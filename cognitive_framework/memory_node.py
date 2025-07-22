@@ -81,6 +81,8 @@ class MemoryNode(Node):
         try:
             # Parse incoming sense data
             sense_data = json.loads(msg.data)
+            if not sense_data['data']['console_text_sensor']['new_input']:
+                return
             
             # Extract relevant information for memory storage
             memory_entry = {

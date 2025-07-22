@@ -50,6 +50,22 @@ ros2 launch cognitive_framework action_node_with_llm.launch.py namespace:=my_age
 - Enhanced decision making with LLM integration
 - Strategic reasoning and goal creation
 
+#### 4. Single LLM Action Example Only
+```bash
+# Launch just the single LLM action example
+ros2 launch cognitive_framework single_llm_action_example.launch.py
+
+# With custom parameters
+ros2 launch cognitive_framework single_llm_action_example.launch.py log_level:=debug
+```
+
+**Features:**
+- Subscribes to `/cognitive/sense_data`
+- Publishes to `/cognitive/action_data`
+- Makes exactly ONE LLM call per text input
+- Clean, simple demonstration of LLM integration
+- Perfect for testing and understanding LLM behavior
+
 ### Complete System Launches
 
 #### 4. Complete System (Original)
@@ -66,6 +82,22 @@ ros2 launch cognitive_framework cognitive_system_with_llm.launch.py
 # With custom parameters
 ros2 launch cognitive_framework cognitive_system_with_llm.launch.py namespace:=my_agent log_level:=debug
 ```
+
+#### 6. Single LLM Action System
+```bash
+# Launch sense, memory, and single LLM action example
+ros2 launch cognitive_framework single_llm_action_system.launch.py
+
+# With custom parameters
+ros2 launch cognitive_framework single_llm_action_system.launch.py log_level:=debug
+```
+
+**Features:**
+- Complete system with simplified LLM integration
+- Sense node for text input
+- Memory node for data storage
+- Single LLM action example for clean, predictable responses
+- Perfect for demonstrations and testing
 
 ## Development Launch Methods
 

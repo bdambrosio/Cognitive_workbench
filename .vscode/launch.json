@@ -9,12 +9,11 @@
             "console": "integratedTerminal",
             "cwd": "${workspaceFolder}",
             "env": {
-                "ROS_LOG_LEVEL": "debug"
+                "ROS_LOG_LEVEL": "info"
             },
             "args": [
                 "--ros-args",
-                "--log-level", "debug",
-                "--ros-args", "-r", "__ns:=cognitive_system"
+                "--log-level", "info"
             ],
             "justMyCode": false,
             "preLaunchTask": "setup-environment"
@@ -27,12 +26,11 @@
             "console": "integratedTerminal",
             "cwd": "${workspaceFolder}",
             "env": {
-                "ROS_LOG_LEVEL": "debug"
+                "ROS_LOG_LEVEL": "info"
             },
             "args": [
                 "--ros-args",
-                "--log-level", "debug",
-                "--ros-args", "-r", "__ns:=cognitive_system"
+                "--log-level", "info"
             ],
             "justMyCode": false,
             "preLaunchTask": "setup-environment"
@@ -45,12 +43,11 @@
             "console": "integratedTerminal",
             "cwd": "${workspaceFolder}",
             "env": {
-                "ROS_LOG_LEVEL": "debug"
+                "ROS_LOG_LEVEL": "info"
             },
             "args": [
                 "--ros-args",
-                "--log-level", "debug",
-                "--ros-args", "-r", "__ns:=cognitive_system"
+                "--log-level", "info"
             ],
             "justMyCode": false,
             "preLaunchTask": "setup-environment"
@@ -63,12 +60,11 @@
             "console": "integratedTerminal",
             "cwd": "${workspaceFolder}",
             "env": {
-                "ROS_LOG_LEVEL": "debug"
+                "ROS_LOG_LEVEL": "info"
             },
             "args": [
                 "--ros-args",
-                "--log-level", "debug",
-                "--ros-args", "-r", "__ns:=cognitive_system"
+                "--log-level", "info"
             ],
             "justMyCode": false,
             "preLaunchTask": "setup-environment"
@@ -81,12 +77,11 @@
             "console": "integratedTerminal",
             "cwd": "${workspaceFolder}",
             "env": {
-                "ROS_LOG_LEVEL": "debug"
+                "ROS_LOG_LEVEL": "info"
             },
             "args": [
                 "--ros-args",
-                "--log-level", "debug",
-                "--ros-args", "-r", "__ns:=cognitive_system"
+                "--log-level", "debug"
             ],
             "justMyCode": false,
             "preLaunchTask": "setup-environment"
@@ -99,12 +94,11 @@
             "console": "integratedTerminal",
             "cwd": "${workspaceFolder}",
             "env": {
-                "ROS_LOG_LEVEL": "debug"
+                "ROS_LOG_LEVEL": "info"
             },
             "args": [
                 "--ros-args",
-                "--log-level", "debug",
-                "--ros-args", "-r", "__ns:=cognitive_system"
+                "--log-level", "info"
             ],
             "justMyCode": false,
             "preLaunchTask": "setup-environment"
@@ -117,11 +111,10 @@
             "console": "integratedTerminal",
             "cwd": "${workspaceFolder}",
             "env": {
-                "ROS_LOG_LEVEL": "debug"
+                "ROS_LOG_LEVEL": "info"
             },
             "args": [
-                "--log-level", "debug",
-                "--namespace", "cognitive_system"
+                "--log-level", "debug"
             ],
             "justMyCode": false,
             "preLaunchTask": "setup-environment"
@@ -134,12 +127,11 @@
             "console": "integratedTerminal",
             "cwd": "${workspaceFolder}",
             "env": {
-                "ROS_LOG_LEVEL": "debug"
+                "ROS_LOG_LEVEL": "info"
             },
             "args": [
                 "--nodes", "sense_node", "memory_node",
-                "--log-level", "debug",
-                "--namespace", "cognitive_system"
+                "--log-level", "info"
             ],
             "justMyCode": false,
             "preLaunchTask": "setup-environment"
@@ -152,12 +144,11 @@
             "console": "integratedTerminal",
             "cwd": "${workspaceFolder}",
             "env": {
-                "ROS_LOG_LEVEL": "debug"
+                "ROS_LOG_LEVEL": "info"
             },
             "args": [
                 "sense_node",
-                "--log-level", "debug",
-                "--namespace", "cognitive_system"
+                        "--log-level", "info"
             ],
             "justMyCode": false,
             "preLaunchTask": "setup-environment"
@@ -170,7 +161,7 @@
             "console": "integratedTerminal",
             "cwd": "${workspaceFolder}",
             "env": {
-                "ROS_LOG_LEVEL": "debug"
+                "ROS_LOG_LEVEL": "info"
             },
             "args": [],
             "justMyCode": false,
@@ -184,9 +175,42 @@
             "console": "integratedTerminal",
             "cwd": "${workspaceFolder}",
             "env": {
-                "ROS_LOG_LEVEL": "debug"
+                "ROS_LOG_LEVEL": "info"
             },
             "args": [],
+            "justMyCode": false,
+            "preLaunchTask": "setup-environment"
+        },
+        {
+            "name": "Debug Single LLM Action Example",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/cognitive_framework/single_llm_action_example.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "ROS_LOG_LEVEL": "info"
+            },
+            "args": [
+                "--ros-args",
+                "--log-level", "info"
+            ],
+            "justMyCode": false,
+            "preLaunchTask": "setup-environment"
+        },
+        {
+            "name": "Debug Single LLM Action System",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/launch/single_llm_action_system.launch.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "ROS_LOG_LEVEL": "info"
+            },
+            "args": [
+                "--log-level", "info"
+            ],
             "justMyCode": false,
             "preLaunchTask": "setup-environment"
         }

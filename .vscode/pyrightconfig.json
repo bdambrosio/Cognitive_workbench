@@ -7,7 +7,9 @@
         "**/__pycache__",
         "build",
         "install",
-        "log"
+        "log",
+        "ros_venv",
+        "/opt/ros/jazzy/",
     ],
     "extraPaths": [
         "./ros_venv/lib/python3.12/site-packages",

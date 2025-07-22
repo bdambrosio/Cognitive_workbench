@@ -63,7 +63,7 @@ def main():
     """Main entry point for simple launch."""
     parser = argparse.ArgumentParser(description='Simple cognitive framework launcher')
     parser.add_argument('--nodes', nargs='+', 
-                       choices=['sense_node', 'memory_node', 'action_node_with_llm'],
+                       choices=['sense_node', 'memory_node', 'action_node_with_llm', 'single_llm_action_example'],
                        default=['sense_node', 'memory_node', 'action_node_with_llm'],
                        help='Nodes to launch (default: all)')
     parser.add_argument('--log-level', default='info',

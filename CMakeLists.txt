@@ -53,6 +53,11 @@ install(PROGRAMS
   DESTINATION lib/${PROJECT_NAME}
   RENAME llm_service_node
 )
+install(PROGRAMS
+  cognitive_framework/single_llm_action_example.py
+  DESTINATION lib/${PROJECT_NAME}
+  RENAME single_llm_action_example
+)
 
 rosidl_generate_interfaces(${PROJECT_NAME}
   "cognitive_framework/srv/MemoryRequest.srv"

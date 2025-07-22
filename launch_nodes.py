@@ -11,6 +11,7 @@ import subprocess
 import argparse
 import signal
 import time
+import os
 from pathlib import Path
 
 
@@ -55,8 +56,9 @@ def run_node(node_name, log_level='info', namespace='cognitive_system'):
         )
         
         # Stream output
-        for line in process.stdout:
-            print(line.rstrip())
+        if process.stdout:
+            for line in process.stdout:
+                print(line.rstrip())
         
         process.wait()
         return process.returncode == 0
@@ -77,7 +79,7 @@ def run_node(node_name, log_level='info', namespace='cognitive_system'):
 def main():
     """Main entry point."""
     parser = argparse.ArgumentParser(description='Launch cognitive framework nodes')
-    parser.add_argument('node', choices=['sense_node', 'memory_node', 'action_node_with_llm'],
+    parser.add_argument('node', choices=['sense_node', 'memory_node', 'action_node_with_llm', 'single_llm_action_example'],
                        help='Node to launch')
     parser.add_argument('--log-level', default='info',
                        choices=['debug', 'info', 'warn', 'error', 'fatal'],
