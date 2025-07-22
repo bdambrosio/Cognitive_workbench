@@ -1,0 +1,36 @@
+{
+    "include": [
+        "cognitive_framework"
+    ],
+    "exclude": [
+        "**/node_modules",
+        "**/__pycache__",
+        "build",
+        "install",
+        "log"
+    ],
+    "extraPaths": [
+        "./ros_venv/lib/python3.12/site-packages",
+        "/opt/ros/jazzy/lib/python3.12/site-packages",
+        "./install/cognitive_framework/lib/python3.12/site-packages",
+        "./install/cognitive_framework/lib/python3.12/site-packages/cognitive_framework"
+    ],
+    "pythonVersion": "3.12",
+    "pythonPlatform": "Linux",
+    "typeCheckingMode": "basic",
+    "useLibraryCodeForTypes": true,
+    "autoImportCompletions": true,
+    "reportMissingImports": "warning",
+    "reportMissingTypeStubs": false,
+    "reportUnusedImport": "warning",
+    "reportUnusedClass": "warning",
+    "reportUnusedFunction": "warning",
+    "reportUnusedVariable": "warning",
+    "reportDuplicateImport": "warning",
+    "reportOptionalSubscript": "warning",
+    "reportOptionalMemberAccess": "warning",
+    "reportOptionalCall": "warning",
+    "reportOptionalIterable": "warning",
+    "reportOptionalContextManager": "warning",
+    "reportOptionalOperand": "warning"
+} 

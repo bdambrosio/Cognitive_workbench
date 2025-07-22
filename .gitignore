@@ -1,0 +1,29 @@
+# ROS2 build artifacts
+build/
+install/
+log/
+
+# Python virtual environment
+ros_venv/
+
+# Python cache files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# IDE files (optional - you might want to keep .vscode/)
+# .vscode/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.swp
+*~
+
+# ROS2 specific
+*.db
+*.db-*

@@ -1,0 +1,194 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug Sense Node",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/cognitive_framework/sense_node.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "ROS_LOG_LEVEL": "debug"
+            },
+            "args": [
+                "--ros-args",
+                "--log-level", "debug",
+                "--ros-args", "-r", "__ns:=cognitive_system"
+            ],
+            "justMyCode": false,
+            "preLaunchTask": "setup-environment"
+        },
+        {
+            "name": "Debug Memory Node",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/cognitive_framework/memory_node.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "ROS_LOG_LEVEL": "debug"
+            },
+            "args": [
+                "--ros-args",
+                "--log-level", "debug",
+                "--ros-args", "-r", "__ns:=cognitive_system"
+            ],
+            "justMyCode": false,
+            "preLaunchTask": "setup-environment"
+        },
+        {
+            "name": "Debug Action Node with LLM",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/cognitive_framework/action_node_with_llm.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "ROS_LOG_LEVEL": "debug"
+            },
+            "args": [
+                "--ros-args",
+                "--log-level", "debug",
+                "--ros-args", "-r", "__ns:=cognitive_system"
+            ],
+            "justMyCode": false,
+            "preLaunchTask": "setup-environment"
+        },
+        {
+            "name": "Debug Action Node (Standard)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/cognitive_framework/action_node.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "ROS_LOG_LEVEL": "debug"
+            },
+            "args": [
+                "--ros-args",
+                "--log-level", "debug",
+                "--ros-args", "-r", "__ns:=cognitive_system"
+            ],
+            "justMyCode": false,
+            "preLaunchTask": "setup-environment"
+        },
+        {
+            "name": "Debug LLM Service Node",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/cognitive_framework/llm_service_node.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "ROS_LOG_LEVEL": "debug"
+            },
+            "args": [
+                "--ros-args",
+                "--log-level", "debug",
+                "--ros-args", "-r", "__ns:=cognitive_system"
+            ],
+            "justMyCode": false,
+            "preLaunchTask": "setup-environment"
+        },
+        {
+            "name": "Debug Action Display Node",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/cognitive_framework/action_display_node.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "ROS_LOG_LEVEL": "debug"
+            },
+            "args": [
+                "--ros-args",
+                "--log-level", "debug",
+                "--ros-args", "-r", "__ns:=cognitive_system"
+            ],
+            "justMyCode": false,
+            "preLaunchTask": "setup-environment"
+        },
+        {
+            "name": "Debug Simple Launch (All Nodes)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/launch/simple_launch.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "ROS_LOG_LEVEL": "debug"
+            },
+            "args": [
+                "--log-level", "debug",
+                "--namespace", "cognitive_system"
+            ],
+            "justMyCode": false,
+            "preLaunchTask": "setup-environment"
+        },
+        {
+            "name": "Debug Simple Launch (Sense + Memory)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/launch/simple_launch.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "ROS_LOG_LEVEL": "debug"
+            },
+            "args": [
+                "--nodes", "sense_node", "memory_node",
+                "--log-level", "debug",
+                "--namespace", "cognitive_system"
+            ],
+            "justMyCode": false,
+            "preLaunchTask": "setup-environment"
+        },
+        {
+            "name": "Debug Individual Node Launcher",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/launch_nodes.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "ROS_LOG_LEVEL": "debug"
+            },
+            "args": [
+                "sense_node",
+                "--log-level", "debug",
+                "--namespace", "cognitive_system"
+            ],
+            "justMyCode": false,
+            "preLaunchTask": "setup-environment"
+        },
+        {
+            "name": "Debug Test Console Input",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/test_console_input.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "ROS_LOG_LEVEL": "debug"
+            },
+            "args": [],
+            "justMyCode": false,
+            "preLaunchTask": "setup-environment"
+        },
+        {
+            "name": "Debug Test Cognitive System",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/test_cognitive_system.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "ROS_LOG_LEVEL": "debug"
+            },
+            "args": [],
+            "justMyCode": false,
+            "preLaunchTask": "setup-environment"
+        }
+    ]
+} 

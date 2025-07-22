@@ -1,0 +1,8 @@
+# Request
+int32 num_entries
+string memory_type  # "short_term", "long_term", "working"
+---
+# Response
+string entries_json  # JSON string of memory entries
+bool success
+string error_message 

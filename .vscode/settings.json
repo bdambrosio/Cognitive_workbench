@@ -1,0 +1,55 @@
+{
+    "python.defaultInterpreterPath": "./ros_venv/bin/python3",
+    "python.terminal.activateEnvironment": true,
+    "python.terminal.activateEnvInCurrentTerminal": true,
+    "python.linting.enabled": true,
+    "python.linting.pylintEnabled": false,
+    "python.linting.flake8Enabled": true,
+    "python.linting.flake8Args": [
+        "--max-line-length=120",
+        "--ignore=E501,W503"
+    ],
+    "python.formatting.provider": "black",
+    "python.formatting.blackArgs": [
+        "--line-length=120"
+    ],
+    "files.associations": {
+        "*.launch.py": "python",
+        "*.srv": "python",
+        "*.msg": "python"
+    },
+    "terminal.integrated.env.linux": {
+        "ROS_DISTRO": "jazzy"
+    },
+    "terminal.integrated.shellArgs.linux": [
+        "-c",
+        "source setup_environment.sh && bash"
+    ],
+    "debug.console.fontSize": 12,
+    "debug.console.lineHeight": 18,
+    "debug.internalConsoleOptions": "openOnSessionStart",
+    "debug.showBreakpointsInOverviewRuler": true,
+    "debug.showInlineBreakpointCandidates": true,
+    "python.analysis.extraPaths": [
+        "./ros_venv/lib/python3.12/site-packages",
+        "/opt/ros/jazzy/lib/python3.12/site-packages",
+        "./install/cognitive_framework/lib/python3.12/site-packages",
+        "./install/cognitive_framework/lib/python3.12/site-packages/cognitive_framework"
+    ],
+    "python.analysis.autoImportCompletions": true,
+    "python.analysis.typeCheckingMode": "basic",
+    "python.analysis.diagnosticMode": "workspace",
+    "python.analysis.include": [
+        "cognitive_framework/**/*.py"
+    ],
+    "python.analysis.ignore": [
+        "**/__pycache__/**",
+        "**/build/**",
+        "**/install/**"
+    ],
+    "python.analysis.stubPath": "./typings",
+    "python.analysis.autoSearchPaths": true,
+    "python.analysis.useLibraryCodeForTypes": true,
+    "python.analysis.completeFunctionParens": true,
+    "python.analysis.importFormat": "absolute"
+} 
