@@ -1,0 +1,41 @@
+2025-07-23 10:36:53 - llm_service_node - INFO - LLM __init__ accepts parameters: {'server_name': 'vllm'}
+2025-07-23 10:36:53 - llm_service_node - INFO - ✅ LLM API initialized with vllm server
+2025-07-23 10:36:53 - llm_service_node - INFO - 🤖 Zenoh LLM Service Node initialized - ready for concurrent requests
+2025-07-23 10:36:53 - llm_service_node - INFO - LLM Service Node running - press Ctrl+C to stop
+2025-07-23 10:38:50 - llm_service_node - INFO - 📥 Received LLM request 6e6ef4eb-e06e-465e-8c0c-6e7a22b5ae95: "You are a helpful AI assistant. 
+            Analy..."
+2025-07-23 10:38:50 - simulation_core - INFO - Prompt: [{'role': 'system', 'content': 'You are a helpful AI assistant. \n            Analyze the input and provide a clear, actionable response.\n            Focus on being helpful and direct.'}, {'role': 'user', 'content': 'Input: hello\n\nPlease provide a helpful response.\n\nend your response with </end>'}]
+
+2025-07-23 10:38:51 - simulation_core - INFO - Response:
+ to indicate you've finished.
+Hello! How can I assist you today? Do you have any specific questions or tasks you need help with? 
+
+2025-07-23 10:38:51 - llm_service_node - INFO - 📤 Completed LLM request 6e6ef4eb-e06e-465e-8c0c-6e7a22b5ae95 in 1.43s
+2025-07-23 10:39:49 - llm_service_node - INFO - 📥 Received LLM request 11b957cc-878e-4303-8c39-9c7a4bcbff87: "You are a helpful AI assistant. 
+            Analy..."
+2025-07-23 10:39:49 - simulation_core - INFO - Prompt: [{'role': 'system', 'content': 'You are a helpful AI assistant. \n            Analyze the input and provide a clear, actionable response.\n            Focus on being helpful and direct.'}, {'role': 'user', 'content': 'Input: Yes, what was my last request?\n\nPlease provide a helpful response.\n\nend your response with </end>'}]
+
+2025-07-23 10:39:51 - simulation_core - INFO - Response:
+ to indicate completion.
+Your previous request is not available in this conversation history. To assist you effectively, please provide the details of your last request or ask a new question. 
+
+2025-07-23 10:39:51 - llm_service_node - INFO - 📤 Completed LLM request 11b957cc-878e-4303-8c39-9c7a4bcbff87 in 1.65s
+2025-07-23 10:41:47 - llm_service_node - INFO - 📥 Received LLM request eedbca13-be0c-4d1f-9805-da43fc80d568: "You are a helpful AI assistant. 
+            Analy..."
+2025-07-23 10:41:47 - simulation_core - INFO - Prompt: [{'role': 'system', 'content': 'You are a helpful AI assistant. \n            Analyze the input and provide a clear, actionable response.\n            Focus on being helpful and direct.'}, {'role': 'user', 'content': 'Input: Are you sure?\n\nPlease provide a helpful response.\n\nend your response with </end>'}]
+
+2025-07-23 10:41:49 - simulation_core - INFO - Response:
+ to indicate completion.
+I'm here to help! Could you please clarify what specific information or confirmation you're looking for? The more details you can give me, the better I can assist you. 
+
+2025-07-23 10:41:49 - llm_service_node - INFO - 📤 Completed LLM request eedbca13-be0c-4d1f-9805-da43fc80d568 in 1.96s
+2025-07-23 10:42:48 - llm_service_node - INFO - 📥 Received LLM request 2a5f5d6e-798d-4f98-9391-f5aaad778cec: "You are a helpful AI assistant. 
+            Analy..."
+2025-07-23 10:42:48 - simulation_core - INFO - Prompt: [{'role': 'system', 'content': 'You are a helpful AI assistant. \n            Analyze the input and provide a clear, actionable response.\n            Focus on being helpful and direct.'}, {'role': 'user', 'content': 'Input: How old are you?\n\nPlease provide a helpful response.\n\nend your response with </end>'}]
+
+2025-07-23 10:42:50 - simulation_core - INFO - Response:
+ to indicate the end of your message
+
+Response: As an artificial intelligence, I don't have age because I'm not a person. I exist to assist you with information and tasks. Is there something specific you need help with? 
+
+2025-07-23 10:42:50 - llm_service_node - INFO - 📤 Completed LLM request 2a5f5d6e-798d-4f98-9391-f5aaad778cec in 2.29s
