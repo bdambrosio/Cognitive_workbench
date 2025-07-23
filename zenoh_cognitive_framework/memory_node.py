@@ -45,19 +45,30 @@ class ZenohMemoryNode:
         config = zenoh.Config()
         self.session = zenoh.open(config)
         self.short_term_memory = []
-        self.working_memory = []
+        self.chat_memory = []
         self.long_term_memory = []
         
         # Subscriber for incoming data to store
         self.data_subscriber = self.session.declare_subscriber(
             "cognitive/sense_data",
-            self.store_data_callback
+            self._sense_data_callback
+        )
+        
+        self.data_subscriber = self.session.declare_subscriber(
+            "cognitive/action",
+            self._action_callback
         )
         
         # Queryable storage for memory retrieval
         self.short_term_storage = self.session.declare_queryable(
             "cognitive/memory/short_term/*",
             self.handle_short_term_query
+        )
+        
+        # Queryable storage for memory retrieval
+        self.short_term_storage = self.session.declare_queryable(
+            "cognitive/memory/chat/*",
+            self.handle_chat_query
         )
         
         # Memory management
@@ -99,7 +110,7 @@ class ZenohMemoryNode:
         finally:
             self.session.close()
     
-    def store_data_callback(self, sample):
+    def _sense_data_callback(self, sample):
         """Handle incoming data to store in memory."""
         try:
             data = json.loads(sample.payload.to_bytes().decode('utf-8'))
@@ -107,7 +118,14 @@ class ZenohMemoryNode:
         except Exception as e:
             logger.error(f'Error storing data: {e}')
     
-    
+    def _action_callback(self, sample):
+        """Handle incoming data to store in memory."""
+        try:
+            data = json.loads(sample.payload.to_bytes().decode('utf-8'))
+            self.chat_memory.append([data['input_text'], data['llm_response']])             
+        except Exception as e:
+            logger.error(f'Error storing data: {e}')
+
     def handle_short_term_query(self, query):
         """Handle queries for short-term memory."""
         try:
@@ -137,6 +155,37 @@ class ZenohMemoryNode:
             
         except Exception as e:
             logger.error(f'Error handling short-term query: {e}')
+            query.reply(query.key_expr, json.dumps({'success': False, 'error': str(e), 'entries': []}).encode('utf-8'))
+    
+    def handle_chat_query(self, query):
+        """Handle queries for short-term memory."""
+        try:
+            # Parse query parameters
+            selector = str(query.selector)  # Convert Selector to string
+            limit = 10  # default limit
+            
+            # Extract limit from query if specified
+            if 'limit=' in selector:
+                try:
+                    limit = int(selector.split('limit=')[1].split('&')[0])
+                except:
+                    pass
+            
+            # Get recent entries
+            entries = self.chat_memory[-limit:]
+            
+            # Send response
+            response = {
+                'success': True,
+                'entries': entries,
+                'count': len(entries)
+            }
+            
+            query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
+            logger.info(f'📚 Chat query: returned {len(entries)} entries')
+            
+        except Exception as e:
+            logger.error(f'Error handling chat query: {e}')
             query.reply(query.key_expr, json.dumps({'success': False, 'error': str(e), 'entries': []}).encode('utf-8'))
     
 

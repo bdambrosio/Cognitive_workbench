@@ -1,12 +1,13 @@
-2025-07-23 10:37:24 - memory_node - INFO - Memory Node initialized
-2025-07-23 10:37:24 - memory_node - INFO - Storage available at:
-2025-07-23 10:37:24 - memory_node - INFO -   - cognitive/memory/short_term/*
-2025-07-23 10:37:24 - memory_node - INFO -   - cognitive/memory/working/*
-2025-07-23 10:37:24 - memory_node - INFO -   - cognitive/memory/long_term/*
-2025-07-23 10:37:24 - memory_node - INFO - Memory Node running - press Ctrl+C to stop
-2025-07-23 10:38:37 - memory_node - INFO - 📚 Short-term query: returned 1 entries
-2025-07-23 10:39:11 - memory_node - INFO - 📚 Short-term query: returned 2 entries
-2025-07-23 10:41:39 - memory_node - INFO - 📚 Short-term query: returned 3 entries
-2025-07-23 10:42:31 - memory_node - INFO - 📚 Short-term query: returned 4 entries
-2025-07-23 10:42:57 - memory_node - INFO - 📚 Short-term query: returned 5 entries
-2025-07-23 10:43:44 - memory_node - INFO - 📚 Short-term query: returned 6 entries
+2025-07-23 13:32:44 - memory_node - INFO - Memory Node initialized
+2025-07-23 13:32:44 - memory_node - INFO - Storage available at:
+2025-07-23 13:32:44 - memory_node - INFO -   - cognitive/memory/short_term/*
+2025-07-23 13:32:44 - memory_node - INFO -   - cognitive/memory/working/*
+2025-07-23 13:32:44 - memory_node - INFO -   - cognitive/memory/long_term/*
+2025-07-23 13:32:44 - memory_node - INFO - Memory Node running - press Ctrl+C to stop
+2025-07-23 13:32:58 - memory_node - INFO - 📚 Chat query: returned 0 entries
+2025-07-23 13:33:26 - memory_node - INFO - 📚 Chat query: returned 1 entries
+2025-07-23 13:35:03 - memory_node - INFO - 📚 Chat query: returned 2 entries
+2025-07-23 14:02:15 - memory_node - INFO - 📚 Chat query: returned 2 entries
+2025-07-23 14:04:05 - memory_node - INFO - 📚 Chat query: returned 2 entries
+2025-07-23 14:05:45 - memory_node - INFO - 📚 Chat query: returned 3 entries
+2025-07-23 14:06:58 - memory_node - INFO - 📚 Chat query: returned 4 entries
