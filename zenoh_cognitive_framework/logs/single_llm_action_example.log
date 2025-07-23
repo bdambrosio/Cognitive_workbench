@@ -1,8 +1,22 @@
-2025-07-23 10:43:34 - single_llm_action_example - INFO - 🧠 Zenoh Single LLM Action Example initialized
-2025-07-23 10:43:34 - single_llm_action_example - INFO -    - Subscribing to: cognitive/sense_data
-2025-07-23 10:43:34 - single_llm_action_example - INFO -    - Publishing to: cognitive/action
-2025-07-23 10:43:34 - single_llm_action_example - INFO -    - Publishing to: cognitive/memory/store
-2025-07-23 10:43:34 - single_llm_action_example - INFO - Single LLM Action Example running - press Ctrl+C to stop
-2025-07-23 10:43:44 - single_llm_action_example - INFO - 📥 Received text input: "hmm"
-2025-07-23 10:43:44 - single_llm_action_example - INFO - 🧠 Making single LLM call for: "hmm"
-2025-07-23 10:43:44 - single_llm_action_example - ERROR - Error getting recent memories: 'builtins.Reply' object has no attribute 'payload'
+2025-07-23 14:03:37 - single_llm_action_example - INFO - 🧠 Zenoh Single LLM Action Example initialized
+2025-07-23 14:03:37 - single_llm_action_example - INFO -    - Subscribing to: cognitive/sense_data
+2025-07-23 14:03:37 - single_llm_action_example - INFO -    - Publishing to: cognitive/action
+2025-07-23 14:03:37 - single_llm_action_example - INFO -    - Publishing to: cognitive/memory/store
+2025-07-23 14:03:37 - single_llm_action_example - INFO - Single LLM Action Example running - press Ctrl+C to stop
+2025-07-23 14:04:05 - single_llm_action_example - INFO - 📥 Received text input: "hi again"
+2025-07-23 14:04:05 - single_llm_action_example - INFO - 🧠 Making single LLM call for: "hi again"
+2025-07-23 14:04:18 - single_llm_action_example - INFO - 📚 Retrieved 1 recent memory entries
+2025-07-23 14:04:52 - single_llm_action_example - INFO - 🤖 LLM Response:  to signify the end of your message. I'm here and ready to help! What do you need assistance with today? 
+2025-07-23 14:04:52 - single_llm_action_example - INFO - 📤 Published action: action_0
+2025-07-23 14:05:45 - single_llm_action_example - INFO - 📥 Received text input: "I'm Bruce, who are you?"
+2025-07-23 14:05:45 - single_llm_action_example - INFO - 🧠 Making single LLM call for: "I'm Bruce, who are you?"
+2025-07-23 14:05:58 - single_llm_action_example - INFO - 📚 Retrieved 1 recent memory entries
+2025-07-23 14:06:39 - single_llm_action_example - INFO - 🤖 LLM Response:  for me to understand it's complete.
+Assistant: Hi Bruce, nice to meet you! I am an AI assistant designed to provide information and help with various tasks. How can I assist you today? 
+2025-07-23 14:06:39 - single_llm_action_example - INFO - 📤 Published action: action_1
+2025-07-23 14:06:58 - single_llm_action_example - INFO - 📥 Received text input: "Do you remember my name?"
+2025-07-23 14:06:58 - single_llm_action_example - INFO - 🧠 Making single LLM call for: "Do you remember my name?"
+2025-07-23 14:06:58 - single_llm_action_example - INFO - 📚 Retrieved 1 recent memory entries
+2025-07-23 14:07:09 - single_llm_action_example - INFO - 🤖 LLM Response:  to signify the end of your message.
+Assistant: Yes, Bruce, I remember your name. How can I assist you further today? 
+2025-07-23 14:07:09 - single_llm_action_example - INFO - 📤 Published action: action_2

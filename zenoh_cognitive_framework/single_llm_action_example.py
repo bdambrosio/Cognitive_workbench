@@ -142,7 +142,7 @@ class ZenohSingleLLMActionExample:
             logger.info(f'🧠 Making single LLM call for: "{text_input}"')
             
             # Get recent memory entries for context
-            recent_memories = self._get_recent_memories(3)
+            recent_memories = self._get_recent_chat_memories(3)
             
             # Simple, focused prompt
             system_prompt = """You are a helpful AI assistant. 
@@ -150,14 +150,13 @@ class ZenohSingleLLMActionExample:
             Focus on being helpful and direct."""
             
             # Build user prompt with context
-            user_prompt = f"Input: {text_input}\n\n"
+            user_prompt = ''
             if recent_memories:
-                user_prompt += "Recent context:\n"
-                for i, memory in enumerate(recent_memories[:2]):  # Use last 2 memories
-                    user_prompt += f"- {memory.get('content', {}).get('text', 'No content')}\n"
-                user_prompt += "\n"
-            
-            user_prompt += "Please provide a helpful response."
+                for i, memory in enumerate(recent_memories):  # Use last 2 memories
+                    user_prompt += f"User: {memory[0]}\n"
+                    user_prompt += f"Assistant: {memory[1]}\n"
+                    
+            user_prompt += f"User: {text_input}\n"
             
             # Make LLM call
             if self.llm_client:
@@ -172,13 +171,14 @@ class ZenohSingleLLMActionExample:
                     
                     # Create action
                     action_data = {
+                        'type': 'action',
                         'action_id': f'action_{self.action_counter}',
                         'timestamp': datetime.now().isoformat(),
                         'action_type': 'cognitive_response',
                         'input_text': text_input,
                         'llm_response': response.text,
-                        'confidence': 0.8
-                    }
+                        'confidence': 0.8,
+                     }
                     
                     # Publish action
                     self.action_publisher.put(json.dumps(action_data))
@@ -196,25 +196,25 @@ class ZenohSingleLLMActionExample:
         except Exception as e:
             logger.error(f'Error in LLM processing: {e}')
     
-    def _get_recent_memories(self, num_entries: int) -> List[Dict[str, Any]]:
+    def _get_recent_chat_memories(self, num_entries: int) -> List[Dict[str, Any]]:
         """Get recent memory entries using Zenoh queries."""
         try:
             # Query short-term memory
             entries = []
-            for reply in self.session.get("cognitive/memory/short_term/*"):
+            for reply in self.session.get("cognitive/memory/chat/*"):
                 try:
-                    content = json.loads(reply.value.payload.to_bytes().decode('utf-8'))
-                    entries.append(content)
+                    if reply.ok:
+                        content = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
+                        entries.append(content)
                 except Exception as e:
                     logger.error(f'Error getting recent memories: {e}')
                     continue
             
-            # Sort by timestamp and limit
-            entries.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
-            entries = entries[:num_entries]
-            
+            m1 = entries[0]
+            m2 = m1['entries']
+
             logger.info(f'📚 Retrieved {len(entries)} recent memory entries')
-            return entries
+            return m2
             
         except Exception as e:
             logger.error(f'Error getting recent memories: {e}')
