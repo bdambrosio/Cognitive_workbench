@@ -2,34 +2,12 @@
     "version": "2.0.0",
     "tasks": [
         {
-            "label": "setup-environment",
+            "label": "setup-zenoh-environment",
             "type": "shell",
-            "command": "source",
-            "args": ["setup_environment.sh"],
-            "group": "build",
-            "presentation": {
-                "echo": true,
-                "reveal": "silent",
-                "focus": false,
-                "panel": "shared",
-                "showReuseMessage": true,
-                "clear": false
-            },
-            "options": {
-                "cwd": "${workspaceFolder}"
-            },
-            "problemMatcher": []
-        },
-        {
-            "label": "build-package",
-            "type": "shell",
-            "command": "colcon",
+            "command": "bash",
             "args": [
-                "build",
-                "--packages-select",
-                "cognitive_framework",
-                "--cmake-args",
-                "-DPYTHON_EXECUTABLE=$(which python3)"
+                "-c",
+                "echo '🔧 Setting up Zenoh environment...' && if [ ! -d 'zenoh_venv' ]; then echo '📦 Creating virtual environment...' && python3 -m venv zenoh_venv && echo '✅ Virtual environment created'; else echo '✅ Virtual environment already exists'; fi && echo '🔧 Activating virtual environment...' && source zenoh_venv/bin/activate && echo '📦 Installing/updating dependencies...' && pip install --upgrade pip && pip install -r zenoh_cognitive_framework/requirements.txt && echo '🧪 Testing Zenoh installation...' && cd zenoh_cognitive_framework && python test_zenoh_installation.py && echo '✅ Zenoh environment ready!'"
             ],
             "group": "build",
             "presentation": {
@@ -40,120 +18,66 @@
                 "showReuseMessage": true,
                 "clear": false
             },
+            "problemMatcher": [],
             "options": {
                 "cwd": "${workspaceFolder}"
-            },
-            "problemMatcher": []
+            }
         },
         {
-            "label": "clean-build",
+            "label": "create-logs-directory",
             "type": "shell",
-            "command": "rm",
-            "args": ["-rf", "build/", "install/", "log/"],
+            "command": "mkdir",
+            "args": [
+                "-p",
+                "zenoh_cognitive_framework/logs"
+            ],
             "group": "build",
             "presentation": {
                 "echo": true,
                 "reveal": "silent",
                 "focus": false,
-                "panel": "shared",
-                "showReuseMessage": true,
-                "clear": false
-            },
-            "options": {
-                "cwd": "${workspaceFolder}"
+                "panel": "shared"
             },
             "problemMatcher": []
         },
         {
-            "label": "rebuild-package",
-            "dependsOrder": "sequence",
-            "dependsOn": ["clean-build", "build-package"],
+            "label": "test-zenoh-only",
+            "type": "shell",
+            "command": "bash",
+            "args": [
+                "-c",
+                "source zenoh_venv/bin/activate && cd zenoh_cognitive_framework && python test_zenoh_installation.py"
+            ],
+            "group": "test",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            },
+            "problemMatcher": [],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            }
+        },
+        {
+            "label": "run-setup-script",
+            "type": "shell",
+            "command": "bash",
+            "args": [
+                "zenoh_cognitive_framework/setup.sh"
+            ],
             "group": "build",
             "presentation": {
                 "echo": true,
                 "reveal": "always",
                 "focus": false,
-                "panel": "shared",
-                "showReuseMessage": true,
-                "clear": false
+                "panel": "shared"
             },
-            "problemMatcher": []
-        },
-        {
-            "label": "test-sense-node",
-            "type": "shell",
-            "command": "ros2",
-            "args": ["launch", "cognitive_framework", "sense_node.launch.py", "--show-args"],
-            "group": "test",
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": false,
-                "panel": "shared",
-                "showReuseMessage": true,
-                "clear": false
-            },
+            "problemMatcher": [],
             "options": {
                 "cwd": "${workspaceFolder}"
-            },
-            "problemMatcher": []
-        },
-        {
-            "label": "test-memory-node",
-            "type": "shell",
-            "command": "ros2",
-            "args": ["launch", "cognitive_framework", "memory_node.launch.py", "--show-args"],
-            "group": "test",
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": false,
-                "panel": "shared",
-                "showReuseMessage": true,
-                "clear": false
-            },
-            "options": {
-                "cwd": "${workspaceFolder}"
-            },
-            "problemMatcher": []
-        },
-        {
-            "label": "test-action-node-with-llm",
-            "type": "shell",
-            "command": "ros2",
-            "args": ["launch", "cognitive_framework", "action_node_with_llm.launch.py", "--show-args"],
-            "group": "test",
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": false,
-                "panel": "shared",
-                "showReuseMessage": true,
-                "clear": false
-            },
-            "options": {
-                "cwd": "${workspaceFolder}"
-            },
-            "problemMatcher": []
-        },
-        {
-            "label": "test-complete-system",
-            "type": "shell",
-            "command": "ros2",
-            "args": ["launch", "cognitive_framework", "cognitive_system_with_llm.launch.py", "--show-args"],
-            "group": "test",
-            "presentation": {
-                "echo": true,
-                "reveal": "always",
-                "focus": false,
-                "panel": "shared",
-                "showReuseMessage": true,
-                "clear": false
-            },
-            "options": {
-                "cwd": "${workspaceFolder}"
-            },
-            "problemMatcher": []
+            }
         }
     ]
 } 

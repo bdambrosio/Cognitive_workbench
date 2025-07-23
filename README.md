@@ -1,235 +1,131 @@
-# Cognitive Framework ROS2 Package
+# Zenoh Cognitive Framework
 
-A basic cognitive architecture implemented using ROS2, featuring three core components:
+A simplified cognitive framework using Zenoh for communication, replacing ROS2 complexity with clean Python applications that can run on separate cores.
 
-- **Sense Node**: Perception and sensory input processing
-- **Memory Node**: Information storage and consolidation  
-- **Action Node**: Decision making and execution
+## 🚀 Quick Start
 
-## Architecture
-
-```
-sense_node → /cognitive/sense_data → memory_node → /cognitive/memory_data → action_node
-     ↓                                                                            ↑
-     └─────────────────────────→ /cognitive/sense_data ────────────────────────┘
-                                                      ↓
-                                              /cognitive/action_data
-```
-
-## Prerequisites
-
-- ROS2 (tested with Humble/Iron)
-- Python 3.8+
-- rclpy
-- std_msgs
-
-## Installation
-
-1. **Navigate to your ROS2 workspace**:
-   ```bash
-   cd ~/ros2_ws/src  # or your workspace location
-   ```
-
-2. **Clone/copy this package**:
-   ```bash
-   # If part of AllTheWorldAPlay, it's already in ros/
-   ln -s /path/to/AllTheWorldAPlay/ros ./cognitive_framework
-   ```
-
-3. **Build the package**:
-   ```bash
-   cd ~/ros2_ws
-   colcon build --packages-select cognitive_framework
-   source install/setup.bash
-   ```
-
-## Usage
-
-### Option 1: Launch All Nodes (Recommended)
+### 1. Setup Environment
 
 ```bash
-# Launch the complete cognitive system
-ros2 launch cognitive_framework cognitive_system.launch.py
-
-# With custom namespace and log level
-ros2 launch cognitive_framework cognitive_system.launch.py namespace:=my_agent log_level:=debug
+# Run the setup script
+./zenoh_cognitive_framework/setup.sh
 ```
 
-### Option 2: Run Individual Nodes
+Or manually:
 
 ```bash
-# Terminal 1: Sense node (with console input)
-ros2 run cognitive_framework sense_node
+# Create virtual environment
+python3 -m venv zenoh_venv
 
-# Terminal 2: Memory node  
-ros2 run cognitive_framework memory_node
+# Activate virtual environment
+source zenoh_venv/bin/activate
 
-# Terminal 3: Action node
-ros2 run cognitive_framework action_node
-
-# Terminal 4: Monitor console input processing (optional)
-python3 ros/test_console_input.py
+# Install dependencies
+pip install -r zenoh_cognitive_framework/requirements.txt
 ```
 
-## Monitoring the System
+### 2. Launch the System
 
-### View Topics
 ```bash
-# List all cognitive topics
-ros2 topic list | grep cognitive
+# Activate virtual environment (if not already active)
+source zenoh_venv/bin/activate
 
-# Monitor sense data (high frequency)
-ros2 topic echo /cognitive/sense_data
-
-# Monitor memory updates
-ros2 topic echo /cognitive/memory_data
-
-# Monitor action commands
-ros2 topic echo /cognitive/action_data
+# Launch all nodes
+python zenoh_cognitive_framework/launch_all_nodes.py
 ```
 
-### Check Node Status
+### 3. Use the System
+
+1. Type text input in the Action Display Node terminal
+2. Watch the cognitive loop process your input
+3. See responses and actions displayed
+
+## 📁 Project Structure
+
+```
+ros_cognitive_framework/
+├── zenoh_cognitive_framework/     # Main framework code
+│   ├── sense_node.py              # Sensory input processing
+│   ├── memory_node.py             # Memory storage and retrieval
+│   ├── llm_service_node.py        # LLM API service
+│   ├── single_llm_action_example.py # Complete cognitive loop
+│   ├── action_display_node.py     # Action display and input
+│   ├── llm_client.py              # LLM client interface
+│   ├── launch_all_nodes.py        # Multi-process launcher
+│   ├── test_zenoh_installation.py # Installation verification
+│   ├── setup.sh                   # Setup script
+│   ├── requirements.txt           # Dependencies
+│   └── README.md                  # Detailed documentation
+├── zenoh_venv/                    # Python virtual environment
+└── README.md                      # This file
+```
+
+## 🎯 Features
+
+- **Multi-core performance**: Each node runs as a separate Python process
+- **Simple communication**: Zenoh pub/sub instead of ROS2 topics/services
+- **Built-in storage**: Zenoh's storage capabilities (when configured)
+- **Easy deployment**: Just Python processes, no complex configuration
+- **Fault tolerance**: Automatic reconnection and recovery
+- **Standard Python**: No ROS2 dependencies or build system
+
+## 🔧 Architecture
+
+The framework consists of these nodes, each running as a separate process:
+
+1. **Memory Node** - Provides persistent storage using Zenoh's built-in storage
+2. **LLM Service Node** - Provides LLM API access via Zenoh pub/sub
+3. **Sense Node** - Simulates sensory input and publishes perception data
+4. **Single LLM Action Example** - Demonstrates complete cognitive loop
+5. **Action Display Node** - Displays incoming actions and provides text input
+
+## 📚 Documentation
+
+For detailed documentation, see [zenoh_cognitive_framework/README.md](zenoh_cognitive_framework/README.md).
+
+## 🔄 Migration from ROS2
+
+This framework replaces the complex ROS2 setup with a simple Zenoh-based solution:
+
+| Feature | ROS2 | Zenoh |
+|---------|------|-------|
+| Communication | Topics/Services | Pub/Sub |
+| Storage | Separate services | Built-in |
+| Configuration | Launch files | Python code |
+| Dependencies | Complex | Simple |
+| Deployment | ROS2 workspace | Python processes |
+
+## 🛠️ Development
+
+### Adding New Nodes
+
+1. Create a new Python file in `zenoh_cognitive_framework/`
+2. Import Zenoh and initialize session with config
+3. Declare publishers/subscribers
+4. Implement your logic
+5. Add to `launch_all_nodes.py` if needed
+
+### Testing
+
 ```bash
-# List running nodes
-ros2 node list
+# Test Zenoh installation
+python zenoh_cognitive_framework/test_zenoh_installation.py
 
-# Get node info
-ros2 node info /sense_node
-ros2 node info /memory_node  
-ros2 node info /action_node
+# Launch individual nodes for testing
+cd zenoh_cognitive_framework
+python memory_node.py
+python llm_service_node.py
+# etc.
 ```
 
-## 🎤 Interactive Console Input
+## 📝 License
 
-The sense node includes a **console text sensor** that reads user input from the terminal:
+This framework is provided as-is for educational and research purposes.
 
-### How to Use:
-1. **Start the cognitive system** (any method above)
-2. **Go to the sense_node terminal** (where you see "Console Text Sensor ready...")
-3. **Type messages and press Enter** - they'll be processed by the cognitive system
-4. **Watch the processing** in real-time through the logs
+## 🤝 Contributing
 
-### Example Session:
-```bash
-# In sense_node terminal:
-Hello cognitive system
-> [INFO] Text input received: "Hello cognitive system"
-> [INFO] Published sense data #45 [Console input: "Hello cognitive system"]
-
-What is 2+2?
-> [INFO] Text input received: "What is 2+2?"
-> [INFO] Published sense data #67 [Console input: "What is 2+2?"]
-```
-
-Console input gets **high importance** (0.8-1.0) in memory processing and triggers cognitive responses!
-
-## Message Flow
-
-1. **Sense Node** publishes hybrid sensor data at 10Hz (simulated + console input):
-   ```json
-   {
-     "timestamp": "2025-01-09T...",
-     "sequence_id": 123,
-     "sensor_type": "hybrid", 
-     "data": {
-       "visual": "visual_input_123",
-       "audio": "audio_input_123",
-       "text": {
-         "simulated": "text_input_123",
-         "console_input": "Hello cognitive system",
-         "last_console_input": "Hello cognitive system"
-       },
-       "console_text_sensor": {
-         "new_input": true,
-         "current_input": "Hello cognitive system",
-         "input_timestamp": "2025-01-09T..."
-       },
-       "environment": {
-         "light_level": 0.65,
-         "noise_level": 0.23
-       }
-     }
-   }
-   ```
-
-2. **Memory Node** processes and stores sensory data, publishes memory updates:
-   ```json
-   {
-     "type": "memory_update",
-     "memory_entry": {...},
-     "working_memory": {...},
-     "memory_stats": {
-       "short_term_count": 45,
-       "long_term_count": 12
-     }
-   }
-   ```
-
-3. **Action Node** receives both streams, makes decisions, publishes actions:
-   ```json
-   {
-     "action_id": 67,
-     "source": "deliberative",
-     "action": {
-       "type": "explorative",
-       "action": "pursue_opportunity",
-       "priority": 0.78
-     }
-   }
-   ```
-
-## Customization
-
-### Modify Sensing
-Edit `cognitive_framework/sense_node.py`:
-- Change sensor simulation in `sense_callback()`
-- Adjust publishing frequency in timer creation
-- Add real sensor interfaces
-
-### Modify Memory Processing  
-Edit `cognitive_framework/memory_node.py`:
-- Adjust memory consolidation logic in `consolidate_memory()`
-- Change importance calculation in `_calculate_importance()`
-- Modify memory structures (STM/LTM/WM)
-
-### Modify Decision Making
-Edit `cognitive_framework/action_node.py`:
-- Update reactive rules in `_check_reactive_actions()`
-- Modify situation assessment in `_assess_situation()`
-- Change action selection logic in `_select_action()`
-
-## Integration with AllTheWorldAPlay
-
-This ROS2 framework is designed to eventually replace or augment the monolithic cognitive system in AllTheWorldAPlay's `agh.py`. Key integration points:
-
-1. **Replace DriveSignalManager** → distributed across memory/action nodes
-2. **Replace MemoryConsolidator** → memory_node  
-3. **Replace decision making** → action_node
-4. **Maintain LLM integration** → add to action_node for reasoning
-5. **Preserve character state** → distribute across all nodes
-
-## Troubleshooting
-
-### Nodes not communicating
-- Check topic names: `ros2 topic list`
-- Verify QoS settings match between publishers/subscribers
-- Ensure all nodes are in same namespace
-
-### High CPU usage
-- Reduce sensing frequency in sense_node timer
-- Increase decision timer interval in action_node
-- Adjust memory consolidation frequency
-
-### No actions being generated
-- Check action_node logs for decision threshold issues
-- Verify both sense and memory data are being received
-- Lower `decision_threshold` in action_node
-
-## Future Extensions
-
-- Custom message types instead of JSON strings
-- Parameter configuration via ROS2 parameters
-- Service interfaces for querying node state
-- Integration with real sensors/actuators
-- LLM integration for reasoning
-- Persistent memory storage 
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Test thoroughly
+5. Submit a pull request 

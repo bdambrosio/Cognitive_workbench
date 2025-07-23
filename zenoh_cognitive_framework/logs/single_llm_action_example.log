@@ -1,0 +1,8 @@
+2025-07-23 10:43:34 - single_llm_action_example - INFO - 🧠 Zenoh Single LLM Action Example initialized
+2025-07-23 10:43:34 - single_llm_action_example - INFO -    - Subscribing to: cognitive/sense_data
+2025-07-23 10:43:34 - single_llm_action_example - INFO -    - Publishing to: cognitive/action
+2025-07-23 10:43:34 - single_llm_action_example - INFO -    - Publishing to: cognitive/memory/store
+2025-07-23 10:43:34 - single_llm_action_example - INFO - Single LLM Action Example running - press Ctrl+C to stop
+2025-07-23 10:43:44 - single_llm_action_example - INFO - 📥 Received text input: "hmm"
+2025-07-23 10:43:44 - single_llm_action_example - INFO - 🧠 Making single LLM call for: "hmm"
+2025-07-23 10:43:44 - single_llm_action_example - ERROR - Error getting recent memories: 'builtins.Reply' object has no attribute 'payload'
