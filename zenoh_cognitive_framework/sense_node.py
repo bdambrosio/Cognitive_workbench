@@ -12,6 +12,7 @@ import time
 import threading
 import queue
 import sys
+import argparse
 from datetime import datetime
 
 
@@ -23,17 +24,21 @@ class ZenohSenseNode:
         cognitive/sense_data: Raw sensory information
     """
     
-    def __init__(self):
+    def __init__(self, character_name="default", character_config=None):
+        # Store character info
+        self.character_name = character_name
+        self.character_config = character_config or {}
+        
         # Initialize Zenoh session
         config = zenoh.Config()
         self.session = zenoh.open(config)
         
-        # Publisher for sense data
-        self.sense_publisher = self.session.declare_publisher("cognitive/sense_data")
+        # Publisher for sense data (character-specific)
+        self.sense_publisher = self.session.declare_publisher(f"cognitive/{character_name}/sense_data")
         
-        # Subscriber for external text input
+        # Subscriber for external text input (character-specific)
         self.text_input_subscriber = self.session.declare_subscriber(
-            "cognitive/text_input",
+            f"cognitive/{character_name}/text_input",
             self.external_text_callback
         )
         
@@ -49,7 +54,7 @@ class ZenohSenseNode:
         self.input_thread = threading.Thread(target=self._console_input_thread, daemon=True)
         self.input_thread.start()
         
-        print('Sense Node initialized - starting perception loop')
+        print(f'Sense Node initialized for character: {character_name}')
         print('Console Text Sensor ready - will auto-disable if external input detected')
     
     def run(self):
@@ -154,7 +159,20 @@ class ZenohSenseNode:
 
 def main():
     """Main entry point for the sense node."""
-    sense_node = ZenohSenseNode()
+    parser = argparse.ArgumentParser(description='Zenoh Sense Node')
+    parser.add_argument('-c', '--character-name', default='default', help='Character name for topic paths')
+    parser.add_argument('-config', default='{}', help='Character configuration as JSON string')
+    
+    args = parser.parse_args()
+    
+    # Parse character config
+    try:
+        character_config = json.loads(args.config)
+    except json.JSONDecodeError as e:
+        print(f"Error parsing character config: {e}")
+        return
+    
+    sense_node = ZenohSenseNode(args.character_name, character_config)
     sense_node.run()
 
 

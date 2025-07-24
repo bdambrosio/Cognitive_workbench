@@ -2,7 +2,7 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Debug Memory Node",
+            "name": "Debug Memory Node (Default)",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/zenoh_cognitive_framework/memory_node.py",
@@ -11,13 +11,28 @@
             "env": {
                 "PYTHONPATH": "${workspaceFolder}/zenoh_cognitive_framework"
             },
-            "args": [],
+            "args": ["-c", "default", "-config", "{}"],
             "justMyCode": false,
             "stopOnEntry": false,
             "preLaunchTask": "setup-zenoh-environment"
         },
         {
-            "name": "Debug LLM Service Node",
+            "name": "Debug Memory Node (Samantha)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/zenoh_cognitive_framework/memory_node.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/zenoh_cognitive_framework",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/zenoh_cognitive_framework"
+            },
+            "args": ["-c", "samantha", "-config", "{\"personality\": \"friendly\"}"],
+            "justMyCode": false,
+            "stopOnEntry": false,
+            "preLaunchTask": "setup-zenoh-environment"
+        },
+        {
+            "name": "Debug LLM Service Node (Shared)",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/zenoh_cognitive_framework/llm_service_node.py",
@@ -32,7 +47,7 @@
             "preLaunchTask": "setup-zenoh-environment"
         },
         {
-            "name": "Debug Sense Node",
+            "name": "Debug Sense Node (Default)",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/zenoh_cognitive_framework/sense_node.py",
@@ -41,13 +56,28 @@
             "env": {
                 "PYTHONPATH": "${workspaceFolder}/zenoh_cognitive_framework"
             },
-            "args": [],
+            "args": ["-c", "default", "-config", "{}"],
             "justMyCode": false,
             "stopOnEntry": false,
             "preLaunchTask": "setup-zenoh-environment"
         },
         {
-            "name": "Debug Single LLM Action Example",
+            "name": "Debug Sense Node (Samantha)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/zenoh_cognitive_framework/sense_node.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/zenoh_cognitive_framework",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/zenoh_cognitive_framework"
+            },
+            "args": ["-c", "samantha", "-config", "{\"personality\": \"friendly\"}"],
+            "justMyCode": false,
+            "stopOnEntry": false,
+            "preLaunchTask": "setup-zenoh-environment"
+        },
+        {
+            "name": "Debug Single LLM Action Example (Default)",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/zenoh_cognitive_framework/single_llm_action_example.py",
@@ -56,13 +86,28 @@
             "env": {
                 "PYTHONPATH": "${workspaceFolder}/zenoh_cognitive_framework"
             },
-            "args": [],
+            "args": ["-c", "default", "-config", "{}"],
             "justMyCode": false,
             "stopOnEntry": false,
             "preLaunchTask": "setup-zenoh-environment"
         },
         {
-            "name": "Debug Action Display Node",
+            "name": "Debug Single LLM Action Example (Samantha)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/zenoh_cognitive_framework/single_llm_action_example.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/zenoh_cognitive_framework",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/zenoh_cognitive_framework"
+            },
+            "args": ["-c", "samantha", "-config", "{\"response_style\": \"friendly\"}"],
+            "justMyCode": false,
+            "stopOnEntry": false,
+            "preLaunchTask": "setup-zenoh-environment"
+        },
+        {
+            "name": "Debug Action Display Node (Multi-Character)",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/zenoh_cognitive_framework/action_display_node.py",
@@ -107,10 +152,10 @@
             "preLaunchTask": "setup-zenoh-environment"
         },
         {
-            "name": "Test Zenoh Installation",
+            "name": "Debug Character Launcher",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/zenoh_cognitive_framework/test_zenoh_installation.py",
+            "program": "${workspaceFolder}/zenoh_cognitive_framework/character_launcher.py",
             "console": "integratedTerminal",
             "cwd": "${workspaceFolder}/zenoh_cognitive_framework",
             "env": {
@@ -122,64 +167,20 @@
             "preLaunchTask": "setup-zenoh-environment"
         },
         {
-            "name": "Debug Memory Node (with breakpoints)",
+            "name": "Debug Character Launcher (with config)",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/zenoh_cognitive_framework/memory_node.py",
+            "program": "${workspaceFolder}/zenoh_cognitive_framework/character_launcher.py",
             "console": "integratedTerminal",
             "cwd": "${workspaceFolder}/zenoh_cognitive_framework",
             "env": {
                 "PYTHONPATH": "${workspaceFolder}/zenoh_cognitive_framework"
             },
-            "args": [],
-            "justMyCode": false,
-            "stopOnEntry": true,
-            "preLaunchTask": "setup-zenoh-environment"
-        },
-        {
-            "name": "Debug LLM Service Node (with breakpoints)",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${workspaceFolder}/zenoh_cognitive_framework/llm_service_node.py",
-            "console": "integratedTerminal",
-            "cwd": "${workspaceFolder}/zenoh_cognitive_framework",
-            "env": {
-                "PYTHONPATH": "${workspaceFolder}/zenoh_cognitive_framework"
-            },
-            "args": [],
-            "justMyCode": false,
-            "stopOnEntry": true,
-            "preLaunchTask": "setup-zenoh-environment"
-        },
-        {
-            "name": "Debug Sense Node (with breakpoints)",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${workspaceFolder}/zenoh_cognitive_framework/sense_node.py",
-            "console": "integratedTerminal",
-            "cwd": "${workspaceFolder}/zenoh_cognitive_framework",
-            "env": {
-                "PYTHONPATH": "${workspaceFolder}/zenoh_cognitive_framework"
-            },
-            "args": [],
-            "justMyCode": false,
-            "stopOnEntry": true,
-            "preLaunchTask": "setup-zenoh-environment"
-        },
-        {
-            "name": "Debug LLM Service Test Driver",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${workspaceFolder}/zenoh_cognitive_framework/test_llm_service.py",
-            "console": "integratedTerminal",
-            "cwd": "${workspaceFolder}/zenoh_cognitive_framework",
-            "env": {
-                "PYTHONPATH": "${workspaceFolder}/zenoh_cognitive_framework"
-            },
-            "args": [],
+            "args": ["--config-file", "characters.yaml"],
             "justMyCode": false,
             "stopOnEntry": false,
             "preLaunchTask": "setup-zenoh-environment"
         }
+
     ]
 } 

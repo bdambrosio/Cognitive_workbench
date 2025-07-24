@@ -18,6 +18,7 @@ import threading
 import logging
 import sys
 import signal
+import argparse
 from datetime import datetime
 from typing import Dict, List, Any
 
@@ -55,22 +56,26 @@ class ZenohSingleLLMActionExample:
     - Stores results in memory
     """
     
-    def __init__(self):
+    def __init__(self, character_name="default", character_config=None):
+        # Store character info
+        self.character_name = character_name
+        self.character_config = character_config or {}
+        
         # Initialize Zenoh session
         config = zenoh.Config()
         self.session = zenoh.open(config)
         
-        # Subscriber for sense data
+        # Subscriber for sense data (character-specific)
         self.sense_subscriber = self.session.declare_subscriber(
-            "cognitive/sense_data",
+            f"cognitive/{character_name}/sense_data",
             self.sense_data_callback
         )
         
-        # Publisher for actions
-        self.action_publisher = self.session.declare_publisher("cognitive/action")
+        # Publisher for actions (character-specific)
+        self.action_publisher = self.session.declare_publisher(f"cognitive/{character_name}/action")
         
-        # Publisher for memory storage
-        self.memory_publisher = self.session.declare_publisher("cognitive/memory/store")
+        # Publisher for memory storage (character-specific)
+        self.memory_publisher = self.session.declare_publisher(f"cognitive/{character_name}/memory/store")
         
         # LLM client
         self.llm_client = None
@@ -88,10 +93,10 @@ class ZenohSingleLLMActionExample:
         signal.signal(signal.SIGTERM, self._signal_handler)
         signal.signal(signal.SIGINT, self._signal_handler)
         
-        logger.info('🧠 Zenoh Single LLM Action Example initialized')
-        logger.info('   - Subscribing to: cognitive/sense_data')
-        logger.info('   - Publishing to: cognitive/action')
-        logger.info('   - Publishing to: cognitive/memory/store')
+        logger.info(f'🧠 Zenoh Single LLM Action Example initialized for character: {character_name}')
+        logger.info(f'   - Subscribing to: cognitive/{character_name}/sense_data')
+        logger.info(f'   - Publishing to: cognitive/{character_name}/action')
+        logger.info(f'   - Publishing to: cognitive/{character_name}/memory/store')
     
     def _signal_handler(self, signum, frame):
         """Handle shutdown signals gracefully."""
@@ -102,12 +107,37 @@ class ZenohSingleLLMActionExample:
         """Main node loop."""
         try:
             logger.info('Single LLM Action Example running - press Ctrl+C to stop')
+            
+            # Announce character presence
+            self._announce_character()
+            
             while not self.shutdown_requested:
                 time.sleep(1)
         except KeyboardInterrupt:
             logger.info('Single LLM Action Example shutting down...')
         finally:
             self.shutdown()
+    
+    def _announce_character(self):
+        """Announce character presence to the action display node."""
+        try:
+            # Create announcement action
+            announcement_data = {
+                'type': 'announcement',
+                'action_id': f'announcement_{self.character_name}',
+                'timestamp': datetime.now().isoformat(),
+                'action_type': 'character_announcement',
+                'character_name': self.character_name,
+                'character_config': self.character_config,
+                'message': f'Character {self.character_name} is ready for interaction'
+            }
+            
+            # Publish announcement
+            self.action_publisher.put(json.dumps(announcement_data))
+            logger.info(f'📢 Announced character presence: {self.character_name}')
+            
+        except Exception as e:
+            logger.error(f'Error announcing character: {e}')
     
     def sense_data_callback(self, sample):
         """Handle incoming sense data."""
@@ -148,6 +178,10 @@ class ZenohSingleLLMActionExample:
             system_prompt = """You are a helpful AI assistant. 
             Analyze the input and provide a clear, actionable response.
             Focus on being helpful and direct."""
+            if self.character_config.get('character', None):
+                system_prompt = self.character_config['character']
+            if self.character_config.get('drives', None):
+                system_prompt += f"\n\nYour drives are: {self.character_config['drives']}"
             
             # Build user prompt with context
             user_prompt = ''
@@ -201,7 +235,7 @@ class ZenohSingleLLMActionExample:
         try:
             # Query short-term memory
             entries = []
-            for reply in self.session.get("cognitive/memory/chat/*"):
+            for reply in self.session.get(f"cognitive/{self.character_name}/memory/chat/*"):
                 try:
                     if reply.ok:
                         content = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
@@ -258,7 +292,20 @@ class ZenohSingleLLMActionExample:
 
 def main():
     """Main entry point for the single LLM action example."""
-    single_llm_action_example = ZenohSingleLLMActionExample()
+    parser = argparse.ArgumentParser(description='Zenoh Single LLM Action Example')
+    parser.add_argument('-c', '--character-name', default='default', help='Character name for topic paths')
+    parser.add_argument('-config', default='{}', help='Character configuration as JSON string')
+    
+    args = parser.parse_args()
+    
+    # Parse character config
+    try:
+        character_config = json.loads(args.config)
+    except json.JSONDecodeError as e:
+        print(f"Error parsing character config: {e}")
+        return
+    
+    single_llm_action_example = ZenohSingleLLMActionExample(args.character_name, character_config)
     try:
         single_llm_action_example.run()
     finally:
