@@ -1,22 +1,12 @@
-2025-07-23 14:03:37 - single_llm_action_example - INFO - 🧠 Zenoh Single LLM Action Example initialized
-2025-07-23 14:03:37 - single_llm_action_example - INFO -    - Subscribing to: cognitive/sense_data
-2025-07-23 14:03:37 - single_llm_action_example - INFO -    - Publishing to: cognitive/action
-2025-07-23 14:03:37 - single_llm_action_example - INFO -    - Publishing to: cognitive/memory/store
-2025-07-23 14:03:37 - single_llm_action_example - INFO - Single LLM Action Example running - press Ctrl+C to stop
-2025-07-23 14:04:05 - single_llm_action_example - INFO - 📥 Received text input: "hi again"
-2025-07-23 14:04:05 - single_llm_action_example - INFO - 🧠 Making single LLM call for: "hi again"
-2025-07-23 14:04:18 - single_llm_action_example - INFO - 📚 Retrieved 1 recent memory entries
-2025-07-23 14:04:52 - single_llm_action_example - INFO - 🤖 LLM Response:  to signify the end of your message. I'm here and ready to help! What do you need assistance with today? 
-2025-07-23 14:04:52 - single_llm_action_example - INFO - 📤 Published action: action_0
-2025-07-23 14:05:45 - single_llm_action_example - INFO - 📥 Received text input: "I'm Bruce, who are you?"
-2025-07-23 14:05:45 - single_llm_action_example - INFO - 🧠 Making single LLM call for: "I'm Bruce, who are you?"
-2025-07-23 14:05:58 - single_llm_action_example - INFO - 📚 Retrieved 1 recent memory entries
-2025-07-23 14:06:39 - single_llm_action_example - INFO - 🤖 LLM Response:  for me to understand it's complete.
-Assistant: Hi Bruce, nice to meet you! I am an AI assistant designed to provide information and help with various tasks. How can I assist you today? 
-2025-07-23 14:06:39 - single_llm_action_example - INFO - 📤 Published action: action_1
-2025-07-23 14:06:58 - single_llm_action_example - INFO - 📥 Received text input: "Do you remember my name?"
-2025-07-23 14:06:58 - single_llm_action_example - INFO - 🧠 Making single LLM call for: "Do you remember my name?"
-2025-07-23 14:06:58 - single_llm_action_example - INFO - 📚 Retrieved 1 recent memory entries
-2025-07-23 14:07:09 - single_llm_action_example - INFO - 🤖 LLM Response:  to signify the end of your message.
-Assistant: Yes, Bruce, I remember your name. How can I assist you further today? 
-2025-07-23 14:07:09 - single_llm_action_example - INFO - 📤 Published action: action_2
+2025-07-23 20:00:17 - single_llm_action_example - INFO - 🧠 Zenoh Single LLM Action Example initialized for character: Joe
+2025-07-23 20:00:17 - single_llm_action_example - INFO -    - Subscribing to: cognitive/Joe/sense_data
+2025-07-23 20:00:17 - single_llm_action_example - INFO -    - Publishing to: cognitive/Joe/action
+2025-07-23 20:00:17 - single_llm_action_example - INFO -    - Publishing to: cognitive/Joe/memory/store
+2025-07-23 20:00:17 - single_llm_action_example - INFO - Single LLM Action Example running - press Ctrl+C to stop
+2025-07-23 20:00:17 - single_llm_action_example - INFO - 📢 Announced character presence: Joe
+2025-07-23 20:01:43 - single_llm_action_example - INFO - 📥 Received text input: "Hi. Have you met Samantha?"
+2025-07-23 20:01:43 - single_llm_action_example - INFO - 🧠 Making single LLM call for: "Hi. Have you met Samantha?"
+2025-07-23 20:01:43 - single_llm_action_example - INFO - 📚 Retrieved 1 recent memory entries
+2025-07-23 20:01:47 - single_llm_action_example - INFO - 🤖 LLM Response:  
+Do you want to know if I've met Samantha? That's an interesting question. I haven't really had much time to meet new people since I got stuck in this forest. I've been pretty focused on figuring out how I ended up here and trying to find my way out. But, hey, if she's someone who can help me navigate this place, I'd be all ears. Maybe she could even teach me some survival skills or share some stories about the area. 
+2025-07-23 20:01:47 - single_llm_action_example - INFO - 📤 Published action: action_0

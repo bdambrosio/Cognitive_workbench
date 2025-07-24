@@ -12,6 +12,7 @@ import time
 import logging
 import sys
 import signal
+import argparse
 from datetime import datetime
 from typing import Dict, List, Any
 
@@ -40,7 +41,11 @@ class ZenohMemoryNode:
     - Automatic cleanup and management
     """
     
-    def __init__(self):
+    def __init__(self, character_name="default", character_config=None):
+        # Store character info
+        self.character_name = character_name
+        self.character_config = character_config or {}
+        
         # Initialize Zenoh session
         config = zenoh.Config()
         self.session = zenoh.open(config)
@@ -48,26 +53,26 @@ class ZenohMemoryNode:
         self.chat_memory = []
         self.long_term_memory = []
         
-        # Subscriber for incoming data to store
+        # Subscriber for incoming data to store (character-specific)
         self.data_subscriber = self.session.declare_subscriber(
-            "cognitive/sense_data",
+            f"cognitive/{character_name}/sense_data",
             self._sense_data_callback
         )
         
-        self.data_subscriber = self.session.declare_subscriber(
-            "cognitive/action",
+        self.action_subscriber = self.session.declare_subscriber(
+            f"cognitive/{character_name}/action",
             self._action_callback
         )
         
-        # Queryable storage for memory retrieval
+        # Queryable storage for memory retrieval (character-specific)
         self.short_term_storage = self.session.declare_queryable(
-            "cognitive/memory/short_term/*",
+            f"cognitive/{character_name}/memory/short_term/*",
             self.handle_short_term_query
         )
         
-        # Queryable storage for memory retrieval
-        self.short_term_storage = self.session.declare_queryable(
-            "cognitive/memory/chat/*",
+        # Queryable storage for memory retrieval (character-specific)
+        self.chat_storage = self.session.declare_queryable(
+            f"cognitive/{character_name}/memory/chat/*",
             self.handle_chat_query
         )
         
@@ -88,11 +93,11 @@ class ZenohMemoryNode:
         signal.signal(signal.SIGTERM, self._signal_handler)
         signal.signal(signal.SIGINT, self._signal_handler)
         
-        logger.info('Memory Node initialized')
+        logger.info(f'Memory Node initialized for character: {character_name}')
         logger.info('Storage available at:')
-        logger.info('  - cognitive/memory/short_term/*')
-        logger.info('  - cognitive/memory/working/*')
-        logger.info('  - cognitive/memory/long_term/*')
+        logger.info(f'  - cognitive/{character_name}/memory/short_term/*')
+        logger.info(f'  - cognitive/{character_name}/memory/chat/*')
+        logger.info(f'  - cognitive/{character_name}/memory/long_term/*')
     
     def _signal_handler(self, signum, frame):
         """Handle shutdown signals gracefully."""
@@ -201,7 +206,20 @@ class ZenohMemoryNode:
 
 def main():
     """Main entry point for the memory node."""
-    memory_node = ZenohMemoryNode()
+    parser = argparse.ArgumentParser(description='Zenoh Memory Node')
+    parser.add_argument('-c', '--character-name', default='default', help='Character name for topic paths')
+    parser.add_argument('-config', default='{}', help='Character configuration as JSON string')
+    
+    args = parser.parse_args()
+    
+    # Parse character config
+    try:
+        character_config = json.loads(args.config)
+    except json.JSONDecodeError as e:
+        print(f"Error parsing character config: {e}")
+        return
+    
+    memory_node = ZenohMemoryNode(args.character_name, character_config)
     try:
         memory_node.run()
     finally:
