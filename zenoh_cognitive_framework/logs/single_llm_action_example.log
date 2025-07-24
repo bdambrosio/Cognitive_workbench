@@ -1,12 +1,6 @@
-2025-07-23 20:00:17 - single_llm_action_example - INFO - 🧠 Zenoh Single LLM Action Example initialized for character: Joe
-2025-07-23 20:00:17 - single_llm_action_example - INFO -    - Subscribing to: cognitive/Joe/sense_data
-2025-07-23 20:00:17 - single_llm_action_example - INFO -    - Publishing to: cognitive/Joe/action
-2025-07-23 20:00:17 - single_llm_action_example - INFO -    - Publishing to: cognitive/Joe/memory/store
-2025-07-23 20:00:17 - single_llm_action_example - INFO - Single LLM Action Example running - press Ctrl+C to stop
-2025-07-23 20:00:17 - single_llm_action_example - INFO - 📢 Announced character presence: Joe
-2025-07-23 20:01:43 - single_llm_action_example - INFO - 📥 Received text input: "Hi. Have you met Samantha?"
-2025-07-23 20:01:43 - single_llm_action_example - INFO - 🧠 Making single LLM call for: "Hi. Have you met Samantha?"
-2025-07-23 20:01:43 - single_llm_action_example - INFO - 📚 Retrieved 1 recent memory entries
-2025-07-23 20:01:47 - single_llm_action_example - INFO - 🤖 LLM Response:  
-Do you want to know if I've met Samantha? That's an interesting question. I haven't really had much time to meet new people since I got stuck in this forest. I've been pretty focused on figuring out how I ended up here and trying to find my way out. But, hey, if she's someone who can help me navigate this place, I'd be all ears. Maybe she could even teach me some survival skills or share some stories about the area. 
-2025-07-23 20:01:47 - single_llm_action_example - INFO - 📤 Published action: action_0
+2025-07-24 09:16:21 - single_llm_action_example - INFO - 🧠 Zenoh Single LLM Action Example initialized for character: Joe
+2025-07-24 09:16:21 - single_llm_action_example - INFO -    - Subscribing to: cognitive/Joe/sense_data
+2025-07-24 09:16:21 - single_llm_action_example - INFO -    - Publishing to: cognitive/Joe/action
+2025-07-24 09:16:21 - single_llm_action_example - INFO -    - Publishing to: cognitive/Joe/memory/store
+2025-07-24 09:16:21 - single_llm_action_example - INFO - Single LLM Action Example running - press Ctrl+C to stop
+2025-07-24 09:16:21 - single_llm_action_example - INFO - 📢 Announced character presence: Joe
