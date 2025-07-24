@@ -180,6 +180,36 @@
             "justMyCode": false,
             "stopOnEntry": false,
             "preLaunchTask": "setup-zenoh-environment"
+        },
+        {
+            "name": "Debug Map Node (Forest)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/zenoh_cognitive_framework/map_node.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/zenoh_cognitive_framework",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/zenoh_cognitive_framework"
+            },
+            "args": ["-m", "forest.py"],
+            "justMyCode": false,
+            "stopOnEntry": false,
+            "preLaunchTask": "setup-zenoh-environment"
+        },
+        {
+            "name": "Debug Character Launcher (with map)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/zenoh_cognitive_framework/character_launcher.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/zenoh_cognitive_framework",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/zenoh_cognitive_framework"
+            },
+            "args": ["--config-file", "characters.yaml", "--map-file", "forest.py"],
+            "justMyCode": false,
+            "stopOnEntry": false,
+            "preLaunchTask": "setup-zenoh-environment"
         }
 
     ]

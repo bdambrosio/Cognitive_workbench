@@ -42,6 +42,12 @@ class ZenohSenseNode:
             self.external_text_callback
         )
         
+        # Subscriber for visual events (character-specific)
+        self.visual_event_subscriber = self.session.declare_subscriber(
+            f"cognitive/{character_name}/sense/visual/*",
+            self.visual_event_callback
+        )
+        
         # Internal state
         self.sequence_id = 0
         
@@ -155,6 +161,21 @@ class ZenohSenseNode:
                 print(f'📨 Received external text input: "{text_input}"')
         except Exception as e:
             print(f'Error processing external text input: {e}')
+    
+    def visual_event_callback(self, sample):
+        """Handle visual events from the map node"""
+        try:
+            # Parse the visual event data
+            visual_data = json.loads(sample.payload.to_bytes().decode('utf-8'))
+            event_type = str(sample.key_expr).split('/')[-1]
+            
+            print(f'👁️ Visual event received: {event_type} - {visual_data}')
+            
+            # TODO: Integrate visual event into sensory processing
+            # This is where you'll handle the visual event integration
+            
+        except Exception as e:
+            print(f'Error processing visual event: {e}')
 
 
 def main():

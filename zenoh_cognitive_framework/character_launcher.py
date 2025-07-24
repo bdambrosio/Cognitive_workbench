@@ -62,8 +62,8 @@ class CharacterLauncher:
         self.characters.append(character)
         self.logger.info(f'Added character: {name}')
     
-    def launch_shared_services(self):
-        """Launch shared services (LLM service node)."""
+    def launch_shared_services(self, map_file: str = None):
+        """Launch shared services (LLM service node and map node)."""
         self.logger.info('Launching shared services...')
         
         # Launch LLM service node (shared across all characters)
@@ -75,6 +75,17 @@ class CharacterLauncher:
             self.logger.info('✅ LLM Service Node launched')
         except Exception as e:
             self.logger.error(f'❌ Failed to launch LLM Service Node: {e}')
+        
+        # Launch map node if map file is specified
+        if map_file:
+            try:
+                map_process = subprocess.Popen([
+                    sys.executable, 'map_node.py', '-m', map_file
+                ])
+                self.shared_processes.append(map_process)
+                self.logger.info(f'✅ Map Node launched with map: {map_file}')
+            except Exception as e:
+                self.logger.error(f'❌ Failed to launch Map Node: {e}')
     
     def launch_character(self, character: CharacterInstance):
         """Launch all nodes for a specific character."""
@@ -116,12 +127,12 @@ class CharacterLauncher:
         except Exception as e:
             self.logger.error(f'❌ Failed to launch {character.name} single_llm_action_example: {e}')
     
-    def launch_all_characters(self):
+    def launch_all_characters(self, map_file: str = None):
         """Launch all character instances."""
         self.logger.info(f'Launching {len(self.characters)} characters...')
         
         # Launch shared services first
-        self.launch_shared_services()
+        self.launch_shared_services(map_file)
         time.sleep(2)  # Give shared services time to start
         
         # Launch each character
@@ -188,6 +199,7 @@ def main():
     parser.add_argument('--config-file', help='YAML or JSON file with character configurations')
     parser.add_argument('--characters', nargs='+', help='Character names to launch')
     parser.add_argument('--list-only', action='store_true', help='List available characters and exit')
+    parser.add_argument('--map-file', help='Map file name (e.g., forest.py) to load in the shared map node')
     
     args = parser.parse_args()
     
@@ -241,7 +253,7 @@ def main():
     
     try:
         # Launch all characters
-        launcher.launch_all_characters()
+        launcher.launch_all_characters(args.map_file)
         
         # Monitor processes
         launcher.monitor_processes()
