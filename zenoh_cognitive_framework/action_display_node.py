@@ -33,6 +33,7 @@ class ZenohActionDisplayNode:
         # Track active characters
         self.active_characters: Set[str] = set()
         self.character_publishers: Dict[str, Any] = {}
+        self.last_character_name: str = None
         
         # Subscriber for all character actions
         self.action_subscriber = self.session.declare_subscriber(
@@ -58,7 +59,7 @@ class ZenohActionDisplayNode:
         print('   - Publishing to: cognitive/{character}/text_input (dynamic)')
         print('   - Publishing to: cognitive/memory/store')
         print('   - Console input ready')
-        print('   - Format: "character: message" (e.g., "samantha: hello")')
+        print('   - Format: "character: message" or just "message" (uses last character)')
     
     def run(self):
         """Main display loop."""
@@ -143,11 +144,8 @@ class ZenohActionDisplayNode:
             # Display LLM response if available
             llm_response = action_data.get('llm_response', '')
             if llm_response:
-                # Truncate long responses
-                if len(llm_response) > 200:
-                    display_response = llm_response[:200] + "..."
-                else:
-                    display_response = llm_response
+               
+                display_response = llm_response
                 print(f'   Response: {display_response}')
             
             # Display confidence if available
@@ -174,9 +172,17 @@ class ZenohActionDisplayNode:
             # Parse character name and message
             character_name, message = self._parse_character_input(text_input)
             
-            if not character_name or not message:
-                print(f'❌ Invalid format. Use: "character: message" (e.g., "samantha: hello")')
+            if not message:
+                print(f'❌ Invalid format. Use: "character: message" or just "message" (if last character exists)')
                 return
+            
+            # If no character name provided, use the last character
+            if not character_name:
+                if not self.last_character_name:
+                    print(f'❌ No character specified and no previous character. Use: "character: message" (e.g., "samantha: hello")')
+                    return
+                character_name = self.last_character_name
+                print(f'💡 Using last character: {character_name}')
             
             # Find the actual character name (case-insensitive matching)
             actual_character_name = None
@@ -188,6 +194,9 @@ class ZenohActionDisplayNode:
             if not actual_character_name:
                 print(f'❌ Character "{character_name}" not found. Available: {", ".join(sorted(self.active_characters))}')
                 return
+            
+            # Store this as the last character used
+            self.last_character_name = actual_character_name
             
             # Get or create publisher for this character
             if actual_character_name not in self.character_publishers:
@@ -211,12 +220,19 @@ class ZenohActionDisplayNode:
     
     def _parse_character_input(self, text_input: str) -> tuple[str, str]:
         """Parse character name and message from input text."""
+        text_input = text_input.strip()
+        
         # Match pattern: "character: message" or "character : message"
-        match = re.match(r'^([^:]+):\s*(.+)$', text_input.strip())
+        match = re.match(r'^([^:]+):\s*(.+)$', text_input)
         if match:
             character_name = match.group(1).strip()
             message = match.group(2).strip()
             return character_name, message
+        
+        # If no colon found, treat as message only (no character specified)
+        if text_input:
+            return "", text_input
+        
         return "", ""
     
     def _console_input_thread(self):
