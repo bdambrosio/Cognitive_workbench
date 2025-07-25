@@ -1,5 +1,5 @@
 # Character configurations for Zenoh Cognitive Framework
-# Each character gets their own sense_node, memory_node, and single_llm_action_example
+# Each character gets their own sense_node, memory_node, and action_node
 # The LLM service node is shared across all characters
 
 Samantha:

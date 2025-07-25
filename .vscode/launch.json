@@ -77,10 +77,10 @@
             "preLaunchTask": "setup-zenoh-environment"
         },
         {
-            "name": "Debug Single LLM Action Example (Default)",
+            "name": "Debug Action Node (Default)",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/zenoh_cognitive_framework/single_llm_action_example.py",
+            "program": "${workspaceFolder}/zenoh_cognitive_framework/action_node.py",
             "console": "integratedTerminal",
             "cwd": "${workspaceFolder}/zenoh_cognitive_framework",
             "env": {
@@ -92,10 +92,10 @@
             "preLaunchTask": "setup-zenoh-environment"
         },
         {
-            "name": "Debug Single LLM Action Example (Samantha)",
+            "name": "Debug Action Node (Samantha)",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/zenoh_cognitive_framework/single_llm_action_example.py",
+            "program": "${workspaceFolder}/zenoh_cognitive_framework/action_node.py",
             "console": "integratedTerminal",
             "cwd": "${workspaceFolder}/zenoh_cognitive_framework",
             "env": {

@@ -44,7 +44,7 @@ The framework consists of these nodes, each running as a separate process:
    - Handles console text input
    - Publishes structured sense data
 
-4. **Single LLM Action Example** (`single_llm_action_example.py`)
+4. **Action Node** (`action_node.py`)
    - Demonstrates complete cognitive loop
    - Receives sense data → makes LLM call → publishes action → stores in memory
    - Uses memory context for better responses
@@ -95,7 +95,7 @@ python llm_service_node.py
 python sense_node.py
 
 # Terminal 4: Single LLM Action Example
-python single_llm_action_example.py
+python action_node.py
 
 # Terminal 5: Action Display Node
 python action_display_node.py

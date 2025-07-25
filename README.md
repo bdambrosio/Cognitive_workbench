@@ -48,7 +48,7 @@ ros_cognitive_framework/
 │   ├── sense_node.py              # Sensory input processing
 │   ├── memory_node.py             # Memory storage and retrieval
 │   ├── llm_service_node.py        # LLM API service
-│   ├── single_llm_action_example.py # Complete cognitive loop
+│   ├── action_node.py # Complete cognitive loop
 │   ├── action_display_node.py     # Action display and input
 │   ├── llm_client.py              # LLM client interface
 │   ├── launch_all_nodes.py        # Multi-process launcher

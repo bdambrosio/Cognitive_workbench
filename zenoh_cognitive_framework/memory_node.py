@@ -15,6 +15,7 @@ import signal
 import argparse
 from datetime import datetime
 from typing import Dict, List, Any
+from entity_model import EntityModel
 
 # Configure logging with unbuffered output
 logging.basicConfig(
@@ -53,6 +54,9 @@ class ZenohMemoryNode:
         self.chat_memory = []
         self.long_term_memory = []
         
+        # Entity registry for tracking character interactions
+        self.entity_models: Dict[str, EntityModel] = {}
+        
         # Subscriber for incoming data to store (character-specific)
         self.data_subscriber = self.session.declare_subscriber(
             f"cognitive/{character_name}/sense_data",
@@ -62,6 +66,12 @@ class ZenohMemoryNode:
         self.action_subscriber = self.session.declare_subscriber(
             f"cognitive/{character_name}/action",
             self._action_callback
+        )
+        
+        # Subscriber for visual events (character-specific)
+        self.visual_event_subscriber = self.session.declare_subscriber(
+            f"cognitive/{character_name}/sense/visual/*",
+            self._visual_event_callback
         )
         
         # Queryable storage for memory retrieval (character-specific)
@@ -74,6 +84,12 @@ class ZenohMemoryNode:
         self.chat_storage = self.session.declare_queryable(
             f"cognitive/{character_name}/memory/chat/*",
             self.handle_chat_query
+        )
+        
+        # Queryable for entity data (character-specific)
+        self.entity_storage = self.session.declare_queryable(
+            f"cognitive/{character_name}/memory/entity/*",
+            self.handle_entity_query
         )
         
         # Memory management
@@ -98,6 +114,7 @@ class ZenohMemoryNode:
         logger.info(f'  - cognitive/{character_name}/memory/short_term/*')
         logger.info(f'  - cognitive/{character_name}/memory/chat/*')
         logger.info(f'  - cognitive/{character_name}/memory/long_term/*')
+        logger.info(f'  - cognitive/{character_name}/memory/entity/*')
     
     def _signal_handler(self, signum, frame):
         """Handle shutdown signals gracefully."""
@@ -119,7 +136,23 @@ class ZenohMemoryNode:
         """Handle incoming data to store in memory."""
         try:
             data = json.loads(sample.payload.to_bytes().decode('utf-8'))
-            self.short_term_memory.append(data)                
+            self.short_term_memory.append(data)
+            
+            # Track conversation entries for entity models
+            if data.get('mode') == 'text' and 'content' in data:
+                # Parse the content which should be JSON with source and text
+                try:
+                    content_data = json.loads(data['content'])
+                    source = content_data.get('source', 'unknown')
+                    text = content_data.get('text', '')
+                    
+                    if source and text:
+                        # Add conversation entry for the source entity
+                        self.add_conversation_entry(source, 'received', text, source)
+                except (json.JSONDecodeError, KeyError):
+                    # Fallback for old format or non-JSON content
+                    pass
+                    
         except Exception as e:
             logger.error(f'Error storing data: {e}')
     
@@ -127,9 +160,50 @@ class ZenohMemoryNode:
         """Handle incoming data to store in memory."""
         try:
             data = json.loads(sample.payload.to_bytes().decode('utf-8'))
-            self.chat_memory.append([data['input_text'], data['llm_response']])             
+            
+            # Handle different action types
+            action_type = data.get('action_type', 'unknown')
+            
+            if action_type == 'character_announcement':
+                # Store announcement in short-term memory
+                self.short_term_memory.append(data)
+                logger.info(f'📢 Stored character announcement: {data.get("character_name", "unknown")}')
+            elif action_type == 'cognitive_response':
+                # Store chat interaction in chat memory
+                if 'input_text' in data and 'llm_response' in data:
+                    self.chat_memory.append([data['input_text'], data['llm_response']])
+                    logger.info(f'💬 Stored chat interaction: {data["action_id"]}')
+                    
+                    # Add the character's response to entity conversation history
+                    source = data.get('source', 'unknown')
+                    llm_response = data['llm_response']
+                    if source and llm_response:
+                        # Add conversation entry: this character sent a response to the source
+                        self.add_conversation_entry(source, 'sent', llm_response, self.character_name)
+                        logger.info(f'💬 Added response to entity {source}: {self.character_name} -> "{llm_response[:50]}..."')
+                else:
+                    logger.warning(f'Missing input_text or llm_response in cognitive_response action: {data.get("action_id", "unknown")}')
+            else:
+                # Store other action types in short-term memory
+                self.short_term_memory.append(data)
+                logger.info(f'📝 Stored action: {action_type} - {data.get("action_id", "unknown")}')
+                
         except Exception as e:
             logger.error(f'Error storing data: {e}')
+    
+    def _visual_event_callback(self, sample):
+        """Handle visual events to update entity models."""
+        try:
+            data = json.loads(sample.payload.to_bytes().decode('utf-8'))
+            
+            # Extract agent name from visual event
+            agent_name = data.get('agent_name')
+            if agent_name:
+                # Update visual detection for the detected agent
+                self.update_visual_detection(agent_name)
+                
+        except Exception as e:
+            logger.error(f'Error processing visual event: {e}')
 
     def handle_short_term_query(self, query):
         """Handle queries for short-term memory."""
@@ -193,6 +267,93 @@ class ZenohMemoryNode:
             logger.error(f'Error handling chat query: {e}')
             query.reply(query.key_expr, json.dumps({'success': False, 'error': str(e), 'entries': []}).encode('utf-8'))
     
+    def handle_entity_query(self, query):
+        """Handle queries for entity data."""
+        try:
+            # Extract entity name from query key
+            key_parts = str(query.key_expr).split('/')
+            entity_name = key_parts[-1] if len(key_parts) > 0 else None
+            
+            if not entity_name:
+                raise ValueError("No entity name provided")
+            
+            # Parse query parameters for limit
+            selector = str(query.selector)
+            limit = 20  # default limit
+            
+            # Extract limit from query if specified
+            if 'limit=' in selector:
+                try:
+                    limit = int(selector.split('limit=')[1].split('&')[0])
+                except:
+                    pass
+            
+            # Check if entity exists
+            if entity_name not in self.entity_models:
+                response = {
+                    'success': False,
+                    'error': f"Entity '{entity_name}' not found"
+                }
+            else:
+                entity = self.entity_models[entity_name]
+                entity_data = entity.get_entity_data(limit)
+                
+                response = {
+                    'success': True,
+                    'entity_data': entity_data
+                }
+            
+            query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
+            logger.info(f'👥 Entity query for {entity_name}: returned data')
+            
+        except Exception as e:
+            logger.error(f'Error handling entity query: {e}')
+            error_response = {
+                'success': False,
+                'error': str(e)
+            }
+            query.reply(query.key_expr, json.dumps(error_response).encode('utf-8'))
+    
+    def get_or_create_entity(self, entity_name: str) -> EntityModel:
+        """
+        Get an existing entity or create a new one.
+        
+        Args:
+            entity_name: Name of the entity
+            
+        Returns:
+            EntityModel instance
+        """
+        if entity_name not in self.entity_models:
+            self.entity_models[entity_name] = EntityModel(entity_name)
+            logger.info(f'👥 Created new entity: {entity_name}')
+        
+        return self.entity_models[entity_name]
+    
+    def add_conversation_entry(self, entity_name: str, direction: str, text: str, source: str) -> None:
+        """
+        Add a conversation entry for an entity.
+        
+        Args:
+            entity_name: Name of the entity
+            direction: 'sent' or 'received'
+            text: The message text
+            source: 'ui' or character name
+        """
+        entity = self.get_or_create_entity(entity_name)
+        entity.add_conversation_entry(direction, text, source)
+        logger.info(f'💬 Added conversation entry for {entity_name}: {direction} "{text[:50]}..."')
+    
+    def update_visual_detection(self, entity_name: str) -> None:
+        """
+        Update visual detection for an entity.
+        
+        Args:
+            entity_name: Name of the entity
+        """
+        entity = self.get_or_create_entity(entity_name)
+        entity.update_visual_detection()
+        logger.info(f'👁️ Updated visual detection for {entity_name}')
 
     def shutdown(self):
         """Cleanup and shutdown."""
