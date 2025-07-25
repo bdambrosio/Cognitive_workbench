@@ -29,11 +29,11 @@ logging.basicConfig(
     datefmt='%Y-%m-%d %H:%M:%S',
     handlers=[
         logging.StreamHandler(sys.stdout),  # Console output
-        logging.FileHandler('logs/single_llm_action_example.log', mode='w')  # File output
+        logging.FileHandler('logs/action_node.log', mode='w')  # File output
     ],
     force=True
 )
-logger = logging.getLogger('single_llm_action_example')
+logger = logging.getLogger('action_node')
 
 # Import LLM client
 import os
@@ -47,7 +47,7 @@ except ImportError as e:
     LLM_CLIENT_AVAILABLE = False
 
 
-class ZenohSingleLLMActionExample:
+class ZenohActionNode:
     """
     A simple cognitive node that:
     - Receives sense data
@@ -77,6 +77,9 @@ class ZenohSingleLLMActionExample:
         # Publisher for memory storage (character-specific)
         self.memory_publisher = self.session.declare_publisher(f"cognitive/{character_name}/memory/store")
         
+        # Publisher for text input to other characters (character-specific)
+        self.text_input_publisher = self.session.declare_publisher(f"cognitive/{character_name}/text_input")
+        
         # LLM client
         self.llm_client = None
         if LLM_CLIENT_AVAILABLE:
@@ -93,10 +96,11 @@ class ZenohSingleLLMActionExample:
         signal.signal(signal.SIGTERM, self._signal_handler)
         signal.signal(signal.SIGINT, self._signal_handler)
         
-        logger.info(f'🧠 Zenoh Single LLM Action Example initialized for character: {character_name}')
+        logger.info(f'🧠 Zenoh Action Node initialized for character: {character_name}')
         logger.info(f'   - Subscribing to: cognitive/{character_name}/sense_data')
         logger.info(f'   - Publishing to: cognitive/{character_name}/action')
         logger.info(f'   - Publishing to: cognitive/{character_name}/memory/store')
+        logger.info(f'   - Publishing to: cognitive/{character_name}/text_input')
     
     def _signal_handler(self, signum, frame):
         """Handle shutdown signals gracefully."""
@@ -106,7 +110,7 @@ class ZenohSingleLLMActionExample:
     def run(self):
         """Main node loop."""
         try:
-            logger.info('Single LLM Action Example running - press Ctrl+C to stop')
+            logger.info('Action Node running - press Ctrl+C to stop')
             
             # Announce character presence
             self._announce_character()
@@ -114,7 +118,7 @@ class ZenohSingleLLMActionExample:
             while not self.shutdown_requested:
                 time.sleep(1)
         except KeyboardInterrupt:
-            logger.info('Single LLM Action Example shutting down...')
+            logger.info('Action Node shutting down...')
         finally:
             self.shutdown()
     
@@ -139,6 +143,24 @@ class ZenohSingleLLMActionExample:
         except Exception as e:
             logger.error(f'Error announcing character: {e}')
     
+    def send_text_input(self, target_character: str, message: str):
+        """Send text input to another character."""
+        try:
+            # Create text input data in JSON format
+            text_input_data = {
+                'source': self.character_name,
+                'text': message
+            }
+            
+            # Publish to the target character's text_input topic
+            target_publisher = self.session.declare_publisher(f"cognitive/{target_character}/text_input")
+            target_publisher.put(json.dumps(text_input_data))
+            
+            logger.info(f'📤 Sent text input to {target_character}: "{message}" (source: {self.character_name})')
+            
+        except Exception as e:
+            logger.error(f'Error sending text input to {target_character}: {e}')
+    
     def sense_data_callback(self, sample):
         """Handle incoming sense data."""
         # Check if shutdown has been requested
@@ -150,15 +172,27 @@ class ZenohSingleLLMActionExample:
             self.last_sense_data = sense_data
             
             # Extract text input from sense data
-            text_input = sense_data['content']
+            content = sense_data['content']
+            
+            # Parse content - it could be JSON (external input) or plain text (console input)
+            try:
+                # Try to parse as JSON first (external input format)
+                content_data = json.loads(content)
+                text_input = content_data.get('text', '')
+                source = content_data.get('source', 'unknown')
+            except (json.JSONDecodeError, TypeError):
+                # Fallback to plain text (console input format)
+                text_input = content
+                source = 'console'
+            
             # Process if we have text input
             if text_input and text_input.strip():
-                logger.info(f'📥 Received text input: "{text_input}"')
+                logger.info(f'📥 Received text input: "{text_input}" (source: {source})')
                 
                 # Process in background thread to avoid blocking
                 thread = threading.Thread(
                     target=self._process_with_single_llm_call,
-                    args=(text_input,),
+                    args=(text_input, source),
                     daemon=True
                 )
                 thread.start()
@@ -166,13 +200,18 @@ class ZenohSingleLLMActionExample:
         except Exception as e:
             logger.error(f'Error processing sense data: {e}')
     
-    def _process_with_single_llm_call(self, text_input: str):
+    def _process_with_single_llm_call(self, text_input: str, source: str):
         """Process text input with a single LLM call."""
         try:
-            logger.info(f'🧠 Making single LLM call for: "{text_input}"')
+            logger.info(f'🧠 Making single LLM call for: "{text_input}" (from {source})')
             
             # Get recent memory entries for context
             recent_memories = self._get_recent_chat_memories(3)
+            
+            # Get entity context if source is not console
+            entity_context = None
+            if source != 'console':
+                entity_context = self.get_entity_context(source, 10)
             
             # Simple, focused prompt
             system_prompt = """You are a helpful AI assistant. 
@@ -185,13 +224,10 @@ class ZenohSingleLLMActionExample:
             
             # Build user prompt with context
             user_prompt = ''
-            if recent_memories:
-                for i, memory in enumerate(recent_memories):  # Use last 2 memories
-                    user_prompt += f"User: {memory[0]}\n"
-                    user_prompt += f"Assistant: {memory[1]}\n"
+            if entity_context:
+                for i, memory in enumerate(entity_context['conversation_history']):  # Use last 2 memories
+                    user_prompt += f"{memory['source']}: {memory['text']}\n"
                     
-            user_prompt += f"User: {text_input}\n"
-            
             # Make LLM call
             if self.llm_client:
                 response = self.llm_client.generate(
@@ -199,7 +235,7 @@ class ZenohSingleLLMActionExample:
                     max_tokens=200,
                     temperature=0.7
                 )
-                
+
                 if response.success:
                     logger.info(f'🤖 LLM Response: {response.text}')
                     
@@ -212,9 +248,10 @@ class ZenohSingleLLMActionExample:
                         'input_text': text_input,
                         'llm_response': response.text,
                         'confidence': 0.8,
+                        'source': source
                      }
                     
-                    # Publish action
+                    # Publish action (this will be picked up by action_display_node)
                     self.action_publisher.put(json.dumps(action_data))
                     logger.info(f'📤 Published action: {action_data["action_id"]}')
                     
@@ -267,7 +304,7 @@ class ZenohSingleLLMActionExample:
                     'action_id': action_data['action_id'],
                     'timestamp': datetime.now().isoformat(),
                     'metadata': {
-                        'node': 'single_llm_action_example',
+                        'node': 'action_node',
                         'processing_time': 0.0
                     }
                 }
@@ -279,20 +316,54 @@ class ZenohSingleLLMActionExample:
         except Exception as e:
             logger.error(f'Error storing in memory: {e}')
     
+    def get_entity_context(self, entity_name: str, limit: int = 20) -> Dict[str, Any]:
+        """
+        Query entity data from memory node for context.
+        
+        Args:
+            entity_name: Name of the entity to query
+            limit: Number of recent conversation entries to include (default 20)
+            
+        Returns:
+            Dictionary with entity data or None if query failed
+        """
+        try:
+            # Query entity data from memory node - try without query parameters first
+            for reply in self.session.get(f"cognitive/{self.character_name}/memory/entity/{entity_name}"):
+                try:
+                    if reply.ok:
+                        data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
+                        if data['success']:
+                            logger.info(f'👥 Retrieved entity context for {entity_name}')
+                            return data['entity_data']
+                        else:
+                            logger.warning(f'Entity query failed for {entity_name}: {data.get("error", "Unknown error")}')
+                            return None
+                except Exception as e:
+                    logger.error(f'Error parsing entity query response for {entity_name}: {e}')
+                    return None
+            
+            logger.warning(f'No response received for entity query: {entity_name}')
+            return None
+            
+        except Exception as e:
+            logger.error(f'Error querying entity context for {entity_name}: {e}')
+            return None
+    
     def shutdown(self):
         """Clean shutdown."""
-        logger.info('Shutting down Single LLM Action Example...')
+        logger.info('Shutting down Action Node...')
         
         if self.llm_client:
             self.llm_client.cleanup()
         
         self.session.close()
-        logger.info('Single LLM Action Example shutdown complete')
+        logger.info('Action Node shutdown complete')
 
 
 def main():
-    """Main entry point for the single LLM action example."""
-    parser = argparse.ArgumentParser(description='Zenoh Single LLM Action Example')
+    """Main entry point for the action node."""
+    parser = argparse.ArgumentParser(description='Zenoh Action Node')
     parser.add_argument('-c', '--character-name', default='default', help='Character name for topic paths')
     parser.add_argument('-config', default='{}', help='Character configuration as JSON string')
     
@@ -305,11 +376,11 @@ def main():
         print(f"Error parsing character config: {e}")
         return
     
-    single_llm_action_example = ZenohSingleLLMActionExample(args.character_name, character_config)
+    action_node = ZenohActionNode(args.character_name, character_config)
     try:
-        single_llm_action_example.run()
+        action_node.run()
     finally:
-        single_llm_action_example.shutdown()
+        action_node.shutdown()
 
 
 if __name__ == '__main__':

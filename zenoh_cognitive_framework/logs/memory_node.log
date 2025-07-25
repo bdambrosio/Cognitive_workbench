@@ -1,6 +1,28 @@
-2025-07-24 09:16:24 - memory_node - INFO - Memory Node initialized for character: Joe
-2025-07-24 09:16:24 - memory_node - INFO - Storage available at:
-2025-07-24 09:16:24 - memory_node - INFO -   - cognitive/Joe/memory/short_term/*
-2025-07-24 09:16:24 - memory_node - INFO -   - cognitive/Joe/memory/chat/*
-2025-07-24 09:16:24 - memory_node - INFO -   - cognitive/Joe/memory/long_term/*
-2025-07-24 09:16:24 - memory_node - INFO - Memory Node running - press Ctrl+C to stop
+2025-07-24 19:20:11 - memory_node - INFO - Memory Node initialized for character: Joe
+2025-07-24 19:20:11 - memory_node - INFO - Storage available at:
+2025-07-24 19:20:11 - memory_node - INFO -   - cognitive/Joe/memory/short_term/*
+2025-07-24 19:20:11 - memory_node - INFO -   - cognitive/Joe/memory/chat/*
+2025-07-24 19:20:11 - memory_node - INFO -   - cognitive/Joe/memory/long_term/*
+2025-07-24 19:20:11 - memory_node - INFO -   - cognitive/Joe/memory/entity/*
+2025-07-24 19:20:11 - memory_node - INFO - Memory Node running - press Ctrl+C to stop
+2025-07-24 19:20:13 - mem2025-07-24 19:20:42 - memory_node - INFO - 👥 Created new entity: ui
+2025-07-24 19:20:42 - memory_node - INFO - 💬 Added conversation entry for ui: received "hello..."
+2025-07-24 19:20:42 - memory_node - INFO - 📚 Chat query: returned 0 entries
+2025-07-24 19:20:42 - memory_node - INFO - 👥 Entity query for ui: returned data
+2025-07-24 19:20:44 - memory_node - INFO - 💬 Stored chat interaction: action_0
+2025-07-24 19:20:44 - memory_node - INFO - 💬 Added conversation entry for ui: sent " Samantha: Hey there! What brings you into these w..."
+2025-07-24 19:20:44 - memory_node - INFO - 💬 Added response to entity ui: Samantha -> " Samantha: Hey there! What brings you into these w..."
+2025-07-24 19:21:04 - memory_node - INFO - 💬 Added conversation entry for ui: received "sure, what did you have in mind?..."
+2025-07-24 19:21:04 - memory_node - INFO - 📚 Chat query: returned 1 entries
+2025-07-24 19:21:04 - memory_node - INFO - 👥 Entity query for ui: returned data
+2025-07-24 19:21:07 - memory_node - INFO - 💬 Stored chat interaction: action_1
+2025-07-24 19:21:07 - memory_node - INFO - 💬 Added conversation entry for ui: sent " 
+Samantha: Well, if you're up for it, we could ex..."
+2025-07-24 19:21:07 - memory_node - INFO - 💬 Added response to entity ui: Samantha -> " 
+Samantha: Well, if you're up for it, we could ex..."
+2025-07-24 19:22:01 - memory_node - INFO - 💬 Added conversation entry for ui: received "Sure, sounds good. BTW, have you seen Joe?..."
+2025-07-24 19:22:01 - memory_node - INFO - 📚 Chat query: returned 2 entries
+2025-07-24 19:22:01 - memory_node - INFO - 👥 Entity query for ui: returned data
+2025-07-24 19:22:42 - memory_node - INFO - 💬 Stored chat interaction: action_2
+2025-07-24 19:22:42 - memory_node - INFO - 💬 Added conversation entry for ui: sent " Samantha: Hmm, Joe, you say? I haven't seen him a..."
+2025-07-24 19:22:42 - memory_node - INFO - 💬 Added response to entity ui: Samantha -> " Samantha: Hmm, Joe, you say? I haven't seen him a..."

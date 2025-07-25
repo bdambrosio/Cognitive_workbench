@@ -39,9 +39,9 @@ class ZenohCognitiveLauncher:
                 'core': 3,
                 'console_access': True   # Console access for input
             },
-            'single_llm_action_example': {
-                'script': 'single_llm_action_example.py',
-                'description': 'Single LLM action example',
+            'action_node': {
+                'script': 'action_node.py',
+                'description': 'Action node for character cognition',
                 'core': 4,
                 'console_access': False  # Background process with log file
             },
@@ -90,9 +90,9 @@ class ZenohCognitiveLauncher:
             else:
                 # For other nodes: background processes with log files
                 # Note: Nodes now write their own logs, so we don't need to capture output
-            process = subprocess.Popen(
-                [sys.executable, script_path],
-                cwd=self.script_dir,
+                process = subprocess.Popen(
+                    [sys.executable, script_path],
+                    cwd=self.script_dir,
                     env=env
                 )
                 
@@ -111,7 +111,7 @@ class ZenohCognitiveLauncher:
         print()
         
         # Launch order: memory -> llm_service -> others
-        launch_order = ['memory_node', 'llm_service_node', 'sense_node', 'single_llm_action_example', 'action_display_node']
+        launch_order = ['memory_node', 'llm_service_node', 'sense_node', 'action_node', 'action_display_node']
         
         for node_name in launch_order:
             if node_name in self.node_configs:
@@ -200,7 +200,7 @@ class ZenohCognitiveLauncher:
             print('📋 Monitoring commands:')
             print(f'   tail -f {self.logs_dir}/memory_node.log')
             print(f'   tail -f {self.logs_dir}/llm_service_node.log')
-            print(f'   tail -f {self.logs_dir}/single_llm_action_example.log')
+            print(f'   tail -f {self.logs_dir}/action_node.log')
             print(f'   tail -f {self.logs_dir}/action_display_node.log')
             print(f'   tail -f {self.logs_dir}/*.log  # Monitor all nodes')
             print('=' * 50)

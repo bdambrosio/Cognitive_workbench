@@ -74,11 +74,24 @@ class ZenohSenseNode:
                     continue
                 
                 # Create structured sense data message
+                # For external input, content should be JSON with source and text
+                # For console input, content is just the text string
+                if hasattr(self, 'last_external_source') and self.last_external_source:
+                    # External input - preserve source information
+                    content = json.dumps({
+                        'source': self.last_external_source,
+                        'text': console_input
+                    })
+                    self.last_external_source = None  # Reset after use
+                else:
+                    # Console input - just the text
+                    content = console_input
+                
                 sense_data = {
                     'timestamp': datetime.now().isoformat(),
                     'sequence_id': self.sequence_id,
                     'mode': 'text',
-                    'content':  console_input
+                    'content': content
                 }
                 
                 # Publish sense data
@@ -149,16 +162,25 @@ class ZenohSenseNode:
     def external_text_callback(self, sample):
         """Handle text input from external sources (like action display)"""
         try:
-            text_input = sample.payload.to_bytes().decode('utf-8').strip()
-            if text_input:
+            # Parse JSON format with source and text fields
+            payload = sample.payload.to_bytes().decode('utf-8').strip()
+            text_input_data = json.loads(payload)
+            
+            source = text_input_data.get('source', 'unknown')
+            text = text_input_data.get('text', '').strip()
+            
+            if text:
                 # Mark external input as active to prevent console input conflicts
                 if not self.external_input_active:
                     self.external_input_active = True
                     print('🔄 External input detected - console input disabled to prevent conflicts')
                 
+                # Store the source for use in the main loop
+                self.last_external_source = source
+                
                 # Add to the queue (only from external source now)
-                self.text_input_queue.put(text_input)
-                print(f'📨 Received external text input: "{text_input}"')
+                self.text_input_queue.put(text)
+                print(f'📨 Received external text input from {source}: "{text}"')
         except Exception as e:
             print(f'Error processing external text input: {e}')
     

@@ -1,11 +1,7 @@
-2025-07-24 10:07:21,895 - __main__ - INFO - Loading map module from: /home/bruce/Downloads/ros_cognitive_framework/zenoh_cognitive_framework/maps/forest.py
-2025-07-24 10:07:21,895 - __main__ - INFO - Creating WorldMap instance...
-2025-07-24 10:07:21,955 - __main__ - INFO - WorldMap created successfully: 50x50
-2025-07-24 10:07:21,956 - __main__ - INFO - Creating Zenoh session...
-2025-07-24 10:07:21,961 - __main__ - INFO - Map queryables set up successfully
-2025-07-24 10:07:21,961 - __main__ - INFO - Zenoh session initialized successfully
-2025-07-24 10:07:21,961 - __main__ - INFO - Map node started with map file: forest.py
-2025-07-24 10:07:30,293 - __main__ - INFO - Agent registered for character 'samantha' at (49, 12)
-2025-07-24 10:07:30,294 - __main__ - INFO - Agent registered for character 'joe' at (49, 13)
-2025-07-24 10:07:31,343 - __main__ - INFO - Published visual event: samantha detected joe at distance 1
-2025-07-24 10:07:31,343 - __main__ - INFO - Agent 'joe' is now visible to: {'samantha'}
+2025-07-24 19:20:08,466 - __main__ - INFO - Loading map module from: maps/forest.py
+2025-07-24 19:20:08,468 - __main__ - INFO - Creating WorldMap instance...
+2025-07-24 19:20:08,548 - __main__ - INFO - WorldMap created successfully: 50x50
+2025-07-24 19:20:08,549 - __main__ - INFO - Creating Zenoh session...
+2025-07-24 19:20:08,556 - __main__ - INFO - Map queryables set up successfully
+2025-07-24 19:20:08,557 - __main__ - INFO - Zenoh session initialized successfully
+2025-07-24 19:20:08,557 - __main__ - INFO - Map node started with map file: forest.py

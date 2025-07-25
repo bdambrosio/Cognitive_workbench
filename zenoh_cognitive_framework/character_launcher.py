@@ -3,7 +3,7 @@
 Zenoh Character Launcher
 
 This script launches multiple character instances with their respective nodes.
-Each character gets its own sense_node, memory_node, and single_llm_action_example.
+Each character gets its own sense_node, memory_node, and action_node.
 The LLM service node is shared across all characters.
 """
 
@@ -115,17 +115,17 @@ class CharacterLauncher:
         except Exception as e:
             self.logger.error(f'❌ Failed to launch {character.name} memory_node: {e}')
         
-        # Launch single_llm_action_example for this character
+        # Launch action_node for this character
         try:
             action_process = subprocess.Popen([
-                sys.executable, 'single_llm_action_example.py', 
+                sys.executable, 'action_node.py', 
                 '-c', character.name, 
                 '-config', json.dumps(character.config)
             ])
             character.processes.append(action_process)
-            self.logger.info(f'✅ {character.name} single_llm_action_example launched')
+            self.logger.info(f'✅ {character.name} action_node launched')
         except Exception as e:
-            self.logger.error(f'❌ Failed to launch {character.name} single_llm_action_example: {e}')
+            self.logger.error(f'❌ Failed to launch {character.name} action_node: {e}')
     
     def launch_all_characters(self, map_file: str = None):
         """Launch all character instances."""

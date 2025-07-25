@@ -195,9 +195,13 @@ class ZenohActionDisplayNode:
                     f"cognitive/{actual_character_name}/text_input"
                 )
             
-            # Publish text input to specific character
-            self.character_publishers[actual_character_name].put(message)
-            print(f'📤 Sent to {actual_character_name}: "{message}"')
+            # Publish text input to specific character in JSON format
+            text_input_data = {
+                'source': 'ui',
+                'text': message
+            }
+            self.character_publishers[actual_character_name].put(json.dumps(text_input_data))
+            print(f'📤 Sent to {actual_character_name}: "{message}" (source: ui)')
             
             # Store in memory
             self._store_text_input_in_memory(text_input, actual_character_name)

@@ -1,6 +1,0 @@
-2025-07-24 09:16:21 - single_llm_action_example - INFO - 🧠 Zenoh Single LLM Action Example initialized for character: Joe
-2025-07-24 09:16:21 - single_llm_action_example - INFO -    - Subscribing to: cognitive/Joe/sense_data
-2025-07-24 09:16:21 - single_llm_action_example - INFO -    - Publishing to: cognitive/Joe/action
-2025-07-24 09:16:21 - single_llm_action_example - INFO -    - Publishing to: cognitive/Joe/memory/store
-2025-07-24 09:16:21 - single_llm_action_example - INFO - Single LLM Action Example running - press Ctrl+C to stop
-2025-07-24 09:16:21 - single_llm_action_example - INFO - 📢 Announced character presence: Joe
