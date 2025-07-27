@@ -19,14 +19,19 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 
 # Configure logging with unbuffered output
+# Console handler with WARNING level (less verbose)
+console_handler = logging.StreamHandler(sys.stdout)
+console_handler.setLevel(logging.WARNING)
+
+# File handler with INFO level (full logging)
+file_handler = logging.FileHandler('logs/llm_service_node.log', mode='w')
+file_handler.setLevel(logging.INFO)
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     datefmt='%Y-%m-%d %H:%M:%S',
-    handlers=[
-        logging.StreamHandler(sys.stdout),  # Console output
-        logging.FileHandler('logs/llm_service_node.log', mode='w')  # File output
-    ],
+    handlers=[console_handler, file_handler],
     force=True
 )
 logger = logging.getLogger('llm_service_node')
@@ -41,8 +46,8 @@ try:
     from Messages import SystemMessage, UserMessage, AssistantMessage
     LLM_AVAILABLE = True
 except ImportError as e:
-    print(f"⚠️  LLM API not available: {e}")
-    print("   LLM service will return mock responses")
+    logger.debug(f"⚠️  LLM API not available: {e}")
+    logger.debug("   LLM service will return mock responses")
     LLM_AVAILABLE = False
 
 
@@ -309,7 +314,7 @@ class ZenohLLMServiceNode:
     def publish_status(self):
         """Publish service status for monitoring."""
         if len(self.active_requests) > 0:
-            print(
+            logger.debug(
                 f'📊 LLM Service Status: {len(self.active_requests)} active, '
                 f'{self.request_stats["total_requests"]} total, '
                 f'{self.request_stats["avg_response_time"]:.2f}s avg'
@@ -337,7 +342,7 @@ class ZenohLLMServiceNode:
         
         # Shutdown thread pool gracefully
         try:
-            self.thread_pool.shutdown(wait=True, timeout=10.0)
+            self.thread_pool.shutdown(wait=True)
             logger.info('Thread pool shutdown complete')
         except Exception as e:
             logger.error(f'Error shutting down thread pool: {e}')

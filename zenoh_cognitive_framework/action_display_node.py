@@ -94,7 +94,7 @@ class ZenohActionDisplayNode:
             self.active_characters.add(character_name)
             
             # Handle character announcements
-            if action_data.get('action_type') == 'character_announcement':
+            if action_data.get('type') == 'announcement':
                 self._handle_character_announcement(action_data, character_name)
                 return
             
@@ -122,7 +122,7 @@ class ZenohActionDisplayNode:
         """Display an action in a formatted way."""
         try:
             action_id = action_data.get('action_id', 'unknown')
-            action_type = action_data.get('action_type', 'unknown')
+            action_type = action_data.get('type', 'unknown')
             timestamp = action_data.get('timestamp', 'unknown')
             
             # Format timestamp

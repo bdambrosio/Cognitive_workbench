@@ -1,7 +1,61 @@
-2025-07-24 19:20:08,466 - __main__ - INFO - Loading map module from: maps/forest.py
-2025-07-24 19:20:08,468 - __main__ - INFO - Creating WorldMap instance...
-2025-07-24 19:20:08,548 - __main__ - INFO - WorldMap created successfully: 50x50
-2025-07-24 19:20:08,549 - __main__ - INFO - Creating Zenoh session...
-2025-07-24 19:20:08,556 - __main__ - INFO - Map queryables set up successfully
-2025-07-24 19:20:08,557 - __main__ - INFO - Zenoh session initialized successfully
-2025-07-24 19:20:08,557 - __main__ - INFO - Map node started with map file: forest.py
+2025-07-27 15:43:45,363 - __main__ - INFO - Loading map module from: maps/forest.py
+2025-07-27 15:43:45,364 - __main__ - INFO - Creating WorldMap instance...
+2025-07-27 15:43:45,436 - __main__ - INFO - WorldMap created successfully: 50x50
+2025-07-27 15:43:45,437 - __main__ - INFO - 📂 No existing world data for 'forest', starting fresh
+2025-07-27 15:43:45,437 - __main__ - INFO - Creating Zenoh session...
+2025-07-27 15:43:45,443 - __main__ - INFO - Map queryables and subscribers set up successfully
+2025-07-27 15:43:45,444 - __main__ - INFO - Turn management system set up successfully
+2025-07-27 15:43:45,444 - __main__ - INFO - Manual turn control enabled - starting in STEP mode
+2025-07-27 15:43:45,444 - __main__ - INFO - Zenoh session initialized successfully
+2025-07-27 15:43:45,445 - __main__ - INFO - 🔄 Started persistence thread for 'forest'
+2025-07-27 15:43:45,445 - __main__ - INFO - Map node started with map file: forest.py
+2025-07-27 15:43:54,643 - __main__ - INFO - Agent created for character 'Samantha' at (20,20)
+2025-07-27 15:43:54,643 - __main__ - INFO - First character added - turn management ready
+2025-07-27 15:43:54,643 - __main__ - INFO - Manual control mode - waiting for step command
+2025-07-27 15:43:58,632 - __main__ - INFO - Agent created for character 'Joe' at (20,20)
+2025-07-27 15:44:13,471 - __main__ - INFO - 🎯 Manual Step Turn command received
+2025-07-27 15:44:13,472 - __main__ - INFO - Starting new turn for step command
+2025-07-27 15:44:13,472 - __main__ - INFO - Starting new turn with active characters: ['Samantha', 'Joe']
+2025-07-27 15:44:13,472 - __main__ - INFO - 🚦 Turn 1 started for: Samantha, Joe
+2025-07-27 15:44:17,567 - __main__ - INFO - Published visual event: Joe detected Samantha at distance 1
+2025-07-27 15:44:17,567 - __main__ - INFO - Agent 'Samantha' is now visible to: {'Joe'}
+2025-07-27 15:44:17,575 - __main__ - INFO - ✅ Samantha completed turn 1
+2025-07-27 15:44:17,580 - __main__ - INFO - Turn progress: 1/2 characters completed
+2025-07-27 15:44:18,285 - __main__ - INFO - ✅ Joe completed turn 1
+2025-07-27 15:44:18,285 - __main__ - INFO - Turn progress: 2/2 characters completed
+2025-07-27 15:44:18,285 - __main__ - INFO - 🎯 All characters completed turn 1
+2025-07-27 15:44:18,285 - __main__ - INFO - Step mode - waiting for manual step command
+2025-07-27 15:44:18,286 - __main__ - INFO - 📢 Published step_complete message for FastAPI UI
+2025-07-27 15:44:20,473 - __main__ - INFO - 🎯 Manual Step Turn command received
+2025-07-27 15:44:20,474 - __main__ - INFO - Starting new turn for step command
+2025-07-27 15:44:20,474 - __main__ - INFO - Starting new turn with active characters: ['Samantha', 'Joe']
+2025-07-27 15:44:20,474 - __main__ - INFO - 🚦 Turn 2 started for: Samantha, Joe
+2025-07-27 15:44:25,186 - __main__ - INFO - ✅ Joe completed turn 2
+2025-07-27 15:44:25,186 - __main__ - INFO - Turn progress: 1/2 characters completed
+2025-07-27 15:44:26,695 - __main__ - INFO - ✅ Samantha completed turn 2
+2025-07-27 15:44:26,695 - __main__ - INFO - Turn progress: 2/2 characters completed
+2025-07-27 15:44:26,695 - __main__ - INFO - 🎯 All characters completed turn 2
+2025-07-27 15:44:26,695 - __main__ - INFO - Step mode - waiting for manual step command
+2025-07-27 15:44:26,695 - __main__ - INFO - 📢 Published step_complete message for FastAPI UI
+2025-07-27 15:44:29,894 - __main__ - INFO - 🎯 Manual Step Turn command received
+2025-07-27 15:44:29,894 - __main__ - INFO - Starting new turn for step command
+2025-07-27 15:44:29,894 - __main__ - INFO - Starting new turn with active characters: ['Samantha', 'Joe']
+2025-07-27 15:44:29,894 - __main__ - INFO - 🚦 Turn 3 started for: Samantha, Joe
+2025-07-27 15:44:33,813 - __main__ - INFO - ✅ Samantha completed turn 3
+2025-07-27 15:44:33,813 - __main__ - INFO - Turn progress: 1/2 characters completed
+2025-07-27 15:44:38,181 - __main__ - INFO - ✅ Joe completed turn 3
+2025-07-27 15:44:38,181 - __main__ - INFO - Turn progress: 2/2 characters completed
+2025-07-27 15:44:38,181 - __main__ - INFO - 🎯 All characters completed turn 3
+2025-07-27 15:44:38,181 - __main__ - INFO - Step mode - waiting for manual step command
+2025-07-27 15:44:38,181 - __main__ - INFO - 📢 Published step_complete message for FastAPI UI
+2025-07-27 15:44:47,823 - __main__ - INFO - 🎯 Manual Step Turn command received
+2025-07-27 15:44:47,824 - __main__ - INFO - Starting new turn for step command
+2025-07-27 15:44:47,824 - __main__ - INFO - Starting new turn with active characters: ['Samantha', 'Joe']
+2025-07-27 15:44:47,824 - __main__ - INFO - 🚦 Turn 4 started for: Samantha, Joe
+2025-07-27 15:44:51,987 - __main__ - INFO - ✅ Joe completed turn 4
+2025-07-27 15:44:51,987 - __main__ - INFO - Turn progress: 1/2 characters completed
+2025-07-27 15:44:55,654 - __main__ - INFO - ✅ Samantha completed turn 4
+2025-07-27 15:44:55,655 - __main__ - INFO - Turn progress: 2/2 characters completed
+2025-07-27 15:44:55,655 - __main__ - INFO - 🎯 All characters completed turn 4
+2025-07-27 15:44:55,655 - __main__ - INFO - Step mode - waiting for manual step command
+2025-07-27 15:44:55,655 - __main__ - INFO - 📢 Published step_complete message for FastAPI UI

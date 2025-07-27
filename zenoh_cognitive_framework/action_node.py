@@ -23,14 +23,19 @@ from datetime import datetime
 from typing import Dict, List, Any
 
 # Configure logging with unbuffered output
+# Console handler with WARNING level (less verbose)
+console_handler = logging.StreamHandler(sys.stdout)
+console_handler.setLevel(logging.WARNING)
+
+# File handler with INFO level (full logging)
+file_handler = logging.FileHandler('logs/action_node.log', mode='w')
+file_handler.setLevel(logging.INFO)
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     datefmt='%Y-%m-%d %H:%M:%S',
-    handlers=[
-        logging.StreamHandler(sys.stdout),  # Console output
-        logging.FileHandler('logs/action_node.log', mode='w')  # File output
-    ],
+    handlers=[console_handler, file_handler],
     force=True
 )
 logger = logging.getLogger('action_node')
@@ -71,6 +76,12 @@ class ZenohActionNode:
             self.sense_data_callback
         )
         
+        # Subscriber for situation data (character-specific)
+        self.situation_subscriber = self.session.declare_subscriber(
+            f"cognitive/{character_name}/situation",
+            self.situation_callback
+        )
+        
         # Publisher for actions (character-specific)
         self.action_publisher = self.session.declare_publisher(f"cognitive/{character_name}/action")
         
@@ -88,6 +99,7 @@ class ZenohActionNode:
         # Internal state
         self.action_counter = 0
         self.last_sense_data = None
+        self.last_situation_data = None
         
         # Shutdown flag
         self.shutdown_requested = False
@@ -98,6 +110,7 @@ class ZenohActionNode:
         
         logger.info(f'🧠 Zenoh Action Node initialized for character: {character_name}')
         logger.info(f'   - Subscribing to: cognitive/{character_name}/sense_data')
+        logger.info(f'   - Subscribing to: cognitive/{character_name}/situation')
         logger.info(f'   - Publishing to: cognitive/{character_name}/action')
         logger.info(f'   - Publishing to: cognitive/{character_name}/memory/store')
         logger.info(f'   - Publishing to: cognitive/{character_name}/text_input')
@@ -191,7 +204,7 @@ class ZenohActionNode:
                 
                 # Process in background thread to avoid blocking
                 thread = threading.Thread(
-                    target=self._process_with_single_llm_call,
+                    target=self.respond,
                     args=(text_input, source),
                     daemon=True
                 )
@@ -200,8 +213,20 @@ class ZenohActionNode:
         except Exception as e:
             logger.error(f'Error processing sense data: {e}')
     
-    def _process_with_single_llm_call(self, text_input: str, source: str):
-        """Process text input with a single LLM call."""
+    def situation_callback(self, sample):
+        """Handle incoming situation data."""
+        try:
+            situation_data = json.loads(sample.payload.to_bytes().decode('utf-8'))
+            logger.info(f'📊 Received situation update: {situation_data.get("look", "no look data")}')
+            
+            # Store situation data for potential use in LLM processing
+            self.last_situation_data = situation_data
+            
+        except Exception as e:
+            logger.error(f'Error processing situation data: {e}')
+    
+    def respond(self, text_input: str, source: str):
+        """Respond to text input from someone."""
         try:
             logger.info(f'🧠 Making single LLM call for: "{text_input}" (from {source})')
             
@@ -223,7 +248,9 @@ class ZenohActionNode:
                 system_prompt += f"\n\nYour drives are: {self.character_config['drives']}"
             
             # Build user prompt with context
-            user_prompt = ''
+            user_prompt = '' 
+            if self.last_situation_data and self.last_situation_data.get('look'):
+                user_prompt += f"The current situation is: {self.last_situation_data['look']['look_result']}\n"
             if entity_context:
                 for i, memory in enumerate(entity_context['conversation_history']):  # Use last 2 memories
                     user_prompt += f"{memory['source']}: {memory['text']}\n"
@@ -232,13 +259,13 @@ class ZenohActionNode:
             if self.llm_client:
                 response = self.llm_client.generate(
                     messages=[system_prompt, user_prompt],
-                    max_tokens=200,
+                    max_tokens=400,
                     temperature=0.7
                 )
 
                 if response.success:
                     logger.info(f'🤖 LLM Response: {response.text}')
-                    
+
                     # Create action
                     action_data = {
                         'type': 'action',
@@ -255,8 +282,16 @@ class ZenohActionNode:
                     self.action_publisher.put(json.dumps(action_data))
                     logger.info(f'📤 Published action: {action_data["action_id"]}')
                     
-                    # Store in memory
-                    #self._store_in_memory(text_input, response.text, action_data)
+                    response_text = response.text
+                    response_lc = response_text.lower()
+                    if 'move' in response_lc:
+                        move_direction = response_lc.split('move')[1].strip()
+                        move_direction = move_direction.split(' ')[0].strip()
+                        move_direction = move_direction.lower()
+                        move_direction = move_direction.rstrip('.,!?;:')
+                        if move_direction in ['north', 'northeast', 'southeast', 'south', 'southwest', 'northwest', 'east', 'west']:
+                            logger.info(f'{response.text}')
+                            self.move(move_direction)
                     
                     self.action_counter += 1
                 else:
@@ -266,6 +301,41 @@ class ZenohActionNode:
                 
         except Exception as e:
             logger.error(f'Error in LLM processing: {e}')
+    
+    def move(self, move_direction: str):
+        """Move the character in the specified direction."""
+        logger.info(f'🚶 Moving {move_direction}')
+        
+        try:
+            # Query map node to move the agent
+            move_data = {'direction': move_direction}
+            for reply in self.session.get(f"cognitive/map/agent/{self.character_name}/move", payload=json.dumps(move_data).encode('utf-8')):
+                try:
+                    if reply.ok:
+                        move_result = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
+                        if move_result.get('success'):
+                            logger.info(f'✅ Move successful: {move_direction}')
+                        else:
+                            logger.warning(f'❌ Move failed: {move_result.get("error", "Unknown error")}')
+                    else:
+                        logger.error(f'❌ Move query failed for {self.character_name}')
+                except Exception as e:
+                    logger.error(f'Error parsing move response: {e}')
+                    break
+            
+            # Create and publish action data
+            action_data = {
+                'type': 'move',
+                'action_type': move_direction,
+                'action_id': f"move_{int(time.time())}",
+                'timestamp': datetime.now().isoformat()
+            }
+            
+            self.action_publisher.put(json.dumps(action_data).encode('utf-8'))
+            logger.info(f'📤 Published move action: {move_direction}')
+            
+        except Exception as e:
+            logger.error(f'Error in move operation: {e}')
     
     def _get_recent_chat_memories(self, num_entries: int) -> List[Dict[str, Any]]:
         """Get recent memory entries using Zenoh queries."""
@@ -281,8 +351,8 @@ class ZenohActionNode:
                     logger.error(f'Error getting recent memories: {e}')
                     continue
             
-            m1 = entries[0]
-            m2 = m1['entries']
+            m1 = entries[0] if len(entries) > 0 else None
+            m2 = m1['entries'] if m1 else []
 
             logger.info(f'📚 Retrieved {len(entries)} recent memory entries')
             return m2

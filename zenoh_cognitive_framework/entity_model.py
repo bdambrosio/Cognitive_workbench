@@ -105,4 +105,32 @@ class EntityModel:
         Returns:
             True if entity has conversation or visual interaction history
         """
-        return len(self.conversation_history) > 0 or self.last_seen is not None 
+        return len(self.conversation_history) > 0 or self.last_seen is not None
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert entity to dictionary for serialization."""
+        return {
+            'entity_name': self.entity_name,
+            'conversation_history': self.conversation_history,
+            'last_seen': self.last_seen.isoformat() if self.last_seen else None,
+            'first_seen': self.first_seen.isoformat() if self.first_seen else None
+        }
+
+    def load_from_dict(self, data: Dict[str, Any]) -> None:
+        """Load entity from dictionary."""
+        self.entity_name = data.get('entity_name', self.entity_name)
+        self.conversation_history = data.get('conversation_history', [])
+        
+        # Parse timestamps
+        last_seen_str = data.get('last_seen')
+        if last_seen_str:
+            self.last_seen = datetime.fromisoformat(last_seen_str)
+        
+        first_seen_str = data.get('first_seen')
+        if first_seen_str:
+            self.first_seen = datetime.fromisoformat(first_seen_str)
+
+    def summarize(self) -> str:
+        """Generate a summary of conversation history. Stub for now."""
+        # TODO: Implement summarization logic
+        return "Summary stub - to be implemented" 

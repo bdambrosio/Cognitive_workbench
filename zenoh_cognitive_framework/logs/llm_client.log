@@ -1,0 +1,54 @@
+2025-07-27 15:43:58 - llm_client - INFO - 🤖 Zenoh LLM Client initialized
+2025-07-27 15:43:58 - executive_node - INFO - 🧠 Zenoh Executive Node initialized for character: Joe
+2025-07-27 15:43:58 - executive_node - INFO -    - Subscribing to: cognitive/Joe/sense_data
+2025-07-27 15:43:58 - executive_node - INFO -    - Subscribing to: cognitive/Joe/situation
+2025-07-27 15:43:58 - executive_node - INFO -    - Subscribing to: cognitive/map/turn/go
+2025-07-27 15:43:58 - executive_node - INFO -    - Publishing to: cognitive/Joe/action
+2025-07-27 15:43:58 - executive_node - INFO -    - Publishing to: cognitive/Joe/memory/store
+2025-07-27 15:43:58 - executive_node - INFO -    - Publishing to: cognitive/Joe/text_input
+2025-07-27 15:43:58 - executive_node - INFO -    - Publishing to: cognitive/map/turn/complete/Joe
+2025-07-27 15:43:58 - executive_node - WARNING - Executive Node running - press Ctrl+C to stop
+2025-07-27 15:43:58 - executive_node - INFO - 📢 Announced character presence: Joe
+2025-07-27 15:44:08 - executive_node - WARNING - 📊 Joe Received situation update
+2025-07-27 15:44:08 - executive_node - WARNING - 📊 Joe Received situation update
+2025-07-27 15:44:13 - executive_node - WARNING - 🚦 Turn 1 started for Joe
+2025-07-27 15:44:14 - executive_node - INFO - 🔄 Hand2025-07-27 15:42025-07-27 15:44:15 - executive_node - WARNING - 🔄 J2025-07-27 15:44:15 - executive_node - WARNING - 🔄 Samantha OODA loop running
+2025-07-27 15:44:16 - executive_node - WARNING - 🤖 Samantha New Goal: #goal Find Mushrooms
+#target Mushrooms2
+##
+2025-07-27 15:44:17 - executive_node - WARNING - 🤖 Samantha New Action:   #action Move  #target North  #value 2025-07-27 15:44:18 - executive_node - WARNING - 🤖 Joe New Action:   #action Say #target Samantha #value I'm Joe, nice to meet you, I don't know how I got here, do you know where we are? 
+2025-07-27 15:44:18 - executive_node - WARNING - 📤 Joe Sent text input to Samantha: "I'm Joe, nice to meet you, I don't know how I got here, do you know where we are?" (source: Joe)
+2025-07-27 15:44:18 - executive_node - WARNING - 📤 Published action: {'action': 'Say', 'target': 'Samantha', 'value': "I'm Joe, nice to meet you, I don't know how I got here, do you k2025-07-27 15:44:18 - executive_node - WARNING - 📥 Samantha Received text input: "I'm Joe, nice to meet you, I don't know how I got here, do you know where we are?" (source: J2025-07-27 15:44:20 - executive_node - WARNING - 🚦 Turn 2 started for Joe
+2025-07-27 15:44:21 - executive_node - INFO - 🔄 Handling interrupt
+2025-07-27 15:44:22 - executive_node - WARNING - 🔄 Joe OODA loop running
+2025-07-27 15:44:22 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-07-27 15:44:23 - executive_node - WARNING - 🤖 Joe New Goal: #goal Find out where we are
+#target Samantha
+2025-07-27 15:44:23 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-07-27 15:44:24 - executive_node - WARNING - 🤖 Joe New Action:   #action Think #target self #value how did I get here 
+2025-07-27 15:442025-07-27 15:44:26 - executive_node - WARNING - 📤 Samantha Sent text input to Joe: "Samantha: Honestly, I'm not entirely sure. I've been hiking for hours, and I haven't seen any signs of civilization. I was starting to think I was the only person around here. The forest seems to stretch on forever. I've been trying to find a way out, but every path I take just leads to more trees. Do you remember anything about how you got here? Anything at all?" (source: Samantha)
+2025-07-27 15:44:26 - executive_node - WARNING - Responding to: "I'm Joe, nice to meet you, I don't know how I got here, do you know where we are?" from Joe: Samantha: Honestly, I'm not entirely sure. I've been hiking for hours, an2025-07-27 15:44:26 - executive_node - WARNING - 📥 Joe Received text input: "Samantha: Honestly, I'm not entirely sure. I've been hiking for hours, and I haven't seen any signs of civilization. I was starting to think I was the only person around here. The forest seems to stretch on forever. I've been trying to find a way out, but every path I take just leads to more trees. Do you remember anything about how you got here? Anything at all?" (so2025-07-27 15:44:27 - executive_node - WARNING - 📊 Samantha Received situation update
+2025-07-27 2025-07-27 15:44:29 - executive_node - WARNING - 🚦 Turn 3 started for Joe
+2025-07-27 15:44:30 - executive_node - INFO - 🔄 Handling interrupt
+2025-07-27 15:44:31 - executive_node - WARNING - 🔄 Joe OODA loop running
+2025-07-27 15:44:31 - executive_node - INFO - Responding to: "Samantha: Honestly, I'm not entirely sure. I've been hiking for hours, and I haven't seen any signs of civilization2025-07-27 15:44:31 - executive_node - WARNING - 🤖 Samantha New Goal: #goal talk to Joe
+#target Joe
+##
+2025-07-27 15:44:31 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-07-27 15:44:32 - executive_node - WARNING - 🤖 Samantha New Action:   #action Think  #target self  #value uncomfortable history  
+2025-07-27 15:44:32 - executive_node - WARNING - Thinking about: uncomfortable history
+2025-07-27 15:44:32 - execut2025-07-27 15:44:38 - executive_node - WARNING - 📤 Joe Sent text input to Samantha: "I'm Joe, nice to meet you too, Samantha. I don't really know how I got here, to be honest. One minute I was just going about my day, and the next thing I know, I'm in the middle of this forest. It's pretty weird. I've been trying to find a way out, but like you said, every path just leads to more trees. I've been walking for hours, and I'm starting to get a bit worried. Do you think we should try to find shelter for the night, or keep trying to find a way out?" (source: Joe)
+22025-07-27 15:44:38 - executive_node - WARNING - 📥 Samantha Received text input: "I'm Joe, nice to meet you too, Samantha. I don't really know how I got here, to be honest. One minute I was just going about my day, and the next thing I know, I'm in the middle of this forest. It's pretty weird. I've been trying to find a way out, but like you said, every path just leads to more trees. I've been walking for hours, and I'm starting to get a bit worried. Do you think we should try to find shelter for the night, or keep trying to find a way out?" (source: Joe)
+2025-07-27 15:44:38 - executive_node - WARNING - 📊 Samantha Received situation update
+2025-07-27 15:44:47 - executive_node - WARNING - 🚦 Turn 4 started for Samantha
+2025-07-27 15:44:48 - executive_node - INFO - 🔄 Handling interrupt
+2025-07-27 15:44:49 - executive_node - WARNING - 🔄 Samantha OODA loop running
+2025-07-27 15:44:49 - executive_node - INFO - Responding to: "I'm Joe, nice to meet you too, Samantha. I don't really know how I got here, to be honest. One minute I was just going about my day, and the next thing I know, I'm in the middle of this forest. It's pretty weird. I've been trying to find a way out, but like you said, every path just leads to more trees. I've been walking for hours, and I'm starting to get a bit worried. Do you think we should try to find shelter for the night, or keep trying to find a way out?" (from Joe)
+2025-07-27 15:44:49 - execut2025-07-27 15:44:49 - executive_node - WARNING - 🤖 Joe New Goal: #goal Ask Samantha about location
+#target Samantha
+2025-07-27 15:44:49 - 2025-07-27 15:44:55 - executive_node - WARNING - 📤 Samantha Sent text input to Joe: "Samantha: I think we should try to find shelter for the night, it's getting dark and I don't like the idea of being out here in the open when it's dark. I've seen some pretty dense thickets and overhangs that might provide some protection from the elements. We could try to find one of those and huddle up for the night. I'm not sure I want to keep walking in the dark, it's easy to get turned around and lost. Plus, I'm getting a bit hungry, have you found any food or water around here?" (source: Samantha)
+2025-07-27 15:44:55 - executive_node - WARNING - Responding to: "I'm Joe, nice to meet you too, Samantha. I don't really know how I got here, to be honest. One minute I was just going about my day, and the next thing I know, I'm in the middle of this forest. It's pretty weird. I've been trying to find a way out, but like you said, every path just leads to mor2025-07-27 15:44:55 - executive_node - WARNING - 📥 Joe Received text input: "Samantha: I think we should try to find shelter for the night, it's getting dark and I don't like the idea of being out here in the open when it's dark. I've seen some pretty dense thickets and overhangs that might provide some protection from the elements. We could try to find one of those and huddle up for the night. I'm not sure I want to keep walking in the dark, it's easy to get turned around and lost. Plus, I'm getting a bit hungry, have you found any food or water around here?" (source: Samantha)
+2025-07-27 15:44:55 - executive_node - WARNING - 📊 Joe Received situation update
+-07-27 15:44:55 - executive_node - INFO - 📤 Published action: action_6
+2025-07-27 15:44:55 - executive_node - WARNING - ✅ Samantha completed turn 4
+2025-07-27 15:44:55 - executive_node - WARNING - 📊 Samantha Received situation update
