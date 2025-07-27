@@ -13,7 +13,27 @@ import threading
 import queue
 import sys
 import argparse
+import logging
+import signal
 from datetime import datetime
+
+# Configure logging with unbuffered output
+# Console handler with WARNING level (less verbose)
+console_handler = logging.StreamHandler(sys.stdout)
+console_handler.setLevel(logging.WARNING)
+
+# File handler with INFO level (full logging)
+file_handler = logging.FileHandler('logs/sense_node.log', mode='w')
+file_handler.setLevel(logging.INFO)
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S',
+    handlers=[console_handler, file_handler],
+    force=True
+)
+logger = logging.getLogger('sense_node')
 
 
 class ZenohSenseNode:
@@ -56,17 +76,31 @@ class ZenohSenseNode:
         self.last_text_input = None
         self.external_input_active = False
         
+        # Shutdown flag (must be set before starting threads)
+        self.shutdown_requested = False
+        
+        # Register signal handlers for graceful shutdown
+        signal.signal(signal.SIGTERM, self._signal_handler)
+        signal.signal(signal.SIGINT, self._signal_handler)
+        
         # Only start console input thread if no external input is expected
         self.input_thread = threading.Thread(target=self._console_input_thread, daemon=True)
         self.input_thread.start()
         
-        print(f'Sense Node initialized for character: {character_name}')
-        print('Console Text Sensor ready - will auto-disable if external input detected')
+        logger.info(f'👁️ Sense Node initialized for character: {character_name}')
+        logger.info('Console Text Sensor ready - will auto-disable if external input detected')
+    
+    def _signal_handler(self, signum, frame):
+        """Handle shutdown signals gracefully."""
+        logger.info(f'Received signal {signum}, initiating shutdown...')
+        self.shutdown_requested = True
     
     def run(self):
         """Main sensing loop."""
         try:
-            while True:
+            logger.info('Sense Node running - press Ctrl+C to stop')
+            
+            while not self.shutdown_requested:
                 # Get console input if available
                 console_input = self._get_console_input()
                 if not console_input:
@@ -98,14 +132,14 @@ class ZenohSenseNode:
                 self.sense_publisher.put(json.dumps(sense_data))
                 
                 # Log
-                print(f'Published sense data #{self.sequence_id} [Console input: "{console_input}"]')
+                logger.info(f'📤 Published sense data: {self.sequence_id}')
                 
                 self.sequence_id += 1
                 
         except KeyboardInterrupt:
-            print('Sense Node shutting down...')
+            logger.info('Sense Node shutting down...')
         finally:
-            self.session.close()
+            self.shutdown()
     
     def _console_input_thread(self):
         """
@@ -115,7 +149,7 @@ class ZenohSenseNode:
         Will automatically disable if external input (from Action Display) is detected.
         """
         try:
-            while True:
+            while not self.shutdown_requested:
                 try:                   
                     # Prompt for input (will only show in terminal, not in logs)
                     user_input = input()
@@ -124,9 +158,9 @@ class ZenohSenseNode:
                         if not self.external_input_active:
                             self.text_input_queue.put(user_input.strip())
                             # Log to console instead of ROS2
-                            print(f'📝 Console text input received: "{user_input.strip()}"')
+                            logger.info(f'📝 Console text input received: "{user_input.strip()}"')
                         else:
-                            print('🔄 Ignoring console input - external input is now active')
+                            logger.info('🔄 Ignoring console input - external input is now active')
                             break
                 except EOFError:
                     # Handle Ctrl+D gracefully
@@ -135,7 +169,7 @@ class ZenohSenseNode:
                     # Handle Ctrl+C gracefully
                     break
         except Exception as e:
-            print(f'Console input thread error: {str(e)}')
+            logger.error(f'Console input thread error: {str(e)}')
     
     def _get_console_input(self):
         """
@@ -173,16 +207,16 @@ class ZenohSenseNode:
                 # Mark external input as active to prevent console input conflicts
                 if not self.external_input_active:
                     self.external_input_active = True
-                    print('🔄 External input detected - console input disabled to prevent conflicts')
+                    logger.info('🔄 External input detected - console input disabled to prevent conflicts')
                 
                 # Store the source for use in the main loop
                 self.last_external_source = source
                 
                 # Add to the queue (only from external source now)
                 self.text_input_queue.put(text)
-                print(f'📨 Received external text input from {source}: "{text}"')
+                logger.info(f'📨 Received external text input from {source}: "{text}"')
         except Exception as e:
-            print(f'Error processing external text input: {e}')
+            logger.error(f'Error processing external text input: {e}')
     
     def visual_event_callback(self, sample):
         """Handle visual events from the map node"""
@@ -191,13 +225,22 @@ class ZenohSenseNode:
             visual_data = json.loads(sample.payload.to_bytes().decode('utf-8'))
             event_type = str(sample.key_expr).split('/')[-1]
             
-            print(f'👁️ Visual event received: {event_type} - {visual_data}')
+            logger.info(f'👁️ Visual event received: {event_type} - {visual_data}')
             
             # TODO: Integrate visual event into sensory processing
             # This is where you'll handle the visual event integration
             
         except Exception as e:
-            print(f'Error processing visual event: {e}')
+            logger.error(f'Error processing visual event: {e}')
+    
+    def shutdown(self):
+        """Cleanup and shutdown."""
+        try:
+            logger.info('Sense Node shutdown initiated...')
+            self.session.close()
+            logger.info('Sense Node shutdown complete')
+        except Exception as e:
+            logger.error(f'Error during shutdown: {e}')
 
 
 def main():
@@ -212,11 +255,14 @@ def main():
     try:
         character_config = json.loads(args.config)
     except json.JSONDecodeError as e:
-        print(f"Error parsing character config: {e}")
+        logger.error(f"Error parsing character config: {e}")
         return
     
     sense_node = ZenohSenseNode(args.character_name, character_config)
-    sense_node.run()
+    try:
+        sense_node.run()
+    finally:
+        sense_node.shutdown()
 
 
 if __name__ == '__main__':

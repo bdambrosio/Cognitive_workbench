@@ -1,0 +1,19 @@
+2025-07-27 15:43:56 - situation_node - INFO - 📂 Loaded situation data for Joe
+2025-07-27 15:43:56 - situation_node - INFO - 🧭 Situation Node initialized for character: Joe
+2025-07-27 15:43:56 - situation_node - INFO -    - Subscribing to: cognitive/Joe/sense_data
+2025-07-27 15:43:56 - situation_node - INFO -    - Subscribing to: cognitive/Joe/action
+2025-07-27 15:43:56 - situation_node - INFO -    - Publishing to: cognitive/Joe/situation
+2025-07-27 15:43:56 - situation_node - INFO -    - Queryable at: cognitive/Joe/situation/*
+2025-07-27 15:43:56 - situation_node - INFO -    - Storage available at: data/situation/Joe_situation.json
+2025-07-27 15:43:56 - situation_node - INFO - Situation Node running - press Ctrl+C to stop
+2025-07-27 15:43:58 - situation_node - INFO - 📥 Received action: unknown
+2025-07-27 15:44:08 - situation_node - WARNING - Map query failed for Joe
+2025-07-27 15:44:08 - situation_node - INFO - 🗺️ Updated map look data for Joe
+2025-07-27 15:44:18 - situation_node - INFO - 📥 Received action: unknown
+2025-07-27 15:44:25 - situation_node - INFO - 📥 Received action: unknown
+2025-07-27 15:44:26 - situation_node - INFO 2025-07-27 15:44:27 - situation_n2025-07-27 15:44:38 - situation_node - INFO - 📥 Received action: unknown
+2025-07-27 15:44:51 - situation_node - INFO - 📥 Received action: unknown
+2025-07-27 15:44:55 - situation_node - INFO - 📥 Received sense data: text
+3 - situation_node - INFO - 📥 Received action: unknown
+2025-07-27 15:44:38 - situation_node - INFO - 📥 Received sense data: text
+2025-07-27 15:44:55 - situation_node - INFO - 📥 Received action: unknown

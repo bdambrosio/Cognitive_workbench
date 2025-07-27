@@ -427,11 +427,11 @@ class WorldMap:
         water_level = self._terrain_rules.get('water_level', 0.2)
         mountain_level = self._terrain_rules.get('mountain_level', 0.8)
         
-        print(f"DEBUG: Starting terrain assignment...")
+        #print(f"DEBUG: Starting terrain assignment...")
         none_count_before = sum(1 for x in range(self.width) 
                               for y in range(self.height) 
                               if self.patches[x][y].terrain_type is None)
-        print(f"DEBUG: Patches with None terrain before assignment: {none_count_before}")
+        #print(f"DEBUG: Patches with None terrain before assignment: {none_count_before}")
         
         terrain_by_elevation = self._terrain_rules.get('terrain_by_elevation', {
             'water': {'max': 0.2, 'type': 'Water'},
@@ -514,7 +514,7 @@ class WorldMap:
         none_count_after = sum(1 for x in range(self.width) 
                              for y in range(self.height) 
                              if self.patches[x][y].terrain_type is None)
-        print(f"DEBUG: Patches with None terrain after assignment: {none_count_after}")
+        #print(f"DEBUG: Patches with None terrain after assignment: {none_count_after}")
         if none_count_after > 0:
             print("WARNING: Some patches still have None terrain!")
             # Print first few None locations for debugging
@@ -852,13 +852,14 @@ class WorldMap:
                         
                         candidates.pop(i)
                         placed += 1
-                        print(f"DEBUG: Placed {resource_id} at ({x}, {y})" + 
-                              (f" owned by {owner.name}" if owner else ""))
+                        #print(f"DEBUG: Placed {resource_id} at ({x}, {y})" + 
+                              #(f" owned by {owner.name}" if owner else ""))
                         break
 
     def get_resource_by_name(self, name):
+        canonical_name = name.capitalize()
         for resource_id in self.resource_registry:
-            if self.resource_registry[resource_id]['name'] == name:
+            if self.resource_registry[resource_id]['name'].capitalize() == canonical_name:
                 return self.resource_registry[resource_id]
         return None
 
@@ -1126,7 +1127,7 @@ class WorldMap:
             'properties': {}
         }
         self.patches[market_x][market_y].resources[resource_id] = 1
-        print(f"DEBUG: Placed {self.scenario_module.required_resource_name} resource {resource_id} at ({market_x}, {market_y})")
+        #print(f"DEBUG: Placed {self.scenario_module.required_resource_name} resource {resource_id} at ({market_x}, {market_y})")
 
     def generate_infrastructure(self):
         """Generate roads connecting central resource to other resources"""
@@ -1146,7 +1147,7 @@ class WorldMap:
             return
             
         market_x, market_y = market_resource['location']
-        print(f"DEBUG: Starting road network from {self.scenario_module.required_resource_name} at ({market_x}, {market_y})")
+        #print(f"DEBUG: Starting road network from {self.scenario_module.required_resource_name} at ({market_x}, {market_y})")
         
         # Convert terrain cost rules to enum values
         self.terrain_costs = {}
@@ -1165,7 +1166,7 @@ class WorldMap:
         
         # Generate number of paths based on density
         paths_to_generate = int(self.width * self.height * self._infrastructure_rules['road_density'])
-        print(f"Generating {paths_to_generate} {path_type_name.lower()}s...")
+        #print(f"Generating {paths_to_generate} {path_type_name.lower()}s...")
         
         # Track connected resources
         connected = {(market_x, market_y)}
@@ -1199,7 +1200,7 @@ class WorldMap:
                 break
                 
             # Build the road
-            print(f"DEBUG: Adding road from {best_start} to {best_end}")
+            #print(f"DEBUG: Adding road from {best_start} to {best_end}")
             self.build_road(best_start[0], best_start[1], best_end[0], best_end[1])
             connected.add(best_end)
 
@@ -1717,7 +1718,6 @@ def hash_direction_info(direction_info, distance_threshold=10, world=None):
                     characters.append(character['name'])
             percept = percept[:-2]
         percept += "\n"
-    percept_summary += f"You see {', '.join(characters)} and {', '.join(resources)} resources{f' and {path_name}(s)' if len(paths) > 0 else ''}"
-    print(percept_summary)
+    percept_summary += f"You see {', '.join(list(set(characters)))} and {', '.join(list(set(resources)))} resources{f' and {path_name}(s)' if len(paths) > 0 else ''}"
     return percept, resources, characters, paths, percept_summary
                 

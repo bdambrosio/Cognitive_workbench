@@ -1,28 +1,36 @@
-2025-07-24 19:20:11 - memory_node - INFO - Memory Node initialized for character: Joe
-2025-07-24 19:20:11 - memory_node - INFO - Storage available at:
-2025-07-24 19:20:11 - memory_node - INFO -   - cognitive/Joe/memory/short_term/*
-2025-07-24 19:20:11 - memory_node - INFO -   - cognitive/Joe/memory/chat/*
-2025-07-24 19:20:11 - memory_node - INFO -   - cognitive/Joe/memory/long_term/*
-2025-07-24 19:20:11 - memory_node - INFO -   - cognitive/Joe/memory/entity/*
-2025-07-24 19:20:11 - memory_node - INFO - Memory Node running - press Ctrl+C to stop
-2025-07-24 19:20:13 - mem2025-07-24 19:20:42 - memory_node - INFO - 👥 Created new entity: ui
-2025-07-24 19:20:42 - memory_node - INFO - 💬 Added conversation entry for ui: received "hello..."
-2025-07-24 19:20:42 - memory_node - INFO - 📚 Chat query: returned 0 entries
-2025-07-24 19:20:42 - memory_node - INFO - 👥 Entity query for ui: returned data
-2025-07-24 19:20:44 - memory_node - INFO - 💬 Stored chat interaction: action_0
-2025-07-24 19:20:44 - memory_node - INFO - 💬 Added conversation entry for ui: sent " Samantha: Hey there! What brings you into these w..."
-2025-07-24 19:20:44 - memory_node - INFO - 💬 Added response to entity ui: Samantha -> " Samantha: Hey there! What brings you into these w..."
-2025-07-24 19:21:04 - memory_node - INFO - 💬 Added conversation entry for ui: received "sure, what did you have in mind?..."
-2025-07-24 19:21:04 - memory_node - INFO - 📚 Chat query: returned 1 entries
-2025-07-24 19:21:04 - memory_node - INFO - 👥 Entity query for ui: returned data
-2025-07-24 19:21:07 - memory_node - INFO - 💬 Stored chat interaction: action_1
-2025-07-24 19:21:07 - memory_node - INFO - 💬 Added conversation entry for ui: sent " 
-Samantha: Well, if you're up for it, we could ex..."
-2025-07-24 19:21:07 - memory_node - INFO - 💬 Added response to entity ui: Samantha -> " 
-Samantha: Well, if you're up for it, we could ex..."
-2025-07-24 19:22:01 - memory_node - INFO - 💬 Added conversation entry for ui: received "Sure, sounds good. BTW, have you seen Joe?..."
-2025-07-24 19:22:01 - memory_node - INFO - 📚 Chat query: returned 2 entries
-2025-07-24 19:22:01 - memory_node - INFO - 👥 Entity query for ui: returned data
-2025-07-24 19:22:42 - memory_node - INFO - 💬 Stored chat interaction: action_2
-2025-07-24 19:22:42 - memory_node - INFO - 💬 Added conversation entry for ui: sent " Samantha: Hmm, Joe, you say? I haven't seen him a..."
-2025-07-24 19:22:42 - memory_node - INFO - 💬 Added response to entity ui: Samantha -> " Samantha: Hmm, Joe, you say? I haven't seen him a..."
+2025-07-27 15:43:55 - memory_node - INFO - 📂 Loaded memory from data/memory/Joe_memory.json
+2025-07-27 15:43:55 - memory_node - INFO - Memory Node initialized for character: Joe
+2025-07-27 15:43:55 - memory_node - INFO - Storage available at:
+2025-07-27 15:43:55 - memory_node - INFO -   - cognitive/Joe/memory/short_term/*
+2025-07-27 15:43:55 - memory_node - INFO -   - cognitive/Joe/memory/chat/*
+2025-07-27 15:43:55 - memory_node - INFO -   - cognitive/Joe/memory/long_term/*
+2025-07-27 15:43:55 - memory_node - INFO -   - cognitive/Joe/memory/entity/*
+2025-07-27 15:43:55 - memory_node - INFO - Memory Node running - press Ctrl+C to stop
+2025-07-27 15:43:58 - memory_node - INFO - 📢 Stored character announcement: Joe
+2025-07-27 15:44:15 - memory_node -2025-07-27 15:44:15 - memory_node - INFO - 👥 E2025-07-27 15:44:16 - memory_node - INFO2025-07-27 15:44:16 - memory_node - INFO - 👥 E2025-07-27 15:44:17 - memory_node - INFO -2025-07-27 15:44:17 - memory_node - INFO - 📝 Stored action: move - move_1753656257
+2025-07-27 15:44:18 - memory_node - INFO - 💾 Saved memory to data/memory/Samantha_memory.json
+2025-07-27 15:44:18 - memory_node - INFO - 💬 Added conversation entry for Joe: received "I'm Joe, nice to meet you, I don't know how I got ..."
+2025-07-27 15:44:21 - memory_node - INFO - 📚 Chat query: returned 0 entries
+2025-07-27 15:44:21 - memory_node - INFO - 👥 Entity query for Joe: returned data
+2025-07-27 15:44:26 - memory_node - INFO - 💾 Saved memory to data/memory/Samantha_memory.json
+2025-07-27 15:44:26 - memory_node - INFO - 💬 Added conversation entry for Joe: sent "Samantha: Honestly, I'm not entirely sure. I've be..."
+2025-07-27 15:44:26 - memory_node - INFO - 💬 Added response to entity Joe: Samantha -> "Samantha: Honestly, I'm not entirely sure. I've be..."
+2025-07-27 15:44:30 - memory_node - INFO - 👥 Entity query for Samantha: returned data
+2025-07-27 15:44:31 - memory_node - INFO - 👥 Entity query for Joe: returned data
+2025-07-27 15:44:32 - memory_node - INFO - 📚 Chat query: returned 1 entries
+2025-07-27 15:44:32 - memory_node - INFO - 👥 Entity query for Samantha: returned data
+2025-07-27 15:44:33 - memory_node - INFO - 👥 Created new entity: Samantha
+2025-07-27 15:44:33 - memory_node - INFO - 💾 Saved memory to data/memory/Samantha_memory.json
+2025-07-27 15:44:33 - memory_node - INFO - 💬 Added conversation entry for Samantha: sent "#thought fear of strangers is rational
+##..."
+2025-07-27 15:44:33 - memory_node - IN2025-07-27 15:44:38 - memory_node - INFO - 💾 Saved memory to data/memory/Joe_memory.json
+2025-07-27 12025-07-27 15:44:38 - memory_node - INFO - 💾 Saved memory to data/memory/Samantha_memory.json
+2025-07-27 15:44:38 - memory_node - INFO - 💬 Added conversation entry for Joe: received "I'm Joe, nice to meet you too, Samantha. I don't r..."
+2025-07-27 15:44:49 - memory_node - INFO - 📚 Chat query: returned 2 entries
+2025-07-27 15:44:49 - memory_node - INFO - 2025-07-27 15:44:49 - memory_node - INFO 2025-07-27 15:44:55 - memory_node - INFO - 💾 Saved memory to data/memory/Samantha_memory.json
+2025-07-27 15:44:55 - memory_node - INFO - 💬 Added conversation entry for Joe: sent "Samantha: I think we should try to find shelter fo..."
+2025-07-27 15:44:55 - memory_node - INFO - 💬 Added response to entity Joe: Samantha -> "Samantha: I think we should try to find shelter fo..."
+ent "#thought Need_to_recover_memories..."
+2025-07-27 15:44:51 - memory_node - INFO - 💬 Added response to entity Joe: Joe -> "#thought Need_to_recover_memories..."
+2025-07-27 15:44:55 - memory_node - INFO - 💾 Saved memory to data/memory/Joe_memory.json
+2025-07-27 15:44:55 - memory_node - INFO - 💬 Added conversation entry for Samantha: received "Samantha: I think we should try to find shelter fo..."

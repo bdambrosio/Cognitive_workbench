@@ -18,10 +18,20 @@ from typing import Dict, List, Any, Optional
 from concurrent.futures import Future, ThreadPoolExecutor
 
 # Configure logging
+# Console handler with WARNING level (less verbose)
+console_handler = logging.StreamHandler(sys.stdout)
+console_handler.setLevel(logging.WARNING)
+
+# File handler with INFO level (full logging)
+file_handler = logging.FileHandler('logs/test_llm_service.log', mode='w')
+file_handler.setLevel(logging.INFO)
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    datefmt='%Y-%m-%d %H:%M:%S'
+    datefmt='%Y-%m-%d %H:%M:%S',
+    handlers=[console_handler, file_handler],
+    force=True
 )
 logger = logging.getLogger('test_llm_service')
 

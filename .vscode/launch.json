@@ -2,21 +2,6 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Debug Memory Node (Default)",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${workspaceFolder}/zenoh_cognitive_framework/memory_node.py",
-            "console": "integratedTerminal",
-            "cwd": "${workspaceFolder}/zenoh_cognitive_framework",
-            "env": {
-                "PYTHONPATH": "${workspaceFolder}/zenoh_cognitive_framework"
-            },
-            "args": ["-c", "default", "-config", "{}"],
-            "justMyCode": false,
-            "stopOnEntry": false,
-            "preLaunchTask": "setup-zenoh-environment"
-        },
-        {
             "name": "Debug Memory Node (Samantha)",
             "type": "debugpy",
             "request": "launch",
@@ -77,36 +62,6 @@
             "preLaunchTask": "setup-zenoh-environment"
         },
         {
-            "name": "Debug Action Node (Default)",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${workspaceFolder}/zenoh_cognitive_framework/action_node.py",
-            "console": "integratedTerminal",
-            "cwd": "${workspaceFolder}/zenoh_cognitive_framework",
-            "env": {
-                "PYTHONPATH": "${workspaceFolder}/zenoh_cognitive_framework"
-            },
-            "args": ["-c", "default", "-config", "{}"],
-            "justMyCode": false,
-            "stopOnEntry": false,
-            "preLaunchTask": "setup-zenoh-environment"
-        },
-        {
-            "name": "Debug Action Node (Samantha)",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${workspaceFolder}/zenoh_cognitive_framework/action_node.py",
-            "console": "integratedTerminal",
-            "cwd": "${workspaceFolder}/zenoh_cognitive_framework",
-            "env": {
-                "PYTHONPATH": "${workspaceFolder}/zenoh_cognitive_framework"
-            },
-            "args": ["-c", "samantha", "-config", "{\"response_style\": \"friendly\"}"],
-            "justMyCode": false,
-            "stopOnEntry": false,
-            "preLaunchTask": "setup-zenoh-environment"
-        },
-        {
             "name": "Debug Action Display Node (Multi-Character)",
             "type": "debugpy",
             "request": "launch",
@@ -137,51 +92,6 @@
             "preLaunchTask": "setup-zenoh-environment"
         },
         {
-            "name": "Debug Launcher (All Nodes)",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${workspaceFolder}/zenoh_cognitive_framework/launch_all_nodes.py",
-            "console": "integratedTerminal",
-            "cwd": "${workspaceFolder}/zenoh_cognitive_framework",
-            "env": {
-                "PYTHONPATH": "${workspaceFolder}/zenoh_cognitive_framework"
-            },
-            "args": [],
-            "justMyCode": false,
-            "stopOnEntry": false,
-            "preLaunchTask": "setup-zenoh-environment"
-        },
-        {
-            "name": "Debug Character Launcher",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${workspaceFolder}/zenoh_cognitive_framework/character_launcher.py",
-            "console": "integratedTerminal",
-            "cwd": "${workspaceFolder}/zenoh_cognitive_framework",
-            "env": {
-                "PYTHONPATH": "${workspaceFolder}/zenoh_cognitive_framework"
-            },
-            "args": [],
-            "justMyCode": false,
-            "stopOnEntry": false,
-            "preLaunchTask": "setup-zenoh-environment"
-        },
-        {
-            "name": "Debug Character Launcher (with config)",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${workspaceFolder}/zenoh_cognitive_framework/character_launcher.py",
-            "console": "integratedTerminal",
-            "cwd": "${workspaceFolder}/zenoh_cognitive_framework",
-            "env": {
-                "PYTHONPATH": "${workspaceFolder}/zenoh_cognitive_framework"
-            },
-            "args": ["--config-file", "characters.yaml"],
-            "justMyCode": false,
-            "stopOnEntry": false,
-            "preLaunchTask": "setup-zenoh-environment"
-        },
-        {
             "name": "Debug Map Node (Forest)",
             "type": "debugpy",
             "request": "launch",
@@ -206,11 +116,45 @@
             "env": {
                 "PYTHONPATH": "${workspaceFolder}/zenoh_cognitive_framework"
             },
-            "args": ["--config-file", "characters.yaml", "--map-file", "forest.py"],
+            "args": ["--ui", "--config-file", "characters.yaml", "--map-file", "forest.py"],
+            "justMyCode": false,
+            "stopOnEntry": false,
+            "preLaunchTask": "setup-zenoh-environment"
+        },
+        {
+            "name": "Clear Character Data",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/zenoh_cognitive_framework/memory_manager.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/zenoh_cognitive_framework",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/zenoh_cognitive_framework"
+            },
+            "args": [],
+            "justMyCode": false,
+            "stopOnEntry": false,
+            "preLaunchTask": "setup-zenoh-environment"
+        },
+        {
+            "name": "Format Prompt",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/zenoh_cognitive_framework/format_prompt.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/zenoh_cognitive_framework",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/zenoh_cognitive_framework",
+                "LD_LIBRARY_PATH": "${workspaceFolder}/zenoh_venv/lib/python3.12/site-packages/PyQt5/Qt5/lib:$LD_LIBRARY_PATH",
+                "QT_PLUGIN_PATH": "${workspaceFolder}/zenoh_venv/lib/python3.12/site-packages/PyQt5/Qt5/plugins",
+                "QT_QPA_PLATFORM_PLUGIN_PATH": ""
+            },
+            "args": [],
             "justMyCode": false,
             "stopOnEntry": false,
             "preLaunchTask": "setup-zenoh-environment"
         }
+
 
     ]
 } 

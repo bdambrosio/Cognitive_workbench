@@ -7,6 +7,9 @@ import logging
 import json
 import importlib.util
 import signal
+import time
+import threading
+from pathlib import Path
 from datetime import datetime
 from typing import Dict, Any, Optional
 
@@ -14,23 +17,29 @@ from typing import Dict, Any, Optional
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import zenoh
-from map import WorldMap, Agent
+from map import WorldMap, Agent, hash_direction_info, extract_direction_info
 
 # Configure logging
+# Console handler with WARNING level (less verbose)
+console_handler = logging.StreamHandler()
+console_handler.setLevel(logging.WARNING)
+
+# File handler with INFO level (full logging)
+file_handler = logging.FileHandler('map_node.log', mode='w')
+file_handler.setLevel(logging.INFO)
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.StreamHandler(),
-        logging.FileHandler('map_node.log', mode='w')
-    ],
+    handlers=[console_handler, file_handler],
     force=True
 )
 logger = logging.getLogger(__name__)
 
 class MapNode:
-    def __init__(self, map_file: str):
+    def __init__(self, map_file: str, world_name: str = None):
         self.map_file = map_file
+        self.world_name = world_name or map_file.replace('.py', '')
         self.world_map = None
         self.session = None
         self.shutdown_requested = False
@@ -41,11 +50,34 @@ class MapNode:
         # Agent visibility tracking: agent_name -> set of visible agent names
         self.agent_visibility = {}
         
+        # Persistence setup
+        self.world_file = Path(f"data/world/{self.world_name}_world.json")
+        self.world_file.parent.mkdir(parents=True, exist_ok=True)
+        
+        # Persistence timer
+        self.last_save_time = time.time()
+        self.save_interval = 120  # 2 minutes
+        self.persistence_thread = None
+        
+        # Turn management
+        self.turn_state = {
+            'turn_number': 0,
+            'active_characters': [],
+            'completed_characters': [],
+            'turn_start_time': None,
+            'timeout_seconds': 30
+        }
+        self.turn_publisher = None
+        self.turn_complete_subscriber = None
+        
         # Load the map module
         self.load_map_module()
         
         # Initialize Zenoh session
         self.init_zenoh()
+        
+        # Start persistence thread
+        self.start_persistence_thread()
         
     def load_map_module(self):
         """Load the map module from the maps subdirectory"""
@@ -68,6 +100,9 @@ class MapNode:
             self.world_map = WorldMap(map_module)
             logger.info(f"WorldMap created successfully: {self.world_map.width}x{self.world_map.height}")
             
+            # Load existing world data if available
+            self.load_world_data()
+            
         except Exception as e:
             logger.error(f"Failed to load map module: {e}")
             raise
@@ -86,6 +121,9 @@ class MapNode:
             
             # Set up queryables for map services
             self.setup_queryables()
+            
+            # Set up turn management
+            self.setup_turn_management()
             
             logger.info("Zenoh session initialized successfully")
             
@@ -150,7 +188,237 @@ class MapNode:
             self.handle_agent_move
         )
         
-        logger.info("Map queryables set up successfully")
+        # Subscriber for character announcements
+        self.character_announcement_subscriber = self.session.declare_subscriber(
+            "cognitive/*/action",
+            self.handle_character_announcement
+        )
+        
+        logger.info("Map queryables and subscribers set up successfully")
+    
+    def setup_turn_management(self):
+        """Set up turn management system"""
+        try:
+            # Publisher for turn "GO" signals
+            self.turn_publisher = self.session.declare_publisher("cognitive/map/turn/go")
+            
+            # Publisher for step complete signals (for FastAPI UI)
+            self.step_complete_publisher = self.session.declare_publisher("cognitive/map/step_complete")
+            
+            # Subscriber for turn completion signals
+            self.turn_complete_subscriber = self.session.declare_subscriber(
+                "cognitive/map/turn/complete/*",
+                self.handle_turn_complete
+            )
+            
+            # Queryable for turn status
+            self.turn_status_queryable = self.session.declare_queryable(
+                "cognitive/map/turn/status",
+                self.handle_turn_status_query
+            )
+            
+            # Subscribers for manual turn control
+            self.turn_step_subscriber = self.session.declare_subscriber(
+                "cognitive/map/turn/step",
+                self.handle_turn_step
+            )
+            
+            self.turn_run_subscriber = self.session.declare_subscriber(
+                "cognitive/map/turn/run",
+                self.handle_turn_run
+            )
+            
+            self.turn_stop_subscriber = self.session.declare_subscriber(
+                "cognitive/map/turn/stop",
+                self.handle_turn_stop
+            )
+            
+            # Turn control state
+            self.turn_control_mode = "step"  # "step" or "run"
+            self.auto_progression_enabled = False
+            
+            logger.info("Turn management system set up successfully")
+            logger.info("Manual turn control enabled - starting in STEP mode")
+            
+        except Exception as e:
+            logger.error(f"Failed to set up turn management: {e}")
+            raise
+    
+    def get_active_characters(self):
+        """Get list of active characters from agent registry"""
+        return list(self.agent_registry.keys())
+    
+    def start_new_turn(self):
+        """Start a new turn for all active characters"""
+        import random
+        
+        # Get active characters and randomize order
+        active_characters = self.get_active_characters()
+        logger.info(f"Starting new turn with active characters: {active_characters}")
+        if not active_characters:
+            logger.debug("No active characters for turn")
+            return
+        
+        random.shuffle(active_characters)
+        
+        # Update turn state
+        self.turn_state['turn_number'] += 1
+        self.turn_state['active_characters'] = active_characters
+        self.turn_state['completed_characters'] = []
+        self.turn_state['turn_start_time'] = time.time()
+        
+        # Publish "GO" signal
+        go_signal = {
+            'turn_number': self.turn_state['turn_number'],
+            'active_characters': active_characters,
+            'timestamp': time.time()
+        }
+        self.turn_publisher.put(json.dumps(go_signal).encode('utf-8'))
+        
+        logger.info(f"🚦 Turn {self.turn_state['turn_number']} started for: {', '.join(active_characters)}")
+    
+    def handle_turn_complete(self, sample):
+        """Handle turn completion signals from characters"""
+        try:
+            # Extract character name from topic
+            topic_parts = str(sample.key_expr).split('/')
+            character_name = topic_parts[-1] if len(topic_parts) > 0 else None
+            
+            if not character_name:
+                logger.warning("Turn complete signal without character name")
+                return
+            
+            # Add to completed list
+            if character_name not in self.turn_state['completed_characters']:
+                self.turn_state['completed_characters'].append(character_name)
+                logger.info(f"✅ {character_name} completed turn {self.turn_state['turn_number']}")
+                logger.info(f"Turn progress: {len(self.turn_state['completed_characters'])}/{len(self.turn_state['active_characters'])} characters completed")
+            
+            # Check if all characters have completed
+            if len(self.turn_state['completed_characters']) >= len(self.turn_state['active_characters']):
+                logger.info(f"🎯 All characters completed turn {self.turn_state['turn_number']}")
+                
+                # In Step mode, never auto-progress - always wait for manual step
+                if self.turn_control_mode == "step":
+                    logger.info("Step mode - waiting for manual step command")
+                    # Publish step complete message for FastAPI UI
+                    step_complete_data = {
+                        'turn_number': self.turn_state['turn_number'],
+                        'active_characters': self.turn_state['active_characters'],
+                        'completed_characters': self.turn_state['completed_characters'],
+                        'timestamp': time.time()
+                    }
+                    self.step_complete_publisher.put(json.dumps(step_complete_data).encode('utf-8'))
+                    logger.info("📢 Published step_complete message for FastAPI UI")
+                    # Reset turn state so next step command starts a new turn
+                    self.turn_state['active_characters'] = []
+                    self.turn_state['completed_characters'] = []
+                    self.turn_state['turn_start_time'] = None
+                # In Run mode, auto-progress to next turn
+                elif self.auto_progression_enabled:
+                    logger.info("Run mode - auto-progressing to next turn")
+                    threading.Timer(1.0, self.start_new_turn).start()
+                else:
+                    logger.info("Run mode but auto-progression disabled - waiting for manual step")
+            
+        except Exception as e:
+            logger.error(f"Error handling turn complete: {e}")
+    
+    def handle_turn_status_query(self, query):
+        """Handle turn status queries"""
+        try:
+            response = {
+                'success': True,
+                'turn_state': self.turn_state,
+                'turn_control': {
+                    'mode': self.turn_control_mode,
+                    'auto_progression': self.auto_progression_enabled
+                }
+            }
+            query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
+        except Exception as e:
+            logger.error(f"Error handling turn status query: {e}")
+            error_response = {
+                'success': False,
+                'error': str(e)
+            }
+            query.reply(query.key_expr, json.dumps(error_response).encode('utf-8'))
+    
+    def check_turn_timeout(self):
+        """Check for turn timeouts and advance turn if needed"""
+        if not self.turn_state['turn_start_time']:
+            return
+        
+        elapsed = time.time() - self.turn_state['turn_start_time']
+        if elapsed > self.turn_state['timeout_seconds']:
+            # In step mode, don't timeout - just log the elapsed time
+            if not self.auto_progression_enabled:
+                logger.info(f"⏰ Turn {self.turn_state['turn_number']} elapsed time: {elapsed:.1f}s (no timeout in step mode)")
+                return
+            
+            # Timeout occurred - remove unresponsive characters (only in run mode)
+            completed = set(self.turn_state['completed_characters'])
+            active = set(self.turn_state['active_characters'])
+            unresponsive = active - completed
+            
+            if unresponsive:
+                logger.warning(f"⏰ Turn timeout - removing unresponsive characters: {', '.join(unresponsive)}")
+                # Remove unresponsive characters from agent registry
+                for char in unresponsive:
+                    if char in self.agent_registry:
+                        del self.agent_registry[char]
+                        logger.info(f"Removed unresponsive character: {char}")
+            
+            # Start next turn only if auto-progression is enabled
+            if self.auto_progression_enabled:
+                self.start_new_turn()
+            else:
+                logger.info("Turn timed out but auto-progression disabled - waiting for manual step")
+    
+    def handle_turn_step(self, sample):
+        """Handle manual step turn command"""
+        try:
+            logger.info("🎯 Manual Step Turn command received")
+            self.turn_control_mode = "step"
+            self.auto_progression_enabled = False
+            
+            # If no turn is currently active, start one
+            if not self.turn_state['active_characters']:
+                logger.info("Starting new turn for step command")
+                self.start_new_turn()
+            else:
+                logger.info("Turn already in progress - will complete normally")
+                
+        except Exception as e:
+            logger.error(f"Error handling turn step command: {e}")
+    
+    def handle_turn_run(self, sample):
+        """Handle manual run turns command"""
+        try:
+            logger.info("🏃 Manual Run Turns command received")
+            self.turn_control_mode = "run"
+            self.auto_progression_enabled = True
+            
+            # If no turn is currently active, start one
+            if not self.turn_state['active_characters']:
+                self.start_new_turn()
+            else:
+                logger.info("Turn already in progress - will auto-progress after completion")
+                
+        except Exception as e:
+            logger.error(f"Error handling turn run command: {e}")
+    
+    def handle_turn_stop(self, sample):
+        """Handle manual stop turns command"""
+        try:
+            logger.info("⏹️ Manual Stop Turns command received")
+            self.turn_control_mode = "step"
+            self.auto_progression_enabled = False
+            
+            logger.info("Auto-progression disabled - waiting for manual step")
+                
+        except Exception as e:
+            logger.error(f"Error handling turn stop command: {e}")
     
     def handle_map_summary(self, query):
         """Handle map summary queries"""
@@ -315,8 +583,9 @@ class MapNode:
             if not character_name:
                 raise ValueError("No character name provided")
             
-            # Check if agent already exists
-            if character_name in self.agent_registry:
+            # Check if agent already exists (case-insensitive)
+            canonical_character_name = character_name.capitalize()
+            if canonical_character_name in self.agent_registry:
                 response = {
                     'success': False,
                     'error': f"Agent for character '{character_name}' already registered"
@@ -329,25 +598,25 @@ class MapNode:
                     location = (25, 25)  # Center of map
                 
                 # Create agent instance
-                agent = Agent(location[0], location[1], self.world_map, character_name)
+                agent = Agent(location[0], location[1], self.world_map, canonical_character_name)
                 
                 # Register agent with world map
                 self.world_map.register_agent(agent)
                 
                 # Store in our registry
-                self.agent_registry[character_name] = agent
+                self.agent_registry[canonical_character_name] = agent
                 
                 # Initialize visibility tracking for this agent
-                self.agent_visibility[character_name] = set()
+                self.agent_visibility[canonical_character_name] = set()
                 
                 response = {
                     'success': True,
-                    'character_name': character_name,
+                    'character_name': canonical_character_name,
                     'location': location,
                     'message': f"Agent registered at {location}"
                 }
                 
-                logger.info(f"Agent registered for character '{character_name}' at {location}")
+                logger.info(f"Agent registered for character '{canonical_character_name}' at {location}")
             
             query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
             
@@ -369,22 +638,32 @@ class MapNode:
             if not character_name:
                 raise ValueError("No character name provided")
             
-            # Get agent from registry
-            if character_name not in self.agent_registry:
+            # Get agent from registry (case-insensitive)
+            canonical_character_name = character_name.capitalize()
+            if canonical_character_name not in self.agent_registry:
                 response = {
                     'success': False,
                     'error': f"Agent for character '{character_name}' not found"
                 }
             else:
-                agent = self.agent_registry[character_name]
+                agent = self.agent_registry[canonical_character_name]
                 
                 # Call agent's look method
                 look_result = agent.look()
+                view = {}
+                for dir in ['Current','North', 'Northeast', 'East', 'Southeast', 
+                        'South', 'Southwest', 'West', 'Northwest']:
+                    dir_obs = extract_direction_info(self.world_map, look_result, dir)
+                    view[dir] = dir_obs
+
+                view_text, resources, characters, paths, percept_summary = hash_direction_info(view, world=self.world_map)
                 
                 response = {
                     'success': True,
-                    'character_name': character_name,
-                    'look_result': look_result
+                    'character_name': canonical_character_name,
+                    'look_result': view_text,
+                    'location': [agent.x, agent.y],
+                    'characters': list(set(characters)),
                 }
             
             query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
@@ -417,24 +696,25 @@ class MapNode:
             except Exception as e:
                 logger.warning(f"Could not parse move payload, using default direction: {e}")
             
-            # Get agent from registry
-            if character_name not in self.agent_registry:
+            # Get agent from registry (case-insensitive)
+            canonical_character_name = character_name.capitalize()
+            if canonical_character_name not in self.agent_registry:
                 response = {
                     'success': False,
                     'error': f"Agent for character '{character_name}' not found"
                 }
             else:
-                agent = self.agent_registry[character_name]
+                agent = self.agent_registry[canonical_character_name]
                 
                 # Call agent's move method
                 move_result = agent.move(direction)
                 
                 # Check for visibility changes after movement
-                self.check_visibility_changes(character_name)
+                self.check_visibility_changes(canonical_character_name)
                 
                 response = {
                     'success': True,
-                    'character_name': character_name,
+                    'character_name': canonical_character_name,
                     'direction': direction,
                     'move_result': move_result
                 }
@@ -569,6 +849,45 @@ class MapNode:
         except Exception as e:
             logger.error(f"Error publishing agent detected event: {e}")
     
+    def handle_character_announcement(self, sample):
+        """Handle character announcement actions to create agents"""
+        try:
+            data = json.loads(sample.payload.to_bytes().decode('utf-8'))
+            
+            # Check if this is a character announcement
+            if data.get('type') == 'announcement':
+                character_name = data.get('character_name')
+                
+                if character_name:
+                    # Check if agent already exists (case-insensitive)
+                    canonical_character_name = character_name.capitalize()
+                    if canonical_character_name not in self.agent_registry:
+                        # Create agent at default spawn point (20,20)
+                        agent = Agent(20, 20, self.world_map, canonical_character_name)
+                        
+                        # Register agent with world map
+                        self.world_map.register_agent(agent)
+                        
+                        # Store in our registry
+                        self.agent_registry[canonical_character_name] = agent
+                        
+                        # Initialize visibility tracking for this agent
+                        self.agent_visibility[canonical_character_name] = set()
+                        
+                        logger.info(f"Agent created for character '{canonical_character_name}' at (20,20)")
+                        
+                        # Start first turn if this is the first character and auto-progression is enabled
+                        if len(self.agent_registry) == 1:
+                            logger.info("First character added - turn management ready")
+                            if self.auto_progression_enabled:
+                                logger.info("Auto-progression enabled - starting first turn")
+                                threading.Timer(2.0, self.start_new_turn).start()
+                            else:
+                                logger.info("Manual control mode - waiting for step command")
+                
+        except Exception as e:
+            logger.error(f"Error handling character announcement: {e}")
+    
     def run(self):
         """Run the map node"""
         logger.info(f"Map node started with map file: {self.map_file}")
@@ -576,7 +895,8 @@ class MapNode:
         try:
             # Keep the node running
             while not self.shutdown_requested:
-                import time
+                # Check for turn timeouts
+                self.check_turn_timeout()
                 time.sleep(1)
                 
         except KeyboardInterrupt:
@@ -586,10 +906,112 @@ class MapNode:
         finally:
             self.shutdown()
     
+    def load_world_data(self):
+        """Load world data from file."""
+        try:
+            if self.world_file.exists():
+                with open(self.world_file, 'r') as f:
+                    world_data = json.load(f)
+                    
+                    # Restore agent positions
+                    if 'agents' in world_data:
+                        for agent_data in world_data['agents']:
+                            character_name = agent_data['character_name']
+                            x, y = agent_data['position']
+                            
+                            # Create agent at saved position
+                            agent = Agent(x, y, self.world_map, character_name)
+                            self.world_map.register_agent(agent)
+                            self.agent_registry[character_name] = agent
+                            self.agent_visibility[character_name] = set()
+                            
+                            logger.info(f"📂 Restored agent {character_name} at position ({x}, {y})")
+                    
+                    # Restore world map state if available
+                    if 'world_map' in world_data:
+                        # TODO: Restore world map modifications (resources, terrain changes, etc.)
+                        logger.info("📂 World map state restored")
+                    
+                    logger.info(f"📂 Loaded world data for '{self.world_name}'")
+                    
+                    # Start turn management if agents were restored
+                    if len(self.agent_registry) > 0:
+                        logger.info(f"📂 {len(self.agent_registry)} agents restored - starting turn management")
+                        # Give characters time to initialize before starting turns
+                        threading.Timer(5.0, self.start_new_turn).start()
+                        
+                        # Trigger character announcements for restored agents
+                        # This ensures the map node knows about them for turn management
+                        for character_name in self.agent_registry.keys():
+                            logger.info(f"📂 Triggering announcement for restored character: {character_name}")
+            else:
+                logger.info(f"📂 No existing world data for '{self.world_name}', starting fresh")
+        except Exception as e:
+            logger.error(f"Error loading world data: {e}")
+    
+    def save_world_data(self):
+        """Save world data to file."""
+        try:
+            world_data = {
+                'world_name': self.world_name,
+                'map_file': self.map_file,
+                'timestamp': datetime.now().isoformat(),
+                'agents': []
+            }
+            
+            # Save agent positions
+            for character_name, agent in self.agent_registry.items():
+                agent_data = {
+                    'character_name': character_name,
+                    'position': [agent.x, agent.y]
+                }
+                world_data['agents'].append(agent_data)
+            
+            # Save world map state
+            # TODO: Add world map modifications (resources, terrain changes, etc.)
+            world_data['world_map'] = {
+                'width': self.world_map.width,
+                'height': self.world_map.height
+                # Add more world state as needed
+            }
+            
+            with open(self.world_file, 'w') as f:
+                json.dump(world_data, f, indent=2)
+            
+            logger.debug(f"💾 Saved world data for '{self.world_name}'")
+        except Exception as e:
+            logger.error(f"Error saving world data: {e}")
+    
+    def start_persistence_thread(self):
+        """Start background thread for periodic persistence."""
+        self.persistence_thread = threading.Thread(target=self._persistence_loop, daemon=True)
+        self.persistence_thread.start()
+        logger.info(f"🔄 Started persistence thread for '{self.world_name}'")
+    
+    def _persistence_loop(self):
+        """Background thread for periodic persistence."""
+        while not self.shutdown_requested:
+            try:
+                current_time = time.time()
+                if current_time - self.last_save_time >= self.save_interval:
+                    self.save_world_data()
+                    self.last_save_time = current_time
+                time.sleep(10)  # Check every 10 seconds
+            except Exception as e:
+                logger.error(f"Error in persistence loop: {e}")
+                time.sleep(30)  # Wait longer on error
+    
     def shutdown(self):
         """Shutdown the map node"""
         logger.info("Shutting down map node...")
         self.shutdown_requested = True
+        
+        # Save world data on shutdown BEFORE closing session
+        try:
+            self.save_world_data()
+            logger.info("✅ World data saved successfully")
+        except Exception as e:
+            logger.error(f"Error saving world data: {e}")
         
         # Clean up agents
         for character_name, agent in self.agent_registry.items():
@@ -602,9 +1024,15 @@ class MapNode:
         # Clear visibility tracking
         self.agent_visibility.clear()
         
+        # Close Zenoh session more carefully
         if self.session:
-            self.session.close()
-            logger.info("Zenoh session closed")
+            try:
+                # Wait longer for any pending operations to complete
+                time.sleep(2.0)
+                self.session.close()
+                logger.info("Zenoh session closed")
+            except Exception as e:
+                logger.error(f"Error closing Zenoh session: {e}")
         
         logger.info("Map node shutdown complete")
 
@@ -618,6 +1046,8 @@ def main():
     parser = argparse.ArgumentParser(description='Shared Map Node')
     parser.add_argument('-m', '--map-file', required=True, 
                        help='Map file name (e.g., forest.py)')
+    parser.add_argument('-w', '--world-name', 
+                       help='World name (defaults to map file name without .py)')
     
     args = parser.parse_args()
     
@@ -627,7 +1057,7 @@ def main():
         signal.signal(signal.SIGINT, signal_handler)
         
         # Create and run map node
-        map_node = MapNode(args.map_file)
+        map_node = MapNode(args.map_file, args.world_name)
         signal_handler.map_node = map_node  # Store reference for signal handler
         
         map_node.run()

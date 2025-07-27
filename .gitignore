@@ -27,3 +27,6 @@ Thumbs.db
 # ROS2 specific
 *.db
 *.db-*
+
+# Cognitive framework data (private memories, etc.)
+data/

@@ -11,9 +11,29 @@ import json
 import time
 import threading
 import uuid
+import logging
+import sys
 from datetime import datetime
 from typing import Dict, List, Any, Optional
 from concurrent.futures import Future, ThreadPoolExecutor
+
+# Configure logging with unbuffered output
+# Console handler with WARNING level (less verbose)
+console_handler = logging.StreamHandler(sys.stdout)
+console_handler.setLevel(logging.WARNING)
+
+# File handler with INFO level (full logging)
+file_handler = logging.FileHandler('logs/llm_client.log', mode='w')
+file_handler.setLevel(logging.INFO)
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S',
+    handlers=[console_handler, file_handler],
+    force=True
+)
+logger = logging.getLogger('llm_client')
 
 
 class LLMResponse:
@@ -59,14 +79,14 @@ class ZenohLLMClient:
         # Thread safety
         self._lock = threading.Lock()
         
-        print('🤖 Zenoh LLM Client initialized')
+        logger.info('🤖 Zenoh LLM Client initialized')
     
     def generate(self, 
                 messages: List[str], 
                 bindings: Dict[str, Any] = None,
                 max_tokens: int = 150, 
                 temperature: float = 0.7, 
-                stops: List[str] = None,
+                stops: List[str] = ['</end>'],
                 timeout: float = None) -> LLMResponse:
         """
         Generate a response from the LLM service.
@@ -133,7 +153,7 @@ class ZenohLLMClient:
         # Publish request
         self.request_publisher.put(json.dumps(request_data))
         
-        print(f'📤 Sent LLM request {request_id}')
+        logger.debug(f'📤 Sent LLM request {request_id}')
         
         return future
     
@@ -161,10 +181,10 @@ class ZenohLLMClient:
                     # Clean up
                     del self.pending_requests[request_id]
                     
-                    print(f'✅ Received LLM response for {request_id}')
+                    logger.debug(f'✅ Received LLM response for {request_id}')
                     
         except Exception as e:
-            print(f'❌ Error handling LLM response: {e}')
+            logger.error(f'❌ Error handling LLM response: {e}')
     
     def cancel_request(self, request_id: str):
         """Cancel a pending request."""
@@ -174,18 +194,23 @@ class ZenohLLMClient:
                 if not future.done():
                     future.cancel()
                 del self.pending_requests[request_id]
-                print(f'❌ Cancelled LLM request {request_id}')
+                logger.info(f'❌ Cancelled LLM request {request_id}')
     
     def cleanup(self):
         """Clean up resources."""
         with self._lock:
-            # Cancel all pending requests
+            # Cancel all pending requests immediately
             for request_id in list(self.pending_requests.keys()):
                 self.cancel_request(request_id)
         
-        # Close Zenoh session
-        self.session.close()
-        print('🧹 LLM Client cleanup completed')
+        # Close Zenoh session more carefully
+        try:
+            # Wait longer for cleanup to avoid Zenoh panics
+            time.sleep(2.0)
+            self.session.close()
+            logger.info('🧹 LLM Client cleanup completed')
+        except Exception as e:
+            logger.error(f'Error closing LLM client session: {e}')
 
 
 # Convenience function for simple requests
