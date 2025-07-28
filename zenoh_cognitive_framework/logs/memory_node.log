@@ -1,33 +1,19 @@
-2025-07-28 13:41:47 - llm_client - INFO - 🤖 Zenoh LLM Client initialized
-2025-07-28 13:41:47 - memory_node - INFO - 📂 No existing memory file, starting fresh
-2025-07-28 13:41:47 - memory_node - INFO - Memory Node initialized for character: Joe
-2025-07-28 13:41:47 - memory_node - INFO - Storage available at:
-2025-07-28 13:41:47 - memory_node - INFO -   - cognitive/Joe/memory/short_term/*
-2025-07-28 13:41:47 - memory_node - INFO -   - cognitive/Joe/memory/chat/*
-2025-07-28 13:41:47 - memory_node - INFO -   - cognitive/Joe/memory/long_term/*
-2025-07-28 13:41:47 - memory_node - INFO -   - cognitive/Joe/memory/entity/*
-2025-07-28 13:41:47 - memory_node - INFO - Subscriptions:
-2025-07-28 13:41:47 - memory_node - INFO -   - cognitive/Joe/memory/close_dialog
-2025-07-28 13:41:47 - memory_node - INFO - Memory Node running - press Ctrl+C to stop
-2025-07-28 13:41:50 - memory_node - INFO - 📢 Stored character announcement: Joe
-2025-07-28 13:42:02 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
-2025-07-28 13:42:05 - memory_node - INFO2025-07-28 13:42:05 - memory_node - I2025-07-28 13:42:05 - memory_node - INFO - 💾 S2025-07-28 13:42:10 - memory_node - INFO - 👥 Created new entity: Joe
-2025-07-28 13:42:10 - memory_node - INFO - 💾 Saved memory to data/memory/Samantha_memory.json
-2025-07-28 13:42:10 - memory_node - INFO - 💬 Added conversation entry for Joe: Joe "Hi, I'm Joe, what's your story?..."
-2025-07-28 13:42:14 - memory_node - INFO - Joe natural_dialog_end: rating: 0, should_end: False
-2025-07-28 13:42:14 - memory_node - INFO - 👥 Entity natural_dialog_end query for Joe: completed
-2025-07-28 13:42:14 - memory_node - INFO - 📚 Chat query: returned 0 entries
-2025-07-28 13:42:14 - memory_node - INFO - 👥 Entity dialog 2025-07-28 13:42:16 - mem2025-07-28 13:42:18 - memory_node - INFO - 💾 Saved memory to data/memory/Samantha_memory.json
-2025-07-28 13:42:18 - memory_node - INFO - 💬 Added conversation entry for Joe: Samantha "Hi, I'm Samantha, nice to meet you, Joe. I'm just ..."
-2025-07-28 13:42:18 - memory_node - INFO - 💬 Added response to entity Joe: Samantha -> "Hi, I'm Samantha, nice to meet you, Joe. I'm just ..."
-2025-07-28 13:42:29 - memory_node - INFO - 👥 Entity dialog query for Samantha: completed
-2025-07-28 13:42:35 - memory_node - INFO - 📝 Stored action: inspect - 3
-2025-07-28 13:42:37 - memory_node - INFO - 💾 Saved memory to data/memory/Samantha_memory.json
-2025-07-28 13:42:37 - memory_node - INFO - 💬 Added conversation entry for Joe: Joe "I'm Joe, nice to meet you too, Samantha. I'm, uh, ..."
-INFO - Samantha natural_dialog_end: rating: 2, should_end: False
-2025-07-28 13:42:30 - memory_node - INFO - 👥 Entity natural_dialog_end query for Samantha: completed
-2025-07-28 13:42:30 - memory_node - INFO - 📚 Chat query: returned 2 entries
-2025-07-28 13:42:30 - memory_node - INFO - 👥 Entity dialog query for Samantha: completed
-2025-07-28 13:42:37 - memory_node - INFO - 💾 Saved memory to data/memory/Joe_memory.json
-2025-07-28 13:42:37 - memory_node - INFO - 💬 Added conversation entry for Samantha: Joe "I'm Joe, nice to meet you too, Samantha. I'm, uh, ..."
-2025-07-28 13:42:37 - memory_node - INFO - 💬 Added response to entity Samantha: Joe -> "I'm Joe, nice to meet you too, Samantha. I'm, uh, ..."
+2025-07-28 15:03:29 - llm_client - INFO - 🤖 Zenoh LLM Client initialized
+2025-07-28 15:03:29 - memory_node - INFO - 📂 No existing memory file, starting fresh
+2025-07-28 15:03:29 - memory_node - INFO - Memory Node initialized for character: Joe
+2025-07-28 15:03:29 - memory_node - INFO - Storage available at:
+2025-07-28 15:03:29 - memory_node - INFO -   - cognitive/Joe/memory/short_term/*
+2025-07-28 15:03:29 - memory_node - INFO -   - cognitive/Joe/memory/chat/*
+2025-07-28 15:03:29 - memory_node - INFO -   - cognitive/Joe/memory/long_term/*
+2025-07-28 15:03:29 - memory_node - INFO -   - cognitive/Joe/memory/entity/*
+2025-07-28 15:03:29 - memory_node - INFO - Subscriptions:
+2025-07-28 15:03:29 - memory_node - INFO -   - cognitive/Joe/memory/close_dialog
+2025-07-28 15:03:29 - memory_node - INFO - Memory Node running - press Ctrl+C to stop
+2025-07-28 15:03:32 - memory_node - INFO - 📢 Stored character announcement: Joe
+2025-07-28 15:03:46 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-07-28 15:03:49 - memory_node - INFO2025-07-28 15:03:49 - memory_node - I2025-07-28 15:03:49 - memory_node - INFO - 💾 S2025-07-28 15:03:50 - memory_node - INFO - 👥 Created new entity: Joe
+2025-07-28 15:03:50 - memory_node - INFO - 💾 Saved memory to data/memory/Samantha_memory.json
+2025-07-28 15:03:50 - memory_node - INFO - 💬 Added conversation entry for Joe: Joe "Hi, where am I?..."
+ory/Joe_memory.json
+2025-07-28 15:03:50 - memory_node - INFO - 💬 Added conversation entry for Joe: Joe "Hi, where am I?..."
+2025-07-28 15:03:50 - memory_node - INFO - 💬 Added response to entity Joe: Joe -> "Hi, where am I?..."

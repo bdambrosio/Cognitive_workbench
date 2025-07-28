@@ -45,6 +45,14 @@ class FastAPIActionDisplayNode:
         self.character_publishers: Dict[str, Any] = {}
         self.last_character_name: str = None
         
+        # Character goals tracking
+        self.character_goals: Dict[str, str] = {}  # character_name -> current_goal_string
+        self.character_goals_lock = threading.Lock()
+        
+        # Character decided actions tracking
+        self.character_decided_actions: Dict[str, str] = {}  # character_name -> decided_action_string
+        self.character_decided_actions_lock = threading.Lock()
+        
         # Turn state tracking with proper locking
         self.turn_state_lock = threading.Lock()
         self.turn_state = {
@@ -71,6 +79,18 @@ class FastAPIActionDisplayNode:
         self.turn_start_subscriber = self.session.declare_subscriber(
             "cognitive/map/turn",
             self.turn_start_callback
+        )
+        
+        # Subscriber for character goals
+        self.goal_subscriber = self.session.declare_subscriber(
+            "cognitive/*/goal",
+            self.goal_callback
+        )
+        
+        # Subscriber for character decided actions
+        self.decided_action_subscriber = self.session.declare_subscriber(
+            "cognitive/*/decided_action",
+            self.decided_action_callback
         )
         
         # Publisher for memory storage
@@ -105,6 +125,8 @@ class FastAPIActionDisplayNode:
         
         print(f'🖥️  FastAPI Action Display Node initialized on port {port}')
         print('   - Subscribing to: cognitive/*/action (all characters)')
+        print('   - Subscribing to: cognitive/*/goal (character goals)')
+        print('   - Subscribing to: cognitive/*/decided_action (character decided actions)')
         print('   - Subscribing to: cognitive/map/step_complete (step completion)')
         print('   - Subscribing to: cognitive/map/turn (turn start)')
         print('   - Publishing to: cognitive/{character}/text_input (dynamic)')
@@ -268,14 +290,148 @@ class FastAPIActionDisplayNode:
         body { 
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
             margin: 0; 
-            padding: 20px; 
+            padding: 0; 
             background-color: #1a1a1a; 
             color: #e0e0e0; 
+            height: 100vh;
+            overflow: hidden;
         }
-        .container { 
-            max-width: 1200px; 
-            margin: 0 auto; 
+        
+        /* Main layout with sidebar and content */
+        .main-layout {
+            display: flex;
+            height: 100vh;
         }
+        
+        /* Character tabs sidebar */
+        .character-sidebar {
+            width: 250px;
+            background: #252525;
+            border-right: 1px solid #404040;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+        }
+        
+        .sidebar-header {
+            background: #2d2d2d;
+            padding: 15px;
+            border-bottom: 1px solid #404040;
+            font-weight: bold;
+            color: #00d4ff;
+            text-align: center;
+        }
+        
+        .character-tabs {
+            flex: 0 0 auto;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        
+        /* Character data area */
+        .character-data-area {
+            flex: 1;
+            padding: 15px;
+            border-top: 1px solid #404040;
+            overflow-y: auto;
+        }
+        
+        .character-data-header {
+            color: #00d4ff;
+            font-weight: bold;
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+        
+        .character-data-item {
+            margin-bottom: 8px;
+            padding: 6px 8px;
+            background: #1a1a1a;
+            border-radius: 4px;
+            border-left: 3px solid #404040;
+        }
+        
+        .character-data-label {
+            color: #888;
+            font-size: 11px;
+            font-weight: bold;
+            text-transform: uppercase;
+            margin-bottom: 2px;
+        }
+        
+        .character-data-value {
+            color: #e0e0e0;
+            font-size: 12px;
+            line-height: 1.3;
+        }
+        
+        .character-tab {
+            padding: 12px 15px;
+            border-bottom: 1px solid #333;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            display: flex;
+            align-items: center;
+        }
+        
+        .character-tab:hover {
+            background: #333;
+        }
+        
+        .character-tab.active {
+            background: #00d4ff;
+            color: #1a1a1a;
+            font-weight: bold;
+        }
+        
+        .character-tab-icon {
+            margin-right: 8px;
+            font-size: 16px;
+        }
+        
+        /* Main content area */
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        
+        /* Character content area (above action log) */
+        .character-content {
+            background: #2d2d2d;
+            border-bottom: 1px solid #404040;
+            padding: 15px 20px;
+            min-height: 60px;
+            max-height: 150px;
+            overflow-y: auto;
+        }
+        
+        .character-content h3 {
+            margin: 0 0 10px 0;
+            color: #00d4ff;
+            font-size: 16px;
+        }
+        
+        .character-goal {
+            color: #4ecdc4;
+            font-style: italic;
+            line-height: 1.4;
+        }
+        
+        .no-character-selected {
+            color: #888;
+            text-align: center;
+            padding: 20px;
+        }
+        
+        /* Scrollable content wrapper */
+        .scrollable-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+        }
+        
         .header { 
             background: #2d2d2d; 
             padding: 20px; 
@@ -296,7 +452,7 @@ class FastAPIActionDisplayNode:
             border: 1px solid #404040; 
             border-radius: 8px; 
             padding: 15px; 
-            height: 500px; 
+            height: 400px; 
             overflow-y: auto; 
             font-family: 'Consolas', 'Monaco', 'Courier New', monospace; 
             font-size: 13px;
@@ -396,53 +552,110 @@ class FastAPIActionDisplayNode:
             color: #ff6b6b; 
         }
         /* Scrollbar styling */
-        .action-log::-webkit-scrollbar {
+        .action-log::-webkit-scrollbar, .character-tabs::-webkit-scrollbar, .scrollable-content::-webkit-scrollbar {
             width: 8px;
         }
-        .action-log::-webkit-scrollbar-track {
+        .action-log::-webkit-scrollbar-track, .character-tabs::-webkit-scrollbar-track, .scrollable-content::-webkit-scrollbar-track {
             background: #1a1a1a;
         }
-        .action-log::-webkit-scrollbar-thumb {
+        .action-log::-webkit-scrollbar-thumb, .character-tabs::-webkit-scrollbar-thumb, .scrollable-content::-webkit-scrollbar-thumb {
             background: #404040;
             border-radius: 4px;
         }
-        .action-log::-webkit-scrollbar-thumb:hover {
+        .action-log::-webkit-scrollbar-thumb:hover, .character-tabs::-webkit-scrollbar-thumb:hover, .scrollable-content::-webkit-scrollbar-thumb:hover {
             background: #555;
+        }
+        
+        /* Responsive design */
+        @media (max-width: 768px) {
+            .main-layout {
+                flex-direction: column;
+            }
+            .character-sidebar {
+                width: 100%;
+                height: 200px;
+                border-right: none;
+                border-bottom: 1px solid #404040;
+            }
+            .character-tabs {
+                display: flex;
+                flex-direction: row;
+                overflow-x: auto;
+                overflow-y: hidden;
+            }
+            .character-tab {
+                min-width: 120px;
+                border-bottom: none;
+                border-right: 1px solid #333;
+            }
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="header">
-            <h1>🖥️ Zenoh Action Display</h1>
-            <p>Real-time action monitoring and text input</p>
-        </div>
-        
-        <div class="action-log" id="actionLog">
-            <div style="color: #888; font-style: italic;">Waiting for actions...</div>
-        </div>
-        
-        <div class="input-section">
-            <h3>Turn Control</h3>
-            <div style="margin-bottom: 15px;">
-                <button id="stepButton" onclick="stepTurn()" style="background: #4ecdc4; margin-right: 10px;">🎯 Step Turn</button>
-                <button onclick="runTurns()" style="background: #ffe66d; color: #1a1a1a; margin-right: 10px;">🏃 Run</button>
-                <button onclick="stopTurns()" style="background: #ff6b6b;">⏹️ Stop</button>
+    <div class="main-layout">
+        <!-- Character Tabs Sidebar -->
+        <div class="character-sidebar">
+            <div class="sidebar-header">
+                👥 Characters
             </div>
-            <div id="turnStatus" style="margin-bottom: 10px; font-size: 12px; color: #888;">
-                <span id="turnMode">Mode: Step</span> | 
-                <span id="turnNumber">Turn: 0</span> | 
-                <span id="turnProgress">Progress: 0/0</span>
+            <div class="character-tabs" id="characterTabs">
+                <!-- Character tabs will be added dynamically -->
             </div>
-            <div id="turnResult" style="margin-top: 10px;"></div>
+            
+            <!-- Character data area -->
+            <div class="character-data-area" id="characterDataArea">
+                <div class="character-data-header">Character Data</div>
+                <div id="characterDataItems">
+                    <div style="color: #888; font-style: italic; text-align: center; padding: 20px;">
+                        Select a character to view data
+                    </div>
+                </div>
+            </div>
         </div>
         
-        <div class="input-section">
-            <h3>Send Text Input</h3>
-            <input type="text" id="characterInput" placeholder="Character name (optional)" style="width: 150px;">
-            <input type="text" id="messageInput" placeholder="Message" style="width: 300px;">
-            <button onclick="sendText()">Send</button>
-            <div id="sendResult"></div>
+        <!-- Main Content Area -->
+        <div class="main-content">
+            <!-- Character-specific content area -->
+            <div class="character-content" id="characterContent">
+                <div class="no-character-selected">
+                    Select a character tab to view their current goal
+                </div>
+            </div>
+            
+            <!-- Scrollable main content -->
+            <div class="scrollable-content">
+                <div class="header">
+                    <h1>🖥️ Zenoh Action Display</h1>
+                    <p>Real-time action monitoring and text input</p>
+                </div>
+                
+                <div class="action-log" id="actionLog">
+                    <div style="color: #888; font-style: italic;">Waiting for actions...</div>
+                </div>
+                
+                <div class="input-section">
+                    <h3>Turn Control</h3>
+                    <div style="margin-bottom: 15px;">
+                        <button id="stepButton" onclick="stepTurn()" style="background: #4ecdc4; margin-right: 10px;">🎯 Step Turn</button>
+                        <button onclick="runTurns()" style="background: #ffe66d; color: #1a1a1a; margin-right: 10px;">🏃 Run</button>
+                        <button onclick="stopTurns()" style="background: #ff6b6b;">⏹️ Stop</button>
+                    </div>
+                    <div id="turnStatus" style="margin-bottom: 10px; font-size: 12px; color: #888;">
+                        <span id="turnMode">Mode: Step</span> | 
+                        <span id="turnNumber">Turn: 0</span> | 
+                        <span id="turnProgress">Progress: 0/0</span>
+                    </div>
+                    <div id="turnResult" style="margin-top: 10px;"></div>
+                </div>
+                
+                <div class="input-section">
+                    <h3>Send Text Input</h3>
+                    <input type="text" id="characterInput" placeholder="Character name (optional)" style="width: 150px;">
+                    <input type="text" id="messageInput" placeholder="Message" style="width: 300px;">
+                    <button onclick="sendText()">Send</button>
+                    <div id="sendResult"></div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -451,6 +664,10 @@ class FastAPIActionDisplayNode:
         let reconnectAttempts = 0;
         const maxReconnectAttempts = 5;
         const reconnectDelay = 2000;
+        
+        // Character tabs state
+        let characterTabs = new Map(); // character_name -> {element, goal, decidedAction}
+        let activeCharacter = null;
         
         function connectWebSocket() {
             ws = new WebSocket('ws://localhost:3000/ws');
@@ -495,6 +712,14 @@ class FastAPIActionDisplayNode:
                 const data = JSON.parse(event.data);
                 if (data.type === 'action') {
                     addActionEntry(data);
+                    // Check if this is an announcement to create a character tab
+                    if (data.action_type === 'announcement') {
+                        createCharacterTab(data.character);
+                    }
+                } else if (data.type === 'goal') {
+                    handleGoalUpdate(data);
+                } else if (data.type === 'decided_action') {
+                    handleDecidedActionUpdate(data);
                 } else if (data.type === 'turn_state') {
                     updateTurnState(data);
                 } else if (data.type === 'step_complete') {
@@ -518,6 +743,148 @@ class FastAPIActionDisplayNode:
         
         // Connect WebSocket on page load
         connectWebSocket();
+        
+        // Character Tab Management Functions
+        function createCharacterTab(characterName) {
+            // Avoid duplicate tabs
+            if (characterTabs.has(characterName)) {
+                return;
+            }
+            
+            const tabsContainer = document.getElementById('characterTabs');
+            const tabElement = document.createElement('div');
+            tabElement.className = 'character-tab';
+            tabElement.innerHTML = `
+                <span class="character-tab-icon">👤</span>
+                <span>${characterName}</span>
+            `;
+            
+            // Add click handler for tab selection
+            tabElement.addEventListener('click', () => selectCharacterTab(characterName));
+            
+            tabsContainer.appendChild(tabElement);
+            characterTabs.set(characterName, {
+                element: tabElement,
+                goal: null,
+                decidedAction: null
+            });
+            
+            console.log(`Created character tab for: ${characterName}`);
+        }
+        
+        function selectCharacterTab(characterName) {
+            // Update active character
+            activeCharacter = characterName;
+            
+            // Update visual state of tabs
+            characterTabs.forEach((tabData, name) => {
+                if (name === characterName) {
+                    tabData.element.classList.add('active');
+                } else {
+                    tabData.element.classList.remove('active');
+                }
+            });
+            
+            // Update character content area
+            updateCharacterContent(characterName);
+            
+            // Update character data display
+            updateCharacterDataDisplay(characterName);
+            
+            console.log(`Selected character tab: ${characterName}`);
+        }
+        
+        function updateCharacterContent(characterName) {
+            const contentDiv = document.getElementById('characterContent');
+            const tabData = characterTabs.get(characterName);
+            
+            if (!tabData) {
+                contentDiv.innerHTML = '<div class="no-character-selected">Character not found</div>';
+                return;
+            }
+            
+            let content = `<h3>👤 ${characterName}</h3>`;
+            
+            if (tabData.goal) {
+                content += `<div class="character-goal">🎯 Goal: ${tabData.goal}</div>`;
+            } else {
+                content += `<div style="color: #888; font-style: italic;">No current goal</div>`;
+            }
+            
+            contentDiv.innerHTML = content;
+        }
+        
+        function handleGoalUpdate(goalData) {
+            const characterName = goalData.character;
+            const goal = goalData.goal;
+            
+            console.log(`Goal update for ${characterName}: ${goal}`);
+            
+            // Update the stored goal for this character
+            if (characterTabs.has(characterName)) {
+                const tabData = characterTabs.get(characterName);
+                tabData.goal = goal;
+                
+                // If this character's tab is currently active, update the display
+                if (activeCharacter === characterName) {
+                    updateCharacterContent(characterName);
+                }
+            } else {
+                // Character tab doesn't exist yet, this shouldn't happen
+                // but we can create it if needed
+                console.warn(`Received goal for unknown character: ${characterName}`);
+            }
+        }
+        
+        function handleDecidedActionUpdate(decidedActionData) {
+            const characterName = decidedActionData.character;
+            const decidedAction = decidedActionData.decided_action;
+            
+            console.log(`Decided action update for ${characterName}: ${decidedAction}`);
+            
+            // Update the stored decided action for this character
+            if (characterTabs.has(characterName)) {
+                const tabData = characterTabs.get(characterName);
+                tabData.decidedAction = decidedAction;
+                
+                // If this character's tab is currently active, update the display
+                if (activeCharacter === characterName) {
+                    updateCharacterDataDisplay(characterName);
+                }
+            } else {
+                // Character tab doesn't exist yet, this shouldn't happen
+                console.warn(`Received decided action for unknown character: ${characterName}`);
+            }
+        }
+        
+        function updateCharacterDataDisplay(characterName) {
+            const dataItemsDiv = document.getElementById('characterDataItems');
+            const tabData = characterTabs.get(characterName);
+            
+            if (!tabData) {
+                dataItemsDiv.innerHTML = '<div style="color: #888; font-style: italic; text-align: center; padding: 20px;">Character not found</div>';
+                return;
+            }
+            
+            let content = '';
+            
+            // Add decided action if available
+            if (tabData.decidedAction) {
+                content += `
+                    <div class="character-data-item">
+                        <div class="character-data-label">Next Action</div>
+                        <div class="character-data-value">${tabData.decidedAction}</div>
+                    </div>
+                `;
+            }
+            
+            // If no data items, show placeholder
+            if (content === '') {
+                content = '<div style="color: #888; font-style: italic; text-align: center; padding: 20px;">No character data available</div>';
+            }
+            
+            dataItemsDiv.innerHTML = content;
+        }
         
         function addActionEntry(actionData) {
             console.log('Adding action entry:', actionData);
@@ -761,6 +1128,8 @@ class FastAPIActionDisplayNode:
             # Handle character announcements
             if action_data.get('type') == 'announcement':
                 self._handle_character_announcement(action_data, character_name)
+                # Send announcement to web clients so tabs can be created
+                self._send_to_websockets(action_data, character_name)
                 return
             
             # Store action in memory
@@ -768,6 +1137,46 @@ class FastAPIActionDisplayNode:
             
             # Send to web clients
             self._send_to_websockets(action_data, character_name)
+            
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+    
+    def goal_callback(self, sample):
+        """Handle incoming character goals."""
+        try:
+            goal_data = json.loads(sample.payload.to_bytes().decode('utf-8'))
+            
+            # Extract character name from topic path
+            topic_path = str(sample.key_expr)
+            character_name = topic_path.split('/')[1]  # cognitive/{character}/goal
+            
+            # Store goal for this character
+            with self.character_goals_lock:
+                self.character_goals[character_name] = goal_data.get('goal', '')
+            
+            # Send goal update to web clients
+            self._send_goal_to_websockets(goal_data, character_name)
+            
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+    
+    def decided_action_callback(self, sample):
+        """Handle incoming character decided actions."""
+        try:
+            decided_action_data = json.loads(sample.payload.to_bytes().decode('utf-8'))
+            
+            # Extract character name from topic path
+            topic_path = str(sample.key_expr)
+            character_name = topic_path.split('/')[1]  # cognitive/{character}/decided_action
+            
+            # Store decided action for this character
+            with self.character_decided_actions_lock:
+                self.character_decided_actions[character_name] = decided_action_data.get('decided_action', '')
+            
+            # Send decided action update to web clients
+            self._send_decided_action_to_websockets(decided_action_data, character_name)
             
         except Exception as e:
             import traceback
@@ -867,6 +1276,81 @@ class FastAPIActionDisplayNode:
                 if websocket in self.websocket_connections:
                     self.websocket_connections.remove(websocket)
 
+    def _send_goal_to_websockets(self, goal_data: Dict[str, Any], character_name: str):
+        """Send goal data to all connected WebSocket clients."""
+        with self.websocket_lock:
+            if not self.websocket_connections:
+                return
+        
+        # Prepare goal data for web clients
+        web_data = {
+            'type': 'goal',
+            'character': character_name,
+            'goal': goal_data.get('goal', ''),
+            'timestamp': goal_data.get('timestamp', '')
+        }
+        
+        # Send to all connected clients
+        if self.event_loop is None:
+            return
+            
+        with self.websocket_lock:
+            disconnected = []
+            for websocket in self.websocket_connections:
+                try:
+                    # Use asyncio.run_coroutine_threadsafe to send from non-async context
+                    future = asyncio.run_coroutine_threadsafe(
+                        websocket.send_text(json.dumps(web_data)), 
+                        self.event_loop
+                    )
+                    future.result(timeout=5.0)
+                except Exception as e:
+                    # Don't remove client on timeout - just log the error
+                    if not isinstance(e, TimeoutError):
+                        disconnected.append(websocket)
+            
+            # Remove only truly disconnected clients (not timeout errors)
+            for websocket in disconnected:
+                if websocket in self.websocket_connections:
+                    self.websocket_connections.remove(websocket)
+
+    def _send_decided_action_to_websockets(self, decided_action_data: Dict[str, Any], character_name: str):
+        """Send decided action data to all connected WebSocket clients."""
+        with self.websocket_lock:
+            if not self.websocket_connections:
+                return
+        
+        # Prepare decided action data for web clients
+        web_data = {
+            'type': 'decided_action',
+            'character': character_name,
+            'decided_action': decided_action_data.get('decided_action', ''),
+            'timestamp': decided_action_data.get('timestamp', '')
+        }
+        
+        # Send to all connected clients
+        if self.event_loop is None:
+            return
+            
+        with self.websocket_lock:
+            disconnected = []
+            for websocket in self.websocket_connections:
+                try:
+                    # Use asyncio.run_coroutine_threadsafe to send from non-async context
+                    future = asyncio.run_coroutine_threadsafe(
+                        websocket.send_text(json.dumps(web_data)), 
+                        self.event_loop
+                    )
+                    future.result(timeout=5.0)
+                except Exception as e:
+                    # Don't remove client on timeout - just log the error
+                    if not isinstance(e, TimeoutError):
+                        disconnected.append(websocket)
+            
+            # Remove only truly disconnected clients (not timeout errors)
+            for websocket in disconnected:
+                if websocket in self.websocket_connections:
+                    self.websocket_connections.remove(websocket)
     
     def _send_turn_state_update(self):
         """Send the current turn state to all WebSocket clients."""

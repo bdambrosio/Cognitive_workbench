@@ -1,6 +1,6 @@
-2025-07-28 13:41:49 - sense_node - INFO - 👁️ Sense Node initialized for character: Joe
-2025-07-28 13:41:49 - sense_node - INFO - Console Text Sensor ready - will auto-disable if external input detected
-2025-07-28 13:41:49 - sense_node - INFO - Sense Node running - press Ctrl+C to stop
-2025-2025-07-28 13:42:10 - sense_node - INFO - 🔄 External input detected - console input disabled to prevent conflicts
-2025-07-28 13:42:10 - sense_node - INFO - 📨 Received external text input2025-07-28 13:42:18 - sense_node - INFO - 🔄 External input detected - console input disabled to prevent conflicts2025-07-28 13:42:37 - sense_node - INFO - 📨 Received external text input from Joe: "I'm Joe, nice to meet you too, Samantha. I'm, uh, not really sure how I got here, to be honest. I don't really remember. I was just, you know, doing my thing, and then... I don't know, I must have gotten lost or something. I'm not really an outdoorsy person, I mean, I like the idea of it and all, but I'm more of a... lab kind of guy, you know? I like science and stuff. But, yeah, I'm trying to find my way out of here, I guess. Do you, uh, know the way out of these woods?"
-2025-07-28 13:42:37 - sense_node - INFO - 📤 Published sense data: 1
+2025-07-28 15:03:31 - sense_node - INFO - 👁️ Sense Node initialized for character: Joe
+2025-07-28 15:03:31 - sense_node - INFO - Console Text Sensor ready - will auto-disable if external input detected
+2025-07-28 15:03:31 - sense_node - INFO - Sense Node running - press Ctrl+C to stop
+2025-2025-07-28 15:03:50 - sense_node - INFO - 🔄 External input detected - console input disabled to prevent conflicts
+2025-07-28 15:03:50 - sense_node - INFO - 📨 Received external text input from Joe: "Hi, where am I?"
+2025-07-28 15:03:50 - sense_node - INFO - 📤 Published sense data: 0
