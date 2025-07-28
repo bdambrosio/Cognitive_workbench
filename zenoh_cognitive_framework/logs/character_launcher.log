@@ -1,21 +1,39 @@
-2025-07-27 15:43:43 - character_launcher - INFO - Added character: Samantha
-2025-07-27 15:43:43 - character_launcher - INFO - Added character: Joe
-2025-07-27 15:43:43 - character_launcher - INFO - Launching 2 characters...
-2025-07-27 15:43:43 - character_launcher - INFO - Launching shared services...
-2025-07-27 15:43:43 - character_launcher - INFO - ✅ LLM Service Node launched
-2025-07-27 15:43:43 - character_launcher - INFO - ✅ FastAPI Action Display Node launched on port 3000
-2025-07-27 15:43:43 - character_launcher - INFO -    - Web UI available at: http://localhost:3000
-2025-07-27 15:43:43 - character_launcher - INFO - ✅ Map Node launched with map: forest.py
-2025-07-27 15:43:43 - character_launcher - INFO - ⏳ Waiting for Map Node to initialize...
-2025-07-27 15:43:50 - character_launcher - INFO - Launching character: Samantha
-2025-07-27 15:43:50 - character_launcher - INFO - ✅ Samantha memory_node launched
-2025-07-27 15:43:51 - character_launcher - INFO - ✅ Samantha situation_node launched
-2025-07-27 15:43:51 - character_launcher - INFO - ✅ Samantha sense_node launched
-2025-07-27 15:43:52 - character_launcher - INFO - ✅ Samantha executive_node launched
-2025-07-27 15:43:53 - character_launcher - INFO - Launching character: Joe
-2025-07-27 15:43:53 - character_launcher - INFO - ✅ Joe memory_node launched
-2025-07-27 15:43:53 - character_launcher - INFO - ✅ Joe situation_node launched
-2025-07-27 15:43:54 - character_launcher - INFO - ✅ Joe sense_node launched
-2025-07-27 15:43:54 - character_launcher - INFO - ✅ Joe executive_node launched
-2025-07-27 15:43:55 - character_launcher - INFO - ✅ All characters launched
-2025-07-27 15:43:55 - character_launcher - INFO - Monitoring processes...
+2025-07-27 21:15:06 - character_launcher - INFO - Added character: Samantha
+2025-07-27 21:15:06 - character_launcher - INFO - Added character: Joe
+2025-07-27 21:15:06 - character_launcher - INFO - Launching 2 characters...
+2025-07-27 21:15:06 - character_launcher - INFO - Launching shared services...
+2025-07-27 21:15:06 - character_launcher - INFO - ✅ LLM Service Node launched
+2025-07-27 21:15:06 - character_launcher - INFO - ✅ FastAPI Action Display Node launched on port 3000
+2025-07-27 21:15:06 - character_launcher - INFO -    - Web UI available at: http://localhost:3000
+2025-07-27 21:15:09 - character_launcher - INFO - ✅ Map Node launched with map: forest.py
+2025-07-27 21:15:09 - character_launcher - INFO - ⏳ Waiting for Map Node to initialize...
+2025-07-27 21:15:16 - character_launcher - INFO - Launching character: Samantha
+2025-07-27 21:15:16 - character_launcher - INFO - ✅ Samantha memory_node launched
+2025-07-27 21:15:16 - character_launcher - INFO - ✅ Samantha situation_node launched
+2025-07-27 21:15:17 - character_launcher - INFO - ✅ Samantha sense_node launched
+2025-07-27 21:15:17 - character_launcher - INFO - ✅ Samantha executive_node launched
+2025-07-27 21:15:18 - character_launcher - INFO - Launching character: Joe
+2025-07-27 21:15:18 - character_launcher - INFO - ✅ Joe memory_node launched
+2025-07-27 21:15:19 - character_launcher - INFO - ✅ Joe situation_node launched
+2025-07-27 21:15:19 - character_launcher - INFO - ✅ Joe sense_node launched
+2025-07-27 21:15:20 - character_launcher - INFO - ✅ Joe executive_node launched
+2025-07-27 21:15:21 - character_launcher - INFO - ✅ All characters launched
+2025-07-27 21:15:21 - character_launcher - INFO - Monitoring processes...
+2025-07-27 21:18:33 - character_launcher - INFO - Received signal 2, initiating shutdown...
+2025-07-27 21:18:35 - character_launcher - INFO - Received signal 2, initiating shutdown...
+2025-07-27 21:18:36 - character_launcher - INFO - 🛑 Initiating graceful shutdown...
+2025-07-27 21:18:36 - character_launcher - INFO - 📨 Sending SIGTERM to 11 processes...
+2025-07-27 21:18:36 - character_launcher - INFO -   ✉️  SIGTERM sent to Samantha process 398012
+2025-07-27 21:18:36 - character_launcher - INFO -   ✉️  SIGTERM sent to Samantha process 398020
+2025-07-27 21:18:36 - character_launcher - INFO -   ✉️  SIGTERM sent to Samantha process 398060
+2025-07-27 21:18:36 - character_launcher - INFO -   ✉️  SIGTERM sent to Samantha process 398074
+2025-07-27 21:18:36 - character_launcher - INFO -   ✉️  SIGTERM sent to Joe process 398111
+2025-07-27 21:18:36 - character_launcher - INFO -   ✉️  SIGTERM sent to Joe process 398130
+2025-07-27 21:18:36 - character_launcher - INFO -   ✉️  SIGTERM sent to Joe process 398168
+2025-07-27 21:18:36 - character_launcher - INFO -   ✉️  SIGTERM sent to Joe process 398171
+2025-07-27 21:18:36 - character_launcher - INFO -   ✉️  SIGTERM sent to shared process 397691
+2025-07-27 21:18:36 - character_launcher - INFO -   ✉️  SIGTERM sent to shared process 397692
+2025-07-27 21:18:36 - character_launcher - INFO -   ✉️  SIGTERM sent to shared process 397752
+2025-07-27 21:18:36 - character_launcher - INFO - ⏳ Waiting up to 30s for graceful shutdown...
+2025-07-27 21:18:36 - character_launcher - INFO - Received signal 2, initiating shutdown...
+2025-07-27 21:18:41 - character_launcher - INFO -   ⏰ 3 processes still running after 5s...

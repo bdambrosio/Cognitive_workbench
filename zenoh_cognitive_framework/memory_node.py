@@ -99,6 +99,12 @@ class ZenohMemoryNode:
             self.handle_entity_query
         )
         
+        # Subscriber for dialog close events (character-specific)
+        self.dialog_close_subscriber = self.session.declare_subscriber(
+            f"cognitive/{character_name}/memory/close_dialog",
+            self.dialog_close_callback
+        )
+        
         # Memory management
         self.max_short_term_entries = 1000
         self.max_working_entries = 100
@@ -132,6 +138,8 @@ class ZenohMemoryNode:
         logger.info(f'  - cognitive/{character_name}/memory/chat/*')
         logger.info(f'  - cognitive/{character_name}/memory/long_term/*')
         logger.info(f'  - cognitive/{character_name}/memory/entity/*')
+        logger.info('Subscriptions:')
+        logger.info(f'  - cognitive/{character_name}/memory/close_dialog')
     
     def _signal_handler(self, signum, frame):
         """Handle shutdown signals gracefully."""
@@ -293,14 +301,24 @@ class ZenohMemoryNode:
             if not entity_name:
                 raise ValueError("No entity name provided")
             
-            # Parse query parameters for limit
+            # Parse query parameters for limit and scope
             selector = str(query.selector)
             limit = 20  # default limit
+            scope = 'current'  # default scope
             
             # Extract limit from query if specified
             if 'limit=' in selector:
                 try:
                     limit = int(selector.split('limit=')[1].split('&')[0])
+                except:
+                    pass
+            
+            # Extract scope from query if specified
+            if 'scope=' in selector:
+                try:
+                    scope = selector.split('scope=')[1].split('&')[0]
+                    if scope not in ['current', 'all']:
+                        scope = 'current'  # Default to current for unknown values
                 except:
                     pass
             
@@ -313,7 +331,7 @@ class ZenohMemoryNode:
                 }
             else:
                 entity = self.entity_models[canonical_entity_name]
-                entity_data = entity.get_entity_data(limit)
+                entity_data = entity.get_entity_data(limit, scope)
                 
                 response = {
                     'success': True,
@@ -359,15 +377,46 @@ class ZenohMemoryNode:
         
         Args:
             entity_name: Name of the entity
-            direction: 'sent' or 'received'
+            direction: 'sent' or 'received' (ignored now, source used instead)
             text: The message text
-            source: 'ui' or character name
+            source: Character name who said this
         """
         entity = self.get_or_create_entity(entity_name)
-        entity.add_conversation_entry(direction, text, source)
+        entity.add_conversation_entry(source, text)
         self.entity_last_activity[entity_name] = datetime.now()  # Track activity
         self.save_memory()  # Save after adding conversation
-        logger.info(f'💬 Added conversation entry for {entity_name}: {direction} "{text[:50]}..."')
+        logger.info(f'💬 Added conversation entry for {entity_name}: {source} "{text[:50]}..."')
+    
+    def close_dialog(self, entity_name: str) -> None:
+        """
+        Close the active dialog for an entity.
+        
+        Args:
+            entity_name: Name of the entity to close dialog with
+        """
+        # Canonicalize entity name using capitalize
+        canonical_entity_name = entity_name.capitalize()
+        
+        if canonical_entity_name in self.entity_models:
+            self.entity_models[canonical_entity_name].close_dialog()
+            self.save_memory()  # Save after closing dialog
+            logger.info(f'🔚 Closed dialog with {canonical_entity_name}')
+        else:
+            logger.warning(f'Cannot close dialog - entity {canonical_entity_name} not found')
+    
+    def dialog_close_callback(self, sample):
+        """Handle incoming dialog close events."""
+        try:
+            data = json.loads(sample.payload.to_bytes().decode('utf-8'))
+            entity_name = data.get('entity_name')
+            
+            if entity_name:
+                self.close_dialog(entity_name)
+            else:
+                logger.warning('Dialog close event missing entity_name')
+                
+        except Exception as e:
+            logger.error(f'Error handling dialog close event: {e}')
     
     def update_visual_detection(self, entity_name: str) -> None:
         """
@@ -389,8 +438,7 @@ class ZenohMemoryNode:
                     data = json.load(f)
                     self.entity_models = {}
                     for entity_name, entity_data in data.get('entities', {}).items():
-                        entity = EntityModel(entity_name)
-                        entity.load_from_dict(entity_data)
+                        entity = EntityModel.load_from_dict(entity_data)
                         self.entity_models[entity_name] = entity
                 logger.info(f'📂 Loaded memory from {self.memory_file}')
             else:
