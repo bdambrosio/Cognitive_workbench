@@ -1,16 +1,13 @@
-2025-07-28 13:41:48 - situation_node - INFO - 📂 No existing situation file for Joe, starting fresh
-2025-07-28 13:41:48 - situation_node - INFO - 🧭 Situation Node initialized for character: Joe
-2025-07-28 13:41:48 - situation_node - INFO -    - Subscribing to: cognitive/Joe/sense_data
-2025-07-28 13:41:48 - situation_node - INFO -    - Subscribing to: cognitive/Joe/action
-2025-07-28 13:41:48 - situation_node - INFO -    - Publishing to: cognitive/Joe/situation
-2025-07-28 13:41:48 - situation_node - INFO -    - Queryable at: cognitive/Joe/situation/*
-2025-07-28 13:41:48 - situation_node - INFO -    - Storage available at: data/situation/Joe_situation.json
-2025-07-28 13:41:48 - situation_node - INFO - Situation Node running - press Ctrl+C to stop
-2025-07-28 13:41:50 - situation_node - INFO - 📥 Received action: unknown
-2025-07-28 13:42:00 - situation_node - WARNING - Map query failed for Joe
-2025-07-28 13:42:00 - situation_node - INFO - 🗺2025-07-28 13:42:05 - situation_no2025-07-28 13:42:10 - situation_node - INF2025-07-28 13:42:10 - situation_no2025-07-28 13:42:16 - situation_node - INFO - 📥 Received action: unknown
-2025-07-28 13:42:18 - situation_node - INFO - 📥 Received sense data: text
-2025-07-28 13:42:37 - situation_node - INFO - 📥 Received action: unknown
-8 - situation_node - INFO - 📥 Received action: unknown
-2025-07-28 13:42:35 - situation_node - INFO - 📥 Received action: unknown
-2025-07-28 13:42:37 - situation_node - INFO - 📥 Received sense data: text
+2025-07-28 15:03:30 - situation_node - INFO - 📂 No existing situation file for Joe, starting fresh
+2025-07-28 15:03:30 - situation_node - INFO - 🧭 Situation Node initialized for character: Joe
+2025-07-28 15:03:30 - situation_node - INFO -    - Subscribing to: cognitive/Joe/sense_data
+2025-07-28 15:03:30 - situation_node - INFO -    - Subscribing to: cognitive/Joe/action
+2025-07-28 15:03:30 - situation_node - INFO -    - Publishing to: cognitive/Joe/situation
+2025-07-28 15:03:30 - situation_node - INFO -    - Queryable at: cognitive/Joe/situation/*
+2025-07-28 15:03:30 - situation_node - INFO -    - Storage available at: data/situation/Joe_situation.json
+2025-07-28 15:03:30 - situation_node - INFO - Situation Node running - press Ctrl+C to stop
+2025-07-28 15:03:32 - situation_node - INFO - 📥 Received action: unknown
+2025-07-28 15:03:42 - situation_node - WARNING - Map query failed for Joe
+2025-07-28 15:03:42 - situation_node - INFO - 🗺2025-07-28 15:03:49 - situation_no2025-07-28 15:03:50 - situation_node - INF2025-07-28 15:03:50 - situation_node - INFO - 📥 Received sense data: text
+2025-07-28 15:03:59 - situation_node - WARNING - Map query failed for Samantha
+2025-07-28 15:03:59 - situation_node - INFO - 🗺️ Updated map look data for Samantha

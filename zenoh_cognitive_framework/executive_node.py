@@ -89,6 +89,12 @@ class ZenohExecutiveNode:
         # Publisher for text input to other characters (character-specific)
         self.text_input_publisher = self.session.declare_publisher(f"cognitive/{character_name}/text_input")
         
+        # Publisher for goals (character-specific)
+        self.goal_publisher = self.session.declare_publisher(f"cognitive/{character_name}/goal")
+        
+        # Publisher for decided actions (character-specific) 
+        self.decided_action_publisher = self.session.declare_publisher(f"cognitive/{character_name}/decided_action")
+        
         # LLM client
         self.llm_client = None
         if LLM_CLIENT_AVAILABLE:
@@ -131,6 +137,8 @@ class ZenohExecutiveNode:
         logger.info(f'   - Publishing to: cognitive/{character_name}/action')
         logger.info(f'   - Publishing to: cognitive/{character_name}/memory/store')
         logger.info(f'   - Publishing to: cognitive/{character_name}/text_input')
+        logger.info(f'   - Publishing to: cognitive/{character_name}/goal')
+        logger.info(f'   - Publishing to: cognitive/{character_name}/decided_action')
         logger.info(f'   - Publishing to: cognitive/map/turn/complete/{character_name}')
     
     def _signal_handler(self, signum, frame):
@@ -214,6 +222,39 @@ class ZenohExecutiveNode:
             
         except Exception as e:
             logger.error(f'Error sending text input to {target_character}: {e}')
+
+    def _publish_goal(self, goal):
+        """Publish current goal to the goal topic for UI display."""
+        try:
+            goal_data = {
+                'goal': goal.to_string(),
+                'timestamp': datetime.now().isoformat(),
+                'character': self.character_name
+            }
+            
+            self.goal_publisher.put(json.dumps(goal_data))
+            logger.info(f'🎯 Published goal for {self.character_name}: {goal.to_string()}')
+            
+        except Exception as e:
+            logger.error(f'Error publishing goal: {e}')
+
+    def _publish_decided_action(self, action):
+        """Publish decided action to the decided_action topic for UI display."""
+        try:
+            decided_action_data = {
+                'decided_action': f"{action['action']}: {action['target']} - {action['value']}",
+                'action': action['action'],
+                'target': action['target'], 
+                'value': action['value'],
+                'timestamp': datetime.now().isoformat(),
+                'character': self.character_name
+            }
+            
+            self.decided_action_publisher.put(json.dumps(decided_action_data))
+            logger.info(f'📋 Published decided action for {self.character_name}: {decided_action_data["decided_action"]}')
+            
+        except Exception as e:
+            logger.error(f'Error publishing decided action: {e}')
 
     def _run_ooda_loop(self):
         """Execute the OODA loop: Observe, Orient, Decide, Act."""
@@ -354,6 +395,7 @@ Respond ONLY with the above hash-formatted text.
                         if goal:
                             logger.warning(f'{self.character_name} generated goal: {goal.to_string()}')
                             self.current_goal = goal
+                            self._publish_goal(goal)
                             return self.current_goal
                         else:
                             logger.error(f'Warning: Invalid goal generation response for {goal_hash}')
@@ -363,6 +405,7 @@ Respond ONLY with the above hash-formatted text.
             else:   
                 logger.error('LLM client not available')
                 self.current_goal = plan.Goal('sleep', actors=[self.character_name])
+                self._publish_goal(self.current_goal)
             return self.current_goal
 
     def _decide(self, goal: str):
@@ -445,6 +488,9 @@ End your response with:
             else:   
                 logger.error('LLM client not available')
                 self.current_action = {'action': 'sleep', 'target': 'self', 'value': ''}
+            
+            # Publish the decided action for UI display
+            self._publish_decided_action(self.current_action)
             return self.current_action
 
     def _act(self, action: Dict[str, Any]):
