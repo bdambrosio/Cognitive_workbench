@@ -129,7 +129,7 @@ class FastAPIActionDisplayNode:
             
             with self.websocket_lock:
                 self.websocket_connections.append(websocket)
-                print(f"WebSocket client connected. Total clients: {len(self.websocket_connections)}")
+        
             
             # Set event loop reference when first WebSocket connects
             if self.event_loop is None:
@@ -142,9 +142,8 @@ class FastAPIActionDisplayNode:
                     'message': 'WebSocket connection established successfully'
                 }
                 await websocket.send_text(json.dumps(test_data))
-                print("Test message sent to WebSocket client")
-            except Exception as e:
-                print(f"Error sending test message: {e}")
+            except Exception:
+                pass  # Ignore test message errors
             
             try:
                 while True:
@@ -159,18 +158,16 @@ class FastAPIActionDisplayNode:
                                     # Send pong response
                                     await websocket.send_text("pong")
                                 continue
-                    except Exception as e:
-                        print(f"WebSocket receive error: {e}")
+                    except Exception:
                         break
             except WebSocketDisconnect:
                 pass
-            except Exception as e:
-                print(f"WebSocket error: {e}")
+            except Exception:
+                pass
             finally:
                 with self.websocket_lock:
                     if websocket in self.websocket_connections:
                         self.websocket_connections.remove(websocket)
-                print(f"WebSocket client disconnected. Total clients: {len(self.websocket_connections)}")
         
         @self.app.post("/api/text_input")
         async def send_text_input(data: Dict[str, str]):
@@ -225,11 +222,9 @@ class FastAPIActionDisplayNode:
                     self.turn_state['mode'] = 'step'
                 
                 self.turn_step_publisher.put(json.dumps({"timestamp": datetime.now().isoformat()}).encode())
-                print('🎯 Step Turn command sent')
                 
                 return {"success": True, "message": "Step Turn command sent"}
             except Exception as e:
-                print(f'❌ Error sending step turn command: {e}')
                 return {"success": False, "message": f"Error: {str(e)}"}
         
         @self.app.post("/api/turn/run")
@@ -240,13 +235,11 @@ class FastAPIActionDisplayNode:
                     self.turn_state['mode'] = 'run'
                 
                 self.turn_run_publisher.put(json.dumps({"timestamp": datetime.now().isoformat()}).encode())
-                print('🏃 Run Turns command sent')
                 
                 # Send turn state update to enable/disable buttons
                 self._send_turn_state_update()
                 return {"success": True, "message": "Run Turns command sent"}
             except Exception as e:
-                print(f'❌ Error sending run turns command: {e}')
                 return {"success": False, "message": f"Error: {str(e)}"}
         
         @self.app.post("/api/turn/stop")
@@ -257,13 +250,11 @@ class FastAPIActionDisplayNode:
                     self.turn_state['mode'] = 'step'
                 
                 self.turn_stop_publisher.put(json.dumps({"timestamp": datetime.now().isoformat()}).encode())
-                print('⏹️ Stop Turns command sent')
                 
                 # Send turn state update to enable/disable buttons
                 self._send_turn_state_update()
                 return {"success": True, "message": "Stop Turns command sent"}
             except Exception as e:
-                print(f'❌ Error sending stop turns command: {e}')
                 return {"success": False, "message": f"Error: {str(e)}"}
     
     def _get_html_template(self) -> str:
@@ -748,9 +739,9 @@ class FastAPIActionDisplayNode:
         """Set the event loop reference when FastAPI starts."""
         try:
             self.event_loop = asyncio.get_running_loop()
-            print(f"Event loop set: {self.event_loop}")
+            pass
         except RuntimeError:
-            print("No running event loop found")
+            pass
     
     def action_callback(self, sample):
         """Handle incoming actions."""
@@ -762,8 +753,7 @@ class FastAPIActionDisplayNode:
             topic_path = str(sample.key_expr)
             character_name = topic_path.split('/')[1]  # cognitive/{character}/action
             
-            print(f'📥 Received action from {character_name}: {action_data.get("type", "unknown")}')
-            print(f'   Raw action data: {action_data}')
+
             
             # Track active character
             self.active_characters.add(character_name)
@@ -780,7 +770,6 @@ class FastAPIActionDisplayNode:
             self._send_to_websockets(action_data, character_name)
             
         except Exception as e:
-            print(f'❌ Error handling action: {e}')
             import traceback
             traceback.print_exc()
     
@@ -789,20 +778,19 @@ class FastAPIActionDisplayNode:
         try:
             step_data = json.loads(sample.payload.to_bytes().decode('utf-8'))
             
-            print(f'🎯 Step complete received: {step_data}')
+
             
             # Update turn state to indicate step is complete
             with self.turn_state_lock:
                 self.turn_state['active_characters'] = []
                 self.turn_state['completed_characters'] = []
                 self.turn_state['turn_start_time'] = None
-            print('✅ Step button will be re-enabled')
+
             
             # Send step_complete message to re-enable Step button
             self._send_step_complete_to_websockets()
             
         except Exception as e:
-            print(f'❌ Error handling step complete: {e}')
             import traceback
             traceback.print_exc()
     
@@ -811,21 +799,16 @@ class FastAPIActionDisplayNode:
         try:
             turn_data = json.loads(sample.payload.to_bytes().decode('utf-8'))
             
-            print(f'🚦 Turn start received: {turn_data}')
-            
             with self.turn_state_lock:
                 self.turn_state['turn_number'] = turn_data.get('turn_number', self.turn_state['turn_number'] + 1)
                 self.turn_state['active_characters'] = turn_data.get('active_characters', [])
                 self.turn_state['completed_characters'] = []
                 self.turn_state['turn_start_time'] = time.time()
             
-            print(f'🚦 Turn {self.turn_state["turn_number"]} started for: {", ".join(self.turn_state["active_characters"])}')
-            
             # Send turn state update to web clients
             self._send_turn_state_update()
             
         except Exception as e:
-            print(f'❌ Error handling turn start: {e}')
             import traceback
             traceback.print_exc()
     
@@ -833,7 +816,6 @@ class FastAPIActionDisplayNode:
         """Send action data to all connected WebSocket clients."""
         with self.websocket_lock:
             if not self.websocket_connections:
-                print("No WebSocket clients connected")
                 return
         
         # Check if this is a Say or response action - only show text
@@ -859,11 +841,10 @@ class FastAPIActionDisplayNode:
             'raw_data': action_data
         }
         
-        print(f"Sending action to {len(self.websocket_connections)} WebSocket clients")
+
         
         # Send to all connected clients
         if self.event_loop is None:
-            print("No event loop available, skipping WebSocket send")
             return
             
         with self.websocket_lock:
@@ -877,84 +858,60 @@ class FastAPIActionDisplayNode:
                     )
                     future.result(timeout=5.0)
                 except Exception as e:
-                    print(f"WebSocket send error for action: {e}")
                     # Don't remove client on timeout - just log the error
-                    if isinstance(e, TimeoutError):
-                        print(f"WebSocket send timeout for action - keeping client")
-                    else:
-                        print(f"WebSocket send error - removing client")
+                    if not isinstance(e, TimeoutError):
                         disconnected.append(websocket)
             
             # Remove only truly disconnected clients (not timeout errors)
             for websocket in disconnected:
                 if websocket in self.websocket_connections:
                     self.websocket_connections.remove(websocket)
-                    print(f"Removed disconnected WebSocket client. Remaining: {len(self.websocket_connections)}")
+
     
     def _send_turn_state_update(self):
         """Send the current turn state to all WebSocket clients."""
         with self.websocket_lock:
             if not self.websocket_connections:
-                print("No WebSocket clients connected, skipping turn state update.")
                 return
 
         with self.turn_state_lock:
             turn_state_data = {
                 'type': 'turn_state',
                 'turn_number': self.turn_state['turn_number'],
+                'mode': self.turn_state['mode'],
                 'active_characters': self.turn_state['active_characters'],
                 'completed_characters': self.turn_state['completed_characters'],
-                'mode': self.turn_state['mode'],
-                'turn_start_time': self.turn_state['turn_start_time']
+                'step_button_disabled': self.turn_state.get('step_button_disabled', False)
             }
 
-        print(f"Sending turn state update to {len(self.websocket_connections)} WebSocket clients")
 
-        if self.event_loop is None:
-            print("No event loop available, skipping turn state update WebSocket send")
-            return
 
-        with self.websocket_lock:
-            disconnected = []
-            for websocket in self.websocket_connections:
-                try:
-                    future = asyncio.run_coroutine_threadsafe(
-                        websocket.send_text(json.dumps(turn_state_data)),
-                        self.event_loop
-                    )
-                    future.result(timeout=5.0)
-                except Exception as e:
-                    print(f"WebSocket send error for turn state update: {e}")
-                    # Don't remove client on timeout - just log the error
-                    if isinstance(e, TimeoutError):
-                        print(f"WebSocket send timeout for turn state update - keeping client")
-                    else:
-                        print(f"WebSocket send error - removing client")
-                        import traceback
-                        traceback.print_exc()
-                        disconnected.append(websocket)
-
-            # Remove only truly disconnected clients (not timeout errors)
-            for websocket in disconnected:
-                if websocket in self.websocket_connections:
-                    self.websocket_connections.remove(websocket)
-                    print(f"Removed disconnected WebSocket client during turn state update. Remaining: {len(self.websocket_connections)}")
+        if self.event_loop:
+            try:
+                future = asyncio.run_coroutine_threadsafe(
+                    self._send_turn_state_to_all_clients(turn_state_data), 
+                    self.event_loop
+                )
+                future.result(timeout=1.0)
+            except asyncio.TimeoutError:
+                pass  # Keep clients, timeouts are expected
+            except Exception as e:
+                # Only log other errors
+                pass
+        else:
+            pass
     
     def _send_step_complete_to_websockets(self):
         """Send a dedicated step_complete message to all WebSocket clients."""
         with self.websocket_lock:
             if not self.websocket_connections:
-                print("No WebSocket clients connected, skipping step complete message.")
                 return
 
         step_complete_data = {
             'type': 'step_complete'
         }
 
-        print(f"Sending step complete message to {len(self.websocket_connections)} WebSocket clients")
-
         if self.event_loop is None:
-            print("No event loop available, skipping step complete message WebSocket send")
             return
 
         with self.websocket_lock:
@@ -967,12 +924,8 @@ class FastAPIActionDisplayNode:
                     )
                     future.result(timeout=5.0)
                 except Exception as e:
-                    print(f"WebSocket send error for step complete message: {e}")
                     # Don't remove client on timeout - just log the error
-                    if isinstance(e, TimeoutError):
-                        print(f"WebSocket send timeout for step complete message - keeping client")
-                    else:
-                        print(f"WebSocket send error - removing client")
+                    if not isinstance(e, TimeoutError):
                         import traceback
                         traceback.print_exc()
                         disconnected.append(websocket)
@@ -981,7 +934,7 @@ class FastAPIActionDisplayNode:
             for websocket in disconnected:
                 if websocket in self.websocket_connections:
                     self.websocket_connections.remove(websocket)
-                    print(f"Removed disconnected WebSocket client during step complete message. Remaining: {len(self.websocket_connections)}")
+
     
     def _store_action_in_memory(self, action_data: Dict[str, Any], character_name: str):
         """Store action in memory system."""
@@ -1012,7 +965,7 @@ class FastAPIActionDisplayNode:
     
     def _handle_character_announcement(self, action_data: Dict[str, Any], character_name: str):
         """Handle character announcement actions."""
-        print(f'🎉 Character announced: {character_name}')
+
         self.active_characters.add(character_name)
     
     def shutdown(self):

@@ -28,7 +28,7 @@ def test_entity_integration():
         
         # Test entity query for non-existent entity
         print("🔍 Testing query for non-existent entity...")
-        for reply in session.get("cognitive/samantha/memory/entity/nonexistent"):
+        for reply in session.get("cognitive/samantha/memory/entity/nonexistent?query=dialog"):
             data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
             if not data['success']:
                 print(f"✅ Correctly returned error: {data['error']}")
@@ -37,7 +37,7 @@ def test_entity_integration():
         
         # Test entity query with limit parameter
         print("\n🔍 Testing entity query with limit parameter...")
-        for reply in session.get("cognitive/samantha/memory/entity/joe?limit=5"):
+        for reply in session.get("cognitive/samantha/memory/entity/joe?query=dialog&limit=5"):
             data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
             if data['success']:
                 entity_data = data['entity_data']
@@ -52,7 +52,7 @@ def test_entity_integration():
         
         # Test entity query without limit (should use default 20)
         print("\n🔍 Testing entity query without limit...")
-        for reply in session.get("cognitive/samantha/memory/entity/joe"):
+        for reply in session.get("cognitive/samantha/memory/entity/joe?query=dialog"):
             data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
             if data['success']:
                 entity_data = data['entity_data']

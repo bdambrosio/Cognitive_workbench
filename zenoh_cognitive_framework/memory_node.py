@@ -19,6 +19,14 @@ from datetime import datetime
 from typing import Dict, List, Any
 from entity_model import EntityModel
 
+# LLM client import
+try:
+    from llm_client import ZenohLLMClient
+    LLM_CLIENT_AVAILABLE = True
+except ImportError as e:
+    print(f"⚠️  LLM Client not available: {e}")
+    LLM_CLIENT_AVAILABLE = False
+
 # Configure logging with unbuffered output
 # Console handler with WARNING level (less verbose)
 console_handler = logging.StreamHandler(sys.stdout)
@@ -63,6 +71,11 @@ class ZenohMemoryNode:
         
         # Entity registry for tracking character interactions
         self.entity_models: Dict[str, EntityModel] = {}
+        
+        # LLM client for entity model functionality
+        self.llm_client = None
+        if LLM_CLIENT_AVAILABLE:
+            self.llm_client = ZenohLLMClient(service_timeout=30.0)
         
         # Subscriber for incoming data to store (character-specific)
         self.data_subscriber = self.session.declare_subscriber(
@@ -292,7 +305,7 @@ class ZenohMemoryNode:
             query.reply(query.key_expr, json.dumps({'success': False, 'error': str(e), 'entries': []}).encode('utf-8'))
     
     def handle_entity_query(self, query):
-        """Handle queries for entity data."""
+        """Handle queries for entity data and operations."""
         try:
             # Extract entity name from query key
             key_parts = str(query.key_expr).split('/')
@@ -301,26 +314,19 @@ class ZenohMemoryNode:
             if not entity_name:
                 raise ValueError("No entity name provided")
             
-            # Parse query parameters for limit and scope
+            # Parse query parameters
             selector = str(query.selector)
-            limit = 20  # default limit
-            scope = 'current'  # default scope
             
-            # Extract limit from query if specified
-            if 'limit=' in selector:
+            # Extract query type (required parameter)
+            query_type = None
+            if 'query=' in selector:
                 try:
-                    limit = int(selector.split('limit=')[1].split('&')[0])
+                    query_type = selector.split('query=')[1].split('&')[0]
                 except:
                     pass
             
-            # Extract scope from query if specified
-            if 'scope=' in selector:
-                try:
-                    scope = selector.split('scope=')[1].split('&')[0]
-                    if scope not in ['current', 'all']:
-                        scope = 'current'  # Default to current for unknown values
-                except:
-                    pass
+            if not query_type:
+                raise ValueError("Missing required 'query' parameter. Use query=dialog or query=natural_dialog_end")
             
             # Check if entity exists (case-insensitive)
             canonical_entity_name = entity_name.capitalize()
@@ -331,15 +337,60 @@ class ZenohMemoryNode:
                 }
             else:
                 entity = self.entity_models[canonical_entity_name]
-                entity_data = entity.get_entity_data(limit, scope)
                 
-                response = {
-                    'success': True,
-                    'entity_data': entity_data
-                }
+                if query_type == 'dialog':
+                    # Handle dialog data retrieval
+                    limit = 20  # default limit
+                    scope = 'current'  # default scope
+                    
+                    # Extract limit from query if specified
+                    if 'limit=' in selector:
+                        try:
+                            limit = int(selector.split('limit=')[1].split('&')[0])
+                        except:
+                            pass
+                    
+                    # Extract scope from query if specified
+                    if 'scope=' in selector:
+                        try:
+                            scope = selector.split('scope=')[1].split('&')[0]
+                            if scope not in ['current', 'all']:
+                                scope = 'current'  # Default to current for unknown values
+                        except:
+                            pass
+                    
+                    entity_data = entity.get_entity_data(limit, scope)
+                    response = {
+                        'success': True,
+                        'entity_data': entity_data
+                    }
+                    
+                elif query_type == 'natural_dialog_end':
+                    # Handle natural dialog end analysis
+                    input_text = None
+                    if 'input_text=' in selector:
+                        try:
+                            # URL decode the input text
+                            import urllib.parse
+                            input_text = urllib.parse.unquote(selector.split('input_text=')[1].split('&')[0])
+                        except:
+                            pass
+                    
+                    if not input_text:
+                        raise ValueError("Missing required 'input_text' parameter for natural_dialog_end query")
+                    
+                    # Call natural_dialog_end method
+                    should_end = entity.natural_dialog_end(input_text)
+                    response = {
+                        'success': True,
+                        'should_end': should_end
+                    }
+                    
+                else:
+                    raise ValueError(f"Unknown query type: {query_type}. Use 'dialog' or 'natural_dialog_end'")
             
             query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
-            logger.info(f'👥 Entity query for {entity_name}: returned data')
+            logger.info(f'👥 Entity {query_type} query for {entity_name}: completed')
             
         except Exception as e:
             logger.error(f'Error handling entity query: {e}')
@@ -364,7 +415,7 @@ class ZenohMemoryNode:
         
         if canonical_entity_name not in self.entity_models:
             # Create new entity with canonicalized name
-            self.entity_models[canonical_entity_name] = EntityModel(canonical_entity_name)
+            self.entity_models[canonical_entity_name] = EntityModel(canonical_entity_name, logger, self.llm_client)
             logger.info(f'👥 Created new entity: {canonical_entity_name}')
             return self.entity_models[canonical_entity_name]
         else:
@@ -426,7 +477,7 @@ class ZenohMemoryNode:
             entity_name: Name of the entity
         """
         entity = self.get_or_create_entity(entity_name)
-        entity.update_visual_detection()
+        entity.update_last_seen()
         self.save_memory()  # Save after visual detection
         logger.info(f'👁️ Updated visual detection for {entity_name}')
 
@@ -438,7 +489,7 @@ class ZenohMemoryNode:
                     data = json.load(f)
                     self.entity_models = {}
                     for entity_name, entity_data in data.get('entities', {}).items():
-                        entity = EntityModel.load_from_dict(entity_data)
+                        entity = EntityModel.load_from_dict(entity_data, logger, self.llm_client)
                         self.entity_models[entity_name] = entity
                 logger.info(f'📂 Loaded memory from {self.memory_file}')
             else:

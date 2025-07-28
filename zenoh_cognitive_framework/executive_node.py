@@ -18,6 +18,7 @@ import argparse
 from datetime import datetime
 from typing import Dict, List, Any
 import utils.hash_utils as hash_utils
+import plan
 
 # Configure logging with unbuffered output
 # Console handler with WARNING level (less verbose)
@@ -149,10 +150,23 @@ class ZenohExecutiveNode:
             while not self.shutdown_requested:
                 if self.waiting_for_turn:
                     # Wait for turn signal
-                    time.sleep(0.1)
-                elif self.interrupt_pending:
-                    self._handle_interrupt()
-                    self.interrupt_pending = False
+                    if self.text_input_pending and self.last_sense_data:
+                        content = self.last_sense_data['content']
+                        try:
+                            content_data = json.loads(content)
+                            text_input = content_data.get('text', '')
+                            source = content_data.get('source', 'unknown')
+                            if source == 'ui': # other text inputs must be handled by OODA to observe dialog turn taking
+                                self.respond(text_input, source)
+                                self.text_input_pending = False
+                                self.last_sense_data = None
+                        except (json.JSONDecodeError, TypeError):
+                            logger.error(f'Error parsing text input: {content}')
+                            self.text_input_pending = False
+                            self.last_sense_data = None
+                            continue
+                    else:
+                        time.sleep(0.1)
                 else:
                     self._run_ooda_loop()
                     # Complete turn after OODA loop
@@ -274,7 +288,7 @@ class ZenohExecutiveNode:
         if self.character_config.get('character', None):
             system_prompt = self.character_config['character']
         if self.character_config.get('drives', None):
-            system_prompt += f"\n\nYour drives are:\n\t{'\n\t'.join(self.character_config['drives'])}"
+            system_prompt += f"\n#Your drives are:\n\t{'\n\t'.join(self.character_config['drives'])}\n"
             
         # Build user prompt with context
         user_prompt = '' 
@@ -282,8 +296,10 @@ class ZenohExecutiveNode:
         entity_context = None
         entity_context = self.get_entity_context(self.character_name, 10)
         if entity_context:
+            user_prompt += f'\n#Your mode recent thoughts include:'
             for i, memory in enumerate(entity_context['conversation_history']):  # Use last 2 memories
-                user_prompt += f"{memory['source']}: {memory['text']}\n"
+                user_prompt += f"\n\t{memory['source']}: {memory['text']}"
+            user_prompt += '\n'
         self.observations = {'static': system_prompt, 'dynamic': user_prompt}
         return self.observations
 
@@ -296,14 +312,27 @@ class ZenohExecutiveNode:
             system_prompt = observations['static']
             user_prompt = observations['dynamic']
             directive = """What would you like to do next? 
-Respond with a simple statement of no more than 20 words stating your highest priority goal given who you are, your drives, your past, your memories, and the current situation you find yourself in.
-If there is an unanswered question awaiting your response, you may choose to respond to it as your first goal.
-Respond using the following hash-formatted text:
-#goal <your goal here>
-#target <character_name or resource_name>
-##
-Do not include any other introductory, explanatory, discursive, or formatting text in your response.
+Consider:
+1. What is the central issue / opportunity / obligation demanding the character's attention?
+2. Given the following available information about the character, the situation, and the surroundings, how can the character best satify their drives?
+3. Identify any other actors involved in the goal, and their relationships to the character.
+4. Each goal should be a candiate for the center of activity for the near future.
+5. Goals must be distinct from one another.
+6. Goals must be consistent with the character's drives and emotional stance.
 
+Nothing in this or other instructions limits your use of deception or surprise.
+                  
+Respond using the following hash-formatted text, where each tag is preceded by a # and followed by a single space, followed by its content.
+Each goal should begin with a #goal tag, and should end with ## on a separate line as shown below:
+be careful to insert line breaks only where shown, separating a value from the next tag:
+
+#goal terse (5-8) words) name for this goal
+#description concise (8-14) words) further details of this goal
+#otherActorName name of the other actor involved in this goal, or None if no other actor is involved
+#termination terse (5-6 words) statement of condition that would mark achievement or partial achievement of this goal. This should be a specific observable condition that can be checked for.
+##
+
+Respond ONLY with the above hash-formatted text.
 """
             # Make LLM call
             if self.llm_client and not self.shutdown_requested:
@@ -318,28 +347,37 @@ Do not include any other introductory, explanatory, discursive, or formatting te
 
                 if response.success:
                     logger.warning(f'🤖 {self.character_name} New Goal: {response.text.strip()}')
-                    self.current_goal = hash_utils.find('goal', response.text.strip())
-                    self.current_target = hash_utils.find('target', response.text.strip())
+                    goals = []
+                    forms = hash_utils.findall_forms(response.text)
+                    for goal_hash in forms:
+                        goal = plan.validate_and_create_goal(self.character_name, goal_hash)
+                        if goal:
+                            logger.warning(f'{self.character_name} generated goal: {goal.to_string()}')
+                            self.current_goal = goal
+                            return self.current_goal
+                        else:
+                            logger.error(f'Warning: Invalid goal generation response for {goal_hash}')
                 else:
                     logger.error(f'LLM call failed: {response.error}')
-                    self.current_goal = 'sleep'
+                    self.current_goal = plan.Goal('sleep', actors=[self.character_name])
             else:   
                 logger.error('LLM client not available')
-                self.current_goal = 'sleep'
+                self.current_goal = plan.Goal('sleep', actors=[self.character_name])
             return self.current_goal
 
     def _decide(self, goal: str):
         """Decide: Choose next action. Stub."""
-        if not self.current_goal or self.current_goal == 'sleep':
+        if not self.current_goal or self.current_goal.name == 'sleep':
             return None
         else:
             system_prompt = self.observations['static']
             user_prompt = self.observations['dynamic']
-            goal_prompt = f"\n\nYour current goal is: {goal}"
-            if self.current_target:
-                entity_context = self.get_entity_context(self.current_target, 10)
+            goal_prompt = f"\n\nYour current goal is: {goal.to_string()}"
+            target = goal.actors[1] if len(goal.actors) > 1 else None
+            if target:
+                entity_context = self.get_entity_context(target, 10)
                 if entity_context and len(entity_context['conversation_history']) > 0:
-                    goal_prompt += f'your recent dialog with {self.current_target} has been:\n'
+                    goal_prompt += f'your recent dialog with {target} has been:\n'
                     for i, memory in enumerate(entity_context['conversation_history']):  # Use last 2 memories
                         goal_prompt += f"\t{memory['source']}: {memory['text']}\n"
 
@@ -554,13 +592,20 @@ End your response with:
         try:
             logger.info(f'Responding to: "{text_input}" (from {source})')
             
+            # Check if dialog should naturally end
+            are_we_done = self.check_natural_dialog_end(source, text_input)
+            logger.warning(f'🤖 {self.character_name} Dialog end check: {are_we_done}')
+            if are_we_done:
+                action_data = {'type': 'dialog_end','action_id': f'action_{self.action_counter}','timestamp': datetime.now().isoformat(),'input': text_input,'text': 'Done','source': source}
+                self.last_action = action_data
+                self.action_publisher.put(json.dumps(action_data))
+                logger.info(f'📤 Published action: {action_data["action_id"]}')
+                return
+            
             # Get recent memory entries for context
             recent_memories = self._get_recent_chat_memories(3)
-            
             # Get entity context if source is not console
-            entity_context = None
-            if source != 'console':
-                entity_context = self.get_entity_context(source, 10)
+            entity_context = self.get_entity_context(source, 10)
             
             # Simple, focused prompt
             system_prompt = """You are a helpful AI assistant. 
@@ -592,7 +637,8 @@ End your response with: </end>"""
                     messages=[system_prompt, user_prompt],
                     max_tokens=400,
                     temperature=0.7,
-                    timeout=timeout
+                    timeout=timeout,
+                    stops=['</end>']
                 )
 
                 if response.success:
@@ -802,8 +848,8 @@ End your response with: </end>"""
             Dictionary with entity data or None if query failed
         """
         try:
-            # Query entity data from memory node with limit parameter
-            for reply in self.session.get(f"cognitive/{self.character_name}/memory/entity/{entity_name}?limit={limit}", timeout=3.0):
+            # Query entity data from memory node with query and limit parameters
+            for reply in self.session.get(f"cognitive/{self.character_name}/memory/entity/{entity_name}?query=dialog&limit={limit}", timeout=3.0):
                 try:
                     if reply.ok:
                         data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
@@ -823,6 +869,43 @@ End your response with: </end>"""
         except Exception as e:
             logger.error(f'Error querying entity context for {entity_name}: {e}')
             return None
+    
+    def check_natural_dialog_end(self, entity_name: str, input_text: str) -> bool:
+        """
+        Check if dialog should naturally end after the given input via memory node.
+        
+        Args:
+            entity_name: Name of the entity
+            input_text: The text input that would end the dialog
+            
+        Returns:
+            bool: True if dialog should end, False if it should continue
+        """
+        try:
+            import urllib.parse
+            encoded_text = urllib.parse.quote(input_text)
+            query_url = f"cognitive/{self.character_name}/memory/entity/{entity_name}?query=natural_dialog_end&input_text={encoded_text}"
+            
+            for reply in self.session.get(query_url, timeout=5.0):
+                try:
+                    if reply.ok:
+                        data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
+                        if data['success']:
+                            logger.info(f'🤔 Natural dialog end check for {entity_name}: {data.get("should_end", False)}')
+                            return data.get('should_end', False)
+                        else:
+                            logger.debug(f'Natural dialog end query failed for {entity_name}: {data.get("error", "Unknown error")}')
+                            return False
+                except Exception as e:
+                    logger.error(f'Error parsing natural dialog end response for {entity_name}: {e}')
+                    return False
+            
+            logger.debug(f'No response received for natural dialog end query: {entity_name}')
+            return False
+            
+        except Exception as e:
+            logger.error(f'Error querying natural dialog end for {entity_name}: {e}')
+            return False
     
     def shutdown(self):
         """Clean shutdown."""
