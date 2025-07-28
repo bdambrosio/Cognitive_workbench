@@ -6,6 +6,13 @@ Entity Model for tracking character interactions and conversations.
 from datetime import datetime
 from typing import List, Dict, Any, Optional
 import json
+import random
+try:
+    from llm_client import ZenohLLMClient
+    LLM_CLIENT_AVAILABLE = True
+except ImportError as e:
+    print(f"⚠️  LLM Client not available: {e}")
+    LLM_CLIENT_AVAILABLE = False
 
 class EntityModel:
     """
@@ -13,10 +20,12 @@ class EntityModel:
     Tracks visual sightings and conversation history organized as dialogs.
     """
     
-    def __init__(self, entity_name: str):
+    def __init__(self, entity_name: str, logger, llm_client: ZenohLLMClient):
         self.entity_name = entity_name
         self.first_seen: Optional[datetime] = None
         self.last_seen: Optional[datetime] = None
+        self.llm_client = llm_client
+        self.logger = logger
         
         # Dialog system - list of dialogs, each dialog is a list of conversation entries
         self.dialogs: List[List[Dict[str, Any]]] = []
@@ -207,18 +216,20 @@ class EntityModel:
         }
     
     @classmethod
-    def load_from_dict(cls, data: Dict[str, Any]) -> 'EntityModel':
+    def load_from_dict(cls, data: Dict[str, Any], logger=None, llm_client=None) -> 'EntityModel':
         """
         Load entity model from dictionary (for persistence).
         Handles migration from old conversation_history format.
         
         Args:
             data: Dictionary representation of entity model
+            logger: Logger instance (optional)
+            llm_client: LLM client instance (optional)
             
         Returns:
             EntityModel instance
         """
-        entity = cls(data['entity_name'])
+        entity = cls(data['entity_name'], logger, llm_client)
         
         # Load timestamps
         if data.get('first_seen'):
@@ -242,3 +253,72 @@ class EntityModel:
             entity.active = data.get('active', False)
         
         return entity 
+    
+    def natural_dialog_end(self, input_text):
+        """
+        Analyze whether a dialog should naturally end after the given input.
+        
+        Args:
+            input_text: The text input that would end the dialog
+            
+        Returns:
+            bool: True if dialog should end, False if it should continue
+        """
+        # Build transcript from recent conversation
+        transcript_text = ''
+        if self.active:
+            conversation_entries = self.get_recent_conversation(20)
+            if conversation_entries:
+                for entry in conversation_entries:
+                    if isinstance(entry, dict) and 'source' in entry and 'text' in entry:
+                        transcript_text += f"{entry['source']}: {entry['text']}\n"
+        
+        # Add the proposed input to transcript
+        # don't actually need this, already in transcript!
+        #transcript_text += f"{self.entity_name}: {input_text}\n"
+        
+        # If no LLM client available, default to continuing dialog
+        if not self.llm_client:
+            self.logger.warning(f'No LLM client available for natural_dialog_end, defaulting to continue')
+            return False
+        
+        system_prompt = """Given the following dialog transcript, rate the naturalness of ending at this point.
+
+#Transcript
+{{$transcript}}
+##
+                              
+For example, if the last entry in the transcript is a question that expects an answer (as opposed to merely musing), ending at this point is likely not expected.
+On the other hand, if the last entry is an agreement to an earlier suggestion, this is a natural end.
+Dialogs are short, and should be resolved quickly.
+Respond only with a rating between 0 and 10, where
+0 expects continuation of the dialog (i.e., termination at this point would be unnatural)
+10 expects termination at this point (i.e., continuation is highly unexpected, unnatural, or repetitious).   
+                                                  
+Do not include any text in your response, ONLY the numeric rating.
+
+My rating is:
+"""  
+        try:
+            response = self.llm_client.generate([system_prompt], bindings={'transcript': transcript_text}, stops=['</end>'], max_tokens=20)
+            if response.success:
+            # Extract rating from response
+                response=response.text
+                rating = int(response.lower().replace('</end>','').strip())
+                try:
+                    rating = int(''.join(filter(str.isdigit, response)))
+                    if rating < 0 or rating > 10:
+                        rating = 7
+                except ValueError:
+                    self.logger.warning(f'{self.entity_name} natural_dialog_end: invalid rating: {response}')
+                    rating = 7
+            
+            # Determine if dialog should end based on rating and some randomness
+            should_end = rating > 7 or (random.randint(4, 10) < rating) or ((rating + len(transcript_text.split('\n'))) > random.randint(8,10))
+            self.logger.info(f'{self.entity_name} natural_dialog_end: rating: {rating}, should_end: {should_end}')
+            return should_end
+            
+        except Exception as e:
+            self.logger.error(f'Error in natural_dialog_end for {self.entity_name}: {e}')
+            return False
+    

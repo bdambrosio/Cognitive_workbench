@@ -12,7 +12,7 @@ def test_basic_functionality():
     print("=== Testing Basic Dialog Functionality ===")
     
     # Create entity and add some conversation entries
-    entity = EntityModel("Samantha")
+    entity = EntityModel("Samantha", None, None)
     
     # Add entries to first dialog
     entity.add_conversation_entry("Joe", "Hi there!")
@@ -48,7 +48,7 @@ def test_persistence():
     print("=== Testing Persistence ===")
     
     # Create entity with some data
-    entity = EntityModel("TestEntity")
+    entity = EntityModel("TestEntity", None, None)
     entity.add_conversation_entry("user", "Test message 1")
     entity.add_conversation_entry("character", "Test response 1")
     entity.update_last_seen()
@@ -101,7 +101,7 @@ def test_migration_from_old_format():
 def test_scope_functionality():
     print("=== Testing Scope Functionality ===")
     
-    entity = EntityModel("ScopeTest")
+    entity = EntityModel("ScopeTest", None, None)
     
     # Add entries to first dialog
     entity.add_conversation_entry("user", "Dialog 1 - Message 1")
@@ -131,7 +131,7 @@ def test_scope_functionality():
 def test_chronological_order_check():
     print("=== Testing Chronological Order Check ===")
     
-    entity = EntityModel("ChronoTest")
+    entity = EntityModel("ChronoTest", None, None)
     
     # Add normal entry
     entity.add_conversation_entry("user", "Normal message")
@@ -151,7 +151,7 @@ def test_chronological_order_check():
 def test_backward_compatibility():
     print("=== Testing Backward Compatibility ===")
     
-    entity = EntityModel("CompatTest")
+    entity = EntityModel("CompatTest", None, None)
     entity.add_conversation_entry("user", "Test message")
     
     # Test conversation_history property

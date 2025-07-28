@@ -1,32 +1,16 @@
-2025-07-27 21:15:21 - situation_node - INFO - 📂 No existing situation file for Joe, starting fresh
-2025-07-27 21:15:21 - situation_node - INFO - 🧭 Situation Node initialized for character: Joe
-2025-07-27 21:15:21 - situation_node - INFO -    - Subscribing to: cognitive/Joe/sense_data
-2025-07-27 21:15:21 - situation_node - INFO -    - Subscribing to: cognitive/Joe/action
-2025-07-27 21:15:21 - situation_node - INFO -    - Publishing to: cognitive/Joe/situation
-2025-07-27 21:15:21 - situation_node - INFO -    - Queryable at: cognitive/Joe/situation/*
-2025-07-27 21:15:21 - situation_node - INFO -    - Storage available at: data/situation/Joe_situation.json
-2025-07-27 21:15:21 - situation_node - INFO - Situation Node running - press Ctrl+C to stop
-2025-07-27 21:15:22 - situation_node - INFO - 📥 Received action: unknown
-2025-07-27 21:15:32 - situation_node - WARNING - Map query failed for Joe
-2025-07-27 21:15:33 - situation_node - INFO - 🗺2025-07-27 21:15:38 - situation_no2025-07-27 21:15:38 - situation_node - INF2025-07-27 21:15:38 - situation_no2025-07-27 21:15:57 - situation_node - INFO - 📥 Received sense data: text
-2025-07-27 21:15:58 - situation_node - INFO - 📥 Received action: unknown
-2025-07-27 21:16:09 - situation_node - INFO - 📥 Received action: unknown
-2025-07-27 21:16:19 - situation_node - INFO - 📥 Received action: unknown
-2025-07-27 21:16:20 - situation_node - INFO - 📥 Received sense data: text
-2025-07-27 21:16:35 - situation_node - INFO - 📥 Received action: unknown
-2025-07-27 21:17:05 - situation_node - INFO - 📥 Received action: unknown
-2025-07-27 21:17:09 - situation_node - INFO - 📥 Received sense data: text
-2025-07-27 21:17:25 - situation_node - INFO - 📥 Received action: unknown
-2025-07-27 21:17:40 - situation_node - INFO - 📥 Received action: unknown
-2025-07-27 21:17:46 - situation_node - INFO - 📥 Received sense data: text
-2025-07-27 21:17:59 - situation_node - INFO - 📥 Received action: unknown
-2025-07-27 21:18:33 - situation_node - INFO - Received signal 2, initiating shutdown...
-2025-07-27 21:18:34 - situation_node - INFO - Situation Node shutdown initiated...
-2025-07-27 21:18:35 - situation_node - INFO - Received signal 2, initiating shutdown...
-2025-07-27 21:18:36 - situation_node - INFO - Received signal 15, initiating shutdown...
-2025-07-27 21:18:36 - situation_node - INFO - Received signal 2, initiating shutdown...
-2025-07-27 21:18:36 - situation_node - INFO - Zenoh session closed
-2025-07-27 21:18:36 - situation_node - INFO - Situation Node shutdown complete
- Situation Node shutdown complete
-2025-07-27 21:18:36 - situation_node - INFO - Received signal 15, initiating shutdown...
-2025-07-27 21:18:36 - situation_node - INFO - Received signal 2, initiating shutdown...
+2025-07-28 13:41:48 - situation_node - INFO - 📂 No existing situation file for Joe, starting fresh
+2025-07-28 13:41:48 - situation_node - INFO - 🧭 Situation Node initialized for character: Joe
+2025-07-28 13:41:48 - situation_node - INFO -    - Subscribing to: cognitive/Joe/sense_data
+2025-07-28 13:41:48 - situation_node - INFO -    - Subscribing to: cognitive/Joe/action
+2025-07-28 13:41:48 - situation_node - INFO -    - Publishing to: cognitive/Joe/situation
+2025-07-28 13:41:48 - situation_node - INFO -    - Queryable at: cognitive/Joe/situation/*
+2025-07-28 13:41:48 - situation_node - INFO -    - Storage available at: data/situation/Joe_situation.json
+2025-07-28 13:41:48 - situation_node - INFO - Situation Node running - press Ctrl+C to stop
+2025-07-28 13:41:50 - situation_node - INFO - 📥 Received action: unknown
+2025-07-28 13:42:00 - situation_node - WARNING - Map query failed for Joe
+2025-07-28 13:42:00 - situation_node - INFO - 🗺2025-07-28 13:42:05 - situation_no2025-07-28 13:42:10 - situation_node - INF2025-07-28 13:42:10 - situation_no2025-07-28 13:42:16 - situation_node - INFO - 📥 Received action: unknown
+2025-07-28 13:42:18 - situation_node - INFO - 📥 Received sense data: text
+2025-07-28 13:42:37 - situation_node - INFO - 📥 Received action: unknown
+8 - situation_node - INFO - 📥 Received action: unknown
+2025-07-28 13:42:35 - situation_node - INFO - 📥 Received action: unknown
+2025-07-28 13:42:37 - situation_node - INFO - 📥 Received sense data: text
