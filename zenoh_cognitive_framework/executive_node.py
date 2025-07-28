@@ -205,7 +205,7 @@ class ZenohExecutiveNode:
         """Execute the OODA loop: Observe, Orient, Decide, Act."""
         try:
             logger.warning(f'🔄 {self.character_name} OODA loop running')
-            if self.text_input_pending:
+            if self.text_input_pending and (not self.last_action or (self.last_action['type'].lower() != 'response' and self.last_action['type'].lower() != 'say')):
                 self.text_input_pending = False
                 content = self.last_sense_data['content']
                 try:
@@ -357,7 +357,7 @@ Use - use a resource in a known way.
 Select an action given who you are, your drives, and the current situation you find yourself in.
 
 """
-            if self.last_action and self.last_action['action'].lower() == 'say':
+            if self.last_action and (self.last_action['type'].lower() == 'say' or self.last_action['type'].lower() == 'response'):
                 directive = """Do NOT attempt to say anything. Respond using the following hash-formatted text:
 #action Sleep / Move / Think / Take / Inspect / Use
 #target na / cardinal_direction / 'self' / resource_name / resource_name / resource_name
@@ -411,7 +411,7 @@ End your response with:
 
     def _act(self, action: Dict[str, Any]):
         """Act: Execute the chosen action."""
-        self.last_action = action
+
         if action['action'].lower() == "sleep":
             time.sleep(1)  # Sleep for 1 second
         elif action['action'].lower() == "move":
@@ -431,6 +431,7 @@ End your response with:
                         'source': self.character_name,
                         'text': action['value']                
                         }
+            self.last_action = action_data
                     
             # Publish action (this will be picked up by action_display_node)
             self.action_publisher.put(json.dumps(action_data))
@@ -440,17 +441,20 @@ End your response with:
             self.action_counter += 1    
         elif action['action'].lower() == "take":
             action_data = {'type': 'take','action_id': self.action_counter,'timestamp': datetime.now().isoformat(),'target': action['target']}
+            self.last_action = action_data
             self.action_publisher.put(json.dumps(action_data))
             #self.take(action['target'])
             self.action_counter += 1
         elif action['action'].lower() == "inspect":
             action_data = {'type': 'inspect','action_id': self.action_counter,'timestamp': datetime.now().isoformat(),'target': action['target']}
+            self.last_action = action_data
             self.action_publisher.put(json.dumps(action_data))
             #self.inspect(action)
             self.action_counter += 1
         elif action['action'].lower() == "use":
             # Create action
             action_data = {'type': 'use','action_id': self.action_counter,'timestamp': datetime.now().isoformat(),'target': action['target']}
+            self.last_action = action_data
             self.action_publisher.put(json.dumps(action_data))
             #self.use(action)
         logger.warning(f'📤 Published action: {action}')
@@ -606,7 +610,7 @@ End your response with: </end>"""
                         'text': response.text.strip(),
                         'source': source
                      }
-                    
+                    self.last_action = action_data
                     # Publish action (this will be picked up by memory_node and action_display_node)
                     self.action_publisher.put(json.dumps(action_data))
                     logger.info(f'📤 Published action: {action_data["action_id"]}')
@@ -649,7 +653,7 @@ End your response with: </end>"""
                 'action_id': f"move_{int(time.time())}",
                 'timestamp': datetime.now().isoformat()
             }
-            
+            self.last_action = action_data
             self.action_publisher.put(json.dumps(action_data).encode('utf-8'))
             logger.info(f'📤 Published move action: {move_direction}')
             
@@ -721,11 +725,10 @@ End your response with: </end>"""
                         'text': response.text.strip(),
                         'source': self.character_name
                      }
-                    
+                    self.last_action = action_data                    
                     # Publish action (this will be picked up by memory_node and action_display_node)
                     self.action_publisher.put(json.dumps(action_data))
                     logger.info(f'📤 Published action: {action_data["action_id"]}')
-                    
                     
                     self.action_counter += 1
                 else:
@@ -799,8 +802,8 @@ End your response with: </end>"""
             Dictionary with entity data or None if query failed
         """
         try:
-            # Query entity data from memory node - try without query parameters first
-            for reply in self.session.get(f"cognitive/{self.character_name}/memory/entity/{entity_name}", timeout=3.0):
+            # Query entity data from memory node with limit parameter
+            for reply in self.session.get(f"cognitive/{self.character_name}/memory/entity/{entity_name}?limit={limit}", timeout=3.0):
                 try:
                     if reply.ok:
                         data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))

@@ -99,6 +99,7 @@ class CharacterLauncher:
                 self.logger.info('   - Web UI available at: http://localhost:3000')
             except Exception as e:
                 self.logger.error(f'❌ Failed to launch FastAPI Action Display Node: {e}')
+                
         
         # Launch map node (required for situation awareness)
         try:
