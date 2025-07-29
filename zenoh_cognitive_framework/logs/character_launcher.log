@@ -1,21 +1,21 @@
-2025-07-28 15:03:16 - character_launcher - INFO - Added character: Samantha
-2025-07-28 15:03:16 - character_launcher - INFO - Added character: Joe
-2025-07-28 15:03:16 - character_launcher - INFO - Launching 2 characters...
-2025-07-28 15:03:16 - character_launcher - INFO - Launching shared services...
-2025-07-28 15:03:16 - character_launcher - INFO - ✅ LLM Service Node launched
-2025-07-28 15:03:16 - character_launcher - INFO - ✅ FastAPI Action Display Node launched on port 3000
-2025-07-28 15:03:16 - character_launcher - INFO -    - Web UI available at: http://localhost:3000
-2025-07-28 15:03:17 - character_launcher - INFO - ✅ Map Node launched with map: forest.py
-2025-07-28 15:03:17 - character_launcher - INFO - ⏳ Waiting for Map Node to initialize...
-2025-07-28 15:03:24 - character_launcher - INFO - Launching character: Samantha
-2025-07-28 15:03:24 - character_launcher - INFO - ✅ Samantha memory_node launched
-2025-07-28 15:03:25 - character_launcher - INFO - ✅ Samantha situation_node launched
-2025-07-28 15:03:25 - character_launcher - INFO - ✅ Samantha sense_node launched
-2025-07-28 15:03:26 - character_launcher - INFO - ✅ Samantha executive_node launched
-2025-07-28 15:03:27 - character_launcher - INFO - Launching character: Joe
-2025-07-28 15:03:27 - character_launcher - INFO - ✅ Joe memory_node launched
-2025-07-28 15:03:27 - character_launcher - INFO - ✅ Joe situation_node launched
-2025-07-28 15:03:28 - character_launcher - INFO - ✅ Joe sense_node launched
-2025-07-28 15:03:28 - character_launcher - INFO - ✅ Joe executive_node launched
-2025-07-28 15:03:29 - character_launcher - INFO - ✅ All characters launched
-2025-07-28 15:03:29 - character_launcher - INFO - Monitoring processes...
+2025-07-28 19:13:33 - character_launcher - INFO - Added character: Samantha
+2025-07-28 19:13:33 - character_launcher - INFO - Added character: Joe
+2025-07-28 19:13:33 - character_launcher - INFO - Launching 2 characters...
+2025-07-28 19:13:33 - character_launcher - INFO - Launching shared services...
+2025-07-28 19:13:33 - character_launcher - INFO - ✅ LLM Service Node launched
+2025-07-28 19:13:33 - character_launcher - INFO - ✅ FastAPI Action Display Node launched on port 3000
+2025-07-28 19:13:33 - character_launcher - INFO -    - Web UI available at: http://localhost:3000
+2025-07-28 19:13:34 - character_launcher - INFO - ✅ Map Node launched with map: forest.py
+2025-07-28 19:13:34 - character_launcher - INFO - ⏳ Waiting for Map Node to initialize...
+2025-07-28 19:13:41 - character_launcher - INFO - Launching character: Samantha
+2025-07-28 19:13:41 - character_launcher - INFO - ✅ Samantha memory_node launched
+2025-07-28 19:13:42 - character_launcher - INFO - ✅ Samantha situation_node launched
+2025-07-28 19:13:42 - character_launcher - INFO - ✅ Samantha sense_node launched
+2025-07-28 19:13:43 - character_launcher - INFO - ✅ Samantha executive_node launched
+2025-07-28 19:13:44 - character_launcher - INFO - Launching character: Joe
+2025-07-28 19:13:44 - character_launcher - INFO - ✅ Joe memory_node launched
+2025-07-28 19:13:44 - character_launcher - INFO - ✅ Joe situation_node launched
+2025-07-28 19:13:45 - character_launcher - INFO - ✅ Joe sense_node launched
+2025-07-28 19:13:45 - character_launcher - INFO - ✅ Joe executive_node launched
+2025-07-28 19:13:46 - character_launcher - INFO - ✅ All characters launched
+2025-07-28 19:13:46 - character_launcher - INFO - Monitoring processes...

@@ -316,6 +316,8 @@ My rating is:
             # Determine if dialog should end based on rating and some randomness
             should_end = rating > 7 or (random.randint(4, 10) < rating) or ((rating + len(transcript_text.split('\n'))) > random.randint(8,10))
             self.logger.info(f'{self.entity_name} natural_dialog_end: rating: {rating}, should_end: {should_end}')
+            if should_end:
+                self.close_dialog()
             return should_end
             
         except Exception as e:

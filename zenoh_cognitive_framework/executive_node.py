@@ -112,6 +112,17 @@ class ZenohExecutiveNode:
         self.text_input_pending = False
         self.last_action = None
         
+        # Plan execution state
+        self.current_plan = None
+        self.plan_state = {
+            'current_step': 0,
+            'variables': {},
+            'completed': False,
+            'loop_start': None,
+            'in_loop': False,
+            'loop_iterations': 0
+        }
+        self.current_action = None
         # Turn management
         self.turn_subscriber = self.session.declare_subscriber(
             "cognitive/map/turn/go",
@@ -286,19 +297,27 @@ class ZenohExecutiveNode:
                     return
             goal = self._orient(observations)
             
-            # Decide: Choose next action
+            # Plan: Return existing plan or create single-action plan
             if self.interrupt_pending:
                 self.interrupt_pending = False
                 if self._handle_interrupt():
                     return
-            action = self._decide(goal)
+            plan = self._plan(goal)
             
-            # Act: Execute the chosen action
+            # Plan Step: Execute current step of plan
             if self.interrupt_pending:
                 self.interrupt_pending = False
                 if self._handle_interrupt():
                     return
-            self._act(action)
+            action = self._plan_step(plan)
+            
+            # Act: Execute the chosen action (if we have one)
+            if action is not None:
+                if self.interrupt_pending:
+                    self.interrupt_pending = False
+                    if self._handle_interrupt():
+                        return
+                self._act(action)
             
         except Exception as e:
             logger.error(f'Error in OODA loop: {e}')
@@ -452,7 +471,8 @@ End your response with:
                 directive = """Respond using the following hash-formatted text:
 #action Say / Move / Think / Take / Inspect / Use
 #target character_name / cardinal_direction / 'self' / resource_name / resource_name / resource_name
-#value text to speak / reason for moving (5 words max) / text to think about (10 words max) / reason for taking (5 words max) / reason for inspecting (5 words max) / target (character_name or resource_name)
+#value text to speak / reason for moving (5 words max) / text to think about (10 words max) / NA / NA / target (character_name or resource_name)
+#reason why you chose this action (7 words max)
 ##
 Do not include any other introductory, explanatory, discursive, or formatting text in your response.
 End your response with: 
@@ -474,28 +494,191 @@ End your response with:
                         action = hash_utils.find('action', action_hash[0])
                         target = hash_utils.find('target', action_hash[0])
                         value = hash_utils.find('value', action_hash[0])
+                        reason = hash_utils.find('reason', action_hash[0])
                         if not action or not target or not value:
                             logger.error(f'No action, target, or value found in LLM response: {response.text}')
-                            self.current_action = {'action': 'sleep', 'target': 'self', 'value': ''}
+                            self.current_action = {'action': 'sleep', 'target': 'self', 'value': '', 'reason': ''}
                         else:
-                            self.current_action = {'action': action, 'target': target, 'value': value}
+                            self.current_action = {'action': action, 'target': target, 'value': value, 'reason': reason}
                     else:
                         logger.error(f'No action found in LLM response: {response.text}')
-                        self.current_action = {'action': 'sleep', 'target': 'self', 'value': ''}
+                        self.current_action = {'action': 'sleep', 'target': 'self', 'value': '', 'reason': ''}
                 else:
                     logger.error(f'LLM call failed: {response.error}')
-                    self.current_action = {'action': 'sleep', 'target': 'self', 'value': ''}
+                    self.current_action = {'action': 'sleep', 'target': 'self', 'value': '', 'reason': ''}
             else:   
                 logger.error('LLM client not available')
-                self.current_action = {'action': 'sleep', 'target': 'self', 'value': ''}
+                self.current_action = {'action': 'sleep', 'target': 'self', 'value': '', 'reason': ''}
             
             # Publish the decided action for UI display
             self._publish_decided_action(self.current_action)
             return self.current_action
 
+    def _plan(self, goal):
+        """Plan: Return existing plan or create single-action plan from goal."""
+        # If we already have a plan, return it
+        if self.current_plan is not None:
+            return self.current_plan
+        
+        # No existing plan - create single-action plan using existing _decide logic
+        if not self.current_goal or self.current_goal.name == 'sleep':
+            single_action = None
+        else:
+            system_prompt = self.observations['static']
+            user_prompt = self.observations['dynamic']
+            goal_prompt = f"\n\nYour current goal is: {goal.to_string()}"
+            target = goal.actors[1] if len(goal.actors) > 1 else None
+            if target:
+                entity_context = self.get_entity_context(target, 10)
+                if entity_context and len(entity_context['conversation_history']) > 0:
+                    goal_prompt += f'your recent dialog with {target} has been:\n'
+                    for i, memory in enumerate(entity_context['conversation_history']):  # Use last 2 memories
+                        goal_prompt += f"\t{memory['source']}: {memory['text']}\n"
+
+                    goal_prompt += "Don't repeat yourself.\n"
+            directive = """What would you like to do next to progress towards your goal? 
+Respond with a selection from the action set:
+
+Say - speak to another character you can see. For a 'say' act, speak only for yourself, and do not include any other introductory, explanatory, discursive, or formatting text in your response.
+Move - Move in one of the 8 cardinal directions
+Think - think about a topic or question, attempting to derive new information, conclusions, or decisions from who you are and what you already explicitly know
+Take - add some resource you see to your personal inventory
+Inspect - inspect a resource you see or one in your inventory to understand how to use it.
+Use - use a resource in a known way.
+
+Select an action given who you are, your drives, and the current situation you find yourself in.
+
+"""
+            if self.last_action and (self.last_action['type'].lower() == 'say' or self.last_action['type'].lower() == 'response'):
+                directive = """Do NOT attempt to say anything. Respond using the following hash-formatted text:
+#action Sleep / Move / Think / Take / Inspect / Use
+#target na / cardinal_direction / 'self' / resource_name / resource_name / resource_name
+#value na / reason for moving (5 words max) / text to think about (10 words max) / reason for taking (5 words max) / reason for inspecting (5 words max) / target (character_name or resource_name)
+##
+Do not include any other introductory, explanatory, discursive, or formatting text in your response.
+End your response with: 
+</end>
+"""
+            else:
+                directive = """Respond using the following hash-formatted text:
+#action Say / Move / Think / Take / Inspect / Use
+#target character_name / cardinal_direction / 'self' / resource_name / resource_name / resource_name
+#value text to speak / reason for moving (5 words max) / text to think about (10 words max) / NA / NA / target (character_name or resource_name)
+#reason why you chose this action (7 words max)
+##
+Do not include any other introductory, explanatory, discursive, or formatting text in your response.
+End your response with: 
+</end>
+
+"""         # Make LLM call
+            if self.llm_client and not self.shutdown_requested:
+                response = self.llm_client.generate(
+                    messages=[system_prompt, user_prompt, goal_prompt,directive],
+                    max_tokens=400,
+                    temperature=0.7,
+                    stops=['</end>']
+                )
+
+                if response.success:
+                    logger.warning(f'🤖 {self.character_name} New Action: {response.text.replace('\n', ' ')}')
+                    action_hash = hash_utils.findall_forms(response.text)
+                    if action_hash and len(action_hash) > 0:
+                        action = hash_utils.find('action', action_hash[0])
+                        target = hash_utils.find('target', action_hash[0])
+                        value = hash_utils.find('value', action_hash[0])
+                        reason = hash_utils.find('reason', action_hash[0])
+                        if not action or not target or not value:
+                            logger.error(f'No action, target, or value found in LLM response: {response.text}')
+                            single_action = {'action': 'sleep', 'target': 'self', 'value': '', 'reason': ''}
+                        else:
+                            single_action = {'action': action, 'target': target, 'value': value, 'reason': reason}
+                    else:
+                        logger.error(f'No action found in LLM response: {response.text}')
+                        single_action = {'action': 'sleep', 'target': 'self', 'value': '', 'reason': ''}
+                else:
+                    logger.error(f'LLM call failed: {response.error}')
+                    single_action = {'action': 'sleep', 'target': 'self', 'value': '', 'reason': ''}
+            else:   
+                logger.error('LLM client not available')
+                single_action = {'action': 'sleep', 'target': 'self', 'value': '', 'reason': ''}
+        
+        # Create single-action plan
+        if single_action:
+            self.current_plan = [{'type': 'action', 'action': single_action['action'], 'target': single_action['target'], 'value': single_action['value'], 'reason': single_action.get('reason', ''), 'step': 0}]
+        else:
+            self.current_plan = []
+        
+        return self.current_plan
+
+    def _plan_step(self, plan):
+        """Execute current step of plan and return next action."""
+        if not plan or len(plan) == 0:
+            return None
+        
+        # For now, stub implementation - just handle sequential execution
+        current_step = self.plan_state['current_step']
+        
+        # Check if plan is complete
+        if current_step >= len(plan):
+            self.plan_state['completed'] = True
+            # Clear plan state on completion
+            self.current_plan = None
+            self.current_goal = None
+            self.plan_state = {
+                'current_step': 0,
+                'variables': {},
+                'completed': False,
+                'loop_start': None,
+                'in_loop': False,
+                'loop_iterations': 0
+            }
+            return None
+        
+        step = plan[current_step]
+        
+        # Handle different step types
+        if step['type'] == 'action':
+            # Simple action - advance step counter and return action
+            self.plan_state['current_step'] += 1
+            action = {
+                'action': step['action'],
+                'target': step['target'], 
+                'value': step['value'],
+                'reason': step.get('reason', '')
+            }
+            self.current_action = action
+            # Publish the decided action for UI display
+            self._publish_decided_action(action)
+            return action
+        
+        elif step['type'] == 'test':
+            # Test action - stub for now, just advance step
+            # TODO: Implement test action execution
+            self.plan_state['current_step'] += 1
+            # For now, recursively call to get next action
+            return self._plan_step(plan)
+        
+        elif step['type'] == 'do':
+            # Do block start - stub for now, just advance step
+            # TODO: Implement do-while logic
+            self.plan_state['current_step'] += 1
+            return self._plan_step(plan)
+        
+        elif step['type'] == 'while':
+            # While condition - stub for now, just advance step
+            # TODO: Implement while condition evaluation and jumping
+            self.plan_state['current_step'] += 1
+            return self._plan_step(plan)
+        
+        else:
+            logger.error(f'Unknown plan step type: {step["type"]}')
+            self.plan_state['current_step'] += 1
+            return self._plan_step(plan)
+
     def _act(self, action: Dict[str, Any]):
         """Act: Execute the chosen action."""
 
+        action = self.current_action if self.current_action else action
         if action['action'].lower() == "sleep":
             time.sleep(1)  # Sleep for 1 second
         elif action['action'].lower() == "move":
@@ -522,19 +705,16 @@ End your response with:
             self.send_text_input(action['target'], action['value'])
         elif action['action'].lower() == "think":
             self.think_about(action['value'])
-            self.action_counter += 1    
         elif action['action'].lower() == "take":
             action_data = {'type': 'take','action_id': self.action_counter,'timestamp': datetime.now().isoformat(),'target': action['target']}
             self.last_action = action_data
             self.action_publisher.put(json.dumps(action_data))
             #self.take(action['target'])
-            self.action_counter += 1
         elif action['action'].lower() == "inspect":
             action_data = {'type': 'inspect','action_id': self.action_counter,'timestamp': datetime.now().isoformat(),'target': action['target']}
             self.last_action = action_data
             self.action_publisher.put(json.dumps(action_data))
             #self.inspect(action)
-            self.action_counter += 1
         elif action['action'].lower() == "use":
             # Create action
             action_data = {'type': 'use','action_id': self.action_counter,'timestamp': datetime.now().isoformat(),'target': action['target']}
@@ -633,8 +813,152 @@ End your response with:
         except Exception as e:
             logger.error(f'Error handling turn signal: {e}')
     
+    def parse_and_set_plan(self, plan_text):
+        """Parse plan input from UI and set current plan."""
+        try:
+            parsed_plan = self.parse_plan_text(plan_text)
+            self.current_plan = parsed_plan
+            self.current_goal = plan.Goal('user_plan', actors=[self.character_name])
+            self.plan_state = {
+                'current_step': 0, 
+                'variables': {}, 
+                'completed': False,
+                'loop_start': None, 
+                'in_loop': False,
+                'loop_iterations': 0
+            }
+            logger.info(f"📋 {self.character_name} received new plan with {len(parsed_plan)} steps")
+        except Exception as e:
+            logger.error(f"Plan parsing failed for {self.character_name}: {e}")
+            # Plan assignment failed - character continues with existing behavior
+
+    def parse_plan_text(self, plan_text):
+        """Parse plan text into internal plan structure."""
+        plan_text = plan_text.strip()
+        
+        # Handle single-line format: "plan: action(target, value)"
+        if plan_text.startswith('plan:') and '\n' not in plan_text:
+            # Single line format - extract the action part after 'plan:'
+            action_part = plan_text[5:].strip()  # Remove 'plan:' and strip
+            if action_part:
+                # Parse as single action
+                parsed_step = self._parse_action_line(action_part, 1)
+                parsed_step['step'] = 0
+                return [parsed_step]
+            else:
+                return []  # Empty plan
+        
+        # Multi-line format
+        lines = plan_text.split('\n')
+        if not lines[0].strip() == 'plan:':
+            raise ValueError("Plan must start with 'plan:'")
+        
+        plan_steps = []
+        do_stack = []  # Track do-while blocks
+        indent_level = 0
+        
+        for i, line in enumerate(lines[1:], 1):  # Skip 'plan:' line
+            stripped_line = line.strip()
+            if not stripped_line:
+                continue
+                
+            # Calculate indentation (assuming 2 spaces per level)
+            current_indent = len(line) - len(line.lstrip())
+            
+            if stripped_line == 'do:':
+                # Start of do-while block
+                do_start_step = len(plan_steps)
+                do_stack.append(do_start_step)
+                plan_steps.append({
+                    'type': 'do',
+                    'step': do_start_step,
+                    'end_step': None  # Will be filled when we find matching while
+                })
+                indent_level = current_indent + 2
+                
+            elif stripped_line.startswith('while(') and stripped_line.endswith(')'):
+                # End of do-while block
+                if not do_stack:
+                    raise ValueError(f"Line {i}: 'while' without matching 'do'")
+                
+                do_start_step = do_stack.pop()
+                condition = stripped_line[6:-1]  # Extract condition from while(...)
+                
+                # Update the do step with the end position
+                plan_steps[do_start_step]['end_step'] = len(plan_steps)
+                
+                plan_steps.append({
+                    'type': 'while',
+                    'condition': condition,
+                    'jump_step': do_start_step + 1,  # Jump to first step after 'do:'
+                    'step': len(plan_steps)
+                })
+                indent_level = current_indent
+                
+            else:
+                # Regular action or test
+                parsed_step = self._parse_action_line(stripped_line, i)
+                parsed_step['step'] = len(plan_steps)
+                plan_steps.append(parsed_step)
+        
+        # Check for unmatched do blocks
+        if do_stack:
+            raise ValueError("Unmatched 'do:' block without 'while(...)'")
+        
+        return plan_steps
+
+    def _parse_action_line(self, line, line_number):
+        """Parse a single action line into step dictionary."""
+        # Check if it's a test action (returns boolean)
+        test_actions = ['near', 'can_see', 'has_item', 'at_location', 'facing']
+        
+        for test_action in test_actions:
+            if line.startswith(f'{test_action}(') and line.endswith(')'):
+                # It's a test action
+                args_str = line[len(test_action)+1:-1]  # Extract args from action(...)
+                args = [arg.strip() for arg in args_str.split(',') if arg.strip()]
+                var_name = f"{test_action}_{args[0]}" if args else f"{test_action}_result"
+                return {
+                    'type': 'test',
+                    'test': test_action,
+                    'args': args,
+                    'var': var_name
+                }
+        
+        # Check if it's a regular action
+        if '(' in line and line.endswith(')'):
+            # Parse action(target, value) or action(target)
+            paren_pos = line.find('(')
+            action = line[:paren_pos].strip()
+            args_str = line[paren_pos+1:-1]
+            
+            # Split arguments - handle commas in quoted strings
+            args = []
+            if args_str.strip():
+                # Simple split for now - could be enhanced for quoted strings later
+                raw_args = [arg.strip() for arg in args_str.split(',')]
+                args = raw_args
+            
+            # Determine target and value
+            target = args[0] if len(args) > 0 else ''
+            value = args[1] if len(args) > 1 else ''
+            
+            return {
+                'type': 'action',
+                'action': action,
+                'target': target,
+                'value': value
+            }
+        else:
+            raise ValueError(f"Line {line_number}: Invalid action format '{line}'")
+
     def respond(self, text_input: str, source: str):
-        """Respond to text input from someone."""
+        # Handle plan input from UI - strip quotes if present
+        clean_input = text_input.strip().strip('"').strip("'")
+        if source == 'ui' and clean_input.startswith('plan:'):
+            self.parse_and_set_plan(clean_input)
+            return
+        
         try:
             logger.info(f'Responding to: "{text_input}" (from {source})')
             
@@ -660,7 +984,7 @@ End your response with:
             if self.character_config.get('character', None):
                 system_prompt = self.character_config['character']
             if self.character_config.get('drives', None):
-                system_prompt += f"\n\nYour drives are: {self.character_config['drives']}"
+                system_prompt += f"\n\nYour drives are:\n\t{'\n\t'.join(self.character_config['drives'])}\n"
             
             # Build user prompt with context
             user_prompt = '' 
