@@ -1,24 +1,42 @@
-2025-07-28 15:03:32 - llm_client - INFO - 🤖 Zenoh LLM Client initialized
-2025-07-28 15:03:32 - executive_node - INFO - 🧠 Zenoh Executive Node initialized for character: Joe
-2025-07-28 15:03:32 - executive_node - INFO -    - Subscribing to: cognitive/Joe/sense_data
-2025-07-28 15:03:32 - executive_node - INFO -    - Subscribing to: cognitive/Joe/situation
-2025-07-28 15:03:32 - executive_node - INFO -    - Subscribing to: cognitive/map/turn/go
-2025-07-28 15:03:32 - executive_node - INFO -    - Publishing to: cognitive/Joe/action
-2025-07-28 15:03:32 - executive_node - INFO -    - Publishing to: cognitive/Joe/memory/store
-2025-07-28 15:03:32 - executive_node - INFO -    - Publishing to: cognitive/Joe/text_input
-2025-07-28 15:03:32 - executive_node - INFO -    - Publishing to: cognitive/Joe/goal
-2025-07-28 15:03:32 - executive_node - INFO -    - Publishing to: cognitive/Joe/decided_action
-2025-07-28 15:03:32 - executive_node - INFO -    - Publishing to: cognitive/map/turn/complete/Joe
-2025-07-28 15:03:32 - executive_node - WARNING - Executive Node running - press Ctrl+C to stop
-2025-07-28 15:03:32 - executive_node - INFO - 📢 Announced character presence: Joe
-2025-07-28 15:03:42 - executive_node - WARNING - 📊 Joe Received situation update
-2025-07-28 15:03:42 - executive_node - WARNING - 📊 Joe Received situation update
-2025-07-28 15:03:45 - executive_node - WARNING - 🚦 Turn 1 started for Joe
-2025-07-28 15:03:46 - executive_node - WARNING - 🔄 Joe OODA loop running
-2025-07-28 15:03:49 - executive_node - WARNING - 🤖 Joe New Goal: #goal Investigate Samantha
-#description Ask Samantha about surroundings
-#otherActorName Samantha
-#termination Samantha responds helpfully
+2025-07-28 19:13:50 - llm_client - INFO - 🤖 Zenoh LLM Client initialized
+2025-07-28 19:13:50 - executive_node - INFO - 🧠 Zenoh Executive Node initialized for character: Joe
+2025-07-28 19:13:50 - executive_node - INFO -    - Subscribing to: cognitive/Joe/sense_data
+2025-07-28 19:13:50 - executive_node - INFO -    - Subscribing to: cognitive/Joe/situation
+2025-07-28 19:13:50 - executive_node - INFO -    - Subscribing to: cognitive/map/turn/go
+2025-07-28 19:13:50 - executive_node - INFO -    - Publishing to: cognitive/Joe/action
+2025-07-28 19:13:50 - executive_node - INFO -    - Publishing to: cognitive/Joe/memory/store
+2025-07-28 19:13:50 - executive_node - INFO -    - Publishing to: cognitive/Joe/text_input
+2025-07-28 19:13:50 - executive_node - INFO -    - Publishing to: cognitive/Joe/goal
+2025-07-28 19:13:50 - executive_node - INFO -    - Publishing to: cognitive/Joe/decided_action
+2025-07-28 19:13:50 - executive_node - INFO -    - Publishing to: cognitive/map/turn/complete/Joe
+2025-07-28 19:13:50 - executive_node - WARNING - Executive Node running - press Ctrl+C to stop
+2025-07-28 19:13:50 - executive_node - INFO - 📢 Announced character presence: Joe
+2025-07-28 19:13:52 - executive_node - WARNING - 🚦 Turn 1 started for Joe
+2025-07-28 19:13:52 - executive_node - WARNING - 🔄 Joe OODA loop running
+2025-07-28 19:13:59 - executive_node - WARNING - 🤖 Joe New Goal: #goal Find a way out of forest
+#description Explore and map the surroundings
+#otherActorName None
+#termination See a clearing or edge
+## 
+#goal Solve the mystery of arriv2025-07-28 19:14:13 - executive_node - WARNING - 🤖 Samantha New Goal: #goal Explore Forest Northeast
+#description Investigate Forest Northeast terrain
+#otherActorName None
+#termination Found New Landmark
+## 
+#goal Follow Southeast Trail
+#description Follow Trail to Mushrooms
+#otherActorName None
+#termination Reached Mushroom Patch
+## 
+#goal Investigate Fallen Branches
+#description Investigate Fallen Branches Southwest
+#otherActorName None
+#termination Found Useful Branch
+## 
+#goal Climb Uphill North
+#description Climb Uphill to Higher Ground
+#otherActorName None
+#termination Reached Higher Elevation
 ## 
 <end> 
 
@@ -26,18 +44,120 @@
 
 
 
-end your response with
-2025-07-28 15:03:49 - executive_node - WARNING - Joe generated goal: Goal Investigate Samantha: Ask Samantha about surroundings; actors: Joe; termination: Samantha responds helpfully
-2025-07-28 15:03:49 - executive_node - INFO - 🎯 Published goal for Joe: Goal Investigate Samantha: Ask Samantha about surroundings; actors: Joe; termination: Samantha responds helpfully
-2025-07-28 15:03:50 - executive_node - WARNING - 🤖 Joe New Action:   #action Say #target Samantha #value Hi, where am I? 
-2025-07-28 15:03:50 - executive_node - INFO - 📋 Published decided action for Joe: Say: Samantha - Hi, where am I?
-2025-07-28 15:03:50 - executive_node - WARNING - 📤 Joe Sent text input to Samantha: "Hi, where am I?" (source: Joe)
-2025-07-28 15:03:50 - executive_node - WARNING - 📊 Joe Received situation update
-2025-07-28 15:03:50 - executive_node - WARNING - 📤 Published action: {'action': 'Say', 'target': 'Samantha', 'value': 'Hi, where am I?'}
-2025-07-28 15:03:50 - executive_node - WARNING - ✅ Joe completed turn 1
-07-28 15:03:49 - executive_node - WARNING - 📤 Published action: {'action': 'Move', 'target': 'Southwest', 'value': 'follow trail downhill'}
-2025-07-28 15:03:49 - executive_node - WARNING - ✅ Samantha completed turn 1
-2025-07-28 15:03:50 - executive_node - WARNING - 📥 Samantha Received text input: "Hi, where am I?" (source: Joe)
-2025-07-28 15:03:50 - executive_node - WARNING - 📊 Samantha Received situation update
-2025-07-28 15:03:59 - executive_node - WARNING - 📊 Samantha Received situation update
-2025-07-28 15:03:59 - executive_node - WARNING - 📊 Samantha Received situation update
+ 
+#goal Explore Forest Northeast
+#description Investigate Forest Northeast terrain
+#otherActorName None
+#termination Found New Landmark
+## 
+#goal Follow Southeast Trail
+#description Follow Trail to Mushrooms
+#otherActorName None
+#termination Reached Mushroom Patch
+## 
+#goal Investigate Fallen Branches
+#description Investigate Fallen Branches Southwest
+#otherActorName None
+#termination Found Useful Branch
+## 
+#goal Climb Uphill North
+#description Climb Uphill to Higher Ground
+#otherActorName None
+#termination Reached Higher Elevation
+## 
+<end> 
+
+
+
+
+
+
+#goal Explore Forest Northeast
+#description Investigate Forest Northeast terrain
+#otherActorName None
+#termination Found New Landmark
+## 
+#goal Follow Southeast Trail
+#description Follow Trail to Mushrooms
+#otherActorName None
+#termination Reached Mushroom Patch
+## 
+#goal Investigate Fallen Branches
+#description Investigate Fallen Branches Southwest
+#otherActorName None
+#termination Found Useful Branch
+## 
+#goal Climb Uphill North
+#description Climb Uphill to Higher Ground
+#otherActorName None
+#termination Reached Higher Elevation
+## 
+<end> 
+
+
+
+
+
+
+#goal Explore Forest Northeast
+#description Investigate Forest Northeast terrain
+#otherActorName None
+2025-07-28 19:14:13 - executive_node - WARNING - Samantha generated goal: Goal Explore Forest Northeast: Investigate Forest Northeast terrain; actors: Samantha; termination: Found New Landmark
+2025-07-28 19:12025-07-28 19:15:37 - executive_node - WARNING - 🚦 Turn 2 started for Joe
+2025-07-28 19:15:37 - executive_node - WARNING - 🔄 Joe OODA loop running
+2025-07-28 19:15:39 - executive_node - WARNING - 🤖 Joe New Goal: #goal Investigate Samantha
+#description Ask Samantha about surroundings
+#otherActorName Samantha
+#termination Samantha responds helpfully
+## 
+<end>
+2025-07-28 19:15:39 - executive_node - WARNING - Joe generated goal: Goal Investigate Samantha: Ask Samantha about surroundings; actors: Joe; termination: Samantha responds helpfully
+2025-07-28 19:15:39 - executive_node - INFO - 🎯 Published goal for Joe: Goal Investigate Samantha: Ask Samantha about surroundings; actors: Joe; termination: Samantha responds helpfully
+2025-07-28 19:15:39 - executive_node - WARNING - ✅ Joe completed turn 2
+5-07-28 19:14:14 - executive_node - WARNING - 📤 Published action: {'action': 'Move', 'target': 'Northeast', 'value': 'Uphill', 'reason': 'Explore terrain'}
+2025-07-28 19:14:14 - executive_node - WARNING - ✅ Samantha completed turn 1
+2025-07-28 19:14:17 - executive_node - WARNING - 📥 Samantha Received text input: "plan: think(self, What should I do next?)" (source: ui)
+2025-07-28 19:14:17 - executive_node - WARNING - 📊 Samantha Received situation update
+2025-07-28 19:14:17 - executive_node - INFO - DEBUG: Original input: "plan: think(self, What should I do next?)", Clean input: "plan: think(self, What should I do next?)", Starts with plan: True
+2025-07-28 19:14:27 - executive_node - WARNING - 📊 Samantha Received situation update
+2025-07-28 19:14:27 - executive_node - WARNING - 📊 Samantha Received situation update
+2025-07-28 19:15:10 - executive_node - INFO - 📋 Samantha received new plan with 1 steps
+2025-07-28 19:15:37 - executive_node - WARNING - 🚦 Turn 2 started for Samantha
+2025-07-28 19:15:38 - executive_node - WARNING - 🔄 Samantha OODA loop running
+2025-07-28 19:15:45 - executive_node - WARNING - 🤖 Samantha New Goal: #goal Investigate Joe
+#description Ask Joe about himself
+#otherActorName Joe
+#termination Joe answers questions
+## 
+#goal Follow Trail
+#description Follow trail southeast
+#otherActorName None
+#termination Reach trail end
+## 
+#goal Gather Resources
+#description Collect nearby resources
+#otherActorName None
+#termination Resources collected
+## 
+#goal Climb Uphill
+#description Climb uphill north
+#otherActorName None
+#termination Reach top
+## 
+#goal Explore Forest
+#description Explore forest surroundings
+#otherActorName None
+#termination New area discovered
+##
+2025-07-28 19:15:45 - executive_node - WARNING - Samantha generated goal: Goal Investigate Joe: Ask Joe about himself; actors: Samantha; termination: Joe answers questions
+2025-07-28 19:15:45 - executive_node - INFO - 🎯 Published goal for Samantha: Goal Investigate Joe: Ask Joe about himself; actors: Samantha; termination: Joe answers questions
+2025-07-28 19:15:45 - executive_node - INFO - 📋 Published decided action for Samantha: think: self - What should I do next?
+2025-07-28 19:15:45 - executive_node - WARNING - Thinking about: What should I do next?
+2025-07-28 19:15:45 - executive_node - INFO - 📚 Retrieved 1 recent memory entries
+2025-07-28 19:15:46 - executive_node - WARNING - 🤖 Samantha New Thought:  
+#thought Trust no one
+
+2025-07-28 19:15:46 - executive_node - INFO - 📤 Published action: action_2
+2025-07-28 19:15:46 - executive_node - WARNING - 📤 Published action: {'action': 'think', 'target': 'self', 'value': 'What should I do next?', 'reason': ''}
+2025-07-28 19:15:46 - executive_node - WARNING - 📊 Samantha Received situation update
+2025-07-28 19:15:46 - executive_node - WARNING - ✅ Samantha completed turn 2

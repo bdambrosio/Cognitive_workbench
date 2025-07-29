@@ -651,7 +651,7 @@ class FastAPIActionDisplayNode:
                 <div class="input-section">
                     <h3>Send Text Input</h3>
                     <input type="text" id="characterInput" placeholder="Character name (optional)" style="width: 150px;">
-                    <input type="text" id="messageInput" placeholder="Message" style="width: 300px;">
+                    <textarea id="messageInput" placeholder="Message or Plan (multi-line supported)" style="width: 300px; height: 80px; resize: vertical;"></textarea>
                     <button onclick="sendText()">Send</button>
                     <div id="sendResult"></div>
                 </div>
