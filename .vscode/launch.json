@@ -5,11 +5,11 @@
             "name": "Debug Memory Node (Samantha)",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/zenoh_cognitive_framework/memory_node.py",
+            "program": "${workspaceFolder}/src/memory_node.py",
             "console": "integratedTerminal",
-            "cwd": "${workspaceFolder}/zenoh_cognitive_framework",
+            "cwd": "${workspaceFolder}/src",
             "env": {
-                "PYTHONPATH": "${workspaceFolder}/zenoh_cognitive_framework"
+                "PYTHONPATH": "${workspaceFolder}/src"
             },
             "args": ["-c", "samantha", "-config", "{\"personality\": \"friendly\"}"],
             "justMyCode": false,
@@ -20,11 +20,11 @@
             "name": "Debug LLM Service Node (Shared)",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/zenoh_cognitive_framework/llm_service_node.py",
+            "program": "${workspaceFolder}/src/llm_service_node.py",
             "console": "integratedTerminal",
-            "cwd": "${workspaceFolder}/zenoh_cognitive_framework",
+            "cwd": "${workspaceFolder}/src",
             "env": {
-                "PYTHONPATH": "${workspaceFolder}/zenoh_cognitive_framework"
+                "PYTHONPATH": "${workspaceFolder}/src"
             },
             "args": [],
             "justMyCode": false,
@@ -35,11 +35,11 @@
             "name": "Debug Sense Node (Default)",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/zenoh_cognitive_framework/sense_node.py",
+            "program": "${workspaceFolder}/src/sense_node.py",
             "console": "integratedTerminal",
-            "cwd": "${workspaceFolder}/zenoh_cognitive_framework",
+            "cwd": "${workspaceFolder}/src",
             "env": {
-                "PYTHONPATH": "${workspaceFolder}/zenoh_cognitive_framework"
+                "PYTHONPATH": "${workspaceFolder}/src"
             },
             "args": ["-c", "default", "-config", "{}"],
             "justMyCode": false,
@@ -50,11 +50,11 @@
             "name": "Debug Sense Node (Samantha)",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/zenoh_cognitive_framework/sense_node.py",
+            "program": "${workspaceFolder}/src/sense_node.py",
             "console": "integratedTerminal",
-            "cwd": "${workspaceFolder}/zenoh_cognitive_framework",
+            "cwd": "${workspaceFolder}/src",
             "env": {
-                "PYTHONPATH": "${workspaceFolder}/zenoh_cognitive_framework"
+                "PYTHONPATH": "${workspaceFolder}/src"
             },
             "args": ["-c", "samantha", "-config", "{\"personality\": \"friendly\"}"],
             "justMyCode": false,
@@ -65,11 +65,11 @@
             "name": "Debug Action Display Node (Multi-Character)",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/zenoh_cognitive_framework/action_display_node.py",
+            "program": "${workspaceFolder}/src/action_display_node.py",
             "console": "integratedTerminal",
-            "cwd": "${workspaceFolder}/zenoh_cognitive_framework",
+            "cwd": "${workspaceFolder}/src",
             "env": {
-                "PYTHONPATH": "${workspaceFolder}/zenoh_cognitive_framework"
+                "PYTHONPATH": "${workspaceFolder}/src"
             },
             "args": [],
             "justMyCode": false,
@@ -80,11 +80,11 @@
             "name": "Debug LLM Client",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/zenoh_cognitive_framework/llm_client.py",
+            "program": "${workspaceFolder}/src/llm_client.py",
             "console": "integratedTerminal",
-            "cwd": "${workspaceFolder}/zenoh_cognitive_framework",
+            "cwd": "${workspaceFolder}/src",
             "env": {
-                "PYTHONPATH": "${workspaceFolder}/zenoh_cognitive_framework"
+                "PYTHONPATH": "${workspaceFolder}/src"
             },
             "args": [],
             "justMyCode": false,
@@ -95,11 +95,11 @@
             "name": "Debug Map Node (Forest)",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/zenoh_cognitive_framework/map_node.py",
+            "program": "${workspaceFolder}/src/map_node.py",
             "console": "integratedTerminal",
-            "cwd": "${workspaceFolder}/zenoh_cognitive_framework",
+            "cwd": "${workspaceFolder}/src",
             "env": {
-                "PYTHONPATH": "${workspaceFolder}/zenoh_cognitive_framework"
+                "PYTHONPATH": "${workspaceFolder}/src"
             },
             "args": ["-m", "forest.py"],
             "justMyCode": false,
@@ -110,11 +110,11 @@
             "name": "Debug Character Launcher (with map)",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/zenoh_cognitive_framework/character_launcher.py",
+            "program": "${workspaceFolder}/src/character_launcher.py",
             "console": "integratedTerminal",
-            "cwd": "${workspaceFolder}/zenoh_cognitive_framework",
+            "cwd": "${workspaceFolder}/src",
             "env": {
-                "PYTHONPATH": "${workspaceFolder}/zenoh_cognitive_framework"
+                "PYTHONPATH": "${workspaceFolder}/src"
             },
             "args": ["--ui", "--config-file", "characters.yaml", "--map-file", "forest.py"],
             "justMyCode": false,
@@ -125,11 +125,11 @@
             "name": "Clear Character Data",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/zenoh_cognitive_framework/memory_manager.py",
+            "program": "${workspaceFolder}/src/memory_manager.py",
             "console": "integratedTerminal",
-            "cwd": "${workspaceFolder}/zenoh_cognitive_framework",
+            "cwd": "${workspaceFolder}/src",
             "env": {
-                "PYTHONPATH": "${workspaceFolder}/zenoh_cognitive_framework"
+                "PYTHONPATH": "${workspaceFolder}/src"
             },
             "args": [],
             "justMyCode": false,
@@ -140,11 +140,11 @@
             "name": "Format Prompt",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/zenoh_cognitive_framework/format_prompt.py",
+            "program": "${workspaceFolder}/src/format_prompt.py",
             "console": "integratedTerminal",
-            "cwd": "${workspaceFolder}/zenoh_cognitive_framework",
+            "cwd": "${workspaceFolder}/src",
             "env": {
-                "PYTHONPATH": "${workspaceFolder}/zenoh_cognitive_framework",
+                "PYTHONPATH": "${workspaceFolder}/src",
                 "LD_LIBRARY_PATH": "${workspaceFolder}/zenoh_venv/lib/python3.12/site-packages/PyQt5/Qt5/lib:$LD_LIBRARY_PATH",
                 "QT_PLUGIN_PATH": "${workspaceFolder}/zenoh_venv/lib/python3.12/site-packages/PyQt5/Qt5/plugins",
                 "QT_QPA_PLATFORM_PLUGIN_PATH": ""
@@ -158,11 +158,11 @@
             "name": "Test Plan Parser",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/zenoh_cognitive_framework/test_plan.py",
+            "program": "${workspaceFolder}/src/test_plan.py",
             "console": "integratedTerminal",
-            "cwd": "${workspaceFolder}/zenoh_cognitive_framework",
+            "cwd": "${workspaceFolder}/src",
             "env": {
-                "PYTHONPATH": "${workspaceFolder}/zenoh_cognitive_framework"
+                "PYTHONPATH": "${workspaceFolder}/src"
             },
             "args": [],
             "justMyCode": false,
