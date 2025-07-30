@@ -68,6 +68,12 @@ class ZenohSenseNode:
             self.visual_event_callback
         )
         
+        # Subscriber for shutdown commands (global)
+        self.shutdown_subscriber = self.session.declare_subscriber(
+            "cognitive/shutdown/sense",
+            self.shutdown_callback
+        )
+        
         # Internal state
         self.sequence_id = 0
         
@@ -232,6 +238,14 @@ class ZenohSenseNode:
             
         except Exception as e:
             logger.error(f'Error processing visual event: {e}')
+    
+    def shutdown_callback(self, sample):
+        """Handle shutdown command from UI."""
+        try:
+            logger.warning(f'🔌 {self.character_name} Sense Node received shutdown command')
+            self.shutdown_requested = True
+        except Exception as e:
+            logger.error(f'Error in shutdown callback: {e}')
     
     def shutdown(self):
         """Cleanup and shutdown."""

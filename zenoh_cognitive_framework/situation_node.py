@@ -72,6 +72,10 @@ class ZenohSituationNode:
             }
         }
         
+        # Thresholds for condition evaluation
+        self.near_threshold = 2.0  # Distance threshold for "near" condition
+        self.at_location_threshold = 0.5  # Distance threshold for "at_location" condition
+        
         # Persistence setup
         self.situation_file = Path(f"data/situation/{character_name}_situation.json")
         self.situation_file.parent.mkdir(parents=True, exist_ok=True)
@@ -100,6 +104,34 @@ class ZenohSituationNode:
             self.handle_situation_query
         )
         
+        # Queryables for condition evaluation (character-specific)
+        self.proximity_queryable = self.session.declare_queryable(
+            f"cognitive/{character_name}/situation/proximity",
+            self.handle_proximity_query
+        )
+        
+        self.visibility_queryable = self.session.declare_queryable(
+            f"cognitive/{character_name}/situation/visibility",
+            self.handle_visibility_query
+        )
+        
+        self.location_queryable = self.session.declare_queryable(
+            f"cognitive/{character_name}/situation/location",
+            self.handle_location_query
+        )
+        
+        # Subscriber for save commands (global)
+        self.save_subscriber = self.session.declare_subscriber(
+            "cognitive/save_all",
+            self.save_callback
+        )
+        
+        # Subscriber for shutdown commands (global)
+        self.shutdown_subscriber = self.session.declare_subscriber(
+            "cognitive/shutdown/situation",
+            self.shutdown_callback
+        )
+        
         # Shutdown flag
         self.shutdown_requested = False
         
@@ -112,6 +144,9 @@ class ZenohSituationNode:
         logger.info(f'   - Subscribing to: cognitive/{character_name}/action')
         logger.info(f'   - Publishing to: cognitive/{character_name}/situation')
         logger.info(f'   - Queryable at: cognitive/{character_name}/situation/*')
+        logger.info(f'   - Proximity queryable at: cognitive/{character_name}/situation/proximity')
+        logger.info(f'   - Visibility queryable at: cognitive/{character_name}/situation/visibility')
+        logger.info(f'   - Location queryable at: cognitive/{character_name}/situation/location')
         logger.info(f'   - Storage available at: {self.situation_file}')
     
     def _signal_handler(self, signum, frame):
@@ -291,6 +326,166 @@ class ZenohSituationNode:
             }
             query.reply(query.key_expr, json.dumps(error_response).encode('utf-8'))
     
+    def handle_proximity_query(self, query):
+        """Handle proximity queries for condition evaluation."""
+        try:
+            # Parse query parameters
+            selector = str(query.selector)
+            target = None
+            
+            # Extract target from query
+            if 'target=' in selector:
+                try:
+                    import urllib.parse
+                    target = urllib.parse.unquote(selector.split('target=')[1].split('&')[0])
+                except:
+                    pass
+            
+            if not target:
+                response = {
+                    'success': False,
+                    'value': False
+                }
+            else:
+                # Check if target is in current situation and distance < near_threshold
+                target_canonical = target.capitalize()
+                is_near = False
+                
+                # Check resources
+                for resource in self.situation.get('adjacent_to', {}).get('resources', []):
+                    if resource.get('name', '').capitalize() == target_canonical:
+                        distance = resource.get('distance', float('inf'))
+                        is_near = distance < self.near_threshold
+                        break
+                
+                # Check characters if not found in resources
+                if not is_near:
+                    for character in self.situation.get('adjacent_to', {}).get('characters', []):
+                        if character.get('name', '').capitalize() == target_canonical:
+                            distance = character.get('distance', float('inf'))
+                            is_near = distance < self.near_threshold
+                            break
+                
+                response = {
+                    'success': True,
+                    'value': is_near
+                }
+            
+            query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
+            logger.info(f'🧭 Proximity query for {target}: {response["value"]}')
+            
+        except Exception as e:
+            logger.error(f'Error handling proximity query: {e}')
+            error_response = {
+                'success': False,
+                'value': False
+            }
+            query.reply(query.key_expr, json.dumps(error_response).encode('utf-8'))
+    
+    def handle_visibility_query(self, query):
+        """Handle visibility queries for condition evaluation."""
+        try:
+            # Parse query parameters
+            selector = str(query.selector)
+            target = None
+            
+            # Extract target from query
+            if 'target=' in selector:
+                try:
+                    import urllib.parse
+                    target = urllib.parse.unquote(selector.split('target=')[1].split('&')[0])
+                except:
+                    pass
+            
+            if not target:
+                response = {
+                    'success': False,
+                    'value': False
+                }
+            else:
+                # Check if target is in visible characters list
+                target_canonical = target.capitalize()
+                can_see = False
+                
+                # Check if target is in visible characters
+                visible_characters = self.situation.get('look', {}).get('characters', [])
+                for character in visible_characters:
+                    if character.get('name', '').capitalize() == target_canonical:
+                        can_see = True
+                        break
+                
+                response = {
+                    'success': True,
+                    'value': can_see
+                }
+            
+            query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
+            logger.info(f'🧭 Visibility query for {target}: {response["value"]}')
+            
+        except Exception as e:
+            logger.error(f'Error handling visibility query: {e}')
+            error_response = {
+                'success': False,
+                'value': False
+            }
+            query.reply(query.key_expr, json.dumps(error_response).encode('utf-8'))
+    
+    def handle_location_query(self, query):
+        """Handle location queries for condition evaluation."""
+        try:
+            # Parse query parameters
+            selector = str(query.selector)
+            target = None
+            
+            # Extract target from query
+            if 'target=' in selector:
+                try:
+                    import urllib.parse
+                    target = urllib.parse.unquote(selector.split('target=')[1].split('&')[0])
+                except:
+                    pass
+            
+            if not target:
+                response = {
+                    'success': False,
+                    'value': False
+                }
+            else:
+                # Check if target is in current situation and distance < at_location_threshold
+                target_canonical = target.capitalize()
+                at_location = False
+                
+                # Check resources
+                for resource in self.situation.get('adjacent_to', {}).get('resources', []):
+                    if resource.get('name', '').capitalize() == target_canonical:
+                        distance = resource.get('distance', float('inf'))
+                        at_location = distance < self.at_location_threshold
+                        break
+                
+                # Check characters if not found in resources
+                if not at_location:
+                    for character in self.situation.get('adjacent_to', {}).get('characters', []):
+                        if character.get('name', '').capitalize() == target_canonical:
+                            distance = character.get('distance', float('inf'))
+                            at_location = distance < self.at_location_threshold
+                            break
+                
+                response = {
+                    'success': True,
+                    'value': at_location
+                }
+            
+            query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
+            logger.info(f'🧭 Location query for {target}: {response["value"]}')
+            
+        except Exception as e:
+            logger.error(f'Error handling location query: {e}')
+            error_response = {
+                'success': False,
+                'value': False
+            }
+            query.reply(query.key_expr, json.dumps(error_response).encode('utf-8'))
+    
     def load_situation(self):
         """Load situation data from file."""
         try:
@@ -312,6 +507,22 @@ class ZenohSituationNode:
             logger.debug(f'💾 Saved situation data for {self.character_name}')
         except Exception as e:
             logger.error(f'Error saving situation data: {e}')
+    
+    def save_callback(self, sample):
+        """Handle save command from UI."""
+        try:
+            logger.info(f'💾 {self.character_name} Situation Node received save command')
+            self.save_situation()
+        except Exception as e:
+            logger.error(f'Error in save callback: {e}')
+    
+    def shutdown_callback(self, sample):
+        """Handle shutdown command from UI."""
+        try:
+            logger.warning(f'🔌 {self.character_name} Situation Node received shutdown command')
+            self.shutdown()
+        except Exception as e:
+            logger.error(f'Error in shutdown callback: {e}')
     
     def shutdown(self):
         """Cleanup and shutdown."""

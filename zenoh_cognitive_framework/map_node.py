@@ -194,6 +194,18 @@ class MapNode:
             self.handle_character_announcement
         )
         
+        # Subscriber for save commands (global)
+        self.save_subscriber = self.session.declare_subscriber(
+            "cognitive/save_all",
+            self.save_callback
+        )
+        
+        # Subscriber for shutdown commands (global)
+        self.shutdown_subscriber = self.session.declare_subscriber(
+            "cognitive/shutdown/shared",
+            self.shutdown_callback
+        )
+        
         logger.info("Map queryables and subscribers set up successfully")
     
     def setup_turn_management(self):
@@ -982,6 +994,22 @@ class MapNode:
         except Exception as e:
             logger.error(f"Error saving world data: {e}")
     
+    def save_callback(self, sample):
+        """Handle save command from UI."""
+        try:
+            logger.info(f'💾 Map Node received save command')
+            self.save_world_data()
+        except Exception as e:
+            logger.error(f'Error in save callback: {e}')
+    
+    def shutdown_callback(self, sample):
+        """Handle shutdown command from UI."""
+        try:
+            logger.warning(f'🔌 Map Node received shutdown command')
+            self.shutdown()
+        except Exception as e:
+            logger.error(f'Error in shutdown callback: {e}')
+    
     def start_persistence_thread(self):
         """Start background thread for periodic persistence."""
         self.persistence_thread = threading.Thread(target=self._persistence_loop, daemon=True)
@@ -1029,7 +1057,7 @@ class MapNode:
             try:
                 # Wait longer for any pending operations to complete
                 time.sleep(2.0)
-                self.session.close()
+                #self.session.close()
                 logger.info("Zenoh session closed")
             except Exception as e:
                 logger.error(f"Error closing Zenoh session: {e}")

@@ -14,6 +14,7 @@ import argparse
 import webbrowser
 import asyncio
 import signal
+import logging
 from datetime import datetime
 from typing import Dict, List, Any, Set
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
@@ -21,6 +22,24 @@ from fastapi.responses import HTMLResponse
 import uvicorn
 from pathlib import Path
 from concurrent.futures import TimeoutError
+
+# Set up logging
+logger = logging.getLogger(__name__)
+console_handler = logging.StreamHandler()
+file_handler = logging.FileHandler('logs/fastapi_action_display.log')
+console_handler.setLevel(logging.INFO)
+file_handler.setLevel(logging.DEBUG)
+
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+console_handler.setFormatter(formatter)
+file_handler.setFormatter(formatter)
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[console_handler, file_handler],
+    force=True
+)
 
 
 class FastAPIActionDisplayNode:
@@ -100,6 +119,20 @@ class FastAPIActionDisplayNode:
         self.turn_step_publisher = self.session.declare_publisher("cognitive/map/turn/step")
         self.turn_run_publisher = self.session.declare_publisher("cognitive/map/turn/run")
         self.turn_stop_publisher = self.session.declare_publisher("cognitive/map/turn/stop")
+        
+        # Publisher for save commands
+        self.save_publisher = self.session.declare_publisher("cognitive/save_all")
+        
+        # Publishers for shutdown commands
+        self.shutdown_executive_publisher = self.session.declare_publisher("cognitive/shutdown/executive")
+        self.shutdown_sense_publisher = self.session.declare_publisher("cognitive/shutdown/sense") 
+        self.shutdown_memory_publisher = self.session.declare_publisher("cognitive/shutdown/memory")
+        self.shutdown_situation_publisher = self.session.declare_publisher("cognitive/shutdown/situation")
+        self.shutdown_shared_publisher = self.session.declare_publisher("cognitive/shutdown/shared")
+        
+        # Shutdown coordination state
+        self.shutdown_in_progress = False
+        self.shutdown_acknowledgments = {}
         
         # Internal state
         self.action_history = []
@@ -278,7 +311,95 @@ class FastAPIActionDisplayNode:
                 return {"success": True, "message": "Stop Turns command sent"}
             except Exception as e:
                 return {"success": False, "message": f"Error: {str(e)}"}
+        
+        @self.app.post("/api/save")
+        async def save_all():
+            """Trigger save for all nodes."""
+            try:
+                # Broadcast save command to all nodes
+                save_data = {
+                    "timestamp": datetime.now().isoformat(),
+                    "source": "ui"
+                }
+                self.save_publisher.put(json.dumps(save_data))
+                
+                return {"success": True, "message": "Save command sent to all nodes"}
+            except Exception as e:
+                return {"success": False, "message": f"Error: {str(e)}"}
+        
+        @self.app.post("/api/save_and_shutdown")
+        async def save_and_shutdown():
+            """Save data then initiate coordinated shutdown."""
+            try:
+                if self.shutdown_in_progress:
+                    return {"success": False, "message": "Shutdown already in progress"}
+                
+                # First save all data
+                save_data = {
+                    "timestamp": datetime.now().isoformat(),
+                    "source": "ui_shutdown"
+                }
+                self.save_publisher.put(json.dumps(save_data))
+                
+                # Wait briefly for saves to complete, then start shutdown
+                await asyncio.sleep(2.0)
+                
+                # Start coordinated shutdown
+                await self._initiate_shutdown()
+                
+                return {"success": True, "message": "Save and shutdown initiated"}
+            except Exception as e:
+                return {"success": False, "message": f"Error: {str(e)}"}
+        
+        @self.app.post("/api/shutdown")
+        async def shutdown_only():
+            """Initiate coordinated shutdown without saving."""
+            try:
+                if self.shutdown_in_progress:
+                    return {"success": False, "message": "Shutdown already in progress"}
+                
+                # Start coordinated shutdown
+                await self._initiate_shutdown()
+                
+                return {"success": True, "message": "Shutdown initiated"}
+            except Exception as e:
+                return {"success": False, "message": f"Error: {str(e)}"}
     
+    async def _initiate_shutdown(self):
+        """Coordinate system shutdown in proper sequence."""
+        self.shutdown_in_progress = True
+        
+        shutdown_data = {
+            "timestamp": datetime.now().isoformat(),
+            "source": "ui",
+            "characters": list(self.active_characters)
+        }
+        
+        # Step 1: Shutdown executive nodes for each character
+        logger.info("🔌 Step 1: Shutting down executive nodes...")
+        self.shutdown_executive_publisher.put(json.dumps(shutdown_data))
+        
+        # Step 2: Shutdown sense nodes for each character 
+        logger.info("🔌 Step 2: Shutting down sense nodes...")
+        self.shutdown_sense_publisher.put(json.dumps(shutdown_data))
+        
+        # Step 3: Shutdown memory and situation nodes for each character
+        logger.info("🔌 Step 3: Shutting down memory and situation nodes...")
+        self.shutdown_memory_publisher.put(json.dumps(shutdown_data))
+        self.shutdown_situation_publisher.put(json.dumps(shutdown_data))
+        
+        # Step 4: Shutdown shared nodes (map, llm_service)
+        logger.info("🔌 Step 4: Shutting down shared nodes...")
+        self.shutdown_shared_publisher.put(json.dumps(shutdown_data))
+        
+        # Step 5: Shutdown self after brief delay
+        logger.info("🔌 Step 5: Shutting down display node...")
+        await asyncio.sleep(1.0)
+        
+        # Trigger our own shutdown
+        import os
+        os._exit(0)
+
     def _get_html_template(self) -> str:
         """Get the HTML template for the web UI."""
         return """
@@ -638,7 +759,9 @@ class FastAPIActionDisplayNode:
                     <div style="margin-bottom: 15px;">
                         <button id="stepButton" onclick="stepTurn()" style="background: #4ecdc4; margin-right: 10px;">🎯 Step Turn</button>
                         <button onclick="runTurns()" style="background: #ffe66d; color: #1a1a1a; margin-right: 10px;">🏃 Run</button>
-                        <button onclick="stopTurns()" style="background: #ff6b6b;">⏹️ Stop</button>
+                        <button onclick="stopTurns()" style="background: #ff6b6b; margin-right: 10px;">⏹️ Stop</button>
+                        <button onclick="saveAll()" style="background: #95e1d3; color: #1a1a1a; margin-right: 10px;">💾 Save</button>
+                        <button onclick="showShutdownDialog()" style="background: #ff4757; color: white;">🔌 Shutdown</button>
                     </div>
                     <div id="turnStatus" style="margin-bottom: 10px; font-size: 12px; color: #888;">
                         <span id="turnMode">Mode: Step</span> | 
@@ -651,7 +774,7 @@ class FastAPIActionDisplayNode:
                 <div class="input-section">
                     <h3>Send Text Input</h3>
                     <input type="text" id="characterInput" placeholder="Character name (optional)" style="width: 150px;">
-                    <textarea id="messageInput" placeholder="Message or Plan (multi-line supported)" style="width: 300px; height: 80px; resize: vertical;"></textarea>
+                    <textarea id="messageInput" placeholder="Message or Plan (multi-line supported)" style="width: 450px; height: 80px; resize: vertical; background-color: #2b2b2b; color: #ffffff; border: 1px solid #555; padding: 8px; font-family: monospace;"></textarea>
                     <button onclick="sendText()">Send</button>
                     <div id="sendResult"></div>
                 </div>
@@ -670,7 +793,8 @@ class FastAPIActionDisplayNode:
         let activeCharacter = null;
         
         function connectWebSocket() {
-            ws = new WebSocket('ws://localhost:3000/ws');
+            const port = window.location.port;
+            ws = new WebSocket(`ws://localhost:${port}/ws`);
             const actionLog = document.getElementById('actionLog');
             
             ws.onopen = function() {
@@ -701,7 +825,7 @@ class FastAPIActionDisplayNode:
                     console.error('Max reconnection attempts reached');
                     const entry = document.createElement('div');
                     entry.className = 'action-entry';
-                    entry.innerHTML = `<span class="timestamp">[${new Date().toLocaleTimeString()}]</span> <span style="color: #ff6b6b;">❌ WebSocket connection lost - please refresh page</span>`;
+                    entry.innerHTML = `<span class="timestamp">[${new Date().toLocaleTimeString()}]</span> <span style="color: #ff6b6b;">X WebSocket connection lost - please refresh page</span>`;
                     actionLog.appendChild(entry);
                     actionLog.scrollTop = actionLog.scrollHeight;
                 }
@@ -709,7 +833,21 @@ class FastAPIActionDisplayNode:
             
             ws.onmessage = function(event) {
                 console.log('WebSocket message received:', event.data);
-                const data = JSON.parse(event.data);
+                
+                // Handle ping/pong messages
+                if (event.data === 'pong') {
+                    console.log('Received pong from server');
+                    return;
+                }
+                
+                // Parse JSON messages
+                let data;
+                try {
+                    data = JSON.parse(event.data);
+                } catch (e) {
+                    console.log('Non-JSON message received:', event.data);
+                    return;
+                }
                 if (data.type === 'action') {
                     addActionEntry(data);
                     // Check if this is an announcement to create a character tab
@@ -734,7 +872,7 @@ class FastAPIActionDisplayNode:
                     // Add a test entry to the action log
                     const entry = document.createElement('div');
                     entry.className = 'action-entry';
-                    entry.innerHTML = `<span class="timestamp">[${new Date().toLocaleTimeString()}]</span> <span style="color: #4ecdc4;">🔗 ${data.message}</span>`;
+                    entry.innerHTML = `<span class="timestamp">[${new Date().toLocaleTimeString()}]</span> <span style="color: #4ecdc4;">* ${data.message}</span>`;
                     actionLog.appendChild(entry);
                     actionLog.scrollTop = actionLog.scrollHeight;
                 }
@@ -806,7 +944,7 @@ class FastAPIActionDisplayNode:
             let content = `<h3>👤 ${characterName}</h3>`;
             
             if (tabData.goal) {
-                content += `<div class="character-goal">🎯 Goal: ${tabData.goal}</div>`;
+                content += `<div class="character-goal">Goal: ${tabData.goal}</div>`;
             } else {
                 content += `<div style="color: #888; font-style: italic;">No current goal</div>`;
             }
@@ -993,11 +1131,13 @@ class FastAPIActionDisplayNode:
             }
         }
         
-        // Allow Enter key to send message
+        // Allow Shift+Enter to send message, Enter for new line
         document.getElementById('messageInput').addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
+            if (e.key === 'Enter' && e.shiftKey) {
+                e.preventDefault(); // Prevent default to avoid new line
                 sendText();
             }
+            // Regular Enter key will create new line (default behavior)
         });
         
         async function stepTurn() {
@@ -1075,6 +1215,91 @@ class FastAPIActionDisplayNode:
                     resultDiv.innerHTML = `<span class="success">${result.message}</span>`;
                 } else {
                     resultDiv.innerHTML = `<span class="error">Error: ${result.message}</span>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<span class="error">Error: ${error.message}</span>`;
+            }
+        }
+        
+        async function saveAll() {
+            const resultDiv = document.getElementById('turnResult');
+            try {
+                const response = await fetch('/api/save', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    resultDiv.innerHTML = `<span class="success">SAVED: ${result.message}</span>`;
+                } else {
+                    resultDiv.innerHTML = `<span class="error">Error: ${result.message}</span>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<span class="error">Error: ${error.message}</span>`;
+            }
+        }
+        
+        function showShutdownDialog() {
+            const choice = confirm("Save data before shutdown?\\n\\nOK = Save & Shutdown\\nCancel = Shutdown without saving\\n\\n(Press ESC or close dialog to cancel shutdown)");
+            
+            if (choice === true) {
+                // User chose "OK" - Save & Shutdown
+                saveAndShutdown();
+            } else if (choice === false) {
+                // User chose "Cancel" - Shutdown without saving
+                if (confirm("Shutdown without saving? All unsaved data will be lost.")) {
+                    shutdownOnly();
+                }
+            }
+            // If user closes dialog or presses ESC, do nothing (cancel)
+        }
+        
+        async function saveAndShutdown() {
+            const resultDiv = document.getElementById('turnResult');
+            resultDiv.innerHTML = '<span style="color: orange;">SAVING data...</span>';
+            
+            try {
+                const response = await fetch('/api/save_and_shutdown', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    resultDiv.innerHTML = '<span style="color: orange;">SHUTTING DOWN system...</span>';
+                } else {
+                    resultDiv.innerHTML = `<span class="error">Save failed: ${result.message}</span>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<span class="error">Error: ${error.message}</span>`;
+            }
+        }
+        
+        async function shutdownOnly() {
+            const resultDiv = document.getElementById('turnResult');
+            resultDiv.innerHTML = '<span style="color: orange;">SHUTTING DOWN system...</span>';
+            
+            try {
+                const response = await fetch('/api/shutdown', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    resultDiv.innerHTML = '<span style="color: orange;">SYSTEM SHUTDOWN initiated</span>';
+                } else {
+                    resultDiv.innerHTML = `<span class="error">Shutdown failed: ${result.message}</span>`;
                 }
             } catch (error) {
                 resultDiv.innerHTML = `<span class="error">Error: ${error.message}</span>`;
