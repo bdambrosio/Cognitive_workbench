@@ -1,6 +1,12 @@
-# Zenoh Cognitive Framework
+# Cognitive workbench
 
+My new playground for cognitive AI experiments.
 A simplified cognitive framework using Zenoh for communication, replacing ROS2 complexity with clean Python applications that can run on separate cores.
+Most of the below is out of date, I'll try to update in the next day or so. 
+First level functionality.
+Multiple characters can be defined in a simple 2 1/2 grid world. you define personality and drives. Each then creates goals, implements plans (simple scripts with control flow - if/then/else and do_while), maintains beliefs and TOM models of others, etc.
+
+System even has a minimal UI that allows stepping, manual input of simple plans, etc.
 
 ## 🚀 Quick Start
 
