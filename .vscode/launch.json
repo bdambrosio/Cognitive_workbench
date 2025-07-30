@@ -153,6 +153,21 @@
             "justMyCode": false,
             "stopOnEntry": false,
             "preLaunchTask": "setup-zenoh-environment"
+        },
+        {
+            "name": "Test Plan Parser",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/zenoh_cognitive_framework/test_plan.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/zenoh_cognitive_framework",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/zenoh_cognitive_framework"
+            },
+            "args": [],
+            "justMyCode": false,
+            "stopOnEntry": false,
+            "preLaunchTask": "setup-zenoh-environment"
         }
 
 
