@@ -95,6 +95,9 @@ class ZenohExecutiveNode:
         # Publisher for decided actions (character-specific) 
         self.decided_action_publisher = self.session.declare_publisher(f"cognitive/{character_name}/decided_action")
         
+        # Publisher for current plans (character-specific)
+        self.current_plan_publisher = self.session.declare_publisher(f"cognitive/{character_name}/current_plan")
+        
         # LLM client
         self.llm_client = None
         if LLM_CLIENT_AVAILABLE:
@@ -268,6 +271,22 @@ class ZenohExecutiveNode:
         except Exception as e:
             logger.error(f'Error publishing decided action: {e}')
 
+    def _publish_current_plan(self):
+        """Publish current plan to the current_plan topic for UI display."""
+        try:
+            current_plan_data = {
+                'current_plan': json.dumps(self.current_plan, indent=2) if self.current_plan else '',
+                'plan_data': self.current_plan,
+                'timestamp': datetime.now().isoformat(),
+                'character': self.character_name
+            }
+            
+            self.current_plan_publisher.put(json.dumps(current_plan_data))
+            logger.info(f'📋 Published current plan for {self.character_name}')
+            
+        except Exception as e:
+            logger.error(f'Error publishing current plan: {e}')
+
     def _run_ooda_loop(self):
         """Execute the OODA loop: Observe, Orient, Decide, Act."""
         try:
@@ -402,7 +421,7 @@ Respond ONLY with the above hash-formatted text.
                 timeout = 5.0 if self.shutdown_requested else None
                 response = self.llm_client.generate(
                     messages=[system_prompt, user_prompt, directive],
-                    max_tokens=400,
+                    max_tokens=100,
                     temperature=0.7,
                     timeout=timeout
                 )
@@ -532,6 +551,7 @@ Allowed control‑flow primitives: sequential list (e.g.. [..., ...]), do_while,
                             single_action = {'action': 'sleep', 'target': 'self', 'value': '', 'reason': ''}
                     else:
                         self.current_plan = plan_candidate
+                        self._publish_current_plan()
                         self.plan_state = {'step_stack': plan_module.Stack()}
                         return self.current_plan
                 else:
@@ -546,6 +566,8 @@ Allowed control‑flow primitives: sequential list (e.g.. [..., ...]), do_while,
             self.current_plan = {'plan': [{'type': single_action['action'], 'target': single_action['target'], 'value': single_action['value'], 'reason': single_action.get('reason', '')}]}
         else:
             self.current_plan = {'plan': []}
+        
+        self._publish_current_plan()
         
         # Initialize plan state for new plan
         self.plan_state = {
@@ -583,6 +605,7 @@ Allowed control‑flow primitives: sequential list (e.g.. [..., ...]), do_while,
             logger.error(traceback.print_exc())
             # Clear plan state on error
             self.current_plan = None
+            self._publish_current_plan()
             self.plan_state = {
                 'step_stack': plan_module.Stack()
             }
@@ -601,6 +624,7 @@ Allowed control‑flow primitives: sequential list (e.g.. [..., ...]), do_while,
             if step_stack.is_empty():
                 # Plan complete
                 self.current_plan = None
+                self._publish_current_plan()
                 self.plan_state = None
                 return None
             else:
@@ -691,10 +715,8 @@ Allowed control‑flow primitives: sequential list (e.g.. [..., ...]), do_while,
         elif action['action'].lower() == "think":
             self.think_about(action['value'])
         elif action['action'].lower() == "take":
-            action_data = {'type': 'take','action_id': self.action_counter,'timestamp': datetime.now().isoformat(),'target': action['target']}
-            self.last_action = action_data
-            self.action_publisher.put(json.dumps(action_data))
-            #self.take(action['target'])
+            self.take(action['target'])
+            self.action_counter += 1
         elif action['action'].lower() == "inspect":
             action_data = {'type': 'inspect','action_id': self.action_counter,'timestamp': datetime.now().isoformat(),'target': action['target']}
             self.last_action = action_data
@@ -810,6 +832,7 @@ Allowed control‑flow primitives: sequential list (e.g.. [..., ...]), do_while,
         try:
             parsed_plan = plan_module.parse_plan_text(plan_text)
             self.current_plan = parsed_plan
+            self._publish_current_plan()
             self.plan_state = {
                 'step_stack': plan_module.Stack()
             }
@@ -945,6 +968,66 @@ End your response with: </end>"""
             
         except Exception as e:
             logger.error(f'Error in move operation: {e}')
+    
+    def take(self, target: str):
+        """Take a resource and add it to inventory."""
+        try:
+            # First validate that the target exists and is a resource
+            resource_exists = False
+            for reply in self.session.get(f"cognitive/map/resource/{target}", timeout=2.0):
+                if reply.ok:
+                    data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
+                    if data.get('success'):
+                        resource_exists = True
+                        logger.debug(f'✅ Validated {target} is a resource')
+                    else:
+                        logger.warning(f'❌ Cannot take {target} - not a resource or does not exist')
+                        return False
+                break
+
+            if not resource_exists:
+                logger.warning(f'❌ Cannot take {target} - resource validation failed')
+                return False
+
+            # Validate that the target is near
+            if not plan_module.is_near(self, target):
+                logger.warning(f'❌ Cannot take {target} - not near resource')
+                return False
+
+            # The take action will be published via the normal action_publisher
+            # and memory_node will see it and handle adding to inventory
+
+            logger.info(f'📦 Taking {target} for {self.character_name}')
+
+            # Create and publish action data for logging/display
+            action_data = {
+                'type': 'take',
+                'target': target,
+                'action_id': f"take_{int(time.time())}",
+                'timestamp': datetime.now().isoformat(),
+                'character': self.character_name
+            }
+            self.last_action = action_data
+            self.action_publisher.put(json.dumps(action_data))
+            logger.info(f'📤 Published take action: {target}')
+
+            # Remove the resource from the map
+            for reply in self.session.get(f"cognitive/map/resource/remove/{target}", timeout=2.0):
+                if reply.ok:
+                    data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
+                    if data.get('success'):
+                        logger.info(f'🗑️ Removed {target} from map')
+                    else:
+                        logger.warning(f'⚠️ Failed to remove {target} from map: {data.get("error", "Unknown error")}')
+                else:
+                    logger.warning(f'⚠️ Failed to remove {target} from map - no response')
+                break
+
+            return True
+
+        except Exception as e:
+            logger.error(f'Error in take operation for {target}: {e}')
+            return False
     
     def think_about(self, value: str):
         """Think about a value."""
