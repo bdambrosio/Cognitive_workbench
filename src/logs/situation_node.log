@@ -1,49 +1,15 @@
-2025-07-30 10:21:59 - situation_node - INFO - 📂 No existing situation file for Joe, starting fresh
-2025-07-30 10:21:59 - situation_node - INFO - 🧭 Situation Node initialized for character: Joe
-2025-07-30 10:21:59 - situation_node - INFO -    - Subscribing to: cognitive/Joe/sense_data
-2025-07-30 10:21:59 - situation_node - INFO -    - Subscribing to: cognitive/Joe/action
-2025-07-30 10:21:59 - situation_node - INFO -    - Publishing to: cognitive/Joe/situation
-2025-07-30 10:21:59 - situation_node - INFO -    - Queryable at: cognitive/Joe/situation/*
-2025-07-30 10:21:59 - situation_node - INFO -    - Proximity queryable at: cognitive/Joe/situation/proximity
-2025-07-30 10:21:59 - situation_node - INFO -    - Visibility queryable at: cognitive/Joe/situation/visibility
-2025-07-30 10:21:59 - situation_node - INFO -    - Location queryable at: cognitive/Joe/situation/location
-2025-07-30 10:21:59 - situation_node - INFO -    - Storage available at: data/situation/Joe_situation.json
-2025-07-30 10:21:59 - situation_node - INFO - Situation Node running - press Ctrl+C to stop
-2025-07-30 10:22:02 - situation_node - INFO - 📥 Received action: unknown
-2025-07-30 10:22:12 - situation_node - WARNING - Map query failed for Joe
-2025-07-30 10:22:12 - situation_node - INFO - 🗺️ Updated map2025-07-30 10:22:39 - situation_node - INFO - 📥 Received sense data: text
-2025-07-30 10:22:42025-07-30 10:22:49 - situation_node - INFO - 📥 Receive2025-07-30 10:22:52025-07-30 10:22:52 - situation_node - INFO - 📥 Receive2025-07-30 10:22:552025-07-30 10:23:01 - situation_node - INFO - 📥 Receiv2025-07-30 10:23:012025-07-30 10:23:18 - situation_node - INFO - 📥 Received action: unknown
-2025-07-30 10:23:23 - situation_node - INFO - 📥 Received sense data: text
-2025-07-30 10:23:28 - situation_node - WARNING - Map query failed for Joe
-2025-07-30 10:23:28 - situation_node - INFO - 🗺️ Updated map look data2025-07-32025-07-30 10:23:40 - situation_node - INFO - 📥 Received action:2025-07-32025-07-30 10:24:00 - situation_node - INFO - 📥 Received sense data: text
-2025-07-30 10:26:22 - situation_node - INFO - 📥 Received action: unknown
-2025-07-30 10:26:25 - situation_node - INFO - 📥 Received action: unknown
-2025-07-30 10:26:29 - situation_node - INFO - 📥 Received sense data: text
-2025-07-30 10:26:30 - situation_node - INFO - 📥 Received action:2025-07-30 10:26:31 - situation_node - INFO - 📥 Received action: unknown
-2025-07-32025-07-30 10:26:33 - situation_node - INFO - 🗺️ Updated map l2025-07-30 10:26:41 - situation_node - INFO - 📥 Received sense data: text
-2025-07-30 10:262025-07-30 10:26:44 - situation_node - INFO - 📥 Received action: unknown
-2025-07-30 10:26:46 - situation_node - INFO - 📥 Received action: unknown
-2025-07-30 10:26:47 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-07-30 10:26:56 - situation_node - INFO - 📥 Received action: unknown
-2025-07-30 10:26:59 - situation_node - INFO - 📥 Received action: unknown
-2025-07-30 10:27:01 - situation_node - INFO - 📥 Received sense data: text
-2025-07-30 10:27:07 - situation_node - INFO - 📥 Received action: unknown
-2025-07-30 10:27:09 - situation_node - INFO - 📥 Received action: unknown
-2025-07-30 10:27:11 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-07-30 10:27:20 - situation_node - INFO - 📥 Received sense data: text
-2025-07-30 10:27:29 - situation_node - INFO - 📥 Received action: unknown
-2025-07-30 10:27:37 - situation_node - INFO - 📥 Received action: unknown
-ction: unknown
-2025-07-30 10:27:07 - situation_node - INFO - 📥 Received sense data: text
-2025-07-30 10:27:11 - situation_node - INFO - 📥 Received action: unknown
-2025-07-30 10:27:21 - situation_node - WARNING - Map query failed for Samantha
-2025-07-30 10:27:21 - situation_node - INFO - 🗺️ Updated map look data for Samantha
-2025-07-30 10:27:21 - situation_node - INFO - 📥 Received action: unknown
-2025-07-30 10:27:29 - situation_node - INFO - 📥 Received sense data: text
-2025-07-30 10:27:35 - situation_node - INFO - 📥 Received action: unknown
-2025-07-30 10:27:37 - situation_node - INFO - 📥 Received sense data: text
-2025-07-30 10:27:45 - situation_node - WARNING - Map query failed for Samantha
-2025-07-30 10:27:45 - situation_node - INFO - 🗺️ Updated map look data for Samantha
-2025-07-30 10:27:53 - situation_node - INFO - 📥 Received sense data: text
-2025-07-30 10:35:21 - situation_node - INFO - 📥 Received sense data: text
-2025-07-30 10:36:00 - situation_node - INFO - 📥 Received sense data: text
+2025-07-30 13:26:15 - situation_node - INFO - 📂 Loaded situation data for Joe
+2025-07-30 13:26:15 - situation_node - INFO - 🧭 Situation Node initialized for character: Joe
+2025-07-30 13:26:15 - situation_node - INFO -    - Subscribing to: cognitive/Joe/sense_data
+2025-07-30 13:26:15 - situation_node - INFO -    - Subscribing to: cognitive/Joe/action
+2025-07-30 13:26:15 - situation_node - INFO -    - Publishing to: cognitive/Joe/situation
+2025-07-30 13:26:15 - situation_node - INFO -    - Queryable at: cognitive/Joe/situation/*
+2025-07-30 13:26:15 - situation_node - INFO -    - Proximity queryable at: cognitive/Joe/situation/proximity
+2025-07-30 13:26:15 - situation_node - INFO -    - Visibility queryable at: cognitive/Joe/situation/visibility
+2025-07-30 13:26:15 - situation_node - INFO -    - Location queryable at: cognitive/Joe/situation/location
+2025-07-30 13:26:15 - situation_node - INFO -    - Storage available at: data/situation/Joe_situation.json
+2025-07-30 13:26:15 - situation_node - INFO - Situation Node running - press Ctrl+C to stop
+2025-07-30 13:26:16 - situation_node - INFO - 📥 Received action: unknown
+2025-07-30 13:26:26 - situation_node - WARNING - Map query failed for Joe
+2025-07-30 13:26:26 - situation_node - INFO - 🗺️ Updated map look data for Joe
+2025-07-30 13:26:41 - situation_node - INFO - 📥 Receive2025-07-30 13:26:41 - situation_node - INFO - 📥 Received action: unknown

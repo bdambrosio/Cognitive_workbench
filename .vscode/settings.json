@@ -7,18 +7,18 @@
     "python.linting.flake8Enabled": true,
     "python.formatting.provider": "black",
     "python.analysis.extraPaths": [
-        "./zenoh_cognitive_framework"
+        "./src"
     ],
     "files.associations": {
         "*.py": "python"
     },
     "terminal.integrated.env.linux": {
-        "PYTHONPATH": "${workspaceFolder}/zenoh_cognitive_framework"
+        "PYTHONPATH": "${workspaceFolder}/src"
     },
     "terminal.integrated.env.osx": {
-        "PYTHONPATH": "${workspaceFolder}/zenoh_cognitive_framework"
+        "PYTHONPATH": "${workspaceFolder}/src"
     },
     "terminal.integrated.env.windows": {
-        "PYTHONPATH": "${workspaceFolder}/zenoh_cognitive_framework"
+        "PYTHONPATH": "${workspaceFolder}/src"
     }
 } 

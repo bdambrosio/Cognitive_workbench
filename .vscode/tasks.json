@@ -7,7 +7,7 @@
             "command": "bash",
             "args": [
                 "-c",
-                "echo '🔧 Setting up Zenoh environment...' && if [ ! -d 'zenoh_venv' ]; then echo '📦 Creating virtual environment...' && python3 -m venv zenoh_venv && echo '✅ Virtual environment created'; else echo '✅ Virtual environment already exists'; fi && echo '🔧 Activating virtual environment...' && source zenoh_venv/bin/activate && echo '📦 Installing/updating dependencies...' && pip install --upgrade pip && pip install -r zenoh_cognitive_framework/requirements.txt && echo '🧪 Testing Zenoh installation...' && cd zenoh_cognitive_framework && python test_zenoh_installation.py && echo '✅ Zenoh environment ready!'"
+                "echo '🔧 Setting up Zenoh environment...' && if [ ! -d 'zenoh_venv' ]; then echo '📦 Creating virtual environment...' && python3 -m venv zenoh_venv && echo '✅ Virtual environment created'; else echo '✅ Virtual environment already exists'; fi && echo '🔧 Activating virtual environment...' && source zenoh_venv/bin/activate && echo '📦 Installing/updating dependencies...' && pip install --upgrade pip && pip install -r src/requirements.txt && echo '🧪 Testing Zenoh installation...' && cd src && python test_zenoh_installation.py && echo '✅ Zenoh environment ready!'"
             ],
             "group": "build",
             "presentation": {
@@ -29,7 +29,7 @@
             "command": "mkdir",
             "args": [
                 "-p",
-                "zenoh_cognitive_framework/logs"
+                "src/logs"
             ],
             "group": "build",
             "presentation": {
@@ -46,7 +46,7 @@
             "command": "bash",
             "args": [
                 "-c",
-                "source zenoh_venv/bin/activate && cd zenoh_cognitive_framework && python test_zenoh_installation.py"
+                "source zenoh_venv/bin/activate && cd src && python test_zenoh_installation.py"
             ],
             "group": "test",
             "presentation": {
@@ -65,7 +65,7 @@
             "type": "shell",
             "command": "bash",
             "args": [
-                "zenoh_cognitive_framework/setup.sh"
+                "src/setup.sh"
             ],
             "group": "build",
             "presentation": {

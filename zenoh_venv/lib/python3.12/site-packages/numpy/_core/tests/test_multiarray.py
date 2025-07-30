@@ -4211,6 +4211,13 @@ class TestBinop:
         assert_equal(obj_arr ** -1, pow_for(-1, obj_arr))
         assert_equal(obj_arr ** 2, pow_for(2, obj_arr))
 
+    def test_pow_calls_square_structured_dtype(self):
+        # gh-29388
+        dt = np.dtype([('a', 'i4'), ('b', 'i4')])
+        a = np.array([(1, 2), (3, 4)], dtype=dt)
+        with pytest.raises(TypeError, match="ufunc 'square' not supported"):
+            a ** 2
+
     def test_pos_array_ufunc_override(self):
         class A(np.ndarray):
             def __array_ufunc__(self, ufunc, method, *inputs, **kwargs):
@@ -8847,6 +8854,14 @@ def test_interface_no_shape():
         array = np.array(1)
         __array_interface__ = array.__array_interface__
     assert_equal(np.array(ArrayLike()), 1)
+
+
+def test_interface_no_shape_error():
+    class ArrayLike:
+        __array_interface__ = {"data": None, "typestr": "f8"}
+
+    with pytest.raises(ValueError, match="Missing __array_interface__ shape"):
+        np.array(ArrayLike())
 
 
 def test_array_interface_itemsize():
