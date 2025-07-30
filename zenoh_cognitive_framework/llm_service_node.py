@@ -95,6 +95,12 @@ class ZenohLLMServiceNode:
         # Publisher for LLM responses
         self.response_publisher = self.session.declare_publisher("cognitive/llm_response")
         
+        # Subscriber for shutdown commands (global)
+        self.shutdown_subscriber = self.session.declare_subscriber(
+            "cognitive/shutdown/shared",
+            self.shutdown_callback
+        )
+        
         # Thread pool for concurrent processing
         self.thread_pool = ThreadPoolExecutor(max_workers=4)
         self.active_requests = {}
@@ -323,6 +329,14 @@ class ZenohLLMServiceNode:
         # Schedule next status update
         self.status_timer = threading.Timer(10.0, self.publish_status)
         self.status_timer.start()
+    
+    def shutdown_callback(self, sample):
+        """Handle shutdown command from UI."""
+        try:
+            logger.warning('🔌 LLM Service Node received shutdown command')
+            self.shutdown()
+        except Exception as e:
+            logger.error(f'Error in shutdown callback: {e}')
     
     def shutdown(self):
         """Clean shutdown."""

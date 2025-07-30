@@ -72,6 +72,9 @@ class ZenohMemoryNode:
         # Entity registry for tracking character interactions
         self.entity_models: Dict[str, EntityModel] = {}
         
+        # Character inventory
+        self.inventory = {}  # {"Berries25": {"name": "Berries25"}, "Mushrooms32": {"name": "Mushrooms32"}}
+        
         # LLM client for entity model functionality
         self.llm_client = None
         if LLM_CLIENT_AVAILABLE:
@@ -112,10 +115,30 @@ class ZenohMemoryNode:
             self.handle_entity_query
         )
         
+        # Queryable for inventory (character-specific)
+        self.inventory_storage = self.session.declare_queryable(
+            f"cognitive/{character_name}/memory/inventory",
+            self.handle_inventory_query
+        )
+        
+
+        
         # Subscriber for dialog close events (character-specific)
         self.dialog_close_subscriber = self.session.declare_subscriber(
             f"cognitive/{character_name}/memory/close_dialog",
             self.dialog_close_callback
+        )
+        
+        # Subscriber for save commands (global)
+        self.save_subscriber = self.session.declare_subscriber(
+            "cognitive/save_all",
+            self.save_callback
+        )
+        
+        # Subscriber for shutdown commands (global)
+        self.shutdown_subscriber = self.session.declare_subscriber(
+            "cognitive/shutdown/memory",
+            self.shutdown_callback
         )
         
         # Memory management
@@ -151,6 +174,8 @@ class ZenohMemoryNode:
         logger.info(f'  - cognitive/{character_name}/memory/chat/*')
         logger.info(f'  - cognitive/{character_name}/memory/long_term/*')
         logger.info(f'  - cognitive/{character_name}/memory/entity/*')
+        logger.info(f'  - cognitive/{character_name}/memory/inventory')
+
         logger.info('Subscriptions:')
         logger.info(f'  - cognitive/{character_name}/memory/close_dialog')
     
@@ -400,6 +425,69 @@ class ZenohMemoryNode:
             }
             query.reply(query.key_expr, json.dumps(error_response).encode('utf-8'))
     
+    def handle_inventory_query(self, query):
+        """Handle inventory queries for condition evaluation."""
+        try:
+            # Parse query parameters
+            selector = str(query.selector)
+            item = None
+            
+            # Extract item from query
+            if 'item=' in selector:
+                try:
+                    import urllib.parse
+                    item = urllib.parse.unquote(selector.split('item=')[1].split('&')[0])
+                except:
+                    pass
+            
+            if not item:
+                response = {
+                    'success': False,
+                    'value': False
+                }
+            else:
+                # Check if item is in inventory
+                item_canonical = item.capitalize()
+                has_item = item_canonical in self.inventory
+                
+                response = {
+                    'success': True,
+                    'value': has_item
+                }
+            
+            query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
+            logger.info(f'📦 Inventory query for {item}: {response["value"]}')
+            
+        except Exception as e:
+            logger.error(f'Error handling inventory query: {e}')
+            error_response = {
+                'success': False,
+                'value': False
+            }
+            query.reply(query.key_expr, json.dumps(error_response).encode('utf-8'))
+    
+
+    
+    def add_item(self, item_name: str) -> None:
+        """Add an item to the character's inventory."""
+        item_canonical = item_name.capitalize()
+        self.inventory[item_canonical] = {"name": item_canonical}
+        logger.info(f'📦 Added {item_canonical} to inventory')
+    
+    def remove_item(self, item_name: str) -> None:
+        """Remove an item from the character's inventory."""
+        item_canonical = item_name.capitalize()
+        if item_canonical in self.inventory:
+            del self.inventory[item_canonical]
+            logger.info(f'📦 Removed {item_canonical} from inventory')
+        else:
+            logger.warning(f'📦 Attempted to remove {item_canonical} from inventory but it was not found')
+    
+    def has_item(self, item_name: str) -> bool:
+        """Check if the character has an item in their inventory."""
+        item_canonical = item_name.capitalize()
+        return item_canonical in self.inventory
+    
     def get_or_create_entity(self, entity_name: str) -> EntityModel:
         """
         Get an existing entity or create a new one (case-insensitive).
@@ -491,6 +579,10 @@ class ZenohMemoryNode:
                     for entity_name, entity_data in data.get('entities', {}).items():
                         entity = EntityModel.load_from_dict(entity_data, logger, self.llm_client)
                         self.entity_models[entity_name] = entity
+                    
+                    # Load inventory
+                    self.inventory = data.get('inventory', {})
+                    
                 logger.info(f'📂 Loaded memory from {self.memory_file}')
             else:
                 logger.info(f'📂 No existing memory file, starting fresh')
@@ -502,7 +594,8 @@ class ZenohMemoryNode:
         try:
             data = {
                 'character_name': self.character_name,
-                'entities': {}
+                'entities': {},
+                'inventory': self.inventory
             }
             for entity_name, entity in self.entity_models.items():
                 data['entities'][entity_name] = entity.to_dict()
@@ -512,6 +605,22 @@ class ZenohMemoryNode:
             logger.info(f'💾 Saved memory to {self.memory_file}')
         except Exception as e:
             logger.error(f'Error saving memory: {e}')
+
+    def save_callback(self, sample):
+        """Handle save command from UI."""
+        try:
+            logger.info(f'💾 {self.character_name} Memory Node received save command')
+            self.save_memory()
+        except Exception as e:
+            logger.error(f'Error in save callback: {e}')
+
+    def shutdown_callback(self, sample):
+        """Handle shutdown command from UI."""
+        try:
+            logger.warning(f'🔌 {self.character_name} Memory Node received shutdown command')
+            self.shutdown()
+        except Exception as e:
+            logger.error(f'Error in shutdown callback: {e}')
 
     def shutdown(self):
         """Cleanup and shutdown."""

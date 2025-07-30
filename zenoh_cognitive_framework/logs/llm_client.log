@@ -1,163 +1,284 @@
-2025-07-28 19:13:50 - llm_client - INFO - 🤖 Zenoh LLM Client initialized
-2025-07-28 19:13:50 - executive_node - INFO - 🧠 Zenoh Executive Node initialized for character: Joe
-2025-07-28 19:13:50 - executive_node - INFO -    - Subscribing to: cognitive/Joe/sense_data
-2025-07-28 19:13:50 - executive_node - INFO -    - Subscribing to: cognitive/Joe/situation
-2025-07-28 19:13:50 - executive_node - INFO -    - Subscribing to: cognitive/map/turn/go
-2025-07-28 19:13:50 - executive_node - INFO -    - Publishing to: cognitive/Joe/action
-2025-07-28 19:13:50 - executive_node - INFO -    - Publishing to: cognitive/Joe/memory/store
-2025-07-28 19:13:50 - executive_node - INFO -    - Publishing to: cognitive/Joe/text_input
-2025-07-28 19:13:50 - executive_node - INFO -    - Publishing to: cognitive/Joe/goal
-2025-07-28 19:13:50 - executive_node - INFO -    - Publishing to: cognitive/Joe/decided_action
-2025-07-28 19:13:50 - executive_node - INFO -    - Publishing to: cognitive/map/turn/complete/Joe
-2025-07-28 19:13:50 - executive_node - WARNING - Executive Node running - press Ctrl+C to stop
-2025-07-28 19:13:50 - executive_node - INFO - 📢 Announced character presence: Joe
-2025-07-28 19:13:52 - executive_node - WARNING - 🚦 Turn 1 started for Joe
-2025-07-28 19:13:52 - executive_node - WARNING - 🔄 Joe OODA loop running
-2025-07-28 19:13:59 - executive_node - WARNING - 🤖 Joe New Goal: #goal Find a way out of forest
-#description Explore and map the surroundings
-#otherActorName None
-#termination See a clearing or edge
-## 
-#goal Solve the mystery of arriv2025-07-28 19:14:13 - executive_node - WARNING - 🤖 Samantha New Goal: #goal Explore Forest Northeast
-#description Investigate Forest Northeast terrain
-#otherActorName None
-#termination Found New Landmark
-## 
-#goal Follow Southeast Trail
-#description Follow Trail to Mushrooms
-#otherActorName None
-#termination Reached Mushroom Patch
-## 
-#goal Investigate Fallen Branches
-#description Investigate Fallen Branches Southwest
-#otherActorName None
-#termination Found Useful Branch
-## 
-#goal Climb Uphill North
-#description Climb Uphill to Higher Ground
-#otherActorName None
-#termination Reached Higher Elevation
-## 
-<end> 
-
-
-
-
-
- 
-#goal Explore Forest Northeast
-#description Investigate Forest Northeast terrain
-#otherActorName None
-#termination Found New Landmark
-## 
-#goal Follow Southeast Trail
-#description Follow Trail to Mushrooms
-#otherActorName None
-#termination Reached Mushroom Patch
-## 
-#goal Investigate Fallen Branches
-#description Investigate Fallen Branches Southwest
-#otherActorName None
-#termination Found Useful Branch
-## 
-#goal Climb Uphill North
-#description Climb Uphill to Higher Ground
-#otherActorName None
-#termination Reached Higher Elevation
-## 
-<end> 
-
-
-
-
-
-
-#goal Explore Forest Northeast
-#description Investigate Forest Northeast terrain
-#otherActorName None
-#termination Found New Landmark
-## 
-#goal Follow Southeast Trail
-#description Follow Trail to Mushrooms
-#otherActorName None
-#termination Reached Mushroom Patch
-## 
-#goal Investigate Fallen Branches
-#description Investigate Fallen Branches Southwest
-#otherActorName None
-#termination Found Useful Branch
-## 
-#goal Climb Uphill North
-#description Climb Uphill to Higher Ground
-#otherActorName None
-#termination Reached Higher Elevation
-## 
-<end> 
-
-
-
-
-
-
-#goal Explore Forest Northeast
-#description Investigate Forest Northeast terrain
-#otherActorName None
-2025-07-28 19:14:13 - executive_node - WARNING - Samantha generated goal: Goal Explore Forest Northeast: Investigate Forest Northeast terrain; actors: Samantha; termination: Found New Landmark
-2025-07-28 19:12025-07-28 19:15:37 - executive_node - WARNING - 🚦 Turn 2 started for Joe
-2025-07-28 19:15:37 - executive_node - WARNING - 🔄 Joe OODA loop running
-2025-07-28 19:15:39 - executive_node - WARNING - 🤖 Joe New Goal: #goal Investigate Samantha
-#description Ask Samantha about surroundings
-#otherActorName Samantha
-#termination Samantha responds helpfully
-## 
-<end>
-2025-07-28 19:15:39 - executive_node - WARNING - Joe generated goal: Goal Investigate Samantha: Ask Samantha about surroundings; actors: Joe; termination: Samantha responds helpfully
-2025-07-28 19:15:39 - executive_node - INFO - 🎯 Published goal for Joe: Goal Investigate Samantha: Ask Samantha about surroundings; actors: Joe; termination: Samantha responds helpfully
-2025-07-28 19:15:39 - executive_node - WARNING - ✅ Joe completed turn 2
-5-07-28 19:14:14 - executive_node - WARNING - 📤 Published action: {'action': 'Move', 'target': 'Northeast', 'value': 'Uphill', 'reason': 'Explore terrain'}
-2025-07-28 19:14:14 - executive_node - WARNING - ✅ Samantha completed turn 1
-2025-07-28 19:14:17 - executive_node - WARNING - 📥 Samantha Received text input: "plan: think(self, What should I do next?)" (source: ui)
-2025-07-28 19:14:17 - executive_node - WARNING - 📊 Samantha Received situation update
-2025-07-28 19:14:17 - executive_node - INFO - DEBUG: Original input: "plan: think(self, What should I do next?)", Clean input: "plan: think(self, What should I do next?)", Starts with plan: True
-2025-07-28 19:14:27 - executive_node - WARNING - 📊 Samantha Received situation update
-2025-07-28 19:14:27 - executive_node - WARNING - 📊 Samantha Received situation update
-2025-07-28 19:15:10 - executive_node - INFO - 📋 Samantha received new plan with 1 steps
-2025-07-28 19:15:37 - executive_node - WARNING - 🚦 Turn 2 started for Samantha
-2025-07-28 19:15:38 - executive_node - WARNING - 🔄 Samantha OODA loop running
-2025-07-28 19:15:45 - executive_node - WARNING - 🤖 Samantha New Goal: #goal Investigate Joe
-#description Ask Joe about himself
-#otherActorName Joe
-#termination Joe answers questions
-## 
-#goal Follow Trail
-#description Follow trail southeast
-#otherActorName None
-#termination Reach trail end
-## 
-#goal Gather Resources
-#description Collect nearby resources
-#otherActorName None
-#termination Resources collected
-## 
-#goal Climb Uphill
-#description Climb uphill north
-#otherActorName None
-#termination Reach top
-## 
-#goal Explore Forest
-#description Explore forest surroundings
-#otherActorName None
-#termination New area discovered
+2025-07-30 10:22:02 - llm_client - INFO - 🤖 Zenoh LLM Client initialized
+2025-07-30 10:22:02 - executive_node - INFO - 🧠 Zenoh Executive Node initialized for character: Joe
+2025-07-30 10:22:02 - executive_node - INFO -    - Subscribing to: cognitive/Joe/sense_data
+2025-07-30 10:22:02 - executive_node - INFO -    - Subscribing to: cognitive/Joe/situation
+2025-07-30 10:22:02 - executive_node - INFO -    - Subscribing to: cognitive/map/turn/go
+2025-07-30 10:22:02 - executive_node - INFO -    - Publishing to: cognitive/Joe/action
+2025-07-30 10:22:02 - executive_node - INFO -    - Publishing to: cognitive/Joe/memory/store
+2025-07-30 10:22:02 - executive_node - INFO -    - Publishing to: cognitive/Joe/text_input
+2025-07-30 10:22:02 - executive_node - INFO -    - Publishing to: cognitive/Joe/goal
+2025-07-30 10:22:02 - executive_node - INFO -    - Publishing to: cognitive/Joe/decided_action
+2025-07-30 10:22:02 - executive_node - INFO -    - Publishing to: cognitive/map/turn/complete/Joe
+2025-07-30 10:22:02 - executive_node - WARNING - Executive Node running - press Ctrl+C to stop
+2025-07-30 10:22:02 - executive_node - INFO - 📢 Announced character presence: Joe
+2025-07-30 10:22:12 - executive_node - WARNING - 📊 Joe Received situation update
+2025-07-30 10:22:12 - executive_node - WARNING - 📊 Joe Received situation update
+2025-07-30 10:22:30 - executive_node - WARNING - 🚦 Turn 1 started for Joe
+2025-07-30 10:22:31 - executive_node - WARNING - 🔄 Joe OODA loop running
+2025-07-30 10:22:34 - executive_node - WARNING - 🤖 Joe New Goal: #goal Find Samantha's Story
+#description Ask Samantha about herself
+#otherCharacterName Samantha
+#termination Samantha shares her story
 ##
-2025-07-28 19:15:45 - executive_node - WARNING - Samantha generated goal: Goal Investigate Joe: Ask Joe about himself; actors: Samantha; termination: Joe answers questions
-2025-07-28 19:15:45 - executive_node - INFO - 🎯 Published goal for Samantha: Goal Investigate Joe: Ask Joe about himself; actors: Samantha; termination: Joe answers questions
-2025-07-28 19:15:45 - executive_node - INFO - 📋 Published decided action for Samantha: think: self - What should I do next?
-2025-07-28 19:15:45 - executive_node - WARNING - Thinking about: What should I do next?
-2025-07-28 19:15:45 - executive_node - INFO - 📚 Retrieved 1 recent memory entries
-2025-07-28 19:15:46 - executive_node - WARNING - 🤖 Samantha New Thought:  
-#thought Trust no one
+2025-07-30 10:22:34 - executive_node - WARNING - Joe generated goal: Goal Find Samantha's Story: Ask Samantha about herself; actors: Joe, Samantha; termination: Samantha shares her story
+2025-07-30 10:22:34 - executive_node - INFO - 🎯 Published goal for Joe: Goal Find Samantha's Story: Ask Samantha about herself; actors: Joe, Samantha; termination: Samantha shares her story
+2025-07-30 10:22:39 - executive_node - WARNING - 🤖 Joe New Action:    {   "plan": [     { "type": "say", "t2025-07-30 10:22:39 - executive_node - WARNING - 📥 Samantha Received text input: "Hi, I'm Joe. What's going on here?" (source: Joe)
+2025-07-30 10:22:39 - executive_node - WARNING - 📊 Samantha Received situation update
+2025-07-30 10:22:44 - executive_node - WARNING - 🤖 Samantha New Action:    {   "plan": [     { "type": "think", "value": "I need to find a way to live safely in the forest, and maybe it's a place of safety. I should start by exploring my surroundings and seeing what resources are available." },     { "type": "move", "target": "Northwest" },     { "type": "inspect", "target": "Apple_Tree3" },     { "type": "take", "target": "Apple_Tree3" },     { "type": "think", "value": "I wonder if there are any other resources or trails nearby that I should explor2025-07-30 10:22:47 - executive_node - WARNING - 🚦 Turn 2 started for Joe
+2025-07-30 10:22:48 - executive_node - WARNING - 🔄 Joe OODA loop running
+2025-07-30 10:22:48 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-07-30 10:22:48 - executive_node - INFO - 📋 Published decided action for Joe: think: None - How did I end up here?
+2025-07-30 10:22:48 - executive_node - WARNING - Thinking about: How did I end up here?
+2025-07-30 10:22:48 - executive_node - INFO - 📚 Retrieved 1 recent memory entries
+2025-07-30 10:22:48 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-07-30 10:22:49 - executive_node - WARNING - 🤖 Joe New Thought:  
+#thought I am lost
 
-2025-07-28 19:15:46 - executive_node - INFO - 📤 Published action: action_2
-2025-07-28 19:15:46 - executive_node - WARNING - 📤 Published action: {'action': 'think', 'target': 'self', 'value': 'What should I do next?', 'reason': ''}
-2025-07-28 19:15:46 - executive_node - WARNING - 📊 Samantha Received situation update
-2025-07-28 19:15:46 - executive_node - WARNING - ✅ Samantha completed turn 2
+2025-07-30 10:22:49 - executive_node - INFO - 📤 Published action: action_1
+2025-07-30 10:22:49 - executive_node - WARNING - 📤 Published action: {'action': 'think', 'target': None, 'value': 'How did I end up here?', 'reason': ''}
+2025-07-30 10:22:49 - executive_node - WARNING - 📊 Joe Received situation update
+2025-07-30 10:22:49 - executive_node - WARNING - ✅ Joe completed turn 2
+2025-07-30 10:22:52 - executive_node - WARNING - 📥 Joe Received text input: "Hi, I'm Samantha. I'm just out for a hike. I love the forest, it's so peaceful. But I have to admit, I'm a bit turned around. I was following a trail, but I think I took a wrong turn somewhere. Do you know where we are?" (source: Samantha)
+2025-07-30 10:22:52 - executive_node - WARNING - 📊 Joe Received situation update
+2025-07-30 10:22:55 - executive_node - WARNING - 🚦 Turn 3 started for Joe
+2025-07-30 10:22:56 - executive_node - WARNING - 🔄 Joe OODA loop running
+2025-07-30 10:22:56 - executive_node - INFO - Responding to: "Hi, I'm Samantha. I'm just out for a hike. I love the forest, it's so peaceful. But I have to admit, I'm a bit turned around. I was following a trail, but I think I took a wrong turn somewhere. Do you know where we are?" (from Samantha)
+2025-07-30 10:22:56 - executive_node - INFO - 🤔 Natural dialog end check for Samantha: False
+2025-07-30 10:22:56 - executive_node - WARNING - 🤖 Joe Dialog end check: False
+2025-07-30 10:22:56 - executive_node - INFO - 📚 Retrieved 1 recent memory entries
+2025-07-30 10:22:56 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-07-30 10:23:01 - executive_node - WARNING - 📤 Joe Sent text input to Samantha: "I'm Joe, nice to meet you. I'm, uh, also a bit turned around, to be honest. I don't really know how I got here or where 'here' is, exactly. I was just... walking, I guess, and then I was here. Do you think we could, maybe, try to find our way out together? I'm pretty sure I saw some trails when I was, you know, looking around." (source: Joe)
+2025-07-30 10:23:01 - executive_node - WARNING - Responding to: "Hi, I'm Samantha. I'm just out for a hike. I love the forest, it's so peaceful. But I have to admit, I'm a bit turned around. I was following a trail, but I think I took a wrong turn somewhere. Do you know where we are?" from Samantha: I'm Joe, nice to meet you. I'm, uh, also a bit turned around, to be honest. I don't really know how I got here or where 'here' is, exactly. I was just... walking, I guess, and then I was here. Do you think we could, maybe, try to find our way out together? I'm pretty sure I saw some trails when I was, you know, looking around.
+2025-07-30 10:23:01 - executive_node - INFO - 📤 Published action: action_3
+2025-07-30 10:23:01 - executive_node - WARNING - ✅ Joe completed turn 3
+2025-07-30 10:23:01 - executive_node - WARNING - 📊 Joe Received situation update
+2025-07-30 10:23:17 - executive_node - WARNING - 🚦 Turn 4 started for Joe
+2025-07-30 10:23:18 - executive_node - WARNING - 🔄 Joe OODA loop running
+2025-07-30 10:23:18 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-07-30 10:23:18 - executive_node - INFO - 📋 Published decided action for Joe: move: North - None
+2025-07-30 10:23:18 - executive_node - WARNING - {'action': 'move', 'target': 'North', 'value': None, 'reason': ''}
+2025-07-30 10:23:18 - executive_node - WARNING - Moving north
+2025-07-30 10:23:18 - executive_node - INFO - ✅ Move successful: north
+2025-07-30 10:23:18 - executive_node - INFO - 📤 Published move action: north
+2025-07-30 10:23:18 - executive_node - WARNING - 📤 Published action: {'action': 'move', 'target': 'North', 'value': None, 'reason': ''}
+2025-07-30 10:23:18 - executive_node - WARNING - ✅ Joe completed turn 4
+2025-07-30 10:23:23 - executive_node - WARNING - 📥 Joe Received text input: "Samantha: That sounds like a great idea, Joe. I'd love to explore the forest with you and see if we can find our way out. But first, can you tell me a bit more about yourself? What do you do, and how did you end up here? I'm curious, and it might help us figure out where we are and how to get out." (source: Samantha)
+2025-07-30 10:23:23 - executive_node - WARNING - 📊 Joe Received situation update
+2025-07-30 10:23:28 - executive_node - WARNING - 📊 Joe Received situation update
+2025-07-30 10:23:28 - executive_node - WARNING - 📊 Joe Received situation update
+2025-07-30 10:23:33 - executive_node - WARNING - 🚦 Turn 5 started for Joe
+2025-07-30 10:23:33 - executive_node - WARNING - 🔄 Joe OODA loop running
+2025-07-30 10:23:33 - executive_node - INFO - Responding to: "Samantha: That sounds like a great idea, Joe. I'd love to explore the forest with you and see if we can find our way out. But first, can you tell me a bit more about yourself? What do you do, and how did you end up here? I'm curious, and it might help us figure out where we are and how to get out." (from Samantha)
+2025-07-30 10:23:34 - executive_node - INFO - 🤔 Natural dialog end check for Samantha: False
+2025-07-30 10:23:34 - executive_node - WARNING - 🤖 Joe Dialog end check: False
+2025-07-30 10:23:34 - executive_node - INFO - 📚 Retrieved 1 recent memory entries
+2025-07-30 10:23:34 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-07-30 10:23:40 - executive_node - WARNING - 📤 Joe Sent text input to Samantha: "I'm a bit of a science nerd, to be honest. I was just, uh, doing some stuff, and then I was here. I don't really know how I got here or what happened before that. It's all a bit fuzzy. But I'm good at figuring things out, so I'm hoping we can, you know, use our combined skills to get out of here. I've been looking around, and I think I saw some trails and stuff, so maybe we can follow those and see where they lead. Do you, uh, know anything about wilderness survival or navigation?" (source: Joe)
+2025-07-30 10:23:40 - executive_node - WARNING - Responding to: "Samantha: That sounds like a great idea, Joe. I'd love to explore the forest with you and see if we can find our way out. But first, can you tell me a bit more about yourself? What do you do, and how did you end up here? I'm curious, and it might help us figure out where we are and how to get out." from Samantha: I'm a bit of a science nerd, to be honest. I was just, uh, doing some stuff, and then I was here. I don't really know how I got here or what happened before that. It's all a bit fuzzy. But I'm good at figuring things out, so I'm hoping we can, you know, use our combined skills to get out of here. I've been looking around, and I think I saw some trails and stuff, so maybe we can follow those and see where they lead. Do you, uh, know anything about wilderness survival or navigation?
+2025-07-30 10:23:40 - executive_node - INFO - 📤 Published action: action_6
+2025-07-30 10:23:40 - executive_node - WARNING - ✅2025-07-30 10:23:40 - executive_node - WARNING - 📥 Samantha Received text input: "I'm a bit of a scienc2025-07-30 10:23:52 - executive_node - WARNING - 🚦 Turn 6 started for Joe
+2025-07-30 10:23:52 - executive_node - WARNING - 🔄 Joe OODA loop running
+2025-07-30 10:23:52 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-07-30 10:23:52 - executive_node - WARNING - ✅ Joe completed turn 6
+2025-07-30 10:24:00 - executive_node - WARNING - 📥 Joe Received text input: "Samantha: I'm a bit of a science nerd too, I guess. I love learning about the natural world and how things work. I've done some hiking and camping, so I know a bit about wilderness survival, but I'm no expert. I'm more of a... philosophical person, I suppose. I like to think about the big questions and how things fit together. But I'm happy to use my skills to help us get out of here. So, shall we start by following one of those trails you saw? And maybe we can talk more about our... situation, and see if we can figure out what's going on." (source: Samantha)
+2025-07-30 10:24:00 - executive_node - WARNING - 📊 Joe Received situation update
+2025-07-30 10:26:16 - executive_node - WARNING - 🚦 Turn 7 started for Joe
+2025-07-30 10:26:17 - executive_node - WARNING - 🔄 Joe OODA loop running
+2025-07-30 10:26:17 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-07-30 10:26:17 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-07-30 10:26:22 - executive_node - WARNING - 🤖 Joe New Action:    {   "plan": [     { "type": "say", "target": "Samantha", "value": "Hi, I'm Joe. What's going on here?" },     { "type": "think", "value": "I am lost" },     { "type": "move", "target": "North" }   ] } 
+2025-07-30 10:26:22 - executive_node - INFO - 📋 Published decided action for Joe: say: Samantha - Hi, I'm Joe. What's going on here?
+2025-07-30 10:26:22 - executive_node - WARNING - 📤 Joe Sent text input to Samantha: "Hi, I'm Joe. What's going on here?" (source: Joe)
+2025-07-30 10:26:22 - executive_node - WARNING - 📤 Published action: {'action': 'say', 'target': 'Samantha', 'value': "Hi, I'm Joe. What's going on here?", 'reason': ''}
+2025-07-30 10:26:22 - executive_node - WARNING - 📊 Joe Received situation update
+2025-07-30 10:26:22 - executive_node - WARNING - ✅ Joe completed turn 7
+2025-07-30 10:26:23 - executive_node - WARNING - 🚦 Turn 8 started for Joe
+2025-07-30 10:26:24 - executive_node - WARNING - 🔄 Joe OODA loop running
+2025-07-30 10:26:24 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-07-30 10:26:24 - executive_node - INFO - 📋 Published decided action for Joe: think: None - I am lost
+2025-07-30 10:26:24 - executive_node - WARNING - Thinking about: I am lost
+2025-07-30 10:26:24 - executive_node - INFO - 📚 Retrieved 1 recent memory entries
+2025-07-30 10:26:24 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-07-30 10:26:25 - executive_node - WARNING - 🤖 Joe New Thought:  
+#thought need a map 
+2025-07-30 10:26:25 - executive_node - INFO - 📤 Published action: action_8
+2025-07-30 10:26:25 - executive_node - WARNING - 📤 Published action: {'action': 'think', 'target': None, 'value': 'I am lost', 'reason': ''}
+2025-07-30 10:26:25 - executive_node - WARNING - 📊 Joe Received situation update
+2025-07-30 10:26:25 - executive_node - WARNING - ✅ Joe completed turn 8
+2025-07-30 10:26:29 - executive_node - WARNING - 📥 Joe Received text input: "Samantha: I think we've already established that, Joe. You said you're a bit turned around and don't know how you got here. I'm in a similar situation. Let's focus on finding a way out of the forest instead of repeating ourselves. We can follow one of the trails you saw and see where it leads. I'd like to get moving and find some answers. Shall we get started?" (source: Samantha)
+2025-07-30 10:26:29 - executive_node - WARNING - 📊 Joe Received situation update
+2025-07-30 10:26:29 - executive_node - WARNING - 🚦 Turn 9 started for Joe
+2025-07-30 10:26:30 - executive_node - WARNING - 🔄 Joe OODA loop running
+2025-07-30 10:26:30 - executive_node - INFO - Responding to: "Samantha: I think we've already established that, Joe. You said you're a bit turned around and don't know how you got here. I'm in a similar situation. Let's focus on finding a way out of the forest instead of repeating ourselves. We can follow one of the trails you saw and see where it leads. I'd like to get moving and find some answers. Shall we get started?" (from Samantha)
+2025-07-30 10:26:30 - executive_node - INFO - 🤔 Natural dialog end check for Samantha: True
+2025-07-30 10:26:30 - executive_node - WARNING - 🤖 Joe Dialog end check: True
+2025-07-30 10:26:30 - executive_node - INFO - 📤 Published action: action_10
+2025-07-30 10:26:30 - executive_node - WARNING - 📊 Joe Received situation update
+2025-07-30 10:26:30 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-07-30 10:26:30 - executive_node - INFO - 🔄 Handling interrupt
+2025-07-30 10:26:30 - executive_node - INFO - 📋 Published decided action for Joe: move: North - None
+2025-07-30 10:26:30 - executive_node - WARNING - {'action': 'move', 'target': 'North', 'value': None, 'reason': ''}
+2025-07-30 10:26:30 - executive_node - WARNING - Moving north
+2025-07-30 10:26:30 - executive_node - INFO - ✅ Move successful: north
+2025-07-30 10:26:30 - executive_node - INFO - 📤 Published move action: north
+2025-07-30 10:26:30 - executive_node - WARNING - 📤 Published action: {'action': 'move', 'target': 'North', 'value': None, 'reason': ''}
+2025-07-30 10:26:30 - executive_node - WARNING - ✅ Joe completed turn 9
+2025-07-30 10:26:32 - executive_node - WARNING - 🚦 Turn 10 started for Joe
+2025-07-30 10:26:33 - executive_node - WARNING - 🔄 Joe OODA loop running
+2025-07-30 10:26:33 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-07-30 10:26:33 - executive_node - WARNING - ✅ Joe completed turn 10
+2025-07-30 10:26:33 - executive_node - WARNING - 📊 Joe Received situation update
+2025-07-30 10:26:33 - executive_node - WARNING - 📊 Joe Received situation update
+2025-07-30 10:26:34 - executive_node - WARNING - 🚦 Turn 11 started for Joe
+2025-07-30 10:26:35 - executive_node - WARNING - 🔄 Joe OODA loop running
+2025-07-30 10:26:35 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-07-30 10:26:35 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-07-30 10:26:41 - executive_node - WARNING - 🤖 Joe New Action:    {   "plan": [     { "type": "say", "target": "Samantha", "value": "Hi, I'm Joe. What's going on here?" },     { "type": "think", "value": "I need to find a way out of the forest" },     { "type": "move", "target": "North" }   ] } 
+2025-07-30 10:26:41 - executive_node - INFO - 📋 Published decided action for Joe: say: Samantha - Hi, I'm Joe. What's going on here?
+2025-07-30 10:26:41 - executive_node - WARNING - 📤 Joe Sent text input to Samantha: "Hi, I'm Joe. What's going on here?" (source: Joe)
+2025-07-30 10:26:41 - executive_node - WARNING - 📤 Published action: {'action': 'say', 'target': 'Samantha', 'value': "Hi, I'm Joe. What's going on here?", 'reason': ''}
+2025-07-30 10:26:41 - executive_node - WARNING - ✅ Joe completed turn 11
+2025-07-30 10:26:41 - executive_node - WARNING - 📊 Joe Received situation update
+2025-07-30 10:26:42 - executive_node - WARNING - 🚦 Turn 12 started for Joe
+2025-07-30 10:26:43 - executive_node - WARNING - 🔄 Joe OODA loop running
+2025-07-30 10:26:43 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-07-30 10:26:43 - executive_node - INFO - 📋 Published decided action for Joe: think: None - I need to find a way out of the forest
+2025-07-30 10:26:43 - executive_node - WARNING - Thinking about: I need to find a way out of the forest
+2025-07-30 10:26:43 - executive_node - INFO - 📚 Retrieved 1 recent memory entries
+2025-07-30 10:26:43 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-07-30 10:26:44 - executive_node - WARNING - 🤖 Joe New Thought:  
+#thought need a map 
+2025-07-30 10:26:44 - executive_node - INFO - 📤 Published action: action_13
+2025-07-30 10:26:44 - executive_node - WARNING - 📤 Published action: {'action': 'think', 'target': None, 'value': 'I need to find a way out of the forest', 'reason': ''}
+2025-07-30 10:26:44 - executive_node - WARNING - ✅ Joe completed turn 12
+2025-07-30 10:26:44 - executive_node - WARNING - 📊 Joe Received situation update
+2025-07-30 10:26:45 - executive_node - WARNING - 🚦 Turn 13 started for Joe
+2025-07-30 10:26:46 - executive_node - WARNING - 🔄 Joe OODA loop running
+2025-07-30 10:26:46 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-07-30 10:26:46 - executive_node - INFO - 📋 Published decided action for Joe: move: North - None
+2025-07-30 10:26:46 - executive_node - WARNING - {'action': 'move', 'target': 'North', 'value': None, 'reason': ''}
+2025-07-30 10:26:46 - executive_node - WARNING - Moving north
+2025-07-30 10:26:46 - executive_node - INFO - ✅ Move successful: north
+2025-07-30 10:26:46 - executive_node - INFO - 📤 Published move action: north
+2025-07-30 10:26:46 - executive_node - WARNING - 📤 Published action: {'action': 'move', 'target': 'North', 'value': None, 'reason': ''}
+2025-07-30 10:26:46 - executive_node - WARNING - ✅ Joe completed turn 13
+2025-07-30 10:26:47 - executive_node - WARNING - 📊 Joe Received situation update
+2025-07-30 10:26:47 - executive_node - WARNING - 📊 Joe Received situation update
+2025-07-30 10:26:48 - executive_node - WARNING - 🚦 Turn 14 started for Joe
+2025-07-30 10:26:49 - executive_node - WARNING - 🔄 Joe OODA loop running
+2025-07-30 10:26:49 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-07-30 10:26:49 - executive_node - WARNING - ✅ Joe completed turn 14
+2025-07-30 10:26:50 - executive_node - WARNING - 🚦 Turn 15 started for Joe
+2025-07-30 10:26:51 - executive_node - WARNING - 🔄 Joe OODA loop running
+2025-07-30 10:26:51 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-07-30 10:26:51 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-07-30 10:26:56 - executive_node - WARNING - 🤖 Joe New Action:    {   "plan": [     { "type": "say", "target": "Samantha", "value": "Hi, I'm Joe. What's going on here?" },     { "type": "think", "value": "I need to find a way out of the forest" },     { "type": "move", "target": "North" }   ] } 
+2025-07-30 10:26:56 - executive_node - INFO - 📋 Published decided action for Joe: say: Samantha - Hi, I'm Joe. What's going on here?
+2025-07-30 10:26:56 - executive_node - WARNING - 📤 Joe Sent text input to Samantha: "Hi, I'm Joe. What's going on here?" (source: Joe)
+2025-07-30 10:26:56 - executive_node - WARNING - 📊 Joe Received situation update
+2025-07-30 10:26:56 - executive_node - WARNING - 📤 Published action: {'action': 'say', 'target': 'Samantha', 'value': "Hi, I'm Joe. What's going on here?", 'reason': ''}
+2025-07-30 10:26:56 - executive_node - WARNING - ✅ Joe completed turn 15
+2025-07-30 10:26:57 - executive_node - WARNING - 🚦 Turn 16 started for Joe
+2025-07-30 10:26:59 - executive_node - WARNING - 🔄 Joe OODA loop running
+2025-07-30 10:26:59 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-07-30 10:26:59 - executive_node - INFO - 📋 Published decided action for Joe: think: None - I need to find a way out of the forest
+2025-07-30 10:26:59 - executive_node - WARNING - Thinking about: I need to find a way out of the forest
+2025-07-30 10:26:59 - executive_node - INFO - 📚 Retrieved 1 recent memory entries
+2025-07-30 10:26:59 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-07-30 10:26:59 - executive_node - WARNING - 🤖 Joe New Thought:  
+#thought need a map 
+2025-07-30 10:26:59 - executive_node - INFO - 📤 Published action: action_18
+2025-07-30 10:26:59 - executive_node - WARNING - 📤 Published action: {'action': 'think', 'target': None, 'value': 'I need to find a way out of the forest', 'reason': ''}
+2025-07-30 10:26:59 - executive_node - WARNING - ✅ Joe completed turn 16
+2025-07-30 10:26:59 - executive_node - WARNING - 📊 Joe Received situation update
+2025-07-30 10:27:01 - executive_node - WARNING - 📥 Joe Received text input: "Hi, I'm Samantha. I'm not really sure what's going on here, to be honest. I was just hiking and then...I don't know, I got a bit turned around, I guess. Do you know where we are?" (source: Samantha)
+2025-07-30 10:27:01 - executive_node - WARNING - 📊 Joe Received situation update
+2025-07-30 10:27:02 - executive_node - WARNING - 🚦 Turn 17 started for Joe
+2025-07-30 10:27:02 - executive_node - WARNING - 🔄 Joe OODA loop running
+2025-07-30 10:27:02 - executive_node - INFO - Responding to: "Hi, I'm Samantha. I'm not really sure what's going on here, to be honest. I was just hiking and then...I don't know, I got a bit turned around, I guess. Do you know where we are?" (from Samantha)
+2025-07-30 10:27:03 - executive_node - INFO - 🤔 Natural dialog end check for Samantha: False
+2025-07-30 10:27:03 - executive_node - WARNING - 🤖 Joe Dialog end check: False
+2025-07-30 10:27:03 - executive_node - INFO - 📚 Retrieved 1 recent memory entries
+2025-07-30 10:27:03 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-07-30 10:27:07 - executive_node - WARNING - 📤 Joe Sent text input to Samantha: "I'm Joe, nice to meet you, Samantha. I'm kinda in the same boat, I was just out for a walk and then...I don't know, everything just gets all weird and I end up here. I don't really know where 'here' is, though. Do you remember anything weird happening before you got turned around? Like, any strange noises or lights or anything?" (source: Joe)
+2025-07-30 10:27:07 - executive_node - WARNING - Responding to: "Hi, I'm Samantha. I'm not really sure what's going on here, to be honest. I was just hiking and then...I don't know, I got a bit turned around, I guess. Do you know where we are?" from Samantha: I'm Joe, nice to meet you, Samantha. I'm kinda in the same boat, I was just out for a walk and then...I don't know, everything just gets all weird and I end up here. I don't really know where 'here' is, though. Do you remember anything weird happening before you got turned around? Like, any strange noises or lights or anything?
+2025-07-30 10:27:07 - executive_node - INFO - 📤 Published action: action_20
+2025-07-30 10:27:07 - executive_node - WARNING - ✅ Joe completed turn 17
+2025-07-30 10:27:07 - executive_node - WARNING - 📊 Joe Received situation update
+2025-07-30 10:27:08 - executive_node - WARNING - 🚦 Turn 18 started for Joe
+2025-07-30 10:27:09 - executive_node - WARNING - 🔄 Joe OODA loop running
+2025-07-30 10:27:09 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-07-30 10:27:09 - executive_node - INFO - 📋 Published decided action for Joe: move: North - None
+2025-07-30 10:27:09 - executive_node - WARNING - {'action': 'move', 'target': 'North', 'value': None, 'reason': ''}
+2025-07-30 10:27:09 - executive_node - WARNING - Moving north
+2025-07-30 10:27:09 - executive_node - INFO - ✅ Move successful: north
+2025-07-30 10:27:09 - executive_node - INFO - 📤 Published move action: north
+2025-07-30 10:27:09 - executive_node - WARNING - 📤 Published action: {'action': 'move', 'target': 'North', 'value': None, 'reason': ''}
+2025-07-30 10:27:09 - executive_node - WARNING - ✅ Joe completed turn 18
+2025-07-30 10:27:11 - executive_node - WARNING - 📊 Joe Received situation update
+2025-07-30 10:27:11 - executive_node - WARNING - 📊 Joe Received situation update
+2025-07-30 10:27:12 - executive_node - WARNING - 🚦 Turn 19 started for Joe
+2025-07-30 10:27:13 - executive_node - WARNING - 🔄 Joe OODA loop running
+2025-07-30 10:27:13 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-07-30 10:27:13 - executive_node - WARNING - ✅ Joe completed turn 19
+2025-07-30 10:27:20 - executive_node - WARNING - 📥 Joe Received text input: "Samantha: Honestly, I don't really remember anything weird happening before I got turned around. I was just hiking and enjoying the scenery, and then I realized I wasn't sure where I was. I've been trying to find my way back, but...I don't know, it's like the forest just keeps shifting or something. I've been walking for hours, but I don't feel like I've gotten anywhere. Do you think we're lost in some kind of...I don't know, some kind of loop or something?" (source: Samantha)
+2025-07-30 10:27:20 - executive_node - WARNING - 📊 Joe Received situation update
+2025-07-30 10:27:21 - executive_node - WARNING - 🚦 Turn 20 started for Joe
+2025-07-30 10:27:21 - executive_node - WARNING - 🔄 Joe OODA loop running
+2025-07-30 10:27:21 - executive_node - INFO - Responding to: "Samantha: Honestly, I don't really remember anything weird happening before I got turned around. I was just hiking and enjoying the scenery, and then I realized I wasn't sure where I was. I've been trying to find my way back, but...I don't know, it's like the forest just keeps shifting or something. I've been walking for hours, but I don't feel like I've gotten anywhere. Do you think we're lost in some kind of...I don't know, some kind of loop or something?" (from Samantha)
+2025-07-30 10:27:22 - executive_node - INFO - 🤔 Natural dialog end check for Samantha: False
+2025-07-30 10:27:22 - executive_node - WARNING - 🤖 Joe Dialog end check: False
+2025-07-30 10:27:22 - executive_node - INFO - 📚 Retrieved 1 recent memory entries
+2025-07-30 10:27:22 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-07-30 10:27:29 - executive_node - WARNING - 📤 Joe Sent text input to Samantha: "Joe: Yeah, that's a good point, it does feel like the forest is shifting or something. I've been trying to get my bearings, but every time I think I've got a sense of direction, something changes and I'm all turned around again. I've been thinking maybe we should try to find some kind of landmark or something, you know, like a stream or a ridge or something, and use that to navigate. But, I don't know, it's not like I'm some kind of expert or anything. What do you think? Maybe we could work together, try to figure this out?" (source: Joe)
+2025-07-30 10:27:29 - executive_node - WARNING - Responding to: "Samantha: Honestly, I don't really remember anything weird happening before I got turned around. I was just hiking and enjoying the scenery, and then I realized I wasn't sure where I was. I've been trying to find my way back, but...I don't know, it's like the forest just keeps shifting or something. I've been walking for hours, but I don't feel like I've gotten anywhere. Do you think we're lost in some kind of...I don't know, some kind of loop or something?" from Samantha: Joe: Yeah, that's a good point, it does feel like the forest is shifting or something. I've been trying to get my bearings, but every time I think I've got a sense of direction, something changes and I'm all turned around again. I've been thinking maybe we should try to find some kind of landmark or something, you know, like a stream or a ridge or something, and use that to navigate. But, I don't know, it's not like I'm some kind of expert or anything. What do you think? Maybe we could work together, try to figure this out?
+2025-07-30 10:27:29 - executive_node - INFO - 📤 Published action: action_23
+2025-07-30 10:27:29 - executive_node - WARNING - ✅ Joe completed turn 20
+2025-07-30 10:27:29 - executive_node - WARNING - 📊 Joe Received situation update
+2025-07-30 10:27:30 - executive_node - WARNING - 🚦 Turn 21 started for Joe
+2025-07-30 10:27:31 - executive_node - WARNING - 🔄 Joe OODA loop running
+2025-07-30 10:27:31 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-07-30 10:27:31 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-07-30 10:27:37 - executive_node - WARNING - 🤖 Joe New Action:    {   "plan": [     { "type": "say", "target": "Samantha", "value": "What's going on here?" },     { "type": "think", "value": "How did I end up here?" },     { "type": "move", "target": "North" }   ] } 
+2025-07-30 10:27:37 - executive_node - INFO - 📋 Published decided action for Joe: say: Samantha - What's going on here?
+2025-07-30 10:27:37 - executive_node - WARNING - 📤 Joe Sent text input to Samantha: "What's going on here?" (source: Joe)
+2025-07-30 10:27:37 - executive_node - WARNING - 📤 Published action: {'action': 'say', 'target': 'Samantha', 'value': "What's going on here?", 'reason': ''}
+2025-07-30 10:27:37 - executive_node - WARNING - ✅ Joe completed turn 21
+2025-07-30 10:27:37 - executive_node - WARNING - 📊 Joe Received situation update
+ to get my bearings, but every time I think I've got a sense of direction, something changes and I'm all turned around again. I've been thinking maybe we should try to find some kind of landmark or something, you know, like a stream or a ridge or something, and use that to navigate. But, I don't know, it's not like I'm some kind of expert or anything. What do you think? Maybe we could work together, try to figure this out?" (source: Joe)
+2025-07-30 10:27:29 - executive_node - WARNING - 📊 Samantha Received situation update
+2025-07-30 10:27:30 - executive_node - WARNING - 🚦 Turn 21 started for Samantha
+2025-07-30 10:27:30 - executive_node - WARNING - 🔄 Samantha OODA loop running
+2025-07-30 10:27:30 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-07-30 10:27:35 - executive_node - WARNING - 🤖 Samantha New Action:    {   "plan": [     { "type": "move", "target": "North" }   ] } 
+2025-07-30 10:27:35 - executive_node - INFO - 📋 Published decided action for Samantha: move: North - None
+2025-07-30 10:27:35 - executive_node - WARNING - {'action': 'move', 'target': 'North', 'value': None, 'reason': ''}
+2025-07-30 10:27:35 - executive_node - WARNING - Moving north
+2025-07-30 10:27:35 - executive_node - INFO - ✅ Move successful: north
+2025-07-30 10:27:35 - executive_node - INFO - 📤 Published move action: north
+2025-07-30 10:27:35 - executive_node - WARNING - 📤 Published action: {'action': 'move', 'target': 'North', 'value': None, 'reason': ''}
+2025-07-30 10:27:35 - executive_node - WARNING - ✅ Samantha completed turn 21
+2025-07-30 10:27:37 - executive_node - WARNING - 📥 Samantha Received text input: "What's going on here?" (source: Joe)
+2025-07-30 10:27:37 - executive_node - WARNING - 📊 Samantha Received situation update
+2025-07-30 10:27:45 - executive_node - WARNING - 📊 Samantha Received situation update
+2025-07-30 10:27:45 - executive_node - WARNING - 📊 Samantha Received situation update
+2025-07-30 10:27:53 - executive_node - WARNING - 📥 Samantha Received text input: "plan:" (source: ui)
+2025-07-30 10:27:53 - executive_node - WARNING - 📊 Samantha Received situation update
+2025-07-30 10:28:14 - executive_node - ERROR - Invalid plan for Samantha
+2025-07-30 10:35:21 - executive_node - WARNING - 📥 Samantha Received text input: "plan:
+if can_see(Joe)
+say(joe, I love you)" (source: ui)
+2025-07-30 10:35:21 - executive_node - WARNING - 📊 Samantha Received situation update
+2025-07-30 10:35:36 - executive_node - ERROR - Invalid plan for Samantha
+2025-07-30 10:36:00 - executive_node - WARNING - 📥 Samantha Received text input: "plan:
+if:
+  has_item(Berries25)
+  say(I have berries to share)
+  use(Berries25)
+else:
+  say(I need to find some berries)
+  move(north)
+endif:
+move(home)" (source: ui)
+2025-07-30 10:36:00 - executive_node - WARNING - 📊 Samantha Received situation update
+2025-07-30 10:36:38 - executive_node - ERROR - Invalid plan for Samantha
