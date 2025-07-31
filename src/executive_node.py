@@ -16,7 +16,7 @@ import sys
 import signal
 import argparse
 from datetime import datetime
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Union
 import utils.hash_utils as hash_utils
 import plan as plan_module
 
@@ -120,7 +120,7 @@ class ZenohExecutiveNode:
         self.plan_state = {
             'step_stack': plan_module.Stack()
         }
-        self.current_action = None
+        self.plan_bindings_cache = {}
         # Turn management
         self.turn_subscriber = self.session.declare_subscriber(
             "cognitive/map/turn/go",
@@ -257,10 +257,10 @@ class ZenohExecutiveNode:
         """Publish decided action to the decided_action topic for UI display."""
         try:
             decided_action_data = {
-                'decided_action': f"{action['action']}: {action['target']} - {action['value']}",
-                'action': action['action'],
-                'target': action['target'], 
-                'value': action['value'],
+                'decided_action': f"{action['type']}: {action['target']} - {action['value']}",
+                'action': action['type'],
+                'target': action.get('target', None), 
+                'value': action.get('value', None),
                 'timestamp': datetime.now().isoformat(),
                 'character': self.character_name
             }
@@ -488,16 +488,40 @@ Only dicts of the types below are allowed for the condition of do_while and if. 
 
 outside a do_while or if condition, "type" can take the values "say", "move", "think", "take", "inspect", or "use":
  - "say": { "type": "say", "target": "character_name", "value": "text to speak" } is for speaking to another character you can see. For a 'say' act, speak only for yourself, and do not include any other introductory, explanatory, discursive, or formatting text in your response.
- - "move": { "type": "move", "target": "cardinal_direction" } is for moving in one of the 8 cardinal directions
+ - "move": { "type": "move", "target": "cardinal_direction" or 'resource or character name'} is for moving in one of the 8 cardinal directions or in the direction of a resource or character.
  - "think": { "type": "think", "value": "text to think about" } is for thinking about a topic or question, attempting to derive new information, conclusions, or decisions from who you are and what you already explicitly know
- - "take": { "type": "take", "target": "resource_name" } is for adding some resource you see to your personal inventory
+ - "take": { "type": "take", "target": "resource_name" } is for adding some resource you see to your personal inventory. you must be 'near' the resource to take it.
  - "inspect": { "type": "inspect", "target": "resource_name" } is for inspecting a resource you see or one in your inventory to understand how to use it.
  - "use": { "type": "use", "target": "resource_name" } is for using a resource in a known way.
 
+In general, a target can be a specific resource_name or character_name or a reasonable generalization thereof. 
+For example, Berry2, Berry, Berries, Fruit, Food, etc are all valid targets. 
+Likewise, Joe, character, person, etc are all valid targets.
+However, in these latter cases, the specific resource or character bound to is indeterminate. 
+For move, target can also be one of the 8 compass points.
+For example, 
+    {"type": "if", "condition": {"type": "near", "target": "Berry"}, "then": [{"type": "move", "target": "Berry"}]}
+is a valid plan. Likewise,
+    {"type": "if", "condition": {"type": "near", "target": "Joe"}, "then": [{"type": "move", "target": "Joe"}]}
+is a valid plan.
+Note that move only moves one step, so you must use a do_while to move repeatedly.
+
+Some actions have conditions that must be met before they can be executed.
+for example, you cannot take a resource unless you are near it.
+you can accomplish this by using the "near" condition in a do_while. Assuming, for example, that Resource2 is in your situation view direction Northeast
+
+{
+  "plan": [
+    { "type": "do_while", "body": [ { "type": "move", "target": "Northeast" } ], "condition": { "type": "notnear", "target": "Resource2" } },
+    { "type": "take", "target": "Resource2" }
+  ]
+}
+
+###
 Allowed control‑flow primitives: sequential list (e.g.. [..., ...]), do_while, and two‑branch if (else is optional).
 {
   "plan": [
-    { "type": "action", "action": "…", "target": "…", "value": "…" },
+    { "type": "action", "target": "…", "value": "…" },
     { "type": "do_while", "body": [ /* steps */ ], "condition": "…" },
     { "type": "if", "condition": "…", "then": [ /* steps */ ], "else": [ /* steps */ ] }
   ]
@@ -548,22 +572,24 @@ Allowed control‑flow primitives: sequential list (e.g.. [..., ...]), do_while,
                         plan_candidate = None
                     if not plan_candidate or not plan_candidate.get('plan') or len(plan_candidate['plan']) == 0:
                             logger.error(f'No action, target, or value found in LLM response: {response.text}')
-                            single_action = {'action': 'sleep', 'target': 'self', 'value': '', 'reason': ''}
+                            single_action = {'type': 'sleep', 'target': 'self', 'value': '', 'reason': ''}
                     else:
                         self.current_plan = plan_candidate
+                        self.plan_bindings_cache = {}
                         self._publish_current_plan()
                         self.plan_state = {'step_stack': plan_module.Stack()}
                         return self.current_plan
                 else:
                     logger.error(f'LLM call failed: {response.error}')
-                    single_action = {'action': 'sleep', 'target': 'self', 'value': '', 'reason': ''}
+                    single_action = {'type': 'sleep', 'target': 'self', 'value': '', 'reason': ''}
             else:   
                 logger.error('LLM client not available')
-                single_action = {'action': 'sleep', 'target': 'self', 'value': '', 'reason': ''}
+                single_action = {'type': 'sleep', 'target': 'self', 'value': '', 'reason': ''}
         
         # Create single-action plan
         if single_action:
-            self.current_plan = {'plan': [{'type': single_action['action'], 'target': single_action['target'], 'value': single_action['value'], 'reason': single_action.get('reason', '')}]}
+            self.current_plan = {'plan': [{'type': single_action['type'], 'target': single_action['target'], 'value': single_action['value'], 'reason': single_action.get('reason', '')}]}
+            self.plan_bindings_cache = {}
         else:
             self.current_plan = {'plan': []}
         
@@ -573,6 +599,9 @@ Allowed control‑flow primitives: sequential list (e.g.. [..., ...]), do_while,
         self.plan_state = {
             'step_stack': plan_module.Stack()
         }
+        
+        # Initialize plan bindings cache for target resolution
+        self.plan_bindings_cache = {}
         
         return self.current_plan
 
@@ -605,10 +634,13 @@ Allowed control‑flow primitives: sequential list (e.g.. [..., ...]), do_while,
             logger.error(traceback.print_exc())
             # Clear plan state on error
             self.current_plan = None
+            self.plan_bindings_cache = {}
             self._publish_current_plan()
             self.plan_state = {
                 'step_stack': plan_module.Stack()
             }
+            # Clear plan bindings cache
+            self.plan_bindings_cache = {}
             return None
     
     def _execute_next_step(self, plan, step_stack):
@@ -624,8 +656,11 @@ Allowed control‑flow primitives: sequential list (e.g.. [..., ...]), do_while,
             if step_stack.is_empty():
                 # Plan complete
                 self.current_plan = None
+                self.plan_bindings_cache = {}
                 self._publish_current_plan()
                 self.plan_state = None
+                # Clear plan bindings cache
+                self.plan_bindings_cache = {}
                 return None
             else:
                 # Continue at parent level
@@ -638,17 +673,13 @@ Allowed control‑flow primitives: sequential list (e.g.. [..., ...]), do_while,
             # Execute action and advance
             step_stack.pop()  # Remove current step
             step_stack.push(current_step + 1)  # Push next step
-            return {
-                'action': step['type'],
-                'target': step.get('target', None),
-                'value': step.get('value', None),
-                'reason': step.get('reason', '')
-            }
+            return step
         
         elif step['type'] == 'do_while':
             # Handle do-while loop
             condition_action = step.get('condition', None)
-            if self._evaluate_condition(condition_action):
+            condition_action = self._resolve_target(condition_action)
+            if plan_module._evaluate_condition(self, condition_action):
                 # Condition true, enter do body
                 step_stack.push(0)  # Start at first action in do body
                 return self._execute_next_step(step['body'], step_stack)
@@ -661,7 +692,8 @@ Allowed control‑flow primitives: sequential list (e.g.. [..., ...]), do_while,
         elif step['type'] == 'if':
             # Handle if-then-else
             condition_action = step.get('condition', None)
-            if self._evaluate_condition(condition_action):
+            condition_action = self._resolve_target(condition_action)
+            if plan_module._evaluate_condition(self, condition_action):
                 # Condition true, execute then branch
                 step_stack.push(0)  # Start at first action in then
                 return self._execute_next_step(step['then'], step_stack)
@@ -688,17 +720,26 @@ Allowed control‑flow primitives: sequential list (e.g.. [..., ...]), do_while,
         """Act: Execute the chosen action."""
 
         action = self.current_action if self.current_action else action
-        if action['action'].lower() == "sleep":
+        if action['type'].lower() == "sleep":
+            action_data = {'type': 'sleep','action_id': self.action_counter,'timestamp': datetime.now().isoformat(),'target': self.character_name}
+            self.last_action = action_data
+            self.action_publisher.put(json.dumps(action_data))
             time.sleep(1)  # Sleep for 1 second
-        elif action['action'].lower() == "move":
-            move_direction = action['target'].lower().strip()
-            if move_direction in ['north', 'northeast', 'southeast', 'south', 'southwest', 'northwest', 'east', 'west']:
-                logger.warning(f'{action}')
+            return
+        action = self._resolve_target(action)
+        if action['type'].lower() == "move":
+            move_target = action['target'].strip()
+            move_direction = move_target.lower()
+            
+            # Step 1: Test for compass points first (case insensitive)
+            cardinal_directions = ['north', 'northeast', 'southeast', 'south', 'southwest', 'northwest', 'east', 'west']
+            if move_direction in cardinal_directions:
                 self.move(move_direction)
+                return
             else:
-                logger.error(f'Unknown move direction: {move_direction}')
-            self.action_counter += 1
-        elif action['action'].lower() == "say":
+                logger.error(f'❌ Cannot move toward "{move_target}" - target not resolved or visible')
+                return
+        elif action['type'].lower() == "say":
             # Create action
             action_data = {
                         'type': 'say',
@@ -712,23 +753,23 @@ Allowed control‑flow primitives: sequential list (e.g.. [..., ...]), do_while,
             # Publish action (this will be picked up by action_display_node)
             self.action_publisher.put(json.dumps(action_data))
             self.send_text_input(action['target'], action['value'])
-        elif action['action'].lower() == "think":
+        elif action['type'].lower() == "think":
             self.think_about(action['value'])
-        elif action['action'].lower() == "take":
+        elif action['type'].lower() == "take":
             self.take(action['target'])
             self.action_counter += 1
-        elif action['action'].lower() == "inspect":
+        elif action['type'].lower() == "inspect":
             action_data = {'type': 'inspect','action_id': self.action_counter,'timestamp': datetime.now().isoformat(),'target': action['target']}
             self.last_action = action_data
             self.action_publisher.put(json.dumps(action_data))
             #self.inspect(action)
-        elif action['action'].lower() == "use":
-            # Create action
+        elif action['type'].lower() == "use":
+            # Create action - noop for now
             action_data = {'type': 'use','action_id': self.action_counter,'timestamp': datetime.now().isoformat(),'target': action['target']}
             self.last_action = action_data
             self.action_publisher.put(json.dumps(action_data))
             #self.use(action)
-        logger.warning(f'📤 Published action: {action}')
+        logger.warning(f'📤 Published action: {action["type"]}')
         self.action_counter += 1
 
     def _handle_interrupt(self):
@@ -832,10 +873,13 @@ Allowed control‑flow primitives: sequential list (e.g.. [..., ...]), do_while,
         try:
             parsed_plan = plan_module.parse_plan_text(plan_text)
             self.current_plan = parsed_plan
+            self.plan_bindings_cache = {}
             self._publish_current_plan()
             self.plan_state = {
                 'step_stack': plan_module.Stack()
             }
+            # Clear plan bindings cache for new plan
+            self.plan_bindings_cache = {}
             if not plan_module.verify_plan(self.current_plan):
                 logger.error(f"Invalid plan for {self.character_name}")
                 return
@@ -934,6 +978,196 @@ End your response with: </end>"""
             logger.error(traceback.format_exc())
         return True
     
+    def _resolve_target(self, action: Dict[str, Any]) -> Union[str, bool]:
+        """
+        Resolve abstract target name to specific instance reference using plan bindings cache.
+        This ONLY handles abstract -> specific resolution (e.g., "Berry" -> "Berry23").
+        
+        Args:
+            action: Action dictionary containing 'type' and 'target', or condition dictionary
+            
+        Returns:
+            Resolved target name (str) or False if resolution fails
+        """
+        action_type = action.get('type', 'unknown')
+        raw_target = action.get('target', None)
+        
+        if not raw_target:
+            return action
+            
+        # Check plan bindings cache first
+        cache_key = raw_target
+        if cache_key in self.plan_bindings_cache:
+            cached_result = self.plan_bindings_cache[cache_key]
+            logger.debug(f'🎯 Cache hit: {raw_target} -> {cached_result}')
+            action_copy = action.copy()
+            action_copy['target'] = cached_result
+            return action_copy
+        
+        logger.debug(f'🔍 Resolving target "{raw_target}" for action type "{action_type}"')
+        resolved_target = False
+        
+        try:
+            # Context-aware resolution based on action type
+            if action['type'].lower() == "move":
+                move_target = action['target'].strip()
+                move_direction = move_target.lower()
+                # Step 1: Test for compass points first (case insensitive)
+                cardinal_directions = ['north', 'northeast', 'southeast', 'south', 'southwest', 'northwest', 'east', 'west']
+                if move_direction in cardinal_directions:
+                    return action
+                else:
+                    resolved_target = self._resolve_resource_instance(raw_target) or self._resolve_character_instance(raw_target)
+                    if not resolved_target:
+                        return action
+                    self.plan_bindings_cache[cache_key] = resolved_target
+                    move_direction = self._find_target_direction(resolved_target)
+                    if move_direction:
+                        action_copy = action.copy()
+                        action_copy['target'] = move_direction
+                        return action_copy
+                    else:
+                        return action
+            if action_type in ['take', 'inspect', 'use', 'has_item', 'hasnt_item']:
+                # Resource actions/conditions - resolve to specific resource instance
+                resolved_target = self._resolve_resource_instance(raw_target) or self._resolve_character_instance(raw_target)
+                action_copy = action.copy()
+                action_copy['target'] = resolved_target
+                return action_copy
+                
+            elif action_type in ['say', 'can_see', 'cant_see']:
+                # Character actions/conditions - resolve to specific character name
+                resolved_target = self._resolve_character_instance(raw_target)
+                action_copy = action.copy()
+                action_copy['target'] = resolved_target
+                return action_copy
+                
+            elif action_type in ['near', 'notnear']:
+                # Proximity conditions - could be character or resource
+                resolved_target = self._resolve_resource_instance(raw_target) or self._resolve_character_instance(raw_target)
+                action_copy = action.copy()
+                action_copy['target'] = resolved_target
+                return action_copy
+            elif action_type in ['at_location', 'notat_location']:
+                # Location conditions - pass through for now
+                resolved_target = self._resolve_resource_instance(raw_target) or self._resolve_character_instance(raw_target)
+                action_copy = action.copy()
+                action_copy['target'] = resolved_target
+                return action_copy
+            else:
+                logger.warning(f'❓ Unknown action type for resolution: {action_type}')
+                resolved_target = raw_target  # Pass through unchanged
+                action_copy = action.copy()
+                action_copy['target'] = resolved_target
+                return action_copy
+        except Exception as e:
+            logger.error(f'❌ Error resolving target "{raw_target}" for {action_type}: {e}')
+            resolved_target = False
+        
+        # Cache the result (even if False or pass-through)
+        if resolved_target:
+            self.plan_bindings_cache[cache_key] = resolved_target
+        
+        if resolved_target and resolved_target != raw_target:
+            logger.info(f'✅ Resolved "{raw_target}" -> "{resolved_target}" ({action_type})')
+        elif resolved_target == raw_target:
+            logger.debug(f'✅ Validated "{raw_target}" ({action_type})')
+        else:
+            logger.warning(f'❌ Failed to resolve "{raw_target}" ({action_type})')
+            
+        return action
+    
+    
+    def _resolve_resource_instance(self, raw_target: str) -> Union[str, bool]:
+        """Resolve abstract resource name to specific resource instance."""
+        try:
+            # First try exact match validation
+            for reply in self.session.get(f"cognitive/map/resource/{raw_target}", timeout=2.0):
+                if reply.ok:
+                    data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
+                    if data.get('success'):
+                        logger.debug(f'✅ Exact resource instance: {raw_target}')
+                        return raw_target
+                break
+            
+            # TODO: Fuzzy matching stub - implement abstract -> specific resolution
+            # e.g., "Berry" -> "Berry23", "Fruit" -> "Apple1", etc.
+            logger.debug(f'🚧 Fuzzy resource resolution stub for: {raw_target}')
+            return False
+            
+        except Exception as e:
+            logger.error(f'Error resolving resource instance {raw_target}: {e}')
+            return False
+    
+    def _resolve_character_instance(self, raw_target: str) -> Union[str, bool]:
+        """Resolve abstract character name to specific character instance."""
+        try:
+            # For characters, exact names are typically used
+            # Just validate character exists in some form
+            canonical_name = raw_target.capitalize()
+            logger.debug(f'✅ Character instance: {canonical_name}')
+            return canonical_name
+            
+            # TODO: Fuzzy matching stub - implement abstract -> specific resolution  
+            # e.g., "Person" -> "Joe", "Guard" -> "Alice", etc.
+            
+        except Exception as e:
+            logger.error(f'Error resolving character instance {raw_target}: {e}')
+            return False
+    
+    def _find_target_direction(self, target: str) -> str:
+        """Find which direction a target (character or resource) is visible in."""
+        try:
+            # Query situation node for current situation data
+            for reply in self.session.get(f"cognitive/{self.character_name}/situation", timeout=2.0):
+                if reply.ok:
+                    situation_data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
+                    if not situation_data.get('success'):
+                        logger.warning(f'Failed to get situation data: {situation_data.get("error", "Unknown error")}')
+                        return None
+                    
+                    situation = situation_data.get('situation', {})
+                    look_data = situation.get('look', {})
+                    
+                    if not look_data:
+                        logger.warning(f'No look data available for target search')
+                        return None
+                    
+                    # Search through each direction for the target
+                    directions = ['North', 'Northeast', 'East', 'Southeast', 'South', 'Southwest', 'West', 'Northwest']
+                    target_lower = target.lower()
+                    
+                    for direction in directions:
+                        direction_data = look_data.get(direction, {})
+                        
+                        # Check resources in this direction
+                        if 'resources' in direction_data:
+                            for resource in direction_data['resources']:
+                                resource_id = resource.get('id', '') if isinstance(resource, dict) else str(resource)
+                                if resource_id.lower() == target_lower or target_lower in resource_id.lower():
+                                    logger.info(f'🎯 Found target "{target}" as resource in direction: {direction}')
+                                    return direction.lower()
+                        
+                        # Check characters in this direction
+                        if 'characters' in direction_data:
+                            for character in direction_data['characters']:
+                                character_name = character.get('name', '') if isinstance(character, dict) else str(character)
+                                if character_name.lower() == target_lower or target_lower in character_name.lower():
+                                    logger.info(f'🎯 Found target "{target}" as character in direction: {direction}')
+                                    return direction.lower()
+                    
+                    logger.warning(f'❌ Target "{target}" not found in any visible direction')
+                    return None
+                
+                break  # Only process first reply
+            
+            logger.warning(f'❌ No response from situation query for target "{target}"')
+            return None
+            
+        except Exception as e:
+            logger.error(f'Error finding direction for target "{target}": {e}')
+            return None
+
     def move(self, move_direction: str):
         """Move the character in the specified direction."""
         logger.warning(f'Moving {move_direction}')
