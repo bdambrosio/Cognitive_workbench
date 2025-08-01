@@ -107,7 +107,7 @@
             "preLaunchTask": "setup-zenoh-environment"
         },
         {
-            "name": "Debug Launcher (with map)",
+            "name": "Debug Launcher (Joe)",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/src/launcher.py",
@@ -122,6 +122,21 @@
             "preLaunchTask": "setup-zenoh-environment"
         },
         {
+            "name": "Debug Launcher (lost)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/launcher.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/src",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src"
+            },
+            "args": ["lost.yaml", "--ui", "--map-file", "forest.py"],
+            "justMyCode": false,
+            "stopOnEntry": false,
+            "preLaunchTask": "setup-zenoh-environment"
+        },
+       {
             "name": "Clear Character Data",
             "type": "debugpy",
             "request": "launch",

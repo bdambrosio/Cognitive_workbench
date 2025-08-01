@@ -194,6 +194,12 @@ class MapNode:
             self.handle_agent_move
         )
         
+        # Map types queryable
+        self.map_types_queryable = self.session.declare_queryable(
+            "cognitive/map/types",
+            self.handle_map_types
+        )
+        
         # Subscriber for character announcements
         self.character_announcement_subscriber = self.session.declare_subscriber(
             "cognitive/*/action",
@@ -795,6 +801,61 @@ class MapNode:
             error_response = {
                 'success': False,
                 'error': str(e)
+            }
+            query.reply(query.key_expr, json.dumps(error_response).encode('utf-8'))
+    
+    def handle_map_types(self, query):
+        """Handle map types query - returns available terrain, infrastructure, property, and resource types"""
+        try:
+            # Get map types from the world map - extract enum member names
+            terrain_types = []
+            if self.world_map.terrain_types:
+                if hasattr(self.world_map.terrain_types, '__members__'):
+                    terrain_types = list(self.world_map.terrain_types.__members__.keys())
+                else:
+                    terrain_types = [t.name for t in self.world_map.terrain_types]
+            
+            infrastructure_types = []
+            if self.world_map.infrastructure_types:
+                if hasattr(self.world_map.infrastructure_types, '__members__'):
+                    infrastructure_types = list(self.world_map.infrastructure_types.__members__.keys())
+                else:
+                    infrastructure_types = [t.name for t in self.world_map.infrastructure_types]
+            
+            property_types = []
+            if self.world_map.property_types:
+                if hasattr(self.world_map.property_types, '__members__'):
+                    property_types = list(self.world_map.property_types.__members__.keys())
+                else:
+                    property_types = [t.name for t in self.world_map.property_types]
+            
+            resource_types = []
+            if self.world_map.resource_types:
+                if hasattr(self.world_map.resource_types, '__members__'):
+                    resource_types = list(self.world_map.resource_types.__members__.keys())
+                else:
+                    resource_types = [t.name for t in self.world_map.resource_types]
+            
+            response = {
+                'success': True,
+                'terrain_types': terrain_types,
+                'infrastructure_types': infrastructure_types,
+                'property_types': property_types,
+                'resource_types': resource_types
+            }
+            
+            query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
+            logger.info(f'🗺️ Map types query: returned {len(terrain_types)} terrain, {len(infrastructure_types)} infrastructure, {len(property_types)} property, {len(resource_types)} resource types')
+            
+        except Exception as e:
+            logger.error(f'Error handling map types query: {e}')
+            error_response = {
+                'success': False,
+                'error': str(e),
+                'terrain_types': [],
+                'infrastructure_types': [],
+                'property_types': [],
+                'resource_types': []
             }
             query.reply(query.key_expr, json.dumps(error_response).encode('utf-8'))
     

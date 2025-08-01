@@ -437,12 +437,35 @@ class FastAPIActionDisplayNode:
         
         /* Character tabs sidebar */
         .character-sidebar {
-            width: 250px;
+            width: 500px;
+            min-width: 300px;
+            max-width: 800px;
             background: #252525;
             border-right: 1px solid #404040;
             display: flex;
             flex-direction: column;
             overflow-y: auto;
+            position: relative;
+        }
+        
+        /* Resizer divider */
+        .sidebar-resizer {
+            position: absolute;
+            right: -3px;
+            top: 0;
+            bottom: 0;
+            width: 6px;
+            background: transparent;
+            cursor: col-resize;
+            z-index: 10;
+        }
+        
+        .sidebar-resizer:hover {
+            background: rgba(0, 212, 255, 0.3);
+        }
+        
+        .sidebar-resizer.dragging {
+            background: rgba(0, 212, 255, 0.5);
         }
         
         .sidebar-header {
@@ -726,7 +749,7 @@ class FastAPIActionDisplayNode:
 <body>
     <div class="main-layout">
         <!-- Character Tabs Sidebar -->
-        <div class="character-sidebar">
+        <div class="character-sidebar" id="characterSidebar">
             <div class="sidebar-header">
                 👥 Characters
             </div>
@@ -743,6 +766,9 @@ class FastAPIActionDisplayNode:
                     </div>
                 </div>
             </div>
+            
+            <!-- Resizer divider -->
+            <div class="sidebar-resizer" id="sidebarResizer"></div>
         </div>
         
         <!-- Main Content Area -->
@@ -802,6 +828,11 @@ class FastAPIActionDisplayNode:
         // Character tabs state
         let characterTabs = new Map(); // character_name -> {element, goal, decidedAction}
         let activeCharacter = null;
+        
+        // Sidebar resizer state
+        let isResizing = false;
+        let startX = 0;
+        let startWidth = 0;
         
         function connectWebSocket() {
             const port = window.location.port;
@@ -892,8 +923,61 @@ class FastAPIActionDisplayNode:
             };
         }
         
+        // Sidebar Resizer Functions
+        function initSidebarResizer() {
+            const resizer = document.getElementById('sidebarResizer');
+            const sidebar = document.getElementById('characterSidebar');
+            
+            // Load saved width from localStorage
+            const savedWidth = localStorage.getItem('sidebarWidth');
+            if (savedWidth) {
+                sidebar.style.width = savedWidth + 'px';
+            }
+            
+            resizer.addEventListener('mousedown', startResize);
+            document.addEventListener('mousemove', resize);
+            document.addEventListener('mouseup', stopResize);
+        }
+        
+        function startResize(e) {
+            isResizing = true;
+            startX = e.clientX;
+            startWidth = parseInt(document.getElementById('characterSidebar').offsetWidth);
+            document.getElementById('sidebarResizer').classList.add('dragging');
+            e.preventDefault();
+        }
+        
+        function resize(e) {
+            if (!isResizing) return;
+            
+            const sidebar = document.getElementById('characterSidebar');
+            const newWidth = startWidth + (e.clientX - startX);
+            const minWidth = 300;
+            const maxWidth = 800;
+            
+            if (newWidth >= minWidth && newWidth <= maxWidth) {
+                sidebar.style.width = newWidth + 'px';
+            }
+        }
+        
+        function stopResize() {
+            if (isResizing) {
+                isResizing = false;
+                document.getElementById('sidebarResizer').classList.remove('dragging');
+                
+                // Save width to localStorage
+                const sidebar = document.getElementById('characterSidebar');
+                localStorage.setItem('sidebarWidth', sidebar.offsetWidth);
+            }
+        }
+        
         // Connect WebSocket on page load
         connectWebSocket();
+        
+        // Initialize sidebar resizer when DOM is loaded
+        document.addEventListener('DOMContentLoaded', function() {
+            initSidebarResizer();
+        });
         
         // Character Tab Management Functions
         function createCharacterTab(characterName) {
