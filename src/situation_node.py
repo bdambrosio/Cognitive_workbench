@@ -19,7 +19,8 @@ from pathlib import Path
 from datetime import datetime
 from typing import Dict, List, Any
 
-from utils import hash_utils
+
+from utils import hash_utils, zenoh_utils
 
 # Configure logging with unbuffered output
 # Console handler with WARNING level (less verbose)
@@ -191,11 +192,12 @@ class ZenohSituationNode:
             data = json.loads(sample.payload.to_bytes().decode('utf-8'))
             logger.info(f'📥 Received action: {data.get("action_type", "unknown")}')
             
-            # Update situation based on action
-            self._update_situation_from_action(data)
+            if data.get('type') == 'move' or data.get('type') == 'announcement':
+                # Update situation based on action
+                self._update_situation_from_action(data)
             
-            # Publish updated situation
-            self._publish_situation()
+                # Publish updated situation
+                self._publish_situation()
             
         except Exception as e:
             logger.error(f'Error processing action: {e}')
@@ -223,7 +225,8 @@ class ZenohSituationNode:
         """Update map data through lookup query."""
         try:
             # Query map node for agent look data with timeout
-            for reply in self.session.get(f"cognitive/map/agent/{self.character_name}/look", timeout=20.0):
+            logger.warning(f'Updating map data for {self.character_name}')
+            for reply in self.session.get(f"cognitive/map/agent/{self.character_name}/look", timeout=40.0):
                 try:
                     if reply.ok:
                         map_look_data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
@@ -259,13 +262,16 @@ class ZenohSituationNode:
                         # Save and publish updated situation
                         self.save_situation()
                         self._publish_situation()
+                        logger.warning(f'Map look data updated for {self.character_name}')
                     else:
-                        logger.error(f'No map look data available for {self.character_name}, {reply}')
-                        logger.error(traceback.format_exc())
+                        reply_str = str(reply)
+                        decoded_error = zenoh_utils.decode_zenoh_error_payload(reply_str)
+                        logger.error(f'No map look data available for {self.character_name}, {decoded_error}')
+                        traceback.print_exc()
 
                 except Exception as e:
                     logger.error(f'Error parsing map look response for {self.character_name}: {e}')
-                    logger.error(traceback.format_exc())
+                    traceback.print_exc()
                     continue
             
         except Exception as e:
@@ -363,7 +369,7 @@ class ZenohSituationNode:
             
         except Exception as e:
             logger.error(f'Error handling proximity query: {e}')
-            logger.error(traceback.format_exc())
+            traceback.print_exc()
             error_response = {
                 'success': False,
                 'value': False
@@ -411,7 +417,7 @@ class ZenohSituationNode:
             
         except Exception as e:
             logger.error(f'Error handling visibility query: {e}')
-            logger.error(traceback.format_exc())
+            traceback.print_exc()
             error_response = {
                 'success': False,
                 'value': False
@@ -468,7 +474,7 @@ class ZenohSituationNode:
             
         except Exception as e:
             logger.error(f'Error handling location query: {e}')
-            logger.error(traceback.format_exc())
+            traceback.print_exc()
             error_response = {
                 'success': False,
                 'value': False

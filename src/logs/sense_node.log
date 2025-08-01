@@ -1,34 +1,5 @@
-2025-07-31 18:56:26 - sense_node - INFO - 👁️ Sense Node initialized for character: Joe
-2025-07-31 18:56:26 - sense_node - INFO - Console Text Sensor ready - will auto-disable if external input detected
-2025-07-31 18:56:26 - sense_node - INFO - Sense Node running - press Ctrl+C to stop
-2025-07-31 18:56:50 - sense_node - INFO - 🔄 External input detected - console input disabled to prevent conflicts
-2025-07-31 18:56:50 - sense_node - INFO - 📨 Received external text input from ui: "plan:
-think(boooring...)"
-2025-07-31 18:56:50 - sense_node - INFO - 📤 Published sense data: 0
-2025-07-31 18:57:52 - sense_node - INFO - 📨 Received external text input from ui: "plan:
-if:
-notsee(Samantha)
-move(north)
-else:
-move(south)
-endif:
-think(hope I get here)"
-2025-07-31 18:57:53 - sense_node - INFO - 📤 Published sense data: 1
-2025-07-31 19:00:06 - sense_node - INFO - 📨 Received external text input from ui: "if:
-    near(Well23)
-    say(joe, "I'm near the well")
-  else:
-    move(north, 1)
-  endif:"
-2025-07-31 19:00:06 - sense_node - INFO - 📤 Published sense data: 2
-2025-07-31 19:01:28 - sense_node - INFO - 📨 Received external text input from ui: "if:
-    near(Well23)
-    say(joe, "I'm near the well")
-  else:
-    move(north, 1)
-  endif:""""
-2025-07-31 19:01:28 - sense_node - INFO - 📤 Published sense data: 3
-2025-07-31 19:02:17 - sense_node - INFO - 📨 Received external text input from ui: "hi"
-2025-07-31 19:02:17 - sense_node - INFO - 📤 Published sense data: 4
-2025-07-31 19:02:39 - sense_node - INFO - 📨 Received external text input from ui: "beats me. Like it here?"
-2025-07-31 19:02:39 - sense_node - INFO - 📤 Published sense data: 5
+2025-07-31 20:31:12 - sense_node - INFO - 👁️ Sense Node initialized for character: Joe
+2025-07-31 20:31:12 - sense_node - INFO - Console Text Sensor ready - will auto-disable if external input detected
+2025-07-31 20:31:12 - sense_node - INFO - Sense Node running - press Ctrl+C to stop
+2025-07-31 20:31:12 - sense_node - INFO - 📝 Console text input received: "n"
+2025-07-31 20:31:12 - sense_node - INFO - 📤 Published sense data: 0

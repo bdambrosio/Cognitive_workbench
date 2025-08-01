@@ -1,0 +1,16 @@
+2025-07-31 20:31:04,963 - map_node - INFO - Loading map module from: maps/forest.py
+2025-07-31 20:31:04,965 - map_node - INFO - Creating WorldMap instance...
+2025-07-31 20:31:05,351 - map_node - INFO - WorldMap created successfully: 50x50
+2025-07-31 20:31:05,351 - map_node - INFO - 📂 No existing world data for 'forest', starting fresh
+2025-07-31 20:31:05,351 - map_node - INFO - Creating Zenoh session...
+2025-07-31 20:31:05,357 - map_node - INFO - Map queryables and subscribers set up successfully
+2025-07-31 20:31:05,359 - map_node - INFO - Turn management system set up successfully
+2025-07-31 20:31:05,359 - map_node - INFO - Manual turn control enabled - starting in STEP mode
+2025-07-31 20:31:05,359 - map_node - INFO - Zenoh session initialized successfully
+2025-07-31 20:31:05,359 - map_node - INFO - 🔄 Started persistence thread for 'forest'
+2025-07-31 20:31:05,359 - map_node - INFO - Map node started with map file: forest.py
+2025-07-31 20:31:12,890 - map_node - INFO - Agent created for character 'Joe' at (20,20)
+2025-07-31 20:31:12,890 - map_node - INFO - First character added - turn management ready
+2025-07-31 20:31:12,890 - map_node - INFO - Manual control mode - waiting for step command
+2025-07-31 20:31:12,891 - map_node - WARNING - Handling agent look command for cognitive/map/agent/Joe/look
+2025-07-31 20:31:29,385 - map_node - WARNING - Agent look command handled for cognitive/map/agent/Joe/look
