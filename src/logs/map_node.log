@@ -1,16 +1,75 @@
-2025-07-31 20:31:04,963 - map_node - INFO - Loading map module from: maps/forest.py
-2025-07-31 20:31:04,965 - map_node - INFO - Creating WorldMap instance...
-2025-07-31 20:31:05,351 - map_node - INFO - WorldMap created successfully: 50x50
-2025-07-31 20:31:05,351 - map_node - INFO - 📂 No existing world data for 'forest', starting fresh
-2025-07-31 20:31:05,351 - map_node - INFO - Creating Zenoh session...
-2025-07-31 20:31:05,357 - map_node - INFO - Map queryables and subscribers set up successfully
-2025-07-31 20:31:05,359 - map_node - INFO - Turn management system set up successfully
-2025-07-31 20:31:05,359 - map_node - INFO - Manual turn control enabled - starting in STEP mode
-2025-07-31 20:31:05,359 - map_node - INFO - Zenoh session initialized successfully
-2025-07-31 20:31:05,359 - map_node - INFO - 🔄 Started persistence thread for 'forest'
-2025-07-31 20:31:05,359 - map_node - INFO - Map node started with map file: forest.py
-2025-07-31 20:31:12,890 - map_node - INFO - Agent created for character 'Joe' at (20,20)
-2025-07-31 20:31:12,890 - map_node - INFO - First character added - turn management ready
-2025-07-31 20:31:12,890 - map_node - INFO - Manual control mode - waiting for step command
-2025-07-31 20:31:12,891 - map_node - WARNING - Handling agent look command for cognitive/map/agent/Joe/look
-2025-07-31 20:31:29,385 - map_node - WARNING - Agent look command handled for cognitive/map/agent/Joe/look
+2025-08-01 11:38:45,690 - map_node - INFO - Loading map module from: maps/forest.py
+2025-08-01 11:38:45,691 - map_node - INFO - Creating WorldMap instance...
+2025-08-01 11:38:46,196 - map_node - INFO - WorldMap created successfully: 50x50
+2025-08-01 11:38:46,196 - map_node - INFO - 📂 No existing world data for 'forest', starting fresh
+2025-08-01 11:38:46,197 - map_node - INFO - Creating Zenoh session...
+2025-08-01 11:38:46,203 - map_node - INFO - Map queryables and subscribers set up successfully
+2025-08-01 11:38:46,204 - map_node - INFO - Turn management system set up successfully
+2025-08-01 11:38:46,204 - map_node - INFO - Manual turn control enabled - starting in STEP mode
+2025-08-01 11:38:46,204 - map_node - INFO - Zenoh session initialized successfully
+2025-08-01 11:38:46,205 - map_node - INFO - 🔄 Started persistence thread for 'forest'
+2025-08-01 11:38:46,205 - map_node - INFO - Map node started with map file: forest.py
+2025-08-01 11:38:54,461 - map_node - INFO - 🗺️ Map types query: returned 5 terrain, 1 infrastructure, 0 property, 8 resource types
+2025-08-01 11:40:05,939 - map_node - INFO - Agent created for character 'Joe' at (20,20)
+2025-08-01 11:40:05,939 - map_node - INFO - First character added - turn management ready
+2025-08-01 11:40:05,939 - map_node - INFO - Manual control mode - waiting for step command
+2025-08-01 11:40:05,940 - map_node - WARNING - Handling agent look command for cognitive/map/agent/Joe/look
+2025-08-01 11:40:05,996 - map_node - WARNING - Agent look command handled for cognitive/map/agent/Joe/look
+2025-08-01 11:41:56,627 - map_node - INFO - 🎯 Manual Step Turn command received
+2025-08-01 11:41:56,628 - map_node - INFO - Starting new turn for step command
+2025-08-01 11:41:56,628 - map_node - INFO - Starting new turn with active characters: ['Joe']
+2025-08-01 11:41:56,628 - map_node - INFO - 🚦 Turn 1 started for: Joe
+2025-08-01 11:42:27,242 - map_node - INFO - ⏰ Turn 1 elapsed time: 30.6s (no timeout in step mode)
+2025-08-01 11:42:28,243 - map_node - INFO - ⏰ Turn 1 elapsed time: 31.6s (no timeout in step mode)
+2025-08-01 11:42:29,243 - map_node - INFO - ⏰ Turn 1 elapsed time: 32.6s (no timeout in step mode)
+2025-08-01 11:42:30,243 - map_node - INFO - ⏰ Turn 1 elapsed time: 33.6s (no timeout in step mode)
+2025-08-01 11:42:31,244 - map_node - INFO - ⏰ Turn 1 elapsed time: 34.6s (no timeout in step mode)
+2025-08-01 11:42:32,244 - map_node - INFO - ⏰ Turn 1 elapsed time: 35.6s (no timeout in step mode)
+2025-08-01 11:42:33,244 - map_node - INFO - ⏰ Turn 1 elapsed time: 36.6s (no timeout in step mode)
+2025-08-01 11:42:34,245 - map_node - INFO - ⏰ Turn 1 elapsed time: 37.6s (no timeout in step mode)
+2025-08-01 11:42:35,245 - map_node - INFO - ⏰ Turn 1 elapsed time: 38.6s (no timeout in step mode)
+2025-08-01 11:42:36,246 - map_node - INFO - ⏰ Turn 1 elapsed time: 39.6s (no timeout in step mode)
+2025-08-01 11:42:37,246 - map_node - INFO - ⏰ Turn 1 elapsed time: 40.6s (no timeout in step mode)
+2025-08-01 11:42:38,246 - map_node - INFO - ⏰ Turn 1 elapsed time: 41.6s (no timeout in step mode)
+2025-08-01 11:42:39,247 - map_node - INFO - ⏰ Turn 1 elapsed time: 42.6s (no timeout in step mode)
+2025-08-01 11:42:40,247 - map_node - INFO - ⏰ Turn 1 elapsed time: 43.6s (no timeout in step mode)
+2025-08-01 11:42:41,247 - map_node - INFO - ⏰ Turn 1 elapsed time: 44.6s (no timeout in step mode)
+2025-08-01 11:42:42,248 - map_node - INFO - ⏰ Turn 1 elapsed time: 45.6s (no timeout in step mode)
+2025-08-01 11:42:43,248 - map_node - INFO - ⏰ Turn 1 elapsed time: 46.6s (no timeout in step mode)
+2025-08-01 11:42:44,248 - map_node - INFO - ⏰ Turn 1 elapsed time: 47.6s (no timeout in step mode)
+2025-08-01 11:42:45,249 - map_node - INFO - ⏰ Turn 1 elapsed time: 48.6s (no timeout in step mode)
+2025-08-01 11:42:46,249 - map_node - INFO - ⏰ Turn 1 elapsed time: 49.6s (no timeout in step mode)
+2025-08-01 11:42:47,249 - map_node - INFO - ⏰ Turn 1 elapsed time: 50.6s (no timeout in step mode)
+2025-08-01 11:42:48,250 - map_node - INFO - ⏰ Turn 1 elapsed time: 51.6s (no timeout in step mode)
+2025-08-01 11:42:49,250 - map_node - INFO - ⏰ Turn 1 elapsed time: 52.6s (no timeout in step mode)
+2025-08-01 11:42:50,250 - map_node - INFO - ⏰ Turn 1 elapsed time: 53.6s (no timeout in step mode)
+2025-08-01 11:42:51,251 - map_node - INFO - ⏰ Turn 1 elapsed time: 54.6s (no timeout in step mode)
+2025-08-01 11:42:52,251 - map_node - INFO - ⏰ Turn 1 elapsed time: 55.6s (no timeout in step mode)
+2025-08-01 11:42:53,251 - map_node - INFO - ⏰ Turn 1 elapsed time: 56.6s (no timeout in step mode)
+2025-08-01 11:42:54,252 - map_node - INFO - ⏰ Turn 1 elapsed time: 57.6s (no timeout in step mode)
+2025-08-01 11:42:55,252 - map_node - INFO - ⏰ Turn 1 elapsed time: 58.6s (no timeout in step mode)
+2025-08-01 11:42:56,252 - map_node - INFO - ⏰ Turn 1 elapsed time: 59.6s (no timeout in step mode)
+2025-08-01 11:42:57,253 - map_node - INFO - ⏰ Turn 1 elapsed time: 60.6s (no timeout in step mode)
+2025-08-01 11:42:58,253 - map_node - INFO - ⏰ Turn 1 elapsed time: 61.6s (no timeout in step mode)
+2025-08-01 11:42:59,254 - map_node - INFO - ⏰ Turn 1 elapsed time: 62.6s (no timeout in step mode)
+2025-08-01 11:43:00,254 - map_node - INFO - ⏰ Turn 1 elapsed time: 63.6s (no timeout in step mode)
+2025-08-01 11:43:01,254 - map_node - INFO - ⏰ Turn 1 elapsed time: 64.6s (no timeout in step mode)
+2025-08-01 11:43:02,255 - map_node - INFO - ⏰ Turn 1 elapsed time: 65.6s (no timeout in step mode)
+2025-08-01 11:43:03,255 - map_node - INFO - ⏰ Turn 1 elapsed time: 66.6s (no timeout in step mode)
+2025-08-01 11:43:04,255 - map_node - INFO - ⏰ Turn 1 elapsed time: 67.6s (no timeout in step mode)
+2025-08-01 11:43:05,256 - map_node - INFO - ⏰ Turn 1 elapsed time: 68.6s (no timeout in step mode)
+2025-08-01 11:43:06,256 - map_node - INFO - ⏰ Turn 1 elapsed time: 69.6s (no timeout in step mode)
+2025-08-01 11:43:07,257 - map_node - INFO - ⏰ Turn 1 elapsed time: 70.6s (no timeout in step mode)
+2025-08-01 11:43:08,257 - map_node - INFO - ⏰ Turn 1 elapsed time: 71.6s (no timeout in step mode)
+2025-08-01 11:43:09,257 - map_node - INFO - ⏰ Turn 1 elapsed time: 72.6s (no timeout in step mode)
+2025-08-01 11:43:10,258 - map_node - INFO - ⏰ Turn 1 elapsed time: 73.6s (no timeout in step mode)
+2025-08-01 11:43:11,258 - map_node - INFO - ⏰ Turn 1 elapsed time: 74.6s (no timeout in step mode)
+2025-08-01 11:43:12,258 - map_node - INFO - ⏰ Turn 1 elapsed time: 75.6s (no timeout in step mode)
+2025-08-01 11:43:13,259 - map_node - INFO - ⏰ Turn 1 elapsed time: 76.6s (no timeout in step mode)
+2025-08-01 11:43:14,259 - map_node - INFO - ⏰ Turn 1 elapsed time: 77.6s (no timeout in step mode)
+2025-08-01 11:43:15,259 - map_node - INFO - ⏰ Turn 1 elapsed time: 78.6s (no timeout in step mode)
+2025-08-01 11:43:16,260 - map_node - INFO - ⏰ Turn 1 elapsed time: 79.6s (no timeout in step mode)
+2025-08-01 11:43:17,260 - map_node - INFO - ⏰ Turn 1 elapsed time: 80.6s (no timeout in step mode)
+2025-08-01 11:43:18,260 - map_node - INFO - ⏰ Turn 1 elapsed time: 81.6s (no timeout in step mode)
+2025-08-01 11:43:19,261 - map_node - INFO - ⏰ Turn 1 elapsed time: 82.6s (no timeout in step mode)
+2025-08-01 11:43:20,261 - map_node - INFO - ⏰ Turn 1 elapsed time: 83.6s (no timeout in step mode)

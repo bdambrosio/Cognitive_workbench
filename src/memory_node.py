@@ -449,10 +449,13 @@ class ZenohMemoryNode:
                     pass
             
             if not item:
+                # Return list of all items in inventory
+                item_names = list(self.inventory.keys())
                 response = {
-                    'success': False,
-                    'value': False
+                    'success': True,
+                    'value': item_names
                 }
+                logger.info(f'📦 Inventory query: returned {len(item_names)} items')
             else:
                 # Check if item is in inventory
                 item_canonical = item.capitalize()
@@ -462,9 +465,9 @@ class ZenohMemoryNode:
                     'success': True,
                     'value': has_item
                 }
+                logger.info(f'📦 Inventory query for {item}: {response["value"]}')
             
             query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
-            logger.info(f'📦 Inventory query for {item}: {response["value"]}')
             
         except Exception as e:
             logger.error(f'Error handling inventory query: {e}')

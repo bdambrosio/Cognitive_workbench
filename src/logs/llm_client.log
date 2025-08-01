@@ -1,13 +1,16 @@
-2025-07-31 20:31:12 - llm_client - INFO - 🤖 Zenoh LLM Client initialized
-2025-07-31 20:31:12 - executive_node - INFO - 🧠 Zenoh Executive Node initialized for character: Joe
-2025-07-31 20:31:12 - executive_node - INFO -    - Subscribing to: cognitive/Joe/sense_data
-2025-07-31 20:31:12 - executive_node - INFO -    - Subscribing to: cognitive/Joe/situation
-2025-07-31 20:31:12 - executive_node - INFO -    - Subscribing to: cognitive/map/turn/go
-2025-07-31 20:31:12 - executive_node - INFO -    - Publishing to: cognitive/Joe/action
-2025-07-31 20:31:12 - executive_node - INFO -    - Publishing to: cognitive/Joe/memory/store
-2025-07-31 20:31:12 - executive_node - INFO -    - Publishing to: cognitive/Joe/text_input
-2025-07-31 20:31:12 - executive_node - INFO -    - Publishing to: cognitive/Joe/goal
-2025-07-31 20:31:12 - executive_node - INFO -    - Publishing to: cognitive/Joe/decided_action
-2025-07-31 20:31:12 - executive_node - INFO -    - Publishing to: cognitive/map/turn/complete/Joe
-2025-07-31 20:31:12 - executive_node - WARNING - Executive Node running - press Ctrl+C to stop
-2025-07-31 20:31:12 - executive_node - INFO - 📢 Announced character presence: Joe
+2025-08-01 11:38:54 - llm_client - INFO - 🤖 Zenoh LLM Client initialized
+2025-08-01 11:40:05 - executive_node - INFO - 🧠 Zenoh Executive Node initialized for character: Joe
+2025-08-01 11:40:05 - executive_node - INFO -    - Subscribing to: cognitive/Joe/sense_data
+2025-08-01 11:40:05 - executive_node - INFO -    - Subscribing to: cognitive/Joe/situation
+2025-08-01 11:40:05 - executive_node - INFO -    - Subscribing to: cognitive/map/turn/go
+2025-08-01 11:40:05 - executive_node - INFO -    - Publishing to: cognitive/Joe/action
+2025-08-01 11:40:05 - executive_node - INFO -    - Publishing to: cognitive/Joe/memory/store
+2025-08-01 11:40:05 - executive_node - INFO -    - Publishing to: cognitive/Joe/text_input
+2025-08-01 11:40:05 - executive_node - INFO -    - Publishing to: cognitive/Joe/goal
+2025-08-01 11:40:05 - executive_node - INFO -    - Publishing to: cognitive/Joe/decided_action
+2025-08-01 11:40:05 - executive_node - INFO -    - Publishing to: cognitive/map/turn/complete/Joe
+2025-08-01 11:40:05 - executive_node - WARNING - Executive Node running - press Ctrl+C to stop
+2025-08-01 11:40:05 - executive_node - INFO - 📢 Announced character presence: Joe
+2025-08-01 11:41:56 - executive_node - WARNING - 🚦 Turn 1 started for Joe
+2025-08-01 11:41:57 - executive_node - WARNING - 🔄 Joe OODA loop running
+2025-08-01 11:43:19 - executive_node - ERROR - Error in _observe: 'ZenohExecutiveNode' object has no attribute 'system_prompt'

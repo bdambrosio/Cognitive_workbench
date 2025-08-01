@@ -140,6 +140,17 @@ class ZenohExecutiveNode:
         
         # Shutdown flag
         self.shutdown_requested = False
+
+        # Get map types
+        self.map_types = {}
+        for reply in self.session.get("cognitive/map/types", timeout=2.0):
+            if reply.ok:
+                data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
+                if data.get('success'):
+                    self.map_types = data
+                    break
+            
+
         
         # Register signal handlers for graceful shutdown
         signal.signal(signal.SIGTERM, self._signal_handler)
@@ -366,23 +377,65 @@ class ZenohExecutiveNode:
 
     def _observe(self):
         """Observe: Collect current situation and sense data. Stub."""
-        if self.character_config.get('character', None):
-            system_prompt = self.character_config['character']
-        if self.character_config.get('drives', None):
-            system_prompt += f"\n#Your drives are:\n\t{'\n\t'.join(self.character_config['drives'])}\n"
-            
-        # Build user prompt with context
-        user_prompt = '' 
-        user_prompt += self.format_situation()
-        entity_context = None
-        entity_context = self.get_entity_context(self.character_name, 10)
-        if entity_context:
-            user_prompt += f'\n#Your most recent thoughts include:'
-            for i, memory in enumerate(entity_context['conversation_history']):  # Use last 2 memories
-                user_prompt += f"\n\t{memory['source']}: {memory['text']}"
+        system_prompt = ''
+        user_prompt = ''
+        try:
+            if self.character_config.get('character', None):
+                system_prompt = self.character_config['character']
+            if self.character_config.get('drives', None):
+                system_prompt += f"\n#Your drives are:\n\t{'\n\t'.join(self.character_config['drives'])}\n"
+            if not self.map_types:
+                for reply in self.session.get("cognitive/map/types", timeout=2.0):
+                    if reply.ok:
+                        data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
+                        if data.get('success'):
+                            self.map_types = data
+                            break
+            if self.map_types:
+                self.system_prompt += f'\n#Available map types:'
+                if self.map_types.get('terrain_types'):
+                    system_prompt += f"\n\tTerrain: {', '.join(self.map_types['terrain_types'])}"
+                if self.map_types.get('infrastructure_types'):
+                    system_prompt += f"\n\tInfrastructure: {', '.join(self.map_types['infrastructure_types'])}"
+                if self.map_types.get('property_types'):
+                    system_prompt += f"\n\tProperties: {', '.join(self.map_types['property_types'])}"
+                if self.map_types.get('resource_types'):
+                    system_prompt += f"\n\tResources: {', '.join(self.map_types['resource_types'])}"
+                system_prompt += '\n'
+
+                
+            # Build user prompt with context
+            user_prompt += self.format_situation()
+            entity_context = None
+            entity_context = self.get_entity_context(self.character_name, 10)
+            if entity_context:
+                user_prompt += f'\n#Your most recent thoughts include:'
+                for i, memory in enumerate(entity_context['conversation_history']):  # Use last 2 memories
+                    user_prompt += f"\n\t{memory['source']}: {memory['text']}"
+                user_prompt += '\n'
+
+
+            # get inventory 
+            inventory = []
+            for reply in self.session.get(f"cognitive/{self.character_name}/memory/inventory", timeout=2.0):
+                if reply.ok:
+                    data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
+                    if data.get('success'):
+                        inventory.append(data.get('value', []))
+            if inventory:
+                user_prompt += f'\n#Your inventory includes:'
+                for item in inventory:
+                    user_prompt += f"\n\t{item}"
             user_prompt += '\n'
-        self.observations = {'static': system_prompt, 'dynamic': user_prompt}
-        return self.observations
+
+
+
+            self.observations = {'static': system_prompt, 'dynamic': user_prompt}
+            return self.observations
+        except Exception as e:
+            logger.error(f'Error in _observe: {e}')       
+            self.observations = {'static': system_prompt, 'dynamic': user_prompt}
+            return self.observations
 
     def _orient(self, observations: Dict[str, Any]):
         """Orient: Assess current state and drives"""
@@ -400,6 +453,7 @@ Consider:
 4. Each goal should be a candiate for the center of activity for the near future.
 5. Goals must be distinct from one another.
 6. Goals must be consistent with the character's drives and emotional stance.
+7. Goals must be consistent with the available map types.
 
 Nothing in this or other instructions limits your use of deception or surprise.
                   
@@ -474,7 +528,7 @@ Output: only valid JSON – no prose, no code fences.
 }
 
 A plan must include no more than 10 steps including all nested do_while and if branches.
-In the following, <resource_name>, <character_name> are placeholders only for KNOWN resources or characters, those appearing above.
+In the following, <resource_name>, <character_name> are placeholders only for KNOWN resources, characters, or maptypes, those appearing above.
 Only dicts of the types below are allowed for the condition of do_while and if. Condition action type can only be one of the following:
  - "near": {"type": "near", "target": <resource name? or <character_name>} is for checking if the character is near a resource or character.
  - "can_see": {"type": "can_see", "target": <character_name>} is for checking if the character can see a character.
@@ -495,10 +549,9 @@ outside a do_while or if condition, "type" can take the values "say", "move", "t
  - "inspect": { "type": "inspect", "target": "resource_name" } is for inspecting a resource you see or one in your inventory to understand how to use it.
  - "use": { "type": "use", "target": "resource_name" } is for using a resource in a known way.
 
-In general, a target can be a specific resource_name or character_name or a reasonable generalization thereof. 
-For example, Berry2, Berry, Berries, Fruit, Food, etc are all valid targets. 
-Likewise, Joe, character, person, etc are all valid targets.
-However, in these latter cases, the specific resource or character bound to is indeterminate. 
+In general, a target can be a specific resource_name or character_name or a map type generalization. 
+For example, Berry2, Berry, Joe, clearing (assuming it is a terrain type) are all valid targets. 
+However, if the target is not an instance, the specific resource or character bound to is indeterminate. 
 For move, target can also be one of the 8 compass points.
 For example, 
     {"type": "if", "condition": {"type": "near", "target": "Berry"}, "then": [{"type": "move", "target": "Berry"}]}
@@ -509,12 +562,12 @@ Note that move only moves one step, so you must use a do_while to move repeatedl
 
 Some actions have conditions that must be met before they can be executed.
 for example, you cannot take a resource unless you are near it.
-you can accomplish this by using the "near" condition in a do_while. Assuming, for example, that Resource2 is in your situation view direction Northeast
+you can accomplish this by using the "near" condition in a do_while. Assuming, for example, that Cave2 is in your situation view direction Northeast
 
 {
   "plan": [
-    { "type": "do_while", "body": [ { "type": "move", "target": "Northeast" } ], "condition": { "type": "notnear", "target": "Resource2" } },
-    { "type": "take", "target": "Resource2" }
+    { "type": "do_while", "body": [ { "type": "move", "target": "Northeast" } ], "condition": { "type": "notnear", "target": "Cave2" } },
+    { "type": "take", "target": "Cave2" }
   ]
 }
 
@@ -528,7 +581,8 @@ Allowed control‑flow primitives: sequential list (e.g.. [..., ...]), do_while,
   ]
 }
 
-A plan must include no more than 10 steps including all nested do_while and if branches.
+A plan must include no more than 8 steps including all nested do_while and if branches.
+A plan must not contain sequential adjacent say actions.
         """
         if not self.current_goal or self.current_goal.name == 'sleep':
             single_action = None
@@ -547,9 +601,13 @@ A plan must include no more than 10 steps including all nested do_while and if b
                     goal_prompt += "Don't repeat yourself.\n"
 
             if self.last_action and (self.last_action['type'].lower() == 'say' or self.last_action['type'].lower() == 'response'):
-                directive = plan_syntax
+                directive = f"""
+respond only with the JSON plan, no other text.
+"""
             else:
-                directive = plan_syntax
+                directive = f"""
+respond only with the JSON plan, no other text.
+"""
             # Make LLM call
             if self.llm_client and not self.shutdown_requested:
                 response = self.llm_client.generate(
@@ -608,7 +666,7 @@ A plan must include no more than 10 steps including all nested do_while and if b
         return self.current_plan
 
     def _plan_step(self, plan):
-        """Execute current step of plan and return next action using step counter stack."""
+        """Execute current step of plan and return next action using frame-based stack."""
         # Extract plan steps from dict format
         if isinstance(plan, dict) and 'plan' in plan:
             plan_steps = plan['plan']
@@ -620,13 +678,18 @@ A plan must include no more than 10 steps including all nested do_while and if b
         
         step_stack = self.plan_state['step_stack']
         
-        # Initialize stack if empty
+        # Initialize stack if empty with main plan frame
         if step_stack.is_empty():
-            step_stack.push(0)  # Start at step 0
+            main_frame = {
+                'plan': plan_steps,
+                'idx': 0,
+                'type': 'main'
+            }
+            step_stack.push(main_frame)
         
         # Execute next step
         try:
-            action = self._execute_next_step(plan_steps, step_stack)
+            action = self._execute_next_step(step_stack)
             if action:
                 self.current_action = action
                 self._publish_decided_action(action)
@@ -645,51 +708,75 @@ A plan must include no more than 10 steps including all nested do_while and if b
             self.plan_bindings_cache = {}
             return None
     
-    def _execute_next_step(self, plan, step_stack):
-        """Execute next step using simple step counter stack."""
+    def _execute_next_step(self, step_stack):
+        """Execute next step using frame-based stack."""
         if step_stack.is_empty():
             return None
         
-        current_step = step_stack.peek()
+        current_frame = step_stack.peek()
+        plan = current_frame['plan']
+        idx = current_frame['idx']
         
         # Check if we've completed the current level
-        if current_step >= len(plan):
-            step_stack.pop()  # Exit this level
-            if step_stack.is_empty():
-                # Plan complete
-                self.current_plan = None
-                self.plan_bindings_cache = {}
-                self._publish_current_plan()
-                self.plan_state = None
-                # Clear plan bindings cache
-                self.plan_bindings_cache = {}
-                return None
+        if idx >= len(plan):
+            # Handle frame completion based on type
+            if current_frame['type'] == 'do_while':
+                # Do-while body completed, test condition
+                condition_action = current_frame['condition']
+                condition_action = self._resolve_target(condition_action)
+                if plan_module._evaluate_condition(self, condition_action):
+                    # Condition true, repeat loop
+                    current_frame['idx'] = 0  # Reset to start of body
+                    return self._execute_next_step(step_stack)
+                else:
+                    # Condition false, exit loop
+                    step_stack.pop()  # Remove do_while frame
+                    if step_stack.is_empty():
+                        # Plan complete
+                        self.current_plan = None
+                        self.plan_bindings_cache = {}
+                        self._publish_current_plan()
+                        self.plan_state = None
+                        return None
+                    else:
+                        # Continue at parent level
+                        parent_frame = step_stack.peek()
+                        parent_frame['idx'] = current_frame['return_to']
+                        return self._execute_next_step(step_stack)
             else:
-                # Continue at parent level
-                return self._execute_next_step(plan, step_stack)
+                # Regular frame completed, pop and continue
+                step_stack.pop()
+                if step_stack.is_empty():
+                    # Plan complete
+                    self.current_plan = None
+                    self.plan_bindings_cache = {}
+                    self._publish_current_plan()
+                    self.plan_state = None
+                    return None
+                else:
+                    # Continue at parent level
+                    return self._execute_next_step(step_stack)
         
-        step = plan[current_step]
+        step = plan[idx]
         
         # Handle different step types
         if step['type'] in ['move', 'say', 'think', 'take', 'inspect', 'use', 'near', 'look']:
             # Execute action and advance
-            step_stack.pop()  # Remove current step
-            step_stack.push(current_step + 1)  # Push next step
+            current_frame['idx'] = idx + 1
             return step
         
         elif step['type'] == 'do_while':
-            # Handle do-while loop
-            condition_action = step.get('condition', None)
-            condition_action = self._resolve_target(condition_action)
-            if plan_module._evaluate_condition(self, condition_action):
-                # Condition true, enter do body
-                step_stack.push(0)  # Start at first action in do body
-                return self._execute_next_step(step['body'], step_stack)
-            else:
-                # Condition false, skip do-while
-                step_stack.pop()  # Remove current step
-                step_stack.push(current_step + 1)  # Push next step
-                return self._execute_next_step(plan, step_stack)
+            # Handle do-while loop - always execute body first
+            # Push do_while frame with body and metadata
+            do_while_frame = {
+                'plan': step['body'],
+                'idx': 0,
+                'type': 'do_while',
+                'condition': step.get('condition', None),
+                'return_to': idx + 1  # Where to go when loop exits
+            }
+            step_stack.push(do_while_frame)
+            return self._execute_next_step(step_stack)
         
         elif step['type'] == 'if':
             # Handle if-then-else
@@ -697,25 +784,35 @@ A plan must include no more than 10 steps including all nested do_while and if b
             condition_action = self._resolve_target(condition_action)
             if plan_module._evaluate_condition(self, condition_action):
                 # Condition true, execute then branch
-                step_stack.push(0)  # Start at first action in then
-                return self._execute_next_step(step['then'], step_stack)
+                then_frame = {
+                    'plan': step['then'],
+                    'idx': 0,
+                    'type': 'if_then',
+                    'return_to': idx + 1  # Where to go when then completes
+                }
+                step_stack.push(then_frame)
+                return self._execute_next_step(step_stack)
             else:
                 # Condition false, execute else branch if it exists
                 if 'else' in step and step['else']:
-                    step_stack.push(0)  # Start at first action in else
-                    return self._execute_next_step(step['else'], step_stack)
+                    else_frame = {
+                        'plan': step['else'],
+                        'idx': 0,
+                        'type': 'if_else',
+                        'return_to': idx + 1  # Where to go when else completes
+                    }
+                    step_stack.push(else_frame)
+                    return self._execute_next_step(step_stack)
                 else:
                     # No else branch, skip if
-                    step_stack.pop()  # Remove current step
-                    step_stack.push(current_step + 1)  # Push next step
-                    return self._execute_next_step(plan, step_stack)
+                    current_frame['idx'] = idx + 1
+                    return self._execute_next_step(step_stack)
         
         else:
             # Unknown step type, skip it
             logger.warning(f'Unknown plan step type: {step["type"]}')
-            step_stack.pop()  # Remove current step
-            step_stack.push(current_step + 1)  # Push next step
-            return self._execute_next_step(plan, step_stack)
+            current_frame['idx'] = idx + 1
+            return self._execute_next_step(step_stack)
     
 
     def _act(self, action: Dict[str, Any]):
@@ -757,7 +854,7 @@ A plan must include no more than 10 steps including all nested do_while and if b
             action_data = {'type': 'inspect','action_id': self.action_counter,'timestamp': datetime.now().isoformat(),'target': action['target']}
             self.last_action = action_data
             self.action_publisher.put(json.dumps(action_data))
-            #self.inspect(action)
+            self.inspect(action['target'])
         elif action['type'].lower() == "use":
             # Create action - noop for now
             action_data = {'type': 'use','action_id': self.action_counter,'timestamp': datetime.now().isoformat(),'target': action['target']}
@@ -1011,12 +1108,14 @@ End your text with: </end>"""
             
         # Check plan bindings cache first
         cache_key = raw_target
-        if cache_key in self.plan_bindings_cache:
-            cached_result = self.plan_bindings_cache[cache_key]
-            logger.debug(f'🎯 Cache hit: {raw_target} -> {cached_result}')
-            action_copy = action.copy()
-            action_copy['target'] = cached_result
-            return action_copy
+        # TODO: Re-enable cache
+        # disabling cache untill we implement invalidation (e.g. on move or visibility change)
+        #if cache_key in self.plan_bindings_cache:
+            #cached_result = self.plan_bindings_cache[cache_key]
+            #logger.debug(f'🎯 Cache hit: {raw_target} -> {cached_result}')
+            #action_copy = action.copy()
+            #action_copy['target'] = cached_result
+            #return action_copy
         
         logger.debug(f'🔍 Resolving target "{raw_target}" for action type "{action_type}"')
         resolved_target = False
@@ -1033,7 +1132,9 @@ End your text with: </end>"""
                 else:
                     resolved_target = self._resolve_resource_instance(raw_target) or self._resolve_character_instance(raw_target)
                     if not resolved_target:
-                        return action
+                        resolved_target = self._resolve_character_instance(raw_target)
+                        if not resolved_target:
+                            return action
                     self.plan_bindings_cache[cache_key] = resolved_target
                     move_direction = self._find_target_direction(resolved_target)
                     if move_direction:
@@ -1141,30 +1242,30 @@ End your text with: </end>"""
                         return None
                     
                     situation = situation_data.get('situation', {})
-                    look_data = situation.get('look', {})
+                    views = situation.get('views', {})
                     
-                    if not look_data:
-                        logger.warning(f'No look data available for target search')
+                    if not views:
+                        logger.warning(f'No views available for target search')
                         return None
                     
                     # Search through each direction for the target
                     directions = ['North', 'Northeast', 'East', 'Southeast', 'South', 'Southwest', 'West', 'Northwest']
                     target_lower = target.lower()
                     
-                    for direction in directions:
-                        direction_data = look_data.get(direction, {})
+                    for view in views:
+                        direction = view.get('direction', {})
                         
                         # Check resources in this direction
-                        if 'resources' in direction_data:
-                            for resource in direction_data['resources']:
+                        if 'resources' in view:
+                            for resource in view['resources']:
                                 resource_id = resource.get('id', '') if isinstance(resource, dict) else str(resource)
                                 if resource_id.lower() == target_lower or target_lower in resource_id.lower():
                                     logger.info(f'🎯 Found target "{target}" as resource in direction: {direction}')
                                     return direction.lower()
                         
                         # Check characters in this direction
-                        if 'characters' in direction_data:
-                            for character in direction_data['characters']:
+                        if 'characters' in view:
+                            for character in view['characters']:
                                 character_name = character.get('name', '') if isinstance(character, dict) else str(character)
                                 if character_name.lower() == target_lower or target_lower in character_name.lower():
                                     logger.info(f'🎯 Found target "{target}" as character in direction: {direction}')
@@ -1277,33 +1378,56 @@ End your text with: </end>"""
             logger.error(f'Error in take operation for {target}: {e}')
             return False
     
+    def inspect(self, target: str):
+        """Learn about a resource."""
+        try:
+            # First validate that the target exists and is a resource
+            resource_exists = False; is_near = False
+            for reply in self.session.get(f"cognitive/{self.character_name}/memory/inventory?item={target}", timeout=2.0):
+                if reply.ok:
+                    data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
+                    if data.get('success'):
+                        resource_exists = True; is_near = True
+            if not resource_exists:
+                for reply in self.session.get(f"cognitive/map/resource/{target}", timeout=2.0):
+                    if reply.ok:
+                        data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
+                        if data.get('success'):
+                            resource_exists = True
+                            is_near = plan_module.is_near(self, target)
+
+            if not resource_exists or not is_near:
+                logger.warning(f'❌ Cannot inspect {target} - resource validation failed')
+                return False
+
+            logger.info(f'📦 Inspecting {target} for {self.character_name}')
+
+            # Create and publish action data for logging/display
+            action_data = {
+                'type': 'inspect',
+                'target': target,
+                'action_id': f"take_{int(time.time())}",
+                'timestamp': datetime.now().isoformat(),
+                'character': self.character_name
+            }
+            self.last_action = action_data
+            self.action_publisher.put(json.dumps(action_data))
+            logger.info(f'📤 Published take action: {target}')
+
+            return True
+
+        except Exception as e:
+            logger.error(f'Error in inspect operation for {target}: {e}')
+            return False
+
     def think_about(self, value: str):
         """Think about a value."""
         logger.warning(f'Thinking about: {value}')
         try:
-            # Get recent memory entries for context
-            recent_memories = self._get_recent_chat_memories(3)
-            
-            # Get entity context if source is not console
-            entity_context = None
-            entity_context = self.get_entity_context(self.character_name, 10)
-            
-            # Simple, focused prompt
-            if self.character_config.get('character', None):
-                system_prompt = self.character_config['character']
-            if self.character_config.get('drives', None):
-                system_prompt += f"\n\nYour drives are: {self.character_config['drives']}"
-            
-            # Build user prompt with context
-            user_prompt = '' 
-            user_prompt += self.format_situation()
-            if entity_context and isinstance(entity_context, dict):
-                conversation_history = entity_context.get('conversation_history', [])
-                if isinstance(conversation_history, list):
-                    for i, memory in enumerate(conversation_history):
-                        if isinstance(memory, dict) and 'source' in memory and 'text' in memory:
-                            user_prompt += f"{memory['source']}: {memory['text']}\n"
-            directive = f"""You are thinking about: {value}. Derive new information, insights, goals, or conclusions based on your memories, drives, and the current situation.
+            system_prompt = self.observations['static']
+            user_prompt = self.observations['dynamic']
+
+            directive = f"""You are thinking about: {value}.\n\n Derive new information, insights, goals, or conclusions based on your memories, drives, and the current situation.
     This new information should be a short statement (10 words max) not explicit in the information provided that will guide your future thoughts and actions.
     Respond with the new information in the following hash-formatted syntax:
 

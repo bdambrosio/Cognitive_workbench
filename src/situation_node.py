@@ -139,7 +139,7 @@ class ZenohSituationNode:
         
         # Shutdown flag
         self.shutdown_requested = False
-        
+        self.update_map_retries = 0
         # Register signal handlers for graceful shutdown
         signal.signal(signal.SIGTERM, self._signal_handler)
         signal.signal(signal.SIGINT, self._signal_handler)
@@ -216,6 +216,7 @@ class ZenohSituationNode:
         """Update situation based on incoming action."""
         try:
             if 'announcement' in action_data.get('type') or 'move' in action_data.get('type'):
+                self.update_map_retries = 0
                 self._update_map_data()
             
         except Exception as e:
@@ -226,7 +227,7 @@ class ZenohSituationNode:
         try:
             # Query map node for agent look data with timeout
             logger.warning(f'Updating map data for {self.character_name}')
-            for reply in self.session.get(f"cognitive/map/agent/{self.character_name}/look", timeout=40.0):
+            for reply in self.session.get(f"cognitive/map/agent/{self.character_name}/look", timeout=1.0):
                 try:
                     if reply.ok:
                         map_look_data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
@@ -266,9 +267,12 @@ class ZenohSituationNode:
                     else:
                         reply_str = str(reply)
                         decoded_error = zenoh_utils.decode_zenoh_error_payload(reply_str)
-                        logger.error(f'No map look data available for {self.character_name}, {decoded_error}')
-                        traceback.print_exc()
-
+                        if 'timeout' in decoded_error:
+                            self.update_map_retries += 1
+                            if self.update_map_retries < 3:
+                                self._update_map_data()
+                            else:
+                                logger.error(f'Map query timeout for {self.character_name} (map node may be busy)')
                 except Exception as e:
                     logger.error(f'Error parsing map look response for {self.character_name}: {e}')
                     traceback.print_exc()
@@ -449,6 +453,8 @@ class ZenohSituationNode:
                 target_canonical = target.capitalize()
                 at_location = False
                 
+                #TODO implement terrain checks
+                #TODO implement abstraction of resources and characters (e.g. person, tree, berry, ...)
                 # Check resources
                 for resource in self.situation.get('adjacent_resources', []):
                     if 'name' in resource and resource['name'] == target_canonical:
@@ -465,7 +471,7 @@ class ZenohSituationNode:
                             break
                 
                 response = {
-                    'success': True,
+                    'success': at_location,
                     'value': at_location
                 }
             

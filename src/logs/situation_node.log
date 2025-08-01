@@ -1,17 +1,15 @@
-2025-07-31 20:31:11 - situation_node - INFO - 📂 Loaded situation data for Joe
-2025-07-31 20:31:11 - situation_node - INFO - 🧭 Situation Node initialized for character: Joe
-2025-07-31 20:31:11 - situation_node - INFO -    - Subscribing to: cognitive/Joe/sense_data
-2025-07-31 20:31:11 - situation_node - INFO -    - Subscribing to: cognitive/Joe/action
-2025-07-31 20:31:11 - situation_node - INFO -    - Publishing to: cognitive/Joe/situation
-2025-07-31 20:31:11 - situation_node - INFO -    - Queryable at: cognitive/Joe/situation/current_situation
-2025-07-31 20:31:11 - situation_node - INFO -    - Proximity queryable at: cognitive/Joe/situation/proximity
-2025-07-31 20:31:11 - situation_node - INFO -    - Visibility queryable at: cognitive/Joe/situation/visibility
-2025-07-31 20:31:11 - situation_node - INFO -    - Location queryable at: cognitive/Joe/situation/location
-2025-07-31 20:31:11 - situation_node - INFO -    - Storage available at: data/situation/Joe_situation.json
-2025-07-31 20:31:11 - situation_node - INFO - Situation Node running - press Ctrl+C to stop
-2025-07-31 20:31:12 - situation_node - INFO - 📥 Received sense data: text
-2025-07-31 20:31:12 - situation_node - INFO - 📥 Received action: unknown
-2025-07-31 20:31:12 - situation_node - WARNING - Updating map data for Joe
-2025-07-31 20:33:03 - situation_node - ERROR - No map look data available for Joe,  (decoded: 'Timeout')
-2025-07-31 20:36:32 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-07-31 20:36:32 - situation_node - WARNING - Map look data updated for Joe
+2025-08-01 11:38:52 - situation_node - INFO - 📂 Loaded situation data for Joe
+2025-08-01 11:38:52 - situation_node - INFO - 🧭 Situation Node initialized for character: Joe
+2025-08-01 11:38:52 - situation_node - INFO -    - Subscribing to: cognitive/Joe/sense_data
+2025-08-01 11:38:52 - situation_node - INFO -    - Subscribing to: cognitive/Joe/action
+2025-08-01 11:38:52 - situation_node - INFO -    - Publishing to: cognitive/Joe/situation
+2025-08-01 11:38:52 - situation_node - INFO -    - Queryable at: cognitive/Joe/situation/current_situation
+2025-08-01 11:38:52 - situation_node - INFO -    - Proximity queryable at: cognitive/Joe/situation/proximity
+2025-08-01 11:38:52 - situation_node - INFO -    - Visibility queryable at: cognitive/Joe/situation/visibility
+2025-08-01 11:38:52 - situation_node - INFO -    - Location queryable at: cognitive/Joe/situation/location
+2025-08-01 11:38:52 - situation_node - INFO -    - Storage available at: data/situation/Joe_situation.json
+2025-08-01 11:38:52 - situation_node - INFO - Situation Node running - press Ctrl+C to stop
+2025-08-01 11:40:05 - situation_node - INFO - 📥 Received action: unknown
+2025-08-01 11:40:05 - situation_node - WARNING - Updating map data for Joe
+2025-08-01 11:40:06 - situation_node - INFO - 🗺️ Updated map look data for Joe
+2025-08-01 11:40:06 - situation_node - WARNING - Map look data updated for Joe
