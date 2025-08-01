@@ -76,7 +76,7 @@ class ZenohExecutiveNode:
         
         # Subscriber for situation data (character-specific)
         self.situation_subscriber = self.session.declare_subscriber(
-            f"cognitive/{character_name}/situation",
+            f"cognitive/{character_name}/situation/current_situation",
             self.situation_callback
         )
         

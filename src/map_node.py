@@ -21,11 +21,11 @@ from map import WorldMap, Agent, hash_direction_info, extract_direction_info
 
 # Configure logging
 # Console handler with WARNING level (less verbose)
-console_handler = logging.StreamHandler()
+console_handler = logging.StreamHandler(sys.stdout)
 console_handler.setLevel(logging.WARNING)
 
 # File handler with INFO level (full logging)
-file_handler = logging.FileHandler('map_node.log', mode='w')
+file_handler = logging.FileHandler('logs/map_node.log', mode='w')
 file_handler.setLevel(logging.INFO)
 
 logging.basicConfig(
@@ -34,7 +34,7 @@ logging.basicConfig(
     handlers=[console_handler, file_handler],
     force=True
 )
-logger = logging.getLogger(__name__)
+logger = logging.getLogger('map_node')
 
 class MapNode:
     def __init__(self, map_file: str, world_name: str = None):
@@ -698,6 +698,7 @@ class MapNode:
     def handle_agent_look(self, query):
         """Handle agent look command"""
         try:
+            logger.warning(f'Handling agent look command for {query.key_expr}')
             # Extract character name from query key
             key_parts = str(query.key_expr).split('/')
             character_name = key_parts[-2] if len(key_parts) > 1 else None
@@ -734,6 +735,7 @@ class MapNode:
                 }
             
             query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
+            logger.warning(f'Agent look command handled for {query.key_expr}')
             
         except Exception as e:
             logger.error(f"Error handling agent look: {e}")
