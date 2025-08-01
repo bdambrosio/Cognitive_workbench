@@ -1,20 +1,180 @@
-2025-07-30 13:26:14 - llm_client - INFO - 🤖 Zenoh LLM Client initialized
-2025-07-30 13:26:14 - memory_node - INFO - 📂 No existing memory file, starting fresh
-2025-07-30 13:26:14 - memory_node - INFO - Memory Node initialized for character: Joe
-2025-07-30 13:26:14 - memory_node - INFO - Storage available at:
-2025-07-30 13:26:14 - memory_node - INFO -   - cognitive/Joe/memory/short_term/*
-2025-07-30 13:26:14 - memory_node - INFO -   - cognitive/Joe/memory/chat/*
-2025-07-30 13:26:14 - memory_node - INFO -   - cognitive/Joe/memory/long_term/*
-2025-07-30 13:26:14 - memory_node - INFO -   - cognitive/Joe/memory/entity/*
-2025-07-30 13:26:14 - memory_node - INFO -   - cognitive/Joe/memory/inventory
-2025-07-30 13:26:14 - memory_node - INFO - Subscriptions:
-2025-07-30 13:26:14 - memory_node - INFO -   - cognitive/Joe/memory/close_dialog
-2025-07-30 13:26:14 - memory_node - INFO - Memory Node running - press Ctrl+C to stop
-2025-07-30 13:26:16 - memory_node - INFO - 📢 Stored character announcement: Joe
-2025-07-30 13:26:23 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
-2025-07-30 13:26:41 - memory_node - INFO - 📚 Chat query: returned 0 entries
-2025-07-30 13:26:41 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
-2025-07-30 13:26:41 - memory_node - INFO - 👥 Cr2025-07-30 13:26:41 - memory_node - INFO - 👥 Created new entity: Samantha
-2025-07-30 13:26:41 - memory_node - INFO - 💾 Saved memory to data/memory/Samantha_memory.json
-2025-07-30 13:26:41 - memory_node - INFO - 💬 Added conversation entry for Samantha: Samantha "#thought Safety requires knowledge of terrain and ..."
-2025-07-30 13:26:41 - memory_node - INFO - 💬 Added response to entity Samantha: Samantha -> "#thought Safety requires knowledge of terrain and ..."
+2025-07-31 18:56:25 - llm_client - INFO - 🤖 Zenoh LLM Client initialized
+2025-07-31 18:56:25 - memory_node - INFO - 📂 No existing memory file, starting fresh
+2025-07-31 18:56:25 - memory_node - INFO - Memory Node initialized for character: Joe
+2025-07-31 18:56:25 - memory_node - INFO - Storage available at:
+2025-07-31 18:56:25 - memory_node - INFO -   - cognitive/Joe/memory/short_term/*
+2025-07-31 18:56:25 - memory_node - INFO -   - cognitive/Joe/memory/chat/*
+2025-07-31 18:56:25 - memory_node - INFO -   - cognitive/Joe/memory/long_term/*
+2025-07-31 18:56:25 - memory_node - INFO -   - cognitive/Joe/memory/entity/*
+2025-07-31 18:56:25 - memory_node - INFO -   - cognitive/Joe/memory/inventory
+2025-07-31 18:56:25 - memory_node - INFO - Subscriptions:
+2025-07-31 18:56:25 - memory_node - INFO -   - cognitive/Joe/memory/close_dialog
+2025-07-31 18:56:25 - memory_node - INFO - Memory Node running - press Ctrl+C to stop
+2025-07-31 18:56:27 - memory_node - INFO - 📢 Stored character announcement: Joe
+2025-07-31 18:56:50 - memory_node - INFO - 👥 Created new entity: Ui
+2025-07-31 18:56:50 - memory_node - INFO - 💾 Saved memory to data/memory/Joe_memory.json
+2025-07-31 18:56:50 - memory_node - INFO - 💬 Added conversation entry for ui: ui "plan:
+think(boooring...)..."
+2025-07-31 18:56:52 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-07-31 18:56:54 - memory_node - INFO - 📚 Chat query: returned 0 entries
+2025-07-31 18:56:54 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-07-31 18:56:55 - memory_node - INFO - 👥 Created new entity: Joe
+2025-07-31 18:56:55 - memory_node - INFO - 💾 Saved memory to data/memory/Joe_memory.json
+2025-07-31 18:56:55 - memory_node - INFO - 💬 Added conversation entry for Joe: Joe "#thought Need a map
+##..."
+2025-07-31 18:56:55 - memory_node - INFO - 💬 Added response to entity Joe: Joe -> "#thought Need a map
+##..."
+2025-07-31 18:57:53 - memory_node - INFO - 💾 Saved memory to data/memory/Joe_memory.json
+2025-07-31 18:57:53 - memory_node - INFO - 💬 Added conversation entry for ui: ui "plan:
+if:
+notsee(Samantha)
+move(north)
+else:
+move(..."
+2025-07-31 18:57:55 - memory_node - INFO - 📝 Generated summary for Joe: Entity: Joe | First seen: 2025-07-31 18:56 | Total...
+2025-07-31 19:00:06 - memory_node - INFO - 💾 Saved memory to data/memory/Joe_memory.json
+2025-07-31 19:00:06 - memory_node - INFO - 💬 Added conversation entry for ui: ui "if:
+    near(Well23)
+    say(joe, "I'm near the we..."
+2025-07-31 19:00:25 - memory_node - INFO - Ui natural_dialog_end: rating: 8, should_end: True
+2025-07-31 19:00:25 - memory_node - INFO - 👥 Entity natural_dialog_end query for ui: completed
+2025-07-31 19:00:25 - memory_node - INFO - 📝 Stored action: dialog_end - action_1
+2025-07-31 19:00:58 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-07-31 19:00:58 - memory_node - INFO - 📝 Stored action: move - move_1754013658
+2025-07-31 19:01:19 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-07-31 19:01:19 - memory_node - INFO - 📚 Chat query: returned 1 entries
+2025-07-31 19:01:19 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-07-31 19:01:19 - memory_node - INFO - 💾 Saved memory to data/memory/Joe_memory.json
+2025-07-31 19:01:19 - memory_node - INFO - 💬 Added conversation entry for Joe: Joe "#thought Need a map
+##..."
+2025-07-31 19:01:19 - memory_node - INFO - 💬 Added response to entity Joe: Joe -> "#thought Need a map
+##..."
+2025-07-31 19:01:28 - memory_node - INFO - 💾 Saved memory to data/memory/Joe_memory.json
+2025-07-31 19:01:28 - memory_node - INFO - 💬 Added conversation entry for ui: ui "if:
+    near(Well23)
+    say(joe, "I'm near the we..."
+2025-07-31 19:01:29 - memory_node - INFO - Ui natural_dialog_end: rating: 8, should_end: True
+2025-07-31 19:01:29 - memory_node - INFO - 👥 Entity natural_dialog_end query for ui: completed
+2025-07-31 19:01:29 - memory_node - INFO - 📝 Stored action: dialog_end - action_2
+2025-07-31 19:01:38 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-07-31 19:01:38 - memory_node - INFO - 📝 Stored action: move - move_1754013698
+2025-07-31 19:01:45 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-07-31 19:01:45 - memory_node - INFO - 📚 Chat query: returned 2 entries
+2025-07-31 19:01:45 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-07-31 19:01:45 - memory_node - INFO - 💾 Saved memory to data/memory/Joe_memory.json
+2025-07-31 19:01:45 - memory_node - INFO - 💬 Added conversation entry for Joe: Joe "#thought Need a map..."
+2025-07-31 19:01:45 - memory_node - INFO - 💬 Added response to entity Joe: Joe -> "#thought Need a map..."
+2025-07-31 19:01:47 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-07-31 19:01:47 - memory_node - INFO - 📝 Stored action: move - move_1754013707
+2025-07-31 19:01:56 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-07-31 19:01:56 - memory_node - INFO - 📚 Chat query: returned 3 entries
+2025-07-31 19:01:56 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-07-31 19:01:57 - memory_node - INFO - 💾 Saved memory to data/memory/Joe_memory.json
+2025-07-31 19:01:57 - memory_node - INFO - 💬 Added conversation entry for Joe: Joe "#thought Need a map
+##..."
+2025-07-31 19:01:57 - memory_node - INFO - 💬 Added response to entity Joe: Joe -> "#thought Need a map
+##..."
+2025-07-31 19:01:59 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-07-31 19:01:59 - memory_node - INFO - 📝 Stored action: move - move_1754013719
+2025-07-31 19:02:01 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-07-31 19:02:01 - memory_node - INFO - 📚 Chat query: returned 4 entries
+2025-07-31 19:02:01 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-07-31 19:02:02 - memory_node - INFO - 💾 Saved memory to data/memory/Joe_memory.json
+2025-07-31 19:02:02 - memory_node - INFO - 💬 Added conversation entry for Joe: Joe "#thought Find a landmark..."
+2025-07-31 19:02:02 - memory_node - INFO - 💬 Added response to entity Joe: Joe -> "#thought Find a landmark..."
+2025-07-31 19:02:04 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-07-31 19:02:04 - memory_node - INFO - 📝 Stored action: move - move_1754013724
+2025-07-31 19:02:06 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-07-31 19:02:06 - memory_node - INFO - 📚 Chat query: returned 5 entries
+2025-07-31 19:02:06 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-07-31 19:02:06 - memory_node - INFO - 💾 Saved memory to data/memory/Joe_memory.json
+2025-07-31 19:02:06 - memory_node - INFO - 💬 Added conversation entry for Joe: Joe "#thought Landmark nearby..."
+2025-07-31 19:02:06 - memory_node - INFO - 💬 Added response to entity Joe: Joe -> "#thought Landmark nearby..."
+2025-07-31 19:02:08 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-07-31 19:02:08 - memory_node - INFO - 📝 Stored action: move - move_1754013728
+2025-07-31 19:02:10 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-07-31 19:02:10 - memory_node - INFO - 📚 Chat query: returned 6 entries
+2025-07-31 19:02:10 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-07-31 19:02:11 - memory_node - INFO - 💾 Saved memory to data/memory/Joe_memory.json
+2025-07-31 19:02:11 - memory_node - INFO - 💬 Added conversation entry for Joe: Joe "#thought Find a stream
+##..."
+2025-07-31 19:02:11 - memory_node - INFO - 💬 Added response to entity Joe: Joe -> "#thought Find a stream
+##..."
+2025-07-31 19:02:13 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-07-31 19:02:13 - memory_node - INFO - 📝 Stored action: move - move_1754013733
+2025-07-31 19:02:15 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-07-31 19:02:15 - memory_node - INFO - 📚 Chat query: returned 7 entries
+2025-07-31 19:02:15 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-07-31 19:02:16 - memory_node - INFO - 💾 Saved memory to data/memory/Joe_memory.json
+2025-07-31 19:02:16 - memory_node - INFO - 💬 Added conversation entry for Joe: Joe "#thought Follow stream downstream..."
+2025-07-31 19:02:16 - memory_node - INFO - 💬 Added response to entity Joe: Joe -> "#thought Follow stream downstream..."
+2025-07-31 19:02:17 - memory_node - INFO - 💾 Saved memory to data/memory/Joe_memory.json
+2025-07-31 19:02:17 - memory_node - INFO - 💬 Added conversation entry for ui: ui "hi..."
+2025-07-31 19:02:18 - memory_node - INFO - Ui natural_dialog_end: rating: 0, should_end: False
+2025-07-31 19:02:18 - memory_node - INFO - 👥 Entity natural_dialog_end query for ui: completed
+2025-07-31 19:02:18 - memory_node - INFO - 📚 Chat query: returned 8 entries
+2025-07-31 19:02:18 - memory_node - INFO - 👥 Entity dialog query for ui: completed
+2025-07-31 19:02:19 - memory_node - INFO - 💾 Saved memory to data/memory/Joe_memory.json
+2025-07-31 19:02:19 - memory_node - INFO - 💬 Added conversation entry for ui: Joe "hi, um, where am I?..."
+2025-07-31 19:02:19 - memory_node - INFO - 💬 Added response to entity ui: Joe -> "hi, um, where am I?..."
+2025-07-31 19:02:21 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-07-31 19:02:21 - memory_node - INFO - 📝 Stored action: move - move_1754013741
+2025-07-31 19:02:23 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-07-31 19:02:23 - memory_node - INFO - 📚 Chat query: returned 9 entries
+2025-07-31 19:02:23 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-07-31 19:02:24 - memory_node - INFO - 💾 Saved memory to data/memory/Joe_memory.json
+2025-07-31 19:02:24 - memory_node - INFO - 💬 Added conversation entry for Joe: Joe "#thought Water downstream
+##..."
+2025-07-31 19:02:24 - memory_node - INFO - 💬 Added response to entity Joe: Joe -> "#thought Water downstream
+##..."
+2025-07-31 19:02:26 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-07-31 19:02:26 - memory_node - INFO - 📝 Stored action: move - move_1754013746
+2025-07-31 19:02:28 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-07-31 19:02:28 - memory_node - INFO - 📚 Chat query: returned 10 entries
+2025-07-31 19:02:28 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-07-31 19:02:29 - memory_node - INFO - 💾 Saved memory to data/memory/Joe_memory.json
+2025-07-31 19:02:29 - memory_node - INFO - 💬 Added conversation entry for Joe: Joe "#thought Find a clearing
+##..."
+2025-07-31 19:02:29 - memory_node - INFO - 💬 Added response to entity Joe: Joe -> "#thought Find a clearing
+##..."
+2025-07-31 19:02:31 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-07-31 19:02:31 - memory_node - INFO - 📝 Stored action: move - move_1754013751
+2025-07-31 19:02:33 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-07-31 19:02:33 - memory_node - INFO - 📚 Chat query: returned 10 entries
+2025-07-31 19:02:33 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-07-31 19:02:34 - memory_node - INFO - 💾 Saved memory to data/memory/Joe_memory.json
+2025-07-31 19:02:34 - memory_node - INFO - 💬 Added conversation entry for Joe: Joe "#thought Need a compass
+##..."
+2025-07-31 19:02:34 - memory_node - INFO - 💬 Added response to entity Joe: Joe -> "#thought Need a compass
+##..."
+2025-07-31 19:02:36 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-07-31 19:02:36 - memory_node - INFO - 📝 Stored action: move - move_1754013756
+2025-07-31 19:02:38 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-07-31 19:02:38 - memory_node - INFO - 📚 Chat query: returned 10 entries
+2025-07-31 19:02:38 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-07-31 19:02:39 - memory_node - INFO - 💾 Saved memory to data/memory/Joe_memory.json
+2025-07-31 19:02:39 - memory_node - INFO - 💬 Added conversation entry for Joe: Joe "#thought Find a high point
+##..."
+2025-07-31 19:02:39 - memory_node - INFO - 💬 Added response to entity Joe: Joe -> "#thought Find a high point
+##..."
+2025-07-31 19:02:39 - memory_node - INFO - 💾 Saved memory to data/memory/Joe_memory.json
+2025-07-31 19:02:39 - memory_node - INFO - 💬 Added conversation entry for ui: ui "beats me. Like it here?..."
+2025-07-31 19:02:40 - memory_node - INFO - Ui natural_dialog_end: rating: 2, should_end: False
+2025-07-31 19:02:40 - memory_node - INFO - 👥 Entity natural_dialog_end query for ui: completed
+2025-07-31 19:02:40 - memory_node - INFO - 📚 Chat query: returned 10 entries
+2025-07-31 19:02:40 - memory_node - INFO - 👥 Entity dialog query for ui: completed
+2025-07-31 19:02:42 - memory_node - INFO - 💾 Saved memory to data/memory/Joe_memory.json
+2025-07-31 19:02:42 - memory_node - INFO - 💬 Added conversation entry for ui: Joe "I don't know, I just got here, I don't even know w..."
+2025-07-31 19:02:42 - memory_node - INFO - 💬 Added response to entity ui: Joe -> "I don't know, I just got here, I don't even know w..."
+2025-07-31 19:02:43 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-07-31 19:02:43 - memory_node - INFO - 📝 Stored action: move - move_1754013763
+2025-07-31 19:02:45 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-07-31 19:02:45 - memory_node - INFO - 📚 Chat query: returned 10 entries
+2025-07-31 19:02:45 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-07-31 19:02:46 - memory_node - INFO - 💾 Saved memory to data/memory/Joe_memory.json
+2025-07-31 19:02:46 - memory_node - INFO - 💬 Added conversation entry for Joe: Joe "#thought Find a vantage point
+##..."
+2025-07-31 19:02:46 - memory_node - INFO - 💬 Added response to entity Joe: Joe -> "#thought Find a vantage point
+##..."
+2025-07-31 19:02:48 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-07-31 19:02:48 - memory_node - INFO - 📝 Stored action: move - move_1754013768

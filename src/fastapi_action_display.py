@@ -72,6 +72,10 @@ class FastAPIActionDisplayNode:
         self.character_decided_actions: Dict[str, str] = {}  # character_name -> decided_action_string
         self.character_decided_actions_lock = threading.Lock()
         
+        # Character current plans tracking
+        self.character_current_plans: Dict[str, str] = {}  # character_name -> current_plan_string
+        self.character_current_plans_lock = threading.Lock()
+        
         # Turn state tracking with proper locking
         self.turn_state_lock = threading.Lock()
         self.turn_state = {
@@ -110,6 +114,12 @@ class FastAPIActionDisplayNode:
         self.decided_action_subscriber = self.session.declare_subscriber(
             "cognitive/*/decided_action",
             self.decided_action_callback
+        )
+        
+        # Subscriber for character current plans
+        self.current_plan_subscriber = self.session.declare_subscriber(
+            "cognitive/*/current_plan",
+            self.current_plan_callback
         )
         
         # Publisher for memory storage
@@ -160,6 +170,7 @@ class FastAPIActionDisplayNode:
         print('   - Subscribing to: cognitive/*/action (all characters)')
         print('   - Subscribing to: cognitive/*/goal (character goals)')
         print('   - Subscribing to: cognitive/*/decided_action (character decided actions)')
+        print('   - Subscribing to: cognitive/*/current_plan (character current plans)')
         print('   - Subscribing to: cognitive/map/step_complete (step completion)')
         print('   - Subscribing to: cognitive/map/turn (turn start)')
         print('   - Publishing to: cognitive/{character}/text_input (dynamic)')
@@ -858,6 +869,8 @@ class FastAPIActionDisplayNode:
                     handleGoalUpdate(data);
                 } else if (data.type === 'decided_action') {
                     handleDecidedActionUpdate(data);
+                } else if (data.type === 'current_plan') {
+                    handleCurrentPlanUpdate(data);
                 } else if (data.type === 'turn_state') {
                     updateTurnState(data);
                 } else if (data.type === 'step_complete') {
@@ -904,7 +917,8 @@ class FastAPIActionDisplayNode:
             characterTabs.set(characterName, {
                 element: tabElement,
                 goal: null,
-                decidedAction: null
+                decidedAction: null,
+                currentPlan: null
             });
             
             console.log(`Created character tab for: ${characterName}`);
@@ -995,6 +1009,27 @@ class FastAPIActionDisplayNode:
             }
         }
         
+        function handleCurrentPlanUpdate(currentPlanData) {
+            const characterName = currentPlanData.character;
+            const currentPlan = currentPlanData.current_plan;
+            
+            console.log(`Current plan update for ${characterName}: ${currentPlan ? 'Plan updated' : 'Plan cleared'}`);
+            
+            // Update the stored current plan for this character
+            if (characterTabs.has(characterName)) {
+                const tabData = characterTabs.get(characterName);
+                tabData.currentPlan = currentPlan;
+                
+                // If this character's tab is currently active, update the display
+                if (activeCharacter === characterName) {
+                    updateCharacterDataDisplay(characterName);
+                }
+            } else {
+                // Character tab doesn't exist yet, this shouldn't happen
+                console.warn(`Received current plan for unknown character: ${characterName}`);
+            }
+        }
+        
         function updateCharacterDataDisplay(characterName) {
             const dataItemsDiv = document.getElementById('characterDataItems');
             const tabData = characterTabs.get(characterName);
@@ -1005,6 +1040,21 @@ class FastAPIActionDisplayNode:
             }
             
             let content = '';
+            
+            // Add current plan if available
+            if (tabData.currentPlan) {
+                content += `
+                    <div class="character-data-item">
+                        <div class="character-data-label">Current Plan</div>
+                        <div class="character-data-value"><pre style="white-space: pre-wrap; font-family: 'Courier New', monospace; font-size: 12px; margin: 0;">${tabData.currentPlan}</pre></div>
+                    </div>
+                `;
+            }
+            
+            // Add horizontal line between plan and action if both exist
+            if (tabData.currentPlan && tabData.decidedAction) {
+                content += '<hr style="border: none; border-top: 1px solid #404040; margin: 8px 0;">';
+            }
             
             // Add decided action if available
             if (tabData.decidedAction) {
@@ -1407,6 +1457,26 @@ class FastAPIActionDisplayNode:
             import traceback
             traceback.print_exc()
     
+    def current_plan_callback(self, sample):
+        """Handle incoming character current plans."""
+        try:
+            current_plan_data = json.loads(sample.payload.to_bytes().decode('utf-8'))
+            
+            # Extract character name from topic path
+            topic_path = str(sample.key_expr)
+            character_name = topic_path.split('/')[1]  # cognitive/{character}/current_plan
+            
+            # Store current plan for this character
+            with self.character_current_plans_lock:
+                self.character_current_plans[character_name] = current_plan_data.get('current_plan', '')
+            
+            # Send current plan update to web clients
+            self._send_current_plan_to_websockets(current_plan_data, character_name)
+            
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+    
     def step_complete_callback(self, sample):
         """Handle step complete events from map node."""
         try:
@@ -1551,6 +1621,44 @@ class FastAPIActionDisplayNode:
             'character': character_name,
             'decided_action': decided_action_data.get('decided_action', ''),
             'timestamp': decided_action_data.get('timestamp', '')
+        }
+        
+        # Send to all connected clients
+        if self.event_loop is None:
+            return
+            
+        with self.websocket_lock:
+            disconnected = []
+            for websocket in self.websocket_connections:
+                try:
+                    # Use asyncio.run_coroutine_threadsafe to send from non-async context
+                    future = asyncio.run_coroutine_threadsafe(
+                        websocket.send_text(json.dumps(web_data)), 
+                        self.event_loop
+                    )
+                    future.result(timeout=5.0)
+                except Exception as e:
+                    # Don't remove client on timeout - just log the error
+                    if not isinstance(e, TimeoutError):
+                        disconnected.append(websocket)
+            
+            # Remove only truly disconnected clients (not timeout errors)
+            for websocket in disconnected:
+                if websocket in self.websocket_connections:
+                    self.websocket_connections.remove(websocket)
+    
+    def _send_current_plan_to_websockets(self, current_plan_data: Dict[str, Any], character_name: str):
+        """Send current plan data to all connected WebSocket clients."""
+        with self.websocket_lock:
+            if not self.websocket_connections:
+                return
+        
+        # Prepare current plan data for web clients
+        web_data = {
+            'type': 'current_plan',
+            'character': character_name,
+            'current_plan': current_plan_data.get('current_plan', ''),
+            'timestamp': current_plan_data.get('timestamp', '')
         }
         
         # Send to all connected clients

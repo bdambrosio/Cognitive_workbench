@@ -1,15 +1,62 @@
-2025-07-30 13:26:15 - situation_node - INFO - 📂 Loaded situation data for Joe
-2025-07-30 13:26:15 - situation_node - INFO - 🧭 Situation Node initialized for character: Joe
-2025-07-30 13:26:15 - situation_node - INFO -    - Subscribing to: cognitive/Joe/sense_data
-2025-07-30 13:26:15 - situation_node - INFO -    - Subscribing to: cognitive/Joe/action
-2025-07-30 13:26:15 - situation_node - INFO -    - Publishing to: cognitive/Joe/situation
-2025-07-30 13:26:15 - situation_node - INFO -    - Queryable at: cognitive/Joe/situation/*
-2025-07-30 13:26:15 - situation_node - INFO -    - Proximity queryable at: cognitive/Joe/situation/proximity
-2025-07-30 13:26:15 - situation_node - INFO -    - Visibility queryable at: cognitive/Joe/situation/visibility
-2025-07-30 13:26:15 - situation_node - INFO -    - Location queryable at: cognitive/Joe/situation/location
-2025-07-30 13:26:15 - situation_node - INFO -    - Storage available at: data/situation/Joe_situation.json
-2025-07-30 13:26:15 - situation_node - INFO - Situation Node running - press Ctrl+C to stop
-2025-07-30 13:26:16 - situation_node - INFO - 📥 Received action: unknown
-2025-07-30 13:26:26 - situation_node - WARNING - Map query failed for Joe
-2025-07-30 13:26:26 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-07-30 13:26:41 - situation_node - INFO - 📥 Receive2025-07-30 13:26:41 - situation_node - INFO - 📥 Received action: unknown
+2025-07-31 18:56:26 - situation_node - INFO - 📂 No existing situation file for Joe, starting fresh
+2025-07-31 18:56:26 - situation_node - INFO - 🧭 Situation Node initialized for character: Joe
+2025-07-31 18:56:26 - situation_node - INFO -    - Subscribing to: cognitive/Joe/sense_data
+2025-07-31 18:56:26 - situation_node - INFO -    - Subscribing to: cognitive/Joe/action
+2025-07-31 18:56:26 - situation_node - INFO -    - Publishing to: cognitive/Joe/situation
+2025-07-31 18:56:26 - situation_node - INFO -    - Queryable at: cognitive/Joe/situation/current_situation
+2025-07-31 18:56:26 - situation_node - INFO -    - Proximity queryable at: cognitive/Joe/situation/proximity
+2025-07-31 18:56:26 - situation_node - INFO -    - Visibility queryable at: cognitive/Joe/situation/visibility
+2025-07-31 18:56:26 - situation_node - INFO -    - Location queryable at: cognitive/Joe/situation/location
+2025-07-31 18:56:26 - situation_node - INFO -    - Storage available at: data/situation/Joe_situation.json
+2025-07-31 18:56:26 - situation_node - INFO - Situation Node running - press Ctrl+C to stop
+2025-07-31 18:56:27 - situation_node - INFO - 📥 Received action: unknown
+2025-07-31 18:56:47 - situation_node - ERROR - No map look data available for Joe, Reply { result: Err(ReplyError { payload: ZBytes(ZBuf { slices: [[54, 69, 6d, 65, 6f, 75, 74]] }), encoding: Encoding(Encoding { id: 0, schema: None }) }), replier_id: Some(EntityGlobalIdProto { zid: 38a42df481751746e2381dfc3d0bb016, eid: 0 }) }
+2025-07-31 18:56:47 - situation_node - ERROR - NoneType: None
+
+2025-07-31 18:56:47 - situation_node - INFO - 🗺️ Updated map look data for Joe
+2025-07-31 18:56:50 - situation_node - INFO - 📥 Received sense data: text
+2025-07-31 18:56:55 - situation_node - INFO - 📥 Received action: unknown
+2025-07-31 18:57:53 - situation_node - INFO - 📥 Received sense data: text
+2025-07-31 19:00:06 - situation_node - INFO - 📥 Received sense data: text
+2025-07-31 19:00:25 - situation_node - INFO - 📥 Received action: unknown
+2025-07-31 19:00:58 - situation_node - INFO - 📥 Received action: unknown
+2025-07-31 19:01:18 - situation_node - ERROR - No map look data available for Joe, Reply { result: Err(ReplyError { payload: ZBytes(ZBuf { slices: [[54, 69, 6d, 65, 6f, 75, 74]] }), encoding: Encoding(Encoding { id: 0, schema: None }) }), replier_id: Some(EntityGlobalIdProto { zid: 38a42df481751746e2381dfc3d0bb016, eid: 0 }) }
+2025-07-31 19:01:18 - situation_node - ERROR - NoneType: None
+
+2025-07-31 19:01:18 - situation_node - INFO - 🗺️ Updated map look data for Joe
+2025-07-31 19:01:19 - situation_node - INFO - 📥 Received action: unknown
+2025-07-31 19:01:28 - situation_node - INFO - 📥 Received sense data: text
+2025-07-31 19:01:29 - situation_node - INFO - 📥 Received action: unknown
+2025-07-31 19:01:38 - situation_node - INFO - 📥 Received action: unknown
+2025-07-31 19:01:58 - situation_node - ERROR - No map look data available for Joe, Reply { result: Err(ReplyError { payload: ZBytes(ZBuf { slices: [[54, 69, 6d, 65, 6f, 75, 74]] }), encoding: Encoding(Encoding { id: 0, schema: None }) }), replier_id: Some(EntityGlobalIdProto { zid: 38a42df481751746e2381dfc3d0bb016, eid: 0 }) }
+2025-07-31 19:01:58 - situation_node - ERROR - NoneType: None
+
+2025-07-31 19:01:58 - situation_node - INFO - 🗺️ Updated map look data for Joe
+2025-07-31 19:01:58 - situation_node - INFO - 📥 Received action: unknown
+2025-07-31 19:01:58 - situation_node - INFO - 📥 Received action: unknown
+2025-07-31 19:02:17 - situation_node - INFO - 📥 Received sense data: text
+2025-07-31 19:02:18 - situation_node - INFO - 🗺️ Updated map look data for Joe
+2025-07-31 19:02:18 - situation_node - ERROR - No map look data available for Joe, Reply { result: Err(ReplyError { payload: ZBytes(ZBuf { slices: [[54, 69, 6d, 65, 6f, 75, 74]] }), encoding: Encoding(Encoding { id: 1, schema: None }) }), replier_id: None }
+2025-07-31 19:02:18 - situation_node - ERROR - NoneType: None
+
+2025-07-31 19:02:18 - situation_node - INFO - 📥 Received action: unknown
+2025-07-31 19:02:18 - situation_node - INFO - 📥 Received action: unknown
+2025-07-31 19:02:38 - situation_node - ERROR - No map look data available for Joe, Reply { result: Err(ReplyError { payload: ZBytes(ZBuf { slices: [[54, 69, 6d, 65, 6f, 75, 74]] }), encoding: Encoding(Encoding { id: 0, schema: None }) }), replier_id: Some(EntityGlobalIdProto { zid: 38a42df481751746e2381dfc3d0bb016, eid: 0 }) }
+2025-07-31 19:02:38 - situation_node - ERROR - NoneType: None
+
+2025-07-31 19:02:38 - situation_node - INFO - 🗺️ Updated map look data for Joe
+2025-07-31 19:02:38 - situation_node - INFO - 📥 Received action: unknown
+2025-07-31 19:02:38 - situation_node - INFO - 📥 Received action: unknown
+2025-07-31 19:02:39 - situation_node - INFO - 📥 Received sense data: text
+2025-07-31 19:02:58 - situation_node - ERROR - No map look data available for Joe, Reply { result: Err(ReplyError { payload: ZBytes(ZBuf { slices: [[54, 69, 6d, 65, 6f, 75, 74]] }), encoding: Encoding(Encoding { id: 0, schema: None }) }), replier_id: Some(EntityGlobalIdProto { zid: 38a42df481751746e2381dfc3d0bb016, eid: 0 }) }
+2025-07-31 19:02:58 - situation_node - ERROR - NoneType: None
+
+2025-07-31 19:02:58 - situation_node - INFO - 🗺️ Updated map look data for Joe
+2025-07-31 19:02:58 - situation_node - INFO - 📥 Received action: unknown
+2025-07-31 19:02:58 - situation_node - INFO - 📥 Received action: unknown
+2025-07-31 19:03:18 - situation_node - ERROR - No map look data available for Joe, Reply { result: Err(ReplyError { payload: ZBytes(ZBuf { slices: [[54, 69, 6d, 65, 6f, 75, 74]] }), encoding: Encoding(Encoding { id: 0, schema: None }) }), replier_id: Some(EntityGlobalIdProto { zid: 38a42df481751746e2381dfc3d0bb016, eid: 0 }) }
+2025-07-31 19:03:18 - situation_node - ERROR - NoneType: None
+
+2025-07-31 19:03:18 - situation_node - INFO - 🗺️ Updated map look data for Joe
+2025-07-31 19:03:18 - situation_node - INFO - 📥 Received action: unknown
+2025-07-31 19:03:18 - situation_node - INFO - 📥 Received action: unknown

@@ -245,6 +245,14 @@ class ZenohMemoryNode:
                     logger.info(f'💬 Added response to entity {source}: {self.character_name} -> "{text[:50]}..."')
                 else:
                     logger.warning(f'Missing input or text in cognitive_response action: {data.get("action_id", "unknown")}')
+            elif action_type == 'take':
+                # Handle take action by adding item to inventory
+                target = data.get('target', '')
+                if target:
+                    self.add_item(target)
+                    logger.info(f'📦 Added {target} to {self.character_name} inventory via take action')
+                else:
+                    logger.warning(f'Take action missing target: {data.get("action_id", "unknown")}')
             else:
                 # Store other action types in short-term memory
                 self.short_term_memory.append(data)

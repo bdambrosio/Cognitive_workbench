@@ -12,23 +12,21 @@
 #   ZettaScale Zenoh Team, <zenoh@zettascale.tech>
 #
 
-from collections.abc import Callable, Iterable
+from collections.abc import Callable
 from datetime import datetime
 from enum import Enum, auto
 from pathlib import Path
-from typing import Any, Generic, Literal, Never, Self, TypeVar, final, overload
+from typing import Any, Generic, Never, Self, TypeVar, final, overload
 
 from . import handlers as handlers
 from .handlers import Handler as Handler
 
 _T = TypeVar("_T")
 _H = TypeVar("_H")
-_F = TypeVar("_F", bound=Callable)
 
 _RustHandler = (
     handlers.DefaultHandler[_T] | handlers.FifoChannel[_T] | handlers.RingChannel[_T]
 )
-
 _PythonCallback = Callable[[_T], Any]
 _PythonHandler = tuple[_PythonCallback[_T], _H]
 
@@ -59,6 +57,7 @@ class CongestionControl(Enum):
 
     DROP = auto()
     BLOCK = auto()
+    BLOCK_FIRST = _unstable(auto())
 
     DEFAULT = DROP
 
@@ -304,6 +303,19 @@ class Encoding:
 
 _IntoEncoding = Encoding | str
 
+EntityId = int
+
+@_unstable
+@final
+class EntityGlobalId:
+    @property
+    def zid(self) -> ZenohId:
+        """Returns the `ZenohId`, i.e. the Zenoh session, this ID is associated to."""
+
+    @property
+    def eid(self) -> EntityId:
+        """Returns the `EntityId` used to identify the entity in a Zenoh session."""
+
 @final
 class Hello:
     @property
@@ -490,20 +502,46 @@ class Publisher:
     @property
     @_unstable
     def reliability(self) -> Reliability: ...
+    @property
+    def matching_status(self) -> bool: ...
     def put(
         self,
         payload: _IntoZBytes,
         *,
         encoding: _IntoEncoding | None = None,
         attachment: _IntoZBytes | None = None,
+        timestamp: Timestamp | None = None,
     ):
         """Put data."""
 
-    def delete(self, *, attachment: _IntoZBytes | None = None):
+    def delete(
+        self,
+        *,
+        attachment: _IntoZBytes | None = None,
+        timestamp: Timestamp | None = None,
+    ):
         """Delete data."""
 
     def undeclare(self):
         """Undeclares the Publisher, informing the network that it needn't optimize publications for its key expression anymore."""
+
+    @overload
+    def declare_matching_listener(
+        self, handler: _RustHandler[MatchingStatus] | None = None
+    ) -> MatchingListener[Handler[MatchingStatus]]:
+        """Create a Matching listener. It will send notifications each time the matching status of this publisher changes."""
+
+    @overload
+    def declare_matching_listener(
+        self, handler: _PythonHandler[MatchingStatus, _H]
+    ) -> MatchingListener[_H]:
+        """Create a Matching listener. It will send notifications each time the matching status of this publisher changes."""
+
+    @overload
+    def declare_matching_listener(
+        self, handler: _PythonCallback[MatchingStatus]
+    ) -> MatchingListener[None]:
+        """Create a Matching listener. It will send notifications each time the matching status of this publisher changes."""
 
 @final
 class Query:
@@ -533,6 +571,7 @@ class Query:
         priority: Priority | None = None,
         express: bool | None = None,
         attachment: _IntoZBytes | None = None,
+        timestamp: Timestamp | None = None,
     ):
         """Sends a reply to this Query.
         By default, queries only accept replies whose key expression intersects with the query's. Unless the query has enabled disjoint replies (you can check this through Query::accepts_replies), replying on a disjoint key expression will result in an error when resolving the reply.
@@ -549,6 +588,7 @@ class Query:
         priority: Priority | None = None,
         express: bool | None = None,
         attachment: _IntoZBytes | None = None,
+        timestamp: Timestamp | None = None,
     ):
         """Sends a delete reply to this Query.
         By default, queries only accept replies whose key expression intersects with the query's. Unless the query has enabled disjoint replies (you can check this through Query::accepts_replies), replying on a disjoint key expression will result in an error when resolving the reply.
@@ -595,7 +635,6 @@ class Queryable(Generic[_H]):
     @overload
     def __iter__(self) -> Never: ...
 
-@_unstable
 @final
 class Querier:
     """A querier that allows to send queries to a queryable.
@@ -605,6 +644,8 @@ class Querier:
     def __exit__(self, *_args, **_kwargs): ...
     @property
     def key_expr(self) -> KeyExpr: ...
+    @property
+    def matching_status(self) -> bool: ...
     @overload
     def get(
         self,
@@ -644,6 +685,24 @@ class Querier:
     def undeclare(self):
         """Undeclares the Querier, informing the network that it needn't optimize queries for its key expression anymore."""
 
+    @overload
+    def declare_matching_listener(
+        self, handler: _RustHandler[MatchingStatus] | None = None
+    ) -> MatchingListener[Handler[MatchingStatus]]:
+        """Create a Matching listener. It will send notifications each time the matching status of this querier changes."""
+
+    @overload
+    def declare_matching_listener(
+        self, handler: _PythonHandler[MatchingStatus, _H]
+    ) -> MatchingListener[_H]:
+        """Create a Matching listener. It will send notifications each time the matching status of this querier changes."""
+
+    @overload
+    def declare_matching_listener(
+        self, handler: _PythonCallback[MatchingStatus]
+    ) -> MatchingListener[None]:
+        """Create a Matching listener. It will send notifications each time the matching status of this querier changes."""
+
 @final
 class QueryConsolidation:
     AUTO: Self
@@ -671,6 +730,16 @@ class Reliability(Enum):
     RELIABLE = auto()
 
 @final
+class Locality(Enum):
+    """The locality of samples/queries to be received by subscribers/queryables or targeted by publishers/queriers."""
+
+    SESSION_LOCAL = auto()
+    REMOTE = auto()
+    ANY = auto()
+
+    DEFAULT = ANY
+
+@final
 class Reply:
     """Structs returned by a get."""
 
@@ -682,7 +751,7 @@ class Reply:
     def err(self) -> ReplyError | None: ...
     @property
     @_unstable
-    def replier_id(self) -> ZenohId | None: ...
+    def replier_id(self) -> EntityGlobalId | None: ...
 
 @final
 class ReplyError:
@@ -835,6 +904,8 @@ class Session:
         priority: Priority | None = None,
         express: bool | None = None,
         attachment: _IntoZBytes | None = None,
+        timestamp: Timestamp | None = None,
+        allowed_destination: Locality | None = None,
     ):
         """Put data on zenoh for a given key expression."""
 
@@ -846,6 +917,8 @@ class Session:
         priority: Priority | None = None,
         express: bool | None = None,
         attachment: _IntoZBytes | None = None,
+        timestamp: Timestamp | None = None,
+        allowed_destination: Locality | None = None,
     ):
         """Delete data for a given key expression."""
 
@@ -864,6 +937,7 @@ class Session:
         payload: _IntoZBytes = None,
         encoding: _IntoEncoding | None = None,
         attachment: _IntoZBytes | None = None,
+        allowed_destination: Locality | None = None,
     ) -> Handler[Reply]:
         """Query data from the matching queryables in the system.
         Unless explicitly requested via GetBuilder::accept_replies, replies are guaranteed to have key expressions that match the requested selector.
@@ -884,6 +958,7 @@ class Session:
         payload: _IntoZBytes = None,
         encoding: _IntoEncoding | None = None,
         attachment: _IntoZBytes | None = None,
+        allowed_destination: Locality | None = None,
     ) -> _H:
         """Query data from the matching queryables in the system.
         Unless explicitly requested via GetBuilder::accept_replies, replies are guaranteed to have key expressions that match the requested selector.
@@ -904,6 +979,7 @@ class Session:
         payload: _IntoZBytes = None,
         encoding: _IntoEncoding | None = None,
         attachment: _IntoZBytes | None = None,
+        allowed_destination: Locality | None = None,
     ) -> None:
         """Query data from the matching queryables in the system.
         Unless explicitly requested via GetBuilder::accept_replies, replies are guaranteed to have key expressions that match the requested selector.
@@ -911,19 +987,31 @@ class Session:
 
     @overload
     def declare_subscriber(
-        self, key_expr: _IntoKeyExpr, handler: _RustHandler[Sample] | None = None
+        self,
+        key_expr: _IntoKeyExpr,
+        handler: _RustHandler[Sample] | None = None,
+        *,
+        allowed_origin: Locality | None = None,
     ) -> Subscriber[Handler[Sample]]:
         """Create a Subscriber for the given key expression."""
 
     @overload
     def declare_subscriber(
-        self, key_expr: _IntoKeyExpr, handler: _PythonHandler[Sample, _H]
+        self,
+        key_expr: _IntoKeyExpr,
+        handler: _PythonHandler[Sample, _H],
+        *,
+        allowed_origin: Locality | None = None,
     ) -> Subscriber[_H]:
         """Create a Subscriber for the given key expression."""
 
     @overload
     def declare_subscriber(
-        self, key_expr: _IntoKeyExpr, handler: _PythonCallback[Sample]
+        self,
+        key_expr: _IntoKeyExpr,
+        handler: _PythonCallback[Sample],
+        *,
+        allowed_origin: Locality | None = None,
     ) -> Subscriber[None]:
         """Create a Subscriber for the given key expression."""
 
@@ -934,6 +1022,7 @@ class Session:
         handler: _RustHandler[Query] | None = None,
         *,
         complete: bool | None = None,
+        allowed_origin: Locality | None = None,
     ) -> Queryable[Handler[Query]]:
         """Create a Queryable for the given key expression."""
 
@@ -944,6 +1033,7 @@ class Session:
         handler: _PythonHandler[Query, _H],
         *,
         complete: bool | None = None,
+        allowed_origin: Locality | None = None,
     ) -> Queryable[_H]:
         """Create a Queryable for the given key expression."""
 
@@ -954,6 +1044,7 @@ class Session:
         handler: _PythonCallback[Query],
         *,
         complete: bool | None = None,
+        allowed_origin: Locality | None = None,
     ) -> Queryable[None]:
         """Create a Queryable for the given key expression."""
 
@@ -966,10 +1057,10 @@ class Session:
         priority: Priority | None = None,
         express: bool | None = None,
         reliability: Reliability | None = None,
+        allowed_destination: Locality | None = None,
     ) -> Publisher:
         """Create a Publisher for the given key expression."""
 
-    @_unstable
     def declare_querier(
         self,
         key_expr: _IntoKeyExpr,
@@ -980,6 +1071,7 @@ class Session:
         congestion_control: CongestionControl | None = None,
         priority: Priority | None = None,
         express: bool | None = None,
+        allowed_destination: Locality | None = None,
     ) -> Querier:
         """Create a Querier for the given key expression."""
 
@@ -1004,6 +1096,45 @@ class SetIntersectionLevel(Enum):
     INTERSECTS = auto()
     INCLUDES = auto()
     EQUALS = auto()
+
+@final
+class MatchingStatus:
+    """A struct that indicates if there exist entities matching the key expression."""
+
+    @property
+    def matching(self) -> bool:
+        """Return true if there exist entities matching the target (i.e either Subscribers matching Publisher's key expression or Queryables matching Querier's key expression and target)."""
+
+@final
+class MatchingListener(Generic[_H]):
+    """A listener that sends notifications when the `MatchingStatus` of a
+    corresponding Zenoh entity changes."""
+
+    def __enter__(self) -> Self: ...
+    def __exit__(self, *_args, **_kwargs): ...
+    @property
+    def handler(self) -> _H: ...
+    def undeclare(self):
+        """Close a Matching listener.
+        Matching listeners are automatically closed when dropped, but you may want to use this function to handle errors or close the Matching listener asynchronously.
+        """
+
+    @overload
+    def try_recv(
+        self: MatchingListener[Handler[MatchingStatus]],
+    ) -> MatchingStatus | None: ...
+    @overload
+    def try_recv(self) -> Never: ...
+    @overload
+    def recv(self: MatchingListener[Handler[MatchingStatus]]) -> MatchingStatus: ...
+    @overload
+    def recv(self) -> Never: ...
+    @overload
+    def __iter__(
+        self: MatchingListener[Handler[MatchingStatus]],
+    ) -> Handler[MatchingStatus]: ...
+    @overload
+    def __iter__(self) -> Never: ...
 
 @final
 class Subscriber(Generic[_H]):

@@ -107,16 +107,16 @@
             "preLaunchTask": "setup-zenoh-environment"
         },
         {
-            "name": "Debug Character Launcher (with map)",
+            "name": "Debug Launcher (with map)",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/src/character_launcher.py",
+            "program": "${workspaceFolder}/src/launcher.py",
             "console": "integratedTerminal",
             "cwd": "${workspaceFolder}/src",
             "env": {
                 "PYTHONPATH": "${workspaceFolder}/src"
             },
-            "args": ["--ui", "--config-file", "characters.yaml", "--map-file", "forest.py"],
+            "args": ["joe.yaml", "--ui", "--map-file", "forest.py"],
             "justMyCode": false,
             "stopOnEntry": false,
             "preLaunchTask": "setup-zenoh-environment"
