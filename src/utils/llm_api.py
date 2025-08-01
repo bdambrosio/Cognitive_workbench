@@ -8,36 +8,34 @@ import logging
 from pathlib import Path
 from sympy import Ordinal
 from Messages import SystemMessage, UserMessage, AssistantMessage
+from utils.OpenAIClient import OpenAIClient
+import utils.OpenRouterClient as OpenRouterClient
 
 MODEL = '' # set by simulation from config.py
 logger = logging.getLogger('simulation_core')
 #logger.setLevel(logging.DEBUG)
 
-response_prime_needed = False
-tabby_api_key = os.getenv("TABBY_API_KEY")
-url = 'http://127.0.0.1:5000/v1/chat/completions'
-tabby_api_key = os.getenv("TABBY_API_KEY")
-headers = {'x-api-key': tabby_api_key}
 api_key = None
 try:
     api_key = os.getenv("OPENAI_API_KEY")
 except Exception as e:
-    print(f"Error getting OpenAI API key: {e}")
+    pass
 
+
+openrouter_client = None
+try:
+    openrouter_client = OpenRouterClient.OpenRouterClient(api_key=os.getenv("OPENROUTER_API_KEY"))
+except Exception as e:
+    pass
+
+response_prime_needed = False
+headers = {}
 IMAGE_PATH = Path.home() / '.local/share/AllTheWorld/images'
 IMAGE_PATH.mkdir(parents=True, exist_ok=True)
-vllm_model = 'deepseek-r1-distill-llama-70b-awq'
 vllm_model = '/home/bruce/Downloads/models/Qwen2.5-32B-Instruct'
-vllm_model = '/home/bruce/Downloads/models/gemma-3-27b-it'
-vllm_model = '/home/bruce/Downloads/models/DeepSeek-R1-Distill-Qwen-32B'
-vllm_model = '/home/bruce/Downloads/models/phi-4'
-vllm_model = 'google/gemma-3-27b-it'
-vllm_model = 'Qwen/Qwen3-32B'
-vllm_model = 'XiaomimMiMo/MiMo-7B-SFT'
+
 elapsed_times = {}
 iteration_count = 0
-
-
 
 pattern = r'\{\$[^}]*\}'
 
@@ -53,6 +51,8 @@ class LLM():
             self.model = model_name
         else:
             self.model = MODEL
+        if self.server_name == 'openai':
+            self.openai_client = OpenAIClient(model_name=self.model)
         if self.server_name == 'vllm':
             try:
                 response = requests.get('http://localhost:5000/v1/models', headers=headers)
@@ -100,8 +100,11 @@ class LLM():
             print(f'\n{json.dumps(substituted_prompt)}\n')      
         if log:
             logger.info(f'Prompt: {substituted_prompt}\n')
-        if False:
-            pass
+        if 'openai' in self.server_name:
+            response = self.openai_client.executeRequest(prompt=substituted_prompt, temperature=temperature, top_p=top_p, max_tokens=max_tokens, stops=stops, model=self.model)
+            return response
+        elif 'openrouter' in self.server_name.lower():
+            response= openrouter_client.executeRequest(prompt=substituted_prompt, temperature=temperature, top_p=top_p, max_tokens=max_tokens, stops=stops, model=self.model)
         elif 'vllm' in self.server_name:
             headers = {"Content-Type": "application/json"}
             url = 'http://localhost:5000/v1/completions'

@@ -291,17 +291,38 @@ def get_water_flow_direction(world, x, y):
     else:
         return "stagnant"
 
+# --- module-level pre-computed thresholds -------------------------------
+_TAN_22_5 = 0.4142135623730950   # tan(22.5°)  = √2-1
+_TAN_67_5 = 2.4142135623730950   # tan(67.5°)  = √2+1
+# -----------------------------------------------------------------------
 
-def get_direction_name(dx, dy):
-    if dx == 0 and dy < 0: return Direction.North
-    if dx > 0 and dy < 0: return Direction.Northeast
-    if dx > 0 and dy == 0: return Direction.East
-    if dx > 0 and dy > 0: return Direction.Southeast
-    if dx == 0 and dy > 0: return Direction.South
-    if dx < 0 and dy > 0: return Direction.Southwest
-    if dx < 0 and dy == 0: return Direction.West
-    if dx < 0 and dy < 0: return Direction.Northwest
-    return Direction.Current
+def get_direction_name(dx: float, dy: float) -> str | None:
+    """
+    Return one of  'N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'
+    for the displacement (dx, dy) without calling atan/atan2.
+
+    The plane is sliced into three bands per quadrant:
+        • near vertical    |dx/dy| ≤ tan 22.5°  →  N / S
+        • diagonal         tan 22.5° < |dx/dy| < tan 67.5° → NE / SE / SW / NW
+        • near horizontal  |dx/dy| ≥ tan 67.5°  →  E / W
+    """
+    if dx == dy == 0:
+        return None   # no direction
+
+    ax, ay = abs(dx), abs(dy)          # speed: no divisions, only compares
+
+    if ax <= ay * _TAN_22_5:           # “mostly north/south”
+        return Direction.North if dy > 0 else Direction.South
+
+    if ax >= ay * _TAN_67_5:           # “mostly east/west”
+        return Direction.East if dx > 0 else Direction.West
+
+    # diagonal band
+    if dx > 0 and dy > 0:   return Direction.Northeast
+    if dx > 0 and dy < 0:   return Direction.Southeast
+    if dx < 0 and dy < 0:   return Direction.Southwest
+    return Direction.Northwest
+
 
 class Resource(Enum):
     Berries = 1
@@ -1129,6 +1150,29 @@ class WorldMap:
         self.patches[market_x][market_y].resources[resource_id] = 1
         #print(f"DEBUG: Placed {self.scenario_module.required_resource_name} resource {resource_id} at ({market_x}, {market_y})")
 
+    def remove_resource(self, resource_id):
+        """Remove a resource from the map completely."""
+        try:
+            if resource_id not in self.resource_registry:
+                return False
+            
+            # Get location from stored data
+            resource_data = self.resource_registry[resource_id]
+            x, y = resource_data['location']
+            
+            # Remove from patch
+            if resource_id in self.patches[x][y].resources:
+                del self.patches[x][y].resources[resource_id]
+            
+            # Remove from registry
+            del self.resource_registry[resource_id]
+            
+            return True
+            
+        except Exception as e:
+            print(f"Error removing resource {resource_id}: {e}")
+            return False
+
     def generate_infrastructure(self):
         """Generate roads connecting central resource to other resources"""
         if not self._infrastructure_rules:
@@ -1515,7 +1559,7 @@ def get_detailed_visibility_description(world, camera_x, camera_y, observer, obs
         if direction == Direction.Current:
             direction_patches = [world.patches[camera_x][camera_y]]
         else:
-            direction_patches = [p for p in visible_patches if get_direction_name(p.x - camera_x, p.y - camera_y) == direction]
+            direction_patches = [p for p in visible_patches if (abs(p.x - camera_x) <= 15 and abs(p.y - camera_y) <= 15) and get_direction_name(p.x - camera_x, p.y - camera_y) == direction]
 
         if not direction_patches:
             ET.SubElement(direction_element, "visibility").text = "No clear visibility"

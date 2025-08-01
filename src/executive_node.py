@@ -180,7 +180,7 @@ class ZenohExecutiveNode:
                             text_input = content_data.get('text', '')
                             source = content_data.get('source', 'unknown')
                             if source == 'ui': # other text inputs must be handled by OODA to observe dialog turn taking
-                                self.respond(text_input, source)
+                                self.generate_speech(text_input, source, mode='respond')
                                 self.text_input_pending = False
                                 self.last_sense_data = None
                         except (json.JSONDecodeError, TypeError):
@@ -257,10 +257,10 @@ class ZenohExecutiveNode:
         """Publish decided action to the decided_action topic for UI display."""
         try:
             decided_action_data = {
-                'decided_action': f"{action['type']}: {action['target']} - {action['value']}",
+                'decided_action': f"{action['type']}: {action.get('target', '')} - {action.get('value', '')}",
                 'action': action['type'],
-                'target': action.get('target', None), 
-                'value': action.get('value', None),
+                'target': action.get('target', ''), 
+                'value': action.get('value', ''),
                 'timestamp': datetime.now().isoformat(),
                 'character': self.character_name
             }
@@ -302,7 +302,7 @@ class ZenohExecutiveNode:
                     # Fallback to plain text (console input format)
                     text_input = content
                     source = 'console'
-                responded = self.respond(text_input, source)
+                responded = self.generate_speech(text_input, source, mode='respond')
                 if responded:
                     return
             if self.interrupt_pending:
@@ -350,7 +350,7 @@ class ZenohExecutiveNode:
         if self.last_situation_data and self.last_situation_data.get('location'):
             formatted_situation += f"You are at location: {self.last_situation_data['location']}\n"
         if self.last_situation_data and self.last_situation_data.get('visible_characters'):
-            formatted_situation += f"You notice the following characters: {self.last_situation_data['visible_characters']}\n"
+            formatted_situation += f"You notice the following characters: {', '.join(self.last_situation_data['visible_characters'])}\n"
         if self.last_situation_data and self.last_situation_data.get('look'):
             formatted_situation += f"You can see the following:\n\t{'\n\t'.join(self.last_situation_data['look'])}\n"
         
@@ -473,6 +473,7 @@ Output: only valid JSON – no prose, no code fences.
   ]
 }
 
+A plan must include no more than 10 steps including all nested do_while and if branches.
 In the following, <resource_name>, <character_name> are placeholders only for KNOWN resources or characters, those appearing above.
 Only dicts of the types below are allowed for the condition of do_while and if. Condition action type can only be one of the following:
  - "near": {"type": "near", "target": <resource name? or <character_name>} is for checking if the character is near a resource or character.
@@ -527,6 +528,7 @@ Allowed control‑flow primitives: sequential list (e.g.. [..., ...]), do_while,
   ]
 }
 
+A plan must include no more than 10 steps including all nested do_while and if branches.
         """
         if not self.current_goal or self.current_goal.name == 'sleep':
             single_action = None
@@ -552,7 +554,7 @@ Allowed control‑flow primitives: sequential list (e.g.. [..., ...]), do_while,
             if self.llm_client and not self.shutdown_requested:
                 response = self.llm_client.generate(
                     messages=[system_prompt, user_prompt, plan_syntax, directive],
-                    max_tokens=400,
+                    max_tokens=1000,
                     temperature=0.7,
                     stops=['</end>']
                 )
@@ -726,6 +728,10 @@ Allowed control‑flow primitives: sequential list (e.g.. [..., ...]), do_while,
             self.action_publisher.put(json.dumps(action_data))
             time.sleep(1)  # Sleep for 1 second
             return
+        if action['type'].lower() == 'think':
+            self.think_about(action['value'])
+            return
+            
         action = self._resolve_target(action)
         if action['type'].lower() == "move":
             move_target = action['target'].strip()
@@ -740,19 +746,8 @@ Allowed control‑flow primitives: sequential list (e.g.. [..., ...]), do_while,
                 logger.error(f'❌ Cannot move toward "{move_target}" - target not resolved or visible')
                 return
         elif action['type'].lower() == "say":
-            # Create action
-            action_data = {
-                        'type': 'say',
-                        'action_id': f'action_{self.action_counter}',
-                        'timestamp': datetime.now().isoformat(),
-                        'source': self.character_name,
-                        'text': action['value']                
-                        }
-            self.last_action = action_data
-                    
-            # Publish action (this will be picked up by action_display_node)
-            self.action_publisher.put(json.dumps(action_data))
-            self.send_text_input(action['target'], action['value'])
+            self.generate_speech(action['value'], action['target'], mode='say')            # Publish action (this will be picked up by action_display_node)
+
         elif action['type'].lower() == "think":
             self.think_about(action['value'])
         elif action['type'].lower() == "take":
@@ -888,7 +883,8 @@ Allowed control‑flow primitives: sequential list (e.g.. [..., ...]), do_while,
             logger.error(f"Plan parsing failed for {self.character_name}: {e}")
             # Plan assignment failed - character continues with existing behavior
 
-    def respond(self, text_input: str, source: str):
+    def generate_speech(self, text_input: str, source: str, mode: str = 'say'):
+        """In say mode, this is start of conversation. In respond mode, this is a response in an ongoing dialog"""
         # Handle plan input from UI - strip quotes if present
         clean_input = text_input.strip().strip('"').strip("'")
         if source == 'ui' and clean_input.startswith('plan:'):
@@ -896,17 +892,21 @@ Allowed control‑flow primitives: sequential list (e.g.. [..., ...]), do_while,
             return
         
         try:
-            logger.info(f'Responding to: "{text_input}" (from {source})')
+            if mode == 'respond':
+                logger.info(f'Responding to: "{text_input}" from {source}')
+            else:
+                logger.info(f'Saying intent: "{text_input}" to {source}')
             
             # Check if dialog should naturally end
-            are_we_done = self.check_natural_dialog_end(source, text_input)
-            logger.warning(f'🤖 {self.character_name} Dialog end check: {are_we_done}')
-            if are_we_done:
-                action_data = {'type': 'dialog_end','action_id': f'action_{self.action_counter}','timestamp': datetime.now().isoformat(),'input': text_input,'text': 'Done','source': source}
-                self.last_action = action_data
-                self.action_publisher.put(json.dumps(action_data))
-                logger.info(f'📤 Published action: {action_data["action_id"]}')
-                return False
+            if mode == 'respond':
+                are_we_done = self.check_natural_dialog_end(source, text_input)
+                logger.warning(f'🤖 {self.character_name} Dialog end check: {are_we_done}')
+                if are_we_done:
+                    action_data = {'type': 'dialog_end','action_id': f'action_{self.action_counter}','timestamp': datetime.now().isoformat(),'input': text_input,'text': 'Done','source': source}
+                    self.last_action = action_data
+                    self.action_publisher.put(json.dumps(action_data))
+                    logger.info(f'📤 Published action: {action_data["action_id"]}')
+                    return False
             
             # Get recent memory entries for context
             recent_memories = self._get_recent_chat_memories(3)
@@ -914,11 +914,22 @@ Allowed control‑flow primitives: sequential list (e.g.. [..., ...]), do_while,
             entity_context = self.get_entity_context(source, 10)
             
             # Simple, focused prompt
-            system_prompt = """You are a helpful AI assistant. 
-            Analyze the input and provide a clear, actionable response.
-            Focus on being helpful and direct."""
+            if mode == 'say':
+                system_prompt = f"""Your task is to say the following:
+    "{text_input}" 
+updated to reflect the current context described below.
+
+you are:
+"""
+            else:
+                system_prompt = f"""Your task is to respond to:
+    "{text_input}"
+in the current context described below.
+
+you are:
+"""
             if self.character_config.get('character', None):
-                system_prompt = self.character_config['character']
+                system_prompt += self.character_config['character']
             if self.character_config.get('drives', None):
                 system_prompt += f"\n\nYour drives are:\n\t{'\n\t'.join(self.character_config['drives'])}\n"
             
@@ -928,12 +939,13 @@ Allowed control‑flow primitives: sequential list (e.g.. [..., ...]), do_while,
             if entity_context and isinstance(entity_context, dict):
                 conversation_history = entity_context.get('conversation_history', [])
                 if isinstance(conversation_history, list):
+                    user_prompt += f"Your recent conversation with {source} has been:\n"
                     for i, memory in enumerate(conversation_history):
                         if isinstance(memory, dict) and 'source' in memory and 'text' in memory:
                             user_prompt += f"{memory['source']}: {memory['text']}\n"
-            user_prompt +=  """Respond to the dialog to date. If you have not yet spoken, speak for yourself. If the dialog has reached a natural end, respond with 'Done'. 
+            user_prompt +=  """Speak in a conversational manner in your own voice.
 Do not include any other introductory, explanatory, discursive, or formatting text in your response.
-End your response with: </end>"""
+End your text with: </end>"""
                     
             # Make LLM call
             if self.llm_client and not self.shutdown_requested:
@@ -955,12 +967,13 @@ End your response with: </end>"""
 
                     # Create action
                     action_data = {
-                        'type': 'response',
+                        'type': 'say' if mode == 'say' else 'response',
                         'action_id': f'action_{self.action_counter}',
                         'timestamp': datetime.now().isoformat(),
                         'input': text_input,
                         'text': response.text.strip(),
-                        'source': source
+                        'source': self.character_name if mode == 'say' else source,
+                        'target': source if mode == 'say' else None
                      }
                     self.last_action = action_data
                     # Publish action (this will be picked up by memory_node and action_display_node)
@@ -977,6 +990,7 @@ End your response with: </end>"""
             logger.error(f'Error in LLM processing: {e}')
             logger.error(traceback.format_exc())
         return True
+
     
     def _resolve_target(self, action: Dict[str, Any]) -> Union[str, bool]:
         """
@@ -1119,7 +1133,7 @@ End your response with: </end>"""
         """Find which direction a target (character or resource) is visible in."""
         try:
             # Query situation node for current situation data
-            for reply in self.session.get(f"cognitive/{self.character_name}/situation", timeout=2.0):
+            for reply in self.session.get(f"cognitive/{self.character_name}/situation/current_situation", timeout=5.0):
                 if reply.ok:
                     situation_data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
                     if not situation_data.get('success'):

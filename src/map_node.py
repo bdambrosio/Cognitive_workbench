@@ -152,6 +152,12 @@ class MapNode:
             self.handle_resource_by_name
         )
         
+        # Resource removal queryable
+        self.resource_remove_queryable = self.session.declare_queryable(
+            "cognitive/map/resource/remove/*",
+            self.handle_resource_remove
+        )
+        
         # Terrain queryable
         self.terrain_queryable = self.session.declare_queryable(
             "cognitive/map/terrain",
@@ -479,9 +485,15 @@ class MapNode:
             
             resource = self.world_map.get_resource_by_name(resource_name)
             if resource:
+                # Create JSON-safe version of resource
+                json_safe_resource = resource.copy()
+                # Convert ResourceType object to string
+                if 'type' in json_safe_resource:
+                    json_safe_resource['type'] = str(json_safe_resource['type'])
+                
                 response = {
                     'success': True,
-                    'resource': resource
+                    'resource': json_safe_resource
                 }
             else:
                 response = {
@@ -492,6 +504,49 @@ class MapNode:
             query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
         except Exception as e:
             logger.error(f"Error handling resource by name query: {e}")
+            error_response = {
+                'success': False,
+                'error': str(e)
+            }
+            query.reply(query.key_expr, json.dumps(error_response).encode('utf-8'))
+    
+    def handle_resource_remove(self, query):
+        """Handle resource removal queries"""
+        try:
+            # Extract resource name from query key
+            key_parts = str(query.key_expr).split('/')
+            resource_name = key_parts[-1] if len(key_parts) > 0 else None
+            
+            if not resource_name:
+                raise ValueError("No resource name provided")
+            
+            # Get resource to remove by name
+            resource = self.world_map.get_resource_by_name(resource_name)
+            if not resource:
+                response = {
+                    'success': False,
+                    'error': f"Resource '{resource_name}' not found"
+                }
+            else:
+                # Remove the resource using the resource ID
+                resource_id = resource['name']  # The 'name' field contains the resource_id
+                success = self.world_map.remove_resource(resource_id)
+                
+                if success:
+                    response = {
+                        'success': True,
+                        'message': f"Resource '{resource_name}' removed successfully"
+                    }
+                    logger.info(f"Resource '{resource_name}' removed from map")
+                else:
+                    response = {
+                        'success': False,
+                        'error': f"Failed to remove resource '{resource_name}'"
+                    }
+            
+            query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
+        except Exception as e:
+            logger.error(f"Error handling resource removal query: {e}")
             error_response = {
                 'success': False,
                 'error': str(e)

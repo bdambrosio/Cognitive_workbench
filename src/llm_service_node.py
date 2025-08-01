@@ -42,7 +42,7 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 try:
-    from llm_api import LLM
+    from utils.llm_api import LLM
     from Messages import SystemMessage, UserMessage, AssistantMessage
     LLM_AVAILABLE = True
 except ImportError as e:
@@ -81,7 +81,11 @@ class ZenohLLMServiceNode:
     - Error handling and fallbacks
     """
     
-    def __init__(self):
+    def __init__(self, server_name: str = 'vllm', model_name: str = None):
+        # Store LLM configuration
+        self.server_name = server_name
+        self.model_name = model_name
+        
         # Initialize Zenoh session
         config = zenoh.Config()
         self.session = zenoh.open(config)
@@ -121,18 +125,21 @@ class ZenohLLMServiceNode:
         self.llm = None
         if LLM_AVAILABLE:
             try:
-                # Try to initialize with vllm server
-                llm_params = {'server_name': 'vllm'}
+                # Initialize with provided configuration
+                llm_params = {'server_name': self.server_name}
+                if self.model_name:
+                    llm_params['model_name'] = self.model_name
+                
                 self.llm = LLM(**llm_params)
-                logger.info(f'LLM __init__ accepts parameters: {llm_params}')
-                logger.info('✅ LLM API initialized with vllm server')
+                logger.info(f'✅ LLM API initialized with server: {self.server_name}, model: {self.model_name or "default"}')
             except Exception as e:
+                logger.error(f'❌ Failed to initialize LLM with server "{self.server_name}": {e}')
                 try:
                     # Fallback to default initialization
                     self.llm = LLM()
-                    logger.info('✅ LLM API initialized with default parameters')
+                    logger.info('✅ LLM API initialized with default parameters as fallback')
                 except Exception as e2:
-                    logger.error(f'Failed to initialize LLM: {e2}')
+                    logger.error(f'❌ Failed to initialize LLM with fallback: {e2}')
                     self.llm = None
         
         logger.info('🤖 Zenoh LLM Service Node initialized - ready for concurrent requests')
@@ -373,7 +380,16 @@ class ZenohLLMServiceNode:
 
 def main():
     """Main entry point for the LLM service node."""
-    llm_service_node = ZenohLLMServiceNode()
+    import argparse
+    
+    parser = argparse.ArgumentParser(description='Zenoh LLM Service Node')
+    parser.add_argument('--server-name', choices=['vllm', 'openai', 'openrouter'], default='vllm', 
+                       help='LLM server to use (default: vllm)')
+    parser.add_argument('--model-name', help='Model name to use with the LLM server')
+    
+    args = parser.parse_args()
+    
+    llm_service_node = ZenohLLMServiceNode(server_name=args.server_name, model_name=args.model_name)
     try:
         llm_service_node.run()
     finally:
