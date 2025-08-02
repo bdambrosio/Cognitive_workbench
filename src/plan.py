@@ -599,7 +599,7 @@ def is_near(character, target: str) -> bool:
         logger.error(f'Error checking proximity for {target}: {e}')
     return False
 
-def _evaluate_condition(character: ZenohExecutiveNode, condition: dict) -> bool:
+def _evaluate_condition(character: ZenohExecutiveNode, condition: dict, target: str) -> bool:
         """Evaluate a condition action dict using distributed node queries."""
         # The key to conditions is access to the character's beliefs and knowledge base.
         # Since this is distributed among nodes, we will used targeted queires by predicate.

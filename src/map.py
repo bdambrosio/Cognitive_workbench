@@ -307,7 +307,7 @@ def get_direction_name(dx: float, dy: float) -> str | None:
         • near horizontal  |dx/dy| ≥ tan 67.5°  →  E / W
     """
     if dx == dy == 0:
-        return None   # no direction
+        return Direction.Current   # no direction
 
     ax, ay = abs(dx), abs(dy)          # speed: no divisions, only compares
 
@@ -1543,7 +1543,7 @@ def get_slope_description(elevation_change):
         return "Downhill"
 
 
-def get_detailed_visibility_description(world, camera_x, camera_y, observer, observer_height):
+def get_detailed_visibility_description(world: WorldMap, camera_x: int, camera_y: int, observer: Agent, observer_height: int):
     visible_patches = world.get_visibility(camera_x, camera_y, observer_height)
     visible_patches.append(world.patches[camera_x][camera_y])  # Add current patch
 
@@ -1559,7 +1559,7 @@ def get_detailed_visibility_description(world, camera_x, camera_y, observer, obs
         if direction == Direction.Current:
             direction_patches = [world.patches[camera_x][camera_y]]
         else:
-            direction_patches = [p for p in visible_patches if (abs(p.x - camera_x) <= 15 and abs(p.y - camera_y) <= 15) and get_direction_name(p.x - camera_x, p.y - camera_y) == direction]
+            direction_patches = [p for p in visible_patches if (abs(p.x - camera_x) <= 16 and abs(p.y - camera_y) <= 16) and get_direction_name(p.x - camera_x, p.y - camera_y) == direction]
 
         if not direction_patches:
             ET.SubElement(direction_element, "visibility").text = "No clear visibility"

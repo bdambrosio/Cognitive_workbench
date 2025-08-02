@@ -6,6 +6,8 @@ This node implements the OODA loop for character decision-making and action exec
 Replaces ROS2 complexity with simple Zenoh pub/sub.
 """
 
+import math
+import random
 import traceback
 import zenoh
 import json
@@ -392,7 +394,7 @@ class ZenohExecutiveNode:
                             self.map_types = data
                             break
             if self.map_types:
-                self.system_prompt += f'\n#Available map types:'
+                system_prompt += f'\n#Available map types:'
                 if self.map_types.get('terrain_types'):
                     system_prompt += f"\n\tTerrain: {', '.join(self.map_types['terrain_types'])}"
                 if self.map_types.get('infrastructure_types'):
@@ -721,15 +723,12 @@ respond only with the JSON plan, no other text.
         if idx >= len(plan):
             # Handle frame completion based on type
             if current_frame['type'] == 'do_while':
-                # Do-while body completed, test condition
-                condition_action = current_frame['condition']
-                condition_action = self._resolve_target(condition_action)
-                if plan_module._evaluate_condition(self, condition_action):
-                    # Condition true, repeat loop
-                    current_frame['idx'] = 0  # Reset to start of body
-                    return self._execute_next_step(step_stack)
-                else:
-                    # Condition false, exit loop
+                # Do-while body completed, increment iteration count
+                current_frame['iteration_count'] += 1
+                
+                # Check iteration limit first
+                if current_frame['iteration_count'] >= current_frame['max_iterations']:
+                    # Max iterations reached, exit loop
                     step_stack.pop()  # Remove do_while frame
                     if step_stack.is_empty():
                         # Plan complete
@@ -743,6 +742,29 @@ respond only with the JSON plan, no other text.
                         parent_frame = step_stack.peek()
                         parent_frame['idx'] = current_frame['return_to']
                         return self._execute_next_step(step_stack)
+                else:
+                    # Test original condition
+                    condition_action = current_frame['condition']
+                    resolved_target = self._resolve_target(condition_action)
+                    if plan_module._evaluate_condition(self, condition_action, resolved_target):
+                        # Condition true, repeat loop
+                        current_frame['idx'] = 0  # Reset to start of body
+                        return self._execute_next_step(step_stack)
+                    else:
+                        # Condition false, exit loop
+                        step_stack.pop()  # Remove do_while frame
+                        if step_stack.is_empty():
+                            # Plan complete
+                            self.current_plan = None
+                            self.plan_bindings_cache = {}
+                            self._publish_current_plan()
+                            self.plan_state = None
+                            return None
+                        else:
+                            # Continue at parent level
+                            parent_frame = step_stack.peek()
+                            parent_frame['idx'] = current_frame['return_to']
+                            return self._execute_next_step(step_stack)
             else:
                 # Regular frame completed, pop and continue
                 step_stack.pop()
@@ -773,7 +795,9 @@ respond only with the JSON plan, no other text.
                 'idx': 0,
                 'type': 'do_while',
                 'condition': step.get('condition', None),
-                'return_to': idx + 1  # Where to go when loop exits
+                'return_to': idx + 1,  # Where to go when loop exits
+                'iteration_count': 0,  # Track current iteration
+                'max_iterations': 5    # Maximum allowed iterations
             }
             step_stack.push(do_while_frame)
             return self._execute_next_step(step_stack)
@@ -781,8 +805,8 @@ respond only with the JSON plan, no other text.
         elif step['type'] == 'if':
             # Handle if-then-else
             condition_action = step.get('condition', None)
-            condition_action = self._resolve_target(condition_action)
-            if plan_module._evaluate_condition(self, condition_action):
+            resolved_target = self._resolve_target(condition_action)
+            if plan_module._evaluate_condition(self, condition_action, resolved_target):
                 # Condition true, execute then branch
                 then_frame = {
                     'plan': step['then'],
@@ -819,19 +843,22 @@ respond only with the JSON plan, no other text.
         """Act: Execute the chosen action."""
 
         action = self.current_action if self.current_action else action
+        self.last_action = action
         if action['type'].lower() == "sleep":
             action_data = {'type': 'sleep','action_id': self.action_counter,'timestamp': datetime.now().isoformat(),'target': self.character_name}
-            self.last_action = action_data
             self.action_publisher.put(json.dumps(action_data))
+            self.last_action_result = 'slept'
             time.sleep(1)  # Sleep for 1 second
             return
         if action['type'].lower() == 'think':
-            self.think_about(action['value'])
+            thought = self.think_about(action)
             return
             
-        action = self._resolve_target(action)
+        resolved_target = self._resolve_target(action)
+        if not resolved_target:
+            logger.error(f'❌ Cannot resolve target for action: {action}')
         if action['type'].lower() == "move":
-            move_target = action['target'].strip()
+            move_target = resolved_target.strip() if resolved_target else ''
             move_direction = move_target.lower()
             
             # Step 1: Test for compass points first (case insensitive)
@@ -840,25 +867,25 @@ respond only with the JSON plan, no other text.
                 self.move(move_direction)
                 return
             else:
-                logger.error(f'❌ Cannot move toward "{move_target}" - target not resolved or visible')
+                logger.error(f'❌ Cannot move toward "{move_target}" - target not resolved or visible, choosing random direction')
+                self.move(random.choice(cardinal_directions))
                 return
         elif action['type'].lower() == "say":
-            self.generate_speech(action['value'], action['target'], mode='say')            # Publish action (this will be picked up by action_display_node)
+            self.generate_speech(action['value'], resolved_target, mode='say')            # Publish action (this will be picked up by action_display_node)
 
-        elif action['type'].lower() == "think":
-            self.think_about(action['value'])
         elif action['type'].lower() == "take":
-            self.take(action['target'])
+            self.take(resolved_target)
             self.action_counter += 1
         elif action['type'].lower() == "inspect":
-            action_data = {'type': 'inspect','action_id': self.action_counter,'timestamp': datetime.now().isoformat(),'target': action['target']}
+            action_data = {'type': 'inspect','action_id': self.action_counter,'timestamp': datetime.now().isoformat(),'target': resolved_target}
             self.last_action = action_data
             self.action_publisher.put(json.dumps(action_data))
-            self.inspect(action['target'])
+            self.inspect(resolved_target)
         elif action['type'].lower() == "use":
             # Create action - noop for now
-            action_data = {'type': 'use','action_id': self.action_counter,'timestamp': datetime.now().isoformat(),'target': action['target']}
+            action_data = {'type': 'use','action_id': self.action_counter,'timestamp': datetime.now().isoformat(),'target': resolved_target}
             self.last_action = action_data
+            self.last_action_result = 'not yet implemented'
             self.action_publisher.put(json.dumps(action_data))
             #self.use(action)
         logger.warning(f'📤 Published action: {action["type"]}')
@@ -987,7 +1014,7 @@ respond only with the JSON plan, no other text.
         if source == 'ui' and clean_input.startswith('plan:'):
             self.parse_and_set_plan(clean_input)
             return
-        
+        text_to_send = ''
         try:
             if mode == 'respond':
                 logger.info(f'Responding to: "{text_input}" from {source}')
@@ -1005,9 +1032,6 @@ respond only with the JSON plan, no other text.
                     logger.info(f'📤 Published action: {action_data["action_id"]}')
                     return False
             
-            # Get recent memory entries for context
-            recent_memories = self._get_recent_chat_memories(3)
-            # Get entity context if source is not console
             entity_context = self.get_entity_context(source, 10)
             
             # Simple, focused prompt
@@ -1025,14 +1049,11 @@ in the current context described below.
 
 you are:
 """
-            if self.character_config.get('character', None):
-                system_prompt += self.character_config['character']
-            if self.character_config.get('drives', None):
-                system_prompt += f"\n\nYour drives are:\n\t{'\n\t'.join(self.character_config['drives'])}\n"
+            system_prompt += self.observations['static']
             
             # Build user prompt with context
             user_prompt = '' 
-            user_prompt += self.format_situation()
+            user_prompt += self.observations['dynamic']
             if entity_context and isinstance(entity_context, dict):
                 conversation_history = entity_context.get('conversation_history', [])
                 if isinstance(conversation_history, list):
@@ -1062,8 +1083,16 @@ End your text with: </end>"""
                         self.send_text_input(source, text_to_send)
                         logger.warning(f'Responding to: "{text_input}" from {source}: {text_to_send}')
 
+                else:
+                    logger.error(f'LLM call failed: {response.error}')
+            else:
+                logger.error('LLM client not available, skipping LLM call')
+                
+        except Exception as e:
+            logger.error(f'Error in LLM processing: {e}')
+            logger.error(traceback.format_exc())
                     # Create action
-                    action_data = {
+        action_data = {
                         'type': 'say' if mode == 'say' else 'response',
                         'action_id': f'action_{self.action_counter}',
                         'timestamp': datetime.now().isoformat(),
@@ -1071,22 +1100,21 @@ End your text with: </end>"""
                         'text': response.text.strip(),
                         'source': self.character_name if mode == 'say' else source,
                         'target': source if mode == 'say' else None
-                     }
-                    self.last_action = action_data
-                    # Publish action (this will be picked up by memory_node and action_display_node)
-                    self.action_publisher.put(json.dumps(action_data))
-                    logger.info(f'📤 Published action: {action_data["action_id"]}')
-                    
-                    self.action_counter += 1
-                else:
-                    logger.error(f'LLM call failed: {response.error}')
-            else:
-                logger.error('LLM client not available')
-                
-        except Exception as e:
-            logger.error(f'Error in LLM processing: {e}')
-            logger.error(traceback.format_exc())
-        return True
+        }
+        self.last_action = {'type': 'say' if mode == 'say' else 'response', 
+                            'action_id': f'action_{self.action_counter}', 
+                            'timestamp': datetime.now().isoformat(), 
+                            'input': text_input, 
+                            'text': text_to_send, 
+                            'source': self.character_name if mode == 'say' else source, 
+                            'target': source if mode == 'say' else None   
+                            }
+        self.last_action_result = text_to_send
+        # Publish action (this will be picked up by memory_node and action_display_node)
+        self.action_publisher.put(json.dumps(action_data))
+        logger.info(f'📤 Published action: {action_data["action_id"]}')
+        self.action_counter += 1
+        return text_to_send
 
     
     def _resolve_target(self, action: Dict[str, Any]) -> Union[str, bool]:
@@ -1104,7 +1132,7 @@ End your text with: </end>"""
         raw_target = action.get('target', None)
         
         if not raw_target:
-            return action
+            return None
             
         # Check plan bindings cache first
         cache_key = raw_target
@@ -1128,53 +1156,42 @@ End your text with: </end>"""
                 # Step 1: Test for compass points first (case insensitive)
                 cardinal_directions = ['north', 'northeast', 'southeast', 'south', 'southwest', 'northwest', 'east', 'west']
                 if move_direction in cardinal_directions:
-                    return action
+                    return move_direction
                 else:
-                    resolved_target = self._resolve_resource_instance(raw_target) or self._resolve_character_instance(raw_target)
+                    resolved_target = self._resolve_resource_instance(raw_target) or self._resolve_character_instance(raw_target) or self.resolve_terrain_instance(raw_target)
                     if not resolved_target:
                         resolved_target = self._resolve_character_instance(raw_target)
                         if not resolved_target:
-                            return action
-                    self.plan_bindings_cache[cache_key] = resolved_target
+                            resolved_target = self.resolve_terrain_instance(raw_target)
+                            if not resolved_target:
+                                return None
+
+                    #self.plan_bindings_cache[cache_key] = resolved_target
                     move_direction = self._find_target_direction(resolved_target)
-                    if move_direction:
-                        action_copy = action.copy()
-                        action_copy['target'] = move_direction
-                        return action_copy
-                    else:
-                        return action
+                    return move_direction
+                
             if action_type in ['take', 'inspect', 'use', 'has_item', 'hasnt_item']:
                 # Resource actions/conditions - resolve to specific resource instance
                 resolved_target = self._resolve_resource_instance(raw_target) or self._resolve_character_instance(raw_target)
-                action_copy = action.copy()
-                action_copy['target'] = resolved_target
-                return action_copy
+                return resolved_target
                 
             elif action_type in ['say', 'can_see', 'cant_see']:
                 # Character actions/conditions - resolve to specific character name
                 resolved_target = self._resolve_character_instance(raw_target)
-                action_copy = action.copy()
-                action_copy['target'] = resolved_target
-                return action_copy
+                return resolved_target
                 
             elif action_type in ['near', 'notnear']:
                 # Proximity conditions - could be character or resource
-                resolved_target = self._resolve_resource_instance(raw_target) or self._resolve_character_instance(raw_target)
-                action_copy = action.copy()
-                action_copy['target'] = resolved_target
-                return action_copy
+                resolved_target = self._resolve_resource_instance(raw_target) or self._resolve_character_instance(raw_target) or self.resolve_terrain_instance(raw_target)
+                return resolved_target
             elif action_type in ['at_location', 'notat_location']:
                 # Location conditions - pass through for now
-                resolved_target = self._resolve_resource_instance(raw_target) or self._resolve_character_instance(raw_target)
-                action_copy = action.copy()
-                action_copy['target'] = resolved_target
-                return action_copy
+                resolved_target = self._resolve_resource_instance(raw_target) or self._resolve_character_instance(raw_target) or self.resolve_terrain_instance(raw_target)
+                return resolved_target
             else:
                 logger.warning(f'❓ Unknown action type for resolution: {action_type}')
                 resolved_target = raw_target  # Pass through unchanged
-                action_copy = action.copy()
-                action_copy['target'] = resolved_target
-                return action_copy
+                return resolved_target
         except Exception as e:
             logger.error(f'❌ Error resolving target "{raw_target}" for {action_type}: {e}')
             resolved_target = False
@@ -1205,9 +1222,16 @@ End your text with: </end>"""
                         return raw_target
                 break
             
-            # TODO: Fuzzy matching stub - implement abstract -> specific resolution
-            # e.g., "Berry" -> "Berry23", "Fruit" -> "Apple1", etc.
-            logger.debug(f'🚧 Fuzzy resource resolution stub for: {raw_target}')
+            # First try exact match validation
+            for reply in self.session.get(f"cognitive/map/bind/resource/{raw_target}", timeout=2.0):
+                if reply.ok:
+                    data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
+                    if data.get('success'):
+                        resolved_target = data.get('resolved_target', raw_target)
+                        logger.debug(f'✅ Exact resource instance: {raw_target} -> {resolved_target}')
+                        return resolved_target
+                break
+            
             return False
             
         except Exception as e:
@@ -1217,6 +1241,8 @@ End your text with: </end>"""
     def _resolve_character_instance(self, raw_target: str) -> Union[str, bool]:
         """Resolve abstract character name to specific character instance."""
         try:
+            if raw_target.lower() == 'person':
+                return raw_target # needs to be resolved in an action or condition-specific way.
             # For characters, exact names are typically used
             # Just validate character exists in some form
             canonical_name = raw_target.capitalize()
@@ -1304,23 +1330,26 @@ End your text with: </end>"""
                     logger.error(f'Error parsing move response: {e}')
                     break
             
+            self.last_action_result = f'moved in direction {move_direction}'
+            
+        except Exception as e:
+            logger.error(f'Error in move operation: {e}')
             # Create and publish action data
-            action_data = {
+        action_data = {
                 'type': 'move',
                 'direction': move_direction,
                 'action_id': f"move_{int(time.time())}",
                 'timestamp': datetime.now().isoformat()
             }
-            self.last_action = action_data
-            self.action_publisher.put(json.dumps(action_data).encode('utf-8'))
-            logger.info(f'📤 Published move action: {move_direction}')
-            
-        except Exception as e:
-            logger.error(f'Error in move operation: {e}')
+        self.action_publisher.put(json.dumps(action_data).encode('utf-8'))
+        self.last_action = action_data
+        self.last_action_result = f'move failed'
     
     def take(self, target: str):
         """Take a resource and add it to inventory."""
-        try:
+        self.last_action_result = f'taking {target}'
+
+        def _do_take(target: str):
             # First validate that the target exists and is a resource
             resource_exists = False
             for reply in self.session.get(f"cognitive/map/resource/{target}", timeout=2.0):
@@ -1329,38 +1358,21 @@ End your text with: </end>"""
                     if data.get('success'):
                         resource_exists = True
                         logger.debug(f'✅ Validated {target} is a resource')
-                    else:
-                        logger.warning(f'❌ Cannot take {target} - not a resource or does not exist')
-                        return False
                 break
-
             if not resource_exists:
                 logger.warning(f'❌ Cannot take {target} - resource validation failed')
+                self.last_action_result = f'cannot take {target} - resource validation failed'
                 return False
 
             # Validate that the target is near
             if not plan_module.is_near(self, target):
                 logger.warning(f'❌ Cannot take {target} - not near resource')
+                self.last_action_result = f'cannot take {target} - not near resource'
                 return False
 
-            # The take action will be published via the normal action_publisher
-            # and memory_node will see it and handle adding to inventory
-
             logger.info(f'📦 Taking {target} for {self.character_name}')
-
-            # Create and publish action data for logging/display
-            action_data = {
-                'type': 'take',
-                'target': target,
-                'action_id': f"take_{int(time.time())}",
-                'timestamp': datetime.now().isoformat(),
-                'character': self.character_name
-            }
-            self.last_action = action_data
-            self.action_publisher.put(json.dumps(action_data))
-            logger.info(f'📤 Published take action: {target}')
-
-            # Remove the resource from the map
+            self.last_action_result = f'taking {target}'
+                        # Remove the resource from the map
             for reply in self.session.get(f"cognitive/map/resource/remove/{target}", timeout=2.0):
                 if reply.ok:
                     data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
@@ -1374,12 +1386,48 @@ End your text with: </end>"""
 
             return True
 
+        try:
+            result = self.do_take(target)
+            # Create and publish action data for logging/display
+            action_data = {
+                'type': 'take',
+                'target': target,
+                'action_id': f"take_{int(time.time())}",
+                'timestamp': datetime.now().isoformat(),
+                'character': self.character_name
+            }
+            self.last_action = {'type': 'take', 'target': target, 'action_id': f"take_{int(time.time())}", 'timestamp': datetime.now().isoformat(), 'character': self.character_name}
+            self.action_publisher.put(json.dumps(action_data))
+            logger.info(f'📤 Published take action: {target}')
+            return True
+
         except Exception as e:
             logger.error(f'Error in take operation for {target}: {e}')
-            return False
+            self.last_action_result = f'take failed'
+
+        # Create and publish action data for logging/display
+        action_data = {
+            'type': 'take',
+            'target': target,
+            'action_id': f"take_{int(time.time())}",
+            'timestamp': datetime.now().isoformat(),
+            'character': self.character_name
+        }
+        self.last_action = {'type': 'take', 'target': target, 'action_id': f"take_{int(time.time())}", 'timestamp': datetime.now().isoformat(), 'character': self.character_name}
+        self.action_publisher.put(json.dumps(action_data))
+        logger.info(f'📤 Published take action: {target}')
+        return True
     
     def inspect(self, target: str):
         """Learn about a resource."""
+            # Create and publish action data for logging/display
+        action_data = {
+                'type': 'inspect',
+                'target': target,
+                'action_id': f"take_{int(time.time())}",
+                'timestamp': datetime.now().isoformat(),
+                'character': self.character_name
+        }
         try:
             # First validate that the target exists and is a resource
             resource_exists = False; is_near = False
@@ -1398,36 +1446,27 @@ End your text with: </end>"""
 
             if not resource_exists or not is_near:
                 logger.warning(f'❌ Cannot inspect {target} - resource validation failed')
-                return False
+                self.last_action_result = f'cannot inspect {target} - resource validation failed'
 
             logger.info(f'📦 Inspecting {target} for {self.character_name}')
-
-            # Create and publish action data for logging/display
-            action_data = {
-                'type': 'inspect',
-                'target': target,
-                'action_id': f"take_{int(time.time())}",
-                'timestamp': datetime.now().isoformat(),
-                'character': self.character_name
-            }
-            self.last_action = action_data
-            self.action_publisher.put(json.dumps(action_data))
-            logger.info(f'📤 Published take action: {target}')
-
+            self.last_action_result = f'inspected {target}'
             return True
 
         except Exception as e:
             logger.error(f'Error in inspect operation for {target}: {e}')
-            return False
+            self.last_action_result = f'inspect failed'
+        self.last_action = {'type': 'inspect', 'target': target, 'action_id': f"inspect_{int(time.time())}", 'timestamp': datetime.now().isoformat(), 'character': self.character_name}
+        self.action_publisher.put(json.dumps(action_data))
 
-    def think_about(self, value: str):
+    def think_about(self, action: dict):
         """Think about a value."""
-        logger.warning(f'Thinking about: {value}')
+        logger.warning(f'Thinking about: {action}')
+        thought = ''
         try:
             system_prompt = self.observations['static']
             user_prompt = self.observations['dynamic']
 
-            directive = f"""You are thinking about: {value}.\n\n Derive new information, insights, goals, or conclusions based on your memories, drives, and the current situation.
+            directive = f"""You are thinking about: {action['value']}.\n\n Derive new information, insights, goals, or conclusions based on your memories, drives, and the current situation.
     This new information should be a short statement (10 words max) not explicit in the information provided that will guide your future thoughts and actions.
     Respond with the new information in the following hash-formatted syntax:
 
@@ -1455,23 +1494,6 @@ End your text with: </end>"""
                     thought = hash_utils.find('thought', response.text)
                     if not thought:
                         logger.error(f'No thought found in LLM response: {response.text}')
-                        return
-
-                    # Create action
-                    action_data = {
-                        'type': 'think',
-                        'action_id': f'action_{self.action_counter}',
-                        'timestamp': datetime.now().isoformat(),
-                        'input': value,
-                        'text': response.text.strip(),
-                        'source': self.character_name
-                     }
-                    self.last_action = action_data                    
-                    # Publish action (this will be picked up by memory_node and action_display_node)
-                    self.action_publisher.put(json.dumps(action_data))
-                    logger.info(f'📤 Published action: {action_data["action_id"]}')
-                    
-                    self.action_counter += 1
                 else:
                     logger.error(f'LLM call failed: {response.error}')
             else:
@@ -1480,7 +1502,23 @@ End your text with: </end>"""
         except Exception as e:
             logger.error(f'Error in LLM processing: {e}')
             logger.error(traceback.format_exc())
-        pass
+            # Create action
+        action_data = {
+                        'type': 'think',
+                        'action_id': f'action_{self.action_counter}',
+                        'timestamp': datetime.now().isoformat(),
+                        'input': action['value'],
+                        'text': response.text.strip(),
+                        'source': self.character_name
+            }
+        self.last_action = action
+        self.last_action_result = thought
+        # Publish action (this will be picked up by memory_node and action_display_node)
+        self.action_publisher.put(json.dumps(action_data))
+        logger.info(f'📤 Published action: {action_data["action_id"]}')
+        self.action_counter += 1
+            
+        return thought
     
     def _get_recent_chat_memories(self, num_entries: int) -> List[Dict[str, Any]]:
         """Get recent memory entries using Zenoh queries."""
