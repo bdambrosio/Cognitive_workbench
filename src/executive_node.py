@@ -51,6 +51,80 @@ except ImportError as e:
     print(f"⚠️  LLM Client not available: {e}")
     LLM_CLIENT_AVAILABLE = False
 
+PLAN_SYNTAX = """
+Task: Break down the user’s high‑level goal into a minimal plan in the JSON format specified below.
+Output: only valid JSON – no prose, no code fences.
+
+{
+  "plan": [
+    { "type": "move", "target": "…"},
+    { "type": "say", "target": "…", "value": "…" },
+    { "type": "think", "value": "…" },
+    { "type": "take", "target": "…" },
+    { "type": "inspect", "target": "…" },
+    { "type": "use", "target": "…" },
+    { "type": "do_while", "body": [ /* steps */ ], "condition": "…" },
+    { "type": "if", "condition": "…", "then": [ /* steps */ ], "else": [ /* steps */ ] }
+  ]
+}
+
+A plan must include no more than 10 steps including all nested do_while and if branches.
+In the following, <resource_name>, <character_name> are placeholders only for KNOWN resources, characters, or maptypes, those appearing above.
+Only dicts of the types below are allowed for the condition of do_while and if. Condition action type can only be one of the following:
+ - "near": {"type": "near", "target": <resource name? or <character_name>} is for checking if the character is near a resource or character.
+ - "can_see": {"type": "can_see", "target": <character_name>} is for checking if the character can see a character.
+ - "has_item": {"type": "has_item", "target": <resource_name>} is for checking if the character has a resource in their inventory.
+ - "at_location": {"type": "at_location", "target": <location_name>} is for checking if the character is at a location.
+ - "believes": {"type": "believes", "target": <character_name>} is for checking if the character believes something about another character.
+ - "notnear": {"type": "notnear", "target": <resource name? or <character_name>} is for checking if the character is not near a resource or character.
+ - "cant_see": {"type": "cant_see", "target": <character_name>} is for checking if the character cannot see a character.
+ - "hasnt_item": {"type": "hasnt_item", "target": <resource_name>} is for checking if the character does not have a resource in their inventory.
+ - "notat_location": {"type": "notat_location", "target": <resource_name>} is for checking if the character is not at a location.
+ - "notbelieves": {"type": "notbelieves", "target": <character_name>} is for checking if the character does not believe something about another character.
+
+outside a do_while or if condition, "type" can take the values "say", "move", "think", "take", "inspect", or "use":
+ - "say": { "type": "say", "target": "character_name", "value": "text to speak" } is for speaking to another character you can see. For a 'say' act, speak only for yourself, and do not include any other introductory, explanatory, discursive, or formatting text in your response.
+ - "move": { "type": "move", "target": "cardinal_direction" or 'resource or character name'} is for moving in one of the 8 cardinal directions or in the direction of a resource or character.
+ - "think": { "type": "think", "value": "text to think about" } is for thinking about a topic or question, attempting to derive new information, conclusions, or decisions from who you are and what you already explicitly know
+ - "take": { "type": "take", "target": "resource_name" } is for adding some resource you see to your personal inventory. you must be 'near' the resource to take it.
+ - "inspect": { "type": "inspect", "target": "resource_name" } is for inspecting a resource you see or one in your inventory to understand how to use it.
+ - "use": { "type": "use", "target": "resource_name" } is for using a resource in a known way.
+
+In general, a target can be a specific resource_name or character_name or a map type generalization. 
+For example, Berry2, Berry, Joe, clearing (assuming it is a terrain type) are all valid targets. 
+However, if the target is not an instance, the specific resource or character bound to is indeterminate. 
+For move, target can also be one of the 8 compass points.
+For example, 
+    {"type": "if", "condition": {"type": "near", "target": "Berry"}, "then": [{"type": "move", "target": "Berry"}]}
+is a valid plan. Likewise,
+    {"type": "if", "condition": {"type": "near", "target": "Joe"}, "then": [{"type": "move", "target": "Joe"}]}
+is a valid plan.
+Note that move only moves one step, so you must use a do_while to move repeatedly.
+
+Some actions have conditions that must be met before they can be executed.
+for example, you cannot take a resource unless you are near it.
+you can accomplish this by using the "near" condition in a do_while. Assuming, for example, that Cave2 is in your situation view direction Northeast
+
+{
+  "plan": [
+    { "type": "do_while", "body": [ { "type": "move", "target": "Northeast" } ], "condition": { "type": "notnear", "target": "Cave2" } },
+    { "type": "take", "target": "Cave2" }
+  ]
+}
+
+###
+Allowed control‑flow primitives: sequential list (e.g.. [..., ...]), do_while, and two‑branch if (else is optional).
+{
+  "plan": [
+    { "type": "action", "target": "…", "value": "…" },
+    { "type": "do_while", "body": [ /* steps */ ], "condition": "…" },
+    { "type": "if", "condition": "…", "then": [ /* steps */ ], "else": [ /* steps */ ] }
+  ]
+}
+
+A plan must include no more than 8 steps including all nested do_while and if branches.
+A plan must not contain sequential adjacent say actions.
+"""
 
 class ZenohExecutiveNode:
     """
@@ -78,7 +152,7 @@ class ZenohExecutiveNode:
         
         # Subscriber for situation data (character-specific)
         self.situation_subscriber = self.session.declare_subscriber(
-            f"cognitive/{character_name}/situation/current_situation",
+            f"cognitive/{character_name}/situation/update",
             self.situation_callback
         )
         
@@ -140,6 +214,11 @@ class ZenohExecutiveNode:
             self.shutdown_callback
         )
         
+        # Subscriber for end dialog queries (character-specific)
+        self.end_dialog_subscriber = self.session.declare_subscriber(
+            f"cognitive/{character_name}/dialog_end",
+            self._dialog_end_callback
+        )
         # Shutdown flag
         self.shutdown_requested = False
 
@@ -160,8 +239,9 @@ class ZenohExecutiveNode:
         
         logger.info(f'🧠 Zenoh Executive Node initialized for character: {character_name}')
         logger.info(f'   - Subscribing to: cognitive/{character_name}/sense_data')
-        logger.info(f'   - Subscribing to: cognitive/{character_name}/situation')
+        logger.info(f'   - Subscribing to: cognitive/{character_name}/situation/update')
         logger.info(f'   - Subscribing to: cognitive/map/turn/go')
+        logger.info(f'   - Subscribing to: cognitive/{character_name}/end_dialog')
         logger.info(f'   - Publishing to: cognitive/{character_name}/action')
         logger.info(f'   - Publishing to: cognitive/{character_name}/memory/store')
         logger.info(f'   - Publishing to: cognitive/{character_name}/text_input')
@@ -192,10 +272,10 @@ class ZenohExecutiveNode:
                             content_data = json.loads(content)
                             text_input = content_data.get('text', '')
                             source = content_data.get('source', 'unknown')
-                            if source == 'ui': # other text inputs must be handled by OODA to observe dialog turn taking
-                                self.generate_speech(text_input, source, mode='respond')
-                                self.text_input_pending = False
-                                self.last_sense_data = None
+                            #if source == 'ui': # other text inputs must be handled by OODA to observe dialog turn taking
+                            self.generate_speech(text_input, source, mode='respond')
+                            self.text_input_pending = False
+                            self.last_sense_data = None
                         except (json.JSONDecodeError, TypeError):
                             logger.error(f'Error parsing text input: {content}')
                             self.text_input_pending = False
@@ -271,7 +351,7 @@ class ZenohExecutiveNode:
         try:
             decided_action_data = {
                 'decided_action': f"{action['type']}: {action.get('target', '')} - {action.get('value', '')}",
-                'action': action['type'],
+                'type': action['type'],
                 'target': action.get('target', ''), 
                 'value': action.get('value', ''),
                 'timestamp': datetime.now().isoformat(),
@@ -303,54 +383,20 @@ class ZenohExecutiveNode:
     def _run_ooda_loop(self):
         """Execute the OODA loop: Observe, Orient, Decide, Act."""
         try:
-            logger.warning(f'🔄 {self.character_name} OODA loop running')
-            if self.text_input_pending and (not self.last_action or (self.last_action['type'].lower() != 'response' and self.last_action['type'].lower() != 'say')):
-                self.text_input_pending = False
-                content = self.last_sense_data['content']
-                try:
-                    content_data = json.loads(content)
-                    text_input = content_data.get('text', '')
-                    source = content_data.get('source', 'unknown')
-                except (json.JSONDecodeError, TypeError):
-                    # Fallback to plain text (console input format)
-                    text_input = content
-                    source = 'console'
-                responded = self.generate_speech(text_input, source, mode='respond')
-                if responded:
-                    return
-            if self.interrupt_pending:
-                self.interrupt_pending = False
-                pass
             # Observe: Collect current situation and sense data
             observations = self._observe()
             
             # Orient: Assess current state and goals
-            if self.interrupt_pending:
-                self.interrupt_pending = False
-                if self._handle_interrupt():
-                    return
             goal = self._orient(observations)
             
             # Plan: Return existing plan or create single-action plan
-            if self.interrupt_pending:
-                self.interrupt_pending = False
-                if self._handle_interrupt():
-                    return
             plan = self._plan(goal)
             
             # Plan Step: Execute current step of plan
-            if self.interrupt_pending:
-                self.interrupt_pending = False
-                if self._handle_interrupt():
-                    return
             action = self._plan_step(plan)
             
             # Act: Execute the chosen action (if we have one)
             if action is not None:
-                if self.interrupt_pending:
-                    self.interrupt_pending = False
-                    if self._handle_interrupt():
-                        return
                 self._act(action)
             
         except Exception as e:
@@ -374,6 +420,15 @@ class ZenohExecutiveNode:
                 formatted_situation += f"You are adjacent to these resources (available to take, inspect, or use): {', '.join(adjacent['resources'])}\n"
             if adjacent.get('characters'):
                 formatted_situation += f"You are adjacent to these characters (available to interact with): {', '.join(adjacent['characters'])}\n"
+
+        if self.last_situation_data and self.last_situation_data.get('visible_characters'):
+            for character_name in self.last_situation_data['visible_characters']:
+                entity_context = self.get_entity_context(character_name, 10)
+                if entity_context:
+                    formatted_situation += f"\nYou can see {character_name}, with whom you have had the following conversation history:\n"
+                    for memory in entity_context['conversation_history']: 
+                        formatted_situation += f"\n\t{memory['source']}: {memory['text']}"
+                    formatted_situation += '\n'
         
         return formatted_situation
 
@@ -429,8 +484,9 @@ class ZenohExecutiveNode:
                 for item in inventory:
                     user_prompt += f"\n\t{item}"
             user_prompt += '\n'
-
-
+            if self.last_action:
+                user_prompt += f'\n#Your last action was:'
+                user_prompt += f"\n\t{self.last_action.get('type')}: {self.last_action.get('target')} - {self.last_action_result}\n"
 
             self.observations = {'static': system_prompt, 'dynamic': user_prompt}
             return self.observations
@@ -510,82 +566,6 @@ Respond ONLY with the above hash-formatted text.
         # If we already have a plan, return it
         if self.current_plan is not None:
             return self.current_plan
-        
-        # No existing plan - create single-action plan using existing _decide logic
-        plan_syntax = """
-Task: Break down the user’s high‑level goal into a minimal plan in the JSON format specified below.
-Output: only valid JSON – no prose, no code fences.
-
-{
-  "plan": [
-    { "type": "move", "target": "…"},
-    { "type": "say", "target": "…", "value": "…" },
-    { "type": "think", "value": "…" },
-    { "type": "take", "target": "…" },
-    { "type": "inspect", "target": "…" },
-    { "type": "use", "target": "…" },
-    { "type": "do_while", "body": [ /* steps */ ], "condition": "…" },
-    { "type": "if", "condition": "…", "then": [ /* steps */ ], "else": [ /* steps */ ] }
-  ]
-}
-
-A plan must include no more than 10 steps including all nested do_while and if branches.
-In the following, <resource_name>, <character_name> are placeholders only for KNOWN resources, characters, or maptypes, those appearing above.
-Only dicts of the types below are allowed for the condition of do_while and if. Condition action type can only be one of the following:
- - "near": {"type": "near", "target": <resource name? or <character_name>} is for checking if the character is near a resource or character.
- - "can_see": {"type": "can_see", "target": <character_name>} is for checking if the character can see a character.
- - "has_item": {"type": "has_item", "target": <resource_name>} is for checking if the character has a resource in their inventory.
- - "at_location": {"type": "at_location", "target": <location_name>} is for checking if the character is at a location.
- - "believes": {"type": "believes", "target": <character_name>} is for checking if the character believes something about another character.
- - "notnear": {"type": "notnear", "target": <resource name? or <character_name>} is for checking if the character is not near a resource or character.
- - "cant_see": {"type": "cant_see", "target": <character_name>} is for checking if the character cannot see a character.
- - "hasnt_item": {"type": "hasnt_item", "target": <resource_name>} is for checking if the character does not have a resource in their inventory.
- - "notat_location": {"type": "notat_location", "target": <resource_name>} is for checking if the character is not at a location.
- - "notbelieves": {"type": "notbelieves", "target": <character_name>} is for checking if the character does not believe something about another character.
-
-outside a do_while or if condition, "type" can take the values "say", "move", "think", "take", "inspect", or "use":
- - "say": { "type": "say", "target": "character_name", "value": "text to speak" } is for speaking to another character you can see. For a 'say' act, speak only for yourself, and do not include any other introductory, explanatory, discursive, or formatting text in your response.
- - "move": { "type": "move", "target": "cardinal_direction" or 'resource or character name'} is for moving in one of the 8 cardinal directions or in the direction of a resource or character.
- - "think": { "type": "think", "value": "text to think about" } is for thinking about a topic or question, attempting to derive new information, conclusions, or decisions from who you are and what you already explicitly know
- - "take": { "type": "take", "target": "resource_name" } is for adding some resource you see to your personal inventory. you must be 'near' the resource to take it.
- - "inspect": { "type": "inspect", "target": "resource_name" } is for inspecting a resource you see or one in your inventory to understand how to use it.
- - "use": { "type": "use", "target": "resource_name" } is for using a resource in a known way.
-
-In general, a target can be a specific resource_name or character_name or a map type generalization. 
-For example, Berry2, Berry, Joe, clearing (assuming it is a terrain type) are all valid targets. 
-However, if the target is not an instance, the specific resource or character bound to is indeterminate. 
-For move, target can also be one of the 8 compass points.
-For example, 
-    {"type": "if", "condition": {"type": "near", "target": "Berry"}, "then": [{"type": "move", "target": "Berry"}]}
-is a valid plan. Likewise,
-    {"type": "if", "condition": {"type": "near", "target": "Joe"}, "then": [{"type": "move", "target": "Joe"}]}
-is a valid plan.
-Note that move only moves one step, so you must use a do_while to move repeatedly.
-
-Some actions have conditions that must be met before they can be executed.
-for example, you cannot take a resource unless you are near it.
-you can accomplish this by using the "near" condition in a do_while. Assuming, for example, that Cave2 is in your situation view direction Northeast
-
-{
-  "plan": [
-    { "type": "do_while", "body": [ { "type": "move", "target": "Northeast" } ], "condition": { "type": "notnear", "target": "Cave2" } },
-    { "type": "take", "target": "Cave2" }
-  ]
-}
-
-###
-Allowed control‑flow primitives: sequential list (e.g.. [..., ...]), do_while, and two‑branch if (else is optional).
-{
-  "plan": [
-    { "type": "action", "target": "…", "value": "…" },
-    { "type": "do_while", "body": [ /* steps */ ], "condition": "…" },
-    { "type": "if", "condition": "…", "then": [ /* steps */ ], "else": [ /* steps */ ] }
-  ]
-}
-
-A plan must include no more than 8 steps including all nested do_while and if branches.
-A plan must not contain sequential adjacent say actions.
-        """
         if not self.current_goal or self.current_goal.name == 'sleep':
             single_action = None
         else:
@@ -603,24 +583,20 @@ A plan must not contain sequential adjacent say actions.
                     goal_prompt += "Don't repeat yourself.\n"
 
             if self.last_action and (self.last_action['type'].lower() == 'say' or self.last_action['type'].lower() == 'response'):
-                directive = f"""
-respond only with the JSON plan, no other text.
-"""
+                directive = f"""\nrespond only with the JSON plan, no other text.\n"""
             else:
-                directive = f"""
-respond only with the JSON plan, no other text.
-"""
+                directive = f"""\nrespond only with the JSON plan, no other text.\n"""
             # Make LLM call
             if self.llm_client and not self.shutdown_requested:
                 response = self.llm_client.generate(
-                    messages=[system_prompt, user_prompt, plan_syntax, directive],
+                    messages=[system_prompt, user_prompt, PLAN_SYNTAX, directive],
                     max_tokens=1000,
                     temperature=0.7,
                     stops=['</end>']
                 )
 
                 if response.success:
-                    logger.warning(f'🤖 {self.character_name} New Action: {response.text.replace('\n', ' ')}')
+                    logger.debug(f'🤖 {self.character_name} New Action: {response.text.replace('\n', ' ')}')
                     plan_candidate = None
                     valid = False
                     try:
@@ -656,17 +632,93 @@ respond only with the JSON plan, no other text.
             self.current_plan = {'plan': []}
         
         self._publish_current_plan()
-        
         # Initialize plan state for new plan
-        self.plan_state = {
-            'step_stack': plan_module.Stack()
-        }
-        
-        # Initialize plan bindings cache for target resolution
-        self.plan_bindings_cache = {}
-        
+        self.plan_state = {'step_stack': plan_module.Stack()}
+        self.plan_bindings_cache = {}      
         return self.current_plan
 
+    def _replan(self, goal, reason):
+        """RePlan: Update an existing plan based on new input."""
+        logger.warning(f'🤖 {self.character_name} Replanning.')
+        if not self.current_plan:
+            return self._plan(goal)
+        remaining_plan = json.dumps(plan_module.remaining_plan(self.current_plan, self.plan_state['step_stack']), indent=2)
+        system_prompt = 'Your task is to replan given your current goal, your remaining current plan, and new input provided by the user.\n' + self.observations['static']
+        user_prompt = self.observations['dynamic']
+        goal_prompt = f"\n\n#Your current goal is:\n{goal.to_string()}"
+        target = goal.actors[1] if len(goal.actors) > 1 else None
+        if target:
+            entity_context = self.get_entity_context(target, 10)
+            if entity_context and len(entity_context['conversation_history']) > 0:
+                goal_prompt += f'your recent dialog with {target} has been:\n'
+                for i, memory in enumerate(entity_context['conversation_history']):  # Use last 2 memories
+                    goal_prompt += f"\t{memory['source']}: {memory['text']}\n"
+
+                goal_prompt += "Don't repeat yourself.\n"
+
+        directive = f"""\n#Your current goal is:
+{goal.to_string()}
+
+#Your current remaining plan is:
+{remaining_plan}
+
+#The new input causing you to replan is:
+{reason}
+
+ respond only with new JSON plan, no other text.\n"""
+
+        # Make LLM call
+        if self.llm_client and not self.shutdown_requested:
+            response = self.llm_client.generate(
+                messages=[system_prompt, user_prompt, PLAN_SYNTAX, directive],
+                max_tokens=1000,
+                temperature=0.7,
+                stops=['</end>']
+            )
+
+            if response.success:
+                logger.debug(f'🤖 {self.character_name} New Action: {response.text.replace('\n', ' ')}')
+                plan_candidate = None
+                valid = False
+                try:
+                    plan_candidate = json.loads(response.text.strip())
+                    valid = plan_module.verify_plan(plan_candidate)
+                    logger.warning(f'🤖 {self.character_name} Replan candidate: {plan_candidate}')
+                    if not valid:
+                        logger.error(f'Invalid plan JSON in LLM response: {response.text}')
+                        plan_candidate = None
+                except Exception as e:
+                    logger.error(f'Invalid plan JSON in LLM response: {e}')
+                    plan_candidate = None
+                if not plan_candidate or not plan_candidate.get('plan') or len(plan_candidate['plan']) == 0:
+                        logger.error(f'No action, target, or value found in LLM response: {response.text}')
+                        single_action = {'type': 'sleep', 'target': 'self', 'value': '', 'reason': ''}
+                else:
+                    self.current_plan = plan_candidate
+                    self.plan_bindings_cache = {}
+                    self._publish_current_plan()
+                    self.plan_state = {'step_stack': plan_module.Stack()}
+                    return self.current_plan
+            else:
+                logger.error(f'LLM call failed: {response.error}')
+                single_action = {'type': 'sleep', 'target': 'self', 'value': '', 'reason': ''}
+        else:   
+            logger.error('LLM client not available')
+            single_action = {'type': 'sleep', 'target': 'self', 'value': '', 'reason': ''}
+        
+        # Create single-action plan
+        if single_action:
+            self.current_plan = {'plan': [{'type': single_action['type'], 'target': single_action['target'], 'value': single_action['value'], 'reason': single_action.get('reason', '')}]}
+            self.plan_bindings_cache = {}
+        else:
+            self.current_plan = {'plan': []}
+            
+        self._publish_current_plan()
+        # Initialize plan state for new plan
+        self.plan_state = {'step_stack': plan_module.Stack()}
+        self.plan_bindings_cache = {}      
+        return self.current_plan
+        
     def _plan_step(self, plan):
         """Execute current step of plan and return next action using frame-based stack."""
         # Extract plan steps from dict format
@@ -734,6 +786,7 @@ respond only with the JSON plan, no other text.
                         # Plan complete
                         self.current_plan = None
                         self.plan_bindings_cache = {}
+                        self.current_goal = None
                         self._publish_current_plan()
                         self.plan_state = None
                         return None
@@ -757,6 +810,7 @@ respond only with the JSON plan, no other text.
                             # Plan complete
                             self.current_plan = None
                             self.plan_bindings_cache = {}
+                            self.current_goal = None
                             self._publish_current_plan()
                             self.plan_state = None
                             return None
@@ -772,6 +826,7 @@ respond only with the JSON plan, no other text.
                     # Plan complete
                     self.current_plan = None
                     self.plan_bindings_cache = {}
+                    self.current_goal = None
                     self._publish_current_plan()
                     self.plan_state = None
                     return None
@@ -878,13 +933,12 @@ respond only with the JSON plan, no other text.
             self.action_counter += 1
         elif action['type'].lower() == "inspect":
             action_data = {'type': 'inspect','action_id': self.action_counter,'timestamp': datetime.now().isoformat(),'target': resolved_target}
-            self.last_action = action_data
+            self.last_action_result = 'not yet implemented'
             self.action_publisher.put(json.dumps(action_data))
             self.inspect(resolved_target)
         elif action['type'].lower() == "use":
             # Create action - noop for now
             action_data = {'type': 'use','action_id': self.action_counter,'timestamp': datetime.now().isoformat(),'target': resolved_target}
-            self.last_action = action_data
             self.last_action_result = 'not yet implemented'
             self.action_publisher.put(json.dumps(action_data))
             #self.use(action)
@@ -953,9 +1007,6 @@ respond only with the JSON plan, no other text.
             # Store situation data for potential use in LLM processing
             self.last_situation_data = situation_data
             
-            # Trigger interrupt for OODA loop
-            self.interrupt_pending = True
-            
         except Exception as e:
             logger.error(f'Error processing situation data: {e}')
     
@@ -987,6 +1038,46 @@ respond only with the JSON plan, no other text.
         except Exception as e:
             logger.error(f'Error in shutdown callback: {e}')
     
+    def _dialog_end_callback(self, sample):
+        """Handle end dialog query from other characters."""
+        try:
+            # Extract the other character name from the JSON payload
+            if not self.current_plan:
+                return
+            
+            data = json.loads(sample.payload.to_bytes().decode('utf-8'))
+            other_name = data.get('other_name', 'unknown')
+            if other_name == 'unknown':
+                logger.error(f'Error in end dialog callback: no other character name found in payload')
+                return
+                
+            logger.warning(f'💬 {self.character_name} received end dialog from {other_name}')
+            entity_context = self.get_entity_context(other_name, 10)
+            # Build user prompt with context
+            dialog_history = '' 
+            if entity_context and isinstance(entity_context, dict):
+                conversation_history = entity_context.get('conversation_history', [])
+                if isinstance(conversation_history, list):
+                    dialog_history += f"Your recent conversation with {other_name} has been:\n"
+                    for i, memory in enumerate(conversation_history):
+                        if isinstance(memory, dict) and 'source' in memory and 'text' in memory:
+                            dialog_history += f"\t{memory['source']}: {memory['text']}\n"
+
+            reason = f'\nDialog end detected with {other_name}, dialog_history:\n{dialog_history}\n'
+            self._replan(self.current_goal, reason)
+            return
+        except Exception as e:
+            logger.error(f'Error in end dialog callback: {e}')
+    
+    def publish_dialog_end(self, source: str):
+        """Publish dialog end notification to another character."""
+        try:
+            key = f"cognitive/{source}/dialog_end"
+            payload = json.dumps({'other_name': self.character_name})
+            self.session.put(key, payload)
+        except Exception as e:
+            logger.error(f'Error publishing dialog end to {source}: {e}')  
+ 
     def parse_and_set_plan(self, plan_text):
         """Parse plan input from UI and set current plan."""
         try:
@@ -1021,18 +1112,29 @@ respond only with the JSON plan, no other text.
             else:
                 logger.info(f'Saying intent: "{text_input}" to {source}')
             
+            entity_context = self.get_entity_context(source, 10)
+            # Build user prompt with context
+            dialog_history = '' 
+            if entity_context and isinstance(entity_context, dict):
+                conversation_history = entity_context.get('conversation_history', [])
+                if isinstance(conversation_history, list):
+                    dialog_history += f"Your recent conversation with {source} has been:\n"
+                    for i, memory in enumerate(conversation_history):
+                        if isinstance(memory, dict) and 'source' in memory and 'text' in memory:
+                            dialog_history += f"\t{memory['source']}: {memory['text']}\n"
+
             # Check if dialog should naturally end
             if mode == 'respond':
                 are_we_done = self.check_natural_dialog_end(source, text_input)
                 logger.warning(f'🤖 {self.character_name} Dialog end check: {are_we_done}')
                 if are_we_done:
+                    reason = f'Dialog end detected with {source}, dialog_history:\n{dialog_history}'
+                    self.publish_dialog_end(source)
+                    self._replan(self.current_goal, reason)
                     action_data = {'type': 'dialog_end','action_id': f'action_{self.action_counter}','timestamp': datetime.now().isoformat(),'input': text_input,'text': 'Done','source': source}
-                    self.last_action = action_data
                     self.action_publisher.put(json.dumps(action_data))
                     logger.info(f'📤 Published action: {action_data["action_id"]}')
                     return False
-            
-            entity_context = self.get_entity_context(source, 10)
             
             # Simple, focused prompt
             if mode == 'say':
@@ -1053,14 +1155,13 @@ you are:
             
             # Build user prompt with context
             user_prompt = '' 
-            user_prompt += self.observations['dynamic']
-            if entity_context and isinstance(entity_context, dict):
-                conversation_history = entity_context.get('conversation_history', [])
-                if isinstance(conversation_history, list):
-                    user_prompt += f"Your recent conversation with {source} has been:\n"
-                    for i, memory in enumerate(conversation_history):
-                        if isinstance(memory, dict) and 'source' in memory and 'text' in memory:
-                            user_prompt += f"{memory['source']}: {memory['text']}\n"
+            user_prompt = self.observations['dynamic']
+            if dialog_history:
+                user_prompt += f"Your recent conversation with {source} has been:\n"
+                for i, memory in enumerate(conversation_history):
+                    if isinstance(memory, dict) and 'source' in memory and 'text' in memory:
+                        user_prompt += f"\t{memory['source']}: {memory['text']}\n"
+
             user_prompt +=  """Speak in a conversational manner in your own voice.
 Do not include any other introductory, explanatory, discursive, or formatting text in your response.
 End your text with: </end>"""
@@ -1101,14 +1202,7 @@ End your text with: </end>"""
                         'source': self.character_name if mode == 'say' else source,
                         'target': source if mode == 'say' else None
         }
-        self.last_action = {'type': 'say' if mode == 'say' else 'response', 
-                            'action_id': f'action_{self.action_counter}', 
-                            'timestamp': datetime.now().isoformat(), 
-                            'input': text_input, 
-                            'text': text_to_send, 
-                            'source': self.character_name if mode == 'say' else source, 
-                            'target': source if mode == 'say' else None   
-                            }
+
         self.last_action_result = text_to_send
         # Publish action (this will be picked up by memory_node and action_display_node)
         self.action_publisher.put(json.dumps(action_data))
@@ -1150,7 +1244,12 @@ End your text with: </end>"""
         
         try:
             # Context-aware resolution based on action type
-            if action['type'].lower() == "move":
+            action_type = action['type'].lower()
+            negated = False
+            if 'hasnt' in action_type or 'cant' in action_type or 'not' in action_type:
+                negated = True
+
+            if action_type == "move":
                 move_target = action['target'].strip()
                 move_direction = move_target.lower()
                 # Step 1: Test for compass points first (case insensitive)
@@ -1158,36 +1257,50 @@ End your text with: </end>"""
                 if move_direction in cardinal_directions:
                     return move_direction
                 else:
-                    resolved_target = self._resolve_resource_instance(raw_target) or self._resolve_character_instance(raw_target) or self.resolve_terrain_instance(raw_target)
+                    resolved_target = self._resolve_visible_instance(negated, raw_target)
                     if not resolved_target:
-                        resolved_target = self._resolve_character_instance(raw_target)
-                        if not resolved_target:
-                            resolved_target = self.resolve_terrain_instance(raw_target)
-                            if not resolved_target:
-                                return None
-
-                    #self.plan_bindings_cache[cache_key] = resolved_target
+                        return None
                     move_direction = self._find_target_direction(resolved_target)
                     return move_direction
-                
-            if action_type in ['take', 'inspect', 'use', 'has_item', 'hasnt_item']:
+            if action_type in ['take', 'inspect', 'use']:
                 # Resource actions/conditions - resolve to specific resource instance
-                resolved_target = self._resolve_resource_instance(raw_target) or self._resolve_character_instance(raw_target)
+                resolved_target = self._resolve_near_resource_instance(negated, raw_target)
                 return resolved_target
+                
+            if action_type in ['has_item', 'hasnt_item']:
+                # Resource actions/conditions - resolve to specific resource instance
+                if resolved_target and not negated:
+                    return resolved_target
+                elif not resolved_target and negated:
+                    return True
+                return False
                 
             elif action_type in ['say', 'can_see', 'cant_see']:
                 # Character actions/conditions - resolve to specific character name
-                resolved_target = self._resolve_character_instance(raw_target)
-                return resolved_target
+                resolved_target = self._resolve_visible_instance(negated, raw_target)
+                if resolved_target and not negated:
+                    return resolved_target
+                elif not resolved_target and negated:
+                    return True
+                return False
                 
             elif action_type in ['near', 'notnear']:
                 # Proximity conditions - could be character or resource
-                resolved_target = self._resolve_resource_instance(raw_target) or self._resolve_character_instance(raw_target) or self.resolve_terrain_instance(raw_target)
-                return resolved_target
+                resolved_target = self._resolve_near_instance(negated,raw_target)
+                if resolved_target and not negated:
+                    return resolved_target
+                elif not resolved_target and negated:
+                    return True
+                return False
+            
             elif action_type in ['at_location', 'notat_location']:
                 # Location conditions - pass through for now
-                resolved_target = self._resolve_resource_instance(raw_target) or self._resolve_character_instance(raw_target) or self.resolve_terrain_instance(raw_target)
-                return resolved_target
+                resolved_target = self._resolve_at_instance(negated,raw_target)
+                if resolved_target and not negated:
+                    return resolved_target
+                elif not resolved_target and negated:
+                    return True
+                return False
             else:
                 logger.warning(f'❓ Unknown action type for resolution: {action_type}')
                 resolved_target = raw_target  # Pass through unchanged
@@ -1208,9 +1321,90 @@ End your text with: </end>"""
             logger.warning(f'❌ Failed to resolve "{raw_target}" ({action_type})')
             
         return action
+
+    def _resolve_visible_instance(self, negated: bool, raw_target: str) -> Union[str, bool]:
+        """Resolve abstract visible instance to specific visible instance."""
+        try:
+            # visible means in current situation, so can be resolved locally
+            target = raw_target.capitalize()
+            for view in self.last_situation_data.get('views', []):
+                if 'characters' in view:
+                    for character in view['characters']:
+                        if character.get('name', '') == target or target == 'person':
+                            return character.get('name', '')
+                if 'resources' in view:
+                    for resource in view['resources']:  
+                        if resource.get('name', '') == target or resource.get('name', '').startswith(target):
+                            return resource.get('name', '')
+                if 'terrain' in view:
+                    if view['terrain'].get('name', '') == target:
+                        return target
+            return False
+        except Exception as e:
+            logger.error(f'Error resolving visible instance {raw_target}: {e}')
+            return False
+        
+    def _resolve_near_instance(self, negated: bool, raw_target: str) -> Union[str, bool]:
+        """Resolve abstract visible instance to specific visible instance."""
+        try:
+            # visible means in current situation, so can be resolved locally
+            target = raw_target.capitalize()
+            for view in self.last_situation_data.get('views', []):
+                if 'characters' in view:
+                    for character in view['characters']:
+                        if character.get('distance', 20) <= 2 and (character.get('name', '') == target or target == 'person'):
+                            return character.get('name', '')
+                if 'resources' in view:
+                    for resource in view['resources']:  
+                        if resource.get('distance', 20) <= 2 and (resource.get('name', '') == target or resource.get('name', '').startswith(target)):
+                            return resource.get('name', '')
+                if 'terrain' in view:
+                    if view['terrain'].get('name', '') == target:
+                        return target
+            return False
+        except Exception as e:
+            logger.error(f'Error resolving visible instance {raw_target}: {e}')
+            return False
+
+    def _resolve_near_resource_instance(self, negated: bool, raw_target: str) -> Union[str, bool]:
+        """Resolve abstract visible instance to specific visible instance."""
+        try:
+            # visible means in current situation, so can be resolved locally
+            target = raw_target.capitalize()
+            for view in self.last_situation_data.get('views', []):
+                if 'resources' in view:
+                    for resource in view['resources']:  
+                        if resource.get('distance', 20) <= 2 and (resource.get('name', '') == target or resource.get('name', '').startswith(target)):
+                            return resource.get('name', '')
+            return False
+        except Exception as e:
+            logger.error(f'Error resolving visible instance {raw_target}: {e}')
+            return False
+
+    def _resolve_at_instance(self, negated: bool, raw_target: str) -> Union[str, bool]:
+        """Resolve abstract visible instance to specific visible instance."""
+        try:
+            # visible means in current situation, so can be resolved locally
+            target = raw_target.capitalize()
+            for view in self.last_situation_data.get('views', []):
+                if 'characters' in view:
+                    for character in view['characters']:
+                        if character.get('distance', 20) <= 1 and (character.get('name', '') == target or target == 'person'):
+                            return character.get('name', '')
+                if 'resources' in view:
+                    for resource in view['resources']:  
+                        if resource.get('distance', 20) <= 1 and (resource.get('name', '') == target or resource.get('name', '').startswith(target)):
+                            return resource.get('name', '')
+                if 'terrain' in view:
+                    if view['terrain'].get('name', '') == target:
+                        return target
+            return False
+        except Exception as e:
+            logger.error(f'Error resolving visible instance {raw_target}: {e}')
+            return False
+
     
-    
-    def _resolve_resource_instance(self, raw_target: str) -> Union[str, bool]:
+    def _resolve_inventory_instance(self, negated: bool, raw_target: str) -> Union[str, bool]:
         """Resolve abstract resource name to specific resource instance."""
         try:
             # First try exact match validation
@@ -1237,25 +1431,7 @@ End your text with: </end>"""
         except Exception as e:
             logger.error(f'Error resolving resource instance {raw_target}: {e}')
             return False
-    
-    def _resolve_character_instance(self, raw_target: str) -> Union[str, bool]:
-        """Resolve abstract character name to specific character instance."""
-        try:
-            if raw_target.lower() == 'person':
-                return raw_target # needs to be resolved in an action or condition-specific way.
-            # For characters, exact names are typically used
-            # Just validate character exists in some form
-            canonical_name = raw_target.capitalize()
-            logger.debug(f'✅ Character instance: {canonical_name}')
-            return canonical_name
             
-            # TODO: Fuzzy matching stub - implement abstract -> specific resolution  
-            # e.g., "Person" -> "Joe", "Guard" -> "Alice", etc.
-            
-        except Exception as e:
-            logger.error(f'Error resolving character instance {raw_target}: {e}')
-            return False
-    
     def _find_target_direction(self, target: str) -> str:
         """Find which direction a target (character or resource) is visible in."""
         try:
@@ -1333,6 +1509,7 @@ End your text with: </end>"""
             self.last_action_result = f'moved in direction {move_direction}'
             
         except Exception as e:
+            self.last_action_result = f'move failed {e}\n'
             logger.error(f'Error in move operation: {e}')
             # Create and publish action data
         action_data = {
@@ -1342,8 +1519,6 @@ End your text with: </end>"""
                 'timestamp': datetime.now().isoformat()
             }
         self.action_publisher.put(json.dumps(action_data).encode('utf-8'))
-        self.last_action = action_data
-        self.last_action_result = f'move failed'
     
     def take(self, target: str):
         """Take a resource and add it to inventory."""
@@ -1396,7 +1571,6 @@ End your text with: </end>"""
                 'timestamp': datetime.now().isoformat(),
                 'character': self.character_name
             }
-            self.last_action = {'type': 'take', 'target': target, 'action_id': f"take_{int(time.time())}", 'timestamp': datetime.now().isoformat(), 'character': self.character_name}
             self.action_publisher.put(json.dumps(action_data))
             logger.info(f'📤 Published take action: {target}')
             return True
@@ -1413,7 +1587,6 @@ End your text with: </end>"""
             'timestamp': datetime.now().isoformat(),
             'character': self.character_name
         }
-        self.last_action = {'type': 'take', 'target': target, 'action_id': f"take_{int(time.time())}", 'timestamp': datetime.now().isoformat(), 'character': self.character_name}
         self.action_publisher.put(json.dumps(action_data))
         logger.info(f'📤 Published take action: {target}')
         return True
@@ -1455,7 +1628,6 @@ End your text with: </end>"""
         except Exception as e:
             logger.error(f'Error in inspect operation for {target}: {e}')
             self.last_action_result = f'inspect failed'
-        self.last_action = {'type': 'inspect', 'target': target, 'action_id': f"inspect_{int(time.time())}", 'timestamp': datetime.now().isoformat(), 'character': self.character_name}
         self.action_publisher.put(json.dumps(action_data))
 
     def think_about(self, action: dict):
@@ -1511,7 +1683,6 @@ End your text with: </end>"""
                         'text': response.text.strip(),
                         'source': self.character_name
             }
-        self.last_action = action
         self.last_action_result = thought
         # Publish action (this will be picked up by memory_node and action_display_node)
         self.action_publisher.put(json.dumps(action_data))
