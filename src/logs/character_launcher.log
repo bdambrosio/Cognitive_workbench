@@ -1,15 +1,21 @@
-2025-08-01 11:38:44 - character_launcher - INFO - Added character: Joe
-2025-08-01 11:38:44 - character_launcher - INFO - Launching 1 characters...
-2025-08-01 11:38:44 - character_launcher - INFO - Launching shared services...
-2025-08-01 11:38:44 - character_launcher - INFO - ✅ LLM Service Node launched with server: vllm, model: llama3.1-8b-instruct
-2025-08-01 11:38:44 - character_launcher - INFO - ✅ FastAPI Action Display Node launched on port 3000
-2025-08-01 11:38:44 - character_launcher - INFO -    - Web UI available at: http://localhost:3000
-2025-08-01 11:38:44 - character_launcher - INFO - ✅ Map Node launched with map: forest.py
-2025-08-01 11:38:44 - character_launcher - INFO - ⏳ Waiting for Map Node to initialize...
-2025-08-01 11:38:51 - character_launcher - INFO - Launching character: Joe
-2025-08-01 11:38:51 - character_launcher - INFO - ✅ Joe memory_node launched
-2025-08-01 11:38:51 - character_launcher - INFO - ✅ Joe situation_node launched
-2025-08-01 11:38:52 - character_launcher - INFO - ✅ Joe sense_node launched
-2025-08-01 11:38:52 - character_launcher - INFO - ✅ Joe executive_node launched
-2025-08-01 11:38:53 - character_launcher - INFO - ✅ All characters launched
-2025-08-01 11:38:53 - character_launcher - INFO - Monitoring processes...
+2025-08-01 19:08:21 - character_launcher - INFO - Added character: Samantha
+2025-08-01 19:08:21 - character_launcher - INFO - Added character: Joe
+2025-08-01 19:08:21 - character_launcher - INFO - Launching 2 characters...
+2025-08-01 19:08:21 - character_launcher - INFO - Launching shared services...
+2025-08-01 19:08:21 - character_launcher - INFO - ✅ LLM Service Node launched with server: openai, model: gpt-4.1-mini
+2025-08-01 19:08:21 - character_launcher - INFO - ✅ FastAPI Action Display Node launched on port 3000
+2025-08-01 19:08:21 - character_launcher - INFO -    - Web UI available at: http://localhost:3000
+2025-08-01 19:08:22 - character_launcher - INFO - ✅ Map Node launched with map: forest.py
+2025-08-01 19:08:22 - character_launcher - INFO - ⏳ Waiting for Map Node to initialize...
+2025-08-01 19:08:29 - character_launcher - INFO - Launching character: Samantha
+2025-08-01 19:08:29 - character_launcher - INFO - ✅ Samantha memory_node launched
+2025-08-01 19:08:29 - character_launcher - INFO - ✅ Samantha situation_node launched
+2025-08-01 19:08:30 - character_launcher - INFO - ✅ Samantha sense_node launched
+2025-08-01 19:08:30 - character_launcher - INFO - ✅ Samantha executive_node launched
+2025-08-01 19:08:31 - character_launcher - INFO - Launching character: Joe
+2025-08-01 19:08:31 - character_launcher - INFO - ✅ Joe memory_node launched
+2025-08-01 19:08:32 - character_launcher - INFO - ✅ Joe situation_node launched
+2025-08-01 19:08:32 - character_launcher - INFO - ✅ Joe sense_node launched
+2025-08-01 19:08:33 - character_launcher - INFO - ✅ Joe executive_node launched
+2025-08-01 19:08:34 - character_launcher - INFO - ✅ All characters launched
+2025-08-01 19:08:34 - character_launcher - INFO - Monitoring processes...

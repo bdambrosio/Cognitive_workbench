@@ -1,75 +1,359 @@
-2025-08-01 11:38:45,690 - map_node - INFO - Loading map module from: maps/forest.py
-2025-08-01 11:38:45,691 - map_node - INFO - Creating WorldMap instance...
-2025-08-01 11:38:46,196 - map_node - INFO - WorldMap created successfully: 50x50
-2025-08-01 11:38:46,196 - map_node - INFO - 📂 No existing world data for 'forest', starting fresh
-2025-08-01 11:38:46,197 - map_node - INFO - Creating Zenoh session...
-2025-08-01 11:38:46,203 - map_node - INFO - Map queryables and subscribers set up successfully
-2025-08-01 11:38:46,204 - map_node - INFO - Turn management system set up successfully
-2025-08-01 11:38:46,204 - map_node - INFO - Manual turn control enabled - starting in STEP mode
-2025-08-01 11:38:46,204 - map_node - INFO - Zenoh session initialized successfully
-2025-08-01 11:38:46,205 - map_node - INFO - 🔄 Started persistence thread for 'forest'
-2025-08-01 11:38:46,205 - map_node - INFO - Map node started with map file: forest.py
-2025-08-01 11:38:54,461 - map_node - INFO - 🗺️ Map types query: returned 5 terrain, 1 infrastructure, 0 property, 8 resource types
-2025-08-01 11:40:05,939 - map_node - INFO - Agent created for character 'Joe' at (20,20)
-2025-08-01 11:40:05,939 - map_node - INFO - First character added - turn management ready
-2025-08-01 11:40:05,939 - map_node - INFO - Manual control mode - waiting for step command
-2025-08-01 11:40:05,940 - map_node - WARNING - Handling agent look command for cognitive/map/agent/Joe/look
-2025-08-01 11:40:05,996 - map_node - WARNING - Agent look command handled for cognitive/map/agent/Joe/look
-2025-08-01 11:41:56,627 - map_node - INFO - 🎯 Manual Step Turn command received
-2025-08-01 11:41:56,628 - map_node - INFO - Starting new turn for step command
-2025-08-01 11:41:56,628 - map_node - INFO - Starting new turn with active characters: ['Joe']
-2025-08-01 11:41:56,628 - map_node - INFO - 🚦 Turn 1 started for: Joe
-2025-08-01 11:42:27,242 - map_node - INFO - ⏰ Turn 1 elapsed time: 30.6s (no timeout in step mode)
-2025-08-01 11:42:28,243 - map_node - INFO - ⏰ Turn 1 elapsed time: 31.6s (no timeout in step mode)
-2025-08-01 11:42:29,243 - map_node - INFO - ⏰ Turn 1 elapsed time: 32.6s (no timeout in step mode)
-2025-08-01 11:42:30,243 - map_node - INFO - ⏰ Turn 1 elapsed time: 33.6s (no timeout in step mode)
-2025-08-01 11:42:31,244 - map_node - INFO - ⏰ Turn 1 elapsed time: 34.6s (no timeout in step mode)
-2025-08-01 11:42:32,244 - map_node - INFO - ⏰ Turn 1 elapsed time: 35.6s (no timeout in step mode)
-2025-08-01 11:42:33,244 - map_node - INFO - ⏰ Turn 1 elapsed time: 36.6s (no timeout in step mode)
-2025-08-01 11:42:34,245 - map_node - INFO - ⏰ Turn 1 elapsed time: 37.6s (no timeout in step mode)
-2025-08-01 11:42:35,245 - map_node - INFO - ⏰ Turn 1 elapsed time: 38.6s (no timeout in step mode)
-2025-08-01 11:42:36,246 - map_node - INFO - ⏰ Turn 1 elapsed time: 39.6s (no timeout in step mode)
-2025-08-01 11:42:37,246 - map_node - INFO - ⏰ Turn 1 elapsed time: 40.6s (no timeout in step mode)
-2025-08-01 11:42:38,246 - map_node - INFO - ⏰ Turn 1 elapsed time: 41.6s (no timeout in step mode)
-2025-08-01 11:42:39,247 - map_node - INFO - ⏰ Turn 1 elapsed time: 42.6s (no timeout in step mode)
-2025-08-01 11:42:40,247 - map_node - INFO - ⏰ Turn 1 elapsed time: 43.6s (no timeout in step mode)
-2025-08-01 11:42:41,247 - map_node - INFO - ⏰ Turn 1 elapsed time: 44.6s (no timeout in step mode)
-2025-08-01 11:42:42,248 - map_node - INFO - ⏰ Turn 1 elapsed time: 45.6s (no timeout in step mode)
-2025-08-01 11:42:43,248 - map_node - INFO - ⏰ Turn 1 elapsed time: 46.6s (no timeout in step mode)
-2025-08-01 11:42:44,248 - map_node - INFO - ⏰ Turn 1 elapsed time: 47.6s (no timeout in step mode)
-2025-08-01 11:42:45,249 - map_node - INFO - ⏰ Turn 1 elapsed time: 48.6s (no timeout in step mode)
-2025-08-01 11:42:46,249 - map_node - INFO - ⏰ Turn 1 elapsed time: 49.6s (no timeout in step mode)
-2025-08-01 11:42:47,249 - map_node - INFO - ⏰ Turn 1 elapsed time: 50.6s (no timeout in step mode)
-2025-08-01 11:42:48,250 - map_node - INFO - ⏰ Turn 1 elapsed time: 51.6s (no timeout in step mode)
-2025-08-01 11:42:49,250 - map_node - INFO - ⏰ Turn 1 elapsed time: 52.6s (no timeout in step mode)
-2025-08-01 11:42:50,250 - map_node - INFO - ⏰ Turn 1 elapsed time: 53.6s (no timeout in step mode)
-2025-08-01 11:42:51,251 - map_node - INFO - ⏰ Turn 1 elapsed time: 54.6s (no timeout in step mode)
-2025-08-01 11:42:52,251 - map_node - INFO - ⏰ Turn 1 elapsed time: 55.6s (no timeout in step mode)
-2025-08-01 11:42:53,251 - map_node - INFO - ⏰ Turn 1 elapsed time: 56.6s (no timeout in step mode)
-2025-08-01 11:42:54,252 - map_node - INFO - ⏰ Turn 1 elapsed time: 57.6s (no timeout in step mode)
-2025-08-01 11:42:55,252 - map_node - INFO - ⏰ Turn 1 elapsed time: 58.6s (no timeout in step mode)
-2025-08-01 11:42:56,252 - map_node - INFO - ⏰ Turn 1 elapsed time: 59.6s (no timeout in step mode)
-2025-08-01 11:42:57,253 - map_node - INFO - ⏰ Turn 1 elapsed time: 60.6s (no timeout in step mode)
-2025-08-01 11:42:58,253 - map_node - INFO - ⏰ Turn 1 elapsed time: 61.6s (no timeout in step mode)
-2025-08-01 11:42:59,254 - map_node - INFO - ⏰ Turn 1 elapsed time: 62.6s (no timeout in step mode)
-2025-08-01 11:43:00,254 - map_node - INFO - ⏰ Turn 1 elapsed time: 63.6s (no timeout in step mode)
-2025-08-01 11:43:01,254 - map_node - INFO - ⏰ Turn 1 elapsed time: 64.6s (no timeout in step mode)
-2025-08-01 11:43:02,255 - map_node - INFO - ⏰ Turn 1 elapsed time: 65.6s (no timeout in step mode)
-2025-08-01 11:43:03,255 - map_node - INFO - ⏰ Turn 1 elapsed time: 66.6s (no timeout in step mode)
-2025-08-01 11:43:04,255 - map_node - INFO - ⏰ Turn 1 elapsed time: 67.6s (no timeout in step mode)
-2025-08-01 11:43:05,256 - map_node - INFO - ⏰ Turn 1 elapsed time: 68.6s (no timeout in step mode)
-2025-08-01 11:43:06,256 - map_node - INFO - ⏰ Turn 1 elapsed time: 69.6s (no timeout in step mode)
-2025-08-01 11:43:07,257 - map_node - INFO - ⏰ Turn 1 elapsed time: 70.6s (no timeout in step mode)
-2025-08-01 11:43:08,257 - map_node - INFO - ⏰ Turn 1 elapsed time: 71.6s (no timeout in step mode)
-2025-08-01 11:43:09,257 - map_node - INFO - ⏰ Turn 1 elapsed time: 72.6s (no timeout in step mode)
-2025-08-01 11:43:10,258 - map_node - INFO - ⏰ Turn 1 elapsed time: 73.6s (no timeout in step mode)
-2025-08-01 11:43:11,258 - map_node - INFO - ⏰ Turn 1 elapsed time: 74.6s (no timeout in step mode)
-2025-08-01 11:43:12,258 - map_node - INFO - ⏰ Turn 1 elapsed time: 75.6s (no timeout in step mode)
-2025-08-01 11:43:13,259 - map_node - INFO - ⏰ Turn 1 elapsed time: 76.6s (no timeout in step mode)
-2025-08-01 11:43:14,259 - map_node - INFO - ⏰ Turn 1 elapsed time: 77.6s (no timeout in step mode)
-2025-08-01 11:43:15,259 - map_node - INFO - ⏰ Turn 1 elapsed time: 78.6s (no timeout in step mode)
-2025-08-01 11:43:16,260 - map_node - INFO - ⏰ Turn 1 elapsed time: 79.6s (no timeout in step mode)
-2025-08-01 11:43:17,260 - map_node - INFO - ⏰ Turn 1 elapsed time: 80.6s (no timeout in step mode)
-2025-08-01 11:43:18,260 - map_node - INFO - ⏰ Turn 1 elapsed time: 81.6s (no timeout in step mode)
-2025-08-01 11:43:19,261 - map_node - INFO - ⏰ Turn 1 elapsed time: 82.6s (no timeout in step mode)
-2025-08-01 11:43:20,261 - map_node - INFO - ⏰ Turn 1 elapsed time: 83.6s (no timeout in step mode)
+2025-08-01 19:08:24,063 - map_node - INFO - Loading map module from: maps/forest.py
+2025-08-01 19:08:24,064 - map_node - INFO - Creating WorldMap instance...
+2025-08-01 19:08:24,611 - map_node - INFO - WorldMap created successfully: 50x50
+2025-08-01 19:08:24,611 - map_node - INFO - 📂 No existing world data for 'forest', starting fresh
+2025-08-01 19:08:24,612 - map_node - INFO - Creating Zenoh session...
+2025-08-01 19:08:24,621 - map_node - INFO - Map queryables and subscribers set up successfully
+2025-08-01 19:08:24,622 - map_node - INFO - Turn management system set up successfully
+2025-08-01 19:08:24,622 - map_node - INFO - Manual turn control enabled - starting in STEP mode
+2025-08-01 19:08:24,622 - map_node - INFO - Zenoh session initialized successfully
+2025-08-01 19:08:24,622 - map_node - INFO - 🔄 Started persistence thread for 'forest'
+2025-08-01 19:08:24,622 - map_node - INFO - Map node started with map file: forest.py
+2025-08-01 19:08:31,127 - map_node - INFO - 🗺️ Map types query: returned 5 terrain, 1 infrastructure, 0 property, 8 resource types
+2025-08-01 19:08:32,695 - map_node - INFO - 🗺️ Map types query: returned 5 terrain, 1 infrastructure, 0 property, 8 resource types
+2025-08-01 19:08:32,697 - map_node - INFO - Agent created for character 'Samantha' at (20,20)
+2025-08-01 19:08:32,697 - map_node - INFO - First character added - turn management ready
+2025-08-01 19:08:32,697 - map_node - INFO - Manual control mode - waiting for step command
+2025-08-01 19:08:32,698 - map_node - WARNING - Handling agent look command for cognitive/map/agent/Samantha/look
+2025-08-01 19:08:32,713 - map_node - WARNING - Agent look command handled for cognitive/map/agent/Samantha/look
+2025-08-01 19:08:34,022 - map_node - INFO - 🗺️ Map types query: returned 5 terrain, 1 infrastructure, 0 property, 8 resource types
+2025-08-01 19:08:35,465 - map_node - INFO - 🗺️ Map types query: returned 5 terrain, 1 infrastructure, 0 property, 8 resource types
+2025-08-01 19:08:35,466 - map_node - INFO - Agent created for character 'Joe' at (20,20)
+2025-08-01 19:08:35,467 - map_node - WARNING - Handling agent look command for cognitive/map/agent/Joe/look
+2025-08-01 19:08:35,484 - map_node - WARNING - Agent look command handled for cognitive/map/agent/Joe/look
+2025-08-01 19:08:50,688 - map_node - INFO - 🎯 Manual Step Turn command received
+2025-08-01 19:08:50,688 - map_node - INFO - Starting new turn for step command
+2025-08-01 19:08:50,688 - map_node - INFO - Starting new turn with active characters: ['Samantha', 'Joe']
+2025-08-01 19:08:50,689 - map_node - INFO - 🚦 Turn 1 started for: Samantha, Joe
+2025-08-01 19:08:56,426 - map_node - INFO - ✅ Joe completed turn 1
+2025-08-01 19:08:56,426 - map_node - INFO - Turn progress: 1/2 characters completed
+2025-08-01 19:09:00,236 - map_node - INFO - ✅ Samantha completed turn 1
+2025-08-01 19:09:00,236 - map_node - INFO - Turn progress: 2/2 characters completed
+2025-08-01 19:09:00,236 - map_node - INFO - 🎯 All characters completed turn 1
+2025-08-01 19:09:00,236 - map_node - INFO - Step mode - waiting for manual step command
+2025-08-01 19:09:00,237 - map_node - INFO - 📢 Published step_complete message for FastAPI UI
+2025-08-01 19:09:26,577 - map_node - INFO - 🎯 Manual Step Turn command received
+2025-08-01 19:09:26,578 - map_node - INFO - Starting new turn for step command
+2025-08-01 19:09:26,578 - map_node - INFO - Starting new turn with active characters: ['Samantha', 'Joe']
+2025-08-01 19:09:26,579 - map_node - INFO - 🚦 Turn 2 started for: Samantha, Joe
+2025-08-01 19:09:44,090 - map_node - INFO - Published visual event: Samantha detected Joe at distance 2
+2025-08-01 19:09:44,090 - map_node - INFO - Agent 'Joe' is now visible to: {'Samantha'}
+2025-08-01 19:09:44,092 - map_node - INFO - ✅ Joe completed turn 2
+2025-08-01 19:09:44,092 - map_node - INFO - Turn progress: 1/2 characters completed
+2025-08-01 19:09:44,096 - map_node - WARNING - Handling agent look command for cognitive/map/agent/Joe/look
+2025-08-01 19:09:44,151 - map_node - WARNING - Agent look command handled for cognitive/map/agent/Joe/look
+2025-08-01 19:09:50,483 - map_node - INFO - Published visual event: Joe detected Samantha at distance 3
+2025-08-01 19:09:50,484 - map_node - INFO - Agent 'Samantha' is now visible to: {'Joe'}
+2025-08-01 19:09:50,486 - map_node - INFO - ✅ Samantha completed turn 2
+2025-08-01 19:09:50,486 - map_node - INFO - Turn progress: 2/2 characters completed
+2025-08-01 19:09:50,486 - map_node - INFO - 🎯 All characters completed turn 2
+2025-08-01 19:09:50,486 - map_node - INFO - Step mode - waiting for manual step command
+2025-08-01 19:09:50,486 - map_node - INFO - 📢 Published step_complete message for FastAPI UI
+2025-08-01 19:09:50,490 - map_node - WARNING - Handling agent look command for cognitive/map/agent/Samantha/look
+2025-08-01 19:09:50,550 - map_node - WARNING - Agent look command handled for cognitive/map/agent/Samantha/look
+2025-08-01 19:09:56,341 - map_node - INFO - 🎯 Manual Step Turn command received
+2025-08-01 19:09:56,342 - map_node - INFO - Starting new turn for step command
+2025-08-01 19:09:56,342 - map_node - INFO - Starting new turn with active characters: ['Samantha', 'Joe']
+2025-08-01 19:09:56,342 - map_node - INFO - 🚦 Turn 3 started for: Joe, Samantha
+2025-08-01 19:09:57,009 - map_node - INFO - ✅ Samantha completed turn 3
+2025-08-01 19:09:57,009 - map_node - INFO - Turn progress: 1/2 characters completed
+2025-08-01 19:09:57,010 - map_node - WARNING - Handling agent look command for cognitive/map/agent/Samantha/look
+2025-08-01 19:09:57,065 - map_node - WARNING - Agent look command handled for cognitive/map/agent/Samantha/look
+2025-08-01 19:09:57,208 - map_node - INFO - ✅ Joe completed turn 3
+2025-08-01 19:09:57,208 - map_node - INFO - Turn progress: 2/2 characters completed
+2025-08-01 19:09:57,208 - map_node - INFO - 🎯 All characters completed turn 3
+2025-08-01 19:09:57,208 - map_node - INFO - Step mode - waiting for manual step command
+2025-08-01 19:09:57,208 - map_node - INFO - 📢 Published step_complete message for FastAPI UI
+2025-08-01 19:09:57,209 - map_node - WARNING - Handling agent look command for cognitive/map/agent/Joe/look
+2025-08-01 19:09:57,240 - map_node - WARNING - Agent look command handled for cognitive/map/agent/Joe/look
+2025-08-01 19:10:08,685 - map_node - INFO - 🎯 Manual Step Turn command received
+2025-08-01 19:10:08,685 - map_node - INFO - Starting new turn for step command
+2025-08-01 19:10:08,686 - map_node - INFO - Starting new turn with active characters: ['Samantha', 'Joe']
+2025-08-01 19:10:08,686 - map_node - INFO - 🚦 Turn 4 started for: Samantha, Joe
+2025-08-01 19:10:09,023 - map_node - INFO - ✅ Samantha completed turn 4
+2025-08-01 19:10:09,023 - map_node - INFO - Turn progress: 1/2 characters completed
+2025-08-01 19:10:09,024 - map_node - WARNING - Handling agent look command for cognitive/map/agent/Samantha/look
+2025-08-01 19:10:09,066 - map_node - WARNING - Agent look command handled for cognitive/map/agent/Samantha/look
+2025-08-01 19:10:09,217 - map_node - INFO - ✅ Joe completed turn 4
+2025-08-01 19:10:09,217 - map_node - INFO - Turn progress: 2/2 characters completed
+2025-08-01 19:10:09,217 - map_node - INFO - 🎯 All characters completed turn 4
+2025-08-01 19:10:09,218 - map_node - INFO - Step mode - waiting for manual step command
+2025-08-01 19:10:09,218 - map_node - INFO - 📢 Published step_complete message for FastAPI UI
+2025-08-01 19:10:09,218 - map_node - WARNING - Handling agent look command for cognitive/map/agent/Joe/look
+2025-08-01 19:10:09,280 - map_node - WARNING - Agent look command handled for cognitive/map/agent/Joe/look
+2025-08-01 19:10:14,902 - map_node - INFO - 🏃 Manual Run Turns command received
+2025-08-01 19:10:14,903 - map_node - INFO - Starting new turn with active characters: ['Samantha', 'Joe']
+2025-08-01 19:10:14,903 - map_node - INFO - 🚦 Turn 5 started for: Samantha, Joe
+2025-08-01 19:10:15,533 - map_node - INFO - ✅ Samantha completed turn 5
+2025-08-01 19:10:15,533 - map_node - INFO - Turn progress: 1/2 characters completed
+2025-08-01 19:10:15,534 - map_node - WARNING - Handling agent look command for cognitive/map/agent/Samantha/look
+2025-08-01 19:10:15,546 - map_node - WARNING - Agent look command handled for cognitive/map/agent/Samantha/look
+2025-08-01 19:10:15,726 - map_node - INFO - ✅ Joe completed turn 5
+2025-08-01 19:10:15,726 - map_node - INFO - Turn progress: 2/2 characters completed
+2025-08-01 19:10:15,726 - map_node - INFO - 🎯 All characters completed turn 5
+2025-08-01 19:10:15,726 - map_node - INFO - Run mode - auto-progressing to next turn
+2025-08-01 19:10:15,727 - map_node - WARNING - Handling agent look command for cognitive/map/agent/Joe/look
+2025-08-01 19:10:15,755 - map_node - WARNING - Agent look command handled for cognitive/map/agent/Joe/look
+2025-08-01 19:10:16,738 - map_node - INFO - Starting new turn with active characters: ['Samantha', 'Joe']
+2025-08-01 19:10:16,738 - map_node - INFO - 🚦 Turn 6 started for: Joe, Samantha
+2025-08-01 19:10:17,648 - map_node - INFO - ✅ Samantha completed turn 6
+2025-08-01 19:10:17,649 - map_node - INFO - Turn progress: 1/2 characters completed
+2025-08-01 19:10:17,649 - map_node - WARNING - Handling agent look command for cognitive/map/agent/Samantha/look
+2025-08-01 19:10:17,668 - map_node - WARNING - Agent look command handled for cognitive/map/agent/Samantha/look
+2025-08-01 19:10:17,833 - map_node - INFO - ✅ Joe completed turn 6
+2025-08-01 19:10:17,833 - map_node - INFO - Turn progress: 2/2 characters completed
+2025-08-01 19:10:17,833 - map_node - INFO - 🎯 All characters completed turn 6
+2025-08-01 19:10:17,833 - map_node - INFO - Run mode - auto-progressing to next turn
+2025-08-01 19:10:17,834 - map_node - WARNING - Handling agent look command for cognitive/map/agent/Joe/look
+2025-08-01 19:10:17,861 - map_node - WARNING - Agent look command handled for cognitive/map/agent/Joe/look
+2025-08-01 19:10:18,834 - map_node - INFO - Starting new turn with active characters: ['Samantha', 'Joe']
+2025-08-01 19:10:18,834 - map_node - INFO - 🚦 Turn 7 started for: Joe, Samantha
+2025-08-01 19:10:19,753 - map_node - INFO - ✅ Samantha completed turn 7
+2025-08-01 19:10:19,753 - map_node - INFO - Turn progress: 1/2 characters completed
+2025-08-01 19:10:19,940 - map_node - INFO - ✅ Joe completed turn 7
+2025-08-01 19:10:19,940 - map_node - INFO - Turn progress: 2/2 characters completed
+2025-08-01 19:10:19,941 - map_node - INFO - 🎯 All characters completed turn 7
+2025-08-01 19:10:19,941 - map_node - INFO - Run mode - auto-progressing to next turn
+2025-08-01 19:10:20,941 - map_node - INFO - Starting new turn with active characters: ['Samantha', 'Joe']
+2025-08-01 19:10:20,942 - map_node - INFO - 🚦 Turn 8 started for: Samantha, Joe
+2025-08-01 19:10:21,863 - map_node - INFO - ✅ Samantha completed turn 8
+2025-08-01 19:10:21,863 - map_node - INFO - Turn progress: 1/2 characters completed
+2025-08-01 19:10:21,864 - map_node - WARNING - Handling agent look command for cognitive/map/agent/Samantha/look
+2025-08-01 19:10:21,882 - map_node - WARNING - Agent look command handled for cognitive/map/agent/Samantha/look
+2025-08-01 19:10:22,044 - map_node - INFO - ✅ Joe completed turn 8
+2025-08-01 19:10:22,044 - map_node - INFO - Turn progress: 2/2 characters completed
+2025-08-01 19:10:22,044 - map_node - INFO - 🎯 All characters completed turn 8
+2025-08-01 19:10:22,044 - map_node - INFO - Run mode - auto-progressing to next turn
+2025-08-01 19:10:23,045 - map_node - INFO - Starting new turn with active characters: ['Samantha', 'Joe']
+2025-08-01 19:10:23,046 - map_node - INFO - 🚦 Turn 9 started for: Samantha, Joe
+2025-08-01 19:10:23,976 - map_node - INFO - ✅ Samantha completed turn 9
+2025-08-01 19:10:23,976 - map_node - INFO - Turn progress: 1/2 characters completed
+2025-08-01 19:10:23,977 - map_node - WARNING - Handling agent look command for cognitive/map/agent/Samantha/look
+2025-08-01 19:10:23,996 - map_node - WARNING - Agent look command handled for cognitive/map/agent/Samantha/look
+2025-08-01 19:10:27,336 - map_node - INFO - ✅ Joe completed turn 9
+2025-08-01 19:10:27,336 - map_node - INFO - Turn progress: 2/2 characters completed
+2025-08-01 19:10:27,336 - map_node - INFO - 🎯 All characters completed turn 9
+2025-08-01 19:10:27,336 - map_node - INFO - Run mode - auto-progressing to next turn
+2025-08-01 19:10:27,337 - map_node - WARNING - Handling agent look command for cognitive/map/agent/Joe/look
+2025-08-01 19:10:27,352 - map_node - WARNING - Agent look command handled for cognitive/map/agent/Joe/look
+2025-08-01 19:10:28,337 - map_node - INFO - Starting new turn with active characters: ['Samantha', 'Joe']
+2025-08-01 19:10:28,337 - map_node - INFO - 🚦 Turn 10 started for: Samantha, Joe
+2025-08-01 19:10:29,389 - map_node - INFO - ✅ Samantha completed turn 10
+2025-08-01 19:10:29,390 - map_node - INFO - Turn progress: 1/2 characters completed
+2025-08-01 19:10:29,391 - map_node - WARNING - Handling agent look command for cognitive/map/agent/Samantha/look
+2025-08-01 19:10:29,419 - map_node - WARNING - Agent look command handled for cognitive/map/agent/Samantha/look
+2025-08-01 19:10:29,444 - map_node - INFO - ✅ Joe completed turn 10
+2025-08-01 19:10:29,444 - map_node - INFO - Turn progress: 2/2 characters completed
+2025-08-01 19:10:29,444 - map_node - INFO - 🎯 All characters completed turn 10
+2025-08-01 19:10:29,444 - map_node - INFO - Run mode - auto-progressing to next turn
+2025-08-01 19:10:29,445 - map_node - WARNING - Handling agent look command for cognitive/map/agent/Joe/look
+2025-08-01 19:10:29,493 - map_node - WARNING - Agent look command handled for cognitive/map/agent/Joe/look
+2025-08-01 19:10:30,445 - map_node - INFO - Starting new turn with active characters: ['Samantha', 'Joe']
+2025-08-01 19:10:30,446 - map_node - INFO - 🚦 Turn 11 started for: Joe, Samantha
+2025-08-01 19:10:31,502 - map_node - INFO - ✅ Samantha completed turn 11
+2025-08-01 19:10:31,502 - map_node - INFO - Turn progress: 1/2 characters completed
+2025-08-01 19:10:31,503 - map_node - WARNING - Handling agent look command for cognitive/map/agent/Samantha/look
+2025-08-01 19:10:31,516 - map_node - WARNING - Agent look command handled for cognitive/map/agent/Samantha/look
+2025-08-01 19:10:31,551 - map_node - INFO - ✅ Joe completed turn 11
+2025-08-01 19:10:31,551 - map_node - INFO - Turn progress: 2/2 characters completed
+2025-08-01 19:10:31,551 - map_node - INFO - 🎯 All characters completed turn 11
+2025-08-01 19:10:31,551 - map_node - INFO - Run mode - auto-progressing to next turn
+2025-08-01 19:10:31,552 - map_node - WARNING - Handling agent look command for cognitive/map/agent/Joe/look
+2025-08-01 19:10:31,576 - map_node - WARNING - Agent look command handled for cognitive/map/agent/Joe/look
+2025-08-01 19:10:32,557 - map_node - INFO - Starting new turn with active characters: ['Samantha', 'Joe']
+2025-08-01 19:10:32,558 - map_node - INFO - 🚦 Turn 12 started for: Samantha, Joe
+2025-08-01 19:10:33,616 - map_node - INFO - ✅ Samantha completed turn 12
+2025-08-01 19:10:33,616 - map_node - INFO - Turn progress: 1/2 characters completed
+2025-08-01 19:10:33,617 - map_node - WARNING - Handling agent look command for cognitive/map/agent/Samantha/look
+2025-08-01 19:10:33,645 - map_node - WARNING - Agent look command handled for cognitive/map/agent/Samantha/look
+2025-08-01 19:10:33,661 - map_node - INFO - ✅ Joe completed turn 12
+2025-08-01 19:10:33,661 - map_node - INFO - Turn progress: 2/2 characters completed
+2025-08-01 19:10:33,661 - map_node - INFO - 🎯 All characters completed turn 12
+2025-08-01 19:10:33,661 - map_node - INFO - Run mode - auto-progressing to next turn
+2025-08-01 19:10:33,662 - map_node - WARNING - Handling agent look command for cognitive/map/agent/Joe/look
+2025-08-01 19:10:33,689 - map_node - WARNING - Agent look command handled for cognitive/map/agent/Joe/look
+2025-08-01 19:10:34,662 - map_node - INFO - Starting new turn with active characters: ['Samantha', 'Joe']
+2025-08-01 19:10:34,662 - map_node - INFO - 🚦 Turn 13 started for: Joe, Samantha
+2025-08-01 19:10:35,727 - map_node - INFO - ✅ Samantha completed turn 13
+2025-08-01 19:10:35,728 - map_node - INFO - Turn progress: 1/2 characters completed
+2025-08-01 19:10:35,729 - map_node - WARNING - Handling agent look command for cognitive/map/agent/Samantha/look
+2025-08-01 19:10:35,741 - map_node - WARNING - Agent look command handled for cognitive/map/agent/Samantha/look
+2025-08-01 19:10:35,768 - map_node - INFO - ✅ Joe completed turn 13
+2025-08-01 19:10:35,768 - map_node - INFO - Turn progress: 2/2 characters completed
+2025-08-01 19:10:35,768 - map_node - INFO - 🎯 All characters completed turn 13
+2025-08-01 19:10:35,768 - map_node - INFO - Run mode - auto-progressing to next turn
+2025-08-01 19:10:35,769 - map_node - WARNING - Handling agent look command for cognitive/map/agent/Joe/look
+2025-08-01 19:10:35,817 - map_node - WARNING - Agent look command handled for cognitive/map/agent/Joe/look
+2025-08-01 19:10:36,769 - map_node - INFO - Starting new turn with active characters: ['Samantha', 'Joe']
+2025-08-01 19:10:36,769 - map_node - INFO - 🚦 Turn 14 started for: Samantha, Joe
+2025-08-01 19:10:37,840 - map_node - INFO - ✅ Samantha completed turn 14
+2025-08-01 19:10:37,840 - map_node - INFO - Turn progress: 1/2 characters completed
+2025-08-01 19:10:37,841 - map_node - WARNING - Handling agent look command for cognitive/map/agent/Samantha/look
+2025-08-01 19:10:37,866 - map_node - WARNING - Agent look command handled for cognitive/map/agent/Samantha/look
+2025-08-01 19:10:37,871 - map_node - INFO - ✅ Joe completed turn 14
+2025-08-01 19:10:37,872 - map_node - INFO - Turn progress: 2/2 characters completed
+2025-08-01 19:10:37,872 - map_node - INFO - 🎯 All characters completed turn 14
+2025-08-01 19:10:37,872 - map_node - INFO - Run mode - auto-progressing to next turn
+2025-08-01 19:10:38,873 - map_node - INFO - Starting new turn with active characters: ['Samantha', 'Joe']
+2025-08-01 19:10:38,873 - map_node - INFO - 🚦 Turn 15 started for: Samantha, Joe
+2025-08-01 19:10:39,952 - map_node - INFO - ✅ Samantha completed turn 15
+2025-08-01 19:10:39,952 - map_node - INFO - Turn progress: 1/2 characters completed
+2025-08-01 19:10:39,953 - map_node - WARNING - Handling agent look command for cognitive/map/agent/Samantha/look
+2025-08-01 19:10:39,995 - map_node - INFO - ✅ Joe completed turn 15
+2025-08-01 19:10:40,002 - map_node - INFO - Turn progress: 2/2 characters completed
+2025-08-01 19:10:40,002 - map_node - INFO - 🎯 All characters completed turn 15
+2025-08-01 19:10:40,002 - map_node - INFO - Run mode - auto-progressing to next turn
+2025-08-01 19:10:40,003 - map_node - WARNING - Agent look command handled for cognitive/map/agent/Samantha/look
+2025-08-01 19:10:40,004 - map_node - WARNING - Handling agent look command for cognitive/map/agent/Joe/look
+2025-08-01 19:10:40,053 - map_node - WARNING - Agent look command handled for cognitive/map/agent/Joe/look
+2025-08-01 19:10:41,003 - map_node - INFO - Starting new turn with active characters: ['Samantha', 'Joe']
+2025-08-01 19:10:41,004 - map_node - INFO - 🚦 Turn 16 started for: Samantha, Joe
+2025-08-01 19:10:42,063 - map_node - INFO - ✅ Samantha completed turn 16
+2025-08-01 19:10:42,064 - map_node - INFO - Turn progress: 1/2 characters completed
+2025-08-01 19:10:42,064 - map_node - WARNING - Handling agent look command for cognitive/map/agent/Samantha/look
+2025-08-01 19:10:42,082 - map_node - WARNING - Agent look command handled for cognitive/map/agent/Samantha/look
+2025-08-01 19:10:42,101 - map_node - INFO - ✅ Joe completed turn 16
+2025-08-01 19:10:42,101 - map_node - INFO - Turn progress: 2/2 characters completed
+2025-08-01 19:10:42,101 - map_node - INFO - 🎯 All characters completed turn 16
+2025-08-01 19:10:42,101 - map_node - INFO - Run mode - auto-progressing to next turn
+2025-08-01 19:10:42,101 - map_node - WARNING - Handling agent look command for cognitive/map/agent/Joe/look
+2025-08-01 19:10:42,118 - map_node - WARNING - Agent look command handled for cognitive/map/agent/Joe/look
+2025-08-01 19:10:43,102 - map_node - INFO - Starting new turn with active characters: ['Samantha', 'Joe']
+2025-08-01 19:10:43,102 - map_node - INFO - 🚦 Turn 17 started for: Samantha, Joe
+2025-08-01 19:10:44,175 - map_node - INFO - ✅ Samantha completed turn 17
+2025-08-01 19:10:44,175 - map_node - INFO - Turn progress: 1/2 characters completed
+2025-08-01 19:10:44,176 - map_node - WARNING - Handling agent look command for cognitive/map/agent/Samantha/look
+2025-08-01 19:10:44,195 - map_node - WARNING - Agent look command handled for cognitive/map/agent/Samantha/look
+2025-08-01 19:10:44,208 - map_node - INFO - ✅ Joe completed turn 17
+2025-08-01 19:10:44,208 - map_node - INFO - Turn progress: 2/2 characters completed
+2025-08-01 19:10:44,208 - map_node - INFO - 🎯 All characters completed turn 17
+2025-08-01 19:10:44,208 - map_node - INFO - Run mode - auto-progressing to next turn
+2025-08-01 19:10:44,208 - map_node - WARNING - Handling agent look command for cognitive/map/agent/Joe/look
+2025-08-01 19:10:44,240 - map_node - WARNING - Agent look command handled for cognitive/map/agent/Joe/look
+2025-08-01 19:10:45,208 - map_node - INFO - Starting new turn with active characters: ['Samantha', 'Joe']
+2025-08-01 19:10:45,209 - map_node - INFO - 🚦 Turn 18 started for: Samantha, Joe
+2025-08-01 19:10:46,288 - map_node - INFO - ✅ Samantha completed turn 18
+2025-08-01 19:10:46,288 - map_node - INFO - Turn progress: 1/2 characters completed
+2025-08-01 19:10:46,289 - map_node - WARNING - Handling agent look command for cognitive/map/agent/Samantha/look
+2025-08-01 19:10:46,303 - map_node - WARNING - Agent look command handled for cognitive/map/agent/Samantha/look
+2025-08-01 19:10:46,320 - map_node - INFO - ✅ Joe completed turn 18
+2025-08-01 19:10:46,321 - map_node - INFO - Turn progress: 2/2 characters completed
+2025-08-01 19:10:46,321 - map_node - INFO - 🎯 All characters completed turn 18
+2025-08-01 19:10:46,321 - map_node - INFO - Run mode - auto-progressing to next turn
+2025-08-01 19:10:46,322 - map_node - WARNING - Handling agent look command for cognitive/map/agent/Joe/look
+2025-08-01 19:10:46,344 - map_node - WARNING - Agent look command handled for cognitive/map/agent/Joe/look
+2025-08-01 19:10:47,322 - map_node - INFO - Starting new turn with active characters: ['Samantha', 'Joe']
+2025-08-01 19:10:47,322 - map_node - INFO - 🚦 Turn 19 started for: Samantha, Joe
+2025-08-01 19:10:48,400 - map_node - INFO - ✅ Samantha completed turn 19
+2025-08-01 19:10:48,400 - map_node - INFO - Turn progress: 1/2 characters completed
+2025-08-01 19:10:48,401 - map_node - WARNING - Handling agent look command for cognitive/map/agent/Samantha/look
+2025-08-01 19:10:48,421 - map_node - WARNING - Agent look command handled for cognitive/map/agent/Samantha/look
+2025-08-01 19:10:48,433 - map_node - INFO - ✅ Joe completed turn 19
+2025-08-01 19:10:48,433 - map_node - INFO - Turn progress: 2/2 characters completed
+2025-08-01 19:10:48,433 - map_node - INFO - 🎯 All characters completed turn 19
+2025-08-01 19:10:48,433 - map_node - INFO - Run mode - auto-progressing to next turn
+2025-08-01 19:10:48,433 - map_node - WARNING - Handling agent look command for cognitive/map/agent/Joe/look
+2025-08-01 19:10:48,462 - map_node - WARNING - Agent look command handled for cognitive/map/agent/Joe/look
+2025-08-01 19:10:49,435 - map_node - INFO - Starting new turn with active characters: ['Samantha', 'Joe']
+2025-08-01 19:10:49,435 - map_node - INFO - 🚦 Turn 20 started for: Samantha, Joe
+2025-08-01 19:10:50,509 - map_node - INFO - ✅ Samantha completed turn 20
+2025-08-01 19:10:50,510 - map_node - INFO - Turn progress: 1/2 characters completed
+2025-08-01 19:10:50,510 - map_node - WARNING - Handling agent look command for cognitive/map/agent/Samantha/look
+2025-08-01 19:10:50,526 - map_node - WARNING - Agent look command handled for cognitive/map/agent/Samantha/look
+2025-08-01 19:10:50,537 - map_node - INFO - ✅ Joe completed turn 20
+2025-08-01 19:10:50,537 - map_node - INFO - Turn progress: 2/2 characters completed
+2025-08-01 19:10:50,537 - map_node - INFO - 🎯 All characters completed turn 20
+2025-08-01 19:10:50,537 - map_node - INFO - Run mode - auto-progressing to next turn
+2025-08-01 19:10:51,538 - map_node - INFO - Starting new turn with active characters: ['Samantha', 'Joe']
+2025-08-01 19:10:51,539 - map_node - INFO - 🚦 Turn 21 started for: Joe, Samantha
+2025-08-01 19:10:52,620 - map_node - INFO - ✅ Samantha completed turn 21
+2025-08-01 19:10:52,620 - map_node - INFO - Turn progress: 1/2 characters completed
+2025-08-01 19:10:52,621 - map_node - WARNING - Handling agent look command for cognitive/map/agent/Samantha/look
+2025-08-01 19:10:52,640 - map_node - WARNING - Agent look command handled for cognitive/map/agent/Samantha/look
+2025-08-01 19:11:21,644 - map_node - WARNING - ⏰ Turn timeout - removing unresponsive characters: Joe
+2025-08-01 19:11:21,646 - map_node - INFO - Removed unresponsive character: Joe
+2025-08-01 19:11:21,647 - map_node - INFO - Starting new turn with active characters: ['Samantha']
+2025-08-01 19:11:21,647 - map_node - INFO - 🚦 Turn 22 started for: Samantha
+2025-08-01 19:11:22,247 - map_node - INFO - ✅ Samantha completed turn 22
+2025-08-01 19:11:22,247 - map_node - INFO - Turn progress: 1/1 characters completed
+2025-08-01 19:11:22,247 - map_node - INFO - 🎯 All characters completed turn 22
+2025-08-01 19:11:22,247 - map_node - INFO - Run mode - auto-progressing to next turn
+2025-08-01 19:11:22,248 - map_node - WARNING - Handling agent look command for cognitive/map/agent/Samantha/look
+2025-08-01 19:11:22,261 - map_node - WARNING - Agent look command handled for cognitive/map/agent/Samantha/look
+2025-08-01 19:11:23,249 - map_node - INFO - Starting new turn with active characters: ['Samantha']
+2025-08-01 19:11:23,249 - map_node - INFO - 🚦 Turn 23 started for: Samantha
+2025-08-01 19:11:24,359 - map_node - INFO - ✅ Samantha completed turn 23
+2025-08-01 19:11:24,359 - map_node - INFO - Turn progress: 1/1 characters completed
+2025-08-01 19:11:24,359 - map_node - INFO - 🎯 All characters completed turn 23
+2025-08-01 19:11:24,359 - map_node - INFO - Run mode - auto-progressing to next turn
+2025-08-01 19:11:24,360 - map_node - WARNING - Handling agent look command for cognitive/map/agent/Samantha/look
+2025-08-01 19:11:24,395 - map_node - WARNING - Agent look command handled for cognitive/map/agent/Samantha/look
+2025-08-01 19:11:25,360 - map_node - INFO - Starting new turn with active characters: ['Samantha']
+2025-08-01 19:11:25,360 - map_node - INFO - 🚦 Turn 24 started for: Samantha
+2025-08-01 19:11:26,472 - map_node - INFO - ✅ Samantha completed turn 24
+2025-08-01 19:11:26,473 - map_node - INFO - Turn progress: 1/1 characters completed
+2025-08-01 19:11:26,473 - map_node - INFO - 🎯 All characters completed turn 24
+2025-08-01 19:11:26,473 - map_node - INFO - Run mode - auto-progressing to next turn
+2025-08-01 19:11:26,474 - map_node - WARNING - Handling agent look command for cognitive/map/agent/Samantha/look
+2025-08-01 19:11:26,515 - map_node - WARNING - Agent look command handled for cognitive/map/agent/Samantha/look
+2025-08-01 19:11:27,474 - map_node - INFO - Starting new turn with active characters: ['Samantha']
+2025-08-01 19:11:27,474 - map_node - INFO - 🚦 Turn 25 started for: Samantha
+2025-08-01 19:11:28,586 - map_node - INFO - ✅ Samantha completed turn 25
+2025-08-01 19:11:28,587 - map_node - INFO - Turn progress: 1/1 characters completed
+2025-08-01 19:11:28,587 - map_node - INFO - 🎯 All characters completed turn 25
+2025-08-01 19:11:28,587 - map_node - INFO - Run mode - auto-progressing to next turn
+2025-08-01 19:11:28,587 - map_node - WARNING - Handling agent look command for cognitive/map/agent/Samantha/look
+2025-08-01 19:11:28,628 - map_node - WARNING - Agent look command handled for cognitive/map/agent/Samantha/look
+2025-08-01 19:11:29,588 - map_node - INFO - Starting new turn with active characters: ['Samantha']
+2025-08-01 19:11:29,588 - map_node - INFO - 🚦 Turn 26 started for: Samantha
+2025-08-01 19:11:30,699 - map_node - INFO - ✅ Samantha completed turn 26
+2025-08-01 19:11:30,699 - map_node - INFO - Turn progress: 1/1 characters completed
+2025-08-01 19:11:30,700 - map_node - INFO - 🎯 All characters completed turn 26
+2025-08-01 19:11:30,700 - map_node - INFO - Run mode - auto-progressing to next turn
+2025-08-01 19:11:30,700 - map_node - WARNING - Handling agent look command for cognitive/map/agent/Samantha/look
+2025-08-01 19:11:30,760 - map_node - WARNING - Agent look command handled for cognitive/map/agent/Samantha/look
+2025-08-01 19:11:31,701 - map_node - INFO - Starting new turn with active characters: ['Samantha']
+2025-08-01 19:11:31,701 - map_node - INFO - 🚦 Turn 27 started for: Samantha
+2025-08-01 19:11:32,812 - map_node - INFO - ✅ Samantha completed turn 27
+2025-08-01 19:11:32,812 - map_node - INFO - Turn progress: 1/1 characters completed
+2025-08-01 19:11:32,812 - map_node - INFO - 🎯 All characters completed turn 27
+2025-08-01 19:11:32,813 - map_node - INFO - Run mode - auto-progressing to next turn
+2025-08-01 19:11:32,813 - map_node - WARNING - Handling agent look command for cognitive/map/agent/Samantha/look
+2025-08-01 19:11:32,858 - map_node - WARNING - Agent look command handled for cognitive/map/agent/Samantha/look
+2025-08-01 19:11:33,813 - map_node - INFO - Starting new turn with active characters: ['Samantha']
+2025-08-01 19:11:33,814 - map_node - INFO - 🚦 Turn 28 started for: Samantha
+2025-08-01 19:11:34,925 - map_node - INFO - ✅ Samantha completed turn 28
+2025-08-01 19:11:34,925 - map_node - INFO - Turn progress: 1/1 characters completed
+2025-08-01 19:11:34,925 - map_node - INFO - 🎯 All characters completed turn 28
+2025-08-01 19:11:34,925 - map_node - INFO - Run mode - auto-progressing to next turn
+2025-08-01 19:11:34,926 - map_node - WARNING - Handling agent look command for cognitive/map/agent/Samantha/look
+2025-08-01 19:11:34,966 - map_node - WARNING - Agent look command handled for cognitive/map/agent/Samantha/look
+2025-08-01 19:11:35,926 - map_node - INFO - Starting new turn with active characters: ['Samantha']
+2025-08-01 19:11:35,926 - map_node - INFO - 🚦 Turn 29 started for: Samantha
+2025-08-01 19:11:36,063 - map_node - INFO - ⏹️ Manual Stop Turns command received
+2025-08-01 19:11:36,063 - map_node - INFO - Auto-progression disabled - waiting for manual step
+2025-08-01 19:11:37,038 - map_node - INFO - ✅ Samantha completed turn 29
+2025-08-01 19:11:37,038 - map_node - INFO - Turn progress: 1/1 characters completed
+2025-08-01 19:11:37,038 - map_node - INFO - 🎯 All characters completed turn 29
+2025-08-01 19:11:37,038 - map_node - INFO - Step mode - waiting for manual step command
+2025-08-01 19:11:37,038 - map_node - INFO - 📢 Published step_complete message for FastAPI UI
+2025-08-01 19:11:37,039 - map_node - WARNING - Handling agent look command for cognitive/map/agent/Samantha/look
+2025-08-01 19:11:37,071 - map_node - WARNING - Agent look command handled for cognitive/map/agent/Samantha/look
+2025-08-01 19:11:46,343 - map_node - INFO - 🎯 Manual Step Turn command received
+2025-08-01 19:11:46,343 - map_node - INFO - Starting new turn for step command
+2025-08-01 19:11:46,343 - map_node - INFO - Starting new turn with active characters: ['Samantha']
+2025-08-01 19:11:46,344 - map_node - INFO - 🚦 Turn 30 started for: Samantha
+2025-08-01 19:11:46,852 - map_node - INFO - ✅ Samantha completed turn 30
+2025-08-01 19:11:46,852 - map_node - INFO - Turn progress: 1/1 characters completed
+2025-08-01 19:11:46,852 - map_node - INFO - 🎯 All characters completed turn 30
+2025-08-01 19:11:46,852 - map_node - INFO - Step mode - waiting for manual step command
+2025-08-01 19:11:46,852 - map_node - INFO - 📢 Published step_complete message for FastAPI UI
+2025-08-01 19:11:46,852 - map_node - WARNING - Handling agent look command for cognitive/map/agent/Samantha/look
+2025-08-01 19:11:46,881 - map_node - WARNING - Agent look command handled for cognitive/map/agent/Samantha/look
+2025-08-01 19:11:57,503 - map_node - INFO - ✅ Joe completed turn 30
+2025-08-01 19:11:57,503 - map_node - INFO - Turn progress: 1/0 characters completed
+2025-08-01 19:11:57,503 - map_node - INFO - 🎯 All characters completed turn 30
+2025-08-01 19:11:57,503 - map_node - INFO - Step mode - waiting for manual step command
+2025-08-01 19:11:57,504 - map_node - INFO - 📢 Published step_complete message for FastAPI UI
+2025-08-01 19:11:57,505 - map_node - WARNING - Handling agent look command for cognitive/map/agent/Joe/look
+2025-08-01 19:11:57,506 - map_node - WARNING - Agent look command handled for cognitive/map/agent/Joe/look

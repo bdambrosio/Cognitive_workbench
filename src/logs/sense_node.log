@@ -1,3 +1,4 @@
-2025-08-01 11:38:53 - sense_node - INFO - 👁️ Sense Node initialized for character: Joe
-2025-08-01 11:38:53 - sense_node - INFO - Console Text Sensor ready - will auto-disable if external input detected
-2025-08-01 11:38:53 - sense_node - INFO - Sense Node running - press Ctrl+C to stop
+2025-08-01 19:08:34 - sense_node - INFO - 👁️ Sense Node initialized for character: Joe
+2025-08-01 19:08:34 - sense_node - INFO - Console Text Sensor ready - will auto-disable if external input detected
+2025-08-01 19:08:34 - sense_node - INFO - Sense Node running - press Ctrl+C to stop
+2025-08-01 19:09:50 - sense_node - INFO - 👁️ Visual event received: agent_detected - {'agent_name': 'Samantha', 'position': [19, 20], 'distance': 3, 'timestamp': '2025-08-01T19:09:50.483459'}

@@ -1,16 +1,323 @@
-2025-08-01 11:38:54 - llm_client - INFO - 🤖 Zenoh LLM Client initialized
-2025-08-01 11:40:05 - executive_node - INFO - 🧠 Zenoh Executive Node initialized for character: Joe
-2025-08-01 11:40:05 - executive_node - INFO -    - Subscribing to: cognitive/Joe/sense_data
-2025-08-01 11:40:05 - executive_node - INFO -    - Subscribing to: cognitive/Joe/situation
-2025-08-01 11:40:05 - executive_node - INFO -    - Subscribing to: cognitive/map/turn/go
-2025-08-01 11:40:05 - executive_node - INFO -    - Publishing to: cognitive/Joe/action
-2025-08-01 11:40:05 - executive_node - INFO -    - Publishing to: cognitive/Joe/memory/store
-2025-08-01 11:40:05 - executive_node - INFO -    - Publishing to: cognitive/Joe/text_input
-2025-08-01 11:40:05 - executive_node - INFO -    - Publishing to: cognitive/Joe/goal
-2025-08-01 11:40:05 - executive_node - INFO -    - Publishing to: cognitive/Joe/decided_action
-2025-08-01 11:40:05 - executive_node - INFO -    - Publishing to: cognitive/map/turn/complete/Joe
-2025-08-01 11:40:05 - executive_node - WARNING - Executive Node running - press Ctrl+C to stop
-2025-08-01 11:40:05 - executive_node - INFO - 📢 Announced character presence: Joe
-2025-08-01 11:41:56 - executive_node - WARNING - 🚦 Turn 1 started for Joe
-2025-08-01 11:41:57 - executive_node - WARNING - 🔄 Joe OODA loop running
-2025-08-01 11:43:19 - executive_node - ERROR - Error in _observe: 'ZenohExecutiveNode' object has no attribute 'system_prompt'
+2025-08-01 19:08:35 - llm_client - INFO - 🤖 Zenoh LLM Client initialized
+2025-08-01 19:08:35 - executive_node - INFO - 🧠 Zenoh Executive Node initialized for character: Joe
+2025-08-01 19:08:35 - executive_node - INFO -    - Subscribing to: cognitive/Joe/sense_data
+2025-08-01 19:08:35 - executive_node - INFO -    - Subscribing to: cognitive/Joe/situation
+2025-08-01 19:08:35 - executive_node - INFO -    - Subscribing to: cognitive/map/turn/go
+2025-08-01 19:08:35 - executive_node - INFO -    - Publishing to: cognitive/Joe/action
+2025-08-01 19:08:35 - executive_node - INFO -    - Publishing to: cognitive/Joe/memory/store
+2025-08-01 19:08:35 - executive_node - INFO -    - Publishing to: cognitive/Joe/text_input
+2025-08-01 19:08:35 - executive_node - INFO -    - Publishing to: cognitive/Joe/goal
+2025-08-01 19:08:35 - executive_node - INFO -    - Publishing to: cognitive/Joe/decided_action
+2025-08-01 19:08:35 - executive_node - INFO -    - Publishing to: cognitive/map/turn/complete/Joe
+2025-08-01 19:08:35 - executive_node - WARNING - Executive Node running - press Ctrl+C to stop
+2025-08-01 19:08:35 - executive_node - INFO - 📢 Announced character presence: Joe
+2025-08-01 19:08:50 - executive_node - WARNING - �2025-08-01 19:08:50 - execu2025-08-01 19:08:50 - executive_node - WARNING - 🔄 J2025-08-01 19:08:51 -2025-08-01 19:08:53 - executive_node - WARNING - 🤖 Joe Ne2025-08-01 19:08:53 - executive_node - WARNING - 🤖 Samantha New Goal: #goal Explore forest to find safety
+#description Investigate forest for shelter, resources, and safe living conditions
+#otherCharacterName None
+#termination Discover a secure, resource-rich shelter in the forest
+##
+
+#goal Identify edible resources nearby
+#description Locate and gather berries, mushrooms, or fruit trees for sustenance
+#otherCharacterName None
+#termination Collect enough edible resources for several days
+##
+
+#goal Find fresh water source
+#description Locate a spring or stream to ensure water
+2025-08-01 19:08:53 - executive_node - WARNING - Samantha generated goal: Goal Explore forest to find safety: Investigate forest for shelter, resources, and safe living conditions; actors: Samantha; termination: Discover a secure, resource-rich shelter in the forest
+2025-08-01 19:08:53 - executive_node - INFO - 🎯 Published goal for Samantha: Goal Explore forest to find safety: 2025-08-01 19:08:55 - executive_node - WARNING - 🤖 Joe New Action: {   "plan": [     { "type": "think", "value": "I need to find the Cave and understand h2025-08-01 19:08:59 - executive_node - WARNING - 🤖 Samantha New Action: {   "plan": [     { "type": "think", "value": "I need to find a safe place in the forest to live and unravel its mystery." },     { "type": "do_while", "body": [ { "type": "move", "target": "Forest" } ], "condition": { "type": "notnear", "target": "Spring" } },     { "type": "inspect", "target": "Spring" },     { "type": "if", "condition": { "type": "near", "target": "Berry" }, "then": [ { "type": "take", "target": "Berry" } ], "else": [ { "type": "move", "target": "Berry" } ] },     { "type": "think", "value": "Gathering resources like berries might help me survive." },     { "type": "do_while", "body": [ { "type": "move", "target": "Hut" } ], "condition": { "type": "notnear", "target": "Hut" } },     { "type": "inspect", "target": "Hut" },     { "type": "think", "value": "This hut might be a safe place for me 2025-08-01 19:09:26 - executive_node - WARNING - 🚦 Turn 2 started for Joe
+2025-08-01 19:09:27 - executive_node - WARNING - 🔄 Joe OODA loop running
+2025-08-01 19:09:27 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-01 19:09:27 - executive_node - INFO - 📋 Published decided action for Joe: move: Northeast - 
+2025-08-01 19:09:44 - executive_node - WARNING - Moving northeast
+2025-08-01 19:09:44 - executive_node - INFO - ✅ Move successful: northeast
+2025-08-01 19:09:44 - executive_node - WARNING - ✅ Joe completed turn 2
+2025-08-01 19:09:56 - executive_node - WARNING - 🚦 Turn 3 started for Joe
+2025-08-01 19:09:57 - executive_node - WARNING - 🔄 Joe OODA loop running
+2025-08-01 19:09:57 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-01 19:09:57 - executive_node - INFO - 📋 Published decided action for Joe: move: Northeast - 
+2025-08-01 19:09:57 - executive_node - WARNING - Moving northeast
+2025-08-01 19:09:57 - executive_node - INFO - ✅ Move successful: northeast
+2025-08-01 19:09:57 - executive_node - WARNING - ✅ Joe completed turn 3
+2025-08-01 19:10:08 - executive_node - WARNING - 🚦 Turn 4 started for Joe
+2025-08-01 19:10:09 - executive_node - WARNING - 🔄 Joe OODA loop running
+2025-08-01 19:10:09 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-01 19:10:09 - executive_node - INFO - 📋 Published decided action for Joe: move: Northeast - 
+2025-08-01 19:10:09 - executive_node - WARNING - Moving northeast
+2025-08-01 19:10:09 - executive_node - INFO - ✅ Move successful: northeast
+2025-08-01 19:10:09 - executive_node - WARNING - ✅ Joe completed turn 4
+2025-08-01 19:10:14 - executive_node - WARNING - 🚦 Turn 5 started for Joe
+2025-08-01 19:10:15 - executive_node - WARNING - 🔄 Joe OODA loop running
+2025-08-01 19:10:15 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-01 19:10:15 - executive_node - INFO - 📋 Published decided action for Joe: move: Northeast - 
+2025-08-01 19:10:15 - executive_node - WARNING - Moving northeast
+2025-08-01 19:10:15 - executive_node - INFO - ✅ Move successful: northeast
+2025-08-01 19:10:15 - executive_node - WARNING - ✅ Joe completed turn 5
+2025-08-01 19:10:16 - executive_node - WARNING - 🚦 Turn 6 started for Joe
+2025-08-01 19:10:17 - executive_node - WARNING - 🔄 Joe OODA loop running
+2025-08-01 19:10:17 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-01 19:10:17 - executive_node - INFO - 📋 Published decided action for Joe: move: Northeast - 
+2025-08-01 19:10:17 - executive_node - WARNING - Moving northeast
+2025-08-01 19:10:17 - executive_node - INFO - ✅ Move successful: northeast
+2025-08-01 19:10:17 - executive_node - WARNING - ✅ Joe completed turn 6
+2025-08-01 19:10:18 - executive_node - WARNING - 🚦 Turn 7 started for Joe
+2025-08-01 19:10:19 - executive_node - WARNING - 🔄 Joe OODA loop running
+2025-08-01 19:10:19 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-01 19:10:19 - executive_node - INFO - 📋 Published decided action for Joe: inspect: Cave - 
+2025-08-01 19:10:19 - executive_node - INFO - 📦 Inspecting Cave for Joe
+2025-08-01 19:10:19 - executive_node - WARNING - 📤 Published action: inspect
+2025-08-01 19:10:19 - executive_node - WARNING - ✅ Joe completed turn 7
+2025-08-01 19:10:20 - executive_node - WARNING - 🚦 Turn 8 started for Joe
+2025-08-01 19:10:22 - executive_node - WARNING - 🔄 Joe OODA loop running
+2025-08-01 19:10:22 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-01 19:10:22 - executive_node - INFO - 📋 Published current plan for Joe
+2025-08-01 19:10:22 - executive_node - WARNING - ✅ Joe completed turn 8
+2025-08-01 19:10:23 - executive_node - WARNING - 🚦 Turn 9 started for Joe
+2025-08-01 19:10:24 - executive_node - WARNING - 🔄 Joe OODA loop running
+2025-08-01 19:10:24 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-01 19:10:27 - executive_node - WARNING - 🤖 Joe New Action: {   "plan": [     {       "type": "do_while",       "body": [         { "type": "move", "target": "Spring" }       ],       "condition": { "type": "notnear", "target": "Spring" }     },     {       "type": "take",       "target": "Spring"     },     {       "type": "do_while",       "body": [         { "type": "move", "target": "Cave" }       ],       "condition": { "type": "notnear", "target": "Cave" }     }   ] } 
+2025-08-01 19:10:27 - executive_node - INFO - 📋 Published current plan for Joe
+2025-08-01 19:10:27 - executive_node - INFO - 📋 Published decided action for Joe: move: Spring - 
+2025-08-01 19:10:27 - executive_node - WARNING - ❌ Target "Spring" not found in any visible direction
+2025-08-01 19:10:27 - executive_node - ERROR - ❌ Cannot resolve target for action: {'type': 'move', 'target': 'Spring'}
+2025-08-01 19:10:27 - executive_node - ERROR - ❌ Cannot move toward "" - target not resolved or visible, choosing random direction
+2025-08-01 19:10:27 - executive_node - WARNING - Moving east
+2025-08-01 19:10:27 - executive_node - INFO - ✅ Move successful: east
+2025-08-01 19:10:27 - executive_node - WARNING - ✅ Joe completed turn 9
+2025-08-01 19:10:28 - executive_node - WARNING - 🚦 Turn 10 started for Joe
+2025-08-01 19:10:29 - executive_node - WARNING - 🔄 Joe OODA loop running
+2025-08-01 19:10:29 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-01 19:10:29 - executive_node - INFO - 📋 Published decided action for Joe: move: Spring - 
+2025-08-01 19:10:29 - executive_node - WARNING - ❌ Target "Spring" not found in any visible direction
+2025-08-01 19:10:29 - executive_node - ERROR - ❌ Cannot resolve target for action: {'type': 'move', 'target': 'Spring'}
+2025-08-01 19:10:29 - executive_node - ERROR - ❌ Cannot move toward "" - target not resolved or visible, choosing random direction
+2025-08-01 19:10:29 - executive_node - WARNING - Moving northwest
+2025-08-01 19:10:29 - executive_node - INFO - ✅ Move successful: northwest
+2025-08-01 19:10:29 - executive_node - WARNING - ✅ Joe completed turn 10
+2025-08-01 19:10:30 - executive_node - WARNING - 🚦 Turn 11 started for Joe
+2025-08-01 19:10:31 - executive_node - WARNING - 🔄 Joe OODA loop running
+2025-08-01 19:10:31 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-01 19:10:31 - executive_node - INFO - 📋 Published decided action for Joe: move: Spring - 
+2025-08-01 19:10:31 - executive_node - WARNING - ❌ Target "Spring" not found in any visible direction
+2025-08-01 19:10:31 - executive_node - ERROR - ❌ Cannot resolve target for action: {'type': 'move', 'target': 'Spring'}
+2025-08-01 19:10:31 - executive_node - ERROR - ❌ Cannot move toward "" - target not resolved or visible, choosing random direction
+2025-08-01 19:10:31 - executive_node - WARNING - Moving south
+2025-08-01 19:10:31 - executive_node - INFO - ✅ Move successful: south
+2025-08-01 19:10:31 - executive_node - WARNING - ✅ Joe completed turn 11
+2025-08-01 19:10:32 - executive_node - WARNING - 🚦 Turn 12 started for Joe
+2025-08-01 19:10:33 - executive_node - WARNING - 🔄 Joe OODA loop running
+2025-08-01 19:10:33 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-01 19:10:33 - executive_node - INFO - 📋 Published decided action for Joe: move: Spring - 
+2025-08-01 19:10:33 - executive_node - WARNING - ❌ Target "Spring" not found in any visible direction
+2025-08-01 19:10:33 - executive_node - ERROR - ❌ Cannot resolve target for action: {'type': 'move', 'target': 'Spring'}
+2025-08-01 19:10:33 - executive_node - ERROR - ❌ Cannot move toward "" - target not resolved or visible, choosing random direction
+2025-08-01 19:10:33 - executive_node - WARNING - Moving southeast
+2025-08-01 19:10:33 - executive_node - INFO - ✅ Move successful: southeast
+2025-08-01 19:10:33 - executive_node - WARNING - ✅ Joe completed turn 12
+2025-08-01 19:10:34 - executive_node - WARNING - 🚦 Turn 13 started for Joe
+2025-08-01 19:10:35 - executive_node - WARNING - 🔄 Joe OODA loop running
+2025-08-01 19:10:35 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-01 19:10:35 - executive_node - INFO - 📋 Published decided action for Joe: move: Spring - 
+2025-08-01 19:10:35 - executive_node - WARNING - ❌ Target "Spring" not found in any visible direction
+2025-08-01 19:10:35 - executive_node - ERROR - ❌ Cannot resolve target for action: {'type': 'move', 'target': 'Spring'}
+2025-08-01 19:10:35 - executive_node - ERROR - ❌ Cannot move toward "" - target not resolved or visible, choosing random direction
+2025-08-01 19:10:35 - executive_node - WARNING - Moving southeast
+2025-08-01 19:10:35 - executive_node - INFO - ✅ Move successful: southeast
+2025-08-01 19:10:35 - executive_node - WARNING - ✅ Joe completed turn 13
+2025-08-01 19:10:36 - executive_node - WARNING - 🚦 Turn 14 started for Joe
+2025-08-01 19:10:37 - executive_node - WARNING - 🔄 Joe OODA loop running
+2025-08-01 19:10:37 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-01 19:10:37 - executive_node - INFO - 📋 Published decided action for Joe: take: Spring - 
+2025-08-01 19:10:37 - executive_node - ERROR - Error in take operation for Spring: 'ZenohExecutiveNode' object has no attribute 'do_take'
+2025-08-01 19:10:37 - executive_node - INFO - 📤 Published take action: Spring
+2025-08-01 19:10:37 - executive_node - WARNING - 📤 Published action: take
+2025-08-01 19:10:37 - executive_node - WARNING - ✅ Joe completed turn 14
+2025-08-01 19:10:38 - executive_node - WARNING - 🚦 Turn 15 started for Joe
+2025-08-01 19:10:39 - executive_node - WARNING - 🔄 Joe OODA loop running
+2025-08-01 19:10:39 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-01 19:10:39 - executive_node - INFO - 📋 Published decided action for Joe: move: Cave - 
+2025-08-01 19:10:39 - executive_node - WARNING - ❌ Target "Cave" not found in any visible direction
+2025-08-01 19:10:39 - executive_node - ERROR - ❌ Cannot resolve target for action: {'type': 'move', 'target': 'Cave'}
+2025-08-01 19:10:39 - executive_node - ERROR - ❌ Cannot move toward "" - target not resolved or visible, choosing random direction
+2025-08-01 19:10:39 - executive_node - WARNING - Moving north
+2025-08-01 19:10:39 - executive_node - INFO - ✅ Move successful: north
+2025-08-01 19:10:39 - executive_node - WARNING - ✅ Joe completed turn 15
+2025-08-01 19:10:41 - executive_node - WARNING - 🚦 Turn 16 started for Joe
+2025-08-01 19:10:42 - executive_node - WARNING - 🔄 Joe OODA loop running
+2025-08-01 19:10:42 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-01 19:10:42 - executive_node - INFO - 📋 Published decided action for Joe: move: Cave - 
+2025-08-01 19:10:42 - executive_node - WARNING - ❌ Target "Cave" not found in any visible direction
+2025-08-01 19:10:42 - executive_node - ERROR - ❌ Cannot resolve target for action: {'type': 'move', 'target': 'Cave'}
+2025-08-01 19:10:42 - executive_node - ERROR - ❌ Cannot move toward "" - target not resolved or visible, choosing random direction
+2025-08-01 19:10:42 - executive_node - WARNING - Moving north
+2025-08-01 19:10:42 - executive_node - INFO - ✅ Move successful: north
+2025-08-01 19:10:42 - executive_node - WARNING - ✅ Joe completed turn 16
+2025-08-01 19:10:43 - executive_node - WARNING - 🚦 Turn 17 started for Joe
+2025-08-01 19:10:44 - executive_node - WARNING - 🔄 Joe OODA loop running
+2025-08-01 19:10:44 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-01 19:10:44 - executive_node - INFO - 📋 Published decided action for Joe: move: Cave - 
+2025-08-01 19:10:44 - executive_node - WARNING - ❌ Target "Cave" not found in any visible direction
+2025-08-01 19:10:44 - executive_node - ERROR - ❌ Cannot resolve target for action: {'type': 'move', 'target': 'Cave'}
+2025-08-01 19:10:44 - executive_node - ERROR - ❌ Cannot move toward "" - target not resolved or visible, choosing random direction
+2025-08-01 19:10:44 - executive_node - WARNING - Moving southwest
+2025-08-01 19:10:44 - executive_node - INFO - ✅ Move successful: southwest
+2025-08-01 19:10:44 - executive_node - WARNING - ✅ Joe completed turn 17
+2025-08-01 19:10:45 - executive_node - WARNING - 🚦 Turn 18 started for Joe
+2025-08-01 19:10:46 - executive_node - WARNING - 🔄 Joe OODA loop running
+2025-08-01 19:10:46 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-01 19:10:46 - executive_node - INFO - 📋 Published decided action for Joe: move: Cave - 
+2025-08-01 19:10:46 - executive_node - WARNING - ❌ Target "Cave" not found in any visible direction
+2025-08-01 19:10:46 - executive_node - ERROR - ❌ Cannot resolve target for action: {'type': 'move', 'target': 'Cave'}
+2025-08-01 19:10:46 - executive_node - ERROR - ❌ Cannot move toward "" - target not resolved or visible, choosing random direction
+2025-08-01 19:10:46 - executive_node - WARNING - Moving north
+2025-08-01 19:10:46 - executive_node - INFO - ✅ Move successful: north
+2025-08-01 19:10:46 - executive_node - WARNING - ✅ Joe completed turn 18
+2025-08-01 19:10:47 - executive_node - WARNING - 🚦 Turn 19 started for Joe
+2025-08-01 19:10:48 - executive_node - WARNING - 🔄 Joe OODA loop running
+2025-08-01 19:10:48 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-01 19:10:48 - executive_node - INFO - 📋 Published decided action for Joe: move: Cave - 
+2025-08-01 19:10:48 - executive_node - WARNING - ❌ Target "Cave" not found in any visible direction
+2025-08-01 19:10:48 - executive_node - ERROR - ❌ Cannot resolve target for action: {'type': 'move', 'target': 'Cave'}
+2025-08-01 19:10:48 - executive_node - ERROR - ❌ Cannot move toward "" - target not resolved or visible, choosing random direction
+2025-08-01 19:10:48 - executive_node - WARNING - Moving east
+2025-08-01 19:10:48 - executive_node - INFO - ✅ Move successful: east
+2025-08-01 19:10:48 - executive_node - WARNING - ✅ Joe completed turn 19
+2025-08-01 19:10:49 - executive_node - WARNING - 🚦 Turn 20 started for Joe
+2025-08-01 19:10:50 - executive_node - WARNING - 🔄 Joe OODA loop running
+2025-08-01 19:10:50 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-01 19:10:50 - executive_node - INFO - 📋 Published current plan for Joe
+2025-08-01 19:10:50 - executive_node - WARNING - ✅ Joe completed turn 20
+2025-08-01 19:10:51 - executive_node - WARNING - 🚦 Turn 21 started for Joe
+2025-08-01 19:10:52 - executive_node - WARNING - 🔄 Joe OODA loop running
+2025-08-01 19:10:52 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-01 19:10:57 - executive_node - WARNING - 🤖 Joe New Action: {   "plan": [     {       "type": "if",       "condition": { "type": "near", "target": "Spring" },       "then": [         { "type": "use", "target": "Spring" },         { "type": "think", "value": "Water source found and used, now prioritize finding Cave." }       ],       "else": [         {           "type": "do_while",           "body": [{ "type": "move", "target": "Spring" }],           "condition": { "type": "notnear", "target": "Spring" }         },         { "type": "use", "target": "Spring" }       ]     },     {       "type": "do_while",       "body": [{ "type": "move", "target": "Cave" }],       "condition": { "type": "notnear", "target": "Cave" }     }   ] } 
+2025-08-01 19:10:57 - executive_node - INFO - 📋 Published current plan for Joe
+2025-08-01 19:11:57 - executive_node - INFO - 📋 Published decided action for Joe: move: Spring - 
+2025-08-01 19:11:57 - executive_node - WARNING - ❌ Target "Spring" not found in any visible direction
+2025-08-01 19:11:57 - executive_node - ERROR - ❌ Cannot resolve target for action: {'type': 'move', 'target': 'Spring'}
+2025-08-01 19:11:57 - executive_node - ERROR - ❌ Cannot move toward "" - target not resolved or visible, choosing random direction
+2025-08-01 19:11:57 - executive_node - WARNING - Moving southwest
+2025-08-01 19:11:57 - executive_node - WARNING - ❌ Move failed: Agent for character 'Joe' not found
+2025-08-01 19:11:57 - executive_node - WARNING - ✅ Joe completed turn 21
+ode - WARNING - ✅ Samantha completed turn 18
+2025-08-01 19:10:47 - executive_node - WARNING - 🚦 Turn 19 started for Samantha
+2025-08-01 19:10:48 - executive_node - WARNING - 🔄 Samantha OODA loop running
+2025-08-01 19:10:48 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-01 19:10:48 - executive_node - INFO - 📋 Published decided action for Samantha: move: Berry - 
+2025-08-01 19:10:48 - executive_node - WARNING - ❌ Target "Berry" not found in any visible direction
+2025-08-01 19:10:48 - executive_node - ERROR - ❌ Cannot resolve target for action: {'type': 'move', 'target': 'Berry'}
+2025-08-01 19:10:48 - executive_node - ERROR - ❌ Cannot move toward "" - target not resolved or visible, choosing random direction
+2025-08-01 19:10:48 - executive_node - WARNING - Moving southeast
+2025-08-01 19:10:48 - executive_node - INFO - ✅ Move successful: southeast
+2025-08-01 19:10:48 - executive_node - WARNING - ✅ Samantha completed turn 19
+2025-08-01 19:10:49 - executive_node - WARNING - 🚦 Turn 20 started for Samantha
+2025-08-01 19:10:50 - executive_node - WARNING - 🔄 Samantha OODA loop running
+2025-08-01 19:10:50 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-01 19:10:50 - executive_node - INFO - 📋 Published decided action for Samantha: move: Berry - 
+2025-08-01 19:10:50 - executive_node - WARNING - ❌ Target "Berry" not found in any visible direction
+2025-08-01 19:10:50 - executive_node - ERROR - ❌ Cannot resolve target for action: {'type': 'move', 'target': 'Berry'}
+2025-08-01 19:10:50 - executive_node - ERROR - ❌ Cannot move toward "" - target not resolved or visible, choosing random direction
+2025-08-01 19:10:50 - executive_node - WARNING - Moving northwest
+2025-08-01 19:10:50 - executive_node - INFO - ✅ Move successful: northwest
+2025-08-01 19:10:50 - executive_node - WARNING - ✅ Samantha completed turn 20
+2025-08-01 19:10:51 - executive_node - WARNING - 🚦 Turn 21 started for Samantha
+2025-08-01 19:10:52 - executive_node - WARNING - 🔄 Samantha OODA loop running
+2025-08-01 19:10:52 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-01 19:10:52 - executive_node - INFO - 📋 Published decided action for Samantha: move: Berry - 
+2025-08-01 19:10:52 - executive_node - WARNING - ❌ Target "Berry" not found in any visible direction
+2025-08-01 19:10:52 - executive_node - ERROR - ❌ Cannot resolve target for action: {'type': 'move', 'target': 'Berry'}
+2025-08-01 19:10:52 - executive_node - ERROR - ❌ Cannot move toward "" - target not resolved or visible, choosing random direction
+2025-08-01 19:10:52 - executive_node - WARNING - Moving west
+2025-08-01 19:10:52 - executive_node - INFO - ✅ Move successful: west
+2025-08-01 19:10:52 - executive_node - WARNING - ✅ Samantha completed turn 21
+2025-08-01 19:11:21 - executive_node - WARNING - 🚦 Turn 22 started for Samantha
+2025-08-01 19:11:22 - executive_node - WARNING - 🔄 Samantha OODA loop running
+2025-08-01 19:11:22 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-01 19:11:22 - executive_node - INFO - 📋 Published decided action for Samantha: move: Berry - 
+2025-08-01 19:11:22 - executive_node - WARNING - ❌ Target "Berry" not found in any visible direction
+2025-08-01 19:11:22 - executive_node - ERROR - ❌ Cannot resolve target for action: {'type': 'move', 'target': 'Berry'}
+2025-08-01 19:11:22 - executive_node - ERROR - ❌ Cannot move toward "" - target not resolved or visible, choosing random direction
+2025-08-01 19:11:22 - executive_node - WARNING - Moving southwest
+2025-08-01 19:11:22 - executive_node - INFO - ✅ Move successful: southwest
+2025-08-01 19:11:22 - executive_node - WARNING - ✅ Samantha completed turn 22
+2025-08-01 19:11:23 - executive_node - WARNING - 🚦 Turn 23 started for Samantha
+2025-08-01 19:11:24 - executive_node - WARNING - 🔄 Samantha OODA loop running
+2025-08-01 19:11:24 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-01 19:11:24 - executive_node - INFO - 📋 Published decided action for Samantha: move: Berry - 
+2025-08-01 19:11:24 - executive_node - WARNING - ❌ Target "Berry" not found in any visible direction
+2025-08-01 19:11:24 - executive_node - ERROR - ❌ Cannot resolve target for action: {'type': 'move', 'target': 'Berry'}
+2025-08-01 19:11:24 - executive_node - ERROR - ❌ Cannot move toward "" - target not resolved or visible, choosing random direction
+2025-08-01 19:11:24 - executive_node - WARNING - Moving northwest
+2025-08-01 19:11:24 - executive_node - INFO - ✅ Move successful: northwest
+2025-08-01 19:11:24 - executive_node - WARNING - ✅ Samantha completed turn 23
+2025-08-01 19:11:25 - executive_node - WARNING - 🚦 Turn 24 started for Samantha
+2025-08-01 19:11:26 - executive_node - WARNING - 🔄 Samantha OODA loop running
+2025-08-01 19:11:26 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-01 19:11:26 - executive_node - INFO - 📋 Published decided action for Samantha: move: Berry - 
+2025-08-01 19:11:26 - executive_node - WARNING - ❌ Target "Berry" not found in any visible direction
+2025-08-01 19:11:26 - executive_node - ERROR - ❌ Cannot resolve target for action: {'type': 'move', 'target': 'Berry'}
+2025-08-01 19:11:26 - executive_node - ERROR - ❌ Cannot move toward "" - target not resolved or visible, choosing random direction
+2025-08-01 19:11:26 - executive_node - WARNING - Moving northeast
+2025-08-01 19:11:26 - executive_node - INFO - ✅ Move successful: northeast
+2025-08-01 19:11:26 - executive_node - WARNING - ✅ Samantha completed turn 24
+2025-08-01 19:11:27 - executive_node - WARNING - 🚦 Turn 25 started for Samantha
+2025-08-01 19:11:28 - executive_node - WARNING - 🔄 Samantha OODA loop running
+2025-08-01 19:11:28 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-01 19:11:28 - executive_node - INFO - 📋 Published decided action for Samantha: move: Berry - 
+2025-08-01 19:11:28 - executive_node - WARNING - ❌ Target "Berry" not found in any visible direction
+2025-08-01 19:11:28 - executive_node - ERROR - ❌ Cannot resolve target for action: {'type': 'move', 'target': 'Berry'}
+2025-08-01 19:11:28 - executive_node - ERROR - ❌ Cannot move toward "" - target not resolved or visible, choosing random direction
+2025-08-01 19:11:28 - executive_node - WARNING - Moving northeast
+2025-08-01 19:11:28 - executive_node - INFO - ✅ Move successful: northeast
+2025-08-01 19:11:28 - executive_node - WARNING - ✅ Samantha completed turn 25
+2025-08-01 19:11:29 - executive_node - WARNING - 🚦 Turn 26 started for Samantha
+2025-08-01 19:11:30 - executive_node - WARNING - 🔄 Samantha OODA loop running
+2025-08-01 19:11:30 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-01 19:11:30 - executive_node - INFO - 📋 Published decided action for Samantha: move: Berry - 
+2025-08-01 19:11:30 - executive_node - WARNING - ❌ Target "Berry" not found in any visible direction
+2025-08-01 19:11:30 - executive_node - ERROR - ❌ Cannot resolve target for action: {'type': 'move', 'target': 'Berry'}
+2025-08-01 19:11:30 - executive_node - ERROR - ❌ Cannot move toward "" - target not resolved or visible, choosing random direction
+2025-08-01 19:11:30 - executive_node - WARNING - Moving north
+2025-08-01 19:11:30 - executive_node - INFO - ✅ Move successful: north
+2025-08-01 19:11:30 - executive_node - WARNING - ✅ Samantha completed turn 26
+2025-08-01 19:11:31 - executive_node - WARNING - 🚦 Turn 27 started for Samantha
+2025-08-01 19:11:32 - executive_node - WARNING - 🔄 Samantha OODA loop running
+2025-08-01 19:11:32 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-01 19:11:32 - executive_node - INFO - 📋 Published decided action for Samantha: move: Berry - 
+2025-08-01 19:11:32 - executive_node - WARNING - ❌ Target "Berry" not found in any visible direction
+2025-08-01 19:11:32 - executive_node - ERROR - ❌ Cannot resolve target for action: {'type': 'move', 'target': 'Berry'}
+2025-08-01 19:11:32 - executive_node - ERROR - ❌ Cannot move toward "" - target not resolved or visible, choosing random direction
+2025-08-01 19:11:32 - executive_node - WARNING - Moving southeast
+2025-08-01 19:11:32 - executive_node - INFO - ✅ Move successful: southeast
+2025-08-01 19:11:32 - executive_node - WARNING - ✅ Samantha completed turn 27
+2025-08-01 19:11:33 - executive_node - WARNING - 🚦 Turn 28 started for Samantha
+2025-08-01 19:11:34 - executive_node - WARNING - 🔄 Samantha OODA loop running
+2025-08-01 19:11:34 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-01 19:11:34 - executive_node - INFO - 📋 Published decided action for Samantha: move: Berry - 
+2025-08-01 19:11:34 - executive_node - WARNING - ❌ Target "Berry" not found in any visible direction
+2025-08-01 19:11:34 - executive_node - ERROR - ❌ Cannot resolve target for action: {'type': 'move', 'target': 'Berry'}
+2025-08-01 19:11:34 - executive_node - ERROR - ❌ Cannot move toward "" - target not resolved or visible, choosing random direction
+2025-08-01 19:11:34 - executive_node - WARNING - Moving west
+2025-08-01 19:11:34 - executive_node - INFO - ✅ Move successful: west
+2025-08-01 19:11:34 - executive_node - WARNING - ✅ Samantha completed turn 28
+2025-08-01 19:11:35 - executive_node - WARNING - 🚦 Turn 29 started for Samantha
+2025-08-01 19:11:37 - executive_node - WARNING - 🔄 Samantha OODA loop running
+2025-08-01 19:11:37 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-01 19:11:37 - executive_node - INFO - 📋 Published decided action for Samantha: move: Berry - 
+2025-08-01 19:11:37 - executive_node - WARNING - ❌ Target "Berry" not found in any visible direction
+2025-08-01 19:11:37 - executive_node - ERROR - ❌ Cannot resolve target for action: {'type': 'move', 'target': 'Berry'}
+2025-08-01 19:11:37 - executive_node - ERROR - ❌ Cannot move toward "" - target not resolved or visible, choosing random direction
+2025-08-01 19:11:37 - executive_node - WARNING - Moving southwest
+2025-08-01 19:11:37 - executive_node - INFO - ✅ Move successful: southwest
+2025-08-01 19:11:37 - executive_node - WARNING - ✅ Samantha completed turn 29
+2025-08-01 19:11:46 - executive_node - WARNING - 🚦 Turn 30 started for Samantha
+2025-08-01 19:11:46 - executive_node - WARNING - 🔄 Samantha OODA loop running
+2025-08-01 19:11:46 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-01 19:11:46 - executive_node - INFO - 📋 Published decided action for Samantha: move: Berry - 
+2025-08-01 19:11:46 - executive_node - WARNING - ❌ Target "Berry" not found in any visible direction
+2025-08-01 19:11:46 - executive_node - ERROR - ❌ Cannot resolve target for action: {'type': 'move', 'target': 'Berry'}
+2025-08-01 19:11:46 - executive_node - ERROR - ❌ Cannot move toward "" - target not resolved or visible, choosing random direction
+2025-08-01 19:11:46 - executive_node - WARNING - Moving northeast
+2025-08-01 19:11:46 - executive_node - INFO - ✅ Move successful: northeast
+2025-08-01 19:11:46 - executive_node - WARNING - ✅ Samantha completed turn 30

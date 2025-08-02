@@ -1,13 +1,110 @@
-2025-08-01 11:38:51 - llm_client - INFO - 🤖 Zenoh LLM Client initialized
-2025-08-01 11:38:51 - memory_node - INFO - 📂 No existing memory file, starting fresh
-2025-08-01 11:38:51 - memory_node - INFO - Memory Node initialized for character: Joe
-2025-08-01 11:38:51 - memory_node - INFO - Storage available at:
-2025-08-01 11:38:51 - memory_node - INFO -   - cognitive/Joe/memory/short_term/*
-2025-08-01 11:38:51 - memory_node - INFO -   - cognitive/Joe/memory/chat/*
-2025-08-01 11:38:51 - memory_node - INFO -   - cognitive/Joe/memory/long_term/*
-2025-08-01 11:38:51 - memory_node - INFO -   - cognitive/Joe/memory/entity/*
-2025-08-01 11:38:51 - memory_node - INFO -   - cognitive/Joe/memory/inventory
-2025-08-01 11:38:51 - memory_node - INFO - Subscriptions:
-2025-08-01 11:38:51 - memory_node - INFO -   - cognitive/Joe/memory/close_dialog
-2025-08-01 11:38:51 - memory_node - INFO - Memory Node running - press Ctrl+C to stop
-2025-08-01 11:40:05 - memory_node - INFO - 📢 Stored character announcement: Joe
+2025-08-01 19:08:33 - llm_client - INFO - 🤖 Zenoh LLM Client initialized
+2025-08-01 19:08:33 - memory_node - INFO - 📂 No existing memory file, starting fresh
+2025-08-01 19:08:33 - memory_node - INFO - Memory Node initialized for character: Joe
+2025-08-01 19:08:33 - memory_node - INFO - Storage available at:
+2025-08-01 19:08:33 - memory_node - INFO -   - cognitive/Joe/memory/short_term/*
+2025-08-01 19:08:33 - memory_node - INFO -   - cognitive/Joe/memory/chat/*
+2025-08-01 19:08:33 - memory_node - INFO -   - cognitive/Joe/memory/long_term/*
+2025-08-01 19:08:33 - memory_node - INFO -   - cognitive/Joe/memory/entity/*
+2025-08-01 19:08:33 - memory_node - INFO -   - cognitive/Joe/memory/inventory
+2025-08-01 19:08:33 - memory_node - INFO - Subscriptions:
+2025-08-01 19:08:33 - memory_node - INFO -   - cognitive/Joe/memory/close_dialog
+2025-08-01 19:08:33 - memory_node - INFO - Memory Node running - press Ctrl+C to stop
+2025-08-01 19:08:35 - memory_node - INFO - 📢 Stored character announcement: Joe
+2025-08-01 19:08:50 - memory_node - INFO2025-08-01 19:08:51 - memory_node - INFO - 👥 Entity dialog query for Samantha: completed
+2025-08-01 19:08:51 - memory_node - I2025-08-01 19:08:56 - memory_node - INFO - �2025-08-01 19:09:00 - memory_node - INFO - 👥 Created new entity: Samantha
+2025-08-01 19:09:00 - memory_node - INFO - 💾 Saved memory to data/memory/Samantha_memory.json
+2025-08-01 19:09:00 - memory_node - INFO - 💬 Added conversation entry for Samantha: Samantha "#thought Seek shelter near water sources for safet..."
+2025-08-01 19:09:00 - memory_node - INFO - 💬 Added response to entity Sam2025-08-01 19:09:27 - memory_node - INFO - 👥 Entity dialog query for Joe2025-08-01 19:09:27 - memory_node - INFO - 👥 Entity dialog query for Samantha: completed
+202025-08-01 19:09:44 - memory_node - INFO - 📝 Stored action: move - move_175412025-02025-08-01 19:09:50 - memory_node - INFO - 👥 Created new entity: Samantha
+2025-08-01 19:09:50 - memory_node - INFO - 💾 Saved memory to data/memory/Joe_memory.json
+2025-08-01 19:09:50 - memory_node - INFO - 👁️ Updated visual detection for Samantha
+2025-08-01 19:09:57 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-01 19:09:57 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-08-01 19:09:57 - memory_node - INFO - 📝 Stored action: move - move_1754100597
+2025-08-01 19:10:03 - memory_node - INFO - 📝 Generated summary for Joe: Entity: Joe | First seen: 2025-08-01 19:08 | Total...
+2025-08-01 19:10:09 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-01 19:10:09 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-08-01 19:10:09 - memory_node - INFO - 📝 Stored action: move - move_1754100609
+2025-08-01 19:10:15 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-01 19:10:15 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-08-01 19:10:15 - memory_node - INFO - 📝 Stored action: move - move_1754100615
+2025-08-01 19:10:17 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-01 19:10:17 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-08-01 19:10:17 - memory_node - INFO - 📝 Stored action: move - move_1754100617
+2025-08-01 19:10:19 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-01 19:10:19 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-08-01 19:10:19 - memory_node - INFO - 📝 Stored action: inspect - 1
+2025-08-01 19:10:19 - memory_node - INFO - 📦 Inventory query for Cave: False
+2025-08-01 19:10:22 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-01 19:10:22 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-08-01 19:10:24 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-01 19:10:24 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-08-01 19:10:27 - memory_node - INFO - 📝 Stored action: move - move_1754100627
+2025-08-01 19:10:29 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-01 19:10:29 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-08-01 19:10:29 - memory_node - INFO - 📝 Stored action: move - move_1754100629
+2025-08-01 19:10:31 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-01 19:10:31 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-08-01 19:10:31 - memory_node - INFO - 📝 Stored action: move - move_1754100631
+2025-08-01 19:10:33 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-01 19:10:33 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-08-01 19:10:33 - memory_node - INFO - 📝 Stored action: move - move_1754100633
+2025-08-01 19:10:35 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-01 19:10:35 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-08-01 19:10:35 - memory_node - INFO - 📝 Stored action: move - move_1754100635
+2025-08-01 19:10:37 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-01 19:10:37 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-08-01 19:10:37 - memory_node - INFO - 📦 Added Spring to inventory
+2025-08-01 19:10:37 - memory_node - INFO - 📦 Added Spring to Joe inventory via take action
+2025-08-01 19:10:39 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-01 19:10:39 - memory_node - INFO - 📦 Inventory query: returned 1 items
+2025-08-01 19:10:39 - memory_node - INFO - 📝 Stored action: move - move_1754100639
+2025-08-01 19:10:42 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-01 19:10:42 - memory_node - INFO - 📦 Inventory query: returned 1 items
+2025-08-01 19:10:42 - memory_node - INFO - 📝 Stored action: move - move_1754100642
+2025-08-01 19:10:44 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-01 19:10:44 - memory_node - INFO - 📦 Inventory query: returned 1 items
+2025-08-01 19:10:44 - memory_node - INFO - 📝 Stored action: move - move_1754100644
+2025-08-01 19:10:46 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-01 19:10:46 - memory_node - INFO - 📦 Inventory query: returned 1 items
+2025-08-01 19:10:46 - memory_node - INFO - 📝 Stored action: move - move_1754100646
+2025-08-01 19:10:48 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-01 19:10:48 - memory_node - INFO - 📦 Inventory query: returned 1 items
+2025-08-01 19:10:48 - memory_node - INFO - 📝 Stored action: move - move_1754100648
+2025-08-01 19:10:50 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-01 19:10:50 - memory_node - INFO - 📦 Inventory query: returned 1 items
+2025-08-01 19:10:52 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-01 19:10:52 - memory_node - INFO - 📦 Inventory query: returned 1 items
+2025-08-01 19:11:57 - memory_node - INFO - 📝 Stored action: move - move_1754100717
+100650
+2025-08-01 19:10:52 - memory_node - INFO - 👥 Entity dialog query for Samantha: completed
+2025-08-01 19:10:52 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-08-01 19:10:52 - memory_node - INFO - 📝 Stored action: move - move_1754100652
+2025-08-01 19:11:22 - memory_node - INFO - 👥 Entity dialog query for Samantha: completed
+2025-08-01 19:11:22 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-08-01 19:11:22 - memory_node - INFO - 📝 Stored action: move - move_1754100682
+2025-08-01 19:11:24 - memory_node - INFO - 👥 Entity dialog query for Samantha: completed
+2025-08-01 19:11:24 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-08-01 19:11:24 - memory_node - INFO - 📝 Stored action: move - move_1754100684
+2025-08-01 19:11:26 - memory_node - INFO - 👥 Entity dialog query for Samantha: completed
+2025-08-01 19:11:26 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-08-01 19:11:26 - memory_node - INFO - 📝 Stored action: move - move_1754100686
+2025-08-01 19:11:28 - memory_node - INFO - 👥 Entity dialog query for Samantha: completed
+2025-08-01 19:11:28 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-08-01 19:11:28 - memory_node - INFO - 📝 Stored action: move - move_1754100688
+2025-08-01 19:11:30 - memory_node - INFO - 👥 Entity dialog query for Samantha: completed
+2025-08-01 19:11:30 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-08-01 19:11:30 - memory_node - INFO - 📝 Stored action: move - move_1754100690
+2025-08-01 19:11:32 - memory_node - INFO - 👥 Entity dialog query for Samantha: completed
+2025-08-01 19:11:32 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-08-01 19:11:32 - memory_node - INFO - 📝 Stored action: move - move_1754100692
+2025-08-01 19:11:34 - memory_node - INFO - 👥 Entity dialog query for Samantha: completed
+2025-08-01 19:11:34 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-08-01 19:11:34 - memory_node - INFO - 📝 Stored action: move - move_1754100694
+2025-08-01 19:11:37 - memory_node - INFO - 👥 Entity dialog query for Samantha: completed
+2025-08-01 19:11:37 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-08-01 19:11:37 - memory_node - INFO - 📝 Stored action: move - move_1754100697
+2025-08-01 19:11:46 - memory_node - INFO - 👥 Entity dialog query for Samantha: completed
+2025-08-01 19:11:46 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-08-01 19:11:46 - memory_node - INFO - 📝 Stored action: move - move_1754100706

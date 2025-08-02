@@ -140,6 +140,13 @@ class ZenohSituationNode:
         # Shutdown flag
         self.shutdown_requested = False
         self.update_map_retries = 0
+        self.map_types = {}
+        for reply in self.session.get("cognitive/map/types", timeout=2.0):
+            if reply.ok:
+                data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
+                if data.get('success'):
+                    self.map_types = data
+                    break
         # Register signal handlers for graceful shutdown
         signal.signal(signal.SIGTERM, self._signal_handler)
         signal.signal(signal.SIGINT, self._signal_handler)
@@ -233,7 +240,6 @@ class ZenohSituationNode:
                         map_look_data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
                         if not map_look_data['success']:
                             logger.warning(f'Map query failed for {self.character_name}: {map_look_data["error"]}')
-                            return
                         self.situation['location'] = map_look_data['location']
                         self.situation['visible_characters'] = map_look_data['characters']
                         view_strings = hash_utils.findall('view', map_look_data['look_result'])
@@ -347,25 +353,33 @@ class ZenohSituationNode:
                 # Check if target is in current situation and distance < near_threshold
                 target_canonical = target.capitalize()
                 is_near = False
+                binding=None
+                
+                for view in self.situation['views']:
+                    if view.get('terrain') == target_canonical:
+                        is_near = True
+                        binding = view['direction']
+                    break
                 
                 # Check resources
                 for resource in self.situation.get('resources', []):
-                    if 'name' in resource and resource['name'] == target_canonical:
-                        distance = resource.get('distance', float('inf'))
-                        is_near = distance < self.near_threshold
+                    if 'name' in resource and resource['name'].startswith(target_canonical) and resource.get('distance', float('inf')) < self.near_threshold:
+                        is_near = True
+                        binding = resource['name']
                         break
                 
                 # Check characters if not found in resources
                 if not is_near:
                     for character in self.situation.get('characters', []):
-                        if 'name' in character and character['name'] == target_canonical:
-                            distance = character.get('distance', float('inf'))
-                            is_near = distance < self.near_threshold
+                        if (target_canonical == 'person' or 'name' in character and character['name'].startswith(target_canonical)) and character.get('distance', float('inf')) < self.near_threshold:
+                            is_near = True
+                            binding = character['name']
                             break
                 
                 response = {
                     'success': True,
-                    'value': is_near
+                    'value': is_near,
+                    'binding': binding
                 }
             
             query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
@@ -404,16 +418,30 @@ class ZenohSituationNode:
                 # Check if target is in visible characters list
                 target_canonical = target.capitalize()
                 can_see = False
+                binding=None
                 
-                # Check if target is in visible characters
-                for character in self.situation.get('characters', []):
-                    if 'name' in character and character['name'] == target_canonical:
+                # Check if target is in visible terrains
+                for view in self.situation['views']:
+                    if view.get('terrain') == target_canonical:
                         can_see = True
+                        binding = view['direction']
+                        break
+                # Check resources
+                for resource in self.situation.get('resources', []):
+                    if 'name' in resource and resource['name'].startswith(target_canonical) and resource.get('distance', float('inf')) < self.near_threshold:
+                        can_see = True
+                        binding = resource['name']
+                        break
+                for character in self.situation.get('characters', []):
+                    if (target_canonical == 'person' or 'name' in character and character['name'].startswith(target_canonical)) and character.get('distance', float('inf')) < self.near_threshold:
+                        can_see = True
+                        binding = character['name']
                         break
                 
                 response = {
                     'success': True,
-                    'value': can_see
+                    'value': can_see,
+                    'binding': binding
                 }
             
             query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
@@ -452,27 +480,32 @@ class ZenohSituationNode:
                 # Check if target is in current situation and distance < at_location_threshold
                 target_canonical = target.capitalize()
                 at_location = False
-                
-                #TODO implement terrain checks
-                #TODO implement abstraction of resources and characters (e.g. person, tree, berry, ...)
+                binding=None
+                # Check terrains
+                for view in self.situation['views']:
+                    if view.get('terrain') == target_canonical:
+                        at_location = True
+                        binding = view['direction']
+                        break
                 # Check resources
                 for resource in self.situation.get('adjacent_resources', []):
-                    if 'name' in resource and resource['name'] == target_canonical:
-                        distance = resource.get('distance', float('inf'))
-                        at_location = distance < self.at_location_threshold
+                    if 'name' in resource and resource['name'].startswith(target_canonical):
+                        at_location = True
+                        binding = resource['name']
                         break
                 
                 # Check characters if not found in resources
                 if not at_location:
                     for character in self.situation.get('adjacent_characters', []):
-                        if 'name' in character and character['name'] == target_canonical:
-                            distance = character.get('distance', float('inf'))
-                            at_location = distance < self.at_location_threshold
+                        if target_canonical == 'person' or ('name' in character and character['name'].startswith(target_canonical)):
+                            at_location = True
+                            binding = character['name']
                             break
                 
                 response = {
-                    'success': at_location,
-                    'value': at_location
+                    'success': True,
+                    'value': at_location,
+                    'binding': binding
                 }
             
             query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
@@ -579,7 +612,10 @@ class ZenohSituationNode:
         
         for part in main_parts:
             if part.startswith('visibility'):
-                result['visibility'] = int(part.split()[1])
+                if part.split()[1].isdigit():
+                    result['visibility'] = int(part.split()[1])
+                else:
+                    result['visibility'] = 0
             elif part.startswith('terrain'):
                 result['terrain'] = part.split()[1]
             elif part.startswith('slope'):
