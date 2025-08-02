@@ -1,6 +1,6 @@
 # Cognitive Workbench Configuration
 llm_config:
-  server_name: "openai"
+  server_name: "vllm"
   model_name: "gpt-4.1-mini"
 
 characters:
