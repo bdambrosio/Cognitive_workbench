@@ -121,22 +121,29 @@ class CharacterLauncher:
                         world_file.unlink()
                         print(f"Removed existing world data for '{world_name}'")
                         
-                        # Remove existing character data from all subdirectories
+                        # Remove existing character data for characters in current config
                         data_dir = Path("data")
                         if data_dir.exists():
-                            # Remove memory files
+                            # Get character names from current config
+                            character_names = [char.name for char in self.characters]
+                            
+                            # Remove memory files for current characters only
                             memory_dir = data_dir / "memory"
                             if memory_dir.exists():
                                 for mem_file in memory_dir.glob("*_memory.json"):
-                                    mem_file.unlink()
-                                    print(f"Removed existing memory data: {mem_file.name}")
+                                    char_name = mem_file.stem.replace('_memory', '')
+                                    if char_name in character_names:
+                                        mem_file.unlink()
+                                        print(f"Removed existing memory data: {mem_file.name}")
                             
-                            # Remove situation files
+                            # Remove situation files for current characters only
                             situation_dir = data_dir / "situation"
                             if situation_dir.exists():
                                 for sit_file in situation_dir.glob("*_situation.json"):
-                                    sit_file.unlink()
-                                    print(f"Removed existing situation data: {sit_file.name}")
+                                    char_name = sit_file.stem.replace('_situation', '')
+                                    if char_name in character_names:
+                                        sit_file.unlink()
+                                        print(f"Removed existing situation data: {sit_file.name}")
                     else:
                         print(f"Reusing existing world '{world_name}'")
                 
