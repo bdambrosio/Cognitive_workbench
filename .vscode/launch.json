@@ -2,81 +2,6 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Debug Memory Node (Samantha)",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${workspaceFolder}/src/memory_node.py",
-            "console": "integratedTerminal",
-            "cwd": "${workspaceFolder}/src",
-            "env": {
-                "PYTHONPATH": "${workspaceFolder}/src"
-            },
-            "args": ["-c", "samantha", "-config", "{\"personality\": \"friendly\"}"],
-            "justMyCode": false,
-            "stopOnEntry": false,
-            "preLaunchTask": "setup-zenoh-environment"
-        },
-        {
-            "name": "Debug LLM Service Node (Shared)",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${workspaceFolder}/src/llm_service_node.py",
-            "console": "integratedTerminal",
-            "cwd": "${workspaceFolder}/src",
-            "env": {
-                "PYTHONPATH": "${workspaceFolder}/src"
-            },
-            "args": [],
-            "justMyCode": false,
-            "stopOnEntry": false,
-            "preLaunchTask": "setup-zenoh-environment"
-        },
-        {
-            "name": "Debug Sense Node (Default)",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${workspaceFolder}/src/sense_node.py",
-            "console": "integratedTerminal",
-            "cwd": "${workspaceFolder}/src",
-            "env": {
-                "PYTHONPATH": "${workspaceFolder}/src"
-            },
-            "args": ["-c", "default", "-config", "{}"],
-            "justMyCode": false,
-            "stopOnEntry": false,
-            "preLaunchTask": "setup-zenoh-environment"
-        },
-        {
-            "name": "Debug Sense Node (Samantha)",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${workspaceFolder}/src/sense_node.py",
-            "console": "integratedTerminal",
-            "cwd": "${workspaceFolder}/src",
-            "env": {
-                "PYTHONPATH": "${workspaceFolder}/src"
-            },
-            "args": ["-c", "samantha", "-config", "{\"personality\": \"friendly\"}"],
-            "justMyCode": false,
-            "stopOnEntry": false,
-            "preLaunchTask": "setup-zenoh-environment"
-        },
-        {
-            "name": "Debug Action Display Node (Multi-Character)",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${workspaceFolder}/src/action_display_node.py",
-            "console": "integratedTerminal",
-            "cwd": "${workspaceFolder}/src",
-            "env": {
-                "PYTHONPATH": "${workspaceFolder}/src"
-            },
-            "args": [],
-            "justMyCode": false,
-            "stopOnEntry": false,
-            "preLaunchTask": "setup-zenoh-environment"
-        },
-        {
             "name": "Debug LLM Client",
             "type": "debugpy",
             "request": "launch",
@@ -87,21 +12,6 @@
                 "PYTHONPATH": "${workspaceFolder}/src"
             },
             "args": [],
-            "justMyCode": false,
-            "stopOnEntry": false,
-            "preLaunchTask": "setup-zenoh-environment"
-        },
-        {
-            "name": "Debug Map Node (Forest)",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${workspaceFolder}/src/map_node.py",
-            "console": "integratedTerminal",
-            "cwd": "${workspaceFolder}/src",
-            "env": {
-                "PYTHONPATH": "${workspaceFolder}/src"
-            },
-            "args": ["-m", "forest.py"],
             "justMyCode": false,
             "stopOnEntry": false,
             "preLaunchTask": "setup-zenoh-environment"
@@ -131,11 +41,27 @@
             "env": {
                 "PYTHONPATH": "${workspaceFolder}/src"
             },
-            "args": ["lost.yaml", "--ui", "--map-file", "forest.py"],
+            "args": ["lost.yaml", "--ui", "--map-file", "sageForest.py"],
             "justMyCode": false,
             "stopOnEntry": false,
             "preLaunchTask": "setup-zenoh-environment"
         },
+        {
+            "name": "Debug Launcher (sage)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/launcher.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/src",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src"
+            },
+            "args": ["sage.yaml", "--ui", "--map-file", "forest.py"],
+            "justMyCode": false,
+            "stopOnEntry": false,
+            "preLaunchTask": "setup-zenoh-environment"
+        },
+
        {
             "name": "Clear Character Data",
             "type": "debugpy",

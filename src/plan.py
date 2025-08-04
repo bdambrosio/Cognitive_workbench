@@ -298,6 +298,7 @@ def parse_plan_text(plan_text):
         plan_steps = []
         current_block = None
         current_block_steps = []
+        while_condition = None  # Store while condition
         
         for i, line in enumerate(lines[1:], 1):  # Skip 'plan:' line
             stripped_line = line.strip()
@@ -307,26 +308,27 @@ def parse_plan_text(plan_text):
             # Calculate indentation (assuming 2 spaces per level)
             current_indent = len(line) - len(line.lstrip())
             
-            if stripped_line == 'do:':
-                # Start of do-while block
-                current_block = 'do_while'
-                current_block_steps = []
-                
-            elif stripped_line.startswith('while(') and stripped_line.endswith(')'):
-                # End of do-while block
-                if current_block != 'do_while':
-                    raise ValueError(f"Line {i}: 'while' without matching 'do'")
-                
-                condition_text = stripped_line[6:-1]  # Extract condition from while(...)
-                # Parse condition as an action
+            if stripped_line.startswith('while(') and stripped_line.endswith(':'):
+                # Start of while block - while(condition):
+                condition_text = stripped_line[6:-2]  # Extract condition from while(...):
                 condition_action = _parse_action_line(condition_text, i)
+                current_block = 'while'
+                current_block_steps = []
+                while_condition = condition_action  # Store condition for later
+                
+            elif stripped_line == 'endwhile:':
+                # End of while block
+                if current_block != 'while':
+                    raise ValueError(f"Line {i}: 'endwhile' without matching 'while'")
+                
                 plan_steps.append({
-                    'type': 'do_while',
+                    'type': 'while',
                     'body': current_block_steps,
-                    'condition': condition_action
+                    'condition': while_condition
                 })
                 current_block = None
                 current_block_steps = []
+                while_condition = None
                 
             elif stripped_line == 'if:':
                 # Start of if block
@@ -394,8 +396,8 @@ def parse_plan_text(plan_text):
                         plan_steps.append(parsed_step)
         
         # Check for unmatched blocks
-        if current_block == 'do_while':
-            raise ValueError("Unmatched 'do:' block without 'while(...)'")
+        if current_block == 'while':
+            raise ValueError("Unmatched 'while(...)' block without 'endwhile:'")
         elif current_block in ['if', 'else']:
             raise ValueError("Unmatched 'if:' block without 'endif'")
         
@@ -463,7 +465,7 @@ def verify_plan(plan_json: Any) -> bool:
 # helpers
 # ---------------------------------------------------------------------------
 
-_ALLOWED_TYPES = {"action", "say", "move", "think", "take", "inspect", "use", "do_while", "if", "near", "look"}
+_ALLOWED_TYPES = {"action", "say", "move", "think", "take", "inspect", "use", "while", "if", "near", "look"}
 _ALLOWED_CONDITION_TYPES = {"near", "can_see", "has_item", "notnear", "cant_see", "hasnt_item", "at_location", "notat_location", "believes", "notbelieves"}
 
 REQ_KEYS = {
@@ -474,7 +476,7 @@ REQ_KEYS = {
     "take": {"type", "target"},
     "inspect": {"type", "target"},
     "use": {"type", "target"},
-    "do_while": {"type", "body", "condition"},
+    "while": {"type", "body", "condition"},
     "if": {"type", "condition", "then"},          # "else" is optional
     "near": {"type", "target"},
 }
@@ -487,7 +489,7 @@ OPTIONAL_KEYS = {
     "take": {"reason", "value"},
     "inspect": {"reason", "value"},
     "use": {"reason", "value"},
-    "do_while": {"reason", "value"},
+    "while": {"reason", "value"},
     "if": {"else"},
     "near": {"reason", "value"},
     "look": {"reason", "value"},
@@ -555,7 +557,7 @@ def _validate_step(step: Any) -> bool:
 
     # --- per‑type structural checks ----------------------------------------
 
-    if step_type == "do_while":
+    if step_type == "while":
         return (
             isinstance(step["condition"], dict)
             and _validate_condition(step["condition"])
@@ -669,3 +671,119 @@ def _evaluate_condition(character: ZenohExecutiveNode, condition: dict, target: 
         # If we get here, the query failed or returned no response
         logger.warning(f'Condition evaluation failed for {condition_type}({target}) - returning False')
         return False
+
+def remaining_plan(original_plan: dict, step_stack) -> dict:
+    """
+    Extract the remaining plan based on current execution state.
+    
+    Parameters
+    ----------
+    original_plan : dict
+        The complete original plan with 'plan' key containing list of steps
+    step_stack : Stack
+        The current execution stack with frame information
+        
+    Returns
+    -------
+    dict
+        A valid plan containing the remaining steps to be executed
+    """
+    if not original_plan or 'plan' not in original_plan:
+        return {'plan': []}
+    
+    if step_stack.is_empty():
+        # No execution state, return original plan
+        return original_plan
+    
+    # Get the stack entries to analyze current state
+    stack_entries = step_stack.get_entries()
+    if not stack_entries:
+        return original_plan
+    
+    # Start with the original plan structure
+    remaining_steps = []
+    original_steps = original_plan['plan']
+    
+    # Process each frame in the stack to determine remaining steps
+    for i, frame in enumerate(stack_entries):
+        plan = frame['plan']
+        idx = frame['idx']
+        frame_type = frame['type']
+        
+        if frame_type == 'main':
+            # Main plan frame - add remaining steps from current index
+            if idx < len(plan):
+                remaining_steps = plan[idx:]
+            else:
+                # Plan is complete
+                remaining_steps = []
+                
+        elif frame_type == 'while':
+            # Do-while frame - add the loop with remaining body steps
+            if idx < len(plan):
+                remaining_body = plan[idx:]
+                # Reconstruct the while step with remaining body
+                while_step = {
+                    'type': 'while',
+                    'body': remaining_body,
+                    'condition': frame.get('condition', {})
+                }
+                remaining_steps = [while_step]
+                
+                # Add remaining steps from parent frame if any
+                if i + 1 < len(stack_entries):
+                    parent_frame = stack_entries[i + 1]
+                    parent_plan = parent_frame['plan']
+                    return_idx = frame.get('return_to', 0)
+                    if return_idx < len(parent_plan):
+                        remaining_steps.extend(parent_plan[return_idx:])
+            else:
+                # Loop body is complete, continue with parent frame
+                if i + 1 < len(stack_entries):
+                    parent_frame = stack_entries[i + 1]
+                    parent_plan = parent_frame['plan']
+                    return_idx = frame.get('return_to', 0)
+                    if return_idx < len(parent_plan):
+                        remaining_steps = parent_plan[return_idx:]
+                        
+        elif frame_type in ['if_then', 'if_else']:
+            # If frame - add the appropriate branch with remaining steps
+            if idx < len(plan):
+                remaining_branch = plan[idx:]
+                # Reconstruct the if step with the appropriate branch
+                if_step = {
+                    'type': 'if',
+                    'condition': frame.get('condition', {}),
+                    'then': remaining_branch if frame_type == 'if_then' else [],
+                    'else': remaining_branch if frame_type == 'if_else' else []
+                }
+                remaining_steps = [if_step]
+                
+                # Add remaining steps from parent frame if any
+                if i + 1 < len(stack_entries):
+                    parent_frame = stack_entries[i + 1]
+                    parent_plan = parent_frame['plan']
+                    return_idx = frame.get('return_to', 0)
+                    if return_idx < len(parent_plan):
+                        remaining_steps.extend(parent_plan[return_idx:])
+            else:
+                # Branch is complete, continue with parent frame
+                if i + 1 < len(stack_entries):
+                    parent_frame = stack_entries[i + 1]
+                    parent_plan = parent_frame['plan']
+                    return_idx = frame.get('return_to', 0)
+                    if return_idx < len(parent_plan):
+                        remaining_steps = parent_plan[return_idx:]
+    
+    # Ensure we have a valid plan structure
+    if not remaining_steps:
+        return {'plan': []}
+    
+    # Validate the remaining plan
+    remaining_plan_dict = {'plan': remaining_steps}
+    if not verify_plan(remaining_plan_dict):
+        # If validation fails, return empty plan
+        logger.warning("Generated remaining plan failed validation, returning empty plan")
+        return {'plan': []}
+    
+    return remaining_plan_dict

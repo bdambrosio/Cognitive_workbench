@@ -101,7 +101,7 @@ class ZenohSituationNode:
         )
         
         # Publisher for situation updates (character-specific)
-        self.situation_publisher = self.session.declare_publisher(f"cognitive/{character_name}/situation")
+        self.situation_publisher = self.session.declare_publisher(f"cognitive/{character_name}/situation/update")
         
         # Queryable for situation data (character-specific)
         self.situation_storage = self.session.declare_queryable(
@@ -154,7 +154,7 @@ class ZenohSituationNode:
         logger.info(f'🧭 Situation Node initialized for character: {character_name}')
         logger.info(f'   - Subscribing to: cognitive/{character_name}/sense_data')
         logger.info(f'   - Subscribing to: cognitive/{character_name}/action')
-        logger.info(f'   - Publishing to: cognitive/{character_name}/situation')
+        logger.info(f'   - Publishing to: cognitive/{character_name}/situation/update')
         logger.info(f'   - Queryable at: cognitive/{character_name}/situation/current_situation')
         logger.info(f'   - Proximity queryable at: cognitive/{character_name}/situation/proximity')
         logger.info(f'   - Visibility queryable at: cognitive/{character_name}/situation/visibility')
@@ -202,9 +202,6 @@ class ZenohSituationNode:
             if data.get('type') == 'move' or data.get('type') == 'announcement':
                 # Update situation based on action
                 self._update_situation_from_action(data)
-            
-                # Publish updated situation
-                self._publish_situation()
             
         except Exception as e:
             logger.error(f'Error processing action: {e}')

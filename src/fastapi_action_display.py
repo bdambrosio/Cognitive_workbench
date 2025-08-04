@@ -76,6 +76,10 @@ class FastAPIActionDisplayNode:
         self.character_current_plans: Dict[str, str] = {}  # character_name -> current_plan_string
         self.character_current_plans_lock = threading.Lock()
         
+        # Character situation data tracking
+        self.character_situation_data: Dict[str, Dict[str, Any]] = {}  # character_name -> situation_data
+        self.character_situation_data_lock = threading.Lock()
+        
         # Turn state tracking with proper locking
         self.turn_state_lock = threading.Lock()
         self.turn_state = {
@@ -120,6 +124,12 @@ class FastAPIActionDisplayNode:
         self.current_plan_subscriber = self.session.declare_subscriber(
             "cognitive/*/current_plan",
             self.current_plan_callback
+        )
+        
+        # Subscriber for character situation data
+        self.situation_subscriber = self.session.declare_subscriber(
+            "cognitive/*/situation/update",
+            self.situation_callback
         )
         
         # Publisher for memory storage
@@ -520,6 +530,46 @@ class FastAPIActionDisplayNode:
             line-height: 1.3;
         }
         
+        /* Character data tabs */
+        .character-data-tabs {
+            display: flex;
+            border-bottom: 1px solid #404040;
+            margin-bottom: 10px;
+        }
+        
+        .character-data-tab {
+            padding: 8px 12px;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            color: #888;
+            font-size: 12px;
+            font-weight: bold;
+            transition: all 0.2s;
+        }
+        
+        .character-data-tab:hover {
+            color: #00d4ff;
+        }
+        
+        .character-data-tab.active {
+            color: #00d4ff;
+            border-bottom-color: #00d4ff;
+        }
+        
+        /* Character data panels */
+        .character-data-content {
+            flex: 1;
+            overflow-y: auto;
+        }
+        
+        .character-data-panel {
+            display: none;
+        }
+        
+        .character-data-panel.active {
+            display: block;
+        }
+        
         .character-tab {
             padding: 12px 15px;
             border-bottom: 1px solid #333;
@@ -760,9 +810,29 @@ class FastAPIActionDisplayNode:
             <!-- Character data area -->
             <div class="character-data-area" id="characterDataArea">
                 <div class="character-data-header">Character Data</div>
-                <div id="characterDataItems">
-                    <div style="color: #888; font-style: italic; text-align: center; padding: 20px;">
-                        Select a character to view data
+                
+                <!-- Character data tabs -->
+                <div class="character-data-tabs" id="characterDataTabs">
+                    <div class="character-data-tab active" data-tab="plan">Plan</div>
+                    <div class="character-data-tab" data-tab="view">View</div>
+                </div>
+                
+                <!-- Character data content -->
+                <div class="character-data-content">
+                    <!-- Plan tab content -->
+                    <div class="character-data-panel active" id="planPanel">
+                        <div id="characterDataItems">
+                            <div style="color: #888; font-style: italic; text-align: center; padding: 20px;">
+                                Select a character to view data
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- View tab content -->
+                    <div class="character-data-panel" id="viewPanel">
+                        <div id="situationData" style="color: #888; font-style: italic; text-align: center; padding: 20px;">
+                            No situation data available
+                        </div>
                     </div>
                 </div>
             </div>
@@ -902,6 +972,8 @@ class FastAPIActionDisplayNode:
                     handleDecidedActionUpdate(data);
                 } else if (data.type === 'current_plan') {
                     handleCurrentPlanUpdate(data);
+                } else if (data.type === 'situation_data') {
+                    handleSituationDataUpdate(data);
                 } else if (data.type === 'turn_state') {
                     updateTurnState(data);
                 } else if (data.type === 'step_complete') {
@@ -977,7 +1049,42 @@ class FastAPIActionDisplayNode:
         // Initialize sidebar resizer when DOM is loaded
         document.addEventListener('DOMContentLoaded', function() {
             initSidebarResizer();
+            initCharacterDataTabs();
         });
+        
+        // Character Data Tab Functions
+        function initCharacterDataTabs() {
+            const tabs = document.querySelectorAll('.character-data-tab');
+            tabs.forEach(tab => {
+                tab.addEventListener('click', function() {
+                    const tabName = this.getAttribute('data-tab');
+                    switchCharacterDataTab(tabName);
+                });
+            });
+        }
+        
+        function switchCharacterDataTab(tabName) {
+            // Update tab active states
+            const tabs = document.querySelectorAll('.character-data-tab');
+            tabs.forEach(tab => {
+                tab.classList.remove('active');
+                if (tab.getAttribute('data-tab') === tabName) {
+                    tab.classList.add('active');
+                }
+            });
+            
+            // Update panel visibility
+            const panels = document.querySelectorAll('.character-data-panel');
+            panels.forEach(panel => {
+                panel.classList.remove('active');
+            });
+            
+            if (tabName === 'plan') {
+                document.getElementById('planPanel').classList.add('active');
+            } else if (tabName === 'view') {
+                document.getElementById('viewPanel').classList.add('active');
+            }
+        }
         
         // Character Tab Management Functions
         function createCharacterTab(characterName) {
@@ -1002,7 +1109,8 @@ class FastAPIActionDisplayNode:
                 element: tabElement,
                 goal: null,
                 decidedAction: null,
-                currentPlan: null
+                currentPlan: null,
+                situationData: null
             });
             
             console.log(`Created character tab for: ${characterName}`);
@@ -1026,6 +1134,9 @@ class FastAPIActionDisplayNode:
             
             // Update character data display
             updateCharacterDataDisplay(characterName);
+            
+            // Update situation data display
+            updateSituationDataDisplay(characterName);
             
             console.log(`Selected character tab: ${characterName}`);
         }
@@ -1114,6 +1225,27 @@ class FastAPIActionDisplayNode:
             }
         }
         
+        function handleSituationDataUpdate(situationData) {
+            const characterName = situationData.character;
+            const situation = situationData.situation_data;
+            
+            console.log(`Situation data update for ${characterName}`);
+            
+            // Update the stored situation data for this character
+            if (characterTabs.has(characterName)) {
+                const tabData = characterTabs.get(characterName);
+                tabData.situationData = situation;
+                
+                // If this character's tab is currently active and view tab is selected, update the display
+                if (activeCharacter === characterName) {
+                    updateSituationDataDisplay(characterName);
+                }
+            } else {
+                // Character tab doesn't exist yet, this shouldn't happen
+                console.warn(`Received situation data for unknown character: ${characterName}`);
+            }
+        }
+        
         function updateCharacterDataDisplay(characterName) {
             const dataItemsDiv = document.getElementById('characterDataItems');
             const tabData = characterTabs.get(characterName);
@@ -1156,6 +1288,20 @@ class FastAPIActionDisplayNode:
             }
             
             dataItemsDiv.innerHTML = content;
+        }
+        
+        function updateSituationDataDisplay(characterName) {
+            const situationDataDiv = document.getElementById('situationData');
+            const tabData = characterTabs.get(characterName);
+            
+            if (!tabData || !tabData.situationData) {
+                situationDataDiv.innerHTML = '<div style="color: #888; font-style: italic; text-align: center; padding: 20px;">No situation data available</div>';
+                return;
+            }
+            
+            // Format the situation data as JSON
+            const formattedData = JSON.stringify(tabData.situationData, null, 2);
+            situationDataDiv.innerHTML = `<pre style="white-space: pre-wrap; font-family: 'Courier New', monospace; font-size: 11px; margin: 0; color: #e0e0e0; text-align: left;">${formattedData}</pre>`;
         }
         
         function addActionEntry(actionData) {
@@ -1561,6 +1707,26 @@ class FastAPIActionDisplayNode:
             import traceback
             traceback.print_exc()
     
+    def situation_callback(self, sample):
+        """Handle incoming character situation data."""
+        try:
+            situation_data = json.loads(sample.payload.to_bytes().decode('utf-8'))
+            
+            # Extract character name from topic path
+            topic_path = str(sample.key_expr)
+            character_name = topic_path.split('/')[1]  # cognitive/{character}/situation/update
+            
+            # Store situation data for this character
+            with self.character_situation_data_lock:
+                self.character_situation_data[character_name] = situation_data
+            
+            # Send situation data update to web clients
+            self._send_situation_data_to_websockets(situation_data, character_name)
+            
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+    
     def step_complete_callback(self, sample):
         """Handle step complete events from map node."""
         try:
@@ -1743,6 +1909,44 @@ class FastAPIActionDisplayNode:
             'character': character_name,
             'current_plan': current_plan_data.get('current_plan', ''),
             'timestamp': current_plan_data.get('timestamp', '')
+        }
+        
+        # Send to all connected clients
+        if self.event_loop is None:
+            return
+            
+        with self.websocket_lock:
+            disconnected = []
+            for websocket in self.websocket_connections:
+                try:
+                    # Use asyncio.run_coroutine_threadsafe to send from non-async context
+                    future = asyncio.run_coroutine_threadsafe(
+                        websocket.send_text(json.dumps(web_data)), 
+                        self.event_loop
+                    )
+                    future.result(timeout=5.0)
+                except Exception as e:
+                    # Don't remove client on timeout - just log the error
+                    if not isinstance(e, TimeoutError):
+                        disconnected.append(websocket)
+            
+            # Remove only truly disconnected clients (not timeout errors)
+            for websocket in disconnected:
+                if websocket in self.websocket_connections:
+                    self.websocket_connections.remove(websocket)
+    
+    def _send_situation_data_to_websockets(self, situation_data: Dict[str, Any], character_name: str):
+        """Send situation data to all connected WebSocket clients."""
+        with self.websocket_lock:
+            if not self.websocket_connections:
+                return
+        
+        # Prepare situation data for web clients
+        web_data = {
+            'type': 'situation_data',
+            'character': character_name,
+            'situation_data': situation_data,
+            'timestamp': datetime.now().isoformat()
         }
         
         # Send to all connected clients

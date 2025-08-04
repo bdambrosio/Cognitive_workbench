@@ -52,7 +52,7 @@ except ImportError as e:
     LLM_CLIENT_AVAILABLE = False
 
 PLAN_SYNTAX = """
-Task: Break down the user’s high‑level goal into a minimal plan in the JSON format specified below.
+Task: Break down the user's high‑level goal into a minimal plan in the JSON format specified below.
 Output: only valid JSON – no prose, no code fences.
 
 {
@@ -63,14 +63,14 @@ Output: only valid JSON – no prose, no code fences.
     { "type": "take", "target": "…" },
     { "type": "inspect", "target": "…" },
     { "type": "use", "target": "…" },
-    { "type": "do_while", "body": [ /* steps */ ], "condition": "…" },
+    { "type": "while", "body": [ /* steps */ ], "condition": "…" },
     { "type": "if", "condition": "…", "then": [ /* steps */ ], "else": [ /* steps */ ] }
   ]
 }
 
-A plan must include no more than 10 steps including all nested do_while and if branches.
+A plan must include no more than 10 steps including all nested while and if branches.
 In the following, <resource_name>, <character_name> are placeholders only for KNOWN resources, characters, or maptypes, those appearing above.
-Only dicts of the types below are allowed for the condition of do_while and if. Condition action type can only be one of the following:
+Only dicts of the types below are allowed for the condition of while and if. Condition action type can only be one of the following:
  - "near": {"type": "near", "target": <resource name? or <character_name>} is for checking if the character is near a resource or character.
  - "can_see": {"type": "can_see", "target": <character_name>} is for checking if the character can see a character.
  - "has_item": {"type": "has_item", "target": <resource_name>} is for checking if the character has a resource in their inventory.
@@ -82,7 +82,7 @@ Only dicts of the types below are allowed for the condition of do_while and if. 
  - "notat_location": {"type": "notat_location", "target": <resource_name>} is for checking if the character is not at a location.
  - "notbelieves": {"type": "notbelieves", "target": <character_name>} is for checking if the character does not believe something about another character.
 
-outside a do_while or if condition, "type" can take the values "say", "move", "think", "take", "inspect", or "use":
+outside a while or if condition, "type" can take the values "say", "move", "think", "take", "inspect", or "use":
  - "say": { "type": "say", "target": "character_name", "value": "text to speak" } is for speaking to another character you can see. For a 'say' act, speak only for yourself, and do not include any other introductory, explanatory, discursive, or formatting text in your response.
  - "move": { "type": "move", "target": "cardinal_direction" or 'resource or character name'} is for moving in one of the 8 cardinal directions or in the direction of a resource or character.
  - "think": { "type": "think", "value": "text to think about" } is for thinking about a topic or question, attempting to derive new information, conclusions, or decisions from who you are and what you already explicitly know
@@ -99,30 +99,30 @@ For example,
 is a valid plan. Likewise,
     {"type": "if", "condition": {"type": "near", "target": "Joe"}, "then": [{"type": "move", "target": "Joe"}]}
 is a valid plan.
-Note that move only moves one step, so you must use a do_while to move repeatedly.
+Note that move only moves one step, so you must use a while to move repeatedly.
 
 Some actions have conditions that must be met before they can be executed.
 for example, you cannot take a resource unless you are near it.
-you can accomplish this by using the "near" condition in a do_while. Assuming, for example, that Cave2 is in your situation view direction Northeast
+you can accomplish this by using the "near" condition in a while. Assuming, for example, that Cave2 is in your situation view direction Northeast
 
 {
   "plan": [
-    { "type": "do_while", "body": [ { "type": "move", "target": "Northeast" } ], "condition": { "type": "notnear", "target": "Cave2" } },
+    { "type": "while", "body": [ { "type": "move", "target": "Northeast" } ], "condition": { "type": "notnear", "target": "Cave2" } },
     { "type": "take", "target": "Cave2" }
   ]
 }
 
 ###
-Allowed control‑flow primitives: sequential list (e.g.. [..., ...]), do_while, and two‑branch if (else is optional).
+Allowed control‑flow primitives: sequential list (e.g.. [..., ...]), while, and two‑branch if (else is optional).
 {
   "plan": [
     { "type": "action", "target": "…", "value": "…" },
-    { "type": "do_while", "body": [ /* steps */ ], "condition": "…" },
+    { "type": " while", "body": [ /* steps */ ], "condition": "…" },
     { "type": "if", "condition": "…", "then": [ /* steps */ ], "else": [ /* steps */ ] }
   ]
 }
 
-A plan must include no more than 8 steps including all nested do_while and if branches.
+A plan must include no more than 8 steps including all nested while and if branches.
 A plan must not contain sequential adjacent say actions.
 """
 
@@ -774,14 +774,14 @@ Respond ONLY with the above hash-formatted text.
         # Check if we've completed the current level
         if idx >= len(plan):
             # Handle frame completion based on type
-            if current_frame['type'] == 'do_while':
-                # Do-while body completed, increment iteration count
+            if current_frame['type'] == 'while':
+                # While body completed, increment iteration count
                 current_frame['iteration_count'] += 1
                 
                 # Check iteration limit first
                 if current_frame['iteration_count'] >= current_frame['max_iterations']:
                     # Max iterations reached, exit loop
-                    step_stack.pop()  # Remove do_while frame
+                    step_stack.pop()  # Remove while frame
                     if step_stack.is_empty():
                         # Plan complete
                         self.current_plan = None
@@ -799,13 +799,14 @@ Respond ONLY with the above hash-formatted text.
                     # Test original condition
                     condition_action = current_frame['condition']
                     resolved_target = self._resolve_target(condition_action)
-                    if plan_module._evaluate_condition(self, condition_action, resolved_target):
+                    #if plan_module._evaluate_condition(self, condition_action, resolved_target): # _resolve_target returns non False if condition is met!
+                    if resolved_target:
                         # Condition true, repeat loop
                         current_frame['idx'] = 0  # Reset to start of body
                         return self._execute_next_step(step_stack)
                     else:
                         # Condition false, exit loop
-                        step_stack.pop()  # Remove do_while frame
+                        step_stack.pop()  # Remove while frame
                         if step_stack.is_empty():
                             # Plan complete
                             self.current_plan = None
@@ -842,20 +843,27 @@ Respond ONLY with the above hash-formatted text.
             current_frame['idx'] = idx + 1
             return step
         
-        elif step['type'] == 'do_while':
-            # Handle do-while loop - always execute body first
-            # Push do_while frame with body and metadata
-            do_while_frame = {
-                'plan': step['body'],
-                'idx': 0,
-                'type': 'do_while',
-                'condition': step.get('condition', None),
-                'return_to': idx + 1,  # Where to go when loop exits
-                'iteration_count': 0,  # Track current iteration
-                'max_iterations': 5    # Maximum allowed iterations
-            }
-            step_stack.push(do_while_frame)
-            return self._execute_next_step(step_stack)
+        elif step['type'] == 'while':
+            # Handle while loop - test condition first
+            condition_action = step.get('condition', None)
+            resolved_target = self._resolve_target(condition_action)
+            if plan_module._evaluate_condition(self, condition_action, resolved_target):
+                # Condition true, enter loop
+                while_frame = {
+                    'plan': step['body'],
+                    'idx': 0,
+                    'type': 'while',
+                    'condition': condition_action,
+                    'return_to': idx + 1,  # Where to go when loop exits
+                    'iteration_count': 0,  # Track current iteration
+                    'max_iterations': 5    # Maximum allowed iterations
+                }
+                step_stack.push(while_frame)
+                return self._execute_next_step(step_stack)
+            else:
+                # Condition false, skip loop entirely
+                current_frame['idx'] = idx + 1
+                return self._execute_next_step(step_stack)
         
         elif step['type'] == 'if':
             # Handle if-then-else
@@ -1151,6 +1159,9 @@ in the current context described below.
 
 you are:
 """
+            if not self.observations:
+                self._observe()
+                
             system_prompt += self.observations['static']
             
             # Build user prompt with context
@@ -1337,7 +1348,7 @@ End your text with: </end>"""
                         if resource.get('name', '') == target or resource.get('name', '').startswith(target):
                             return resource.get('name', '')
                 if 'terrain' in view:
-                    if view['terrain'].get('name', '') == target:
+                    if view['terrain'] == target:
                         return target
             return False
         except Exception as e:
@@ -1359,7 +1370,7 @@ End your text with: </end>"""
                         if resource.get('distance', 20) <= 2 and (resource.get('name', '') == target or resource.get('name', '').startswith(target)):
                             return resource.get('name', '')
                 if 'terrain' in view:
-                    if view['terrain'].get('name', '') == target:
+                    if view['terrain'] == target:
                         return target
             return False
         except Exception as e:
@@ -1396,7 +1407,7 @@ End your text with: </end>"""
                         if resource.get('distance', 20) <= 1 and (resource.get('name', '') == target or resource.get('name', '').startswith(target)):
                             return resource.get('name', '')
                 if 'terrain' in view:
-                    if view['terrain'].get('name', '') == target:
+                    if view['terrain'] == target:
                         return target
             return False
         except Exception as e:
@@ -1452,26 +1463,28 @@ End your text with: </end>"""
                     
                     # Search through each direction for the target
                     directions = ['North', 'Northeast', 'East', 'Southeast', 'South', 'Southwest', 'West', 'Northwest']
-                    target_lower = target.lower()
+                    target_name = target.capitalize()
                     
                     for view in views:
                         direction = view.get('direction', {})
                         
                         # Check resources in this direction
+                        if view['terrain'] == target_name:
+                            return direction
+                        
                         if 'resources' in view:
                             for resource in view['resources']:
-                                resource_id = resource.get('id', '') if isinstance(resource, dict) else str(resource)
-                                if resource_id.lower() == target_lower or target_lower in resource_id.lower():
+                                if resource.get('name') == target_name:
                                     logger.info(f'🎯 Found target "{target}" as resource in direction: {direction}')
-                                    return direction.lower()
+                                    return direction
                         
                         # Check characters in this direction
                         if 'characters' in view:
                             for character in view['characters']:
-                                character_name = character.get('name', '') if isinstance(character, dict) else str(character)
-                                if character_name.lower() == target_lower or target_lower in character_name.lower():
+                                character_name = character.get('name', '') 
+                                if character_name == target_name:
                                     logger.info(f'🎯 Found target "{target}" as character in direction: {direction}')
-                                    return direction.lower()
+                                    return direction
                     
                     logger.warning(f'❌ Target "{target}" not found in any visible direction')
                     return None

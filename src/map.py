@@ -436,13 +436,13 @@ class WorldMap:
         elevation = np.zeros((self.width, self.height))
         for x in range(self.width):
             for y in range(self.height):
-                elevation[x][y] = np.random.normal(0, 1)
+                elevation[x][y] = 0.3 # np.random.normal(0, 1)
         
         # Smooth elevation
-        elevation = gaussian_filter(elevation, sigma=scale/10)
+        #elevation = gaussian_filter(elevation, sigma=scale/10)
         
         # Normalize elevation to 0-1
-        elevation = (elevation - elevation.min()) / (elevation.max() - elevation.min())
+        #elevation = (elevation - elevation.min()) / (elevation.max() - elevation.min())
         
         # Assign elevation and terrain types
         water_level = self._terrain_rules.get('water_level', 0.2)
