@@ -318,10 +318,15 @@ def get_direction_name(dx: float, dy: float) -> str | None:
         return Direction.East if dx > 0 else Direction.West
 
     # diagonal band
-    if dx > 0 and dy > 0:   return Direction.Northeast
-    if dx > 0 and dy < 0:   return Direction.Southeast
-    if dx < 0 and dy < 0:   return Direction.Southwest
-    return Direction.Northwest
+    if dx > 0 and dy > 0:   
+        return Direction.Northeast
+    if dx > 0 and dy < 0:   
+        return Direction.Southeast
+    if dx < 0 and dy < 0:   
+        return Direction.Southwest
+    if dx < 0 and dy > 0:   
+        return Direction.Northwest
+    return None
 
 
 class Resource(Enum):
@@ -1437,12 +1442,12 @@ class Agent:
         direction = Direction.from_string(direction_text)
         if direction:
             offsets = {
-                Direction.North: (0, -1),
-                Direction.Northeast: (1, -1),
+                Direction.North: (0, 1),
+                Direction.Northeast: (1, 1),
                 Direction.East: (1, 0),
-                Direction.Southeast: (1, 1),
-                Direction.South: (0, 1),
-                Direction.Southwest: (-1, 1),
+                Direction.Southeast: (1, -1),
+                Direction.South: (0, -1),
+                Direction.Southwest: (-1, -1),
                 Direction.West: (-1, 0),
                 Direction.Northwest: (-1, -1)
             }
@@ -1450,23 +1455,23 @@ class Agent:
 
         # If that fails, look for direction words in the text
         direction_words = {
-            'north': (0, -1),
-            'northeast': (1, -1), 
+            'north': (0, 1),
+            'northeast': (1, 1), 
             'east': (1, 0),
-            'southeast': (1, 1),
-            'south': (0, 1),
-            'southwest': (-1, 1),
+            'southeast': (1, -1),
+            'south': (0, -1),
+            'southwest': (-1, -1),
             'west': (-1, 0),
-            'northwest': (-1, -1),
+            'northwest': (-1, 1),
             # Add common abbreviations
-            'n': (0, -1),
-            'ne': (1, -1),
+            'n': (0, 1),
+            'ne': (1, 1),
             'e': (1, 0),
-            'se': (1, 1),
-            's': (0, 1),
-            'sw': (-1, 1),
+            'se': (1, -1),
+            's': (0, -1),
+            'sw': (-1, -1),
             'w': (-1, 0),
-            'nw': (-1, -1)
+            'nw': (-1, 1)
         }
 
         # Convert to lowercase and split into words

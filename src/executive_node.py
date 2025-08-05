@@ -63,12 +63,12 @@ Output: only valid JSON – no prose, no code fences.
     { "type": "take", "target": "…" },
     { "type": "inspect", "target": "…" },
     { "type": "use", "target": "…" },
-    { "type": "while", "body": [ /* steps */ ], "condition": "…" },
+    { "type": "while", "condition": "…" , "body": [ /* steps */ ]},
     { "type": "if", "condition": "…", "then": [ /* steps */ ], "else": [ /* steps */ ] }
   ]
 }
 
-A plan must include no more than 10 steps including all nested while and if branches.
+A plan must include no more than 7 steps including all nested while and if branches.
 In the following, <resource_name>, <character_name> are placeholders only for KNOWN resources, characters, or maptypes, those appearing above.
 Only dicts of the types below are allowed for the condition of while and if. Condition action type can only be one of the following:
  - "near": {"type": "near", "target": <resource name? or <character_name>} is for checking if the character is near a resource or character.
@@ -85,25 +85,28 @@ Only dicts of the types below are allowed for the condition of while and if. Con
 outside a while or if condition, "type" can take the values "say", "move", "think", "take", "inspect", or "use":
  - "say": { "type": "say", "target": "character_name", "value": "text to speak" } is for speaking to another character you can see. For a 'say' act, speak only for yourself, and do not include any other introductory, explanatory, discursive, or formatting text in your response.
  - "move": { "type": "move", "target": "cardinal_direction" or 'resource or character name'} is for moving in one of the 8 cardinal directions or in the direction of a resource or character.
+    You can only move in the direction of a resource, character, or terrain type if you can see it.
  - "think": { "type": "think", "value": "text to think about" } is for thinking about a topic or question, attempting to derive new information, conclusions, or decisions from who you are and what you already explicitly know
  - "take": { "type": "take", "target": "resource_name" } is for adding some resource you see to your personal inventory. you must be 'near' the resource to take it.
  - "inspect": { "type": "inspect", "target": "resource_name" } is for inspecting a resource you see or one in your inventory to understand how to use it.
- - "use": { "type": "use", "target": "resource_name" } is for using a resource in a known way.
+ - "use": { "type": "use", "target": "resource_name" } is for using a resource in your inventory in a known way.
 
 In general, a target can be a specific resource_name or character_name or a map type generalization. 
-For example, Berry2, Berry, Joe, clearing (assuming it is a terrain type) are all valid targets. 
-However, if the target is not an instance, the specific resource or character bound to is indeterminate. 
+For example, Berry2, Berry, Joe, Clearing (assuming it is a terrain type) are all valid targets. 
+However, if the target is not an instance, the specific resource or character bound to the target is indeterminate. 
 For move, target can also be one of the 8 compass points.
+
 For example, 
     {"type": "if", "condition": {"type": "near", "target": "Berry"}, "then": [{"type": "move", "target": "Berry"}]}
 is a valid plan. Likewise,
     {"type": "if", "condition": {"type": "near", "target": "Joe"}, "then": [{"type": "move", "target": "Joe"}]}
 is a valid plan.
-Note that move only moves one step, so you must use a while to move repeatedly.
+Note that move only moves one step. You can use a while to move repeatedly.
 
 Some actions have conditions that must be met before they can be executed.
 for example, you cannot take a resource unless you are near it.
-you can accomplish this by using the "near" condition in a while. Assuming, for example, that Cave2 is in your situation view direction Northeast
+you can accomplish this by using the "near" condition in a while form. 
+Assuming, for example, that Cave2 is in your situation view direction Northeast, the following plan will move you to Cave2:
 
 {
   "plan": [
@@ -122,7 +125,7 @@ Allowed control‑flow primitives: sequential list (e.g.. [..., ...]), while, an
   ]
 }
 
-A plan must include no more than 8 steps including all nested while and if branches.
+A plan must include no more than 7 steps including all nested while and if branches.
 A plan must not contain sequential adjacent say actions.
 """
 
@@ -833,6 +836,8 @@ Respond ONLY with the above hash-formatted text.
                     return None
                 else:
                     # Continue at parent level
+                    parent = step_stack.peek()
+                    parent['idx'] = current_frame.get('return_to', parent['idx'])   # ⟵ NEW
                     return self._execute_next_step(step_stack)
         
         step = plan[idx]
@@ -867,33 +872,18 @@ Respond ONLY with the above hash-formatted text.
         
         elif step['type'] == 'if':
             # Handle if-then-else
-            condition_action = step.get('condition', None)
-            resolved_target = self._resolve_target(condition_action)
-            if plan_module._evaluate_condition(self, condition_action, resolved_target):
-                # Condition true, execute then branch
-                then_frame = {
-                    'plan': step['then'],
-                    'idx': 0,
-                    'type': 'if_then',
-                    'return_to': idx + 1  # Where to go when then completes
-                }
-                step_stack.push(then_frame)
-                return self._execute_next_step(step_stack)
+            cond = step['condition']
+            branch = 'then' if plan_module._evaluate_condition(self, cond, self._resolve_target(cond)) else 'else'
+            if branch == 'then' or step.get('else'):
+                step_stack.push({
+                    'plan'      : step[branch],
+                    'idx'       : 0,
+                    'type'      : 'if_then' if branch == 'then' else 'if_else',
+                    'return_to' : idx + 1
+                })
             else:
-                # Condition false, execute else branch if it exists
-                if 'else' in step and step['else']:
-                    else_frame = {
-                        'plan': step['else'],
-                        'idx': 0,
-                        'type': 'if_else',
-                        'return_to': idx + 1  # Where to go when else completes
-                    }
-                    step_stack.push(else_frame)
-                    return self._execute_next_step(step_stack)
-                else:
-                    # No else branch, skip if
-                    current_frame['idx'] = idx + 1
-                    return self._execute_next_step(step_stack)
+                current_frame['idx'] = idx + 1
+            return self._execute_next_step(step_stack)
         
         else:
             # Unknown step type, skip it
@@ -1280,6 +1270,7 @@ End your text with: </end>"""
                 
             if action_type in ['has_item', 'hasnt_item']:
                 # Resource actions/conditions - resolve to specific resource instance
+                resolved_target = self._resolve_inventory_instance(negated, raw_target)
                 if resolved_target and not negated:
                     return resolved_target
                 elif not resolved_target and negated:
@@ -1343,9 +1334,10 @@ End your text with: </end>"""
                     for character in view['characters']:
                         if character.get('name', '') == target or target == 'person':
                             return character.get('name', '')
-                if 'resources' in view:
-                    for resource in view['resources']:  
-                        if resource.get('name', '') == target or resource.get('name', '').startswith(target):
+                if 'resources' in view: 
+                    for resource in view['resources']:
+                        if ((not any(ch.isdigit() for ch in resource['name']) and resource['name'].startswith(target)) 
+                            or resource['name'] == target):
                             return resource.get('name', '')
                 if 'terrain' in view:
                     if view['terrain'] == target:
@@ -1367,7 +1359,8 @@ End your text with: </end>"""
                             return character.get('name', '')
                 if 'resources' in view:
                     for resource in view['resources']:  
-                        if resource.get('distance', 20) <= 2 and (resource.get('name', '') == target or resource.get('name', '').startswith(target)):
+                        if resource.get('distance', 20) <= 2 and ((not any(ch.isdigit() for ch in resource['name']) and resource['name'].startswith(target)) 
+                            or resource['name'] == target):
                             return resource.get('name', '')
                 if 'terrain' in view:
                     if view['terrain'] == target:
@@ -1385,7 +1378,8 @@ End your text with: </end>"""
             for view in self.last_situation_data.get('views', []):
                 if 'resources' in view:
                     for resource in view['resources']:  
-                        if resource.get('distance', 20) <= 2 and (resource.get('name', '') == target or resource.get('name', '').startswith(target)):
+                        if resource.get('distance', 20) <= 2 and ((not any(ch.isdigit() for ch in resource['name']) and resource['name'].startswith(target)) 
+                            or resource['name'] == target):                            
                             return resource.get('name', '')
             return False
         except Exception as e:
@@ -1404,7 +1398,8 @@ End your text with: </end>"""
                             return character.get('name', '')
                 if 'resources' in view:
                     for resource in view['resources']:  
-                        if resource.get('distance', 20) <= 1 and (resource.get('name', '') == target or resource.get('name', '').startswith(target)):
+                        if resource.get('distance', 20) <= 2 and ((not any(ch.isdigit() for ch in resource['name']) and resource['name'].startswith(target)) 
+                            or resource['name'] == target):                            
                             return resource.get('name', '')
                 if 'terrain' in view:
                     if view['terrain'] == target:
@@ -1419,7 +1414,7 @@ End your text with: </end>"""
         """Resolve abstract resource name to specific resource instance."""
         try:
             # First try exact match validation
-            for reply in self.session.get(f"cognitive/map/resource/{raw_target}", timeout=2.0):
+            for reply in self.session.get(f"cognitive/{self.character_name}/memory/inventory?item={raw_target}", timeout=2.0):
                 if reply.ok:
                     data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
                     if data.get('success'):
@@ -1575,7 +1570,7 @@ End your text with: </end>"""
             return True
 
         try:
-            result = self.do_take(target)
+            result = _do_take(target)
             # Create and publish action data for logging/display
             action_data = {
                 'type': 'take',

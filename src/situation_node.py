@@ -360,16 +360,21 @@ class ZenohSituationNode:
                 
                 # Check resources
                 for resource in self.situation.get('resources', []):
-                    if 'name' in resource and resource['name'].startswith(target_canonical) and resource.get('distance', float('inf')) < self.near_threshold:
-                        is_near = True
+                    if ('name' in resource 
+                        and ((not any(ch.isdigit() for ch in resource['name']) and resource['name'].startswith(target_canonical)) 
+                            or resource['name'] == target_canonical)
+                        and resource.get('distance', float('inf')) < self.near_threshold):
+                        is_near = resource['name']
                         binding = resource['name']
                         break
                 
                 # Check characters if not found in resources
                 if not is_near:
                     for character in self.situation.get('characters', []):
-                        if (target_canonical == 'person' or 'name' in character and character['name'].startswith(target_canonical)) and character.get('distance', float('inf')) < self.near_threshold:
-                            is_near = True
+                        if (((not any(ch.isdigit() for ch in character['name']) and character['name'].startswith(target_canonical)) 
+                            or character['name'] == target_canonical)
+                            and character.get('distance', float('inf')) < self.near_threshold):
+                            is_near = character['name']
                             binding = character['name']
                             break
                 
@@ -420,18 +425,20 @@ class ZenohSituationNode:
                 # Check if target is in visible terrains
                 for view in self.situation['views']:
                     if view.get('terrain') == target_canonical:
-                        can_see = True
+                        can_see = target_canonical
                         binding = view['direction']
                         break
                 # Check resources
                 for resource in self.situation.get('resources', []):
-                    if 'name' in resource and resource['name'].startswith(target_canonical) and resource.get('distance', float('inf')) < self.near_threshold:
-                        can_see = True
+                    if ('name' in resource 
+                        and ((not any(ch.isdigit() for ch in resource['name']) and resource['name'].startswith(target_canonical)) 
+                            or resource['name'] == target_canonical)):
+                        can_see = resource['name']
                         binding = resource['name']
                         break
                 for character in self.situation.get('characters', []):
-                    if (target_canonical == 'person' or 'name' in character and character['name'].startswith(target_canonical)) and character.get('distance', float('inf')) < self.near_threshold:
-                        can_see = True
+                    if target_canonical == 'person' or ('name' in character and character['name'] == target_canonical):
+                        can_see = character['name']
                         binding = character['name']
                         break
                 
@@ -481,13 +488,15 @@ class ZenohSituationNode:
                 # Check terrains
                 for view in self.situation['views']:
                     if view.get('terrain') == target_canonical:
-                        at_location = True
+                        at_location = target_canonical
                         binding = view['direction']
                         break
                 # Check resources
                 for resource in self.situation.get('adjacent_resources', []):
-                    if 'name' in resource and resource['name'].startswith(target_canonical):
-                        at_location = True
+                    if ('name' in resource and ((not any(ch.isdigit() for ch in resource['name']) and resource['name'].startswith(target_canonical)) 
+                        or resource['name'] == target_canonical)
+                        and resource.get('distance', float('inf')) < self.at_location_threshold):
+                        at_location = resource['name']
                         binding = resource['name']
                         break
                 
@@ -495,7 +504,7 @@ class ZenohSituationNode:
                 if not at_location:
                     for character in self.situation.get('adjacent_characters', []):
                         if target_canonical == 'person' or ('name' in character and character['name'].startswith(target_canonical)):
-                            at_location = True
+                            at_location = character['name']
                             binding = character['name']
                             break
                 
