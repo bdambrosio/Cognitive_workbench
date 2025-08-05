@@ -438,17 +438,17 @@ class ZenohMemoryNode:
         try:
             # Parse query parameters
             selector = str(query.selector)
-            item = None
+            target_item = None
             
             # Extract item from query
             if 'item=' in selector:
                 try:
                     import urllib.parse
-                    item = urllib.parse.unquote(selector.split('item=')[1].split('&')[0])
+                    target_item = urllib.parse.unquote(selector.split('item=')[1].split('&')[0])
                 except:
                     pass
             
-            if not item:
+            if not target_item:
                 # Return list of all items in inventory
                 item_names = list(self.inventory.keys())
                 response = {
@@ -458,14 +458,22 @@ class ZenohMemoryNode:
                 logger.info(f'📦 Inventory query: returned {len(item_names)} items')
             else:
                 # Check if item is in inventory
-                item_canonical = item.capitalize()
+                item_canonical = target_item.capitalize()
                 has_item = item_canonical in self.inventory
+                if has_item:
+                    has_item = item_canonical
+                else:
+                    for item_name in self.inventory:
+                        if ((not any(ch.isdigit() for ch in target_item) and item_name.startswith(target_item)) 
+                            or item_name == target_item):
+                            has_item = item_name
+                            break
                 
                 response = {
                     'success': True,
                     'value': has_item
                 }
-                logger.info(f'📦 Inventory query for {item}: {response["value"]}')
+                logger.info(f'📦 Inventory query for {target_item}: {response["value"]}')
             
             query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
             
