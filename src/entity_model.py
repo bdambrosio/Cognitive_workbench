@@ -7,6 +7,8 @@ from datetime import datetime
 from typing import List, Dict, Any, Optional
 import json
 import random
+
+from utils import hash_utils
 try:
     from llm_client import ZenohLLMClient
     LLM_CLIENT_AVAILABLE = True
@@ -20,7 +22,8 @@ class EntityModel:
     Tracks visual sightings and conversation history organized as dialogs.
     """
     
-    def __init__(self, entity_name: str, logger, llm_client: ZenohLLMClient):
+    def __init__(self, character_name: str, entity_name: str, logger, llm_client: ZenohLLMClient):
+        self.character_name = character_name
         self.entity_name = entity_name
         self.first_seen: Optional[datetime] = None
         self.last_seen: Optional[datetime] = None
@@ -75,6 +78,46 @@ class EntityModel:
         Close the current dialog. Next conversation entry will start a new dialog.
         """
         self.active = False
+        # Consolidate dialogs if they are too long
+        if len(self.dialogs) <= 6:
+            return
+        dialog_to_consolidate = self.dialogs[-6]
+
+        if dialog_to_consolidate and isinstance(dialog_to_consolidate, list):
+            dialog_history = f"Your recent conversation with {self.entity_name} has been:\n"
+            for i, memory in enumerate(dialog_to_consolidate):
+                if isinstance(memory, dict) and 'source' in memory and 'text' in memory:
+                    dialog_history += f"\t{memory['source']}: {memory['text']}\n"
+
+        system_prompt = """Given the following dialog transcript, create two summaries, one for each of the two characters.
+Each summary should be a single sentence accurately conveying the essence of that character's part of the conversation.
+Each summary Should accurately reflect both the content and tone of that character's part of the conversation.
+"""
+
+        user_prompt = f"""#Dialog transcript
+{{$transcript}}
+##
+
+Respond with the two summaries in hash-formatted text using the following format:
+
+#{{$name}} Summary for {{$name}}
+#{{$other_name}} Summary for {{$other_name}}
+##
+
+Do not include any other introductory, explanatory, discursive, or formatting text in your response.
+End your response with: 
+</end>"""
+
+        response = self.llm_client.generate([system_prompt], bindings={'transcript': dialog_history, 'name': self.entity_name, 'other_name': self.entity_name}, stops=['</end>'], max_tokens=20)
+        if response.success:
+            response=response.text
+            me = hash_utils.find(f'{self.character_name}', response)
+            other = hash_utils.find(f'{self.entity_name}', response)
+            self.dialogs[-6] = [me, other]
+        else:
+            self.logger.error(f'Error in consolidate_dialog for {self.character_name} and {self.entity_name}: {response}')
+
+
     
     def update_last_seen(self) -> None:
         """
@@ -304,7 +347,6 @@ My rating is:
             if response.success:
             # Extract rating from response
                 response=response.text
-                rating = int(response.lower().replace('</end>','').strip())
                 try:
                     rating = int(''.join(filter(str.isdigit, response)))
                     if rating < 0 or rating > 10:
@@ -322,5 +364,6 @@ My rating is:
             
         except Exception as e:
             self.logger.error(f'Error in natural_dialog_end for {self.entity_name}: {e}')
-            return False
+            self.close_dialog()
+            return True
     

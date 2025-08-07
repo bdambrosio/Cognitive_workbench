@@ -730,7 +730,7 @@ class MapNode:
                     dir_obs = extract_direction_info(self.world_map, look_result, dir)
                     view[dir] = dir_obs
 
-                view_text, resources, characters, paths, percept_summary = hash_direction_info(view, world=self.world_map)
+                view_text, resources, characters, paths, percept_summary = hash_direction_info(view, distance_threshold=16, world=self.world_map)
                 
                 response = {
                     'success': True,

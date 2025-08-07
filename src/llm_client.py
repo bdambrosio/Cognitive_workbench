@@ -57,7 +57,7 @@ class ZenohLLMClient:
     - Thread-safe operations
     """
     
-    def __init__(self, service_timeout: float = 30.0):
+    def __init__(self, service_timeout: float = 60.0):
         # Initialize Zenoh session
         config = zenoh.Config()
         self.session = zenoh.open(config)

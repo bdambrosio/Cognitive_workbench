@@ -1741,12 +1741,12 @@ def hash_direction_info(direction_info, distance_threshold=10, world=None):
             percept += f", slope {direction_info[dir]['slope']['description']} "
         percept += "; "
         if 'resources' in direction_info[dir] and len(direction_info[dir]['resources']) > 0:
-            resource_added = False
+            resource_label_added = False
             for resource in direction_info[dir]['resources']:
                 if resource['distance'] <= distance_threshold:
-                    if not resource_added:
+                    if not resource_label_added:
                         percept += f"resources: "
-                        resource_added = True
+                        resource_label_added = True
                     percept += f"{resource['id']} distance {resource['distance']}, "
                     resources.append(resource['id'])
             percept = percept[:-2] + '; '
@@ -1757,14 +1757,15 @@ def hash_direction_info(direction_info, distance_threshold=10, world=None):
             paths.append(path_name)
 
         if 'characters' in direction_info[dir] and len(direction_info[dir]['characters']) > 0:  
-            character_added = False
+            character_label_added = False
             for character in direction_info[dir]['characters']:
                 if character['distance'] <= distance_threshold:
-                    if not character_added:
+                    if not character_label_added:
                         percept += f"characters: "
-                        character_added = True
+                        character_label_added = True
                     percept += f"{character['name']} distance {character['distance']}, "
-                    characters.append(character['name'])
+                    if character['name'] not in characters:
+                        characters.append(character['name'])
             percept = percept[:-2]
         percept += "\n"
     percept_summary += f"You see {', '.join(list(set(characters)))} and {', '.join(list(set(resources)))} resources{f' and {path_name}(s)' if len(paths) > 0 else ''}"

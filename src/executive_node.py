@@ -68,7 +68,7 @@ Output: only valid JSON – no prose, no code fences.
   ]
 }
 
-A plan must include no more than 7 steps including all nested while and if branches.
+A plan must include at least 1 step and no more than 6 steps including all nested while and if branches.
 In the following, <resource_name>, <character_name> are placeholders only for KNOWN resources, characters, or maptypes, those appearing above.
 Only dicts of the types below are allowed for the condition of while and if. Condition action type can only be one of the following:
  - "near": {"type": "near", "target": <resource name? or <character_name>} is for checking if the character is near a resource or character.
@@ -83,13 +83,20 @@ Only dicts of the types below are allowed for the condition of while and if. Con
  - "notbelieves": {"type": "notbelieves", "target": <character_name>} is for checking if the character does not believe something about another character.
 
 outside a while or if condition, "type" can take the values "say", "move", "think", "take", "inspect", or "use":
- - "say": { "type": "say", "target": "character_name", "value": "text to speak" } is for speaking to another character you can see. For a 'say' act, speak only for yourself, and do not include any other introductory, explanatory, discursive, or formatting text in your response.
- - "move": { "type": "move", "target": "cardinal_direction" or 'resource or character name'} is for moving in one of the 8 cardinal directions or in the direction of a resource or character.
+ - "say": { "type": "say", "target": "character_name", "value": "text to speak" } 
+     for speaking to another character you can see. Use this to seek information, respond, inform the other character, or to maintain 'social chatter' to stay aligned.
+     For a 'say' act, speak only for yourself, and do not include any other introductory, explanatory, discursive, or formatting text in your response.
+ - "move": { "type": "move", "target": "cardinal_direction" or 'resource or character name'} 
+     For moving in one of the 8 cardinal directions or in the direction of a resource or character.
     You can only move in the direction of a resource, character, or terrain type if you can see it.
- - "think": { "type": "think", "value": "text to think about" } is for thinking about a topic or question, attempting to derive new information, conclusions, or decisions from who you are and what you already explicitly know
- - "take": { "type": "take", "target": "resource_name" } is for adding some resource you see to your personal inventory. you must be 'near' the resource to take it.
- - "inspect": { "type": "inspect", "target": "resource_name" } is for inspecting a resource you see or one in your inventory to understand how to use it.
- - "use": { "type": "use", "target": "resource_name" } is for using a resource in your inventory in a known way.
+ - "think": { "type": "think", "value": "text to think about" } 
+     For thinking about a topic or question, attempting to derive new information, conclusions, or decisions from who you are and what you already explicitly know
+ - "take": { "type": "take", "target": "resource_name" } 
+     For adding some resource you see to your personal inventory. you must be 'near' the resource to take it.
+ - "inspect": { "type": "inspect", "target": "resource_name" } 
+     For inspecting a resource you see or one in your inventory to understand how to use it.
+ - "use": { "type": "use", "target": "resource_name" } 
+     For using a resource in your inventory in a known way.
 
 In general, a target can be a specific resource_name or character_name or a map type generalization. 
 For example, Berry2, Berry, Joe, Clearing (assuming it is a terrain type) are all valid targets. 
@@ -125,7 +132,7 @@ Allowed control‑flow primitives: sequential list (e.g.. [..., ...]), while, an
   ]
 }
 
-A plan must include no more than 7 steps including all nested while and if branches.
+A plan must include no more than 6 steps including all nested while and if branches.
 A plan must not contain sequential adjacent say actions.
 """
 
@@ -161,6 +168,9 @@ class ZenohExecutiveNode:
         
         # Publisher for actions (character-specific)
         self.action_publisher = self.session.declare_publisher(f"cognitive/{character_name}/action")
+
+        # Publisher for map update requests (character-specific)
+        self.map_update_request_publisher = self.session.declare_publisher(f"cognitive/{character_name}/situation/request_update")
         
         # Publisher for memory storage (character-specific)
         self.memory_publisher = self.session.declare_publisher(f"cognitive/{character_name}/memory/store")
@@ -246,6 +256,7 @@ class ZenohExecutiveNode:
         logger.info(f'   - Subscribing to: cognitive/map/turn/go')
         logger.info(f'   - Subscribing to: cognitive/{character_name}/end_dialog')
         logger.info(f'   - Publishing to: cognitive/{character_name}/action')
+        logger.info(f'   - Publishing to: cognitive/{character_name}/situation/request_update')
         logger.info(f'   - Publishing to: cognitive/{character_name}/memory/store')
         logger.info(f'   - Publishing to: cognitive/{character_name}/text_input')
         logger.info(f'   - Publishing to: cognitive/{character_name}/goal')
@@ -264,6 +275,9 @@ class ZenohExecutiveNode:
             
             # Announce character presence
             self._announce_character()
+            time.sleep(0.1)
+            self.map_update_request_publisher.put(json.dumps({'type': 'announcement look'}))
+            time.sleep(1.0)
             
             # Start OODA loop
             while not self.shutdown_requested:
@@ -412,7 +426,7 @@ class ZenohExecutiveNode:
         if self.last_situation_data and self.last_situation_data.get('location'):
             formatted_situation += f"You are at location: {self.last_situation_data['location']}\n"
         if self.last_situation_data and self.last_situation_data.get('visible_characters'):
-            formatted_situation += f"You notice the following characters: {', '.join(self.last_situation_data['visible_characters'])}\n"
+            formatted_situation += f"You notice the following characters: {', '.join(self.last_situation_data['characters'])}\n"
         if self.last_situation_data and self.last_situation_data.get('look'):
             formatted_situation += f"You can see the following:\n\t{'\n\t'.join(self.last_situation_data['look'])}\n"
         
@@ -424,15 +438,17 @@ class ZenohExecutiveNode:
             if adjacent.get('characters'):
                 formatted_situation += f"You are adjacent to these characters (available to interact with): {', '.join(adjacent['characters'])}\n"
 
-        if self.last_situation_data and self.last_situation_data.get('visible_characters'):
-            for character_name in self.last_situation_data['visible_characters']:
+        if self.last_situation_data and self.last_situation_data.get('characters'):
+            for character_name in self.last_situation_data['characters']:
                 entity_context = self.get_entity_context(character_name, 10)
                 if entity_context:
                     formatted_situation += f"\nYou can see {character_name}, with whom you have had the following conversation history:\n"
                     for memory in entity_context['conversation_history']: 
                         formatted_situation += f"\n\t{memory['source']}: {memory['text']}"
                     formatted_situation += '\n'
-        
+
+        if self.last_situation_data and self.last_situation_data.get('views'):
+            formatted_situation += f"\nYou can see the following:\n"+json.dumps(self.last_situation_data['views'], indent=2)
         return formatted_situation
 
     def _observe(self):
@@ -494,7 +510,8 @@ class ZenohExecutiveNode:
             self.observations = {'static': system_prompt, 'dynamic': user_prompt}
             return self.observations
         except Exception as e:
-            logger.error(f'Error in _observe: {e}')       
+            logger.error(f'Error in _observe: {e}')  
+            traceback.print_exc()
             self.observations = {'static': system_prompt, 'dynamic': user_prompt}
             return self.observations
 
@@ -504,6 +521,7 @@ class ZenohExecutiveNode:
         if self.current_goal:
             return self.current_goal
         else:
+            self.map_update_request_publisher.put(json.dumps({'type': 'goal_look'}))
             system_prompt = observations['static']
             user_prompt = observations['dynamic']
             directive = """What would you like to do next? 
@@ -924,7 +942,7 @@ Respond ONLY with the above hash-formatted text.
                 self.move(random.choice(cardinal_directions))
                 return
         elif action['type'].lower() == "say":
-            self.generate_speech(action['value'], resolved_target, mode='say')            # Publish action (this will be picked up by action_display_node)
+            self.generate_speech(action['value'], resolved_target if resolved_target else action['target'], mode='say')            # Publish action (this will be picked up by action_display_node)
 
         elif action['type'].lower() == "take":
             self.take(resolved_target)
@@ -1114,10 +1132,10 @@ Respond ONLY with the above hash-formatted text.
             # Build user prompt with context
             dialog_history = '' 
             if entity_context and isinstance(entity_context, dict):
-                conversation_history = entity_context.get('conversation_history', [])
-                if isinstance(conversation_history, list):
+                dialog_history = entity_context.get('conversation_history', [])
+                if isinstance(dialog_history, list):
                     dialog_history += f"Your recent conversation with {source} has been:\n"
-                    for i, memory in enumerate(conversation_history):
+                    for i, memory in enumerate(dialog_history):
                         if isinstance(memory, dict) and 'source' in memory and 'text' in memory:
                             dialog_history += f"\t{memory['source']}: {memory['text']}\n"
 
@@ -1136,16 +1154,20 @@ Respond ONLY with the above hash-formatted text.
             
             # Simple, focused prompt
             if mode == 'say':
-                system_prompt = f"""Your task is to say the following:
+                system_prompt = f"""Your task is to say the following text:
+
     "{text_input}" 
-updated to reflect the current context described below.
+
+updated to reflect the current context described below. Keep the length of the text at most 10 words longer than the original text above.
 
 you are:
 """
             else:
                 system_prompt = f"""Your task is to respond to:
+
     "{text_input}"
-in the current context described below.
+
+    in the current context described below. You are in a conversation, so you should respond in a conversational manner, saying only enough for the conversation to continue.
 
 you are:
 """
@@ -1159,7 +1181,7 @@ you are:
             user_prompt = self.observations['dynamic']
             if dialog_history:
                 user_prompt += f"Your recent conversation with {source} has been:\n"
-                for i, memory in enumerate(conversation_history):
+                for i, memory in enumerate(dialog_history):
                     if isinstance(memory, dict) and 'source' in memory and 'text' in memory:
                         user_prompt += f"\t{memory['source']}: {memory['text']}\n"
 
@@ -1173,7 +1195,7 @@ End your text with: </end>"""
                 timeout = 5.0 if self.shutdown_requested else None
                 response = self.llm_client.generate(
                     messages=[system_prompt, user_prompt],
-                    max_tokens=400,
+                    max_tokens=200,
                     temperature=0.7,
                     timeout=timeout,
                     stops=['</end>']
@@ -1199,7 +1221,7 @@ End your text with: </end>"""
                         'action_id': f'action_{self.action_counter}',
                         'timestamp': datetime.now().isoformat(),
                         'input': text_input,
-                        'text': response.text.strip(),
+                        'text': response.text.strip() if (response and response.success) else text_to_send,
                         'source': self.character_name if mode == 'say' else source,
                         'target': source if mode == 'say' else None
         }
@@ -1329,6 +1351,8 @@ End your text with: </end>"""
         try:
             # visible means in current situation, so can be resolved locally
             target = raw_target.capitalize()
+            if self.last_situation_data and target in self.last_situation_data.get('characters', []):
+                return target
             for view in self.last_situation_data.get('views', []):
                 if 'characters' in view:
                     for character in view['characters']:
@@ -1336,7 +1360,7 @@ End your text with: </end>"""
                             return character.get('name', '')
                 if 'resources' in view: 
                     for resource in view['resources']:
-                        if ((not any(ch.isdigit() for ch in resource['name']) and resource['name'].startswith(target)) 
+                        if ((not any(ch.isdigit() for ch in target) and resource['name'].startswith(target)) 
                             or resource['name'] == target):
                             return resource.get('name', '')
                 if 'terrain' in view:
@@ -1359,7 +1383,7 @@ End your text with: </end>"""
                             return character.get('name', '')
                 if 'resources' in view:
                     for resource in view['resources']:  
-                        if resource.get('distance', 20) <= 2 and ((not any(ch.isdigit() for ch in resource['name']) and resource['name'].startswith(target)) 
+                        if resource.get('distance', 20) <= 2 and ((not any(ch.isdigit() for ch in target) and resource['name'].startswith(target)) 
                             or resource['name'] == target):
                             return resource.get('name', '')
                 if 'terrain' in view:
@@ -1378,7 +1402,7 @@ End your text with: </end>"""
             for view in self.last_situation_data.get('views', []):
                 if 'resources' in view:
                     for resource in view['resources']:  
-                        if resource.get('distance', 20) <= 2 and ((not any(ch.isdigit() for ch in resource['name']) and resource['name'].startswith(target)) 
+                        if resource.get('distance', 20) <= 2 and ((not any(ch.isdigit() for ch in target) and resource['name'].startswith(target)) 
                             or resource['name'] == target):                            
                             return resource.get('name', '')
             return False
@@ -1398,7 +1422,7 @@ End your text with: </end>"""
                             return character.get('name', '')
                 if 'resources' in view:
                     for resource in view['resources']:  
-                        if resource.get('distance', 20) <= 2 and ((not any(ch.isdigit() for ch in resource['name']) and resource['name'].startswith(target)) 
+                        if resource.get('distance', 20) <= 2 and ((not any(ch.isdigit() for ch in target) and resource['name'].startswith(target)) 
                             or resource['name'] == target):                            
                             return resource.get('name', '')
                 if 'terrain' in view:
@@ -1803,21 +1827,21 @@ End your text with: </end>"""
                     if reply.ok:
                         data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
                         if data['success']:
-                            logger.info(f'🤔 Natural dialog end check for {entity_name}: {data.get("should_end", False)}')
-                            return data.get('should_end', False)
+                            logger.info(f'🤔 Natural dialog end check for {entity_name}: {data.get("should_end", True)}')
+                            return data.get('should_end', True)
                         else:
                             logger.debug(f'Natural dialog end query failed for {entity_name}: {data.get("error", "Unknown error")}')
-                            return False
+                            return True
                 except Exception as e:
                     logger.error(f'Error parsing natural dialog end response for {entity_name}: {e}')
-                    return False
+                    return True
             
             logger.debug(f'No response received for natural dialog end query: {entity_name}')
-            return False
+            return True
             
         except Exception as e:
             logger.error(f'Error querying natural dialog end for {entity_name}: {e}')
-            return False
+            return True
     
     def shutdown(self):
         """Clean shutdown."""
