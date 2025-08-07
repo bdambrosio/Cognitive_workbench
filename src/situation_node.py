@@ -100,6 +100,12 @@ class ZenohSituationNode:
             self.action_callback
         )
         
+        # Subscriber for map update requests (character-specific)
+        self.map_update_request_subscriber = self.session.declare_subscriber(
+            f"cognitive/{character_name}/situation/request_update",
+            self.map_update_callback
+        )
+        
         # Publisher for situation updates (character-specific)
         self.situation_publisher = self.session.declare_publisher(f"cognitive/{character_name}/situation/update")
         
@@ -206,6 +212,15 @@ class ZenohSituationNode:
         except Exception as e:
             logger.error(f'Error processing action: {e}')
     
+    def map_update_callback(self, sample):
+        """Handle incoming actions to update situation."""
+        try:
+            self.update_map_retries = 0
+            self._update_map_data()
+            
+        except Exception as e:
+            logger.error(f'Error processing action: {e}')
+    
     def _update_situation_from_sense_data(self, sense_data: Dict[str, Any]):
         """Update situation based on incoming sense data."""
         try:
@@ -231,38 +246,42 @@ class ZenohSituationNode:
         try:
             # Query map node for agent look data with timeout
             logger.warning(f'Updating map data for {self.character_name}')
-            for reply in self.session.get(f"cognitive/map/agent/{self.character_name}/look", timeout=1.0):
+            for reply in self.session.get(f"cognitive/map/agent/{self.character_name}/look", timeout=4.0):
                 try:
                     if reply.ok:
                         map_look_data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
-                        if not map_look_data['success']:
-                            logger.warning(f'Map query failed for {self.character_name}: {map_look_data["error"]}')
+                    if reply.ok and map_look_data['success']:
+                        for character in map_look_data['characters']:
+                            if type(character) == dict:
+                                logger.error(f'Character is a dict: {character}')
                         self.situation['location'] = map_look_data['location']
                         self.situation['visible_characters'] = map_look_data['characters']
                         view_strings = hash_utils.findall('view', map_look_data['look_result'])
                         self.situation['views'] = [self.parse_view_string(view_string) for view_string in view_strings]
-                        self.situation['adjacent_resources'] = []
-                        self.situation['adjacent_characters'] = []
+                        self.situation['adjacent_to']['resources'] = []
+                        self.situation['adjacent_to']['characters'] = []
                         self.situation['resources'] = []
-                        self.situation['characters'] = []
+                        self.situation['characters'] = map_look_data['characters']
 
                         # Check if resources and characters are in the response
                         for view in self.situation['views']:
                             for resource in view['resources']:
                                 if isinstance(resource, dict) and 'distance' in resource:
                                     if resource['distance'] <= 1:
-                                        self.situation['adjacent_resources'].append(resource)
-                                    self.situation['resources'].append(resource)
+                                        self.situation['adjacent_to']['resources'].append(resource['name'])
+                                    if resource['name'] not in self.situation['resources']:
+                                        self.situation['resources'].append(resource['name'])
                         
                             for character in view['characters']:
                                 if isinstance(character, dict) and 'distance' in character:
-                                    if character['distance'] <= 1:
-                                        self.situation['adjacent_characters'].append(character)
-                                    self.situation['characters'].append(character)
+                                    if character['distance'] <= 1 and (character not in self.situation['adjacent_to']['characters']):
+                                        self.situation['adjacent_to']['characters'].append(character['name'])
+                                    if character['name'] not in self.situation['characters']:
+                                        self.situation['characters'].append(character['name'])
                         
                         logger.info(f'🗺️ Updated map look data for {self.character_name}')
-                        logger.debug(f'   Adjacent resources: {self.situation["adjacent_resources"]}')
-                        logger.debug(f'   Adjacent characters: {self.situation["adjacent_characters"]}')
+                        logger.debug(f'   Adjacent resources: {self.situation["adjacent_to"]["resources"]}')
+                        logger.debug(f'   Adjacent characters: {self.situation["adjacent_to"]["characters"]}')
                         # Save and publish updated situation
                         self.save_situation()
                         self._publish_situation()
@@ -270,7 +289,7 @@ class ZenohSituationNode:
                     else:
                         reply_str = str(reply)
                         decoded_error = zenoh_utils.decode_zenoh_error_payload(reply_str)
-                        if 'timeout' in decoded_error:
+                        if 'timeout' in decoded_error or 'not found' in decoded_error:
                             self.update_map_retries += 1
                             if self.update_map_retries < 3:
                                 self._update_map_data()
@@ -361,7 +380,7 @@ class ZenohSituationNode:
                 # Check resources
                 for resource in self.situation.get('resources', []):
                     if ('name' in resource 
-                        and ((not any(ch.isdigit() for ch in resource['name']) and resource['name'].startswith(target_canonical)) 
+                        and ((not any(ch.isdigit() for ch in target_canonical) and resource['name'].startswith(target_canonical)) 
                             or resource['name'] == target_canonical)
                         and resource.get('distance', float('inf')) < self.near_threshold):
                         is_near = resource['name']
@@ -371,9 +390,8 @@ class ZenohSituationNode:
                 # Check characters if not found in resources
                 if not is_near:
                     for character in self.situation.get('characters', []):
-                        if (((not any(ch.isdigit() for ch in character['name']) and character['name'].startswith(target_canonical)) 
-                            or character['name'] == target_canonical)
-                            and character.get('distance', float('inf')) < self.near_threshold):
+                        if (target_canonical == 'person' or ('name' in character and character['name'] == target_canonical)) \
+                            and character.get('distance', float('inf')) < self.near_threshold:
                             is_near = character['name']
                             binding = character['name']
                             break
@@ -431,7 +449,7 @@ class ZenohSituationNode:
                 # Check resources
                 for resource in self.situation.get('resources', []):
                     if ('name' in resource 
-                        and ((not any(ch.isdigit() for ch in resource['name']) and resource['name'].startswith(target_canonical)) 
+                        and ((not any(ch.isdigit() for ch in target_canonical) and resource['name'].startswith(target_canonical)) 
                             or resource['name'] == target_canonical)):
                         can_see = resource['name']
                         binding = resource['name']
@@ -493,7 +511,7 @@ class ZenohSituationNode:
                         break
                 # Check resources
                 for resource in self.situation.get('adjacent_resources', []):
-                    if ('name' in resource and ((not any(ch.isdigit() for ch in resource['name']) and resource['name'].startswith(target_canonical)) 
+                    if ('name' in resource and ((not any(ch.isdigit() for ch in target_canonical) and resource['name'].startswith(target_canonical)) 
                         or resource['name'] == target_canonical)
                         and resource.get('distance', float('inf')) < self.at_location_threshold):
                         at_location = resource['name']

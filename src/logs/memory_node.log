@@ -1,81 +1,17 @@
-2025-08-04 19:28:06 - llm_client - INFO - 🤖 Zenoh LLM Client initialized
-2025-08-04 19:28:06 - memory_node - INFO - 📂 No existing memory file, starting fresh
-2025-08-04 19:28:06 - memory_node - INFO - Memory Node initialized for character: Joe
-2025-08-04 19:28:06 - memory_node - INFO - Storage available at:
-2025-08-04 19:28:06 - memory_node - INFO -   - cognitive/Joe/memory/short_term/*
-2025-08-04 19:28:06 - memory_node - INFO -   - cognitive/Joe/memory/chat/*
-2025-08-04 19:28:06 - memory_node - INFO -   - cognitive/Joe/memory/long_term/*
-2025-08-04 19:28:06 - memory_node - INFO -   - cognitive/Joe/memory/entity/*
-2025-08-04 19:28:06 - memory_node - INFO -   - cognitive/Joe/memory/inventory
-2025-08-04 19:28:06 - memory_node - INFO - Subscriptions:
-2025-08-04 19:28:06 - memory_node - INFO -   - cognitive/Joe/memory/close_dialog
-2025-08-04 19:28:06 - memory_node - INFO - Memory Node running - press Ctrl+C to stop
-2025-08-04 19:28:08 - memory_node - INFO - 📢 Stored character announcement: Joe
-2025-08-04 19:28:14 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
-2025-08-04 19:28:14 - memory_node - INFO - 📦 Inventory query: returned 0 items
-2025-08-04 19:28:33 - memory_node - INFO - 👥 Created new entity: Joe
-2025-08-04 19:28:33 - memory_node - INFO - 💾 Saved memory to data/memory/Joe_memory.json
-2025-08-04 19:28:33 - memory_node - INFO - 💬 Added conversation entry for Joe: Joe "#thought Map the immediate area for resources and ..."
-2025-08-04 19:28:33 - memory_node - INFO - 💬 Added response to entity Joe: Joe -> "#thought Map the immediate area for resources and ..."
-2025-08-04 19:28:37 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
-2025-08-04 19:28:37 - memory_node - INFO - 📦 Inventory query: returned 0 items
-2025-08-04 19:28:37 - memory_node - INFO - 📝 Stored action: inspect - 1
-2025-08-04 19:28:37 - memory_node - INFO - 📦 Inventory query for False: False
-2025-08-04 19:28:39 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
-2025-08-04 19:28:39 - memory_node - INFO - 📦 Inventory query: returned 0 items
-2025-08-04 19:28:39 - memory_node - INFO - 📝 Stored action: move - move_1754360919
-2025-08-04 19:28:52 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
-2025-08-04 19:28:52 - memory_node - INFO - 📦 Inventory query: returned 0 items
-2025-08-04 19:28:52 - memory_node - INFO - 📝 Stored action: move - move_1754360932
-2025-08-04 19:28:53 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
-2025-08-04 19:28:53 - memory_node - INFO - 📦 Inventory query: returned 0 items
-2025-08-04 19:28:53 - memory_node - INFO - 📝 Stored action: move - move_1754360933
-2025-08-04 19:28:55 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
-2025-08-04 19:28:55 - memory_node - INFO - 📦 Inventory query: returned 0 items
-2025-08-04 19:28:55 - memory_node - INFO - 📝 Stored action: move - move_1754360935
-2025-08-04 19:28:58 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
-2025-08-04 19:28:58 - memory_node - INFO - 📦 Inventory query: returned 0 items
-2025-08-04 19:28:58 - memory_node - INFO - 📝 Stored action: move - move_1754360938
-2025-08-04 19:29:04 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
-2025-08-04 19:29:04 - memory_node - INFO - 📦 Inventory query: returned 0 items
-2025-08-04 19:29:04 - memory_node - INFO - 📝 Stored action: move - move_1754360944
-2025-08-04 19:29:10 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
-2025-08-04 19:29:10 - memory_node - INFO - 📦 Inventory query: returned 0 items
-2025-08-04 19:29:11 - memory_node - INFO - 💾 Saved memory to data/memory/Joe_memory.json
-2025-08-04 19:29:11 - memory_node - INFO - 💬 Added conversation entry for Joe: Joe "#thought Locate spring for water and clues
-##..."
-2025-08-04 19:29:11 - memory_node - INFO - 💬 Added response to entity Joe: Joe -> "#thought Locate spring for water and clues
-##..."
-2025-08-04 19:29:16 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
-2025-08-04 19:29:16 - memory_node - INFO - 📦 Inventory query: returned 0 items
-2025-08-04 19:29:50 - memory_node - INFO - 📦 Inventory query for Spring: False
-2025-08-04 19:30:12 - memory_node - INFO - 📦 Inventory query for Spring: False
-2025-08-04 19:30:12 - memory_node - INFO - 📝 Stored action: move - move_1754361012
-2025-08-04 19:30:23 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
-2025-08-04 19:30:23 - memory_node - INFO - 📦 Inventory query: returned 0 items
-2025-08-04 19:30:23 - memory_node - INFO - 💾 Saved memory to data/memory/Joe_memory.json
-2025-08-04 19:30:23 - memory_node - INFO - 💬 Added conversation entry for Joe: Joe "#thought Spring is nearby, follow water source
-##..."
-2025-08-04 19:30:23 - memory_node - INFO - 💬 Added response to entity Joe: Joe -> "#thought Spring is nearby, follow water source
-##..."
-2025-08-04 19:30:30 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
-2025-08-04 19:30:30 - memory_node - INFO - 📦 Inventory query: returned 0 items
-2025-08-04 19:30:38 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
-2025-08-04 19:30:38 - memory_node - INFO - 📦 Inventory query: returned 0 items
-2025-08-04 19:30:56 - memory_node - INFO - 💾 Saved memory to data/memory/Joe_memory.json
-2025-08-04 19:30:56 - memory_node - INFO - 💬 Added conversation entry for Joe: Joe "#thought Follow spring upstream for hidden trail
-#..."
-2025-08-04 19:30:56 - memory_node - INFO - 💬 Added response to entity Joe: Joe -> "#thought Follow spring upstream for hidden trail
-#..."
-2025-08-04 19:31:02 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
-2025-08-04 19:31:02 - memory_node - INFO - 📦 Inventory query: returned 0 items
-2025-08-04 19:31:02 - memory_node - INFO - 📝 Stored action: move - move_1754361062
-2025-08-04 19:31:04 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
-2025-08-04 19:31:04 - memory_node - INFO - 📦 Inventory query: returned 0 items
-2025-08-04 19:31:04 - memory_node - INFO - 📝 Stored action: move - move_1754361064
-2025-08-04 19:31:06 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
-2025-08-04 19:31:06 - memory_node - INFO - 📦 Inventory query: returned 0 items
-2025-08-04 19:31:06 - memory_node - INFO - 📝 Stored action: move - move_1754361066
-2025-08-04 19:31:08 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
-2025-08-04 19:31:08 - memory_node - INFO - 📦 Inventory query: returned 0 items
-2025-08-04 19:31:08 - memory_node - INFO - 📝 Stored action: move - move_1754361068
+2025-08-06 18:47:48 - llm_client - INFO - 🤖 Zenoh LLM Client initialized
+2025-08-06 18:47:48 - memory_node - INFO - 📂 No existing memory file, starting fresh
+2025-08-06 18:47:48 - memory_node - INFO - Memory Node initialized for character: Joe
+2025-08-06 18:47:48 - memory_node - INFO - Storage available at:
+2025-08-06 18:47:48 - memory_node - INFO -   - cognitive/Joe/memory/short_term/*
+2025-08-06 18:47:48 - memory_node - INFO -   - cognitive/Joe/memory/chat/*
+2025-08-06 18:47:48 - memory_node - INFO -   - cognitive/Joe/memory/long_term/*
+2025-08-06 18:47:48 - memory_node - INFO -   - cognitive/Joe/memory/entity/*
+2025-08-06 18:47:48 - memory_node - INFO -   - cognitive/Joe/memory/inventory
+2025-08-06 18:47:48 - memory_node - INFO - Subscriptions:
+2025-08-06 18:47:48 - memory_node - INFO -   - cognitive/Joe/memory/close_dialog
+2025-08-06 18:47:48 - memory_node - INFO - Memory Node running - press Ctrl+C to stop
+2025-08-06 18:47:50 - memory_node - INFO - 📢 Stored character announcement: Joe
+2025-08-06 18:48:04 - memory_node - INFO2025-08-06 18:48:04 - memory_node - INFO - 👥 Entity dialog query for Samantha: completed
+2025-08-06 18:48:04 - memory_node - INFO - 📦 Inventory query: returned 0 items
+ INFO - 📦 Inventory query: returned 0 items
+2025-08-06 18:48:05 - memory_node - INFO - 👥 Entity dialog query for Samantha: completed

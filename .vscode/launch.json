@@ -41,7 +41,7 @@
             "env": {
                 "PYTHONPATH": "${workspaceFolder}/src"
             },
-            "args": ["lost.yaml", "--ui", "--map-file", "sageForest.py"],
+            "args": ["lost.yaml", "--ui", "--map-file", "forest.py"],
             "justMyCode": false,
             "stopOnEntry": false,
             "preLaunchTask": "setup-zenoh-environment"
@@ -56,7 +56,7 @@
             "env": {
                 "PYTHONPATH": "${workspaceFolder}/src"
             },
-            "args": ["sage.yaml", "--ui", "--map-file", "forest.py"],
+            "args": ["sage.yaml", "--ui", "--map-file", "sageForest.py"],
             "justMyCode": false,
             "stopOnEntry": false,
             "preLaunchTask": "setup-zenoh-environment"

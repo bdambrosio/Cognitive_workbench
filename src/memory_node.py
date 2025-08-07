@@ -522,7 +522,7 @@ class ZenohMemoryNode:
         
         if canonical_entity_name not in self.entity_models:
             # Create new entity with canonicalized name
-            self.entity_models[canonical_entity_name] = EntityModel(canonical_entity_name, logger, self.llm_client)
+            self.entity_models[canonical_entity_name] = EntityModel(self.character_name, canonical_entity_name, logger, self.llm_client)
             logger.info(f'👥 Created new entity: {canonical_entity_name}')
             return self.entity_models[canonical_entity_name]
         else:
