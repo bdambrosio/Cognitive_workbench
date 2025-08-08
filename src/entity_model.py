@@ -259,7 +259,7 @@ End your response with:
         }
     
     @classmethod
-    def load_from_dict(cls, data: Dict[str, Any], logger=None, llm_client=None) -> 'EntityModel':
+    def load_from_dict(cls, character_name: str, data: Dict[str, Any], logger=None, llm_client=None) -> 'EntityModel':
         """
         Load entity model from dictionary (for persistence).
         Handles migration from old conversation_history format.
@@ -272,7 +272,7 @@ End your response with:
         Returns:
             EntityModel instance
         """
-        entity = cls(data['entity_name'], logger, llm_client)
+        entity = cls(character_name, data['entity_name'], logger, llm_client=llm_client)
         
         # Load timestamps
         if data.get('first_seen'):

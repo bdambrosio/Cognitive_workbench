@@ -596,7 +596,7 @@ class ZenohMemoryNode:
                     data = json.load(f)
                     self.entity_models = {}
                     for entity_name, entity_data in data.get('entities', {}).items():
-                        entity = EntityModel.load_from_dict(entity_data, logger, self.llm_client)
+                        entity = EntityModel.load_from_dict(self.character_name, entity_data, logger, self.llm_client)
                         self.entity_models[entity_name] = entity
                     
                     # Load inventory

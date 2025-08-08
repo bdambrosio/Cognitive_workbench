@@ -243,9 +243,8 @@ class ZenohExecutiveNode:
                 if data.get('success'):
                     self.map_types = data
                     break
-            
+        self.inspections = {} # cache of inspections
 
-        
         # Register signal handlers for graceful shutdown
         signal.signal(signal.SIGTERM, self._signal_handler)
         signal.signal(signal.SIGINT, self._signal_handler)
@@ -408,6 +407,8 @@ class ZenohExecutiveNode:
             
             # Plan: Return existing plan or create single-action plan
             plan = self._plan(goal)
+            if not plan:
+                return
             
             # Plan Step: Execute current step of plan
             action = self._plan_step(plan)
@@ -449,7 +450,25 @@ class ZenohExecutiveNode:
 
         if self.last_situation_data and self.last_situation_data.get('views'):
             formatted_situation += f"\nYou can see the following:\n"+json.dumps(self.last_situation_data['views'], indent=2)
+
+        if self.inspections:
+            formatted_situation += f"\nYou have inspected the following:\n"
+            for target, inspection in self.inspections.items():
+                formatted_situation += f"\n\t{target}: {inspection}"
+            formatted_situation += '\n'
+
         return formatted_situation
+
+    def _update_system_prompt(self):
+        """Update the system prompt with the current situation."""
+        system_prompt = self.observations['static']
+        if self.current_goal:
+            system_prompt += f"\n#Your current goal is:\n\t{self.current_goal.to_string()}\n"
+        if self.current_plan:
+            system_prompt += f"\n#Your current plan is:\n\t{json.dumps(self.current_plan, indent=2)}\n"
+        if self.last_action:
+            system_prompt += f"\n#Your last action was:\n\t{self.last_action.get('type')}: {self.last_action.get('target')} - {self.last_action_result}\n"
+        return system_prompt
 
     def _observe(self):
         """Observe: Collect current situation and sense data. Stub."""
@@ -579,6 +598,7 @@ Respond ONLY with the above hash-formatted text.
                 logger.error('LLM client not available')
                 self.current_goal = plan_module.Goal('sleep', actors=[self.character_name])
                 self._publish_goal(self.current_goal)
+            
             return self.current_goal
 
 
@@ -590,7 +610,7 @@ Respond ONLY with the above hash-formatted text.
         if not self.current_goal or self.current_goal.name == 'sleep':
             single_action = None
         else:
-            system_prompt = self.observations['static']
+            system_prompt = self._update_system_prompt()
             user_prompt = self.observations['dynamic']
             goal_prompt = f"\n\nYour current goal is: {goal.to_string()}"
             target = goal.actors[1] if len(goal.actors) > 1 else None
@@ -613,15 +633,16 @@ Respond ONLY with the above hash-formatted text.
                     messages=[system_prompt, user_prompt, PLAN_SYNTAX, directive],
                     max_tokens=1000,
                     temperature=0.7,
-                    stops=['</end>']
+                    stops=['</end>'],
+                    is_json=True
                 )
 
                 if response.success:
-                    logger.debug(f'🤖 {self.character_name} New Action: {response.text.replace('\n', ' ')}')
+                    logger.debug(f'🤖 {self.character_name} New Action: {response.text}')
                     plan_candidate = None
                     valid = False
                     try:
-                        plan_candidate = json.loads(response.text.strip())
+                        plan_candidate = response.text #json.loads(response.text.strip())
                         valid = plan_module.verify_plan(plan_candidate)
                         if not valid:
                             logger.error(f'Invalid plan JSON in LLM response: {response.text}')
@@ -663,11 +684,14 @@ Respond ONLY with the above hash-formatted text.
         logger.warning(f'🤖 {self.character_name} Replanning.')
         if not self.current_plan:
             return self._plan(goal)
-        remaining_plan = json.dumps(plan_module.remaining_plan(self.current_plan, self.plan_state['step_stack']), indent=2)
-        system_prompt = 'Your task is to replan given your current goal, your remaining current plan, and new input provided by the user.\n' + self.observations['static']
+        if self.current_plan and self.plan_state:
+            remaining_plan = json.dumps(plan_module.remaining_plan(self.current_plan, self.plan_state['step_stack']), indent=2)
+        else:
+            remaining_plan = 'None'
+        system_prompt = 'Your task is to replan given your current goal, your remaining current plan, and new input provided by the user.\n' + self._update_system_prompt()
         user_prompt = self.observations['dynamic']
-        goal_prompt = f"\n\n#Your current goal is:\n{goal.to_string()}"
-        target = goal.actors[1] if len(goal.actors) > 1 else None
+        goal_prompt = f"\n\n#Your current goal is:\n{goal.to_string() if goal else 'None'}"
+        target = goal.actors[1] if goal and len(goal.actors) > 1 else None
         if target:
             entity_context = self.get_entity_context(target, 10)
             if entity_context and len(entity_context['conversation_history']) > 0:
@@ -694,15 +718,16 @@ Respond ONLY with the above hash-formatted text.
                 messages=[system_prompt, user_prompt, PLAN_SYNTAX, directive],
                 max_tokens=1000,
                 temperature=0.7,
+                is_json=True,
                 stops=['</end>']
             )
 
             if response.success:
-                logger.debug(f'🤖 {self.character_name} New Action: {response.text.replace('\n', ' ')}')
+                logger.debug(f'🤖 {self.character_name} New Action: {response.text}')
                 plan_candidate = None
                 valid = False
                 try:
-                    plan_candidate = json.loads(response.text.strip())
+                    plan_candidate = response.text #json.loads(response.text.strip())
                     valid = plan_module.verify_plan(plan_candidate)
                     logger.warning(f'🤖 {self.character_name} Replan candidate: {plan_candidate}')
                     if not valid:
@@ -1029,6 +1054,7 @@ Respond ONLY with the above hash-formatted text.
     def turn_callback(self, sample):
         """Handle turn "GO" signals."""
         try:
+            logger.warning(f'🚦 Turn {self.current_turn_number} received by {self.character_name}')
             data = json.loads(sample.payload.to_bytes().decode('utf-8'))
             turn_number = data.get('turn_number', 0)
             active_characters = data.get('active_characters', [])
@@ -1041,10 +1067,11 @@ Respond ONLY with the above hash-formatted text.
                 # Set interrupt flag to start OODA loop
                 self.interrupt_pending = True
             else:
-                logger.debug(f'Turn {turn_number} started but {self.character_name} not included')
+                logger.warning(f'Turn {turn_number} started but {self.character_name} not included')
             
         except Exception as e:
             logger.error(f'Error handling turn signal: {e}')
+            traceback.print_exc()
     
     def shutdown_callback(self, sample):
         """Handle shutdown command from UI."""
@@ -1094,6 +1121,21 @@ Respond ONLY with the above hash-formatted text.
         except Exception as e:
             logger.error(f'Error publishing dialog end to {source}: {e}')  
  
+
+    def parse_and_set_goal(self, goal_text):
+        """Parse goal input from UI and set current goal."""
+        try:
+            parsed_goal = goal_text.strip().strip('"').strip("'")[6:]
+            if not self.observations:
+                self._observe()
+            self.current_goal = plan_module.Goal(parsed_goal, [self.character_name], description='supplied by user', termination='')
+            self._replan(self.current_goal, 'Goal set by user')
+            return
+        except Exception as e:
+            logger.error(f"Goal parsing failed for {self.character_name}: {e}")
+            traceback.print_exc()
+            return
+
     def parse_and_set_plan(self, plan_text):
         """Parse plan input from UI and set current plan."""
         try:
@@ -1118,6 +1160,9 @@ Respond ONLY with the above hash-formatted text.
         """In say mode, this is start of conversation. In respond mode, this is a response in an ongoing dialog"""
         # Handle plan input from UI - strip quotes if present
         clean_input = text_input.strip().strip('"').strip("'")
+        if source == 'ui' and clean_input.startswith('goal:'):
+            self.parse_and_set_goal(clean_input)
+            return
         if source == 'ui' and clean_input.startswith('plan:'):
             self.parse_and_set_plan(clean_input)
             return
@@ -1132,10 +1177,10 @@ Respond ONLY with the above hash-formatted text.
             # Build user prompt with context
             dialog_history = '' 
             if entity_context and isinstance(entity_context, dict):
-                dialog_history = entity_context.get('conversation_history', [])
-                if isinstance(dialog_history, list):
+                conversation = entity_context.get('conversation_history', [])
+                if isinstance(conversation, list):
                     dialog_history += f"Your recent conversation with {source} has been:\n"
-                    for i, memory in enumerate(dialog_history):
+                    for i, memory in enumerate(conversation):
                         if isinstance(memory, dict) and 'source' in memory and 'text' in memory:
                             dialog_history += f"\t{memory['source']}: {memory['text']}\n"
 
@@ -1174,18 +1219,17 @@ you are:
             if not self.observations:
                 self._observe()
                 
-            system_prompt += self.observations['static']
+            system_prompt += self._update_system_prompt()
             
             # Build user prompt with context
             user_prompt = '' 
             user_prompt = self.observations['dynamic']
             if dialog_history:
-                user_prompt += f"Your recent conversation with {source} has been:\n"
-                for i, memory in enumerate(dialog_history):
-                    if isinstance(memory, dict) and 'source' in memory and 'text' in memory:
-                        user_prompt += f"\t{memory['source']}: {memory['text']}\n"
+                user_prompt += f"{dialog_history}\n"
 
-            user_prompt +=  """Speak in a conversational manner in your own voice.
+            user_prompt +=  """Speak in a conversational manner in your own voice. 
+Do not invent knowledge not contained in the data of the current situation. 
+For example if a resource is listed (e.g. mushroom29), do not invent knowledge about it beyond general knowledge of mushroomsnot contained above.
 Do not include any other introductory, explanatory, discursive, or formatting text in your response.
 End your text with: </end>"""
                     
@@ -1376,6 +1420,11 @@ End your text with: </end>"""
         try:
             # visible means in current situation, so can be resolved locally
             target = raw_target.capitalize()
+            # check inventory first!
+            resolved_target = self._resolve_inventory_instance(negated, raw_target)
+            if resolved_target:
+                return resolved_target
+            
             for view in self.last_situation_data.get('views', []):
                 if 'characters' in view:
                     for character in view['characters']:
@@ -1389,6 +1438,7 @@ End your text with: </end>"""
                 if 'terrain' in view:
                     if view['terrain'] == target:
                         return target
+            
             return False
         except Exception as e:
             logger.error(f'Error resolving visible instance {raw_target}: {e}')
@@ -1634,24 +1684,36 @@ End your text with: </end>"""
                 'character': self.character_name
         }
         try:
-            # First validate that the target exists and is a resource
-            resource_exists = False; is_near = False
-            for reply in self.session.get(f"cognitive/{self.character_name}/memory/inventory?item={target}", timeout=2.0):
-                if reply.ok:
-                    data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
-                    if data.get('success'):
-                        resource_exists = True; is_near = True
-            if not resource_exists:
-                for reply in self.session.get(f"cognitive/map/resource/{target}", timeout=2.0):
-                    if reply.ok:
-                        data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
-                        if data.get('success'):
-                            resource_exists = True
-                            is_near = plan_module.is_near(self, target)
+            system_prompt = self._update_system_prompt()
+            user_prompt = self.observations['dynamic']
 
-            if not resource_exists or not is_near:
-                logger.warning(f'❌ Cannot inspect {target} - resource validation failed')
-                self.last_action_result = f'cannot inspect {target} - resource validation failed'
+            directive = f"""You are inspecting: {target}.\n\n 
+respond with a short text description of the resource consistent with its name and situated wrt the information in the situation.
+The description should particularly highlight information relevant to your drives, goal, and current plan.
+It should also include some 'color' to enrich your perception of the resource in the context of the current situation.
+The description should be 20 words max.
+Do not include any other introductory, explanatory, discursive, or formatting text in your response.
+End your response with: 
+</end>
+"""
+            if self.llm_client and not self.shutdown_requested:
+                # Use shorter timeout during shutdown
+                timeout = 5.0 if self.shutdown_requested else None
+                response = self.llm_client.generate(
+                    messages=[system_prompt, user_prompt, directive],
+                    max_tokens=50,
+                    temperature=0.7,
+                    timeout=timeout
+                )
+                if response.success:
+                    logger.warning(f'🤖 {self.character_name} Inspected {target}:\n\t {response.text}')
+                    self.last_action_result = response.text
+                    self.inspections[target] = response.text
+                    return True
+                else:
+                    logger.error(f'LLM call failed: {response.error}')
+            else:
+                logger.error('LLM client not available')
 
             logger.info(f'📦 Inspecting {target} for {self.character_name}')
             self.last_action_result = f'inspected {target}'
@@ -1667,7 +1729,7 @@ End your text with: </end>"""
         logger.warning(f'Thinking about: {action}')
         thought = ''
         try:
-            system_prompt = self.observations['static']
+            system_prompt = self._update_system_prompt()
             user_prompt = self.observations['dynamic']
 
             directive = f"""You are thinking about: {action['value']}.\n\n Derive new information, insights, goals, or conclusions based on your memories, drives, and the current situation.

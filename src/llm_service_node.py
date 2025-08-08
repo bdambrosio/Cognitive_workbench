@@ -53,12 +53,13 @@ except ImportError as e:
 
 class LLMRequest:
     """Simple LLM request structure."""
-    def __init__(self, messages, bindings, max_tokens: int = 150, temperature: float = 0.7, stops: list = ['</end>']):
+    def __init__(self, messages, bindings, max_tokens: int = 150, temperature: float = 0.7, stops: list = ['</end>'], is_json: bool = False):
         self.bindings = bindings
         self.messages = messages
         self.max_tokens = max_tokens
         self.temperature = temperature
         self.stops = stops
+        self.is_json = is_json
         self.timestamp = datetime.now().isoformat()
 
 
@@ -183,7 +184,8 @@ class ZenohLLMServiceNode:
                 bindings=request_data.get('bindings', {}),
                 max_tokens=request_data.get('max_tokens', 150),
                 temperature=request_data.get('temperature', 0.7),
-                stops=request_data.get('stops', ['</end>'])
+                stops=request_data.get('stops', ['</end>']),
+                is_json=request_data.get('is_json', False)
             )
             
             # Log the first message as a preview
@@ -254,7 +256,7 @@ class ZenohLLMServiceNode:
                     stops = ['</end>']
                 
                 # This is the blocking call, but it's in a separate thread
-                response_text = self.llm.ask(llm_request.bindings, messages, temp=llm_request.temperature, max_tokens=llm_request.max_tokens, stops=stops)
+                response_text = self.llm.ask(llm_request.bindings, messages, temp=llm_request.temperature, max_tokens=llm_request.max_tokens, is_json = llm_request.is_json, stops=stops)
                 
                 llm_response = LLMResponse(
                     response=response_text,
