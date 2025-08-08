@@ -44,7 +44,7 @@ class OpenRouterClient():
                         "stop": stops,
                         "stream": False,
                     }),
-                    timeout=30.0,
+                    timeout=40.0,
                 )
 
                 response.raise_for_status()

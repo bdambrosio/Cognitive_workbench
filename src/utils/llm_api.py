@@ -150,7 +150,7 @@ class LLM():
             traceback.print_exc()
             raise Exception(response)
 
-    def ask(self, input, prompt_msgs, template=None, tag='', temp=None, max_tokens=None, top_p=None, stops=None, stop_on_json=False, model=None, log=True, trace=False):
+    def ask(self, input, prompt_msgs, template=None, tag='', temp=None, max_tokens=None, top_p=None, stops=None, is_json=False, model=None, log=True, trace=False):
         global elapsed_times, iteration_count
         if max_tokens is None: max_tokens = 400
         if temp is None: temp = 0.7
@@ -187,6 +187,11 @@ class LLM():
                         eos_index=response.rfind(stop)
                         if eos_index > -1:
                             response=response[:eos_index]
+            if is_json:
+                try:
+                    response = json.loads(response.strip())
+                except Exception as e:
+                    response = self.repair_json(response, e)
             if log:
                 logger.info(f'Response:\n{response}\n')
                 #logger.handlers[0].flush()
@@ -195,3 +200,63 @@ class LLM():
             traceback.print_exc()
             return None
        
+    def repair_json(self, response, error):
+        """Repair JSON if it is invalid"""
+
+        if not response.startswith('{')and '{' in response:
+            start = response.find('{')
+            end = response.rfind('}')
+            response = response[start:end+1]
+
+        # Remove newlines that are outside of string values
+        in_string = False
+        result = []
+        i = 0
+        while i < len(response):
+            if response[i] == '"' and (i == 0 or response[i-1] != '\\'):
+                in_string = not in_string
+            if not in_string and response[i] == '\n':
+                i += 1
+                continue
+            result.append(response[i])
+            i += 1
+        response = ''.join(result)
+
+        # Find first complete JSON form
+        brace_count = 0
+        json_end = 0
+        for i, char in enumerate(response):
+            if char == '{':
+                brace_count += 1
+            elif char == '}':
+                brace_count -= 1
+                if brace_count == 0:
+                    json_end = i + 1
+                    break
+        if json_end > 0:
+            response = response[:json_end]
+
+        try:
+            return json.loads(response)
+        except Exception as e:
+            error = e
+
+        # Ok, ask llm
+        prompt = [UserMessage(content="""You are a JSON repair tool.
+Your task is to repair the following JSON:
+
+<json>
+{{$json}}
+</json> 
+
+The reported error is:
+{{$error}}
+
+Respond with the repaired JSON string. Make sure the string is in a format that can be parsed by the json.loads function. No commentary, no code fences.
+""")]
+        response = self.llm.ask({"json": response, "error": error}, prompt, tag='repair_json', temp=0.2, max_tokens=3500)
+        try:
+            return json.loads(response.replace("```json", "").replace("```", "").strip())
+        except Exception as e:
+            print(f'Error parsing JSON: {e}')
+            return None

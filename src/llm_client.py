@@ -87,6 +87,7 @@ class ZenohLLMClient:
                 max_tokens: int = 150, 
                 temperature: float = 0.7, 
                 stops: List[str] = ['</end>'],
+                is_json: bool = False,
                 timeout: float = None) -> LLMResponse:
         """
         Generate a response from the LLM service.
@@ -102,7 +103,7 @@ class ZenohLLMClient:
         Returns:
             LLMResponse object with the result
         """
-        future = self.generate_async(messages, bindings, max_tokens, temperature, stops)
+        future = self.generate_async(messages, bindings, max_tokens, temperature, stops, is_json)
         
         try:
             timeout_value = timeout or self.service_timeout
@@ -121,7 +122,8 @@ class ZenohLLMClient:
                       bindings: Dict[str, Any] = None,
                       max_tokens: int = 150,
                       temperature: float = 0.7,
-                      stops: List[str] = None) -> Future:
+                      stops: List[str] = None,
+                      is_json: bool = False) -> Future:
         """
         Generate a response asynchronously.
         
@@ -139,6 +141,7 @@ class ZenohLLMClient:
             'max_tokens': max_tokens,
             'temperature': temperature,
             'stops': stops or ['</end>'],
+            'is_json': is_json,
             'timestamp': datetime.now().isoformat()
         }
         

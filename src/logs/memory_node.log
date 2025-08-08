@@ -1,17 +1,13 @@
-2025-08-06 18:47:48 - llm_client - INFO - 🤖 Zenoh LLM Client initialized
-2025-08-06 18:47:48 - memory_node - INFO - 📂 No existing memory file, starting fresh
-2025-08-06 18:47:48 - memory_node - INFO - Memory Node initialized for character: Joe
-2025-08-06 18:47:48 - memory_node - INFO - Storage available at:
-2025-08-06 18:47:48 - memory_node - INFO -   - cognitive/Joe/memory/short_term/*
-2025-08-06 18:47:48 - memory_node - INFO -   - cognitive/Joe/memory/chat/*
-2025-08-06 18:47:48 - memory_node - INFO -   - cognitive/Joe/memory/long_term/*
-2025-08-06 18:47:48 - memory_node - INFO -   - cognitive/Joe/memory/entity/*
-2025-08-06 18:47:48 - memory_node - INFO -   - cognitive/Joe/memory/inventory
-2025-08-06 18:47:48 - memory_node - INFO - Subscriptions:
-2025-08-06 18:47:48 - memory_node - INFO -   - cognitive/Joe/memory/close_dialog
-2025-08-06 18:47:48 - memory_node - INFO - Memory Node running - press Ctrl+C to stop
-2025-08-06 18:47:50 - memory_node - INFO - 📢 Stored character announcement: Joe
-2025-08-06 18:48:04 - memory_node - INFO2025-08-06 18:48:04 - memory_node - INFO - 👥 Entity dialog query for Samantha: completed
-2025-08-06 18:48:04 - memory_node - INFO - 📦 Inventory query: returned 0 items
- INFO - 📦 Inventory query: returned 0 items
-2025-08-06 18:48:05 - memory_node - INFO - 👥 Entity dialog query for Samantha: completed
+2025-08-08 13:44:11 - llm_client - INFO - 🤖 Zenoh LLM Client initialized
+2025-08-08 13:44:11 - memory_node - INFO - 📂 No existing memory file, starting fresh
+2025-08-08 13:44:11 - memory_node - INFO - Memory Node initialized for character: Joe
+2025-08-08 13:44:11 - memory_node - INFO - Storage available at:
+2025-08-08 13:44:11 - memory_node - INFO -   - cognitive/Joe/memory/short_term/*
+2025-08-08 13:44:11 - memory_node - INFO -   - cognitive/Joe/memory/chat/*
+2025-08-08 13:44:11 - memory_node - INFO -   - cognitive/Joe/memory/long_term/*
+2025-08-08 13:44:11 - memory_node - INFO -   - cognitive/Joe/memory/entity/*
+2025-08-08 13:44:11 - memory_node - INFO -   - cognitive/Joe/memory/inventory
+2025-08-08 13:44:11 - memory_node - INFO - Subscriptions:
+2025-08-08 13:44:11 - memory_node - INFO -   - cognitive/Joe/memory/close_dialog
+2025-08-08 13:44:11 - memory_node - INFO - Memory Node running - press Ctrl+C to stop
+2025-08-08 13:44:15 - memory_node - INFO - 📢 Stored character announcement: Joe

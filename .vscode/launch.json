@@ -45,7 +45,22 @@
             "justMyCode": false,
             "stopOnEntry": false,
             "preLaunchTask": "setup-zenoh-environment"
-        },
+            },
+            {
+                "name": "Debug Launcher (ABetterLife)",
+                "type": "debugpy",
+                "request": "launch",
+                "program": "${workspaceFolder}/src/launcher.py",
+                "console": "integratedTerminal",
+                "cwd": "${workspaceFolder}/src",
+                "env": {
+                    "PYTHONPATH": "${workspaceFolder}/src"
+                },
+                "args": ["ABetterLife.yaml", "--ui", "--map-file", "suburban.py"],
+                "justMyCode": false,
+                "stopOnEntry": false,
+                "preLaunchTask": "setup-zenoh-environment"
+            },
         {
             "name": "Debug Launcher (sage)",
             "type": "debugpy",

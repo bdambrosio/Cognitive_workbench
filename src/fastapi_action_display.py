@@ -1312,7 +1312,16 @@ class FastAPIActionDisplayNode:
             const timestamp = new Date().toLocaleTimeString();
             let html = `<span class="timestamp">[${timestamp}]</span> `;
             html += `<span class="character-name">[${actionData.character.toUpperCase()}]</span> `;
-            html += `<span class="action-type">${actionData.action_type}</span>`;
+            const typeLower = (actionData.action_type || '').toLowerCase();
+            let actorLabel = '';
+            if (actionData.is_text_only) {
+                if (typeLower === 'say' && actionData.target) {
+                    actorLabel = ` ${actionData.target}:`;
+                } else if (typeLower === 'response' && actionData.source) {
+                    actorLabel = ` ${actionData.source}:`;
+                }
+            }
+            html += `<span class="action-type">${actionData.action_type}</span>${actorLabel}`;
             
             // For text-only actions (Say/response), only show the text
             if (actionData.is_text_only) {
@@ -1789,7 +1798,8 @@ class FastAPIActionDisplayNode:
             'confidence': action_data.get('confidence'),
             'timestamp': action_data.get('timestamp', ''),
             'action': action_data.get('action', '') if not is_text_only else '',
-            'target': action_data.get('target', '') if not is_text_only else '',
+            'target': action_data.get('target', ''),
+            'source': action_data.get('source', ''),
             'value': action_data.get('value', '') if not is_text_only else '',
             'metadata': action_data.get('metadata', {}),
             'raw_data': action_data
