@@ -149,6 +149,8 @@ class FastAPIActionDisplayNode:
         self.shutdown_memory_publisher = self.session.declare_publisher("cognitive/shutdown/memory")
         self.shutdown_situation_publisher = self.session.declare_publisher("cognitive/shutdown/situation")
         self.shutdown_shared_publisher = self.session.declare_publisher("cognitive/shutdown/shared")
+        # Centralized launcher shutdown publisher (preferred path)
+        self.launcher_shutdown_publisher = self.session.declare_publisher("cognitive/launcher/shutdown")
         
         # Shutdown coordination state
         self.shutdown_in_progress = False
@@ -280,7 +282,7 @@ class FastAPIActionDisplayNode:
             
             # Publish text input
             text_input_data = {
-                'source': 'ui',
+                'source': 'User',
                 'text': message
             }
             self.character_publishers[actual_character_name].put(json.dumps(text_input_data))
@@ -340,7 +342,7 @@ class FastAPIActionDisplayNode:
                 # Broadcast save command to all nodes
                 save_data = {
                     "timestamp": datetime.now().isoformat(),
-                    "source": "ui"
+                    "source": "User"
                 }
                 self.save_publisher.put(json.dumps(save_data))
                 
@@ -350,7 +352,7 @@ class FastAPIActionDisplayNode:
         
         @self.app.post("/api/save_and_shutdown")
         async def save_and_shutdown():
-            """Save data then initiate coordinated shutdown."""
+            """Save data then request centralized shutdown via launcher."""
             try:
                 if self.shutdown_in_progress:
                     return {"success": False, "message": "Shutdown already in progress"}
@@ -362,27 +364,37 @@ class FastAPIActionDisplayNode:
                 }
                 self.save_publisher.put(json.dumps(save_data))
                 
-                # Wait briefly for saves to complete, then start shutdown
+                # Wait briefly for saves to complete
                 await asyncio.sleep(2.0)
                 
-                # Start coordinated shutdown
-                await self._initiate_shutdown()
-                
-                return {"success": True, "message": "Save and shutdown initiated"}
+                # Request launcher shutdown
+                try:
+                    self.launcher_shutdown_publisher.put(json.dumps({
+                        "timestamp": datetime.now().isoformat(),
+                        "source": "ui",
+                        "mode": "save_and_shutdown"
+                    }))
+                except Exception:
+                    pass
+                return {"success": True, "message": "Save and shutdown requested"}
             except Exception as e:
                 return {"success": False, "message": f"Error: {str(e)}"}
         
         @self.app.post("/api/shutdown")
         async def shutdown_only():
-            """Initiate coordinated shutdown without saving."""
+            """Request centralized shutdown via launcher (no save)."""
             try:
                 if self.shutdown_in_progress:
                     return {"success": False, "message": "Shutdown already in progress"}
-                
-                # Start coordinated shutdown
-                await self._initiate_shutdown()
-                
-                return {"success": True, "message": "Shutdown initiated"}
+                try:
+                    self.launcher_shutdown_publisher.put(json.dumps({
+                        "timestamp": datetime.now().isoformat(),
+                        "source": "ui",
+                        "mode": "shutdown"
+                    }))
+                except Exception:
+                    pass
+                return {"success": True, "message": "Shutdown requested"}
             except Exception as e:
                 return {"success": False, "message": f"Error: {str(e)}"}
     
@@ -417,9 +429,12 @@ class FastAPIActionDisplayNode:
         logger.info("🔌 Step 5: Shutting down display node...")
         await asyncio.sleep(1.0)
         
-        # Trigger our own shutdown
-        import os
-        os._exit(0)
+        # Trigger our own graceful shutdown
+        try:
+            self.shutdown()
+        finally:
+            import sys
+            sys.exit(0)
 
     def _get_html_template(self) -> str:
         """Get the HTML template for the web UI."""
@@ -2071,7 +2086,7 @@ class FastAPIActionDisplayNode:
                 'type': 'text_input',
                 'character': character_name,
                 'text': text_input,
-                'source': 'ui',
+                'source': 'User',
                 'timestamp': datetime.now().isoformat()
             }
             self.memory_publisher.put(json.dumps(memory_data))

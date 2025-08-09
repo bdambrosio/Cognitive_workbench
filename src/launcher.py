@@ -40,6 +40,7 @@ class CharacterLauncher:
         self.characters: List[CharacterInstance] = []
         self.shared_processes: List[subprocess.Popen] = []
         self.running = True
+        self.zenoh_session = None
         
         # Configure logging
         # Console handler with WARNING level (less verbose)
@@ -62,11 +63,39 @@ class CharacterLauncher:
         # Register signal handlers for graceful shutdown
         signal.signal(signal.SIGTERM, self._signal_handler)
         signal.signal(signal.SIGINT, self._signal_handler)
+        
+        # Initialize Zenoh session and subscribe to shutdown requests
+        try:
+            import zenoh
+            config = zenoh.Config()
+            self.zenoh_session = zenoh.open(config)
+            # Listen for centralized shutdown requests
+            self.zenoh_session.declare_subscriber(
+                "cognitive/launcher/shutdown",
+                self._shutdown_request_callback
+            )
+            self.logger.info('✅ Launcher subscribed to cognitive/launcher/shutdown')
+        except Exception as e:
+            self.logger.warning(f'⚠️  Could not initialize Zenoh in launcher for shutdown subscription: {e}')
     
     def _signal_handler(self, signum, frame):
         """Handle shutdown signals gracefully."""
         self.logger.info(f'Received signal {signum}, initiating shutdown...')
         self.running = False
+
+    def _shutdown_request_callback(self, sample):
+        """Handle shutdown request published by UI or other controller."""
+        try:
+            payload = sample.payload.to_bytes().decode('utf-8')
+            self.logger.warning(f'Received shutdown request via Zenoh: {payload}')
+        except Exception:
+            self.logger.warning('Received shutdown request via Zenoh')
+        # Trigger graceful shutdown
+        try:
+            self.shutdown()
+        finally:
+            # Exit the launcher process
+            sys.exit(0)
     
     def add_character(self, name: str, config: Dict[str, Any]):
         """Add a character to be launched."""
@@ -75,7 +104,7 @@ class CharacterLauncher:
         self.characters.append(character)
         self.logger.info(f'Added character: {canonical_name}')
     
-    def launch_shared_services(self, map_file: str = None, launch_ui: bool = False, server_name: str = 'vllm', model_name: str = None):
+    def launch_shared_services(self, map_file: str = None, launch_ui: bool = False, server_name: str = 'vllm', model_name: str = None, ui_port: int = 3000):
         """Launch shared services (LLM service node and map node)."""
         self.logger.info('Launching shared services...')
         
@@ -95,11 +124,11 @@ class CharacterLauncher:
         if launch_ui:
             try:
                 ui_process = subprocess.Popen([
-                    sys.executable, 'fastapi_action_display.py', '--port', '3000'
+                    sys.executable, 'fastapi_action_display.py', '--port', str(ui_port)
                 ])
                 self.shared_processes.append(ui_process)
-                self.logger.info('✅ FastAPI Action Display Node launched on port 3000')
-                self.logger.info('   - Web UI available at: http://localhost:3000')
+                self.logger.info(f'✅ FastAPI Action Display Node launched on port {ui_port}')
+                self.logger.info(f'   - Web UI available at: http://localhost:{ui_port}')
             except Exception as e:
                 self.logger.error(f'❌ Failed to launch FastAPI Action Display Node: {e}')
                 
@@ -219,12 +248,12 @@ class CharacterLauncher:
         except Exception as e:
             self.logger.error(f'❌ Failed to launch {character.name} executive_node: {e}')
     
-    def launch_all_characters(self, map_file: str = None, launch_ui: bool = False, server_name: str = 'vllm', model_name: str = None):
+    def launch_all_characters(self, map_file: str = None, launch_ui: bool = False, server_name: str = 'vllm', model_name: str = None, ui_port: int = 3000):
         """Launch all character instances."""
         self.logger.info(f'Launching {len(self.characters)} characters...')
         
         # Launch shared services first
-        self.launch_shared_services(map_file, launch_ui, server_name, model_name)
+        self.launch_shared_services(map_file, launch_ui, server_name, model_name, ui_port)
         time.sleep(2)  # Give shared services time to start
         
         # Launch each character
@@ -239,17 +268,29 @@ class CharacterLauncher:
         self.logger.info('Monitoring processes...')
         
         while self.running:
+            # Track if anything is still alive
+            any_alive = False
+
             # Check shared processes
             for i, process in enumerate(self.shared_processes):
-                if process.poll() is not None:
+                if process.poll() is None:
+                    any_alive = True
+                else:
                     self.logger.warning(f'Shared process {i} has stopped')
             
             # Check character processes
             for character in self.characters:
                 for i, process in enumerate(character.processes):
-                    if process.poll() is not None:
+                    if process.poll() is None:
+                        any_alive = True
+                    else:
                         self.logger.warning(f'{character.name} process {i} has stopped')
-            
+
+            # If everything has stopped, end monitoring loop
+            if not any_alive:
+                self.logger.info('All child processes have exited; stopping monitor loop')
+                break
+
             time.sleep(5)  # Check every 5 seconds
     
     def shutdown(self):
@@ -281,7 +322,7 @@ class CharacterLauncher:
                 self.logger.error(f'  ❌ Error sending SIGTERM to {name} process {process.pid}: {e}')
         
         # Step 2: Wait for graceful shutdown (standard timeout)
-        shutdown_timeout = 30  # 30 seconds total
+        shutdown_timeout = 15  # 15 seconds total
         self.logger.info(f'⏳ Waiting up to {shutdown_timeout}s for graceful shutdown...')
         
         start_time = time.time()
@@ -294,7 +335,7 @@ class CharacterLauncher:
             time.sleep(1)  # Check every second
             elapsed = int(time.time() - start_time)
             if elapsed % 5 == 0:  # Log every 5 seconds
-                self.logger.info(f'  ⏰ {len(alive_processes)} processes still running after {elapsed}s...')
+                self.logger.warning(f'  ⏰ {len(alive_processes)} processes still running after {elapsed}s...')
         
         # Step 3: Force kill any remaining processes
         remaining_processes = [(name, p) for name, p in all_processes if p.poll() is None]
@@ -308,6 +349,12 @@ class CharacterLauncher:
                     self.logger.error(f'  ❌ Error force killing {name} process {process.pid}: {e}')
         
         self.logger.info('✅ Shutdown complete')
+        # Close zenoh session if present
+        try:
+            if self.zenoh_session is not None:
+                self.zenoh_session.close()
+        except Exception:
+            pass
 
 
 def main():
@@ -316,8 +363,10 @@ def main():
     parser.add_argument('config_file', help='YAML configuration file with character and LLM settings')
     parser.add_argument('--characters', nargs='+', help='Character names to launch (overrides config file)')
     parser.add_argument('--list-only', action='store_true', help='List available characters and exit')
-    parser.add_argument('--map-file', help='Map file name (e.g., forest.py) to load in the shared map node')
-    parser.add_argument('--ui', action='store_true', help='Launch FastAPI web UI on port 3000')
+    parser.add_argument('--map-file', help='Map file name (e.g., forest.py) to load in the shared map node (overrides YAML "map" if provided)')
+    parser.add_argument('--ui', action='store_true', help='Launch FastAPI web UI')
+    parser.add_argument('--ui-port', type=int, default=3000, help='Port for FastAPI web UI (default: 3000)')
+    parser.add_argument('--scenario-id', type=str, default=None, help='Optional scenario identifier (forwarded, not used yet)')
     
     args = parser.parse_args()
     
@@ -335,6 +384,9 @@ def main():
         server_name = llm_config.get('server_name', 'vllm')
         model_name = llm_config.get('model_name', None)
         
+        # Extract optional map file from YAML (key: 'map')
+        yaml_map_file = config_data.get('map')
+
         # Extract characters configuration
         characters_config = config_data.get('characters', [])
         if isinstance(characters_config, dict):
@@ -371,7 +423,8 @@ def main():
     
     try:
         # Launch all characters
-        launcher.launch_all_characters(args.map_file, args.ui, server_name, model_name)
+        effective_map_file = args.map_file if args.map_file else yaml_map_file
+        launcher.launch_all_characters(effective_map_file, args.ui, server_name, model_name, ui_port=args.ui_port)
         
         # Monitor processes
         launcher.monitor_processes()

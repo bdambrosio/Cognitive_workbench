@@ -637,13 +637,17 @@ class ZenohMemoryNode:
         """Handle shutdown command from UI."""
         try:
             logger.warning(f'🔌 {self.character_name} Memory Node received shutdown command')
-            self.shutdown()
+            # Request shutdown; let main loop handle cleanup
+            self.shutdown_requested = True
         except Exception as e:
             logger.error(f'Error in shutdown callback: {e}')
 
     def shutdown(self):
         """Cleanup and shutdown."""
         try:
+            if getattr(self, '_shutting_down', False):
+                return
+            self._shutting_down = True
             logger.info('Memory Node shutdown initiated...')
             self._summarize_active_conversations()  # Summarize before shutdown
             self.save_memory()  # Save before shutdown

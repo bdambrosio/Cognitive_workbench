@@ -124,6 +124,21 @@
             "justMyCode": false,
             "stopOnEntry": false,
             "preLaunchTask": "setup-zenoh-environment"
+        },
+        {
+            "name": "Scenario Manager",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/scenario_manager.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/src",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src"
+            },
+            "args": ["--port", "3100", "--ui-base-port", "3000"],
+            "justMyCode": false,
+            "stopOnEntry": false,
+            "preLaunchTask": "setup-zenoh-environment"
         }
 
 

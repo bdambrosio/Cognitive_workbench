@@ -232,8 +232,9 @@ class ZenohExecutiveNode:
             f"cognitive/{character_name}/dialog_end",
             self._dialog_end_callback
         )
-        # Shutdown flag
+        # Shutdown flags
         self.shutdown_requested = False
+        self._shutting_down = False
 
         # Get map types
         self.map_types = {}
@@ -288,7 +289,7 @@ class ZenohExecutiveNode:
                             content_data = json.loads(content)
                             text_input = content_data.get('text', '')
                             source = content_data.get('source', 'unknown')
-                            #if source == 'ui': # other text inputs must be handled by OODA to observe dialog turn taking
+                            #if source == 'User': # other text inputs must be handled by OODA to observe dialog turn taking
                             self.generate_speech(text_input, source, mode='respond')
                             self.text_input_pending = False
                             self.last_sense_data = None
@@ -1160,10 +1161,10 @@ Respond ONLY with the above hash-formatted text.
         """In say mode, this is start of conversation. In respond mode, this is a response in an ongoing dialog"""
         # Handle plan input from UI - strip quotes if present
         clean_input = text_input.strip().strip('"').strip("'")
-        if source == 'ui' and clean_input.startswith('goal:'):
+        if source == 'User' and clean_input.startswith('goal:'):
             self.parse_and_set_goal(clean_input)
             return
-        if source == 'ui' and clean_input.startswith('plan:'):
+        if source == 'User' and clean_input.startswith('plan:'):
             self.parse_and_set_plan(clean_input)
             return
         text_to_send = ''
@@ -1907,6 +1908,9 @@ End your response with:
     
     def shutdown(self):
         """Clean shutdown."""
+        if self._shutting_down:
+            return
+        self._shutting_down = True
         logger.info('Shutting down Executive Node...')
         
         # Set shutdown flag to prevent new operations

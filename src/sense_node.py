@@ -250,6 +250,9 @@ class ZenohSenseNode:
     def shutdown(self):
         """Cleanup and shutdown."""
         try:
+            if getattr(self, '_shutting_down', False):
+                return
+            self._shutting_down = True
             logger.info('Sense Node shutdown initiated...')
             self.session.close()
             logger.info('Sense Node shutdown complete')

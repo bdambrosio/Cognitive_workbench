@@ -1,3 +1,7 @@
-2025-08-08 13:44:13 - sense_node - INFO - 👁️ Sense Node initialized for character: Joe
-2025-08-08 13:44:13 - sense_node - INFO - Console Text Sensor ready - will auto-disable if external input detected
-2025-08-08 13:44:13 - sense_node - INFO - Sense Node running - press Ctrl+C to stop
+2025-08-09 09:26:08 - sense_node - INFO - 👁️ Sense Node initialized for character: Sage
+2025-08-09 09:26:08 - sense_node - INFO - Console Text Sensor ready - will auto-disable if external input detected
+2025-08-09 09:26:08 - sense_node - INFO - Sense Node running - press Ctrl+C to stop
+2025-08-09 09:30:09 - sense_node - INFO - Received signal 15, initiating shutdown...
+2025-08-09 09:30:09 - sense_node - INFO - Sense Node shutdown initiated...
+2025-08-09 09:30:09 - sense_node - INFO - Sense Node shutdown complete
+2025-08-09 09:30:09 - sense_node - INFO - Received signal 15, initiating shutdown...

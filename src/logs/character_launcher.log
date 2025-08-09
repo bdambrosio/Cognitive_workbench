@@ -1,21 +1,52 @@
-2025-08-08 13:43:58 - character_launcher - INFO - Added character: Samantha
-2025-08-08 13:43:58 - character_launcher - INFO - Added character: Joe
-2025-08-08 13:43:58 - character_launcher - INFO - Launching 2 characters...
-2025-08-08 13:43:58 - character_launcher - INFO - Launching shared services...
-2025-08-08 13:43:58 - character_launcher - INFO - ✅ LLM Service Node launched with server: vllm, model: openai/gpt-5-mini
-2025-08-08 13:43:58 - character_launcher - INFO - ✅ FastAPI Action Display Node launched on port 3000
-2025-08-08 13:43:58 - character_launcher - INFO -    - Web UI available at: http://localhost:3000
-2025-08-08 13:43:59 - character_launcher - INFO - ✅ Map Node launched with map: forest.py
-2025-08-08 13:43:59 - character_launcher - INFO - ⏳ Waiting for Map Node to initialize...
-2025-08-08 13:44:06 - character_launcher - INFO - Launching character: Samantha
-2025-08-08 13:44:06 - character_launcher - INFO - ✅ Samantha memory_node launched
-2025-08-08 13:44:07 - character_launcher - INFO - ✅ Samantha situation_node launched
-2025-08-08 13:44:07 - character_launcher - INFO - ✅ Samantha sense_node launched
-2025-08-08 13:44:08 - character_launcher - INFO - ✅ Samantha executive_node launched
-2025-08-08 13:44:09 - character_launcher - INFO - Launching character: Joe
-2025-08-08 13:44:09 - character_launcher - INFO - ✅ Joe memory_node launched
-2025-08-08 13:44:09 - character_launcher - INFO - ✅ Joe situation_node launched
-2025-08-08 13:44:10 - character_launcher - INFO - ✅ Joe sense_node launched
-2025-08-08 13:44:10 - character_launcher - INFO - ✅ Joe executive_node launched
-2025-08-08 13:44:11 - character_launcher - INFO - ✅ All characters launched
-2025-08-08 13:44:11 - character_launcher - INFO - Monitoring processes...
+2025-08-09 09:25:57 - character_launcher - INFO - ✅ Launcher subscribed to cognitive/launcher/shutdown
+2025-08-09 09:25:57 - character_launcher - INFO - Added character: Sage
+2025-08-09 09:25:57 - character_launcher - INFO - Launching 1 characters...
+2025-08-09 09:25:57 - character_launcher - INFO - Launching shared services...
+2025-08-09 09:25:57 - character_launcher - INFO - ✅ LLM Service Node launched with server: vllm, model: gpt-4.1-mini
+2025-08-09 09:25:57 - character_launcher - INFO - ✅ FastAPI Action Display Node launched on port 3000
+2025-08-09 09:25:57 - character_launcher - INFO -    - Web UI available at: http://localhost:3000
+2025-08-09 09:25:58 - character_launcher - INFO - ✅ Map Node launched with map: sageForest.py
+2025-08-09 09:25:58 - character_launcher - INFO - ⏳ Waiting for Map Node to initialize...
+2025-08-09 09:26:05 - character_launcher - INFO - Launching character: Sage
+2025-08-09 09:26:05 - character_launcher - INFO - ✅ Sage memory_node launched
+2025-08-09 09:26:06 - character_launcher - INFO - ✅ Sage situation_node launched
+2025-08-09 09:26:06 - character_launcher - INFO - ✅ Sage sense_node launched
+2025-08-09 09:26:07 - character_launcher - INFO - ✅ Sage executive_node launched
+2025-08-09 09:26:08 - character_launcher - INFO - ✅ All characters launched
+2025-08-09 09:26:08 - character_launcher - INFO - Monitoring processes...
+2025-08-09 09:29:46 - character_launcher - WARNING - Received shutdown request via Zenoh: {"timestamp": "2025-08-09T09:29:46.230281", "source": "ui", "mode": "shutdown"}
+2025-08-09 09:29:46 - character_launcher - INFO - 🛑 Initiating graceful shutdown...
+2025-08-09 09:30:09 - character_launcher - INFO - 🛑 Initiating graceful shutdown...
+2025-08-09 09:30:09 - character_launcher - INFO - 📨 Sending SIGTERM to 7 processes...
+2025-08-09 09:30:09 - character_launcher - INFO -   ✉️  SIGTERM sent to Sage process 42379
+2025-08-09 09:30:09 - character_launcher - INFO -   ✉️  SIGTERM sent to Sage process 42386
+2025-08-09 09:30:09 - character_launcher - INFO -   ✉️  SIGTERM sent to Sage process 42405
+2025-08-09 09:30:09 - character_launcher - INFO -   ✉️  SIGTERM sent to Sage process 42447
+2025-08-09 09:30:09 - character_launcher - INFO -   ✉️  SIGTERM sent to shared process 42060
+2025-08-09 09:30:09 - character_launcher - INFO -   ✉️  SIGTERM sent to shared process 42061
+2025-08-09 09:30:09 - character_launcher - INFO -   ✉️  SIGTERM sent to shared process 42105
+2025-08-09 09:30:09 - character_launcher - INFO - ⏳ Waiting up to 15s for graceful shutdown...
+2025-08-09 09:30:09 - character_launcher - INFO - 📨 Sending SIGTERM to 7 processes...
+2025-08-09 09:30:09 - character_launcher - INFO -   ✉️  SIGTERM sent to Sage process 42379
+2025-08-09 09:30:09 - character_launcher - INFO -   ✉️  SIGTERM sent to Sage process 42386
+2025-08-09 09:30:09 - character_launcher - INFO -   ✉️  SIGTERM sent to Sage process 42405
+2025-08-09 09:30:09 - character_launcher - INFO -   ✉️  SIGTERM sent to Sage process 42447
+2025-08-09 09:30:09 - character_launcher - INFO -   ✉️  SIGTERM sent to shared process 42060
+2025-08-09 09:30:09 - character_launcher - INFO -   ✉️  SIGTERM sent to shared process 42061
+2025-08-09 09:30:09 - character_launcher - INFO -   ✉️  SIGTERM sent to shared process 42105
+2025-08-09 09:30:09 - character_launcher - INFO - ⏳ Waiting up to 15s for graceful shutdown...
+2025-08-09 09:30:17 - character_launcher - WARNING -   ⏰ 4 processes still running after 5s...
+2025-08-09 09:30:20 - character_launcher - WARNING -   ⏰ 3 processes still running after 10s...
+2025-08-09 09:30:20 - character_launcher - WARNING -   ⏰ 3 processes still running after 10s...
+2025-08-09 09:30:25 - character_launcher - WARNING -   ⏰ 3 processes still running after 15s...
+2025-08-09 09:30:25 - character_launcher - WARNING - ⚠️  Force killing 3 unresponsive processes...
+2025-08-09 09:30:25 - character_launcher - WARNING -   💀 Force killed Sage process 42379
+2025-08-09 09:30:25 - character_launcher - WARNING -   💀 Force killed Sage process 42405
+2025-08-09 09:30:25 - character_launcher - WARNING -   💀 Force killed shared process 42105
+2025-08-09 09:30:29 - character_launcher - INFO - ✅ Shutdown complete
+2025-08-09 09:30:29 - character_launcher - INFO - ✅ Shutdown complete
+2025-08-09 09:30:29 - zenoh.handlers - ERROR - callback error
+Traceback (most recent call last):
+  File "/home/bruce/Downloads/Cognitive_workbench/src/launcher.py", line 98, in _shutdown_request_callback
+    sys.exit(0)
+SystemExit: 0

@@ -43,6 +43,7 @@ class MapNode:
         self.world_map = None
         self.session = None
         self.shutdown_requested = False
+        self._shutting_down = False
         
         # Agent registry: character_name -> Agent instance
         self.agent_registry = {}
@@ -1124,7 +1125,8 @@ class MapNode:
         """Handle shutdown command from UI."""
         try:
             logger.warning(f'🔌 Map Node received shutdown command')
-            self.shutdown()
+            # Request shutdown; let main loop exit and call shutdown() once
+            self.shutdown_requested = True
         except Exception as e:
             logger.error(f'Error in shutdown callback: {e}')
     
@@ -1149,6 +1151,9 @@ class MapNode:
     
     def shutdown(self):
         """Shutdown the map node"""
+        if self._shutting_down:
+            return
+        self._shutting_down = True
         logger.info("Shutting down map node...")
         self.shutdown_requested = True
         
@@ -1175,10 +1180,12 @@ class MapNode:
             try:
                 # Wait longer for any pending operations to complete
                 time.sleep(2.0)
-                #self.session.close()
-                logger.info("Zenoh session closed")
+                # Known issue: closing Zenoh session here triggers a PanicException in some versions.
+                # Skip explicit close and rely on process exit to tear down resources.
+                # self.session.close()
+                logger.info("Skipping explicit Zenoh session close to avoid panic; relying on process exit")
             except Exception as e:
-                logger.error(f"Error closing Zenoh session: {e}")
+                logger.error(f"Error during Zenoh session cleanup: {e}")
         
         logger.info("Map node shutdown complete")
 
@@ -1186,7 +1193,8 @@ def signal_handler(signum, frame):
     """Handle shutdown signals"""
     logger.info(f"Received signal {signum}")
     if hasattr(signal_handler, 'map_node'):
-        signal_handler.map_node.shutdown()
+        # Request shutdown; allow main loop to exit and perform cleanup once
+        signal_handler.map_node.shutdown_requested = True
 
 def main():
     parser = argparse.ArgumentParser(description='Shared Map Node')

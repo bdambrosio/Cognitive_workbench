@@ -1,3 +1,4 @@
+map: forest.py
 # Cognitive Workbench Configuration
 llm_config:
   server_name: "vllm"
