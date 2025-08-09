@@ -143,8 +143,9 @@ class ZenohSituationNode:
             self.shutdown_callback
         )
         
-        # Shutdown flag
+        # Shutdown flags
         self.shutdown_requested = False
+        self._shutting_down = False
         self.update_map_retries = 0
         self.map_types = {}
         for reply in self.session.get("cognitive/map/types", timeout=2.0):
@@ -578,13 +579,16 @@ class ZenohSituationNode:
         """Handle shutdown command from UI."""
         try:
             logger.warning(f'🔌 {self.character_name} Situation Node received shutdown command')
-            self.shutdown()
+            self.shutdown_requested = True
         except Exception as e:
             logger.error(f'Error in shutdown callback: {e}')
     
     def shutdown(self):
         """Cleanup and shutdown."""
         try:
+            if self._shutting_down:
+                return
+            self._shutting_down = True
             logger.info('Situation Node shutdown initiated...')
             self.save_situation()
             
