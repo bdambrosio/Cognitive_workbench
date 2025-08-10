@@ -56,6 +56,17 @@ python3 launcher.py lost.yaml --ui
 ### 3. Use the System
 
 A browser tab should open (localhost:3000) with a minimal UI.
+The main panel lists actions characters perform and the results.
+The left panel allows inspection. Click on a character name and 
+- its current goal will be displayed above the main panel
+- below in the left panel are a set of tabs:
+  - plan displays its current_plan
+  - view displays its current report from the map
+  - this will be expanded to show inventory, TOM, plan history and analysis, ... work in progress
+The bottom, in addition to the control buttons, contains an entry area.
+- A small entry area for a character name
+- A larger text area for chatting with that character. type text and press send. The named character will usually answer.
+- You can also start with goal: or plan: to give the character a new goal or a plan. The plan text format is a bit fragile.
 Characters run in parallel. 'Step' gives every character a single turn. Run is just a loop calling step repeatedly.
 Condition testing for an if or while does not count as a step. 
 
