@@ -1,30 +1,71 @@
-2025-08-09 09:26:07 - situation_node - INFO - 📂 No existing situation file for Sage, starting fresh
-2025-08-09 09:26:07 - situation_node - INFO - 🧭 Situation Node initialized for character: Sage
-2025-08-09 09:26:07 - situation_node - INFO -    - Subscribing to: cognitive/Sage/sense_data
-2025-08-09 09:26:07 - situation_node - INFO -    - Subscribing to: cognitive/Sage/action
-2025-08-09 09:26:07 - situation_node - INFO -    - Publishing to: cognitive/Sage/situation/update
-2025-08-09 09:26:07 - situation_node - INFO -    - Queryable at: cognitive/Sage/situation/current_situation
-2025-08-09 09:26:07 - situation_node - INFO -    - Proximity queryable at: cognitive/Sage/situation/proximity
-2025-08-09 09:26:07 - situation_node - INFO -    - Visibility queryable at: cognitive/Sage/situation/visibility
-2025-08-09 09:26:07 - situation_node - INFO -    - Location queryable at: cognitive/Sage/situation/location
-2025-08-09 09:26:07 - situation_node - INFO -    - Storage available at: data/situation/Sage_situation.json
-2025-08-09 09:26:07 - situation_node - INFO - Situation Node running - press Ctrl+C to stop
-2025-08-09 09:26:10 - situation_node - INFO - 📥 Received action: unknown
-2025-08-09 09:26:10 - situation_node - WARNING - Updating map data for Sage
-2025-08-09 09:26:10 - situation_node - WARNING - Updating map data for Sage
-2025-08-09 09:26:10 - situation_node - INFO - 🗺️ Updated map look data for Sage
-2025-08-09 09:26:10 - situation_node - WARNING - Map look data updated for Sage
-2025-08-09 09:26:14 - situation_node - INFO - 🗺️ Updated map look data for Sage
-2025-08-09 09:26:14 - situation_node - WARNING - Map look data updated for Sage
-2025-08-09 09:26:16 - situation_node - WARNING - Updating map data for Sage
-2025-08-09 09:26:20 - situation_node - INFO - 🗺️ Updated map look data for Sage
-2025-08-09 09:26:20 - situation_node - WARNING - Map look data updated for Sage
-2025-08-09 09:26:25 - situation_node - INFO - 📥 Received action: unknown
-2025-08-09 09:26:25 - situation_node - WARNING - Updating map data for Sage
-2025-08-09 09:26:29 - situation_node - INFO - 🗺️ Updated map look data for Sage
-2025-08-09 09:26:29 - situation_node - WARNING - Map look data updated for Sage
-2025-08-09 09:30:09 - situation_node - INFO - Received signal 15, initiating shutdown...
-2025-08-09 09:30:09 - situation_node - INFO - Received signal 15, initiating shutdown...
-2025-08-09 09:30:10 - situation_node - INFO - Situation Node shutdown initiated...
-2025-08-09 09:30:12 - situation_node - INFO - Zenoh session closed
-2025-08-09 09:30:12 - situation_node - INFO - Situation Node shutdown complete
+2025-08-09 20:07:45 - situation_node - INFO - 📂 No existing situation file for User, starting fresh
+2025-08-09 20:07:45 - situation_node - INFO - 🧭 Situation Node initialized for character: User
+2025-08-09 20:07:45 - situation_node - INFO -    - Subscribing to: cognitive/User/sense_data
+2025-08-09 20:07:45 - situation_node - INFO -    - Subscribing to: cognitive/User/action
+2025-08-09 20:07:45 - situation_node - INFO -    - Publishing to: cognitive/User/situation/update
+2025-08-09 20:07:45 - situation_node - INFO -    - Queryable at: cognitive/User/situation/current_situation
+2025-08-09 20:07:45 - situation_node - INFO -    - Proximity queryable at: cognitive/User/situation/proximity
+2025-08-09 20:07:45 - situation_node - INFO -    - Visibility queryable at: cognitive/User/situation/visibility
+2025-08-09 20:07:45 - situation_node - INFO -    - Location queryable at: cognitive/User/situation/location
+2025-08-09 20:07:45 - situation_node - INFO -    - Storage available at: data/situation/User_situation.json
+2025-08-09 20:07:45 - situation_node - INFO - Situation Node running - press Ctrl+C to stop
+2025-08-09 20:07:47 - situation_node - INFO - 📥 Received action: unknown
+2025-08-09 20:07:47 - situation_node - WARNING - Updating map data for User
+2025-08-09 20:07:47 - situation_node - WARNING - Updating map data for User
+2025-08-09 20:07:47 - situation_node - INFO - 🗺️ Updated map look data for User
+2025-08-09 20:07:47 - situation_node - WARNING - Map look data updated for User
+2025-08-09 20:07:51 - situation_node - INFO - 🗺️ Updated map look data for User
+2025-08-09 20:07:51 - situation_node - WARNING - Map look data u2025-08-09 20:072025-08-09 20:11:04 - situation_node - INFO - 📥 Received sense data: text
+2025-08-09 20:12:01 - situation_node - INFO - 📥 Received sense data: text
+2025-08-09 20:12:52 - situation_node - INFO - 📥 Received sense data: text
+2025-08-09 20:14:49 - situation_node - INFO - 📥 Received sense data: text
+2025-08-09 20:15:01 - situation_node - INFO - 💾 User Situation Node received save command
+2025-08-09 20:15:03 - situation_node - INFO - Received signal 15, initiating shutdown...
+2025-08-09 20:15:03 - situation_node - INFO - Situation Node shutdown initiated...
+2025-08-09 20:15:05 - situation_node - INFO - Received signal 15, initiating shutdown...
+2025-08-09 20:15:05 - situation_node - INFO - Zenoh session closed
+2025-08-09 20:15:05 - situation_node - INFO - Situation Node shutdown complete
+ - 💾 Jill Situation Node received save command
+2025-08-09 20:15:03 - situation_node - INFO - Received signal 15, initiating shutdown...
+2025-08-09 20:15:03 - situation_node - INFO - Situation Node shutdown initiated...
+2025-08-09 20:15:05 - situation_node - INFO - Received signal 15, initiating shutdown...
+2025-08-09 20:15:05 - situation_node - INFO - Zenoh session closed
+2025-08-09 20:15:05 - situation_node - INFO - Situation Node shutdown complete
+node - INFO - 📥 Received sense data: text
+2025-08-09 20:09:39 - situation_node - INFO - 📥 Received action: unknown
+2025-08-09 20:09:48 - situation_node - INFO - 📥 Received sense data: text
+2025-08-09 20:10:07 - situation_node - INFO - 📥 Received action: unknown
+2025-08-09 20:10:53 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-08-09 20:10:53 - situation_node - INFO - 📥 Received action: unknown
+2025-08-09 20:10:53 - situation_node - WARNING - Updating map data for Sam
+2025-08-09 20:10:53 - situation_node - WARNING - Updating map data for Sam
+2025-08-09 20:10:53 - situation_node - INFO - 🗺️ Updated map look data for Sam
+2025-08-09 20:10:53 - situation_node - WARNING - Map look data updated for Sam
+2025-08-09 20:10:57 - situation_node - INFO - 🗺️ Updated map look data for Sam
+2025-08-09 20:10:57 - situation_node - WARNING - Map look data updated for Sam
+2025-08-09 20:11:04 - situation_node - INFO - 📥 Received action: unknown
+2025-08-09 20:11:57 - situation_node - INFO - 📥 Received sense data: text
+2025-08-09 20:12:01 - situation_node - INFO - 📥 Received action: unknown
+2025-08-09 20:12:49 - situation_node - INFO - 📥 Received sense data: text
+2025-08-09 20:12:52 - situation_node - INFO - 📥 Received action: unknown
+2025-08-09 20:13:55 - situation_node - INFO - 📥 Received sense data: text
+2025-08-09 20:14:02 - situation_node - INFO - 📥 Received action: unknown
+2025-08-09 20:14:15 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-08-09 20:14:15 - situation_node - WARNING - Updating map data for Sam
+2025-08-09 20:14:15 - situation_node - INFO - 📥 Received action: unknown
+2025-08-09 20:14:15 - situation_node - WARNING - Updating map data for Sam
+2025-08-09 20:14:15 - situation_node - INFO - 🗺️ Updated map look data for Sam
+2025-08-09 20:14:15 - situation_node - WARNING - Map look data updated for Sam
+2025-08-09 20:14:19 - situation_node - INFO - 🗺️ Updated map look data for Sam
+2025-08-09 20:14:19 - situation_node - WARNING - Map look data updated for Sam
+2025-08-09 20:14:25 - situation_node - INFO - 📥 Received action: unknown
+2025-08-09 20:14:36 - situation_node - WARNING - Updating map data for Sam
+2025-08-09 20:14:40 - situation_node - INFO - 🗺️ Updated map look data for Sam
+2025-08-09 20:14:40 - situation_node - WARNING - Map look data updated for Sam
+2025-08-09 20:14:49 - situation_node - INFO - 📥 Received action: unknown
+2025-08-09 20:15:01 - situation_node - INFO - 💾 Sam Situation Node received save command
+2025-08-09 20:15:03 - situation_node - INFO - Received signal 15, initiating shutdown...
+2025-08-09 20:15:04 - situation_node - INFO - Situation Node shutdown initiated...
+2025-08-09 20:15:05 - situation_node - INFO - Received signal 15, initiating shutdown...
+2025-08-09 20:15:06 - situation_node - INFO - Zenoh session closed
+2025-08-09 20:15:06 - situation_node - INFO - Situation Node shutdown complete

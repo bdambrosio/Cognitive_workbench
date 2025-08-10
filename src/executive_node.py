@@ -18,9 +18,10 @@ import sys
 import signal
 import argparse
 from datetime import datetime
-from typing import Dict, List, Any, Union
+from typing import Dict, List, Any, Union, Optional
 import utils.hash_utils as hash_utils
 import plan as plan_module
+from dataclasses import dataclass
 
 # Configure logging with unbuffered output
 # Console handler with WARNING level (less verbose)
@@ -136,6 +137,13 @@ A plan must include no more than 6 steps including all nested while and if branc
 A plan must not contain sequential adjacent say actions.
 """
 
+@dataclass
+class ActionRecord:
+    """Record of an action and its result."""
+    action: Dict[str, Any]
+    result: Optional[str]
+    timestamp: datetime
+
 class ZenohExecutiveNode:
     """
     Executive node that implements the OODA loop:
@@ -149,6 +157,9 @@ class ZenohExecutiveNode:
         # Store character info (canonicalized)
         self.character_name = character_name.capitalize()
         self.character_config = character_config or {}
+        # Manual control flags
+        self.manual = bool(self.character_config.get('manual', False))
+        self.manual_response = bool(self.character_config.get('manual_response', False))
         
         # Initialize Zenoh session
         config = zenoh.Config()
@@ -187,6 +198,17 @@ class ZenohExecutiveNode:
         # Publisher for current plans (character-specific)
         self.current_plan_publisher = self.session.declare_publisher(f"cognitive/{character_name}/current_plan")
         
+        # Backward compatibility properties
+        @property
+        def last_action(self):
+            """Get the last action for backward compatibility."""
+            return self.action_history[-1].action if self.action_history else None
+        
+        @property
+        def last_action_result(self):
+            """Get the last action result for backward compatibility."""
+            return self.action_history[-1].result if self.action_history else None
+        
         # LLM client
         self.llm_client = None
         if LLM_CLIENT_AVAILABLE:
@@ -202,14 +224,14 @@ class ZenohExecutiveNode:
         self.observations = None
         self.interrupt_pending = False
         self.text_input_pending = False
-        self.last_action = None
+        self.action_history = []  # List of ActionRecord instances
         
         # Plan execution state
         self.current_plan = None
-        self.plan_state = {
-            'step_stack': plan_module.Stack()
-        }
+        self.plan_state = None
         self.plan_bindings_cache = {}
+        self.plan_summary_completed = False  # Track if current plan has been summarized
+        self.plan_summary = None
         # Turn management
         self.turn_subscriber = self.session.declare_subscriber(
             "cognitive/map/turn/go",
@@ -402,18 +424,29 @@ class ZenohExecutiveNode:
         try:
             # Observe: Collect current situation and sense data
             observations = self._observe()
-            
+
+            # Manual characters skip orient/plan entirely
+            if self.manual:
+                if self.current_plan:
+                    action = self._plan_step(self.current_plan)
+                    if action is not None:
+                        self._act(action)
+
+                        
+                return
+
             # Orient: Assess current state and goals
             goal = self._orient(observations)
-            
+
             # Plan: Return existing plan or create single-action plan
             plan = self._plan(goal)
             if not plan:
+                self._complete_turn()
                 return
-            
+
             # Plan Step: Execute current step of plan
             action = self._plan_step(plan)
-            
+
             # Act: Execute the chosen action (if we have one)
             if action is not None:
                 self._act(action)
@@ -428,7 +461,7 @@ class ZenohExecutiveNode:
         if self.last_situation_data and self.last_situation_data.get('location'):
             formatted_situation += f"You are at location: {self.last_situation_data['location']}\n"
         if self.last_situation_data and self.last_situation_data.get('visible_characters'):
-            formatted_situation += f"You notice the following characters: {', '.join(self.last_situation_data['characters'])}\n"
+            formatted_situation += f"You can see {len(self.last_situation_data)} people: {', and '.join(self.last_situation_data['characters'])}\n"
         if self.last_situation_data and self.last_situation_data.get('look'):
             formatted_situation += f"You can see the following:\n\t{'\n\t'.join(self.last_situation_data['look'])}\n"
         
@@ -467,8 +500,9 @@ class ZenohExecutiveNode:
             system_prompt += f"\n#Your current goal is:\n\t{self.current_goal.to_string()}\n"
         if self.current_plan:
             system_prompt += f"\n#Your current plan is:\n\t{json.dumps(self.current_plan, indent=2)}\n"
-        if self.last_action:
-            system_prompt += f"\n#Your last action was:\n\t{self.last_action.get('type')}: {self.last_action.get('target')} - {self.last_action_result}\n"
+        if self.action_history:
+            last_action = self.action_history[-1]
+            system_prompt += f"\n#Your last action was:\n\t{last_action.action.get('type')}: {last_action.action.get('target')} - {last_action.result}\n"
         return system_prompt
 
     def _observe(self):
@@ -523,9 +557,10 @@ class ZenohExecutiveNode:
                 for item in inventory:
                     user_prompt += f"\n\t{item}"
             user_prompt += '\n'
-            if self.last_action:
+            if self.action_history:
+                last_action = self.action_history[-1]
                 user_prompt += f'\n#Your last action was:'
-                user_prompt += f"\n\t{self.last_action.get('type')}: {self.last_action.get('target')} - {self.last_action_result}\n"
+                user_prompt += f"\n\t{last_action.action.get('type')}: {last_action.action.get('target')} - {last_action.result}\n"
 
             self.observations = {'static': system_prompt, 'dynamic': user_prompt}
             return self.observations
@@ -567,6 +602,7 @@ be careful to insert line breaks only where shown, separating a value from the n
 ##
 
 Respond ONLY with the above hash-formatted text.
+end your response with </end>
 """
             # Make LLM call
             if self.llm_client and not self.shutdown_requested:
@@ -574,8 +610,9 @@ Respond ONLY with the above hash-formatted text.
                 timeout = 5.0 if self.shutdown_requested else None
                 response = self.llm_client.generate(
                     messages=[system_prompt, user_prompt, directive],
-                    max_tokens=100,
-                    temperature=0.7,
+                    max_tokens=400,
+                    temperature=0.5,
+                    stops=['</end>'],
                     timeout=timeout
                 )
 
@@ -624,7 +661,7 @@ Respond ONLY with the above hash-formatted text.
 
                     goal_prompt += "Don't repeat yourself.\n"
 
-            if self.last_action and (self.last_action['type'].lower() == 'say' or self.last_action['type'].lower() == 'response'):
+            if self.action_history and (self.action_history[-1].action['type'].lower() == 'say' or self.action_history[-1].action['type'].lower() == 'response'):
                 directive = f"""\nrespond only with the JSON plan, no other text.\n"""
             else:
                 directive = f"""\nrespond only with the JSON plan, no other text.\n"""
@@ -632,7 +669,7 @@ Respond ONLY with the above hash-formatted text.
             if self.llm_client and not self.shutdown_requested:
                 response = self.llm_client.generate(
                     messages=[system_prompt, user_prompt, PLAN_SYNTAX, directive],
-                    max_tokens=1000,
+                    max_tokens=1500,
                     temperature=0.7,
                     stops=['</end>'],
                     is_json=True
@@ -657,6 +694,7 @@ Respond ONLY with the above hash-formatted text.
                     else:
                         self.current_plan = plan_candidate
                         self.plan_bindings_cache = {}
+                        self.plan_summary_completed = False  # Reset for new plan
                         self._publish_current_plan()
                         self.plan_state = {'step_stack': plan_module.Stack()}
                         return self.current_plan
@@ -674,6 +712,7 @@ Respond ONLY with the above hash-formatted text.
         else:
             self.current_plan = {'plan': []}
         
+        self.plan_summary_completed = False  # Reset for new plan
         self._publish_current_plan()
         # Initialize plan state for new plan
         self.plan_state = {'step_stack': plan_module.Stack()}
@@ -743,6 +782,7 @@ Respond ONLY with the above hash-formatted text.
                 else:
                     self.current_plan = plan_candidate
                     self.plan_bindings_cache = {}
+                    self.plan_summary_completed = False  # Reset for new plan
                     self._publish_current_plan()
                     self.plan_state = {'step_stack': plan_module.Stack()}
                     return self.current_plan
@@ -760,6 +800,7 @@ Respond ONLY with the above hash-formatted text.
         else:
             self.current_plan = {'plan': []}
             
+        self.plan_summary_completed = False  # Reset for new plan
         self._publish_current_plan()
         # Initialize plan state for new plan
         self.plan_state = {'step_stack': plan_module.Stack()}
@@ -831,6 +872,7 @@ Respond ONLY with the above hash-formatted text.
                     step_stack.pop()  # Remove while frame
                     if step_stack.is_empty():
                         # Plan complete
+                        self._summarize_plan_execution()
                         self.current_plan = None
                         self.plan_bindings_cache = {}
                         self.current_goal = None
@@ -856,6 +898,7 @@ Respond ONLY with the above hash-formatted text.
                         step_stack.pop()  # Remove while frame
                         if step_stack.is_empty():
                             # Plan complete
+                            self._summarize_plan_execution()
                             self.current_plan = None
                             self.plan_bindings_cache = {}
                             self.current_goal = None
@@ -872,6 +915,7 @@ Respond ONLY with the above hash-formatted text.
                 step_stack.pop()
                 if step_stack.is_empty():
                     # Plan complete
+                    self._summarize_plan_execution()
                     self.current_plan = None
                     self.plan_bindings_cache = {}
                     self.current_goal = None
@@ -940,11 +984,19 @@ Respond ONLY with the above hash-formatted text.
         """Act: Execute the chosen action."""
 
         action = self.current_action if self.current_action else action
-        self.last_action = action
+        
+        # Create action record
+        action_record = ActionRecord(
+            action=action,
+            result=None,  # Will be set below
+            timestamp=datetime.now()
+        )
+        self.action_history.append(action_record)
+        
         if action['type'].lower() == "sleep":
             action_data = {'type': 'sleep','action_id': self.action_counter,'timestamp': datetime.now().isoformat(),'target': self.character_name}
             self.action_publisher.put(json.dumps(action_data))
-            self.last_action_result = 'slept'
+            action_record.result = 'slept'
             time.sleep(1)  # Sleep for 1 second
             return
         if action['type'].lower() == 'think':
@@ -962,10 +1014,19 @@ Respond ONLY with the above hash-formatted text.
             cardinal_directions = ['north', 'northeast', 'southeast', 'south', 'southwest', 'northwest', 'east', 'west']
             if move_direction in cardinal_directions:
                 self.move(move_direction)
+                # Request situation/map update for UI immediately after move
+                try:
+                    self.map_update_request_publisher.put(json.dumps({'type': 'step_look'}))
+                except Exception:
+                    pass
                 return
             else:
                 logger.error(f'❌ Cannot move toward "{move_target}" - target not resolved or visible, choosing random direction')
                 self.move(random.choice(cardinal_directions))
+                try:
+                    self.map_update_request_publisher.put(json.dumps({'type': 'step_look'}))
+                except Exception:
+                    pass
                 return
         elif action['type'].lower() == "say":
             self.generate_speech(action['value'], resolved_target if resolved_target else action['target'], mode='say')            # Publish action (this will be picked up by action_display_node)
@@ -974,16 +1035,38 @@ Respond ONLY with the above hash-formatted text.
             self.take(resolved_target)
             self.action_counter += 1
         elif action['type'].lower() == "inspect":
+            # Publish initial inspect action
             action_data = {'type': 'inspect','action_id': self.action_counter,'timestamp': datetime.now().isoformat(),'target': resolved_target}
-            self.last_action_result = 'not yet implemented'
             self.action_publisher.put(json.dumps(action_data))
+            # Perform inspect which may populate last_action_result
             self.inspect(resolved_target)
+            # Publish result if available so UI can display it
+            try:
+                result_text = action_record.result if isinstance(action_record.result, str) else ''
+                if result_text and result_text.strip():
+                    result_action = {
+                        'type': 'inspect',
+                        'action_id': f"inspect_{int(time.time())}",
+                        'timestamp': datetime.now().isoformat(),
+                        'target': resolved_target,
+                        'llm_response': result_text
+                    }
+                    self.action_publisher.put(json.dumps(result_action))
+            except Exception:
+                pass
         elif action['type'].lower() == "use":
             # Create action - noop for now
             action_data = {'type': 'use','action_id': self.action_counter,'timestamp': datetime.now().isoformat(),'target': resolved_target}
-            self.last_action_result = 'not yet implemented'
+            action_record.result = 'not yet implemented'
             self.action_publisher.put(json.dumps(action_data))
             #self.use(action)
+        # Request situation/map update for UI after non-move actions that may affect visibility/adjacency
+        try:
+            if action['type'].lower() in ["take", "inspect", "use"]:
+                self.map_update_request_publisher.put(json.dumps({'type': 'step_look'}))
+        except Exception:
+            pass
+
         logger.warning(f'📤 Published action: {action["type"]}')
         self.action_counter += 1
 
@@ -994,23 +1077,72 @@ Respond ONLY with the above hash-formatted text.
         pass
     
     def _complete_turn(self):
-        """Complete the current turn and wait for next turn."""
-        try:
-            # Publish turn completion
-            completion_data = {
-                'character_name': self.character_name,
-                'turn_number': self.current_turn_number,
-                'timestamp': time.time()
-            }
-            self.turn_complete_publisher.put(json.dumps(completion_data).encode('utf-8'))
+        """Complete the current turn and prepare for the next one."""
+        logger.info(f'🔄 {self.character_name} completing turn')
+        # Reset turn-specific state
+        self.text_input_pending = False
+        self.interrupt_pending = False
+        
+        # Publish turn completion
+        turn_data = {
+            'character': self.character_name,
+            'timestamp': datetime.now().isoformat(),
+            'type': 'turn_complete'
+        }
+        self.turn_complete_publisher.put(json.dumps(turn_data))
+        
+        # Wait for next turn
+        self.waiting_for_turn = True
+    
+    def _summarize_plan_execution(self):
+        """Summarize the completed plan execution for memory storage."""
+        if self.plan_summary_completed:
+            logger.debug(f'📝 Plan summary already completed for {self.character_name}')
+            return
             
-            logger.warning(f'✅ {self.character_name} completed turn {self.current_turn_number}')
+        if not self.action_history:
+            logger.debug(f'📝 No actions to summarize for {self.character_name}')
+            return
             
-            # Wait for next turn
-            self.waiting_for_turn = True
-            
-        except Exception as e:
-            logger.error(f'Error completing turn: {e}')
+        logger.info(f'📝 Creating plan execution summary for {self.character_name}')
+        
+        # Convert action history to text structure
+        actions_text = []
+        for record in self.action_history:
+            action_type = record.action.get('type', 'unknown')
+            target = record.action.get('target', 'unknown')
+            result = record.result if record.result else 'no result recorded'
+            timestamp = record.timestamp.strftime('%H:%M:%S')
+            actions_text.append(f"{timestamp} - {action_type}: {target} -> {result}")
+        
+        actions_summary = '\n'.join(actions_text)
+        
+        # Prepare context for LLM summary
+        goal_text = self.current_goal.to_string() if self.current_goal else "No specific goal"
+        plan_text = json.dumps(self.current_plan, indent=2) if self.current_plan else "No plan available"
+        
+        # TODO: Complete the LLM prompt and call
+        # This is a stub - the actual LLM integration will be implemented in the next phase
+        summary_prompt = f"""
+        Goal: {goal_text}
+        
+        Plan: {plan_text}
+        
+        Actions Taken:
+        {actions_summary}
+        
+        Please provide a concise paragraph summarizing this plan execution, including the goal, actions taken, and observed results.
+        Do not include any other introductory, explanatory, discursive, or formatting text in your response.
+        End your text with: </end>
+        """
+        response = self.llm_client.generate([summary_prompt], max_tokens=200, stops=['</end>'])
+        self.plan_summary = response.text
+        logger.info(f'📝 Summary prompt prepared for {self.character_name}')
+        logger.debug(f'Summary prompt: {summary_prompt}')
+        
+        # Mark as completed to prevent redundant calls
+        self.action_history = []
+        self.plan_summary_completed = True
     
     def sense_data_callback(self, sample):
         """Handle incoming sense data."""
@@ -1086,9 +1218,6 @@ Respond ONLY with the above hash-formatted text.
         """Handle end dialog query from other characters."""
         try:
             # Extract the other character name from the JSON payload
-            if not self.current_plan:
-                return
-            
             data = json.loads(sample.payload.to_bytes().decode('utf-8'))
             other_name = data.get('other_name', 'unknown')
             if other_name == 'unknown':
@@ -1108,7 +1237,9 @@ Respond ONLY with the above hash-formatted text.
                             dialog_history += f"\t{memory['source']}: {memory['text']}\n"
 
             reason = f'\nDialog end detected with {other_name}, dialog_history:\n{dialog_history}\n'
-            self._replan(self.current_goal, reason)
+            # In manual mode, do not replan due to dialog
+            if not self.manual and self.current_plan:
+                self._replan(self.current_goal, reason)
             return
         except Exception as e:
             logger.error(f'Error in end dialog callback: {e}')
@@ -1130,7 +1261,11 @@ Respond ONLY with the above hash-formatted text.
             if not self.observations:
                 self._observe()
             self.current_goal = plan_module.Goal(parsed_goal, [self.character_name], description='supplied by user', termination='')
-            self._replan(self.current_goal, 'Goal set by user')
+            # In manual mode, do not auto-plan/replan; just publish goal
+            if self.manual:
+                self._publish_goal(self.current_goal)
+            else:
+                self._replan(self.current_goal, 'Goal set by user')
             return
         except Exception as e:
             logger.error(f"Goal parsing failed for {self.character_name}: {e}")
@@ -1143,6 +1278,7 @@ Respond ONLY with the above hash-formatted text.
             parsed_plan = plan_module.parse_plan_text(plan_text)
             self.current_plan = parsed_plan
             self.plan_bindings_cache = {}
+            self.plan_summary_completed = False  # Reset for new plan
             self._publish_current_plan()
             self.plan_state = {
                 'step_stack': plan_module.Stack()
@@ -1167,6 +1303,9 @@ Respond ONLY with the above hash-formatted text.
         if source == 'User' and clean_input.startswith('plan:'):
             self.parse_and_set_plan(clean_input)
             return
+        # In manual mode with manual_response disabled, do not auto-respond
+        if self.manual and self.manual_response:
+            return ''
         text_to_send = ''
         try:
             if mode == 'respond':
@@ -1192,7 +1331,8 @@ Respond ONLY with the above hash-formatted text.
                 if are_we_done:
                     reason = f'Dialog end detected with {source}, dialog_history:\n{dialog_history}'
                     self.publish_dialog_end(source)
-                    self._replan(self.current_goal, reason)
+                    if not self.manual:
+                        self._replan(self.current_goal, reason)
                     action_data = {'type': 'dialog_end','action_id': f'action_{self.action_counter}','timestamp': datetime.now().isoformat(),'input': text_input,'text': 'Done','source': source}
                     self.action_publisher.put(json.dumps(action_data))
                     logger.info(f'📤 Published action: {action_data["action_id"]}')
@@ -1271,7 +1411,8 @@ End your text with: </end>"""
                         'target': source if mode == 'say' else None
         }
 
-        self.last_action_result = text_to_send
+        if self.action_history:
+            self.action_history[-1].result = text_to_send
         # Publish action (this will be picked up by memory_node and action_display_node)
         self.action_publisher.put(json.dumps(action_data))
         logger.info(f'📤 Published action: {action_data["action_id"]}')
@@ -1589,10 +1730,14 @@ End your text with: </end>"""
                     logger.error(f'Error parsing move response: {e}')
                     break
             
-            self.last_action_result = f'moved in direction {move_direction}'
+            # Update the most recent action record with the result
+            if self.action_history:
+                self.action_history[-1].result = f'moved in direction {move_direction}'
             
         except Exception as e:
-            self.last_action_result = f'move failed {e}\n'
+            # Update the most recent action record with the error result
+            if self.action_history:
+                self.action_history[-1].result = f'move failed {e}\n'
             logger.error(f'Error in move operation: {e}')
             # Create and publish action data
         action_data = {
@@ -1605,7 +1750,9 @@ End your text with: </end>"""
     
     def take(self, target: str):
         """Take a resource and add it to inventory."""
-        self.last_action_result = f'taking {target}'
+        # Update the most recent action record with the result
+        if self.action_history:
+            self.action_history[-1].result = f'taking {target}'
 
         def _do_take(target: str):
             # First validate that the target exists and is a resource
@@ -1619,17 +1766,20 @@ End your text with: </end>"""
                 break
             if not resource_exists:
                 logger.warning(f'❌ Cannot take {target} - resource validation failed')
-                self.last_action_result = f'cannot take {target} - resource validation failed'
+                if self.action_history:
+                    self.action_history[-1].result = f'cannot take {target} - resource validation failed'
                 return False
 
             # Validate that the target is near
             if not plan_module.is_near(self, target):
                 logger.warning(f'❌ Cannot take {target} - not near resource')
-                self.last_action_result = f'cannot take {target} - not near resource'
+                if self.action_history:
+                    self.action_history[-1].result = f'cannot take {target} - not near resource'
                 return False
 
             logger.info(f'📦 Taking {target} for {self.character_name}')
-            self.last_action_result = f'taking {target}'
+            if self.action_history:
+                self.action_history[-1].result = f'taking {target}'
                         # Remove the resource from the map
             for reply in self.session.get(f"cognitive/map/resource/remove/{target}", timeout=2.0):
                 if reply.ok:
@@ -1660,7 +1810,8 @@ End your text with: </end>"""
 
         except Exception as e:
             logger.error(f'Error in take operation for {target}: {e}')
-            self.last_action_result = f'take failed'
+            if self.action_history:
+                self.action_history[-1].result = f'take failed'
 
         # Create and publish action data for logging/display
         action_data = {
@@ -1708,7 +1859,8 @@ End your response with:
                 )
                 if response.success:
                     logger.warning(f'🤖 {self.character_name} Inspected {target}:\n\t {response.text}')
-                    self.last_action_result = response.text
+                    if self.action_history:
+                        self.action_history[-1].result = response.text
                     self.inspections[target] = response.text
                     return True
                 else:
@@ -1717,12 +1869,14 @@ End your response with:
                 logger.error('LLM client not available')
 
             logger.info(f'📦 Inspecting {target} for {self.character_name}')
-            self.last_action_result = f'inspected {target}'
+            if self.action_history:
+                self.action_history[-1].result = f'inspected {target}'
             return True
 
         except Exception as e:
             logger.error(f'Error in inspect operation for {target}: {e}')
-            self.last_action_result = f'inspect failed'
+            if self.action_history:
+                self.action_history[-1].result = f'inspect failed'
         self.action_publisher.put(json.dumps(action_data))
 
     def think_about(self, action: dict):
@@ -1778,7 +1932,8 @@ End your response with:
                         'text': response.text.strip(),
                         'source': self.character_name
             }
-        self.last_action_result = thought
+        if self.action_history:
+            self.action_history[-1].result = thought
         # Publish action (this will be picked up by memory_node and action_display_node)
         self.action_publisher.put(json.dumps(action_data))
         logger.info(f'📤 Published action: {action_data["action_id"]}')
@@ -1883,7 +2038,7 @@ End your response with:
         try:
             import urllib.parse
             encoded_text = urllib.parse.quote(input_text)
-            query_url = f"cognitive/{self.character_name}/memory/entity/{entity_name}?query=natural_dialog_end&input_text={encoded_text}"
+            query_url = f"cognitive/{self.character_name}/memory/entity/{entity_name}?query=natural_dialog_end&input_text={encoded_text}&context={self.observations['static']}"
             
             for reply in self.session.get(query_url, timeout=10.0):
                 try:

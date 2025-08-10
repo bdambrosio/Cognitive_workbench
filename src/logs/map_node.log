@@ -1,40 +1,162 @@
-2025-08-09 09:26:01,286 - map_node - INFO - Loading map module from: maps/sageForest.py
-2025-08-09 09:26:01,287 - map_node - INFO - Creating WorldMap instance...
-2025-08-09 09:26:02,013 - map_node - INFO - WorldMap created successfully: 50x50
-2025-08-09 09:26:02,013 - map_node - INFO - 📂 No existing world data for 'sageForest', starting fresh
-2025-08-09 09:26:02,013 - map_node - INFO - Creating Zenoh session...
-2025-08-09 09:26:02,023 - map_node - INFO - Map queryables and subscribers set up successfully
-2025-08-09 09:26:02,024 - map_node - INFO - Turn management system set up successfully
-2025-08-09 09:26:02,024 - map_node - INFO - Manual turn control enabled - starting in STEP mode
-2025-08-09 09:26:02,024 - map_node - INFO - Zenoh session initialized successfully
-2025-08-09 09:26:02,025 - map_node - INFO - 🔄 Started persistence thread for 'sageForest'
-2025-08-09 09:26:02,025 - map_node - INFO - Map node started with map file: sageForest.py
-2025-08-09 09:26:07,960 - map_node - INFO - 🗺️ Map types query: returned 5 terrain, 1 infrastructure, 0 property, 8 resource types
-2025-08-09 09:26:10,144 - map_node - INFO - 🗺️ Map types query: returned 5 terrain, 1 infrastructure, 0 property, 8 resource types
-2025-08-09 09:26:10,146 - map_node - INFO - Agent created for character 'Sage' at (20,20)
-2025-08-09 09:26:10,146 - map_node - INFO - First character added - turn management ready
-2025-08-09 09:26:10,146 - map_node - INFO - Manual control mode - waiting for step command
-2025-08-09 09:26:10,147 - map_node - WARNING - Handling agent look command for cognitive/map/agent/Sage/look
-2025-08-09 09:26:10,180 - map_node - WARNING - Agent look command handled for cognitive/map/agent/Sage/look
-2025-08-09 09:26:10,247 - map_node - WARNING - Handling agent look command for cognitive/map/agent/Sage/look
-2025-08-09 09:26:10,309 - map_node - WARNING - Agent look command handled for cognitive/map/agent/Sage/look
-2025-08-09 09:26:16,238 - map_node - INFO - 🎯 Manual Step Turn command received
-2025-08-09 09:26:16,238 - map_node - INFO - Starting new turn for step command
-2025-08-09 09:26:16,239 - map_node - INFO - Starting new turn with active characters: ['Sage']
-2025-08-09 09:26:16,239 - map_node - INFO - 🚦 Turn 1 started for: Sage
-2025-08-09 09:26:16,753 - map_node - WARNING - Handling agent look command for cognitive/map/agent/Sage/look
-2025-08-09 09:26:16,812 - map_node - WARNING - Agent look command handled for cognitive/map/agent/Sage/look
-2025-08-09 09:26:25,684 - map_node - INFO - ✅ Sage completed turn 1
-2025-08-09 09:26:25,684 - map_node - WARNING - Handling agent look command for cognitive/map/agent/Sage/look
-2025-08-09 09:26:25,684 - map_node - INFO - Turn progress: 1/1 characters completed
-2025-08-09 09:26:25,695 - map_node - INFO - 🎯 All characters completed turn 1
-2025-08-09 09:26:25,700 - map_node - INFO - Step mode - waiting for manual step command
-2025-08-09 09:26:25,711 - map_node - INFO - 📢 Published step_complete message for FastAPI UI
-2025-08-09 09:26:25,750 - map_node - WARNING - Agent look command handled for cognitive/map/agent/Sage/look
-2025-08-09 09:30:09,790 - map_node - INFO - Received signal 15
-2025-08-09 09:30:09,946 - map_node - INFO - Received signal 15
-2025-08-09 09:30:10,050 - map_node - INFO - Shutting down map node...
-2025-08-09 09:30:10,051 - map_node - INFO - ✅ World data saved successfully
-2025-08-09 09:30:10,051 - map_node - INFO - Unregistered agent for character: Sage
-2025-08-09 09:30:12,051 - map_node - INFO - Skipping explicit Zenoh session close to avoid panic; relying on process exit
-2025-08-09 09:30:12,051 - map_node - INFO - Map node shutdown complete
+2025-08-09 20:07:32,610 - map_node - INFO - Loading map module from: maps/forest.py
+2025-08-09 20:07:32,611 - map_node - INFO - Creating WorldMap instance...
+2025-08-09 20:07:33,292 - map_node - INFO - WorldMap created successfully: 50x50
+2025-08-09 20:07:33,293 - map_node - INFO - 📂 No existing world data for 'forest', starting fresh
+2025-08-09 20:07:33,293 - map_node - INFO - Creating Zenoh session...
+2025-08-09 20:07:33,300 - map_node - INFO - Map queryables and subscribers set up successfully
+2025-08-09 20:07:33,302 - map_node - INFO - Turn management system set up successfully
+2025-08-09 20:07:33,302 - map_node - INFO - Manual turn control enabled - starting in STEP mode
+2025-08-09 20:07:33,302 - map_node - INFO - Zenoh session initialized successfully
+2025-08-09 20:07:33,302 - map_node - INFO - 🔄 Started persistence thread for 'forest'
+2025-08-09 20:07:33,302 - map_node - INFO - Map node started with map file: forest.py
+2025-08-09 20:07:39,223 - map_node - INFO - 🗺️ Map types query: returned 5 terrain, 1 infrastructure, 0 property, 8 resource types
+2025-08-09 20:07:40,959 - map_node - INFO - 🗺️ Map types query: returned 5 terrain, 1 infrastructure, 0 property, 8 resource types
+2025-08-09 20:07:40,960 - map_node - INFO - Agent created for character 'Sam' at (20,20)
+2025-08-09 20:07:40,960 - map_node - INFO - First character added - turn management ready
+2025-08-09 20:07:40,960 - map_node - INFO - Manual control mode - waiting for step command
+2025-08-09 20:07:40,961 - map_node - WARNING - Handling agent look command for cognitive/map/agent/Sam/look
+2025-08-09 20:07:41,011 - map_node - WARNING - Agent look command handled for cognitive/map/agent/Sam/look
+2025-08-09 20:07:41,061 - map_node - WARNING - Handling agent look command for cognitive/map/agent/Sam/look
+2025-08-09 20:07:41,096 - map_node - WARNING - Agent look command handled for cognitive/map/agent/Sam/look
+2025-08-09 20:07:42,246 - map_node - INFO - 🗺️ Map types query: returned 5 terrain, 1 infrastructure, 0 property, 8 resource types
+2025-08-09 20:07:44,057 - map_node - INFO - 🗺️ Map types query: returned 5 terrain, 1 infrastructure, 0 property, 8 resource types
+2025-08-09 20:07:44,059 - map_node - INFO - Agent created for character 'Jill' at (20,20)
+2025-08-09 20:07:44,060 - map_node - WARNING - Handling agent look command for cognitive/map/agent/Jill/look
+2025-08-09 20:07:44,107 - map_node - WARNING - Agent look command handled for cognitive/map/agent/Jill/look
+2025-08-09 20:07:44,160 - map_node - WARNING - Handling agent look command for cognitive/map/agent/Jill/look
+2025-08-09 20:07:44,195 - map_node - WARNING - Agent look command handled for cognitive/map/agent/Jill/look
+2025-08-09 20:07:45,300 - map_node - INFO - 🗺️ Map types query: returned 5 terrain, 1 infrastructure, 0 property, 8 resource types
+2025-08-09 20:07:47,195 - map_node - INFO - 🗺️ Map types query: returned 5 terrain, 1 infrastructure, 0 property, 8 resource types
+2025-08-09 20:07:47,196 - map_node - INFO - Agent created for character 'User' at (20,20)
+2025-08-09 20:07:47,198 - map_node - WARNING - Handling agent look command for cognitive/map/agent/User/look
+2025-08-09 20:07:47,231 - map_node - WARNING - Agent look command handled for cognitive/map/agent/User/look
+2025-08-09 20:07:47,298 - map_node - WARNING - Handling agent look command for cognitive/map/agent/User/look
+2025-08-09 20:07:47,360 - map_node - WARNING - Agent look command handled for cognitive/map/agent/User/look
+2025-08-09 20:07:54,673 - map_node - INFO - 🎯 Manual Step Turn command received
+2025-08-09 20:07:54,674 - map_node - INFO - Starting new turn for step command
+2025-08-09 20:07:54,674 - map_node - INFO - Starting new turn with active characters: ['Sam', 'Jill', 'User']
+2025-08-09 20:07:54,675 - map_node - INFO - 🚦 Turn 1 started for: Jill, User, Sam
+2025-08-09 20:07:54,906 - map_node - INFO - ✅ User completed turn 1
+2025-08-09 20:07:54,906 - map_node - INFO - Turn progress: 1/3 characters completed
+2025-08-09 20:07:55,068 - map_node - INFO - ✅ Jill completed turn 1
+2025-08-09 20:07:55,069 - map_node - INFO - Turn progress: 2/3 characters completed
+2025-08-09 20:07:55,270 - map_node - WARNING - Handling agent look command for cognitive/map/agent/Sam/look
+2025-08-09 20:07:55,356 - map_node - WARNING - Agent look command handled for cognitive/map/agent/Sam/look
+2025-08-09 20:08:03,596 - map_node - INFO - Published visual event: Jill detected Sam at distance 1
+2025-08-09 20:08:03,597 - map_node - INFO - Published visual event: User detected Sam at distance 1
+2025-08-09 20:08:03,597 - map_node - INFO - Agent 'Sam' is now visible to: {'Jill', 'User'}
+2025-08-09 20:08:03,598 - map_node - INFO - ✅ Sam completed turn 1
+2025-08-09 20:08:03,598 - map_node - INFO - Turn progress: 3/3 characters completed
+2025-08-09 20:08:03,598 - map_node - INFO - 🎯 All characters completed turn 1
+2025-08-09 20:08:03,598 - map_node - INFO - Step mode - waiting for manual step command
+2025-08-09 20:08:03,599 - map_node - INFO - 📢 Published step_complete message for FastAPI UI
+2025-08-09 20:08:03,599 - map_node - WARNING - Handling agent look command for cognitive/map/agent/Sam/look
+2025-08-09 20:08:03,623 - map_node - WARNING - Agent look command handled for cognitive/map/agent/Sam/look
+2025-08-09 20:08:03,623 - map_node - WARNING - Handling agent look command for cognitive/map/agent/Sam/look
+2025-08-09 20:08:03,647 - map_node - WARNING - Agent look command handled for cognitive/map/agent/Sam/look
+2025-08-09 20:09:03,919 - map_node - INFO - 🎯 Manual Step Turn command received
+2025-08-09 20:09:03,919 - map_node - INFO - Starting new turn for step command
+2025-08-09 20:09:03,919 - map_node - INFO - Starting new turn with active characters: ['Sam', 'Jill', 'User']
+2025-08-09 20:09:03,920 - map_node - INFO - 🚦 Turn 2 started for: Jill, Sam, User
+2025-08-09 20:09:04,120 - map_node - INFO - ✅ User completed turn 2
+2025-08-09 20:09:04,120 - map_node - INFO - Turn progress: 1/3 characters completed
+2025-08-09 20:09:04,284 - map_node - INFO - ✅ Jill completed turn 2
+2025-08-09 20:09:04,284 - map_node - INFO - Turn progress: 2/3 characters completed
+2025-08-09 20:09:06,370 - map_node - INFO - ✅ Sam completed turn 2
+2025-08-09 20:09:06,370 - map_node - INFO - Turn progress: 3/3 characters completed
+2025-08-09 20:09:06,370 - map_node - INFO - 🎯 All characters completed turn 2
+2025-08-09 20:09:06,370 - map_node - INFO - Step mode - waiting for manual step command
+2025-08-09 20:09:06,370 - map_node - INFO - 📢 Published step_complete message for FastAPI UI
+2025-08-09 20:10:52,167 - map_node - INFO - 🎯 Manual Step Turn command received
+2025-08-09 20:10:52,167 - map_node - INFO - Starting new turn for step command
+2025-08-09 20:10:52,167 - map_node - INFO - Starting new turn with active characters: ['Sam', 'Jill', 'User']
+2025-08-09 20:10:52,167 - map_node - INFO - 🚦 Turn 3 started for: Sam, Jill, User
+2025-08-09 20:10:52,866 - map_node - INFO - ✅ Jill completed turn 3
+2025-08-09 20:10:52,866 - map_node - INFO - Turn progress: 1/3 characters completed
+2025-08-09 20:10:52,969 - map_node - INFO - ✅ User completed turn 3
+2025-08-09 20:10:52,970 - map_node - INFO - Turn progress: 2/3 characters completed
+2025-08-09 20:10:53,018 - map_node - INFO - ✅ Sam completed turn 3
+2025-08-09 20:10:53,018 - map_node - INFO - Turn progress: 3/3 characters completed
+2025-08-09 20:10:53,018 - map_node - INFO - 🎯 All characters completed turn 3
+2025-08-09 20:10:53,018 - map_node - INFO - Step mode - waiting for manual step command
+2025-08-09 20:10:53,018 - map_node - INFO - 📢 Published step_complete message for FastAPI UI
+2025-08-09 20:10:53,019 - map_node - WARNING - Handling agent look command for cognitive/map/agent/Sam/look
+2025-08-09 20:10:53,050 - map_node - WARNING - Agent look command handled for cognitive/map/agent/Sam/look
+2025-08-09 20:10:53,051 - map_node - WARNING - Handling agent look command for cognitive/map/agent/Sam/look
+2025-08-09 20:10:53,079 - map_node - WARNING - Agent look command handled for cognitive/map/agent/Sam/look
+2025-08-09 20:11:00,943 - map_node - INFO - 🎯 Manual Step Turn command received
+2025-08-09 20:11:00,943 - map_node - INFO - Starting new turn for step command
+2025-08-09 20:11:00,943 - map_node - INFO - Starting new turn with active characters: ['Sam', 'Jill', 'User']
+2025-08-09 20:11:00,943 - map_node - INFO - 🚦 Turn 4 started for: Jill, Sam, User
+2025-08-09 20:11:01,570 - map_node - INFO - ✅ Jill completed turn 4
+2025-08-09 20:11:01,571 - map_node - INFO - Turn progress: 1/3 characters completed
+2025-08-09 20:11:01,675 - map_node - INFO - ✅ User completed turn 4
+2025-08-09 20:11:01,675 - map_node - INFO - Turn progress: 2/3 characters completed
+2025-08-09 20:11:04,683 - map_node - INFO - ✅ Sam completed turn 4
+2025-08-09 20:11:04,683 - map_node - INFO - Turn progress: 3/3 characters completed
+2025-08-09 20:11:04,683 - map_node - INFO - 🎯 All characters completed turn 4
+2025-08-09 20:11:04,683 - map_node - INFO - Step mode - waiting for manual step command
+2025-08-09 20:11:04,683 - map_node - INFO - 📢 Published step_complete message for FastAPI UI
+2025-08-09 20:14:15,008 - map_node - INFO - 🎯 Manual Step Turn command received
+2025-08-09 20:14:15,009 - map_node - INFO - Starting new turn for step command
+2025-08-09 20:14:15,009 - map_node - INFO - Starting new turn with active characters: ['Sam', 'Jill', 'User']
+2025-08-09 20:14:15,010 - map_node - INFO - 🚦 Turn 5 started for: Jill, Sam, User
+2025-08-09 20:14:15,102 - map_node - INFO - ✅ Jill completed turn 5
+2025-08-09 20:14:15,102 - map_node - INFO - Turn progress: 1/3 characters completed
+2025-08-09 20:14:15,307 - map_node - INFO - ✅ Sam completed turn 5
+2025-08-09 20:14:15,307 - map_node - INFO - Turn progress: 2/3 characters completed
+2025-08-09 20:14:15,308 - map_node - WARNING - Handling agent look command for cognitive/map/agent/Sam/look
+2025-08-09 20:14:15,360 - map_node - WARNING - Agent look command handled for cognitive/map/agent/Sam/look
+2025-08-09 20:14:15,360 - map_node - WARNING - Handling agent look command for cognitive/map/agent/Sam/look
+2025-08-09 20:14:15,404 - map_node - WARNING - Agent look command handled for cognitive/map/agent/Sam/look
+2025-08-09 20:14:15,872 - map_node - INFO - ✅ User completed turn 5
+2025-08-09 20:14:15,872 - map_node - INFO - Turn progress: 3/3 characters completed
+2025-08-09 20:14:15,872 - map_node - INFO - 🎯 All characters completed turn 5
+2025-08-09 20:14:15,872 - map_node - INFO - Step mode - waiting for manual step command
+2025-08-09 20:14:15,872 - map_node - INFO - 📢 Published step_complete message for FastAPI UI
+2025-08-09 20:14:22,657 - map_node - INFO - 🏃 Manual Run Turns command received
+2025-08-09 20:14:22,657 - map_node - INFO - Starting new turn with active characters: ['Sam', 'Jill', 'User']
+2025-08-09 20:14:22,657 - map_node - INFO - 🚦 Turn 6 started for: Sam, Jill, User
+2025-08-09 20:14:22,706 - map_node - INFO - ✅ Jill completed turn 6
+2025-08-09 20:14:22,706 - map_node - INFO - Turn progress: 1/3 characters completed
+2025-08-09 20:14:23,478 - map_node - INFO - ✅ User completed turn 6
+2025-08-09 20:14:23,478 - map_node - INFO - Turn progress: 2/3 characters completed
+2025-08-09 20:14:25,340 - map_node - INFO - ✅ Sam completed turn 6
+2025-08-09 20:14:25,340 - map_node - INFO - Turn progress: 3/3 characters completed
+2025-08-09 20:14:25,340 - map_node - INFO - 🎯 All characters completed turn 6
+2025-08-09 20:14:25,340 - map_node - INFO - Run mode - auto-progressing to next turn
+2025-08-09 20:14:26,341 - map_node - INFO - Starting new turn with active characters: ['Sam', 'Jill', 'User']
+2025-08-09 20:14:26,341 - map_node - INFO - 🚦 Turn 7 started for: Sam, User, Jill
+2025-08-09 20:14:26,683 - map_node - INFO - ✅ User completed turn 7
+2025-08-09 20:14:26,683 - map_node - INFO - Turn progress: 1/3 characters completed
+2025-08-09 20:14:27,350 - map_node - INFO - ✅ Jill completed turn 7
+2025-08-09 20:14:27,350 - map_node - INFO - Turn progress: 2/3 characters completed
+2025-08-09 20:14:34,308 - map_node - INFO - ✅ Sam completed turn 7
+2025-08-09 20:14:34,308 - map_node - INFO - Turn progress: 3/3 characters completed
+2025-08-09 20:14:34,308 - map_node - INFO - 🎯 All characters completed turn 7
+2025-08-09 20:14:34,308 - map_node - INFO - Run mode - auto-progressing to next turn
+2025-08-09 20:14:35,309 - map_node - INFO - Starting new turn with active characters: ['Sam', 'Jill', 'User']
+2025-08-09 20:14:35,309 - map_node - INFO - 🚦 Turn 8 started for: Jill, Sam, User
+2025-08-09 20:14:35,389 - map_node - INFO - ✅ User completed turn 8
+2025-08-09 20:14:35,390 - map_node - INFO - Turn progress: 1/3 characters completed
+2025-08-09 20:14:36,054 - map_node - INFO - ✅ Jill completed turn 8
+2025-08-09 20:14:36,054 - map_node - INFO - Turn progress: 2/3 characters completed
+2025-08-09 20:14:36,413 - map_node - WARNING - Handling agent look command for cognitive/map/agent/Sam/look
+2025-08-09 20:14:36,482 - map_node - WARNING - Agent look command handled for cognitive/map/agent/Sam/look
+2025-08-09 20:14:46,495 - map_node - INFO - ⏹️ Manual Stop Turns command received
+2025-08-09 20:14:46,495 - map_node - INFO - Auto-progression disabled - waiting for manual step
+2025-08-09 20:14:49,586 - map_node - INFO - ✅ Sam completed turn 8
+2025-08-09 20:14:49,586 - map_node - INFO - Turn progress: 3/3 characters completed
+2025-08-09 20:14:49,586 - map_node - INFO - 🎯 All characters completed turn 8
+2025-08-09 20:14:49,586 - map_node - INFO - Step mode - waiting for manual step command
+2025-08-09 20:14:49,586 - map_node - INFO - 📢 Published step_complete message for FastAPI UI
+2025-08-09 20:15:01,274 - map_node - INFO - 💾 Map Node received save command
+2025-08-09 20:15:03,277 - map_node - INFO - Received signal 15
+2025-08-09 20:15:03,355 - map_node - INFO - Shutting down map node...
+2025-08-09 20:15:03,356 - map_node - INFO - ✅ World data saved successfully
+2025-08-09 20:15:03,356 - map_node - INFO - Unregistered agent for character: Sam
+2025-08-09 20:15:03,356 - map_node - INFO - Unregistered agent for character: Jill
+2025-08-09 20:15:03,356 - map_node - INFO - Unregistered agent for character: User
+2025-08-09 20:15:05,021 - map_node - INFO - Received signal 15
+2025-08-09 20:15:05,356 - map_node - INFO - Skipping explicit Zenoh session close to avoid panic; relying on process exit
+2025-08-09 20:15:05,356 - map_node - INFO - Map node shutdown complete

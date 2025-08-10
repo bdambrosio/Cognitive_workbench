@@ -188,8 +188,12 @@ class LLM():
                         if eos_index > -1:
                             response=response[:eos_index]
             if is_json:
+                if type(response) == dict:
+                    return response
                 try:
-                    response = json.loads(response.strip())
+                    if type(response) == str:
+                        response = response.strip()
+                    response = json.loads(response)
                 except Exception as e:
                     response = self.repair_json(response, e)
             if log:

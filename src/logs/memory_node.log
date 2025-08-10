@@ -1,21 +1,141 @@
-2025-08-09 09:26:06 - llm_client - INFO - 🤖 Zenoh LLM Client initialized
-2025-08-09 09:26:06 - memory_node - INFO - 📂 No existing memory file, starting fresh
-2025-08-09 09:26:06 - memory_node - INFO - Memory Node initialized for character: Sage
-2025-08-09 09:26:06 - memory_node - INFO - Storage available at:
-2025-08-09 09:26:06 - memory_node - INFO -   - cognitive/Sage/memory/short_term/*
-2025-08-09 09:26:06 - memory_node - INFO -   - cognitive/Sage/memory/chat/*
-2025-08-09 09:26:06 - memory_node - INFO -   - cognitive/Sage/memory/long_term/*
-2025-08-09 09:26:06 - memory_node - INFO -   - cognitive/Sage/memory/entity/*
-2025-08-09 09:26:06 - memory_node - INFO -   - cognitive/Sage/memory/inventory
-2025-08-09 09:26:06 - memory_node - INFO - Subscriptions:
-2025-08-09 09:26:06 - memory_node - INFO -   - cognitive/Sage/memory/close_dialog
-2025-08-09 09:26:06 - memory_node - INFO - Memory Node running - press Ctrl+C to stop
-2025-08-09 09:26:10 - memory_node - INFO - 📢 Stored character announcement: Sage
-2025-08-09 09:26:16 - memory_node - INFO - 👥 Entity dialog query for Sage: completed
-2025-08-09 09:26:16 - memory_node - INFO - 📦 Inventory query: returned 0 items
-2025-08-09 09:26:25 - memory_node - INFO - 📝 Stored action: move - move_1754756785
-2025-08-09 09:30:09 - memory_node - INFO - Received signal 15, initiating shutdown...
-2025-08-09 09:30:09 - memory_node - INFO - Memory Node shutdown initiated...
-2025-08-09 09:30:09 - memory_node - INFO - 💾 Saved memory to data/memory/Sage_memory.json
-2025-08-09 09:30:09 - memory_node - INFO - Memory Node shutdown complete
-2025-08-09 09:30:09 - memory_node - INFO - Received signal 15, initiating shutdown...
+2025-08-09 20:07:44 - llm_client - INFO - 🤖 Zenoh LLM Client initialized
+2025-08-09 20:07:44 - memory_node - INFO - 📂 No existing memory file, starting fresh
+2025-08-09 20:07:44 - memory_node - INFO - Memory Node initialized for character: User
+2025-08-09 20:07:44 - memory_node - INFO - Storage available at:
+2025-08-09 20:07:44 - memory_node - INFO -   - cognitive/User/memory/short_term/*
+2025-08-09 20:07:44 - memory_node - INFO -   - cognitive/User/memory/chat/*
+2025-08-09 20:07:44 - memory_node - INFO -   - cognitive/User/memory/long_term/*
+2025-08-09 20:07:44 - memory_node - INFO -   - cognitive/User/memory/entity/*
+2025-08-09 20:07:44 - memory_node - INFO -   - cognitive/User/memory/inventory
+2025-08-09 20:07:44 - memory_node - INFO - Subscriptions:
+2025-08-09 20:07:44 - memory_node - INFO -   - cognitive/User/memory/close_dialog
+2025-08-09 20:07:44 - memory_node - INFO - Memory Node running - press Ctrl+C to stop
+2025-08-09 20:07:47 - memory_node - INFO - 📢 Stored character announcemen2025-08-09 20:07:55 - memory_node - INFO - 👥 Entity dialog query for Sam: completed
+2025-08-09 20:07:55 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-08-09 20:08:03 - memory_node - INFO - 📝 Stored action: move - move_1754795283
+2025-08-09 20:08:59 - memory_node - INFO - 👥 Created new entity: User
+2025-08-09 20:08:59 - memory_node - INFO - 💾 Saved memory to data/memory/Sam_memory.json
+2025-08-09 20:08:59 - memory_node - INFO - 💬 Added conversation entry for User: User "plan:2025-08-09 20:09:04 - memory_node - INFO - 👥 En2025-08-09 20:09:05 - memory_node - INFO - 👥 Entity dialog query for Jill: completed
+2025-08-09 20:09:05 - memory_node - INFO - 👥 Entity dialog query for User: completed
+2025-08-09 20:09:05 - memory_no2025-08-09 20:09:06 - memory_node - INFO - 💾 Saved memory to data/memory/Jill_memory.json
+2025-08-09 20:09:06 - memory_node - INFO - 💬 Added conversation entry for Sam: S2025-08-09 20:10:52 - memory_node - INFO - 👥 Entity dialog query for Jill: completed
+2025-08-09 20:10:52 - memory_node - INFO - 👥 Entity dialog query for Sam: completed
+2025-08-09 20:10:52 - memory_node - INFO - 👥 Entity dialog query for User: completed
+2025-08-09 20:10:52 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-08-09 20:11:01 - memory_node - INFO - 👥 Entity dialog query for Jill: completed
+2025-08-09 20:11:01 - memory_node - INFO - 👥 Entity dialog query for Sam: completed
+2025-08-09 20:11:01 - memory_node - INFO - 👥 Entity dialog query for User: completed
+2025-08-09 20:11:01 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-08-09 20:11:04 - memory_node - INFO - 💾 Saved memory to data/memory/User_memory.json
+2025-08-09 20:11:04 - memory_node - INFO - 💬 Added conversation entry for Sam: Sam "Hi, I'm Sam, it's nice to meet you, I've been talk..."
+2025-08-09 20:12:01 - memory_node - INFO - 💾 Saved memory to data/memory/User_memory.json
+2025-08-09 20:12:01 - memory_node - INFO - 💬 Added conversation entry for Sam: Sam "I'm in a forest, it's a really beautiful place, I ..."
+2025-08-09 20:12:52 - memory_node - INFO - 💾 Saved memory to data/memory/User_memory.json
+2025-08-09 20:12:52 - memory_node - INFO - 💬 Added conversation entry for Sam: Sam "I'm curious, what kind of work were you doing in y..."
+2025-08-09 20:14:01 - memory_node - INFO - 👥 Entity dialog query for Sam: completed
+2025-08-09 20:14:14 - memory_node - INFO - 📝 Generated summary for Sam: Entity: Sam | First seen: 2025-08-09 20:08 | Last ...
+2025-08-09 20:14:15 - memory_node - INFO - 👥 Entity dialog query for Jill: completed
+2025-08-09 20:14:15 - memory_node - INFO - 👥 Entity dialog query for Sam: completed
+2025-08-09 20:14:15 - memory_node - INFO - 👥 Entity dialog query for User: completed
+2025-08-09 20:14:15 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-08-09 20:14:23 - memory_node - INFO - 👥 Entity dialog query for Jill: completed
+2025-08-09 20:14:23 - memory_node - INFO - 👥 Entity dialog query for Sam: completed
+2025-08-09 20:14:23 - memory_node - INFO - 👥 Entity dialog query for User: completed
+2025-08-09 20:14:23 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-08-09 20:14:26 - memory_node - INFO - 👥 Entity dialog query for Jill: completed
+2025-08-09 20:14:26 - memory_node - INFO - 👥 Entity dialog query for Sam: completed
+2025-08-09 20:14:26 - memory_node - INFO - 👥 Entity dialog query for User: completed
+2025-08-09 20:14:26 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-08-09 20:14:35 - memory_node - INFO - 👥 Entity dialog query for Jill: completed
+2025-08-09 20:14:35 - memory_node - INFO - 👥 Entity dialog query for Sam: completed
+2025-08-09 20:14:35 - memory_node - INFO - 👥 Entity dialog query for User: completed
+2025-08-09 20:14:35 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-08-09 20:14:49 - memory_node - INFO - 💾 Saved memory to data/memory/User_memory.json
+2025-08-09 20:14:49 - memory_node - INFO - 💬 Added conversation entry for Sam: Sam "I'm glad we met, I was just talking to Jill, but I..."
+2025-08-09 20:15:01 - memory_node - INFO - 💾 User Memory Node received save command
+2025-08-09 20:15:01 - memory_node - INFO - 💾 Saved memory to data/memory/User_memory.json
+2025-08-09 20:15:03 - memory_node - INFO - Received signal 15, initiating shutdown...
+2025-08-09 20:15:03 - memory_node - INFO - Memory Node shutdown initiated...
+2025-08-09 20:15:03 - memory_node - INFO - 📝 Generated summary for Sam: Entity: Sam | First seen: 2025-08-09 20:08 | Last ...
+2025-08-09 20:15:03 - memory_node - INFO - 💾 Saved memory to data/memory/User_memory.json
+2025-08-09 20:15:03 - memory_node - INFO - Memory Node shutdown complete
+2025-08-09 20:15:05 - memory_node - INFO - Received signal 15, initiating shutdown...
+y_node - INFO - 📦 Inventory query: returned 0 items
+2025-08-09 20:11:11 - memory_node - INFO - 📝 Generated summary for Sam: Entity: Sam | First seen: 2025-08-09 20:08 | Last ...
+2025-08-09 20:14:15 - memory_node - INFO - 👥 Entity dialog query for Sam: completed
+2025-08-09 20:14:15 - memory_node - INFO - 👥 Entity dialog query for Jill: completed
+2025-08-09 20:14:15 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-08-09 20:14:22 - memory_node - INFO - 👥 Entity dialog query for Sam: completed
+2025-08-09 20:14:22 - memory_node - INFO - 👥 Entity dialog query for Jill: completed
+2025-08-09 20:14:22 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-08-09 20:14:25 - memory_node - INFO - 💾 Saved memory to data/memory/Jill_memory.json
+2025-08-09 20:14:25 - memory_node - INFO - 💬 Added conversation entry for Sam: Sam "Hi Jill, I think my conversation with User just en..."
+2025-08-09 20:14:25 - memory_node - INFO - 👥 Entity dialog query for Sam: completed
+2025-08-09 20:14:26 - memory_node - INFO - Sam natural_dialog_end: rating: 2, should_end: True
+2025-08-09 20:14:26 - memory_node - INFO - 👥 Entity natural_dialog_end query for Sam: completed
+2025-08-09 20:14:26 - memory_node - INFO - 📝 Stored action: dialog_end - action_4
+2025-08-09 20:14:27 - memory_node - INFO - 👥 Entity dialog query for Sam: completed
+2025-08-09 20:14:27 - memory_node - INFO - 👥 Entity dialog query for Jill: completed
+2025-08-09 20:14:27 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-08-09 20:14:36 - memory_node - INFO - 👥 Entity dialog query for Sam: completed
+2025-08-09 20:14:36 - memory_node - INFO - 👥 Entity dialog query for Jill: completed
+2025-08-09 20:14:36 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-08-09 20:15:01 - memory_node - INFO - 💾 Jill Memory Node received save command
+2025-08-09 20:15:01 - memory_node - INFO - 💾 Saved memory to data/memory/Jill_memory.json
+2025-08-09 20:15:03 - memory_node - INFO - Received signal 15, initiating shutdown...
+2025-08-09 20:15:03 - memory_node - INFO - Memory Node shutdown initiated...
+2025-08-09 20:15:03 - memory_node - INFO - 📝 Generated summary for Sam: Entity: Sam | First seen: 2025-08-09 20:08 | Last ...
+2025-08-09 20:15:03 - memory_node - INFO - 💾 Saved memory to data/memory/Jill_memory.json
+2025-08-09 20:15:03 - memory_node - INFO - Memory Node shutdown complete
+2025-08-09 20:15:05 - memory_node - INFO - Received signal 15, initiating shutdown...
+st seen: 2025-08-09 20:09 | Total...
+2025-08-09 20:12:49 - memory_node - INFO - 💾 Saved memory to data/memory/Sam_memory.json
+2025-08-09 20:12:49 - memory_node - INFO - 💬 Added conversation entry for User: User "I'm not sure. One minute I was working in my lab, ..."
+2025-08-09 20:12:49 - memory_node - INFO - 👥 Entity dialog query for User: completed
+2025-08-09 20:12:50 - memory_node - INFO - User natural_dialog_end: rating: 2, should_end: False
+2025-08-09 20:12:50 - memory_node - INFO - 👥 Entity natural_dialog_end query for User: completed
+2025-08-09 20:12:52 - memory_node - INFO - 💾 Saved memory to data/memory/Sam_memory.json
+2025-08-09 20:12:52 - memory_node - INFO - 💬 Added conversation entry for User: Sam "I'm curious, what kind of work were you doing in y..."
+2025-08-09 20:12:52 - memory_node - INFO - 💬 Added response to entity User: Sam -> "I'm curious, what kind of work were you doing in y..."
+2025-08-09 20:13:55 - memory_node - INFO - 💾 Saved memory to data/memory/Sam_memory.json
+2025-08-09 20:13:55 - memory_node - INFO - 💬 Added conversation entry for User: User "I'm a chemist. I work trying to identify the activ..."
+2025-08-09 20:13:56 - memory_node - INFO - 👥 Entity dialog query for User: completed
+2025-08-09 20:13:56 - memory_node - INFO - User natural_dialog_end: rating: 2, should_end: True
+2025-08-09 20:13:56 - memory_node - INFO - 👥 Entity natural_dialog_end query for User: completed
+2025-08-09 20:14:02 - memory_node - INFO - 📝 Stored action: dialog_end - action_9
+2025-08-09 20:14:15 - memory_node - INFO - 👥 Entity dialog query for Jill: completed
+2025-08-09 20:14:15 - memory_node - INFO - 👥 Entity dialog query for User: completed
+2025-08-09 20:14:15 - memory_node - INFO - 👥 Entity dialog query for Sam: completed
+2025-08-09 20:14:15 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-08-09 20:14:15 - memory_node - INFO - 📝 Stored action: move - move_1754795655
+2025-08-09 20:14:22 - memory_node - INFO - 👥 Entity dialog query for Jill: completed
+2025-08-09 20:14:22 - memory_node - INFO - 👥 Entity dialog query for User: completed
+2025-08-09 20:14:22 - memory_node - INFO - 👥 Entity dialog query for Sam: completed
+2025-08-09 20:14:22 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-08-09 20:14:22 - memory_node - INFO - 👥 Entity dialog query for Jill: completed
+2025-08-09 20:14:25 - memory_node - INFO - 💾 Saved memory to data/memory/Sam_memory.json
+2025-08-09 20:14:25 - memory_node - INFO - 💬 Added conversation entry for Sam: Sam "Hi Jill, I think my conversation with User just en..."
+2025-08-09 20:14:25 - memory_node - INFO - 💬 Added response to entity Sam: Sam -> "Hi Jill, I think my conversation with User just en..."
+2025-08-09 20:14:26 - memory_node - INFO - 👥 Entity dialog query for Jill: completed
+2025-08-09 20:14:27 - memory_node - INFO - 👥 Entity dialog query for Jill: completed
+2025-08-09 20:14:27 - memory_node - INFO - 👥 Entity dialog query for User: completed
+2025-08-09 20:14:27 - memory_node - INFO - 👥 Entity dialog query for Sam: completed
+2025-08-09 20:14:27 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-08-09 20:14:36 - memory_node - INFO - 👥 Entity dialog query for Jill: completed
+2025-08-09 20:14:36 - memory_node - INFO - 👥 Entity dialog query for User: completed
+2025-08-09 20:14:36 - memory_node - INFO - 👥 Entity dialog query for Sam: completed
+2025-08-09 20:14:36 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-08-09 20:14:42 - memory_node - INFO - 👥 Entity dialog query for User: completed
+2025-08-09 20:14:46 - memory_node - INFO - 👥 Entity dialog query for User: completed
+2025-08-09 20:14:49 - memory_node - INFO - 💾 Saved memory to data/memory/Sam_memory.json
+2025-08-09 20:14:49 - memory_node - INFO - 💬 Added conversation entry for Sam: Sam "I'm glad we met, I was just talking to Jill, but I..."
+2025-08-09 20:14:49 - memory_node - INFO - 💬 Added response to entity Sam: Sam -> "I'm glad we met, I was just talking to Jill, but I..."
+2025-08-09 20:15:01 - memory_node - INFO - 💾 Sam Memory Node received save command
+2025-08-09 20:15:01 - memory_node - INFO - 💾 Saved memory to data/memory/Sam_memory.json
+2025-08-09 20:15:03 - memory_node - INFO - Received signal 15, initiating shutdown...
+2025-08-09 20:15:03 - memory_node - INFO - Memory Node shutdown initiated...
+2025-08-09 20:15:03 - memory_node - INFO - 📝 Generated summary for User: Entity: User | First seen: 2025-08-09 20:08 | Tota...
+2025-08-09 20:15:03 - memory_node - INFO - 📝 Generated summary for Sam: Entity: Sam | First seen: 2025-08-09 20:09 | Total...
+2025-08-09 20:15:03 - memory_node - INFO - 💾 Saved memory to data/memory/Sam_memory.json
+2025-08-09 20:15:03 - memory_node - INFO - Memory Node shutdown complete
+2025-08-09 20:15:05 - memory_node - INFO - Received signal 15, initiating shutdown...

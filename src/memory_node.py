@@ -412,8 +412,20 @@ class ZenohMemoryNode:
                     if not input_text:
                         raise ValueError("Missing required 'input_text' parameter for natural_dialog_end query")
                     
+                    context = None
+                    if 'context=' in selector:
+                        try:
+                            # URL decode the input text
+                            import urllib.parse
+                            context = urllib.parse.unquote(selector.split('context=')[1].split('&')[0])
+                        except:
+                            pass
+                    
+                    if not context:
+                        raise ValueError("Missing required 'context' parameter for natural_dialog_end query")
+                    
                     # Call natural_dialog_end method
-                    should_end = entity.natural_dialog_end(input_text)
+                    should_end = entity.natural_dialog_end(input_text, context)
                     response = {
                         'success': True,
                         'should_end': should_end

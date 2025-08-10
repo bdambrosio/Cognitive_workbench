@@ -297,7 +297,7 @@ End your response with:
         
         return entity 
     
-    def natural_dialog_end(self, input_text):
+    def natural_dialog_end(self, input_text, context):
         """
         Analyze whether a dialog should naturally end after the given input.
         
@@ -325,7 +325,12 @@ End your response with:
             self.logger.warning(f'No LLM client available for natural_dialog_end, defaulting to continue')
             return False
         
-        system_prompt = """Given the following dialog transcript, rate the naturalness of ending at this point.
+        system_prompt = """Given the following context and dialog transcript, rate the naturalness of ending at this point.
+Include in your consideration of whether you are likely to end the dialog your personality and drives. 
+
+#Context
+You are {{$context}}
+##
 
 #Transcript
 {{$transcript}}
@@ -333,7 +338,7 @@ End your response with:
                               
 For example, if the last entry in the transcript is a question that expects an answer (as opposed to merely musing), ending at this point is likely not expected.
 On the other hand, if the last entry is an agreement to an earlier suggestion, this is a natural end.
-Dialogs are short, and should be resolved quickly.
+Dialogs may be short or tend to be longer depending on the characters involved.
 Respond only with a rating between 0 and 10, where
 0 expects continuation of the dialog (i.e., termination at this point would be unnatural)
 10 expects termination at this point (i.e., continuation is highly unexpected, unnatural, or repetitious).   
@@ -343,7 +348,7 @@ Do not include any text in your response, ONLY the numeric rating.
 My rating is:
 """  
         try:
-            response = self.llm_client.generate([system_prompt], bindings={'transcript': transcript_text}, stops=['</end>'], max_tokens=20)
+            response = self.llm_client.generate([system_prompt], bindings={'transcript': transcript_text, 'context': context}, stops=['</end>'], max_tokens=20)
             if response.success:
             # Extract rating from response
                 response=response.text

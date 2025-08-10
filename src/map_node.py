@@ -993,8 +993,24 @@ class MapNode:
                     # Check if agent already exists (case-insensitive)
                     canonical_character_name = character_name.capitalize()
                     if canonical_character_name not in self.agent_registry:
-                        # Create agent at default spawn point (20,20)
-                        agent = Agent(20, 20, self.world_map, canonical_character_name)
+                        # Determine spawn location: default (20,20) or scenario-provided resource instance
+                        spawn_x, spawn_y = 20, 20
+                        character_config = data.get('character_config', {})
+                        if isinstance(character_config, dict):
+                            resource_location_name = character_config.get('location')
+                            if resource_location_name:
+                                resource = self.world_map.get_resource_by_name(resource_location_name)
+                                if resource and isinstance(resource, dict) and 'location' in resource:
+                                    try:
+                                        rx, ry = resource['location']
+                                        spawn_x, spawn_y = int(rx), int(ry)
+                                    except Exception:
+                                        logger.error(f"Invalid resource location for '{resource_location_name}' - defaulting to (20,20)")
+                                else:
+                                    logger.error(f"Resource instance '{resource_location_name}' not found for '{canonical_character_name}' - defaulting to (20,20)")
+
+                        # Create agent at resolved spawn point
+                        agent = Agent(spawn_x, spawn_y, self.world_map, canonical_character_name)
                         
                         # Register agent with world map
                         self.world_map.register_agent(agent)
@@ -1005,7 +1021,7 @@ class MapNode:
                         # Initialize visibility tracking for this agent
                         self.agent_visibility[canonical_character_name] = set()
                         
-                        logger.info(f"Agent created for character '{canonical_character_name}' at (20,20)")
+                        logger.info(f"Agent created for character '{canonical_character_name}' at ({agent.x},{agent.y})")
                         
                         # Start first turn if this is the first character and auto-progression is enabled
                         if len(self.agent_registry) == 1:

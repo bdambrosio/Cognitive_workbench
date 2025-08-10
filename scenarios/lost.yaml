@@ -31,3 +31,13 @@ characters:
       - "safety from threats including accident, illness, or physical threats from unknown or adversarial actors or adverse events."
       - "companionship, community, family, acceptance, trust, intimacy."
       - "immediate physiological needs: survival, shelter, water, food, rest."
+
+  Caver:
+    manual: true
+    manual_response: false
+    location: Cave1
+    character: |
+      Caver, a 60-year-old male dresses in tatters and is covered in dirt.
+      I know the secrets of the forest but I'm not sure I can trust you.
+    drives:
+      - "hunger, thirst, and shelter"

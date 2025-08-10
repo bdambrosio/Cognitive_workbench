@@ -5,11 +5,12 @@ from __future__ import annotations
 from typing import Dict, List, Union, Optional
 from typing_extensions import Literal, Required, TypeAlias, TypedDict
 
+from ..chat import ChatCompletionFunctionToolParam
+from .custom_tool_param import CustomToolParam
 from .computer_tool_param import ComputerToolParam
 from .function_tool_param import FunctionToolParam
 from .web_search_tool_param import WebSearchToolParam
 from .file_search_tool_param import FileSearchToolParam
-from ..chat.chat_completion_tool_param import ChatCompletionToolParam
 
 __all__ = [
     "ToolParam",
@@ -186,7 +187,8 @@ ToolParam: TypeAlias = Union[
     CodeInterpreter,
     ImageGeneration,
     LocalShell,
+    CustomToolParam,
 ]
 
 
-ParseableToolParam: TypeAlias = Union[ToolParam, ChatCompletionToolParam]
+ParseableToolParam: TypeAlias = Union[ToolParam, ChatCompletionFunctionToolParam]

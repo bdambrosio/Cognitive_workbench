@@ -1,7 +1,31 @@
-2025-08-09 09:26:08 - sense_node - INFO - 👁️ Sense Node initialized for character: Sage
-2025-08-09 09:26:08 - sense_node - INFO - Console Text Sensor ready - will auto-disable if external input detected
-2025-08-09 09:26:08 - sense_node - INFO - Sense Node running - press Ctrl+C to stop
-2025-08-09 09:30:09 - sense_node - INFO - Received signal 15, initiating shutdown...
-2025-08-09 09:30:09 - sense_node - INFO - Sense Node shutdown initiated...
-2025-08-09 09:30:09 - sense_node - INFO - Sense Node shutdown complete
-2025-08-09 09:30:09 - sense_node - INFO - Received signal 15, initiating shutdown...
+2025-08-09 20:07:46 - sense_node - INFO - 👁️ Sense Node initialized for character: User
+2025-08-09 20:07:46 - sense_node - INFO - Console Text Sensor ready - will auto-disable if external input detected
+2025-08-09 20:07:46 - sense_node - INFO - Sense Node running - press Ctrl+C to stop2025-08-09 20:08:59 - sense_node - INFO - 🔄 External input detected - console input disabled to prevent conflicts
+2025-08-09 20:08:59 - sense_node - INFO - 📨 Received external text input 2025-08-09 20:11:04 - sense_node - INFO - 🔄 External input detected - console input disabled to prevent conflicts
+2025-08-09 20:11:04 - sense_node - INFO - 📨 Received external text input from Sam: "Hi, I'm Sam, it's nice to meet you, I've been talking with Jill over here, but I think our conversation just ended, would you like to talk for a bit?"
+2025-08-09 20:11:04 - sense_node - INFO - 📤 Published sense data: 0
+2025-08-09 20:12:01 - sense_node - INFO - 📨 Received external text input from Sam: "I'm in a forest, it's a really beautiful place, I come here to gather herbs for my work as an herbalist, I love the peace and quiet, it helps me clear my mind and think about my life, what about you, how did you end up here?"
+2025-08-09 20:12:01 - sense_node - INFO - 📤 Published sense data: 1
+2025-08-09 20:12:52 - sense_node - INFO - 📨 Received external text input from Sam: "I'm curious, what kind of work were you doing in your lab, was it something that you enjoy doing?"
+2025-08-09 20:12:52 - sense_node - INFO - 📤 Published sense data: 2
+2025-08-09 20:14:49 - sense_node - INFO - 📨 Received external text input from Sam: "I'm glad we met, I was just talking to Jill, but I think our conversation just ended, would you like to talk for a bit about your work as a chemist?"
+2025-08-09 20:14:49 - sense_node - INFO - 📤 Published sense data: 3
+2025-08-09 20:15:03 - sense_node - INFO - Received signal 15, initiating shutdown...
+2025-08-09 20:15:03 - sense_node - INFO - Sense Node shutdown initiated...
+2025-08-09 20:15:03 - sense_node - INFO - Sense Node shutdown complete
+8 - sense_node - INFO - 📨 Received external text input from Jill: "I've been learning that I'm more introspective than I thought, and that I really value quiet and solitude,2025-08-09 20:14:25 - sense_node - INFO - 📨 Received external text input from Sam: "Hi Jill, I think my conversation with User just ended, would you like to talk for a bit?"
+2025-08-09 20:14:25 - sense_node - INFO - 📤 Published sense data: 4
+2025-08-09 20:15:03 - sense_node - INFO - Received signal 15, initiating shutdown...
+2025-08-09 20:15:03 - sense_node - INFO - Sense Node shutdown initiated...
+2025-08-09 20:15:03 - sense_node - INFO - Sense Node shutdown complete
+ you that you can talk to and share your experiences with?"
+2025-08-09 20:09:48 - sense_node - INFO - 📤 Published sense data: 4
+2025-08-09 20:11:56 - sense_node - INFO - 📨 Received external text input from User: "Hi Sam. You are really beautiful. Uh, I mean, I'm surprised to see someone here. Where am I?"
+2025-08-09 20:11:57 - sense_node - INFO - 📤 Published sense data: 5
+2025-08-09 20:12:49 - sense_node - INFO - 📨 Received external text input from User: "I'm not sure. One minute I was working in my lab, then I was here with you and that other women over there..."
+2025-08-09 20:12:49 - sense_node - INFO - 📤 Published sense data: 6
+2025-08-09 20:13:55 - sense_node - INFO - 📨 Received external text input from User: "I'm a chemist. I work trying to identify the active compounds in herbs so we can remove the harmful elements"
+2025-08-09 20:13:55 - sense_node - INFO - 📤 Published sense data: 7
+2025-08-09 20:15:03 - sense_node - INFO - Received signal 15, initiating shutdown...
+2025-08-09 20:15:03 - sense_node - INFO - Sense Node shutdown initiated...
+2025-08-09 20:15:03 - sense_node - INFO - Sense Node shutdown complete
