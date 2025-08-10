@@ -461,8 +461,8 @@ class ZenohMemoryNode:
                     pass
             
             if not target_item:
-                # Return list of all items in inventory
-                item_names = self.inventory.keys()
+                # Return list of all items in inventory (as a JSON-serializable list)
+                item_names = list(self.inventory.keys())
                 response = {
                     'success': True,
                     'value': item_names
