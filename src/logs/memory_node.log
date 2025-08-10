@@ -27,6 +27,8 @@
 2025-08-10 14:34:33 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
 2025-08-10 14:34:34 - memory_node - INFO - Joe natural_dialog_end: rating: 6, should_end: True
 2025-08-10 14:34:34 - memory_node - INFO - 👥 Entity natural_dialog_end query for Joe: completed
-ind Hut1, I've been moving nor..."
-2025-08-10 14:34:33 - memory_node - INFO - 💬 Added response to entity Samantha: Joe -> "I'm just trying to find Hut1, I've been moving nor..."
-2025-08-10 14:34:34 - memory_node - INFO - 👥 Entity dialog query for Samantha: completed
+2025-08-10 14:35:50 - memory_node - INFO - 📝 Generated summary for Joe: Entity: Joe | First seen: 2025-08-10 14:34 | Total...
+2025-08-10 14:36:45 - memory_node - INFO - 📝 Stored action: dialog_end - action_1
+ - INFO - 👥 Entity dialog query for Samantha: completed
+2025-08-10 14:35:23 - memory_node - INFO - 📝 Generated summary for Joe: Entity: Joe | First seen: 2025-08-10 14:34 | Total...
+2025-08-10 14:35:53 - memory_node - INFO - 📝 Generated summary for Samantha: Entity: Samantha | First seen: 2025-08-10 14:34 | ...

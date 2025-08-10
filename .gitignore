@@ -30,3 +30,6 @@ Thumbs.db
 
 # Cognitive framework data (private memories, etc.)
 data/
+src/logs/llm_client.log
+src/logs/memory_node.log
+src/logs/situation_node.log
