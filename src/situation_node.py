@@ -279,7 +279,8 @@ class ZenohSituationNode:
                                         self.situation['adjacent_to']['characters'].append(character['name'])
                                     if character['name'] not in self.situation['characters']:
                                         self.situation['characters'].append(character['name'])
-                        
+                        self.situation['adjacent_to']['characters'] = list(set(self.situation['adjacent_to']['characters']))
+                        self.situation['adjacent_to']['resources'] = list(set(self.situation['adjacent_to']['resources']))
                         logger.info(f'🗺️ Updated map look data for {self.character_name}')
                         logger.debug(f'   Adjacent resources: {self.situation["adjacent_to"]["resources"]}')
                         logger.debug(f'   Adjacent characters: {self.situation["adjacent_to"]["characters"]}')

@@ -459,37 +459,41 @@ class ZenohExecutiveNode:
         """Format the situation data for the LLM."""
         formatted_situation = ''
         if self.last_situation_data and self.last_situation_data.get('location'):
-            formatted_situation += f"You are at location: {self.last_situation_data['location']}\n"
+            formatted_situation += f"\n#You are at location: {self.last_situation_data['location']}\n"
         if self.last_situation_data and self.last_situation_data.get('visible_characters'):
-            formatted_situation += f"You can see {len(self.last_situation_data)} people: {', and '.join(self.last_situation_data['characters'])}\n"
+            formatted_situation += f"\n#You can see {len(self.last_situation_data)} people: {', and '.join(self.last_situation_data['characters'])}\n"
         if self.last_situation_data and self.last_situation_data.get('look'):
-            formatted_situation += f"You can see the following:\n\t{'\n\t'.join(self.last_situation_data['look'])}\n"
+            formatted_situation += f"\n#You can see the following:\n\t{'\n\t'.join(self.last_situation_data['look'])}\n"
         
         # Add adjacent information
         if self.last_situation_data and self.last_situation_data.get('adjacent_to'):
             adjacent = self.last_situation_data['adjacent_to']
             if adjacent.get('resources'):
-                formatted_situation += f"You are adjacent to these resources (available to take, inspect, or use): {', '.join(adjacent['resources'])}\n"
+                formatted_situation += f"\n#You are adjacent to these resources (available to take, inspect, or use): {', '.join(adjacent['resources'])}\n"
             if adjacent.get('characters'):
-                formatted_situation += f"You are adjacent to these characters (available to interact with): {', '.join(adjacent['characters'])}\n"
+                formatted_situation += f"\n#You are adjacent to these characters (available to interact with): {', '.join(adjacent['characters'])}\n"
 
         if self.last_situation_data and self.last_situation_data.get('characters'):
             for character_name in self.last_situation_data['characters']:
                 entity_context = self.get_entity_context(character_name, 10)
                 if entity_context:
-                    formatted_situation += f"\nYou can see {character_name}, with whom you have had the following conversation history:\n"
+                    formatted_situation += f"\n#You can see {character_name}, with whom you have had the following conversation history:\n"
                     for memory in entity_context['conversation_history']: 
                         formatted_situation += f"\n\t{memory['source']}: {memory['text']}"
                     formatted_situation += '\n'
 
         if self.last_situation_data and self.last_situation_data.get('views'):
-            formatted_situation += f"\nYou can see the following:\n"+json.dumps(self.last_situation_data['views'], indent=2)
+            formatted_situation += f"\n#You can see the following:\n"+json.dumps(self.last_situation_data['views'], indent=2)
 
         if self.inspections:
-            formatted_situation += f"\nYou have inspected the following:\n"
+            formatted_situation += f"\n#You have inspected the following:\n"
             for target, inspection in self.inspections.items():
-                formatted_situation += f"\n\t{target}: {inspection}"
+                if target:
+                    formatted_situation += f"\n\t{target}: {inspection}"
             formatted_situation += '\n'
+
+        if self.plan_summary:
+            formatted_situation += f"\n#The summary of your most recent plan before the current one was:\n{self.plan_summary}\n"
 
         return formatted_situation
 
@@ -1990,7 +1994,7 @@ End your response with:
         except Exception as e:
             logger.error(f'Error storing in memory: {e}')
     
-    def get_entity_context(self, entity_name: str, limit: int = 20) -> Dict[str, Any]:
+    def get_entity_context(self, entity_name: str, limit: int = 20, scope='all') -> Dict[str, Any]:
         """
         Query entity data from memory node for context.
         
@@ -2003,7 +2007,7 @@ End your response with:
         """
         try:
             # Query entity data from memory node with query and limit parameters
-            for reply in self.session.get(f"cognitive/{self.character_name}/memory/entity/{entity_name}?query=dialog&limit={limit}", timeout=3.0):
+            for reply in self.session.get(f"cognitive/{self.character_name}/memory/entity/{entity_name}?query=dialog&limit={limit}&scope={scope}", timeout=3.0):
                 try:
                     if reply.ok:
                         data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
