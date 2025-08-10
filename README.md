@@ -73,10 +73,10 @@ Condition testing for an if or while does not count as a step.
 Shutdown button or ^C on console shuts everything down (15-20 secs, be patient).
 
 ## 📁 Project Structure
-
+Rather out of date, work in progress
 ```
-ros_cognitive_framework/
-├── zenoh_cognitive_framework/     # Main framework code
+Cognitive_workbench/
+├── src/     # Main framework code
 │   ├── sense_node.py              # Sensory input processing
 │   ├── memory_node.py             # Memory storage and retrieval
 │   ├── llm_service_node.py        # LLM API service
@@ -94,26 +94,27 @@ ros_cognitive_framework/
 
 ## 🎯 Features
 
-- **Multi-core performance**: Each node runs as a separate Python process
-- **Simple communication**: Zenoh pub/sub instead of ROS2 topics/services
+- **Multi-core performance**: Each node runs as multiple Python processes each supporting a zenoh node
+- **Simple communication**: Zenoh pub/sub and queryables (simple? hmm)
 - **Built-in storage**: Zenoh's storage capabilities (when configured)
 - **Easy deployment**: Just Python processes, no complex configuration
 - **Fault tolerance**: Automatic reconnection and recovery
-- **Standard Python**: No ROS2 dependencies or build system
+- **Standard Python**: except for HTMX/js ui
 
 ## 🔧 Architecture
 
 The framework consists of these nodes, each running as a separate process:
 
-1. **Memory Node** - Provides persistent storage using Zenoh's built-in storage
-2. **LLM Service Node** - Provides LLM API access via Zenoh pub/sub
-3. **Sense Node** - Simulates sensory input and publishes perception data
-4. **Single LLM Action Example** - Demonstrates complete cognitive loop
-5. **Action Display Node** - Displays incoming actions and provides text input
+1. **Fastapi_action_display Node** - Shared - horrible name for UI
+2. **Map Node** - Shared - simple 2D world
+3. **LLM Service Node** - Shared - Provides LLM API access via Zenoh pub/sub - uses futures, but actually not needed since vllm / openai / openrouter can all handle simultaneous requests. refactoring needed
+4. **Executive Node** - per character, overall orchestration for a character.
+5. **Memory Node** - per character, provides memory services and persistent storage using json format files
+6. **Situation node** - per character, manages current external environment interface.
+7. **Sense Node** - per character - handles sensory input and publishes perception data - mostly a stub right now.
 
 ## 📚 Documentation
 
-For detailed documentation, see [zenoh_cognitive_framework/README.md](zenoh_cognitive_framework/README.md).
 
 ## 🔄 Migration from ROS2
 
