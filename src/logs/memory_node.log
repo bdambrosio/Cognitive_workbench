@@ -1,13 +1,32 @@
-2025-08-10 10:11:42 - llm_client - INFO - 🤖 Zenoh LLM Client initialized
-2025-08-10 10:11:42 - memory_node - INFO - 📂 No existing memory file, starting fresh
-2025-08-10 10:11:42 - memory_node - INFO - Memory Node initialized for character: User
-2025-08-10 10:11:42 - memory_node - INFO - Storage available at:
-2025-08-10 10:11:42 - memory_node - INFO -   - cognitive/User/memory/short_term/*
-2025-08-10 10:11:42 - memory_node - INFO -   - cognitive/User/memory/chat/*
-2025-08-10 10:11:42 - memory_node - INFO -   - cognitive/User/memory/long_term/*
-2025-08-10 10:11:42 - memory_node - INFO -   - cognitive/User/memory/entity/*
-2025-08-10 10:11:42 - memory_node - INFO -   - cognitive/User/memory/inventory
-2025-08-10 10:11:42 - memory_node - INFO - Subscriptions:
-2025-08-10 10:11:42 - memory_node - INFO -   - cognitive/User/memory/close_dialog
-2025-08-10 10:11:42 - memory_node - INFO - Memory Node running - press Ctrl+C to stop
-2025-08-10 10:11:44 - memory_node - INFO - 📢 Stored character announcement: User
+2025-08-10 14:33:58 - llm_client - INFO - 🤖 Zenoh LLM Client initialized
+2025-08-10 14:33:58 - memory_node - INFO - 📂 No existing memory file, starting fresh
+2025-08-10 14:33:58 - memory_node - INFO - Memory Node initialized for character: User
+2025-08-10 14:33:58 - memory_node - INFO - Storage available at:
+2025-08-10 14:33:58 - memory_node - INFO -   - cognitive/User/memory/short_term/*
+2025-08-10 14:33:58 - memory_node - INFO -   - cognitive/User/memory/chat/*
+2025-08-10 14:33:58 - memory_node - INFO -   - cognitive/User/memory/long_term/*
+2025-08-10 14:33:58 - memory_node - INFO -   - cognitive/User/memory/entity/*
+2025-08-10 14:33:58 - memory_node - INFO -   - cognitive/User/memory/inventory
+2025-08-10 14:33:58 - memory_node - INFO - Subscriptions:
+2025-08-10 14:33:58 - memory_node - INFO -   - cognitive/User/memory/close_dialog
+2025-08-10 14:33:58 - memory_node - INFO - Memory Node running - press Ctrl+C to stop
+2025-08-10 14:34:01 - memory_node - INFO - 📢 Stored character announcemen2025-08-2025-08-10 14:342025-08-10 14:34:10 - memory_node - INFO - 👥 Entity dialog query for Hermit: completed
+2025-08-10 14:34:10 - memory_node - INFO - 📦 Inventory query: returned 0 items
+ returned 0 items
+2025-08-10 14:34:22 - memory_node - INFO - 📝 Stored action: move - move_1754861662
+2025-08-10 14:34:23 - memory_node - INFO - 👥 Created new entity: Joe
+2025-08-10 14:34:23 - memory_node - INFO - 💾 Saved memory to data/memory/Samantha_memory.json
+2025-08-10 14:34:23 - memory_node - INFO - 💬 Added conversation entry for Joe: Joe "Hi, I'm Joe. What's going on here, and where's Hut..."
+2025-08-10 14:34:24 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-10 14:34:24 - memory_node - INFO - Joe natural_dialog_end: rating: 2, should_end: False
+2025-08-10 14:34:24 - memory_node - INFO - 👥 Entity natural_dialog_end query for Joe: completed
+2025-08-10 14:34:28 - memory_node - INFO - 💾 Saved memory to data/memory/Samantha_memory.json
+2025-08-10 14:34:28 - memory_node - INFO - 💬 Added conversation e2025-08-10 14:34:28 - memory_node - INFO - 💾 Saved memory to data/memory/Joe_memory.json
+2025-08-10 14:34:28 - memory_node - INFO - 💬 Added conversation entry for Samantha: Samantha "I'm Samantha, nice to meet you, Joe.2025-08-10 14:34:33 - memory_node - INFO - 💾 Saved memory to data/memory/Samantha_memory.json
+2025-08-10 14:34:33 - memory_node - INFO - 💬 Added conversation entry for Joe: Joe "I'm just trying to find Hut1, I've been moving nor..."
+2025-08-10 14:34:33 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-10 14:34:34 - memory_node - INFO - Joe natural_dialog_end: rating: 6, should_end: True
+2025-08-10 14:34:34 - memory_node - INFO - 👥 Entity natural_dialog_end query for Joe: completed
+ind Hut1, I've been moving nor..."
+2025-08-10 14:34:33 - memory_node - INFO - 💬 Added response to entity Samantha: Joe -> "I'm just trying to find Hut1, I've been moving nor..."
+2025-08-10 14:34:34 - memory_node - INFO - 👥 Entity dialog query for Samantha: completed

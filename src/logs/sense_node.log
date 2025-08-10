@@ -1,3 +1,7 @@
-2025-08-10 10:11:43 - sense_node - INFO - 👁️ Sense Node initialized for character: User
-2025-08-10 10:11:43 - sense_node - INFO - Console Text Sensor ready - will auto-disable if external input detected
-2025-08-10 10:11:43 - sense_node - INFO - Sense Node running - press Ctrl+C to stop
+2025-08-10 14:34:00 - sense_node - INFO - 👁️ Sense Node initialized for character: User
+2025-08-10 14:34:00 - sense_node - INFO - Console Text Sensor ready - will auto-disable if external input detected
+2025-08-10 14:34:00 - sense_node - INFO - Sense Node running - press Ctrl+C to stop2025-2025-08-10 14:34:23 - sense_node - INFO - 🔄 External input detected - console input disabled to prevent conflicts
+2025-08-10 14:34:23 - sense_node - INFO - 📨 Received external text input2025-08-10 14:34:28 - sense_node - INFO - 🔄 External input detected - console input disabled to prevent conflicts
+2025-08-10 14:34:28 2025-08-10 14:34:33 - sense_node - INFO - 📨 Received external text input from Joe: "I'm just trying to find Hut1, I've been moving north too, I saw that thicket and thought maybe it's a good idea to check it out together, you know, safety in numbers, right?"
+2025-08-10 14:34:33 - sense_node - INFO - 📤 Published sense data: 1
+8 - sense_node - INFO - 📤 Published sense data: 0

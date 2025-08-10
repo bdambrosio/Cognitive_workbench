@@ -1350,11 +1350,22 @@ class FastAPIActionDisplayNode:
                 }
             } else {
                 // Display action details if available
-                if (actionData.action || actionData.target || actionData.value) {
+                if (actionData.action || actionData.target || actionData.value || actionData.requested_target || actionData.error || actionData.status) {
                     let actionDetails = [];
                     if (actionData.action) actionDetails.push(`Action: ${actionData.action}`);
-                    if (actionData.target) actionDetails.push(`Target: ${actionData.target}`);
+                    // Prefer resolved target if present, else show requested target, else target
+                    const targetLabel = actionData.resolved_target || actionData.target || actionData.requested_target;
+                    if (targetLabel) actionDetails.push(`Target: ${targetLabel}`);
+                    if (actionData.requested_target && (!actionData.resolved_target && !actionData.target)) {
+                        actionDetails.push(`Requested: ${actionData.requested_target}`);
+                    }
                     if (actionData.value) actionDetails.push(`Value: ${actionData.value}`);
+                    // Append status/error inline without adding vertical height
+                    if ((actionData.status && actionData.status.toLowerCase() === 'failed') || actionData.error) {
+                        const status = actionData.status ? actionData.status.toUpperCase() : 'FAILED';
+                        const errorMsg = actionData.error ? ` - ${actionData.error}` : '';
+                        actionDetails.push(`${status}${errorMsg}`);
+                    }
                     html += `<br><span class="action-details">${actionDetails.join(' | ')}</span>`;
                 }
                 
@@ -1818,6 +1829,10 @@ class FastAPIActionDisplayNode:
             'timestamp': action_data.get('timestamp', ''),
             'action': action_data.get('action', '') if not is_text_only else '',
             'target': action_data.get('target', ''),
+            'requested_target': action_data.get('requested_target', ''),
+            'resolved_target': action_data.get('resolved_target', ''),
+            'status': action_data.get('status', ''),
+            'error': action_data.get('error', ''),
             'source': action_data.get('source', ''),
             'value': action_data.get('value', '') if not is_text_only else '',
             'metadata': action_data.get('metadata', {}),

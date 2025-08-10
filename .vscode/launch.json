@@ -76,6 +76,21 @@
             "stopOnEntry": false,
             "preLaunchTask": "setup-zenoh-environment"
         },
+        {
+            "name": "Debug Launcher (laTerre)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/launcher.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/src",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src"
+            },
+            "args": ["laTerre.yaml", "--ui"],
+            "justMyCode": false,
+            "stopOnEntry": false,
+            "preLaunchTask": "setup-zenoh-environment"
+        },
 
        {
             "name": "Clear Character Data",

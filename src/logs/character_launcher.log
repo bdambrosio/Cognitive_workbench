@@ -1,34 +1,34 @@
-2025-08-10 10:11:25 - character_launcher - INFO - ✅ Launcher subscribed to cognitive/launcher/shutdown
-2025-08-10 10:11:25 - character_launcher - INFO - Added character: Samantha
-2025-08-10 10:11:25 - character_launcher - INFO - Added character: Joe
-2025-08-10 10:11:25 - character_launcher - INFO - Added character: Hermit
-2025-08-10 10:11:25 - character_launcher - INFO - Added character: User
-2025-08-10 10:11:27 - character_launcher - INFO - Launching 4 characters...
-2025-08-10 10:11:27 - character_launcher - INFO - Launching shared services...
-2025-08-10 10:11:27 - character_launcher - INFO - ✅ LLM Service Node launched with server: vllm, model: qwen/qwen3-235b-a22b-2507
-2025-08-10 10:11:27 - character_launcher - INFO - ✅ FastAPI Action Display Node launched on port 3000
-2025-08-10 10:11:27 - character_launcher - INFO -    - Web UI available at: http://localhost:3000
-2025-08-10 10:11:27 - character_launcher - INFO - ✅ Map Node launched with map: forest.py
-2025-08-10 10:11:27 - character_launcher - INFO - ⏳ Waiting for Map Node to initialize...
-2025-08-10 10:11:34 - character_launcher - INFO - Launching character: Samantha
-2025-08-10 10:11:34 - character_launcher - INFO - ✅ Samantha memory_node launched
-2025-08-10 10:11:35 - character_launcher - INFO - ✅ Samantha situation_node launched
-2025-08-10 10:11:35 - character_launcher - INFO - ✅ Samantha sense_node launched
-2025-08-10 10:11:36 - character_launcher - INFO - ✅ Samantha executive_node launched
-2025-08-10 10:11:37 - character_launcher - INFO - Launching character: Joe
-2025-08-10 10:11:37 - character_launcher - INFO - ✅ Joe memory_node launched
-2025-08-10 10:11:37 - character_launcher - INFO - ✅ Joe situation_node launched
-2025-08-10 10:11:38 - character_launcher - INFO - ✅ Joe sense_node launched
-2025-08-10 10:11:38 - character_launcher - INFO - ✅ Joe executive_node launched
-2025-08-10 10:11:39 - character_launcher - INFO - Launching character: Hermit
-2025-08-10 10:11:39 - character_launcher - INFO - ✅ Hermit memory_node launched
-2025-08-10 10:11:40 - character_launcher - INFO - ✅ Hermit situation_node launched
-2025-08-10 10:11:40 - character_launcher - INFO - ✅ Hermit sense_node launched
-2025-08-10 10:11:41 - character_launcher - INFO - ✅ Hermit executive_node launched
-2025-08-10 10:11:42 - character_launcher - INFO - Launching character: User
-2025-08-10 10:11:42 - character_launcher - INFO - ✅ User memory_node launched
-2025-08-10 10:11:42 - character_launcher - INFO - ✅ User situation_node launched
-2025-08-10 10:11:43 - character_launcher - INFO - ✅ User sense_node launched
-2025-08-10 10:11:43 - character_launcher - INFO - ✅ User executive_node launched
-2025-08-10 10:11:44 - character_launcher - INFO - ✅ All characters launched
-2025-08-10 10:11:44 - character_launcher - INFO - Monitoring processes...
+2025-08-10 14:33:41 - character_launcher - INFO - ✅ Launcher subscribed to cognitive/launcher/shutdown
+2025-08-10 14:33:41 - character_launcher - INFO - Added character: Samantha
+2025-08-10 14:33:41 - character_launcher - INFO - Added character: Joe
+2025-08-10 14:33:41 - character_launcher - INFO - Added character: Hermit
+2025-08-10 14:33:41 - character_launcher - INFO - Added character: User
+2025-08-10 14:33:42 - character_launcher - INFO - Launching 4 characters...
+2025-08-10 14:33:42 - character_launcher - INFO - Launching shared services...
+2025-08-10 14:33:42 - character_launcher - INFO - ✅ LLM Service Node launched with server: vllm, model: qwen/qwen3-235b-a22b-2507
+2025-08-10 14:33:42 - character_launcher - INFO - ✅ FastAPI Action Display Node launched on port 3000
+2025-08-10 14:33:42 - character_launcher - INFO -    - Web UI available at: http://localhost:3000
+2025-08-10 14:33:42 - character_launcher - INFO - ✅ Map Node launched with map: forest.py
+2025-08-10 14:33:42 - character_launcher - INFO - ⏳ Waiting for Map Node to initialize...
+2025-08-10 14:33:49 - character_launcher - INFO - Launching character: Samantha
+2025-08-10 14:33:49 - character_launcher - INFO - ✅ Samantha memory_node launched
+2025-08-10 14:33:50 - character_launcher - INFO - ✅ Samantha situation_node launched
+2025-08-10 14:33:50 - character_launcher - INFO - ✅ Samantha sense_node launched
+2025-08-10 14:33:51 - character_launcher - INFO - ✅ Samantha executive_node launched
+2025-08-10 14:33:52 - character_launcher - INFO - Launching character: Joe
+2025-08-10 14:33:52 - character_launcher - INFO - ✅ Joe memory_node launched
+2025-08-10 14:33:52 - character_launcher - INFO - ✅ Joe situation_node launched
+2025-08-10 14:33:53 - character_launcher - INFO - ✅ Joe sense_node launched
+2025-08-10 14:33:53 - character_launcher - INFO - ✅ Joe executive_node launched
+2025-08-10 14:33:54 - character_launcher - INFO - Launching character: Hermit
+2025-08-10 14:33:54 - character_launcher - INFO - ✅ Hermit memory_node launched
+2025-08-10 14:33:55 - character_launcher - INFO - ✅ Hermit situation_node launched
+2025-08-10 14:33:55 - character_launcher - INFO - ✅ Hermit sense_node launched
+2025-08-10 14:33:56 - character_launcher - INFO - ✅ Hermit executive_node launched
+2025-08-10 14:33:57 - character_launcher - INFO - Launching character: User
+2025-08-10 14:33:57 - character_launcher - INFO - ✅ User memory_node launched
+2025-08-10 14:33:57 - character_launcher - INFO - ✅ User situation_node launched
+2025-08-10 14:33:58 - character_launcher - INFO - ✅ User sense_node launched
+2025-08-10 14:33:58 - character_launcher - INFO - ✅ User executive_node launched
+2025-08-10 14:33:59 - character_launcher - INFO - ✅ All characters launched
+2025-08-10 14:33:59 - character_launcher - INFO - Monitoring processes...

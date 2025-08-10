@@ -547,15 +547,17 @@ class ZenohExecutiveNode:
                 for i, memory in enumerate(entity_context['conversation_history']):  # Use last 2 memories
                     user_prompt += f"\n\t{memory['source']}: {memory['text']}"
                 user_prompt += '\n'
-
-
-            # get inventory 
+            # get inventory
             inventory = []
             for reply in self.session.get(f"cognitive/{self.character_name}/memory/inventory", timeout=2.0):
                 if reply.ok:
                     data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
                     if data.get('success'):
-                        inventory.append(data.get('value', []))
+                        value = data.get('value', [])
+                        if isinstance(value, list):
+                            inventory.extend(value)
+                        elif value:
+                            inventory.append(value)
             if inventory:
                 user_prompt += f'\n#Your inventory includes:'
                 for item in inventory:
@@ -1007,6 +1009,8 @@ end your response with </end>
             thought = self.think_about(action)
             return
             
+        # Capture the originally requested target for UI/reporting
+        requested_target = action.get('target', '')
         resolved_target = self._resolve_target(action)
         if not resolved_target:
             logger.error(f'❌ Cannot resolve target for action: {action}')
@@ -1036,31 +1040,69 @@ end your response with </end>
             self.generate_speech(action['value'], resolved_target if resolved_target else action['target'], mode='say')            # Publish action (this will be picked up by action_display_node)
 
         elif action['type'].lower() == "take":
+            # If resolution failed, publish a failure action with requested_target
+            if not resolved_target:
+                action_data = {
+                    'type': 'take',
+                    'action_id': self.action_counter,
+                    'timestamp': datetime.now().isoformat(),
+                    'target': '',
+                    'requested_target': requested_target,
+                    'resolved_target': '',
+                    'status': 'failed',
+                    'error': 'target not nearby/visible'
+                }
+                self.action_publisher.put(json.dumps(action_data))
+                logger.warning('📤 Published action: take (failed)')
+                self.action_counter += 1
+                return
             self.take(resolved_target)
             self.action_counter += 1
         elif action['type'].lower() == "inspect":
-            # Publish initial inspect action
-            action_data = {'type': 'inspect','action_id': self.action_counter,'timestamp': datetime.now().isoformat(),'target': resolved_target}
-            self.action_publisher.put(json.dumps(action_data))
-            # Perform inspect which may populate last_action_result
-            self.inspect(resolved_target)
-            # Publish result if available so UI can display it
-            try:
-                result_text = action_record.result if isinstance(action_record.result, str) else ''
-                if result_text and result_text.strip():
-                    result_action = {
-                        'type': 'inspect',
-                        'action_id': f"inspect_{int(time.time())}",
-                        'timestamp': datetime.now().isoformat(),
-                        'target': resolved_target,
-                        'llm_response': result_text
-                    }
-                    self.action_publisher.put(json.dumps(result_action))
-            except Exception:
-                pass
+            # Publish inspect action including requested vs resolved target
+            action_data = {
+                'type': 'inspect',
+                'action_id': self.action_counter,
+                'timestamp': datetime.now().isoformat(),
+                'target': resolved_target if resolved_target else '',
+                'requested_target': requested_target,
+                'resolved_target': resolved_target if resolved_target else ''
+            }
+            if not resolved_target:
+                action_data['status'] = 'failed'
+                action_data['error'] = 'target not nearby/visible'
+                self.action_publisher.put(json.dumps(action_data))
+            else:
+                self.action_publisher.put(json.dumps(action_data))
+                # Perform inspect which may populate last_action_result
+                self.inspect(resolved_target)
+                # Publish result if available so UI can display it
+                try:
+                    result_text = action_record.result if isinstance(action_record.result, str) else ''
+                    if result_text and result_text.strip():
+                        result_action = {
+                            'type': 'inspect',
+                            'action_id': f"inspect_{int(time.time())}",
+                            'timestamp': datetime.now().isoformat(),
+                            'target': resolved_target,
+                            'llm_response': result_text
+                        }
+                        self.action_publisher.put(json.dumps(result_action))
+                except Exception:
+                    pass
         elif action['type'].lower() == "use":
-            # Create action - noop for now
-            action_data = {'type': 'use','action_id': self.action_counter,'timestamp': datetime.now().isoformat(),'target': resolved_target}
+            # Create action - include requested vs resolved
+            action_data = {
+                'type': 'use',
+                'action_id': self.action_counter,
+                'timestamp': datetime.now().isoformat(),
+                'target': resolved_target if resolved_target else '',
+                'requested_target': requested_target,
+                'resolved_target': resolved_target if resolved_target else ''
+            }
+            if not resolved_target:
+                action_data['status'] = 'failed'
+                action_data['error'] = 'target not nearby/visible'
             action_record.result = 'not yet implemented'
             self.action_publisher.put(json.dumps(action_data))
             #self.use(action)

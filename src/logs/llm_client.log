@@ -1,17 +1,53 @@
-2025-08-10 10:11:44 - llm_client - INFO - 🤖 Zenoh LLM Client initialized
-2025-08-10 10:11:44 - executive_node - INFO - 🧠 Zenoh Executive Node initialized for character: User
-2025-08-10 10:11:44 - executive_node - INFO -    - Subscribing to: cognitive/User/sense_data
-2025-08-10 10:11:44 - executive_node - INFO -    - Subscribing to: cognitive/User/situation/update
-2025-08-10 10:11:44 - executive_node - INFO -    - Subscribing to: cognitive/map/turn/go
-2025-08-10 10:11:44 - executive_node - INFO -    - Subscribing to: cognitive/User/end_dialog
-2025-08-10 10:11:44 - executive_node - INFO -    - Publishing to: cognitive/User/action
-2025-08-10 10:11:44 - executive_node - INFO -    - Publishing to: cognitive/User/situation/request_update
-2025-08-10 10:11:44 - executive_node - INFO -    - Publishing to: cognitive/User/memory/store
-2025-08-10 10:11:44 - executive_node - INFO -    - Publishing to: cognitive/User/text_input
-2025-08-10 10:11:44 - executive_node - INFO -    - Publishing to: cognitive/User/goal
-2025-08-10 10:11:44 - executive_node - INFO -    - Publishing to: cognitive/User/decided_action
-2025-08-10 10:11:44 - executive_node - INFO -    - Publishing to: cognitive/map/turn/complete/User
-2025-08-10 10:11:44 - executive_node - WARNING - Executive Node running - press Ctrl+C to stop
-2025-08-10 10:11:44 - executive_node - INFO - 📢 Announced character presence: User
-2025-08-10 10:11:44 - executive_node - WARNING - 📊 User Received situation update
-2025-08-10 10:11:44 - executive_node - WARNING - 📊 User Received situation update
+2025-08-10 14:34:01 - llm_client - INFO - 🤖 Zenoh LLM Client initialized
+2025-08-10 14:34:01 - executive_node - INFO - 🧠 Zenoh Executive Node initialized for character: User
+2025-08-10 14:34:01 - executive_node - INFO -    - Subscribing to: cognitive/User/sense_data
+2025-08-10 14:34:01 - executive_node - INFO -    - Subscribing to: cognitive/User/situation/update
+2025-08-10 14:34:01 - executive_node - INFO -    - Subscribing to: cognitive/map/turn/go
+2025-08-10 14:34:01 - executive_node - INFO -    - Subscribing to: cognitive/User/end_dialog
+2025-08-10 14:34:01 - executive_node - INFO -    - Publishing to: cognitive/User/action
+2025-08-10 14:34:01 - executive_node - INFO -    - Publishing to: cognitive/User/situation/request_update
+2025-08-10 14:34:01 - executive_node - INFO -    - Publishing to: cognitive/User/memory/store
+2025-08-10 14:34:01 - executive_node - INFO -    - Publishing to: cognitive/User/text_input
+2025-08-10 14:34:01 - executive_node - INFO -    - Publishing to: cognitive/User/goal
+2025-08-10 14:34:01 - executive_node - INFO -    - Publishing to: cognitive/User/decided_action
+2025-08-10 14:34:01 - executive_node - INFO -    - Publishing to: cognitive/map/turn/complete/User
+2025-08-10 14:34:01 - executive_node - WARNING - Executive Node running - press Ctrl+C to stop
+2025-08-10 14:34:01 - executive_node - INFO - 📢 Announced character presence: User
+2025-08-10 14:34:01 - executive_node - WARNING - 📊 User Received situation update
+2025-08-10 14:34:05 - executive_node - WARNING - 📊 User Received sit2025-08-10 14:34:09 - executive_node - WAR2025-08-10 14:34:09 - execut2025-08-10 14:34:09 - executive_node - WARNING - 🚦 Turn 0 received by Samantha
+202025-08-10 14:34:10 - executive_node - WARNING -2025-08-10 14:34:10 - executive_20252025-08-10 14:34:16 - executive_node - WARNING - 🤖 Joe New Goal: #goal Find Hut1
+#description Search for shelter and safety
+#otherCharacterName None
+#termination Arrived at Hut1 location
+## 
+#goal Meet Samantha
+#description Introduce self to nearby person
+#otherCharacterName Samantha
+#termination Spoken to Samantha
+## 
+#goal Gather food
+#description Find and collect edible resources
+#otherCharacterName None
+#termination Collected food resources
+##
+2025-08-10 14:34:16 - executive_node - WARNING - Joe generated goal: Goal Find Hut1: Search for shelter and safety; actors: Joe; termination: Arrived at Hut1 location
+2025-08-10 14:34:16 - executive_node - INFO - 🎯 Published goal for Joe: Goal Find Hut1: Search for shelter and safety; actors: Joe; termination: Arrived at Hut1 location
+2025-08-10 14:34:21 - executive_node - INFO - 📋 Published current plan for Joe
+2025-08-10 12025-08-10 14:34:22 - executive_node - INFO - 📋 Published current plan for Samantha
+2025-08-10 14:34:22 - executive_node - INFO - 📋 Published decided action for Samantha: move: North - 
+2025-08-10 14:34:22 - executive_node - WAR2025-08-10 14:34:23 - executive_node - WARNING - 📤 Joe Sent text input to Samantha: "Hi, I'm Joe. What's going on here, and where's Hut1?" (source: Joe)
+2025-08-10 14:34:23 - executive_node - WARNING - Responding to: "Hi, I'm Joe. What's going on here?" f2025-08-10 14:34:23 - executive_node - WARNING - 📥 Samantha Received text input: "Hi, I'm Joe. What's going on here, and where's Hut1?" (source: Joe)
+2025-08-10 14:34:23 - executive_node - WARNING - 📊 Samantha Received situation update
+2025-08-10 14:34:24 - executive_node - INFO - Resp2025-08-10 14:34:28 - executive_node - WARNING - 📥 Joe Received text input: "I'm Samantha, nice to meet you, Joe. I'm just exploring the forest, trying to get a sense of the lay of the land. I haven't seen Hut1, but I've been moving north, and I was just about to check out that thicket up ahead. What brings you here?" (source: Samantha)
+2025-08-10 14:34:28 - executive_node - WARNING - 📊 Joe Received situation update
+2025-08-10 14:34:29 - executive_node - INFO - Responding to: "I'm Samantha, nice to meet you, Joe. I'm just exploring the forest, trying to get a sense of the lay of the land. I haven't seen Hut1, but I've been moving north, and I was just about to check out that thicket up ahead. What brings you here?" from Samantha
+2025-08-10 14:34:29 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-10 14:34:30 - executive_node - INFO - 🤔 Natural dialog end check for Samantha: False
+2025-08-10 14:34:30 - executive_node - WARNING - 🤖 Joe Dialog end check: False
+2025-08-10 14:34:33 - executive_node - WARNING - 📤 Joe Sent text input to Samantha: "I'm just trying to find Hut1, I've been moving north too, I saw that thicket and thought maybe it's a good idea to check it o2025-08-10 14:34:33 - executive_node - WARNING - 📥 Samantha Received text input: "I'm just trying to find Hut1, I've been moving north too, I saw that thicket and thought maybe it's a good idea to check it out together, you know, safety in numbers, right?" (source: Joe)
+2025-08-10 14:34:33 - executive_node - WARNING - 📊 Samantha Received situation update
+2025-08-10 14:34:33 - executive_node - INFO - Responding to: "I'm just trying to find Hut1, I've been moving north too, I saw that thicket and thought maybe it's a good idea to check it out together, you know, safety in numbers, right?" from Joe
+2025-08-10 14:34:33 - executiv2025-08-10 14:34:34 - executive_node - WARNING - 💬 Joe received end dialog from Samantha
+2025-08-10 14:34:34 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-10 14:34:34 - executive_node - WARNING - 🤖 Joe Replanning.
+ executive_node - WARNING - 🤖 Samantha Replanning.

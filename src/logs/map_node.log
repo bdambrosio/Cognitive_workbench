@@ -1,41 +1,67 @@
-2025-08-10 10:11:28,345 - map_node - INFO - Loading map module from: /home/bruce/Downloads/Cognitive_workbench/src/maps/forest.py
-2025-08-10 10:11:28,345 - map_node - INFO - Creating WorldMap instance...
-2025-08-10 10:11:29,080 - map_node - INFO - WorldMap created successfully: 50x50
-2025-08-10 10:11:29,080 - map_node - INFO - 📂 No existing world data for 'forest', starting fresh
-2025-08-10 10:11:29,080 - map_node - INFO - Creating Zenoh session...
-2025-08-10 10:11:29,085 - map_node - INFO - Map queryables and subscribers set up successfully
-2025-08-10 10:11:29,085 - map_node - INFO - Turn management system set up successfully
-2025-08-10 10:11:29,085 - map_node - INFO - Manual turn control enabled - starting in STEP mode
-2025-08-10 10:11:29,086 - map_node - INFO - Zenoh session initialized successfully
-2025-08-10 10:11:29,086 - map_node - INFO - 🔄 Started persistence thread for 'forest'
-2025-08-10 10:11:29,086 - map_node - INFO - Map node started with map file: forest.py
-2025-08-10 10:11:35,518 - map_node - INFO - 🗺️ Map types query: returned 5 terrain, 1 infrastructure, 0 property, 8 resource types
-2025-08-10 10:11:36,638 - map_node - INFO - 🗺️ Map types query: returned 5 terrain, 1 infrastructure, 0 property, 8 resource types
-2025-08-10 10:11:36,638 - map_node - INFO - Agent created for character 'Samantha' at (20,20)
-2025-08-10 10:11:36,638 - map_node - INFO - First character added - turn management ready
-2025-08-10 10:11:36,638 - map_node - INFO - Manual control mode - waiting for step command
-2025-08-10 10:11:36,639 - map_node - WARNING - Handling agent look command for cognitive/map/agent/Samantha/look
-2025-08-10 10:11:36,685 - map_node - WARNING - Agent look command handled for cognitive/map/agent/Samantha/look
-2025-08-10 10:11:36,739 - map_node - WARNING - Handling agent look command for cognitive/map/agent/Samantha/look
-2025-08-10 10:11:36,786 - map_node - WARNING - Agent look command handled for cognitive/map/agent/Samantha/look
-2025-08-10 10:11:38,029 - map_node - INFO - 🗺️ Map types query: returned 5 terrain, 1 infrastructure, 0 property, 8 resource types
-2025-08-10 10:11:39,153 - map_node - INFO - 🗺️ Map types query: returned 5 terrain, 1 infrastructure, 0 property, 8 resource types
-2025-08-10 10:11:39,153 - map_node - INFO - Agent created for character 'Joe' at (20,20)
-2025-08-10 10:11:39,154 - map_node - WARNING - Handling agent look command for cognitive/map/agent/Joe/look
-2025-08-10 10:11:39,196 - map_node - WARNING - Agent look command handled for cognitive/map/agent/Joe/look
-2025-08-10 10:11:39,254 - map_node - WARNING - Handling agent look command for cognitive/map/agent/Joe/look
-2025-08-10 10:11:39,280 - map_node - WARNING - Agent look command handled for cognitive/map/agent/Joe/look
-2025-08-10 10:11:40,525 - map_node - INFO - 🗺️ Map types query: returned 5 terrain, 1 infrastructure, 0 property, 8 resource types
-2025-08-10 10:11:41,652 - map_node - INFO - 🗺️ Map types query: returned 5 terrain, 1 infrastructure, 0 property, 8 resource types
-2025-08-10 10:11:41,653 - map_node - INFO - Agent created for character 'Hermit' at (21,37)
-2025-08-10 10:11:41,654 - map_node - WARNING - Handling agent look command for cognitive/map/agent/Hermit/look
-2025-08-10 10:11:41,673 - map_node - WARNING - Agent look command handled for cognitive/map/agent/Hermit/look
-2025-08-10 10:11:41,754 - map_node - WARNING - Handling agent look command for cognitive/map/agent/Hermit/look
-2025-08-10 10:11:41,777 - map_node - WARNING - Agent look command handled for cognitive/map/agent/Hermit/look
-2025-08-10 10:11:43,033 - map_node - INFO - 🗺️ Map types query: returned 5 terrain, 1 infrastructure, 0 property, 8 resource types
-2025-08-10 10:11:44,144 - map_node - INFO - 🗺️ Map types query: returned 5 terrain, 1 infrastructure, 0 property, 8 resource types
-2025-08-10 10:11:44,145 - map_node - INFO - Agent created for character 'User' at (20,20)
-2025-08-10 10:11:44,145 - map_node - WARNING - Handling agent look command for cognitive/map/agent/User/look
-2025-08-10 10:11:44,188 - map_node - WARNING - Agent look command handled for cognitive/map/agent/User/look
-2025-08-10 10:11:44,246 - map_node - WARNING - Handling agent look command for cognitive/map/agent/User/look
-2025-08-10 10:11:44,274 - map_node - WARNING - Agent look command handled for cognitive/map/agent/User/look
+2025-08-10 14:33:45,341 - map_node - INFO - Loading map module from: maps/forest.py
+2025-08-10 14:33:45,343 - map_node - INFO - Creating WorldMap instance...
+2025-08-10 14:33:46,071 - map_node - INFO - WorldMap created successfully: 50x50
+2025-08-10 14:33:46,071 - map_node - INFO - 📂 No existing world data for 'forest', starting fresh
+2025-08-10 14:33:46,072 - map_node - INFO - Creating Zenoh session...
+2025-08-10 14:33:46,079 - map_node - INFO - Map queryables and subscribers set up successfully
+2025-08-10 14:33:46,081 - map_node - INFO - Turn management system set up successfully
+2025-08-10 14:33:46,081 - map_node - INFO - Manual turn control enabled - starting in STEP mode
+2025-08-10 14:33:46,081 - map_node - INFO - Zenoh session initialized successfully
+2025-08-10 14:33:46,081 - map_node - INFO - 🔄 Started persistence thread for 'forest'
+2025-08-10 14:33:46,081 - map_node - INFO - Map node started with map file: forest.py
+2025-08-10 14:33:50,977 - map_node - INFO - 🗺️ Map types query: returned 5 terrain, 1 infrastructure, 0 property, 8 resource types
+2025-08-10 14:33:52,635 - map_node - INFO - 🗺️ Map types query: returned 5 terrain, 1 infrastructure, 0 property, 8 resource types
+2025-08-10 14:33:52,637 - map_node - INFO - Agent created for character 'Samantha' at (20,20)
+2025-08-10 14:33:52,637 - map_node - INFO - First character added - turn management ready
+2025-08-10 14:33:52,637 - map_node - INFO - Manual control mode - waiting for step command
+2025-08-10 14:33:52,638 - map_node - WARNING - Handling agent look command for cognitive/map/agent/Samantha/look
+2025-08-10 14:33:52,662 - map_node - WARNING - Agent look command handled for cognitive/map/agent/Samantha/look
+2025-08-10 14:33:52,738 - map_node - WARNING - Handling agent look command for cognitive/map/agent/Samantha/look
+2025-08-10 14:33:52,777 - map_node - WARNING - Agent look command handled for cognitive/map/agent/Samantha/look
+2025-08-10 14:33:53,919 - map_node - INFO - 🗺️ Map types query: returned 5 terrain, 1 infrastructure, 0 property, 8 resource types
+2025-08-10 14:33:55,572 - map_node - INFO - 🗺️ Map types query: returned 5 terrain, 1 infrastructure, 0 property, 8 resource types
+2025-08-10 14:33:55,573 - map_node - INFO - Agent created for character 'Joe' at (20,20)
+2025-08-10 14:33:55,574 - map_node - WARNING - Handling agent look command for cognitive/map/agent/Joe/look
+2025-08-10 14:33:55,613 - map_node - WARNING - Agent look command handled for cognitive/map/agent/Joe/look
+2025-08-10 14:33:55,675 - map_node - WARNING - Handling agent look command for cognitive/map/agent/Joe/look
+2025-08-10 14:33:55,717 - map_node - WARNING - Agent look command handled for cognitive/map/agent/Joe/look
+2025-08-10 14:33:56,672 - map_node - INFO - 🗺️ Map types query: returned 5 terrain, 1 infrastructure, 0 property, 8 resource types
+2025-08-10 14:33:58,274 - map_node - INFO - 🗺️ Map types query: returned 5 terrain, 1 infrastructure, 0 property, 8 resource types
+2025-08-10 14:33:58,276 - map_node - INFO - Agent created for character 'Hermit' at (25,41)
+2025-08-10 14:33:58,277 - map_node - WARNING - Handling agent look command for cognitive/map/agent/Hermit/look
+2025-08-10 14:33:58,294 - map_node - WARNING - Agent look command handled for cognitive/map/agent/Hermit/look
+2025-08-10 14:33:58,377 - map_node - WARNING - Handling agent look command for cognitive/map/agent/Hermit/look
+2025-08-10 14:33:58,422 - map_node - WARNING - Agent look command handled for cognitive/map/agent/Hermit/look
+2025-08-10 14:33:59,447 - map_node - INFO - 🗺️ Map types query: returned 5 terrain, 1 infrastructure, 0 property, 8 resource types
+2025-08-10 14:34:01,154 - map_node - INFO - 🗺️ Map types query: returned 5 terrain, 1 infrastructure, 0 property, 8 resource types
+2025-08-10 14:34:01,155 - map_node - INFO - Agent created for character 'User' at (20,20)
+2025-08-10 14:34:01,156 - map_node - WARNING - Handling agent look command for cognitive/map/agent/User/look
+2025-08-10 14:34:01,182 - map_node - WARNING - Agent look command handled for cognitive/map/agent/User/look
+2025-08-10 14:34:01,256 - map_node - WARNING - Handling agent look command for cognitive/map/agent/User/look
+2025-08-10 14:34:01,332 - map_node - WARNING - Agent look command handled for cognitive/map/agent/User/look
+2025-08-10 14:34:09,294 - map_node - INFO - 🎯 Manual Step Turn command received
+2025-08-10 14:34:09,294 - map_node - INFO - Starting new turn for step command
+2025-08-10 14:34:09,295 - map_node - INFO - Starting new turn with active characters: ['Samantha', 'Joe', 'Hermit', 'User']
+2025-08-10 14:34:09,295 - map_node - INFO - 🚦 Turn 1 started for: Joe, Hermit, User, Samantha
+2025-08-10 14:34:09,883 - map_node - WARNING - Handling agent look command for cognitive/map/agent/Joe/look
+2025-08-10 14:34:09,956 - map_node - WARNING - Agent look command handled for cognitive/map/agent/Joe/look
+2025-08-10 14:34:09,964 - map_node - INFO - ✅ User completed turn 1
+2025-08-10 14:34:09,964 - map_node - INFO - Turn progress: 1/4 characters completed
+2025-08-10 14:34:10,246 - map_node - WARNING - Handling agent look command for cognitive/map/agent/Samantha/look
+2025-08-10 14:34:10,317 - map_node - WARNING - Agent look command handled for cognitive/map/agent/Samantha/look
+2025-08-10 14:34:10,383 - map_node - INFO - ✅ Hermit completed turn 1
+2025-08-10 14:34:10,384 - map_node - INFO - Turn progress: 2/4 characters completed
+2025-08-10 14:34:22,148 - map_node - INFO - Published visual event: User detected Samantha at distance 1
+2025-08-10 14:34:22,149 - map_node - INFO - Published visual event: Joe detected Samantha at distance 1
+2025-08-10 14:34:22,149 - map_node - INFO - Agent 'Samantha' is now visible to: {'User', 'Joe'}
+2025-08-10 14:34:22,150 - map_node - INFO - ✅ Samantha completed turn 1
+2025-08-10 14:34:22,150 - map_node - INFO - Turn progress: 3/4 characters completed
+2025-08-10 14:34:22,151 - map_node - WARNING - Handling agent look command for cognitive/map/agent/Samantha/look
+2025-08-10 14:34:22,189 - map_node - WARNING - Agent look command handled for cognitive/map/agent/Samantha/look
+2025-08-10 14:34:22,189 - map_node - WARNING - Handling agent look command for cognitive/map/agent/Samantha/look
+2025-08-10 14:34:22,228 - map_node - WARNING - Agent look command handled for cognitive/map/agent/Samantha/look
+2025-08-10 14:34:23,098 - map_node - INFO - ✅ Joe completed turn 1
+2025-08-10 14:34:23,098 - map_node - INFO - Turn progress: 4/4 characters completed
+2025-08-10 14:34:23,098 - map_node - INFO - 🎯 All characters completed turn 1
+2025-08-10 14:34:23,098 - map_node - INFO - Step mode - waiting for manual step command
+2025-08-10 14:34:23,098 - map_node - INFO - 📢 Published step_complete message for FastAPI UI
