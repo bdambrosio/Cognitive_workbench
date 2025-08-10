@@ -116,40 +116,6 @@ The framework consists of these nodes, each running as a separate process:
 ## 📚 Documentation
 
 
-## 🔄 Migration from ROS2
-
-This framework replaces the complex ROS2 setup with a simple Zenoh-based solution:
-
-| Feature | ROS2 | Zenoh |
-|---------|------|-------|
-| Communication | Topics/Services | Pub/Sub |
-| Storage | Separate services | Built-in |
-| Configuration | Launch files | Python code |
-| Dependencies | Complex | Simple |
-| Deployment | ROS2 workspace | Python processes |
-
-## 🛠️ Development
-
-### Adding New Nodes
-
-1. Create a new Python file in `zenoh_cognitive_framework/`
-2. Import Zenoh and initialize session with config
-3. Declare publishers/subscribers
-4. Implement your logic
-5. Add to `launch_all_nodes.py` if needed
-
-### Testing
-
-```bash
-# Test Zenoh installation
-python zenoh_cognitive_framework/test_zenoh_installation.py
-
-# Launch individual nodes for testing
-cd zenoh_cognitive_framework
-python memory_node.py
-python llm_service_node.py
-# etc.
-```
 
 ## 📝 License
 
