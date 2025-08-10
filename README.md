@@ -1,9 +1,8 @@
 # Cognitive workbench
 
 My new playground for cognitive AI experiments.
-A simplified cognitive framework using Zenoh for communication, replacing ROS2 complexity with clean Python applications that can run on separate cores.
-Most of the below is out of date, I'll try to update in the next day or so. 
-First level functionality.
+A simplified cognitive framework using Zenoh for parallelism and communication.
+Barest of functionality, this is the initial skeleton, tested enough I believe it is worth building on.
 Multiple characters can be defined in a simple 2 1/2 grid world. you define personality and drives. Each then creates goals, implements plans (simple scripts with control flow - if/then/else and do_while), maintains beliefs and TOM models of others, etc.
 
 System even has a minimal UI that allows stepping, manual input of simple plans, etc.
@@ -76,49 +75,31 @@ Shutdown button or ^C on console shuts everything down (15-20 secs, be patient).
 
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/bdambrosio/Cognitive_workbench)
 
-Rather out of date, work in progress
-```
-Cognitive_workbench/
-├── src/     # Main framework code
-│   ├── sense_node.py              # Sensory input processing
-│   ├── memory_node.py             # Memory storage and retrieval
-│   ├── llm_service_node.py        # LLM API service
-│   ├── action_node.py # Complete cognitive loop
-│   ├── action_display_node.py     # Action display and input
-│   ├── llm_client.py              # LLM client interface
-│   ├── launch_all_nodes.py        # Multi-process launcher
-│   ├── test_zenoh_installation.py # Installation verification
-│   ├── setup.sh                   # Setup script
-│   ├── requirements.txt           # Dependencies
-│   └── README.md                  # Detailed documentation
-├── zenoh_venv/                    # Python virtual environment
-└── README.md                      # This file
-```
 
 ## 🎯 Features
 
-- **Multi-core performance**: Each node runs as multiple Python processes each supporting a zenoh node
+- **Multi-core performance**: Each character is modeled as multiple zenoh nodes. Each zenoh node runs as a separate Python job
 - **Simple communication**: Zenoh pub/sub and queryables (simple? hmm)
-- **Built-in storage**: Zenoh's storage capabilities (when configured)
-- **Easy deployment**: Just Python processes, no complex configuration
+- **Built-in storage**: json / files, maybe migrate to Zenoh's storage capabilities in future.
+- **Easy deployment**: Just Python processes, no complex configuration (tried ROS2 earlier, bad idea)
 - **Fault tolerance**: Automatic reconnection and recovery
-- **Standard Python**: except for HTMX/js ui
+- **Standard Python**: except for HTMX/js ui (may move this to React later to better support modularity as UI complexity increases)
 
 ## 🔧 Architecture
 
-The framework consists of these nodes, each running as a separate process:
+The workbench consists of these nodes, each running as a separate process:
 
 1. **Fastapi_action_display Node** - Shared - horrible name for UI
 2. **Map Node** - Shared - simple 2D world
 3. **LLM Service Node** - Shared - Provides LLM API access via Zenoh pub/sub - uses futures, but actually not needed since vllm / openai / openrouter can all handle simultaneous requests. refactoring needed
 4. **Executive Node** - per character, overall orchestration for a character.
-5. **Memory Node** - per character, provides memory services and persistent storage using json format files
+5. **Memory Node** - per character, provides memory services and persistent storage using json format files. (aside - 'memory', what a simple word for the heart of cognition.
 6. **Situation node** - per character, manages current external environment interface.
-7. **Sense Node** - per character - handles sensory input and publishes perception data - mostly a stub right now.
+7. **Sense Node** - per character - handles sensory input and publishes perception data - mostly a stub right now, this, like memory, is where most of the complexity lies.
 
 ## 📚 Documentation
 
-
+Ain't none yet but what you see here. 
 
 ## 📝 License
 
