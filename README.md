@@ -13,13 +13,8 @@ System even has a minimal UI that allows stepping, manual input of simple plans,
 ### 1. Setup Environment
 
 ```bash
-# Run the setup script
-./zenoh_cognitive_framework/setup.sh
-```
-
-Or manually:
-
-```bash
+mkdir Cog
+cd Cog
 # Create virtual environment
 python3 -m venv zenoh_venv
 
@@ -32,19 +27,39 @@ pip install -r zenoh_cognitive_framework/requirements.txt
 
 ### 2. Launch the System
 
+First, be sure you edit the scenario you want to run to use the proper llm.
+Scenarios are in Cognitive_workbench/scenarios (but maps are in src/maps, I should fix that)
+
+The system supports OpenAI and OpenRouter as well as a local option on port 5000
+scenarios are in yaml format, the first few lines look like:
+
+```yaml
+map: forest.py
+# Cognitive Workbench Configuration
+llm_config:
+  server_name: "vllm"
+  model_name: "qwen/qwen3-235b-a22b-2507"
+```
+
+model doesn't actually matter for vllm, it will get model from server
+
 ```bash
 # Activate virtual environment (if not already active)
 source zenoh_venv/bin/activate
 
 # Launch all nodes
-python zenoh_cognitive_framework/launch_all_nodes.py
+cd src
+python3 launcher.py lost.yaml --ui
+# watch for 'Reuse existing world' message (if it finds saves for this scenario). probably safest to answer no, this often fails at the moment.
 ```
 
 ### 3. Use the System
 
-1. Type text input in the Action Display Node terminal
-2. Watch the cognitive loop process your input
-3. See responses and actions displayed
+A browser tab should open (localhost:3000) with a minimal UI.
+Characters run in parallel. 'Step' gives every character a single turn. Run is just a loop calling step repeatedly.
+Condition testing for an if or while does not count as a step. 
+
+Shutdown button or ^C on console shuts everything down (15-20 secs, be patient).
 
 ## 📁 Project Structure
 
