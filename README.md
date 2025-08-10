@@ -71,6 +71,8 @@ Condition testing for an if or while does not count as a step.
 
 Shutdown button or ^C on console shuts everything down (15-20 secs, be patient).
 
+Word of caution: debugging is hard because if you set a breakpoint a character will time out and be deemed unresponsive, and dropped from turn manager in launcher.py. Should pbly add a debug mode to launch that disables that, but there are timeouts in zenoh queryables too. tbd. Ideas welcome.
+
 ## 📁 Project Structure
 
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/bdambrosio/Cognitive_workbench)
