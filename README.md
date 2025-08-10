@@ -3,7 +3,7 @@
 My new playground for cognitive AI experiments.
 A simplified cognitive framework using Zenoh for parallelism and communication.
 Barest of functionality, this is the initial skeleton, tested enough I believe it is worth building on.
-Multiple characters can be defined in a simple 2 1/2 grid world. you define personality and drives. Each then creates goals, implements plans (simple scripts with control flow - if/then/else and do_while), maintains beliefs and TOM models of others, etc.
+Multiple characters can be defined in a simple 2 1/2 grid world. you define personality and drives. Each then creates goals, implements plans (simple scripts with control flow - if/then/else and while), maintains beliefs and TOM models of others, etc.
 
 System even has a minimal UI that allows stepping, manual input of simple plans, etc.
 
