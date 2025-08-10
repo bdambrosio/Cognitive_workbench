@@ -73,6 +73,9 @@ Condition testing for an if or while does not count as a step.
 Shutdown button or ^C on console shuts everything down (15-20 secs, be patient).
 
 ## 📁 Project Structure
+
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/bdambrosio/Cognitive_workbench)
+
 Rather out of date, work in progress
 ```
 Cognitive_workbench/
