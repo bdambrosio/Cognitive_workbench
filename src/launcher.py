@@ -137,45 +137,8 @@ class CharacterLauncher:
         try:
             map_args = [sys.executable, 'map_node.py']
             if map_file:
-                # Check for existing world data
+                # Decision on reuse/new world is handled early in main()
                 world_name = map_file.replace('.py', '')
-                world_file = Path(f"data/world/{world_name}_world.json")
-                
-                if world_file.exists():
-                    print(f"\nFound existing world data for '{world_name}'")
-                    reuse = input("Reuse existing world? (y/n): ").strip().lower()
-                    if reuse != 'y':
-                        print("Creating new world...")
-                        # Remove existing world file
-                        world_file.unlink()
-                        print(f"Removed existing world data for '{world_name}'")
-                        
-                        # Remove existing character data for characters in current config
-                        data_dir = Path("data")
-                        if data_dir.exists():
-                            # Get character names from current config
-                            character_names = [char.name for char in self.characters]
-                            
-                            # Remove memory files for current characters only
-                            memory_dir = data_dir / "memory"
-                            if memory_dir.exists():
-                                for mem_file in memory_dir.glob("*_memory.json"):
-                                    char_name = mem_file.stem.replace('_memory', '')
-                                    if char_name in character_names:
-                                        mem_file.unlink()
-                                        print(f"Removed existing memory data: {mem_file.name}")
-                            
-                            # Remove situation files for current characters only
-                            situation_dir = data_dir / "situation"
-                            if situation_dir.exists():
-                                for sit_file in situation_dir.glob("*_situation.json"):
-                                    char_name = sit_file.stem.replace('_situation', '')
-                                    if char_name in character_names:
-                                        sit_file.unlink()
-                                        print(f"Removed existing situation data: {sit_file.name}")
-                    else:
-                        print(f"Reusing existing world '{world_name}'")
-                
                 map_args.extend(['-m', map_file, '-w', world_name])
             map_process = subprocess.Popen(map_args)
             self.shared_processes.append(map_process)
@@ -424,6 +387,51 @@ def main():
     try:
         # Launch all characters
         effective_map_file = args.map_file if args.map_file else yaml_map_file
+        
+        # Prompt early about reusing existing world before any subprocesses start
+        if effective_map_file:
+            world_name = effective_map_file.replace('.py', '')
+            world_file = Path(f"data/world/{world_name}_world.json")
+            if world_file.exists():
+                print(f"\nFound existing world data for '{world_name}'")
+                reuse = input("Reuse existing world? (y/n): ").strip().lower()
+                if reuse != 'y':
+                    print("Creating new world...")
+                    # Remove existing world file
+                    try:
+                        world_file.unlink()
+                        print(f"Removed existing world data for '{world_name}'")
+                    except Exception as e:
+                        print(f"Failed to remove existing world data: {e}")
+                    
+                    # Remove existing character data for characters in current config
+                    data_dir = Path("data")
+                    if data_dir.exists():
+                        character_names = [char.name for char in launcher.characters]
+                        
+                        memory_dir = data_dir / "memory"
+                        if memory_dir.exists():
+                            for mem_file in memory_dir.glob("*_memory.json"):
+                                char_name = mem_file.stem.replace('_memory', '')
+                                if char_name in character_names:
+                                    try:
+                                        mem_file.unlink()
+                                        print(f"Removed existing memory data: {mem_file.name}")
+                                    except Exception:
+                                        pass
+                        
+                        situation_dir = data_dir / "situation"
+                        if situation_dir.exists():
+                            for sit_file in situation_dir.glob("*_situation.json"):
+                                char_name = sit_file.stem.replace('_situation', '')
+                                if char_name in character_names:
+                                    try:
+                                        sit_file.unlink()
+                                        print(f"Removed existing situation data: {sit_file.name}")
+                                    except Exception:
+                                        pass
+                else:
+                    print(f"Reusing existing world '{world_name}'")
         launcher.launch_all_characters(effective_map_file, args.ui, server_name, model_name, ui_port=args.ui_port)
         
         # Monitor processes

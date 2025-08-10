@@ -462,7 +462,7 @@ class ZenohMemoryNode:
             
             if not target_item:
                 # Return list of all items in inventory
-                item_names = list(self.inventory.keys())
+                item_names = self.inventory.keys()
                 response = {
                     'success': True,
                     'value': item_names

@@ -1,9 +1,12 @@
+import logging
 import requests, time
 from dataclasses import dataclass, asdict
 import json, os, requests
 
 from openai import OpenAI
 
+logger = logging.getLogger('simulation_core')
+#logger.setLevel(logging.DEBUG)
 
 api_key = None
 try:

@@ -2,7 +2,7 @@ map: forest.py
 # Cognitive Workbench Configuration
 llm_config:
   server_name: "vllm"
-  model_name: "openai/gpt-5-mini"
+  model_name: "qwen/qwen3-235b-a22b-2507"
 
 characters:
   Samantha:
@@ -27,17 +27,28 @@ characters:
       You are socially awkward, especially around strangers. 
       You speak informally, but occasionally in a 'budding scientist' style.
     drives:
-      - "solve the mystery of how I ended up here. Find Cave."
+      - "solve the mystery of how I ended up here. Find Hut1."
       - "safety from threats including accident, illness, or physical threats from unknown or adversarial actors or adverse events."
       - "companionship, community, family, acceptance, trust, intimacy."
       - "immediate physiological needs: survival, shelter, water, food, rest."
 
-  Caver:
+  Hermit:
     manual: true
     manual_response: false
-    location: Cave1
+    location: Hut1
     character: |
-      Caver, a 60-year-old male dresses in tatters and is covered in dirt.
+      Hermit, a 60-year-old male dresses in tatters and is covered in dirt.
       I know the secrets of the forest but I'm not sure I can trust you.
     drives:
       - "hunger, thirst, and shelter"
+
+  User:
+    manual: true
+    manual_response: true
+    character: |
+      User, a 25-year-old male who wears a blue shirt and jeans..
+      I know way more than I let on.
+    drives:
+      - "conversation, exploring my own thoughts and feelings, and those of others."
+      - "encouraging critical thinking"
+      - "helping others stay safe"
