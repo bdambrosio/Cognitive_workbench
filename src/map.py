@@ -1759,7 +1759,6 @@ def hash_direction_info(direction_info, distance_threshold=10, world=None):
         if 'characters' in direction_info[dir] and len(direction_info[dir]['characters']) > 0:  
             character_label_added = False
             for character in direction_info[dir]['characters']:
-                if character['distance'] <= distance_threshold:
                     if not character_label_added:
                         percept += f"characters: "
                         character_label_added = True

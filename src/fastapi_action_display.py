@@ -1335,6 +1335,10 @@ class FastAPIActionDisplayNode:
                 } else if (typeLower === 'response' && actionData.source) {
                     actorLabel = ` ${actionData.source}:`;
                 }
+            } else {
+                if (typeLower === 'take' && actionData.target) {
+                    actorLabel = ` ${actionData.target}`;
+                }
             }
             html += `<span class="action-type">${actionData.action_type}</span>${actorLabel}`;
             
