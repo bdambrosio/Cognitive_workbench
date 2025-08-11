@@ -1640,8 +1640,8 @@ End your text with: </end>"""
             for view in self.last_situation_data.get('views', []):
                 if 'resources' in view:
                     for resource in view['resources']:  
-                        if resource.get('distance', 20) <= 2 and ((not any(ch.isdigit() for ch in target) and resource['name'].startswith(target)) 
-                            or resource['name'] == target):                            
+                        if resource.get('distance', 20) <= 2 \
+                            and ((not any(ch.isdigit() for ch in target) and resource['name'].startswith(target)) or resource['name'] == target):                            
                             return resource.get('name', '')
             return False
         except Exception as e:
@@ -1802,27 +1802,6 @@ End your text with: </end>"""
 
         def _do_take(target: str):
             # First validate that the target exists and is a resource
-            resource_exists = False
-            for reply in self.session.get(f"cognitive/map/resource/{target}", timeout=2.0):
-                if reply.ok:
-                    data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
-                    if data.get('success'):
-                        resource_exists = True
-                        logger.debug(f'✅ Validated {target} is a resource')
-                break
-            if not resource_exists:
-                logger.warning(f'❌ Cannot take {target} - resource validation failed')
-                if self.action_history:
-                    self.action_history[-1].result = f'cannot take {target} - resource validation failed'
-                return False
-
-            # Validate that the target is near
-            if not plan_module.is_near(self, target):
-                logger.warning(f'❌ Cannot take {target} - not near resource')
-                if self.action_history:
-                    self.action_history[-1].result = f'cannot take {target} - not near resource'
-                return False
-
             logger.info(f'📦 Taking {target} for {self.character_name}')
             if self.action_history:
                 self.action_history[-1].result = f'taking {target}'
