@@ -62,6 +62,11 @@ class ZenohMemoryNode:
         self.character_name = character_name.capitalize()
         self.character_config = character_config or {}
         
+        # Debug mode flag
+        self.debug = str(os.getenv('CWB_DEBUG', '')).lower() in ('1', 'true', 'yes', 'on')
+        if self.debug:
+            logger.info(f'🔧 Debug mode enabled for {self.character_name}')
+        
         # Initialize Zenoh session
         config = zenoh.Config()
         self.session = zenoh.open(config)
@@ -78,7 +83,7 @@ class ZenohMemoryNode:
         # LLM client for entity model functionality
         self.llm_client = None
         if LLM_CLIENT_AVAILABLE:
-            self.llm_client = ZenohLLMClient(service_timeout=30.0)
+            self.llm_client = ZenohLLMClient(service_timeout=60.0 if not self.debug else 600.0)
         
         # Subscriber for incoming data to store (character-specific)
         self.data_subscriber = self.session.declare_subscriber(
