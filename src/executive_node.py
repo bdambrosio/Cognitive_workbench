@@ -22,6 +22,7 @@ from typing import Dict, List, Any, Union, Optional
 import utils.hash_utils as hash_utils
 import plan as plan_module
 from dataclasses import dataclass
+import os
 
 # Configure logging with unbuffered output
 # Console handler with WARNING level (less verbose)
@@ -143,6 +144,20 @@ class ActionRecord:
     action: Dict[str, Any]
     result: Optional[str]
     timestamp: datetime
+    # Optional telemetry fields (kept lightweight; None when not applicable)
+    step_id: Optional[int] = None
+    plan_id: Optional[str] = None
+    frame_path: Optional[List[Any]] = None
+    requested_target: Optional[str] = None
+    resolved_target: Optional[str] = None
+    resolution_status: Optional[str] = None     # resolved | too_far | not_visible | not_in_inventory | ambiguous | not_found | passthrough
+    preconditions: Optional[Dict[str, Any]] = None  # e.g., {"visible": bool, "near": bool, "distance": float}
+    outcome_status: Optional[str] = None         # success | failure | skipped | no_op | not_implemented
+    failure_code: Optional[str] = None           # e.g., target_too_far | target_not_visible | inventory_missing | while_max_iterations | error
+    started_at: Optional[datetime] = None
+    ended_at: Optional[datetime] = None
+    duration_ms: Optional[int] = None
+    notes: Optional[str] = None
 
 class ZenohExecutiveNode:
     """
@@ -157,6 +172,12 @@ class ZenohExecutiveNode:
         # Store character info (canonicalized)
         self.character_name = character_name.capitalize()
         self.character_config = character_config or {}
+        
+        # Debug mode flag - must be set early as it's used throughout initialization
+        self.debug = str(os.getenv('CWB_DEBUG', '')).lower() in ('1', 'true', 'yes', 'on')
+        if self.debug:
+            logger.info(f'🔧 Debug mode enabled for {self.character_name}')
+        
         # Manual control flags
         self.manual = bool(self.character_config.get('manual', False))
         self.manual_response = bool(self.character_config.get('manual_response', False))
@@ -212,7 +233,7 @@ class ZenohExecutiveNode:
         # LLM client
         self.llm_client = None
         if LLM_CLIENT_AVAILABLE:
-            self.llm_client = ZenohLLMClient(service_timeout=30.0)
+            self.llm_client = ZenohLLMClient(service_timeout=30.0 if not self.debug else 600.0)
         
         # Internal state
         self.action_counter = 0
@@ -232,6 +253,11 @@ class ZenohExecutiveNode:
         self.plan_bindings_cache = {}
         self.plan_summary_completed = False  # Track if current plan has been summarized
         self.plan_summary = None
+        # Control-flow telemetry and plan/step identifiers
+        self.control_flow_events: List[Dict[str, Any]] = []
+        self.current_plan_id: Optional[str] = None
+        self.plan_counter: int = 0
+        self.step_counter: int = 0
         # Turn management
         self.turn_subscriber = self.session.declare_subscriber(
             "cognitive/map/turn/go",
@@ -260,7 +286,7 @@ class ZenohExecutiveNode:
 
         # Get map types
         self.map_types = {}
-        for reply in self.session.get("cognitive/map/types", timeout=2.0):
+        for reply in self.session.get("cognitive/map/types", timeout=2.0 if not self.debug else 600.0):
             if reply.ok:
                 data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
                 if data.get('success'):
@@ -430,9 +456,12 @@ class ZenohExecutiveNode:
                 if self.current_plan:
                     action = self._plan_step(self.current_plan)
                     if action is not None:
-                        self._act(action)
-
-                        
+                        action_succeeded = self._act(action)
+                        if not action_succeeded:
+                            # Action failed, don't advance plan state but complete turn
+                            logger.info(f'Manual action failed for {self.character_name}, will retry same step next turn')
+                            self._complete_turn()
+                            return
                 return
 
             # Orient: Assess current state and goals
@@ -449,7 +478,13 @@ class ZenohExecutiveNode:
 
             # Act: Execute the chosen action (if we have one)
             if action is not None:
-                self._act(action)
+                action_succeeded = self._act(action)
+                if not action_succeeded:
+                    # Action failed (e.g., conversation lock unavailable), don't advance plan state
+                    # but still complete the turn so launcher can continue
+                    logger.info(f'Action failed for {self.character_name}, will retry same step next turn')
+                    self._complete_turn()
+                    return
             
         except Exception as e:
             logger.error(f'Error in OODA loop: {e}')
@@ -461,7 +496,7 @@ class ZenohExecutiveNode:
         if self.last_situation_data and self.last_situation_data.get('location'):
             formatted_situation += f"\n#You are at location: {self.last_situation_data['location']}\n"
         if self.last_situation_data and self.last_situation_data.get('visible_characters'):
-            formatted_situation += f"\n#You can see {len(self.last_situation_data)} people: {', and '.join(self.last_situation_data['characters'])}\n"
+            formatted_situation += f"\n#You can see {len(self.last_situation_data['visible_characters'])} people: {', and '.join(self.last_situation_data['visible_characters'])}\n"
         if self.last_situation_data and self.last_situation_data.get('look'):
             formatted_situation += f"\n#You can see the following:\n\t{'\n\t'.join(self.last_situation_data['look'])}\n"
         
@@ -519,7 +554,7 @@ class ZenohExecutiveNode:
             if self.character_config.get('drives', None):
                 system_prompt += f"\n#Your drives are:\n\t{'\n\t'.join(self.character_config['drives'])}\n"
             if not self.map_types:
-                for reply in self.session.get("cognitive/map/types", timeout=2.0):
+                for reply in self.session.get("cognitive/map/types", timeout=2.0 if not self.debug else 600.0):
                     if reply.ok:
                         data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
                         if data.get('success'):
@@ -549,7 +584,7 @@ class ZenohExecutiveNode:
                 user_prompt += '\n'
             # get inventory
             inventory = []
-            for reply in self.session.get(f"cognitive/{self.character_name}/memory/inventory", timeout=2.0):
+            for reply in self.session.get(f"cognitive/{self.character_name}/memory/inventory", timeout=2.0 if not self.debug else 600.0):
                 if reply.ok:
                     data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
                     if data.get('success'):
@@ -668,9 +703,9 @@ end your response with </end>
                     goal_prompt += "Don't repeat yourself.\n"
 
             if self.action_history and (self.action_history[-1].action['type'].lower() == 'say' or self.action_history[-1].action['type'].lower() == 'response'):
-                directive = f"""\nrespond only with the JSON plan, no other text.\n"""
+                directive = f"""\nrespond only with the JSON plan, no other text.\nend your response with </end>"""
             else:
-                directive = f"""\nrespond only with the JSON plan, no other text.\n"""
+                directive = f"""\nrespond only with the JSON plan, no other text.\nend your response with </end>"""
             # Make LLM call
             if self.llm_client and not self.shutdown_requested:
                 response = self.llm_client.generate(
@@ -695,12 +730,18 @@ end your response with </end>
                         logger.error(f'Invalid plan JSON in LLM response: {e}')
                         plan_candidate = None
                     if not plan_candidate or not plan_candidate.get('plan') or len(plan_candidate['plan']) == 0:
-                            logger.error(f'No action, target, or value found in LLM response: {response.text}')
-                            single_action = {'type': 'sleep', 'target': 'self', 'value': '', 'reason': ''}
+                        logger.error(f'No action, target, or value found in LLM response: {response.text}')
+                        single_action = {'type': 'sleep', 'target': 'self', 'value': '', 'reason': ''}
                     else:
+                        self._plan_abandoned()  # Clear any existing plan
                         self.current_plan = plan_candidate
                         self.plan_bindings_cache = {}
                         self.plan_summary_completed = False  # Reset for new plan
+                        # Initialize plan identifiers and control-flow events
+                        self.plan_counter += 1
+                        self.current_plan_id = f"p_{self.plan_counter}"
+                        self.control_flow_events = []
+                        self.step_counter = 0
                         self._publish_current_plan()
                         self.plan_state = {'step_stack': plan_module.Stack()}
                         return self.current_plan
@@ -713,12 +754,19 @@ end your response with </end>
         
         # Create single-action plan
         if single_action:
+            self._plan_abandoned()  # Clear any existing plan
             self.current_plan = {'plan': [{'type': single_action['type'], 'target': single_action['target'], 'value': single_action['value'], 'reason': single_action.get('reason', '')}]}
             self.plan_bindings_cache = {}
         else:
+            self._plan_abandoned()  # Clear any existing plan
             self.current_plan = {'plan': []}
         
         self.plan_summary_completed = False  # Reset for new plan
+        # Initialize plan identifiers and control-flow events
+        self.plan_counter += 1
+        self.current_plan_id = f"p_{self.plan_counter}"
+        self.control_flow_events = []
+        self.step_counter = 0
         self._publish_current_plan()
         # Initialize plan state for new plan
         self.plan_state = {'step_stack': plan_module.Stack()}
@@ -734,7 +782,9 @@ end your response with </end>
             remaining_plan = json.dumps(plan_module.remaining_plan(self.current_plan, self.plan_state['step_stack']), indent=2)
         else:
             remaining_plan = 'None'
-        system_prompt = 'Your task is to replan given your current goal, your remaining current plan, and new input provided by the user.\n' + self._update_system_prompt()
+        system_prompt = """Your task is to consider replacing your current goal and your remaining current plan, in light of the following recent conversation.
+"""     
+        system_prompt += self._update_system_prompt()
         user_prompt = self.observations['dynamic']
         goal_prompt = f"\n\n#Your current goal is:\n{goal.to_string() if goal else 'None'}"
         target = goal.actors[1] if goal and len(goal.actors) > 1 else None
@@ -753,65 +803,82 @@ end your response with </end>
 #Your current remaining plan is:
 {remaining_plan}
 
-#The new input causing you to replan is:
+#The new input causing you to reconsider your goal and plan is:
 {reason}
 
- respond only with new JSON plan, no other text.\n"""
+Consider whether to abandon your current goal and replace it with a new goal.
+Is this conversation a good reason to abandon your current goal? 
+I.E. does it present a new issue / opportunity / obligation demanding the character's attention?
+If so, is your current goal important enought to be merged into the new goal?
+Nothing in this or other instructions limits your use of deception or surprise.
+                  
+Respond with either the word 'current' or the word 'new' followed by a newline.
+if you choose a new goal, specify it using the following hash-formatted text, where each tag is preceded by a # and followed by a single space, followed by its content.
+Each goal should begin with a #goal tag, and should end with ## on a separate line as shown below:
+be careful to insert line breaks only where shown, separating a value from the next tag:
+
+#goal terse (5-8) words) name for this goal
+#description concise (8-14) words) further details of this goal
+#otherCharacterName name of the other actor involved in this goal, or None if no other actor is involved
+#termination terse (5-6 words) statement of condition that would mark achievement or partial achievement of this goal. This should be a specific observable condition that can be checked for.
+##
+
+Respond ONLY with the above keyword 'current' or the keyword 'new' followed by a newline and the above hash-formatted text.
+end your response with </end>
+"""
 
         # Make LLM call
         if self.llm_client and not self.shutdown_requested:
             response = self.llm_client.generate(
                 messages=[system_prompt, user_prompt, PLAN_SYNTAX, directive],
-                max_tokens=1000,
+                max_tokens=200,
                 temperature=0.7,
-                is_json=True,
                 stops=['</end>']
             )
 
             if response.success:
-                logger.debug(f'🤖 {self.character_name} New Action: {response.text}')
-                plan_candidate = None
-                valid = False
-                try:
-                    plan_candidate = response.text #json.loads(response.text.strip())
-                    valid = plan_module.verify_plan(plan_candidate)
-                    logger.warning(f'🤖 {self.character_name} Replan candidate: {plan_candidate}')
-                    if not valid:
-                        logger.error(f'Invalid plan JSON in LLM response: {response.text}')
-                        plan_candidate = None
-                except Exception as e:
-                    logger.error(f'Invalid plan JSON in LLM response: {e}')
-                    plan_candidate = None
-                if not plan_candidate or not plan_candidate.get('plan') or len(plan_candidate['plan']) == 0:
-                        logger.error(f'No action, target, or value found in LLM response: {response.text}')
-                        single_action = {'type': 'sleep', 'target': 'self', 'value': '', 'reason': ''}
-                else:
-                    self.current_plan = plan_candidate
-                    self.plan_bindings_cache = {}
-                    self.plan_summary_completed = False  # Reset for new plan
-                    self._publish_current_plan()
-                    self.plan_state = {'step_stack': plan_module.Stack()}
-                    return self.current_plan
+                logger.warning(f'🤖 {self.character_name} New Goal: {response.text.strip()}')
+                goals = []
+                if response.text.strip().lower() == 'current':
+                    return self.current_goal
+                forms = hash_utils.findall_forms(response.text)
+                for goal_hash in forms:
+                    goal = plan_module.validate_and_create_goal(self.character_name, goal_hash)
+                    if goal:
+                        logger.warning(f'{self.character_name} generated goal: {goal.to_string()}')
+                        self.current_goal = goal
+                        self._plan_abandoned()
+                        self._publish_goal(goal)
+                        return self.current_goal
+                    else:
+                        logger.error(f'Warning: Invalid goal generation response for {goal_hash}')
             else:
                 logger.error(f'LLM call failed: {response.error}')
-                single_action = {'type': 'sleep', 'target': 'self', 'value': '', 'reason': ''}
+                self.current_goal = plan_module.Goal('sleep', actors=[self.character_name])
         else:   
             logger.error('LLM client not available')
-            single_action = {'type': 'sleep', 'target': 'self', 'value': '', 'reason': ''}
-        
-        # Create single-action plan
-        if single_action:
-            self.current_plan = {'plan': [{'type': single_action['type'], 'target': single_action['target'], 'value': single_action['value'], 'reason': single_action.get('reason', '')}]}
-            self.plan_bindings_cache = {}
-        else:
-            self.current_plan = {'plan': []}
+            self.current_goal = plan_module.Goal('sleep', actors=[self.character_name])
+            self._publish_goal(self.current_goal)
             
-        self.plan_summary_completed = False  # Reset for new plan
+        return self.current_goal
+        
+    def _plan_completed(self):
+        """Handle successful plan completion."""
+        self._summarize_plan_execution()
+        self.current_plan = None
+        self.plan_bindings_cache = {}
+        self.current_goal = None
+        self.action_history = []
+        self.plan_state = None
         self._publish_current_plan()
-        # Initialize plan state for new plan
-        self.plan_state = {'step_stack': plan_module.Stack()}
-        self.plan_bindings_cache = {}      
-        return self.current_plan
+        
+    def _plan_abandoned(self):
+        """Handle plan abandonment for any reason."""
+        self.current_plan = None
+        self.plan_bindings_cache = {}
+        self.action_history = []
+        self.plan_state = None
+        self._publish_current_plan()
         
     def _plan_step(self, plan):
         """Execute current step of plan and return next action using frame-based stack."""
@@ -846,14 +913,10 @@ end your response with </end>
             logger.error(f'Error in plan execution: {e}')
             logger.error(traceback.print_exc())
             # Clear plan state on error
-            self.current_plan = None
-            self.plan_bindings_cache = {}
-            self._publish_current_plan()
+            self._plan_abandoned()
             self.plan_state = {
                 'step_stack': plan_module.Stack()
             }
-            # Clear plan bindings cache
-            self.plan_bindings_cache = {}
             return None
     
     def _execute_next_step(self, step_stack):
@@ -864,6 +927,19 @@ end your response with </end>
         current_frame = step_stack.peek()
         plan = current_frame['plan']
         idx = current_frame['idx']
+        # Maintain a minimal frame path for telemetry (main/if/while nesting)
+        try:
+            # Build frame path from stack entries (oldest first)
+            frames = step_stack.get_entries() if hasattr(step_stack, 'get_entries') else []
+            self.current_frame_path = []
+            for f in frames:
+                kind = f.get('type', 'main')
+                if kind == 'while':
+                    self.current_frame_path.append([kind, f.get('iteration_count', 0), f.get('return_to', 0)])
+                else:
+                    self.current_frame_path.append([kind, f.get('idx', 0)])
+        except Exception:
+            self.current_frame_path = []
         
         # Check if we've completed the current level
         if idx >= len(plan):
@@ -875,15 +951,21 @@ end your response with </end>
                 # Check iteration limit first
                 if current_frame['iteration_count'] >= current_frame['max_iterations']:
                     # Max iterations reached, exit loop
+                    try:
+                        self.control_flow_events.append({
+                            'event': 'while_exit',
+                            'plan_id': self.current_plan_id,
+                            'frame_path': list(self.current_frame_path),
+                            'exit_reason': 'max_iterations',
+                            'iteration_count': current_frame.get('iteration_count', 0),
+                            'timestamp': datetime.now().isoformat()
+                        })
+                    except Exception:
+                        pass
                     step_stack.pop()  # Remove while frame
                     if step_stack.is_empty():
                         # Plan complete
-                        self._summarize_plan_execution()
-                        self.current_plan = None
-                        self.plan_bindings_cache = {}
-                        self.current_goal = None
-                        self._publish_current_plan()
-                        self.plan_state = None
+                        self._plan_completed()
                         return None
                     else:
                         # Continue at parent level
@@ -901,15 +983,21 @@ end your response with </end>
                         return self._execute_next_step(step_stack)
                     else:
                         # Condition false, exit loop
+                        try:
+                            self.control_flow_events.append({
+                                'event': 'while_exit',
+                                'plan_id': self.current_plan_id,
+                                'frame_path': list(self.current_frame_path),
+                                'exit_reason': 'condition_false',
+                                'iteration_count': current_frame.get('iteration_count', 0),
+                                'timestamp': datetime.now().isoformat()
+                            })
+                        except Exception:
+                            pass
                         step_stack.pop()  # Remove while frame
                         if step_stack.is_empty():
                             # Plan complete
-                            self._summarize_plan_execution()
-                            self.current_plan = None
-                            self.plan_bindings_cache = {}
-                            self.current_goal = None
-                            self._publish_current_plan()
-                            self.plan_state = None
+                            self._plan_completed()
                             return None
                         else:
                             # Continue at parent level
@@ -921,12 +1009,7 @@ end your response with </end>
                 step_stack.pop()
                 if step_stack.is_empty():
                     # Plan complete
-                    self._summarize_plan_execution()
-                    self.current_plan = None
-                    self.plan_bindings_cache = {}
-                    self.current_goal = None
-                    self._publish_current_plan()
-                    self.plan_state = None
+                    self._plan_completed()
                     return None
                 else:
                     # Continue at parent level
@@ -946,7 +1029,21 @@ end your response with </end>
             # Handle while loop - test condition first
             condition_action = step.get('condition', None)
             resolved_target = self._resolve_target(condition_action)
-            if plan_module._evaluate_condition(self, condition_action, resolved_target):
+            # Record condition eval event (entering while?)
+            cond_outcome = plan_module._evaluate_condition(self, condition_action, resolved_target)
+            try:
+                self.control_flow_events.append({
+                    'event': 'while_eval',
+                    'plan_id': self.current_plan_id,
+                    'frame_path': list(self.current_frame_path),
+                    'condition': condition_action,
+                    'resolved_target': resolved_target,
+                    'outcome': bool(cond_outcome),
+                    'timestamp': datetime.now().isoformat()
+                })
+            except Exception:
+                pass
+            if cond_outcome:
                 # Condition true, enter loop
                 while_frame = {
                     'plan': step['body'],
@@ -967,7 +1064,22 @@ end your response with </end>
         elif step['type'] == 'if':
             # Handle if-then-else
             cond = step['condition']
-            branch = 'then' if plan_module._evaluate_condition(self, cond, self._resolve_target(cond)) else 'else'
+            cond_target = self._resolve_target(cond)
+            cond_outcome = plan_module._evaluate_condition(self, cond, cond_target)
+            branch = 'then' if cond_outcome else 'else'
+            try:
+                self.control_flow_events.append({
+                    'event': 'if_evaluated',
+                    'plan_id': self.current_plan_id,
+                    'frame_path': list(self.current_frame_path),
+                    'condition': cond,
+                    'resolved_target': cond_target,
+                    'outcome': bool(cond_outcome),
+                    'branch_taken': branch if (branch == 'then' or step.get('else')) else 'skip',
+                    'timestamp': datetime.now().isoformat()
+                })
+            except Exception:
+                pass
             if branch == 'then' or step.get('else'):
                 step_stack.push({
                     'plan'      : step[branch],
@@ -986,16 +1098,23 @@ end your response with </end>
             return self._execute_next_step(step_stack)
     
 
-    def _act(self, action: Dict[str, Any]):
-        """Act: Execute the chosen action."""
+    def _act(self, action: Dict[str, Any]) -> bool:
+        """Act: Execute the chosen action. Returns True if action succeeded, False if it failed."""
 
         action = self.current_action if self.current_action else action
         
-        # Create action record
+        # Create action record with basic telemetry
+        now_ts = datetime.now()
+        self.step_counter += 1
         action_record = ActionRecord(
             action=action,
             result=None,  # Will be set below
-            timestamp=datetime.now()
+            timestamp=now_ts,
+            step_id=self.step_counter,
+            plan_id=self.current_plan_id,
+            frame_path=list(self.current_frame_path) if hasattr(self, 'current_frame_path') else None,
+            requested_target=action.get('target', ''),
+            started_at=now_ts
         )
         self.action_history.append(action_record)
         
@@ -1004,16 +1123,67 @@ end your response with </end>
             self.action_publisher.put(json.dumps(action_data))
             action_record.result = 'slept'
             time.sleep(1)  # Sleep for 1 second
-            return
+            return True
         if action['type'].lower() == 'think':
             thought = self.think_about(action)
-            return
+            return True
             
         # Capture the originally requested target for UI/reporting
         requested_target = action.get('target', '')
         resolved_target = self._resolve_target(action)
+        # Precondition snapshot
+        preconditions = {}
+        resolution_status = None
+        nearest_candidate = None
+        try:
+            target_cap = (requested_target or '').capitalize()
+            views = (self.last_situation_data or {}).get('views', []) if hasattr(self, 'last_situation_data') else []
+            best_dist = None
+            best_name = None
+            best_dir = None
+            for view in views:
+                direction = view.get('direction')
+                for resource in view.get('resources', []):
+                    name = resource.get('name', '')
+                    if ((not any(ch.isdigit() for ch in target_cap) and name.startswith(target_cap)) or name == target_cap):
+                        dist = resource.get('distance', None)
+                        if dist is not None and (best_dist is None or dist < best_dist):
+                            best_dist = dist
+                            best_name = name
+                            best_dir = direction
+                for character in view.get('characters', []):
+                    name = character.get('name', '')
+                    if name == target_cap or target_cap == 'Person':
+                        dist = character.get('distance', None)
+                        if dist is not None and (best_dist is None or dist < best_dist):
+                            best_dist = dist
+                            best_name = name
+                            best_dir = direction
+            if best_name is not None:
+                preconditions['visible'] = True
+                preconditions['distance'] = best_dist
+                preconditions['near'] = (best_dist is not None and best_dist <= 2)
+                nearest_candidate = {'name': best_name, 'distance': best_dist, 'direction': best_dir}
+            else:
+                preconditions['visible'] = False
+        except Exception:
+            pass
+
+        action_record.resolved_target = resolved_target if isinstance(resolved_target, str) else ''
+        action_record.resolution_status = resolution_status
+        action_record.preconditions = preconditions if preconditions else None
         if not resolved_target:
             logger.error(f'❌ Cannot resolve target for action: {action}')
+        else:
+            resolution_status = 'resolved'
+            
+        if not resolved_target:
+            if preconditions.get('visible') is False:
+                resolution_status = 'not_visible'
+            elif preconditions.get('near') is False and preconditions.get('visible') is True:
+                resolution_status = 'too_far'
+            else:
+                resolution_status = 'not_found'
         if action['type'].lower() == "move":
             move_target = resolved_target.strip() if resolved_target else ''
             move_direction = move_target.lower()
@@ -1027,7 +1197,7 @@ end your response with </end>
                     self.map_update_request_publisher.put(json.dumps({'type': 'step_look'}))
                 except Exception:
                     pass
-                return
+                return True
             else:
                 logger.error(f'❌ Cannot move toward "{move_target}" - target not resolved or visible, choosing random direction')
                 self.move(random.choice(cardinal_directions))
@@ -1035,10 +1205,27 @@ end your response with </end>
                     self.map_update_request_publisher.put(json.dumps({'type': 'step_look'}))
                 except Exception:
                     pass
-                return
+                return True
         elif action['type'].lower() == "say":
-            self.generate_speech(action['value'], resolved_target if resolved_target else action['target'], mode='say')            # Publish action (this will be picked up by action_display_node)
-
+            # Check if we can acquire conversation lock
+            if resolved_target and self._acquire_conversation_lock(resolved_target):
+                self.generate_speech(action['value'], resolved_target, mode='say')
+            else:
+                # Lock acquisition failed, publish failure action
+                action_data = {
+                    'type': 'say',
+                    'action_id': self.action_counter,
+                    'timestamp': datetime.now().isoformat(),
+                    'target': resolved_target if resolved_target else '',
+                    'requested_target': requested_target,
+                    'resolved_target': resolved_target if resolved_target else '',
+                    'status': 'failed',
+                    'error': 'conversation lock unavailable'
+                }
+                self.action_publisher.put(json.dumps(action_data))
+                logger.warning('📤 Published action: say (failed - lock unavailable)')
+                self.action_counter += 1
+                return False
         elif action['type'].lower() == "take":
             # If resolution failed, publish a failure action with requested_target
             if not resolved_target:
@@ -1055,7 +1242,7 @@ end your response with </end>
                 self.action_publisher.put(json.dumps(action_data))
                 logger.warning('📤 Published action: take (failed)')
                 self.action_counter += 1
-                return
+                return False
             self.take(resolved_target)
             self.action_counter += 1
         elif action['type'].lower() == "inspect":
@@ -1113,8 +1300,31 @@ end your response with </end>
         except Exception:
             pass
 
+        # Finalize timing and outcome inference
+        action_record.ended_at = datetime.now()
+        try:
+            action_record.duration_ms = int((action_record.ended_at - action_record.started_at).total_seconds() * 1000)
+        except Exception:
+            pass
+        if action_record.result is None:
+            if action['type'].lower() == 'move':
+                action_record.outcome_status = 'success'
+            elif action_record.resolution_status in ('too_far', 'not_visible', 'not_found'):
+                action_record.outcome_status = 'failure'
+                if action_record.resolution_status == 'too_far':
+                    action_record.failure_code = 'target_too_far'
+                elif action_record.resolution_status == 'not_visible':
+                    action_record.failure_code = 'target_not_visible'
+                else:
+                    action_record.failure_code = 'target_not_found'
+        if nearest_candidate:
+            if action_record.preconditions is None:
+                action_record.preconditions = {}
+            action_record.preconditions['nearest_candidate'] = nearest_candidate
+
         logger.warning(f'📤 Published action: {action["type"]}')
         self.action_counter += 1
+        return True
 
     def _handle_interrupt(self):
         """Handle interrupt from sense data or situation updates."""
@@ -1271,6 +1481,10 @@ end your response with </end>
                 return
                 
             logger.warning(f'💬 {self.character_name} received end dialog from {other_name}')
+            
+            # Release conversation lock with this character
+            self._release_conversation_lock(other_name)
+            
             entity_context = self.get_entity_context(other_name, 10)
             # Build user prompt with context
             dialog_history = '' 
@@ -1296,8 +1510,12 @@ end your response with </end>
             key = f"cognitive/{source}/dialog_end"
             payload = json.dumps({'other_name': self.character_name})
             self.session.put(key, payload)
+            
+            # Release conversation lock with this character
+            self._release_conversation_lock(source)
+            
         except Exception as e:
-            logger.error(f'Error publishing dialog end to {source}: {e}')  
+            logger.error(f'Error publishing dialog end to {source}: {e}')
  
 
     def parse_and_set_goal(self, goal_text):
@@ -1311,7 +1529,7 @@ end your response with </end>
             if self.manual:
                 self._publish_goal(self.current_goal)
             else:
-                self._replan(self.current_goal, 'Goal set by user')
+                self._plan_abandoned()
             return
         except Exception as e:
             logger.error(f"Goal parsing failed for {self.character_name}: {e}")
@@ -1322,6 +1540,7 @@ end your response with </end>
         """Parse plan input from UI and set current plan."""
         try:
             parsed_plan = plan_module.parse_plan_text(plan_text)
+            self._plan_abandoned()  # Clear any existing plan
             self.current_plan = parsed_plan
             self.plan_bindings_cache = {}
             self.plan_summary_completed = False  # Reset for new plan
@@ -1676,7 +1895,7 @@ End your text with: </end>"""
         """Resolve abstract resource name to specific resource instance."""
         try:
             # First try exact match validation
-            for reply in self.session.get(f"cognitive/{self.character_name}/memory/inventory?item={raw_target}", timeout=2.0):
+            for reply in self.session.get(f"cognitive/{self.character_name}/memory/inventory?item={raw_target}", timeout=2.0 if not self.debug else 600.0):
                 if reply.ok:
                     data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
                     if data.get('success'):
@@ -1685,7 +1904,7 @@ End your text with: </end>"""
                 break
             
             # First try exact match validation
-            for reply in self.session.get(f"cognitive/map/bind/resource/{raw_target}", timeout=2.0):
+            for reply in self.session.get(f"cognitive/map/bind/resource/{raw_target}", timeout=2.0 if not self.debug else 600.0):
                 if reply.ok:
                     data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
                     if data.get('success'):
@@ -1704,7 +1923,7 @@ End your text with: </end>"""
         """Find which direction a target (character or resource) is visible in."""
         try:
             # Query situation node for current situation data
-            for reply in self.session.get(f"cognitive/{self.character_name}/situation/current_situation", timeout=5.0):
+            for reply in self.session.get(f"cognitive/{self.character_name}/situation/current_situation", timeout=5.0 if not self.debug else 600.0):
                 if reply.ok:
                     situation_data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
                     if not situation_data.get('success'):
@@ -1762,7 +1981,7 @@ End your text with: </end>"""
         try:
             # Query map node to move the agent
             move_data = {'direction': move_direction}
-            for reply in self.session.get(f"cognitive/map/agent/{self.character_name}/move", payload=json.dumps(move_data).encode('utf-8'), timeout=5.0):
+            for reply in self.session.get(f"cognitive/map/agent/{self.character_name}/move", payload=json.dumps(move_data).encode('utf-8'), timeout=5.0 if not self.debug else 600.0):
                 try:
                     if reply.ok:
                         move_result = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
@@ -1806,7 +2025,7 @@ End your text with: </end>"""
             if self.action_history:
                 self.action_history[-1].result = f'taking {target}'
                         # Remove the resource from the map
-            for reply in self.session.get(f"cognitive/map/resource/remove/{target}", timeout=2.0):
+            for reply in self.session.get(f"cognitive/map/resource/remove/{target}", timeout=2.0 if not self.debug else 600.0   ):
                 if reply.ok:
                     data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
                     if data.get('success'):
@@ -1880,7 +2099,8 @@ End your response with:
                     messages=[system_prompt, user_prompt, directive],
                     max_tokens=50,
                     temperature=0.7,
-                    timeout=timeout
+                    timeout=timeout,
+                    stops=['</end>']
                 )
                 if response.success:
                     logger.warning(f'🤖 {self.character_name} Inspected {target}:\n\t {response.text}')
@@ -1932,7 +2152,8 @@ End your response with:
                     messages=[system_prompt, user_prompt, directive],
                     max_tokens=50,
                     temperature=0.7,
-                    timeout=timeout
+                    timeout=timeout,
+                    stops=['</end>']
                 )
 
                 if response.success:
@@ -1971,7 +2192,7 @@ End your response with:
         try:
             # Query short-term memory
             entries = []
-            for reply in self.session.get(f"cognitive/{self.character_name}/memory/chat/*", timeout=3.0):
+            for reply in self.session.get(f"cognitive/{self.character_name}/memory/chat/*", timeout=3.0 if not self.debug else 600.0):
                 try:
                     if reply.ok:
                         content = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
@@ -2028,7 +2249,7 @@ End your response with:
         """
         try:
             # Query entity data from memory node with query and limit parameters
-            for reply in self.session.get(f"cognitive/{self.character_name}/memory/entity/{entity_name}?query=dialog&limit={limit}&scope={scope}", timeout=3.0):
+            for reply in self.session.get(f"cognitive/{self.character_name}/memory/entity/{entity_name}?query=dialog&limit={limit}&scope={scope}", timeout=3.0 if not self.debug else 600.0):
                 try:
                     if reply.ok:
                         data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
@@ -2065,13 +2286,13 @@ End your response with:
             encoded_text = urllib.parse.quote(input_text)
             query_url = f"cognitive/{self.character_name}/memory/entity/{entity_name}?query=natural_dialog_end&input_text={encoded_text}&context={self.observations['static']}"
             
-            for reply in self.session.get(query_url, timeout=10.0):
+            for reply in self.session.get(query_url, timeout=10.0 if not self.debug else 600.0):
                 try:
                     if reply.ok:
                         data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
                         if data['success']:
                             logger.info(f'🤔 Natural dialog end check for {entity_name}: {data.get("should_end", True)}')
-                            return data.get('should_end', True)
+                            return data.get("should_end", True)
                         else:
                             logger.debug(f'Natural dialog end query failed for {entity_name}: {data.get("error", "Unknown error")}')
                             return True
@@ -2086,35 +2307,143 @@ End your response with:
             logger.error(f'Error querying natural dialog end for {entity_name}: {e}')
             return True
     
+    def _acquire_conversation_lock(self, target_character: str) -> bool:
+        """
+        Attempt to acquire conversation lock with target character.
+        
+        Args:
+            target_character: Name of character to talk to
+            
+        Returns:
+            bool: True if lock acquired, False if not available
+        """
+        try:
+            # Query map node to acquire conversation lock
+            lock_request = {
+                'requester': self.character_name,
+                'target': target_character
+            }
+            
+            for reply in self.session.get("cognitive/map/conversation/lock/acquire", 
+                                        payload=json.dumps(lock_request).encode('utf-8'),
+                                        timeout=5.0 if not self.debug else 60.0):
+                if reply.ok:
+                    data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
+                    if data.get('success'):
+                        lock_acquired = data.get('lock_acquired', False)
+                        if lock_acquired:
+                            logger.info(f'🔒 Conversation lock acquired with {target_character}')
+                        else:
+                            logger.info(f'🔒 Conversation lock unavailable with {target_character}')
+                        return lock_acquired
+                    else:
+                        logger.error(f'Failed to acquire conversation lock: {data.get("error", "Unknown error")}')
+                        return False
+            
+            logger.error(f'No response received for conversation lock request with {target_character}')
+            return False
+            
+        except Exception as e:
+            logger.error(f'Error acquiring conversation lock with {target_character}: {e}')
+            return False
+    
+    def _release_conversation_lock(self, target_character: str):
+        """
+        Release conversation lock with target character.
+        
+        Args:
+            target_character: Name of character to release lock with
+        """
+        try:
+            # Query map node to release conversation lock
+            lock_release = {
+                'character1': self.character_name,
+                'character2': target_character
+            }
+            
+            for reply in self.session.get("cognitive/map/conversation/lock/release", 
+                                        payload=json.dumps(lock_release).encode('utf-8'),
+                                        timeout=5.0 if not self.debug else 60.0):
+                if reply.ok:
+                    data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
+                    if data.get('success'):
+                        logger.info(f'🔓 Conversation lock released with {target_character}')
+                    else:
+                        logger.error(f'Failed to release conversation lock: {data.get("error", "Unknown error")}')
+                break
+            
+        except Exception as e:
+            logger.error(f'Error releasing conversation lock with {target_character}: {e}')
+    
+    def check_conversation_lock_availability(self, target_character: str) -> bool:
+        """
+        Check if conversation lock is available with target character.
+        
+        Args:
+            target_character: Name of character to check
+            
+        Returns:
+            bool: True if lock is available, False if not
+        """
+        try:
+            # Query map node to check conversation lock status
+            for reply in self.session.get(f"cognitive/map/conversation/lock/status/{target_character}", 
+                                        timeout=5.0 if not self.debug else 60.0):
+                if reply.ok:
+                    data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
+                    if data.get('success'):
+                        is_locked = data.get('is_locked', False)
+                        if not is_locked:
+                            logger.info(f'🔓 Conversation lock available with {target_character}')
+                            return True
+                        else:
+                            locked_with = data.get('locked_with', 'unknown')
+                            logger.info(f'🔒 Conversation lock unavailable with {target_character} (locked with {locked_with})')
+                            return False
+                    else:
+                        logger.error(f'Failed to check conversation lock status: {data.get("error", "Unknown error")}')
+                        return False
+            
+            logger.error(f'No response received for conversation lock status check with {target_character}')
+            return False
+            
+        except Exception as e:
+            logger.error(f'Error checking conversation lock availability with {target_character}: {e}')
+            return False
+    
     def shutdown(self):
         """Clean shutdown."""
-        if self._shutting_down:
-            return
-        self._shutting_down = True
-        logger.info('Shutting down Executive Node...')
-        
-        # Set shutdown flag to prevent new operations
-        self.shutdown_requested = True
-        
-        # Clean up LLM client first (this cancels pending requests)
-        if self.llm_client:
-            try:
-                self.llm_client.cleanup()
-                logger.info('LLM client cleanup completed')
-            except Exception as e:
-                logger.error(f'Error cleaning up LLM client: {e}')
-        
-        # Close Zenoh session more carefully
         try:
-            # Wait longer for cleanup to avoid Zenoh panics
-            time.sleep(2.0)
-            self.session.close()
-            logger.info('Zenoh session closed')
+            if getattr(self, '_shutting_down', False):
+                return
+            self._shutting_down = True
+            
+            logger.info(f'Executive Node shutdown initiated for {self.character_name}...')
+            
+            # Publish shutdown event for cleanup
+            try:
+                shutdown_data = {
+                    'character_name': self.character_name,
+                    'timestamp': datetime.now().isoformat(),
+                    'type': 'shutdown'
+                }
+                self.session.put(f"cognitive/{self.character_name}/shutdown", 
+                               json.dumps(shutdown_data).encode('utf-8'))
+                logger.info(f'Published shutdown event for {self.character_name}')
+            except Exception as e:
+                logger.error(f'Error publishing shutdown event: {e}')
+            
+            # Close Zenoh session
+            try:
+                self.session.close()
+                logger.info('Zenoh session closed')
+            except Exception as e:
+                logger.error(f'Error closing Zenoh session: {e}')
+            
+            logger.info(f'Executive Node shutdown complete for {self.character_name}')
+            
         except Exception as e:
-            logger.error(f'Error closing Zenoh session: {e}')
-        
-        logger.info('Executive Node shutdown complete')
-
+            logger.error(f'Error during shutdown: {e}')
 
 def main():
     """Main entry point for the executive node."""
