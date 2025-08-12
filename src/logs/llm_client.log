@@ -1,56 +1,1019 @@
-2025-08-10 14:34:01 - llm_client - INFO - 🤖 Zenoh LLM Client initialized
-2025-08-10 14:34:01 - executive_node - INFO - 🧠 Zenoh Executive Node initialized for character: User
-2025-08-10 14:34:01 - executive_node - INFO -    - Subscribing to: cognitive/User/sense_data
-2025-08-10 14:34:01 - executive_node - INFO -    - Subscribing to: cognitive/User/situation/update
-2025-08-10 14:34:01 - executive_node - INFO -    - Subscribing to: cognitive/map/turn/go
-2025-08-10 14:34:01 - executive_node - INFO -    - Subscribing to: cognitive/User/end_dialog
-2025-08-10 14:34:01 - executive_node - INFO -    - Publishing to: cognitive/User/action
-2025-08-10 14:34:01 - executive_node - INFO -    - Publishing to: cognitive/User/situation/request_update
-2025-08-10 14:34:01 - executive_node - INFO -    - Publishing to: cognitive/User/memory/store
-2025-08-10 14:34:01 - executive_node - INFO -    - Publishing to: cognitive/User/text_input
-2025-08-10 14:34:01 - executive_node - INFO -    - Publishing to: cognitive/User/goal
-2025-08-10 14:34:01 - executive_node - INFO -    - Publishing to: cognitive/User/decided_action
-2025-08-10 14:34:01 - executive_node - INFO -    - Publishing to: cognitive/map/turn/complete/User
-2025-08-10 14:34:01 - executive_node - WARNING - Executive Node running - press Ctrl+C to stop
-2025-08-10 14:34:01 - executive_node - INFO - 📢 Announced character presence: User
-2025-08-10 14:34:01 - executive_node - WARNING - 📊 User Received situation update
-2025-08-10 14:34:05 - executive_node - WARNING - 📊 User Received sit2025-08-10 14:34:09 - executive_node - WAR2025-08-10 14:34:09 - execut2025-08-10 14:34:09 - executive_node - WARNING - 🚦 Turn 0 received by Samantha
-202025-08-10 14:34:10 - executive_node - WARNING -2025-08-10 14:34:10 - executive_20252025-08-10 14:34:16 - executive_node - WARNING - 🤖 Joe New Goal: #goal Find Hut1
+2025-08-11 17:58:58 - llm_client - INFO - 🤖 Zenoh LLM Client initialized
+2025-08-11 17:58:58 - executive_node - INFO - 🧠 Zenoh Executive Node initialized for character: User
+2025-08-11 17:58:58 - executive_node - INFO -    - Subscribing to: cognitive/User/sense_data
+2025-08-11 17:58:58 - executive_node - INFO -    - Subscribing to: cognitive/User/situation/update
+2025-08-11 17:58:58 - executive_node - INFO -    - Subscribing to: cognitive/map/turn/go
+2025-08-11 17:58:58 - executive_node - INFO -    - Subscribing to: cognitive/User/end_dialog
+2025-08-11 17:58:58 - executive_node - INFO -    - Publishing to: cognitive/User/action
+2025-08-11 17:58:58 - executive_node - INFO -    - Publishing to: cognitive/User/situation/request_update
+2025-08-11 17:58:58 - executive_node - INFO -    - Publishing to: cognitive/User/memory/store
+2025-08-11 17:58:58 - executive_node - INFO -    - Publishing to: cognitive/User/text_input
+2025-08-11 17:58:58 - executive_node - INFO -    - Publishing to: cognitive/User/goal
+2025-08-11 17:58:58 - executive_node - INFO -    - Publishing to: cognitive/User/decided_action
+2025-08-11 17:58:58 - executive_node - INFO -    - Publishing to: cognitive/map/turn/complete/User
+2025-08-11 17:58:58 - executive_node - WARNING - Executive Node running - press Ctrl+C to stop
+2025-08-11 17:58:58 - executive_node - INFO - 📢 Announced character presence: User
+2025-08-11 17:58:59 - executive_node - WARNING - 📊 User Received situation update
+2025-08-11 17:59:02 - executive_node - WARNING - 📊 User Received sit2025-08-11 17:59:36 - executive_node - WARNING - 🚦 Turn 0 received by Joe
+2025-08-11 17:59:36 - executive_node - WARNING - 🚦 Turn 1 started for Joe
+2025-08-11 17:59:41 - executive_node - WARNING - 📊 Joe Received situation update
+20252025-08-11 18:00:51 - executive_no2025-08-11 18:00:51 - executive_node - WARNING - 🚦 Turn 1 received by Hermit
+2025-08-11 18:00:51 - executive_node - WAR2025-08-11 18:00:52 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-11 18:00:52 - e2025-08-11 18:01:19 - executive_node - WARNING - 2025-08-11 18:01:19 - executive2025-08-11 18:01:19 - executive_node - WARNING 2025-08-11 18:01:19 - executive_n2025-08-11 18:01:19 - executive_node - INFO -2025-08-11 18:01:20 - executi2025-08-11 18:01:24 - executive_node - WARNING - 🚦 Turn 3 received by Hermit
+2025-08-11 18:01:24 - executive_node - WARNING - 🚦 Turn 4 started for Hermit
+2025-08-11 18:01:25 - executive_node - INFO - 🔄 Hermit completing turn
+2025-08-11 18:01:26 - executive_node - WARNING - 🚦 Turn 4 received by Hermit
+2025-08-11 18:01:26 - executive_node - WARNING - 🚦 Turn 5 started for Hermit
+2025-08-11 18:01:27 - executive_node - INFO - 🔄 Hermit completing turn
+2025-08-11 18:01:28 - executive_node - WARNING - 🚦 Turn 5 received by Hermit
+2025-08-11 18:01:28 - executive_node - WARNING - 🚦 Turn 6 started for Hermit
+2025-08-11 18:01:28 - executive_node - WARNING - 🚦 Turn 6 received by Hermit
+2025-08-11 18:01:28 - executive_node - WARNING - 🚦 Turn 7 started for Hermit
+2025-08-11 18:01:29 - executive_node - INFO - 🔄 Hermit completing turn
+2025-08-11 18:05:32 - executive_node - WARNING - 🚦 Turn 7 received by Hermit
+2025-08-11 18:05:32 - executive_node - WARNING - 🚦 Turn 8 started for Hermit
+2025-08-11 18:05:32 - executive_node - INFO - 🔄 Hermit completing turn
+2025-08-11 18:06:05 - executive_node - WARNING - 🚦 Turn 8 received by Hermit
+2025-08-11 18:06:05 - executive_node - WARNING - 🚦 Turn 9 started for Hermit
+2025-08-11 18:06:05 - executive_node - INFO - 🔄 Hermit completing turn
+2025-08-11 18:06:16 - executive_node - WARNING - 🚦 Turn 9 received by Hermit
+2025-08-11 18:06:16 - executive_node - WARNING - 🚦 Turn 10 started for Hermit
+2025-08-11 18:06:17 - executive_node - INFO - 🔄 Hermit completing turn
+2025-08-11 18:06:23 - executive_node - WARNING - 🚦 Turn 10 received by Hermit
+2025-08-11 18:06:23 - executive_node - WARNING - 🚦 Turn 11 started for Hermit
+2025-08-11 18:06:24 - executive_node - INFO - 🔄 Hermit completing turn
+2025-08-11 18:06:25 - executive_node - WARNING - 🚦 Turn 11 received by Hermit
+2025-08-11 18:06:25 - executive_node - WARNING - 🚦 Turn 12 started for Hermit
+2025-08-11 18:06:25 - executive_node - WARNING - 🚦 Turn 12 received by Hermit
+2025-08-11 18:06:25 - executive_node - WARNING - 🚦 Turn 13 started for Hermit
+2025-08-11 18:06:26 - executive_node - INFO - 🔄 Hermit completing turn
+2025-08-11 18:06:42 - executive_node - WARNING - 🚦 Turn 13 received by Hermit
+2025-08-11 18:06:42 - executive_node - WARNING - 🚦 Turn 14 started for Hermit
+2025-08-11 18:06:43 - executive_node - INFO - 🔄 Hermit completing turn
+2025-08-11 18:06:50 - executive_node - WARNING - 🚦 Turn 14 received by Hermit
+2025-08-11 18:06:50 - executive_node - WARNING - 🚦 Turn 15 started for Hermit
+2025-08-11 18:06:51 - executive_node - INFO - 🔄 Hermit completing turn
+2025-08-11 18:06:52 - executive_node - WARNING - 🚦 Turn 15 received by Hermit
+2025-08-11 18:06:52 - executive_node - WARNING - 🚦 Turn 16 started for Hermit
+2025-08-11 18:06:53 - executive_node - INFO - 🔄 Hermit completing turn
+2025-08-11 18:06:55 - executive_node - WARNING - 🚦 Turn 16 received by Hermit
+2025-08-11 18:06:55 - executive_node - WARNING - 🚦 Turn 17 started for Hermit
+2025-08-11 18:06:56 - executive_node - INFO - 🔄 Hermit completing turn
+2025-08-11 18:07:01 - executive_node - WARNING - 🚦 Turn 17 received by Hermit
+2025-08-11 18:07:01 - executive_node - WARNING - 🚦 Turn 18 started for Hermit
+2025-08-11 18:07:01 - executive_node - INFO - 🔄 Hermit completing turn
+2025-08-11 18:07:31 - executive_node - WARNING - 🚦 Turn 18 received by Hermit
+2025-08-11 18:07:31 - executive_node - WARNING - 🚦 Turn 19 started for Hermit
+2025-08-11 18:07:32 - executive_node - WARNING - 🚦 Turn 19 received by Hermit
+2025-08-11 18:07:32 - executive_node - WARNING - 🚦 Turn 20 started for Hermit
+2025-08-11 18:07:32 - executive_node - INFO - 🔄 Hermit completing turn
+2025-08-11 18:07:38 - executive_node - WARNING - 🚦 Turn 20 received by Hermit
+2025-08-11 18:07:38 - executive_node - WARNING - 🚦 Turn 21 started for Hermit
+2025-08-11 18:07:39 - executive_node - INFO - 🔄 Hermit completing turn
+2025-08-11 18:07:53 - executive_node - WARNING - 🚦 Turn 21 received by Hermit
+2025-08-11 18:07:53 - executive_node - WARNING - 🚦 Turn 22 started for Hermit
+2025-08-11 18:07:53 - executive_node - INFO - 🔄 Hermit completing turn
+2025-08-11 18:08:05 - executive_node - WARNING - 🚦 Turn 22 received by Hermit
+2025-08-11 18:08:05 - executive_node - WARNING - 🚦 Turn 23 started for Hermit
+2025-08-11 18:08:06 - executive_node - INFO - 🔄 Hermit completing turn
+2025-08-11 18:08:11 - executive_node - WARNING - 🚦 Turn 23 received by Hermit
+2025-08-11 18:08:11 - executive_node - WARNING - 🚦 Turn 24 started for Hermit
+2025-08-11 18:08:11 - executive_node - INFO - 🔄 Hermit completing turn
+2025-08-11 18:08:25 - executive_node - WARNING - 🚦 Turn 24 received by Hermit
+2025-08-11 18:08:25 - executive_node - WARNING - 🚦 Turn 25 started for Hermit
+2025-08-11 18:08:26 - executive_node - INFO - 🔄 Hermit completing turn
+2025-08-11 18:08:40 - executive_node - WARNING - 🚦 Turn 25 received by Hermit
+2025-08-11 18:08:40 - executive_node - WARNING - 🚦 Turn 26 started for Hermit
+2025-08-11 18:08:41 - executive_node - INFO - 🔄 Hermit completing turn
+2025-08-11 18:08:43 - executive_node - WARNING - 🚦 Turn 26 received by Hermit
+2025-08-11 18:08:43 - executive_node - WARNING - 🚦 Turn 27 started for Hermit
+2025-08-11 18:08:43 - executive_node - INFO - 🔄 Hermit completing turn
+2025-08-11 18:08:48 - executive_node - WARNING - 🚦 Turn 27 received by Hermit
+2025-08-11 18:08:48 - executive_node - WARNING - 🚦 Turn 28 started for Hermit
+2025-08-11 18:08:48 - executive_node - INFO - 🔄 Hermit completing turn
+2025-08-11 18:09:00 - executive_node - WARNING - 🚦 Turn 28 received by Hermit
+2025-08-11 18:09:00 - executive_node - WARNING - 🚦 Turn 29 started for Hermit
+2025-08-11 18:09:00 - executive_node - INFO - 🔄 Hermit completing turn
+2025-08-11 18:09:18 - executive_node - WARNING - 🚦 Turn 29 received by Hermit
+2025-08-11 18:09:18 - executive_node - WARNING - 🚦 Turn 30 started for Hermit
+2025-08-11 18:09:18 - executive_node - INFO - 🔄 Hermit completing turn
+2025-08-11 18:09:22 - executive_node - WARNING - 🚦 Turn 30 received by Hermit
+2025-08-11 18:09:22 - executive_node - WARNING - 🚦 Turn 31 started for Hermit
+2025-08-11 18:09:22 - executive_node - INFO - 🔄 Hermit completing turn
+2025-08-11 18:09:29 - executive_node - WARNING - 🚦 Turn 31 received by Hermit
+2025-08-11 18:09:29 - executive_node - WARNING - 🚦 Turn 32 started for Hermit
+2025-08-11 18:09:29 - executive_node - INFO - 🔄 Hermit completing turn
+2025-08-11 18:09:41 - executive_node - WARNING - 🚦 Turn 32 received by Hermit
+2025-08-11 18:09:41 - executive_node - WARNING - 🚦 Turn 33 started for Hermit
+2025-08-11 18:09:42 - executive_node - INFO - 🔄 Hermit completing turn
+2025-08-11 18:09:43 - executive_node - WARNING - 🚦 Turn 33 received by Hermit
+2025-08-11 18:09:43 - executive_node - WARNING - 🚦 Turn 34 started for Hermit
+2025-08-11 18:09:44 - executive_node - INFO - 🔄 Hermit completing turn
+2025-08-11 18:09:45 - executive_node - WARNING - 🚦 Turn 34 received by Hermit
+2025-08-11 18:09:45 - executive_node - WARNING - 🚦 Turn 35 started for Hermit
+2025-08-11 18:09:45 - executive_node - WARNING - 🚦 Turn 35 received by Hermit
+2025-08-11 18:09:45 - executive_node - WARNING - 🚦 Turn 36 started for Hermit
+2025-08-11 18:09:46 - executive_node - INFO - 🔄 Hermit completing turn
+2025-08-11 18:09:53 - executive_node - WARNING - 🚦 Turn 36 received by Hermit
+2025-08-11 18:09:53 - executive_node - WARNING - 🚦 Turn 37 started for Hermit
+2025-08-11 18:09:54 - executive_node - INFO - 🔄 Hermit completing turn
+2025-08-11 18:10:24 - executive_node - WARNING - 🚦 Turn 37 received by Hermit
+2025-08-11 18:10:24 - executive_node - WARNING - 🚦 Turn 38 started for Hermit
+2025-08-11 18:10:24 - executive_node - INFO - 🔄 Hermit completing turn
+2025-08-11 18:10:25 - executive_node - WARNING - 🚦 Turn 38 received by Hermit
+2025-08-11 18:10:25 - executive_node - WARNING - 🚦 Turn 39 started for Hermit
+2025-08-11 18:10:26 - executive_node - INFO - 🔄 Hermit completing turn
+2025-08-11 18:10:27 - executive_node - WARNING - 🚦 Turn 39 received by Hermit
+2025-08-11 18:10:27 - executive_node - WARNING - 🚦 Turn 40 started for Hermit
+2025-08-11 18:10:28 - executive_node - WARNING - 🚦 Turn 40 received by Hermit
+2025-08-11 18:10:28 - executive_node - WARNING - 🚦 Turn 41 started for Hermit
+2025-08-11 18:10:29 - executive_node - INFO - 🔄 Hermit completing turn
+2025-08-11 18:10:34 - executive_node - WARNING - 🚦 Turn 41 received by Hermit
+2025-08-11 18:10:34 - executive_node - WARNING - 🚦 Turn 42 started for Hermit
+2025-08-11 18:10:35 - executive_node - INFO - 🔄 Hermit completing turn
+2025-08-11 18:10:46 - executive_node - WARNING - 🚦 Turn 42 received by Hermit
+2025-08-11 18:10:46 - executive_node - WARNING - 🚦 Turn 43 started for Hermit
+2025-08-11 18:10:46 - executive_node - INFO - 🔄 Hermit completing turn
+2025-08-11 18:10:48 - executive_node - WARNING - 🚦 Turn 43 received by Hermit
+2025-08-11 18:10:48 - executive_node - WARNING - 🚦 Turn 44 started for Hermit
+2025-08-11 18:10:48 - executive_node - INFO - 🔄 Hermit completing turn
+2025-08-11 18:10:50 - executive_node - WARNING - 🚦 Turn 44 received by Hermit
+2025-08-11 18:10:50 - executive_node - WARNING - 🚦 Turn 45 started for Hermit
+2025-08-11 18:10:50 - executive_node - WARNING - 🚦 Turn 45 received by Hermit
+2025-08-11 18:10:50 - executive_node - WARNING - 🚦 Turn 46 started for Hermit
+2025-08-11 18:10:50 - executive_node - INFO - 🔄 Hermit completing turn
+2025-08-11 18:10:56 - executive_node - WARNING - 🚦 Turn 46 received by Hermit
+2025-08-11 18:10:56 - executive_node - WARNING - 🚦 Turn 47 started for Hermit
+2025-08-11 18:10:57 - executive_node - INFO - 🔄 Hermit completing turn
+2025-08-11 18:11:07 - executive_node - WARNING - 🚦 Turn 47 received by Hermit
+2025-08-11 18:11:07 - executive_node - WARNING - 🚦 Turn 48 started for Hermit
+2025-08-11 18:11:08 - executive_node - INFO - 🔄 Hermit completing turn
+2025-08-11 18:11:09 - executive_node - WARNING - 🚦 Turn 48 received by Hermit
+2025-08-11 18:11:09 - executive_node - WARNING - 🚦 Turn 49 started for Hermit
+2025-08-11 18:11:10 - executive_node - INFO - 🔄 Hermit completing turn
+2025-08-11 18:11:12 - executive_node - WARNING - 🚦 Turn 49 received by Hermit
+2025-08-11 18:11:12 - executive_node - WARNING - 🚦 Turn 50 started for Hermit
+2025-08-11 18:11:13 - executive_node - INFO - 🔄 Hermit completing turn
+2025-08-11 18:11:18 - executive_node - WARNING - 🚦 Turn 50 received by Hermit
+2025-08-11 18:11:18 - executive_node - WARNING - 🚦 Turn 51 started for Hermit
+2025-08-11 18:11:18 - executive_node - INFO - 🔄 Hermit completing turn
+2025-08-11 18:11:26 - executive_node - WARNING - 🚦 Turn 51 received by Hermit
+2025-08-11 18:11:26 - executive_node - WARNING - 🚦 Turn 52 started for Hermit
+2025-08-11 18:11:27 - executive_node - INFO - 🔄 Hermit completing turn
+2025-08-11 18:11:30 - executive_node - WARNING - 🚦 Turn 52 received by Hermit
+2025-08-11 18:11:30 - executive_node - WARNING - 🚦 Turn 53 started for Hermit
+2025-08-11 18:11:31 - executive_node - INFO - 🔄 Hermit completing turn
+2025-08-11 18:11:38 - executive_node - WARNING - 🚦 Turn 53 received by Hermit
+2025-08-11 18:11:38 - executive_node - WARNING - 🚦 Turn 54 started for Hermit
+2025-08-11 18:11:39 - executive_node - INFO - 🔄 Hermit completing turn
+2025-08-11 18:11:42 - executive_node - WARNING - 🚦 Turn 54 received by Hermit
+2025-08-11 18:11:42 - executive_node - WARNING - 🚦 Turn 55 started for Hermit
+2025-08-11 18:11:42 - executive_node - INFO - 🔄 Hermit completing turn
+2025-08-11 18:11:54 - executive_node - WARNING - 🚦 Turn 55 received by Hermit
+2025-08-11 18:11:54 - executive_node - WARNING - 🚦 Turn 56 started for Hermit
+2025-08-11 18:11:55 - executive_node - INFO - 🔄 Hermit completing turn
+2025-08-11 18:11:57 - executive_node - WARNING - 🚦 Turn 56 received by Hermit
+2025-08-11 18:11:57 - executive_node - WARNING - 🚦 Turn 57 started for Hermit
+2025-08-11 18:11:57 - executive_node - INFO - 🔄 Hermit completing turn
+2025-08-11 18:12:00 - executive_node - WARNING - 🚦 Turn 57 received by Hermit
+2025-08-11 18:12:00 - executive_node - WARNING - 🚦 Turn 58 started for Hermit
+2025-08-11 18:12:00 - executive_node - INFO - 🔄 Hermit completing turn
+2025-08-11 18:12:07 - executive_node - WARNING - 🚦 Turn 58 received by Hermit
+2025-08-11 18:12:07 - executive_node - WARNING - 🚦 Turn 59 started for Hermit
+2025-08-11 18:12:07 - executive_node - INFO - 🔄 Hermit completing turn
+2025-08-11 18:12:08 - executive_node - WARNING - Received signal 15, initiating shutdown...
+2025-08-11 18:12:08 - executive_node - INFO - Executive Node shutdown initiated for Hermit...
+2025-08-11 18:12:08 - executive_node - INFO - Published shutdown event for Hermit
+2025-08-11 18:12:08 - executive_node - INFO - Zenoh session closed
+2025-08-11 18:12:08 - executive_node - INFO - Executive Node shutdown complete for Hermit
+2025-08-11 18:12:11 - executive_node - WARNING - Received signal 15, initiating shutdown...
+ING - 🚦 Turn 26 received by User
+2025-08-11 18:08:43 - executive_node - WARNING - 🚦 Turn 27 started for User
+2025-08-11 18:08:43 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-11 18:08:43 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-11 18:08:43 - executive_node - INFO - 👥 Retrieved entity context for User
+2025-08-11 18:08:43 - executive_node - INFO - 🔄 User completing turn
+2025-08-11 18:08:48 - executive_node - WARNING - 🚦 Turn 27 received by User
+2025-08-11 18:08:48 - executive_node - WARNING - 🚦 Turn 28 started for User
+2025-08-11 18:08:49 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-11 18:08:49 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-11 18:08:49 - executive_node - INFO - 👥 Retrieved entity context for User
+2025-08-11 18:08:49 - executive_node - INFO - 🔄 User completing turn
+2025-08-11 18:09:00 - executive_node - WARNING - 🚦 Turn 28 received by User
+2025-08-11 18:09:00 - executive_node - WARNING - 🚦 Turn 29 started for User
+2025-08-11 18:09:01 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-11 18:09:01 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-11 18:09:01 - executive_node - INFO - 👥 Retrieved entity context for User
+2025-08-11 18:09:01 - executive_node - INFO - 🔄 User completing turn
+2025-08-11 18:09:18 - executive_node - WARNING - 🚦 Turn 29 received by User
+2025-08-11 18:09:18 - executive_node - WARNING - 🚦 Turn 30 started for User
+2025-08-11 18:09:18 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-11 18:09:18 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-11 18:09:18 - executive_node - INFO - 👥 Retrieved entity context for User
+2025-08-11 18:09:18 - executive_node - INFO - 🔄 User completing turn
+2025-08-11 18:09:21 - executive_node - WARNING - 📥 User Received text input: "I think I see Hut1, let's go check it out" (source: Joe)
+2025-08-11 18:09:21 - executive_node - WARNING - 📊 User Received situation update
+2025-08-11 18:09:22 - executive_node - WARNING - 🚦 Turn 30 received by User
+2025-08-11 18:09:22 - executive_node - WARNING - 🚦 Turn 31 started for User
+2025-08-11 18:09:22 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-11 18:09:22 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-11 18:09:22 - executive_node - INFO - 👥 Retrieved entity context for User
+2025-08-11 18:09:22 - executive_node - INFO - 🔄 User completing turn
+2025-08-11 18:09:29 - executive_node - WARNING - 🚦 Turn 31 received by User
+2025-08-11 18:09:29 - executive_node - WARNING - 🚦 Turn 32 started for User
+2025-08-11 18:09:29 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-11 18:09:29 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-11 18:09:29 - executive_node - INFO - 👥 Retrieved entity context for User
+2025-08-11 18:09:29 - executive_node - INFO - 🔄 User completing turn
+2025-08-11 18:09:41 - executive_node - WARNING - 🚦 Turn 32 received by User
+2025-08-11 18:09:41 - executive_node - WARNING - 🚦 Turn 33 started for User
+2025-08-11 18:09:42 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-11 18:09:42 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-11 18:09:42 - executive_node - INFO - 👥 Retrieved entity context for User
+2025-08-11 18:09:42 - executive_node - INFO - 🔄 User completing turn
+2025-08-11 18:09:43 - executive_node - WARNING - 🚦 Turn 33 received by User
+2025-08-11 18:09:43 - executive_node - WARNING - 🚦 Turn 34 started for User
+2025-08-11 18:09:44 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-11 18:09:44 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-11 18:09:44 - executive_node - INFO - 👥 Retrieved entity context for User
+2025-08-11 18:09:44 - executive_node - INFO - 🔄 User completing turn
+2025-08-11 18:09:45 - executive_node - WARNING - 🚦 Turn 34 received by User
+2025-08-11 18:09:45 - executive_node - WARNING - 🚦 Turn 35 started for User
+2025-08-11 18:09:45 - executive_node - WARNING - 🚦 Turn 35 received by User
+2025-08-11 18:09:45 - executive_node - WARNING - 🚦 Turn 36 started for User
+2025-08-11 18:09:46 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-11 18:09:46 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-11 18:09:46 - executive_node - INFO - 👥 Retrieved entity context for User
+2025-08-11 18:09:46 - executive_node - INFO - 🔄 User completing turn
+2025-08-11 18:09:53 - executive_node - WARNING - 🚦 Turn 36 received by User
+2025-08-11 18:09:53 - executive_node - WARNING - 🚦 Turn 37 started for User
+2025-08-11 18:09:54 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-11 18:09:54 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-11 18:09:54 - executive_node - INFO - 👥 Retrieved entity context for User
+2025-08-11 18:09:54 - executive_node - INFO - 🔄 User completing turn
+2025-08-11 18:10:24 - executive_node - WARNING - 🚦 Turn 37 received by User
+2025-08-11 18:10:24 - executive_node - WARNING - 🚦 Turn 38 started for User
+2025-08-11 18:10:24 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-11 18:10:24 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-11 18:10:24 - executive_node - INFO - 👥 Retrieved entity context for User
+2025-08-11 18:10:24 - executive_node - INFO - 🔄 User completing turn
+2025-08-11 18:10:25 - executive_node - WARNING - 🚦 Turn 38 received by User
+2025-08-11 18:10:25 - executive_node - WARNING - 🚦 Turn 39 started for User
+2025-08-11 18:10:26 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-11 18:10:26 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-11 18:10:26 - executive_node - INFO - 👥 Retrieved entity context for User
+2025-08-11 18:10:27 - executive_node - INFO - 🔄 User completing turn
+2025-08-11 18:10:27 - executive_node - WARNING - 🚦 Turn 39 received by User
+2025-08-11 18:10:27 - executive_node - WARNING - 🚦 Turn 40 started for User
+2025-08-11 18:10:28 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-11 18:10:28 - executive_node - WARNING - 🚦 Turn 40 received by User
+2025-08-11 18:10:28 - executive_node - WARNING - 🚦 Turn 41 started for User
+2025-08-11 18:10:28 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-11 18:10:28 - executive_node - INFO - 👥 Retrieved entity context for User
+2025-08-11 18:10:28 - executive_node - INFO - 🔄 User completing turn
+2025-08-11 18:10:34 - executive_node - WARNING - 🚦 Turn 41 received by User
+2025-08-11 18:10:34 - executive_node - WARNING - 🚦 Turn 42 started for User
+2025-08-11 18:10:35 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-11 18:10:35 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-11 18:10:35 - executive_node - INFO - 👥 Retrieved entity context for User
+2025-08-11 18:10:35 - executive_node - INFO - 🔄 User completing turn
+2025-08-11 18:10:46 - executive_node - WARNING - 🚦 Turn 42 received by User
+2025-08-11 18:10:46 - executive_node - WARNING - 🚦 Turn 43 started for User
+2025-08-11 18:10:46 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-11 18:10:46 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-11 18:10:46 - executive_node - INFO - 👥 Retrieved entity context for User
+2025-08-11 18:10:46 - executive_node - INFO - 🔄 User completing turn
+2025-08-11 18:10:48 - executive_node - WARNING - 🚦 Turn 43 received by User
+2025-08-11 18:10:48 - executive_node - WARNING - 🚦 Turn 44 started for User
+2025-08-11 18:10:48 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-11 18:10:48 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-11 18:10:48 - executive_node - INFO - 👥 Retrieved entity context for User
+2025-08-11 18:10:48 - executive_node - INFO - 🔄 User completing turn
+2025-08-11 18:10:50 - executive_node - WARNING - 🚦 Turn 44 received by User
+2025-08-11 18:10:50 - executive_node - WARNING - 🚦 Turn 45 started for User
+2025-08-11 18:10:50 - executive_node - WARNING - 🚦 Turn 45 received by User
+2025-08-11 18:10:50 - executive_node - WARNING - 🚦 Turn 46 started for User
+2025-08-11 18:10:50 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-11 18:10:50 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-11 18:10:50 - executive_node - INFO - 👥 Retrieved entity context for User
+2025-08-11 18:10:50 - executive_node - INFO - 🔄 User completing turn
+2025-08-11 18:10:56 - executive_node - WARNING - 🚦 Turn 46 received by User
+2025-08-11 18:10:56 - executive_node - WARNING - 🚦 Turn 47 started for User
+2025-08-11 18:10:57 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-11 18:10:57 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-11 18:10:57 - executive_node - INFO - 👥 Retrieved entity context for User
+2025-08-11 18:10:57 - executive_node - INFO - 🔄 User completing turn
+2025-08-11 18:11:07 - executive_node - WARNING - 🚦 Turn 47 received by User
+2025-08-11 18:11:07 - executive_node - WARNING - 🚦 Turn 48 started for User
+2025-08-11 18:11:08 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-11 18:11:08 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-11 18:11:08 - executive_node - INFO - 👥 Retrieved entity context for User
+2025-08-11 18:11:08 - executive_node - INFO - 🔄 User completing turn
+2025-08-11 18:11:09 - executive_node - WARNING - 🚦 Turn 48 received by User
+2025-08-11 18:11:09 - executive_node - WARNING - 🚦 Turn 49 started for User
+2025-08-11 18:11:10 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-11 18:11:10 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-11 18:11:10 - executive_node - INFO - 👥 Retrieved entity context for User
+2025-08-11 18:11:10 - executive_node - INFO - 🔄 User completing turn
+2025-08-11 18:11:12 - executive_node - WARNING - 🚦 Turn 49 received by User
+2025-08-11 18:11:12 - executive_node - WARNING - 🚦 Turn 50 started for User
+2025-08-11 18:11:13 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-11 18:11:13 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-11 18:11:13 - executive_node - INFO - 👥 Retrieved entity context for User
+2025-08-11 18:11:13 - executive_node - INFO - 🔄 User completing turn
+2025-08-11 18:11:18 - executive_node - WARNING - 🚦 Turn 50 received by User
+2025-08-11 18:11:18 - executive_node - WARNING - 🚦 Turn 51 started for User
+2025-08-11 18:11:18 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-11 18:11:18 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-11 18:11:18 - executive_node - INFO - 👥 Retrieved entity context for User
+2025-08-11 18:11:18 - executive_node - INFO - 🔄 User completing turn
+2025-08-11 18:11:26 - executive_node - WARNING - 🚦 Turn 51 received by User
+2025-08-11 18:11:26 - executive_node - WARNING - 🚦 Turn 52 started for User
+2025-08-11 18:11:27 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-11 18:11:27 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-11 18:11:27 - executive_node - INFO - 👥 Retrieved entity context for User
+2025-08-11 18:11:27 - executive_node - INFO - 🔄 User completing turn
+2025-08-11 18:11:30 - executive_node - WARNING - 🚦 Turn 52 received by User
+2025-08-11 18:11:30 - executive_node - WARNING - 🚦 Turn 53 started for User
+2025-08-11 18:11:31 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-11 18:11:31 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-11 18:11:31 - executive_node - INFO - 👥 Retrieved entity context for User
+2025-08-11 18:11:31 - executive_node - INFO - 🔄 User completing turn
+2025-08-11 18:11:38 - executive_node - WARNING - 🚦 Turn 53 received by User
+2025-08-11 18:11:38 - executive_node - WARNING - 🚦 Turn 54 started for User
+2025-08-11 18:11:38 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-11 18:11:38 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-11 18:11:38 - executive_node - INFO - 👥 Retrieved entity context for User
+2025-08-11 18:11:38 - executive_node - INFO - 🔄 User completing turn
+2025-08-11 18:11:42 - executive_node - WARNING - 🚦 Turn 54 received by User
+2025-08-11 18:11:42 - executive_node - WARNING - 🚦 Turn 55 started for User
+2025-08-11 18:11:42 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-11 18:11:42 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-11 18:11:42 - executive_node - INFO - 👥 Retrieved entity context for User
+2025-08-11 18:11:42 - executive_node - INFO - 🔄 User completing turn
+2025-08-11 18:11:54 - executive_node - WARNING - 🚦 Turn 55 received by User
+2025-08-11 18:11:54 - executive_node - WARNING - 🚦 Turn 56 started for User
+2025-08-11 18:11:55 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-11 18:11:55 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-11 18:11:55 - executive_node - INFO - 👥 Retrieved entity context for User
+2025-08-11 18:11:55 - executive_node - INFO - 🔄 User completing turn
+2025-08-11 18:11:57 - executive_node - WARNING - 🚦 Turn 56 received by User
+2025-08-11 18:11:57 - executive_node - WARNING - 🚦 Turn 57 started for User
+2025-08-11 18:11:57 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-11 18:11:57 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-11 18:11:57 - executive_node - INFO - 👥 Retrieved entity context for User
+2025-08-11 18:11:57 - executive_node - INFO - 🔄 User completing turn
+2025-08-11 18:12:00 - executive_node - WARNING - 🚦 Turn 57 received by User
+2025-08-11 18:12:00 - executive_node - WARNING - 🚦 Turn 58 started for User
+2025-08-11 18:12:01 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-11 18:12:01 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-11 18:12:01 - executive_node - INFO - 👥 Retrieved entity context for User
+2025-08-11 18:12:01 - executive_node - INFO - 🔄 User completing turn
+2025-08-11 18:12:07 - executive_node - WARNING - 🚦 Turn 58 received by User
+2025-08-11 18:12:07 - executive_node - WARNING - 🚦 Turn 59 started for User
+2025-08-11 18:12:07 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-11 18:12:07 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-11 18:12:07 - executive_node - INFO - 👥 Retrieved entity context for User
+2025-08-11 18:12:07 - executive_node - INFO - 🔄 User completing turn
+2025-08-11 18:12:08 - executive_node - WARNING - Received signal 15, initiating shutdown...
+2025-08-11 18:12:08 - executive_node - INFO - Executive Node shutdown initiated for User...
+2025-08-11 18:12:08 - executive_node - INFO - Published shutdown event for User
+2025-08-11 18:12:08 - executive_node - INFO - Zenoh session closed
+2025-08-11 18:12:08 - executive_node - INFO - Executive Node shutdown complete for User
+2025-08-11 18:12:11 - executive_node - WARNING - Received signal 15, initiating shutdown...
+7 received by Joe
+2025-08-11 18:07:01 - executive_node - WARNING - 🚦 Turn 18 started for Joe
+2025-08-11 18:07:02 - executive_node - INFO - 👥 Retrieved entity context for User
+2025-08-11 18:07:02 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-11 18:07:02 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-11 18:07:06 - executive_node - WARNING - 📊 Joe Received situation update
+2025-08-11 18:07:06 - executive_node - WARNING - 📥 Joe Received text input: "I think we have enough materials to build a shelter now, let's head back to our starting point, Joe, I'm getting a bit hungry too, maybe we can find some food on the way" (source: Samantha)
+2025-08-11 18:07:06 - executive_node - WARNING - 📊 Joe Received situation update
+2025-08-11 18:07:24 - executive_node - WARNING - 🤖 Joe New Goal: #goal Find Hut1 for safety
 #description Search for shelter and safety
 #otherCharacterName None
-#termination Arrived at Hut1 location
+#termination Found Hut1 structure
 ## 
-#goal Meet Samantha
-#description Introduce self to nearby person
-#otherCharacterName Samantha
-#termination Spoken to Samantha
-## 
-#goal Gather food
+#goal Gather food resources
 #description Find and collect edible resources
+#otherCharacterName User
+#termination Collected food items
+## 
+#goal Build shelter structure
+#description Construct shelter using available materials
+#otherCharacterName Samantha
+#termination Built shelter structure
+## 
+#goal Explore surroundings
+#description Investigate and map the environment
 #otherCharacterName None
-#termination Collected food resources
+#termination Mapped surrounding area
+## 
+<end> 
+#goal Find Hut1 for safety
+#description Search for shelter and safety
+#otherCharacterName None
+#termination Found Hut1 structure
+## 
+#goal Gather food resources
+#description Find and collect edible resources
+#otherCharacterName User
+#termination Collected food items
+## 
+#goal Build shelter structure
+#description Construct shelter using available materials
+#otherCharacterName Samantha
+#termination Built shelter structure
+## 
+#goal Explore surroundings
+#description Investigate and map the environment
+#otherCharacterName None
+#termination Mapped surrounding area
+## 
+<end> 
+#goal Find Hut1 for safety
+#description Search for shelter and safety
+#otherCharacterName None
+#termination Found Hut1 structure
+## 
+#goal Gather food resources
+#description Find and collect edible resources
+#otherCharacterName User
+#termination Collected food items
+## 
+#goal Build shelter structure
+#description Construct shelter using available materials
+#otherCharacterName Samantha
+#termination Built shelter structure
+## 
+#goal Explore surroundings
+#description Investigate and map the environment
+#otherCharacterName None
+#termination Mapped surrounding area
+## 
+<end> 
+#goal Find Hut1 for safety
+#description Search for shelter and safety
+2025-08-11 18:07:31 - executive_node - WARNING - 🚦 Turn 18 received by Samantha
+2025-08-11 18:07:31 - executive_node - WARNING - 🚦 Turn 19 started for Samantha
+2025-08-11 18:07:31 - executive_node - INFO - 👥 Retrieved entity context for User
+2025-08-11 18:07:31 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-11 18:07:31 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-11 18:07:31 - executive_node - INFO - 📝 Creating plan execution summary for Samantha
+2025-08-11 18:07:32 - executive_node - WARNING - 🚦 Turn 19 received by Samantha
+2025-08-11 18:07:32 - executive_node - WARNING - 🚦 Turn 20 started for Samantha
+2025-08-11 18:07:37 - executive_node - INFO - 📝 Summary prompt prepared for Samantha
+2025-08-11 18:07:37 - executive_node - INFO - 📋 Published current plan for Samantha
+2025-08-11 18:07:37 - executive_node - INFO - 🔄 Samantha completing turn
+2025-08-11 18:07:38 - executive_node - WARNING - 🚦 Turn 20 received by Samantha
+2025-08-11 18:07:38 - executive_node - WARNING - 🚦 Turn 21 started for Samantha
+2025-08-11 18:07:39 - executive_node - INFO - 👥 Retrieved entity context for User
+2025-08-11 18:07:39 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-11 18:07:39 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-11 18:07:43 - executive_node - WARNING - 📊 Samantha Received situation update
+2025-08-11 18:07:45 - executive_node - WARNING - 🤖 Samantha New Goal: #goal Find Food
+#description Find berries or mushrooms nearby
+#otherCharacterName Joe
+#termination Food is found
+## 
+#goal Build Shelter
+#description Use gathered materials to build
+#otherCharacterName Joe
+#termination Shelter is built
+## 
+#goal Assess Stranger
+#description Evaluate User's intentions carefully
+#otherCharacterName User
+#termination Intentions are clear
+## 
+#goal Explore Forest
+#description Move northeast to find resources
+#otherCharacterName None
+#termination New resources found
 ##
-2025-08-10 14:34:16 - executive_node - WARNING - Joe generated goal: Goal Find Hut1: Search for shelter and safety; actors: Joe; termination: Arrived at Hut1 location
-2025-08-10 14:34:16 - executive_node - INFO - 🎯 Published goal for Joe: Goal Find Hut1: Search for shelter and safety; actors: Joe; termination: Arrived at Hut1 location
-2025-08-10 14:34:21 - executive_node - INFO - 📋 Published current plan for Joe
-2025-08-10 12025-08-10 14:34:22 - executive_node - INFO - 📋 Published current plan for Samantha
-2025-08-10 14:34:22 - executive_node - INFO - 📋 Published decided action for Samantha: move: North - 
-2025-08-10 14:34:22 - executive_node - WAR2025-08-10 14:34:23 - executive_node - WARNING - 📤 Joe Sent text input to Samantha: "Hi, I'm Joe. What's going on here, and where's Hut1?" (source: Joe)
-2025-08-10 14:34:23 - executive_node - WARNING - Responding to: "Hi, I'm Joe. What's going on here?" f2025-08-10 14:34:23 - executive_node - WARNING - 📥 Samantha Received text input: "Hi, I'm Joe. What's going on here, and where's Hut1?" (source: Joe)
-2025-08-10 14:34:23 - executive_node - WARNING - 📊 Samantha Received situation update
-2025-08-10 14:34:24 - executive_node - INFO - Resp2025-08-10 14:34:28 - executive_node - WARNING - 📥 Joe Received text input: "I'm Samantha, nice to meet you, Joe. I'm just exploring the forest, trying to get a sense of the lay of the land. I haven't seen Hut1, but I've been moving north, and I was just about to check out that thicket up ahead. What brings you here?" (source: Samantha)
-2025-08-10 14:34:28 - executive_node - WARNING - 📊 Joe Received situation update
-2025-08-10 14:34:29 - executive_node - INFO - Responding to: "I'm Samantha, nice to meet you, Joe. I'm just exploring the forest, trying to get a sense of the lay of the land. I haven't seen Hut1, but I've been moving north, and I was just about to check out that thicket up ahead. What brings you here?" from Samantha
-2025-08-10 14:34:29 - executive_node - INFO - 👥 Retrieved entity context for Samantha
-2025-08-10 14:34:30 - executive_node - INFO - 🤔 Natural dialog end check for Samantha: False
-2025-08-10 14:34:30 - executive_node - WARNING - 🤖 Joe Dialog end check: False
-2025-08-10 14:34:33 - executive_node - WARNING - 📤 Joe Sent text input to Samantha: "I'm just trying to find Hut1, I've been moving north too, I saw that thicket and thought maybe it's a good idea to check it o2025-08-10 14:34:33 - executive_node - WARNING - 📥 Samantha Received text input: "I'm just trying to find Hut1, I've been moving north too, I saw that thicket and thought maybe it's a good idea to check it out together, you know, safety in numbers, right?" (source: Joe)
-2025-08-10 14:34:33 - executive_node - WARNING - 📊 Samantha Received situation update
-2025-08-10 14:34:33 - executive_node - INFO - Responding to: "I'm just trying to find Hut1, I've been moving north too, I saw that thicket and thought maybe it's a good idea to check it out together, you know, safety in numbers, right?" from Joe
-2025-08-10 14:34:33 - executiv2025-08-10 14:34:34 - executive_node - WARNING - 💬 Joe received end dialog from Samantha
-2025-08-10 14:34:34 - executive_node - INFO - 👥 Retrieved entity context for Samantha
-2025-08-10 14:34:34 - executive_node - WARNING - 🤖 Joe Replanning.
- executive_node - WARNING - 🤖 Samantha Replanning.
-2025-08-10 14:36:45 - executive_node - WARNING - 🤖 Samantha Replan candidate: {'plan': [{'type': 'move', 'target': 'North'}, {'type': 'while', 'body': [{'type': 'move', 'target': 'North'}], 'condition': {'type': 'notnear', 'target': 'Thicket4'}}, {'type': 'inspect', 'target': 'Thicket4'}]}
-2025-08-10 14:36:45 - executive_node - INFO - 📋 Published current plan for Samantha
-2025-08-10 14:36:45 - executive_node - INFO - 📤 Published action: action_1
+2025-08-11 18:07:45 - executive_node - WARNING - Samantha generated goal: Goal Find Food: Find berries or mushrooms nearby; actors: Samantha, Joe; termination: Food is found
+2025-08-11 18:07:45 - executive_node - INFO - 🎯 Published goal for Samantha: Goal Find Food: Find berries or mushrooms nearby; actors: Samantha, Joe; termination: Food is found
+2025-08-11 18:07:45 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-11 18:07:52 - executive_node - INFO - 📋 Published current plan for Samantha
+2025-08-11 18:07:52 - executive_node - INFO - 📋 Published current plan for Samantha
+2025-08-11 18:07:52 - executive_node - INFO - 📋 Published decided action for Samantha: move: Southeast - 
+2025-08-11 18:07:52 - executive_node - WARNING - Moving southeast
+2025-08-11 18:07:52 - executive_node - INFO - ✅ Move successful: southeast
+2025-08-11 18:07:52 - executive_node - INFO - 🔄 Samantha completing turn
+2025-08-11 18:07:52 - executive_node - WARNING - 📊 Samantha Received situation update
+2025-08-11 18:07:53 - executive_node - WARNING - 🚦 Turn 21 received by Samantha
+2025-08-11 18:07:53 - executive_node - WARNING - 🚦 Turn 22 started for Samantha
+2025-08-11 18:07:54 - executive_node - WARNING - 📊 Samantha Received situation update
+2025-08-11 18:07:54 - executive_node - INFO - 👥 Retrieved entity context for User
+2025-08-11 18:07:54 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-11 18:07:54 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-11 18:07:54 - executive_node - INFO - 📋 Published decided action for Samantha: move: Southeast - 
+2025-08-11 18:07:54 - executive_node - WARNING - Moving southeast
+2025-08-11 18:07:54 - executive_node - INFO - ✅ Move successful: southeast
+2025-08-11 18:07:54 - executive_node - INFO - 🔄 Samantha completing turn
+2025-08-11 18:07:54 - executive_node - WARNING - 📊 Samantha Received situation update
+2025-08-11 18:07:58 - executive_node - WARNING - 📊 Samantha Received situation update
+2025-08-11 18:08:05 - executive_node - WARNING - 🚦 Turn 22 received by Samantha
+2025-08-11 18:08:05 - executive_node - WARNING - 🚦 Turn 23 started for Samantha
+2025-08-11 18:08:06 - executive_node - INFO - 👥 Retrieved entity context for User
+2025-08-11 18:08:06 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-11 18:08:06 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-11 18:08:06 - executive_node - INFO - 📋 Published decided action for Samantha: take: Berries4 - 
+2025-08-11 18:08:06 - executive_node - ERROR - ❌ Cannot resolve target for action: {'type': 'take', 'target': 'Berries4'}
+2025-08-11 18:08:06 - executive_node - WARNING - 📤 Published action: take (failed)
+2025-08-11 18:08:06 - executive_node - INFO - Action failed for Samantha, will retry same step next turn
+2025-08-11 18:08:06 - executive_node - INFO - 🔄 Samantha completing turn
+2025-08-11 18:08:06 - executive_node - INFO - 🔄 Samantha completing turn
+2025-08-11 18:08:11 - executive_node - WARNING - 🚦 Turn 23 received by Samantha
+2025-08-11 18:08:11 - executive_node - WARNING - 🚦 Turn 24 started for Samantha
+2025-08-11 18:08:11 - executive_node - INFO - 👥 Retrieved entity context for User
+2025-08-11 18:08:11 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-11 18:08:11 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-11 18:08:11 - executive_node - INFO - 📝 Creating plan execution summary for Samantha
+2025-08-11 18:08:16 - executive_node - INFO - 📝 Summary prompt prepared for Samantha
+2025-08-11 18:08:16 - executive_node - INFO - 📋 Published current plan for Samantha
+2025-08-11 18:08:16 - executive_node - INFO - 🔄 Samantha completing turn
+2025-08-11 18:08:25 - executive_node - WARNING - 🚦 Turn 24 received by Samantha
+2025-08-11 18:08:25 - executive_node - WARNING - 🚦 Turn 25 started for Samantha
+2025-08-11 18:08:26 - executive_node - INFO - 👥 Retrieved entity context for User
+2025-08-11 18:08:26 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-11 18:08:26 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-11 18:08:27 - executive_node - WARNING - 📊 Samantha Received situation update
+2025-08-11 18:08:33 - executive_node - WARNING - 🤖 Samantha New Goal: #goal Find Food and Shelter
+#description Gather berries and mushrooms for food
+#otherCharacterName Joe
+#termination Found berries and mushrooms
+## 
+#goal Build Safe Shelter
+#description Use fallen branches and thickets
+#otherCharacterName Joe
+#termination Shelter is built
+## 
+#goal Explore Forest
+#description Move northeast and observe terrain
+#otherCharacterName None
+#termination Reached new terrain
+## 
+#goal Meet New Person
+#description Talk to User and decide
+#otherCharacterName User
+#termination User joins or leaves
+## 
+<end>
+2025-08-11 18:08:33 - executive_node - WARNING - Samantha generated goal: Goal Find Food and Shelter: Gather berries and mushrooms for food; actors: Samantha, Joe; termination: Found berries and mushrooms
+2025-08-11 18:08:33 - executive_node - INFO - 🎯 Published goal for Samantha: Goal Find Food and Shelter: Gather berries and mushrooms for food; actors: Samantha, Joe; termination: Found berries and mushrooms
+2025-08-11 18:08:33 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-11 18:08:39 - executive_node - INFO - 📋 Published current plan for Samantha
+2025-08-11 18:08:39 - executive_node - INFO - 📋 Published current plan for Samantha
+2025-08-11 18:08:39 - executive_node - INFO - 📋 Published decided action for Samantha: move: Southeast - 
+2025-08-11 18:08:39 - executive_node - WARNING - Moving southeast
+2025-08-11 18:08:39 - executive_node - INFO - ✅ Move successful: southeast
+2025-08-11 18:08:39 - executive_node - INFO - 🔄 Samantha completing turn
+2025-08-11 18:08:39 - executive_node - WARNING - 📊 Samantha Received situation update
+2025-08-11 18:08:40 - executive_node - WARNING - 🚦 Turn 25 received by Samantha
+2025-08-11 18:08:40 - executive_node - WARNING - 🚦 Turn 26 started for Samantha
+2025-08-11 18:08:41 - executive_node - INFO - 👥 Retrieved entity context for User
+2025-08-11 18:08:41 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-11 18:08:41 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-11 18:08:42 - executive_node - INFO - 📋 Published decided action for Samantha: move: Southeast - 
+2025-08-11 18:08:42 - executive_node - WARNING - Moving southeast
+2025-08-11 18:08:42 - executive_node - INFO - ✅ Move successful: southeast
+2025-08-11 18:08:42 - executive_node - INFO - 🔄 Samantha completing turn
+2025-08-11 18:08:42 - executive_node - WARNING - 📊 Samantha Received situation update
+2025-08-11 18:08:42 - executive_node - WARNING - 📊 Samantha Received situation update
+2025-08-11 18:08:43 - executive_node - WARNING - 🚦 Turn 26 received by Samantha
+2025-08-11 18:08:43 - executive_node - WARNING - 🚦 Turn 27 started for Samantha
+2025-08-11 18:08:44 - executive_node - INFO - 👥 Retrieved entity context for User
+2025-08-11 18:08:44 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-11 18:08:44 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-11 18:08:44 - executive_node - INFO - 📋 Published decided action for Samantha: take: Berries4 - 
+2025-08-11 18:08:44 - executive_node - INFO - 📦 Taking Berries4 for Samantha
+2025-08-11 18:08:44 - executive_node - INFO - 🗑️ Removed Berries4 from map
+2025-08-11 18:08:44 - executive_node - INFO - 📤 Published take action: Berries4
+2025-08-11 18:08:44 - executive_node - WARNING - 📤 Published action: take
+2025-08-11 18:08:44 - executive_node - INFO - 🔄 Samantha completing turn
+2025-08-11 18:08:44 - executive_node - WARNING - 📊 Samantha Received situation update
+2025-08-11 18:08:48 - executive_node - WARNING - 📊 Samantha Received situation update
+2025-08-11 18:08:48 - executive_node - WARNING - 🚦 Turn 27 received by Samantha
+2025-08-11 18:08:48 - executive_node - WARNING - 🚦 Turn 28 started for Samantha
+2025-08-11 18:08:49 - executive_node - INFO - 👥 Retrieved entity context for User
+2025-08-11 18:08:49 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-11 18:08:49 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-11 18:08:49 - executive_node - INFO - 📝 Creating plan execution summary for Samantha
+2025-08-11 18:08:57 - executive_node - INFO - 📝 Summary prompt prepared for Samantha
+2025-08-11 18:08:57 - executive_node - INFO - 📋 Published current plan for Samantha
+2025-08-11 18:08:57 - executive_node - INFO - 🔄 Samantha completing turn
+2025-08-11 18:09:00 - executive_node - WARNING - 🚦 Turn 28 received by Samantha
+2025-08-11 18:09:00 - executive_node - WARNING - 🚦 Turn 29 started for Samantha
+2025-08-11 18:09:01 - executive_node - INFO - 👥 Retrieved entity context for User
+2025-08-11 18:09:01 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-11 18:09:01 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-11 18:09:01 - executive_node - WARNING - 📊 Samantha Received situation update
+2025-08-11 18:09:08 - executive_node - WARNING - 🤖 Samantha New Goal: #goal Find Food and Shelter
+#description Gather berries and mushrooms nearby
+#otherCharacterName Joe
+#termination Berries and mushrooms gathered
+## 
+#goal Build Shelter
+#description Use gathered materials to build
+#otherCharacterName Joe
+#termination Shelter built and safe
+## 
+#goal Explore Forest
+#description Move northeast to find resources
+#otherCharacterName None
+#termination New resources found and mapped
+## 
+#goal Meet User
+#description Talk to User and decide
+#otherCharacterName User
+#termination User's intentions understood
+## 
+<end>
+2025-08-11 18:09:08 - executive_node - WARNING - Samantha generated goal: Goal Find Food and Shelter: Gather berries and mushrooms nearby; actors: Samantha, Joe; termination: Berries and mushrooms gathered
+2025-08-11 18:09:08 - executive_node - INFO - 🎯 Published goal for Samantha: Goal Find Food and Shelter: Gather berries and mushrooms nearby; actors: Samantha, Joe; termination: Berries and mushrooms gathered
+2025-08-11 18:09:08 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-11 18:09:17 - executive_node - INFO - 📋 Published current plan for Samantha
+2025-08-11 18:09:17 - executive_node - INFO - 📋 Published current plan for Samantha
+2025-08-11 18:09:17 - executive_node - INFO - 📋 Published decided action for Samantha: take: Mushrooms1 - 
+2025-08-11 18:09:17 - executive_node - INFO - 📦 Taking Mushrooms1 for Samantha
+2025-08-11 18:09:17 - executive_node - INFO - 🗑️ Removed Mushrooms1 from map
+2025-08-11 18:09:17 - executive_node - INFO - 📤 Published take action: Mushrooms1
+2025-08-11 18:09:17 - executive_node - WARNING - 📤 Published action: take
+2025-08-11 18:09:17 - executive_node - INFO - 🔄 Samantha completing turn
+2025-08-11 18:09:18 - executive_node - WARNING - 🚦 Turn 29 received by Samantha
+2025-08-11 18:09:18 - executive_node - WARNING - 🚦 Turn 30 started for Samantha
+2025-08-11 18:09:19 - executive_node - INFO - 👥 Retrieved entity context for User
+2025-08-11 18:09:19 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-11 18:09:19 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-11 18:09:19 - executive_node - INFO - 📋 Published decided action for Samantha: move: Northeast - 
+2025-08-11 18:09:19 - executive_node - WARNING - Moving northeast
+2025-08-11 18:09:19 - executive_node - INFO - ✅ Move successful: northeast
+2025-08-11 18:09:19 - executive_node - INFO - 🔄 Samantha completing turn
+2025-08-11 18:09:19 - executive_node - WARNING - 📊 Samantha Received situation update
+2025-08-11 18:09:19 - executive_node - WARNING - 📊 Samantha Received situation update
+2025-08-11 18:09:22 - executive_node - WARNING - 🚦 Turn 30 received by Samantha
+2025-08-11 18:09:22 - executive_node - WARNING - 🚦 Turn 31 started for Samantha
+2025-08-11 18:09:22 - executive_node - INFO - 👥 Retrieved entity context for User
+2025-08-11 18:09:22 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-11 18:09:22 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-11 18:09:22 - executive_node - INFO - 📋 Published decided action for Samantha: take: Mushrooms3 - 
+2025-08-11 18:09:22 - executive_node - ERROR - ❌ Cannot resolve target for action: {'type': 'take', 'target': 'Mushrooms3'}
+2025-08-11 18:09:22 - executive_node - WARNING - 📤 Published action: take (failed)
+2025-08-11 18:09:22 - executive_node - INFO - Action failed for Samantha, will retry same step next turn
+2025-08-11 18:09:22 - executive_node - INFO - 🔄 Samantha completing turn
+2025-08-11 18:09:22 - executive_node - INFO - 🔄 Samantha completing turn
+2025-08-11 18:09:23 - executive_node - WARNING - 📊 Samantha Received situation update
+2025-08-11 18:09:29 - executive_node - WARNING - 🚦 Turn 31 received by Samantha
+2025-08-11 18:09:29 - executive_node - WARNING - 🚦 Turn 32 started for Samantha
+2025-08-11 18:09:30 - executive_node - INFO - 👥 Retrieved entity context for User
+2025-08-11 18:09:30 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-11 18:09:30 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-11 18:09:30 - executive_node - INFO - 📋 Published decided action for Samantha: think:  - I have enough food now, let's head back to our starting point
+2025-08-11 18:09:30 - executive_node - WARNING - Thinking about: {'type': 'think', 'value': "I have enough food now, let's head back to our starting point"}
+2025-08-11 18:09:32 - executive_node - WARNING - 🤖 Samantha New Thought:  
+#thought Safety is key
+
+2025-08-11 18:09:32 - executive_node - INFO - 📤 Published action: action_27
+2025-08-11 18:09:32 - executive_node - INFO - 🔄 Samantha completing turn
+2025-08-11 18:09:41 - executive_node - WARNING - 🚦 Turn 32 received by Samantha
+2025-08-11 18:09:41 - executive_node - WARNING - 🚦 Turn 33 started for Samantha
+2025-08-11 18:09:42 - executive_node - INFO - 👥 Retrieved entity context for User
+2025-08-11 18:09:42 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-11 18:09:42 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-11 18:09:42 - executive_node - INFO - 📋 Published decided action for Samantha: move: Southwest - 
+2025-08-11 18:09:42 - executive_node - WARNING - Moving southwest
+2025-08-11 18:09:42 - executive_node - INFO - ✅ Move successful: southwest
+2025-08-11 18:09:42 - executive_node - INFO - 🔄 Samantha completing turn
+2025-08-11 18:09:42 - executive_node - WARNING - 📊 Samantha Received situation update
+2025-08-11 18:09:42 - executive_node - WARNING - 📊 Samantha Received situation update
+2025-08-11 18:09:43 - executive_node - WARNING - 🚦 Turn 33 received by Samantha
+2025-08-11 18:09:43 - executive_node - WARNING - 🚦 Turn 34 started for Samantha
+2025-08-11 18:09:44 - executive_node - INFO - 👥 Retrieved entity context for User
+2025-08-11 18:09:44 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-11 18:09:44 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-11 18:09:44 - executive_node - INFO - 📋 Published decided action for Samantha: say: Joe - I'm getting a bit hungry, let's find some food
+2025-08-11 18:09:44 - executive_node - ERROR - Failed to acquire conversation lock: Lock unavailable
+2025-08-11 18:09:44 - executive_node - WARNING - 📤 Published action: say (failed - lock unavailable)
+2025-08-11 18:09:44 - executive_node - INFO - Action failed for Samantha, will retry same step next turn
+2025-08-11 18:09:44 - executive_node - INFO - 🔄 Samantha completing turn
+2025-08-11 18:09:44 - executive_node - INFO - 🔄 Samantha completing turn
+2025-08-11 18:09:45 - executive_node - WARNING - 🚦 Turn 34 received by Samantha
+2025-08-11 18:09:45 - executive_node - WARNING - 🚦 Turn 35 started for Samantha
+2025-08-11 18:09:45 - executive_node - WARNING - 🚦 Turn 35 received by Samantha
+2025-08-11 18:09:45 - executive_node - WARNING - 🚦 Turn 36 started for Samantha
+2025-08-11 18:09:46 - executive_node - INFO - 👥 Retrieved entity context for User
+2025-08-11 18:09:46 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-11 18:09:46 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-11 18:09:46 - executive_node - INFO - 📝 Creating plan execution summary for Samantha
+2025-08-11 18:09:52 - executive_node - INFO - 📝 Summary prompt prepared for Samantha
+2025-08-11 18:09:52 - executive_node - INFO - 📋 Published current plan for Samantha
+2025-08-11 18:09:52 - executive_node - INFO - 🔄 Samantha completing turn
+2025-08-11 18:09:53 - executive_node - WARNING - 🚦 Turn 36 received by Samantha
+2025-08-11 18:09:53 - executive_node - WARNING - 🚦 Turn 37 started for Samantha
+2025-08-11 18:09:54 - executive_node - INFO - 👥 Retrieved entity context for User
+2025-08-11 18:09:54 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-11 18:09:54 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-11 18:09:58 - executive_node - WARNING - 📊 Samantha Received situation update
+2025-08-11 18:10:17 - executive_node - WARNING - 🤖 Samantha New Goal: #goal Find Food and Shelter
+#description Gather berries and mushrooms safely
+#otherCharacterName Joe
+#termination Have enough food and shelter
+## 
+#goal Build Trust with User
+#description Have open conversation with User
+#otherCharacterName User
+#termination User shares personal info
+## 
+#goal Explore Forest Safely
+#description Map terrain and resources carefully
+#otherCharacterName None
+#termination Have detailed forest map
+## 
+#goal Find Apple Tree
+#description Locate and pick apples safely
+#otherCharacterName Joe
+#termination Have apples in inventory
+## 
+<end> 
+#goal Find Food and Shelter
+#description Gather berries and mushrooms safely
+#otherCharacterName Joe
+#termination Have enough food and shelter
+## 
+#goal Build Trust with User
+#description Have open conversation with User
+#otherCharacterName User
+#termination User shares personal info
+## 
+#goal Explore Forest Safely
+#description Map terrain and resources carefully
+#otherCharacterName None
+#termination Have detailed forest map
+## 
+#goal Find Apple Tree
+#description Locate and pick apples safely
+#otherCharacterName Joe
+#termination Have apples in inventory
+## 
+<end> 
+#goal Find Food and Shelter
+#description Gather berries and mushrooms safely
+#otherCharacterName Joe
+#termination Have enough food and shelter
+## 
+#goal Build Trust with User
+#description Have open conversation with User
+#otherCharacterName User
+#termination User shares personal info
+## 
+#goal Explore Forest Safely
+#description Map terrain and resources carefully
+#otherCharacterName None
+#termination Have detailed forest map
+## 
+#goal Find Apple Tree
+#description Locate and pick apples safely
+#otherCharacterName Joe
+#termination Have apples in inventory
+## 
+<end> 
+#goal Find Food and Shelter
+#description Gather berries and mushrooms safely
+#otherCharacterName Joe
+#termination Have enough food and
+2025-08-11 18:10:17 - executive_node - WARNING - Samantha generated goal: Goal Find Food and Shelter: Gather berries and mushrooms safely; actors: Samantha, Joe; termination: Have enough food and shelter
+2025-08-11 18:10:17 - executive_node - INFO - 🎯 Published goal for Samantha: Goal Find Food and Shelter: Gather berries and mushrooms safely; actors: Samantha, Joe; termination: Have enough food and shelter
+2025-08-11 18:10:17 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-11 18:10:24 - executive_node - WARNING - 🚦 Turn 37 received by Samantha
+2025-08-11 18:10:24 - executive_node - WARNING - Turn 38 started but Samantha not included
+2025-08-11 18:10:25 - executive_node - WARNING - 🚦 Turn 37 received by Samantha
+2025-08-11 18:10:25 - executive_node - WARNING - Turn 39 started but Samantha not included
+2025-08-11 18:10:26 - executive_node - INFO - 📋 Published current plan for Samantha
+2025-08-11 18:10:26 - executive_node - INFO - 📋 Published current plan for Samantha
+2025-08-11 18:10:26 - executive_node - INFO - 📋 Published decided action for Samantha: move: Northeast - 
+2025-08-11 18:10:26 - executive_node - WARNING - Moving northeast
+2025-08-11 18:10:26 - executive_node - WARNING - ❌ Move failed: Agent for character 'Samantha' not found
+2025-08-11 18:10:26 - executive_node - INFO - 🔄 Samantha completing turn
+2025-08-11 18:10:27 - executive_node - WARNING - 🚦 Turn 37 received by Samantha
+2025-08-11 18:10:27 - executive_node - WARNING - Turn 40 started but Samantha not included
+2025-08-11 18:10:28 - executive_node - WARNING - 🚦 Turn 37 received by Samantha
+2025-08-11 18:10:28 - executive_node - WARNING - Turn 41 started but Samantha not included
+2025-08-11 18:10:34 - executive_node - WARNING - 🚦 Turn 37 received by Samantha
+2025-08-11 18:10:34 - executive_node - WARNING - Turn 42 started but Samantha not included
+2025-08-11 18:10:46 - executive_node - WARNING - 🚦 Turn 37 received by Samantha
+2025-08-11 18:10:46 - executive_node - WARNING - Turn 43 started but Samantha not included
+2025-08-11 18:10:48 - executive_node - WARNING - 🚦 Turn 37 received by Samantha
+2025-08-11 18:10:48 - executive_node - WARNING - Turn 44 started but Samantha not included
+2025-08-11 18:10:50 - executive_node - WARNING - 🚦 Turn 37 received by Samantha
+2025-08-11 18:10:50 - executive_node - WARNING - Turn 45 started but Samantha not included
+2025-08-11 18:10:50 - executive_node - WARNING - 🚦 Turn 37 received by Samantha
+2025-08-11 18:10:50 - executive_node - WARNING - Turn 46 started but Samantha not included
+2025-08-11 18:10:56 - executive_node - WARNING - 🚦 Turn 37 received by Samantha
+2025-08-11 18:10:56 - executive_node - WARNING - Turn 47 started but Samantha not included
+2025-08-11 18:11:07 - executive_node - WARNING - 🚦 Turn 37 received by Samantha
+2025-08-11 18:11:07 - executive_node - WARNING - Turn 48 started but Samantha not included
+2025-08-11 18:11:09 - executive_node - WARNING - 🚦 Turn 37 received by Samantha
+2025-08-11 18:11:09 - executive_node - WARNING - Turn 49 started but Samantha not included
+2025-08-11 18:11:12 - executive_node - WARNING - 🚦 Turn 37 received by Samantha
+2025-08-11 18:11:12 - executive_node - WARNING - Turn 50 started but Samantha not included
+2025-08-11 18:11:18 - executive_node - WARNING - 🚦 Turn 37 received by Samantha
+2025-08-11 18:11:18 - executive_node - WARNING - Turn 51 started but Samantha not included
+2025-08-11 18:11:26 - executive_node - WARNING - 🚦 Turn 37 received by Samantha
+2025-08-11 18:11:26 - executive_node - WARNING - Turn 52 started but Samantha not included
+2025-08-11 18:11:30 - executive_node - WARNING - 🚦 Turn 37 received by Samantha
+2025-08-11 18:11:30 - executive_node - WARNING - Turn 53 started but Samantha not included
+2025-08-11 18:11:38 - executive_node - WARNING - 🚦 Turn 37 received by Samantha
+2025-08-11 18:11:38 - executive_node - WARNING - Turn 54 started but Samantha not included
+2025-08-11 18:11:42 - executive_node - WARNING - 🚦 Turn 37 received by Samantha
+2025-08-11 18:11:42 - executive_node - WARNING - Turn 55 started but Samantha not included
+2025-08-11 18:11:54 - executive_node - WARNING - 🚦 Turn 37 received by Samantha
+2025-08-11 18:11:54 - executive_node - WARNING - Turn 56 started but Samantha not included
+2025-08-11 18:11:57 - executive_node - WARNING - 🚦 Turn 37 received by Samantha
+2025-08-11 18:11:57 - executive_node - WARNING - Turn 57 started but Samantha not included
+2025-08-11 18:12:00 - executive_node - WARNING - 🚦 Turn 37 received by Samantha
+2025-08-11 18:12:00 - executive_node - WARNING - Turn 58 started but Samantha not included
+2025-08-11 18:12:07 - executive_node - WARNING - 🚦 Turn 37 received by Samantha
+2025-08-11 18:12:07 - executive_node - WARNING - Turn 59 started but Samantha not included
+2025-08-11 18:12:08 - executive_node - WARNING - Received signal 15, initiating shutdown...
+2025-08-11 18:12:08 - executive_node - INFO - Executive Node shutdown initiated for Samantha...
+2025-08-11 18:12:08 - executive_node - INFO - Published shutdown event for Samantha
+2025-08-11 18:12:08 - executive_node - INFO - Zenoh session closed
+2025-08-11 18:12:08 - executive_node - INFO - Executive Node shutdown complete for Samantha
+2025-08-11 18:12:11 - executive_node - WARNING - Received signal 15, initiating shutdown...
+44 started for Joe
+2025-08-11 18:10:49 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-11 18:10:49 - executive_node - INFO - 📋 Published decided action for Joe: say: Hermit - Hi, I'm Joe. I'm looking for Hut1. Have you seen it?
+2025-08-11 18:10:49 - executive_node - ERROR - Failed to acquire conversation lock: Lock unavailable
+2025-08-11 18:10:49 - executive_node - WARNING - 📤 Published action: say (failed - lock unavailable)
+2025-08-11 18:10:49 - executive_node - INFO - Action failed for Joe, will retry same step next turn
+2025-08-11 18:10:49 - executive_node - INFO - 🔄 Joe completing turn
+2025-08-11 18:10:49 - executive_node - INFO - 🔄 Joe completing turn
+2025-08-11 18:10:50 - executive_node - WARNING - 🚦 Turn 44 received by Joe
+2025-08-11 18:10:50 - executive_node - WARNING - 🚦 Turn 45 started for Joe
+2025-08-11 18:10:50 - executive_node - WARNING - 🚦 Turn 45 received by Joe
+2025-08-11 18:10:50 - executive_node - WARNING - 🚦 Turn 46 started for Joe
+2025-08-11 18:10:51 - executive_node - WARNING - 📊 Joe Received situation update
+2025-08-11 18:10:51 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-11 18:10:51 - executive_node - INFO - 📝 Creating plan execution summary for Joe
+2025-08-11 18:10:55 - executive_node - INFO - 📝 Summary prompt prepared for Joe
+2025-08-11 18:10:55 - executive_node - INFO - 📋 Published current plan for Joe
+2025-08-11 18:10:55 - executive_node - INFO - 🔄 Joe completing turn
+2025-08-11 18:10:56 - executive_node - WARNING - 🚦 Turn 46 received by Joe
+2025-08-11 18:10:56 - executive_node - WARNING - 🚦 Turn 47 started for Joe
+2025-08-11 18:10:57 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-11 18:11:00 - executive_node - WARNING - 🤖 Joe New Goal: #goal Find Hut1 for safety
+#description Search north for Hut1 location
+#otherCharacterName None
+#termination Arrived at Hut1 location
+##
+2025-08-11 18:11:00 - executive_node - WARNING - Joe generated goal: Goal Find Hut1 for safety: Search north for Hut1 location; actors: Joe; termination: Arrived at Hut1 location
+2025-08-11 18:11:00 - executive_node - INFO - 🎯 Published goal for Joe: Goal Find Hut1 for safety: Search north for Hut1 location; actors: Joe; termination: Arrived at Hut1 location
+2025-08-11 18:11:01 - executive_node - WARNING - 📊 Joe Received situation update
+2025-08-11 18:11:06 - executive_node - INFO - 📋 Published current plan for Joe
+2025-08-11 18:11:06 - executive_node - INFO - 📋 Published current plan for Joe
+2025-08-11 18:11:06 - executive_node - INFO - 📋 Published decided action for Joe: move: North - 
+2025-08-11 18:11:06 - executive_node - WARNING - Moving north
+2025-08-11 18:11:06 - executive_node - INFO - ✅ Move successful: north
+2025-08-11 18:11:06 - executive_node - INFO - 🔄 Joe completing turn
+2025-08-11 18:11:06 - executive_node - WARNING - 📊 Joe Received situation update
+2025-08-11 18:11:07 - executive_node - WARNING - 🚦 Turn 47 received by Joe
+2025-08-11 18:11:07 - executive_node - WARNING - 🚦 Turn 48 started for Joe
+2025-08-11 18:11:08 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-11 18:11:08 - executive_node - INFO - 📋 Published decided action for Joe: move: North - 
+2025-08-11 18:11:08 - executive_node - WARNING - Moving north
+2025-08-11 18:11:08 - executive_node - INFO - ✅ Move successful: north
+2025-08-11 18:11:08 - executive_node - INFO - 🔄 Joe completing turn
+2025-08-11 18:11:08 - executive_node - WARNING - 📊 Joe Received situation update
+2025-08-11 18:11:08 - executive_node - WARNING - 📊 Joe Received situation update
+2025-08-11 18:11:09 - executive_node - WARNING - 🚦 Turn 48 received by Joe
+2025-08-11 18:11:09 - executive_node - WARNING - 🚦 Turn 49 started for Joe
+2025-08-11 18:11:10 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-11 18:11:10 - executive_node - INFO - 📋 Published decided action for Joe: think:  - I have arrived at Hut1
+2025-08-11 18:11:10 - executive_node - WARNING - Thinking about: {'type': 'think', 'value': 'I have arrived at Hut1'}
+2025-08-11 18:11:11 - executive_node - WARNING - 🤖 Joe New Thought:  
+#thought Hut1 is here
+## 
+
+2025-08-11 18:11:11 - executive_node - INFO - 📤 Published action: action_22
+2025-08-11 18:11:11 - executive_node - INFO - 🔄 Joe completing turn
+2025-08-11 18:11:12 - executive_node - WARNING - 📊 Joe Received situation update
+2025-08-11 18:11:12 - executive_node - WARNING - 🚦 Turn 49 received by Joe
+2025-08-11 18:11:12 - executive_node - WARNING - 🚦 Turn 50 started for Joe
+2025-08-11 18:11:13 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-11 18:11:13 - executive_node - INFO - 📝 Creating plan execution summary for Joe
+2025-08-11 18:11:17 - executive_node - INFO - 📝 Summary prompt prepared for Joe
+2025-08-11 18:11:17 - executive_node - INFO - 📋 Published current plan for Joe
+2025-08-11 18:11:17 - executive_node - INFO - 🔄 Joe completing turn
+2025-08-11 18:11:18 - executive_node - WARNING - 🚦 Turn 50 received by Joe
+2025-08-11 18:11:18 - executive_node - WARNING - 🚦 Turn 51 started for Joe
+2025-08-11 18:11:19 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-11 18:11:21 - executive_node - WARNING - 🤖 Joe New Goal: #goal Investigate Hut1
+#description Check out Hut1 for safety
+#otherCharacterName None
+#termination Hut1 is safe to enter
+##
+2025-08-11 18:11:21 - executive_node - WARNING - Joe generated goal: Goal Investigate Hut1: Check out Hut1 for safety; actors: Joe; termination: Hut1 is safe to enter
+2025-08-11 18:11:21 - executive_node - INFO - 🎯 Published goal for Joe: Goal Investigate Hut1: Check out Hut1 for safety; actors: Joe; termination: Hut1 is safe to enter
+2025-08-11 18:11:23 - executive_node - WARNING - 📊 Joe Received situation update
+2025-08-11 18:11:24 - executive_node - INFO - 📋 Published current plan for Joe
+2025-08-11 18:11:24 - executive_node - INFO - 📋 Published current plan for Joe
+2025-08-11 18:11:24 - executive_node - INFO - 📋 Published decided action for Joe: inspect: Hut1 - 
+2025-08-11 18:11:25 - executive_node - WARNING - 🤖 Joe Inspected Hut1:
+	  
+Hut1: small wooden cabin, locked door, overgrown garden 
+2025-08-11 18:11:25 - executive_node - WARNING - 📤 Published action: inspect
+2025-08-11 18:11:25 - executive_node - INFO - 🔄 Joe completing turn
+2025-08-11 18:11:26 - executive_node - WARNING - 🚦 Turn 51 received by Joe
+2025-08-11 18:11:26 - executive_node - WARNING - 🚦 Turn 52 started for Joe
+2025-08-11 18:11:27 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-11 18:11:27 - executive_node - INFO - 📝 Creating plan execution summary for Joe
+2025-08-11 18:11:29 - executive_node - WARNING - 📊 Joe Received situation update
+2025-08-11 18:11:29 - executive_node - INFO - 📝 Summary prompt prepared for Joe
+2025-08-11 18:11:29 - executive_node - INFO - 📋 Published current plan for Joe
+2025-08-11 18:11:29 - executive_node - INFO - 🔄 Joe completing turn
+2025-08-11 18:11:30 - executive_node - WARNING - 🚦 Turn 52 received by Joe
+2025-08-11 18:11:30 - executive_node - WARNING - 🚦 Turn 53 started for Joe
+2025-08-11 18:11:31 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-11 18:11:33 - executive_node - WARNING - 🤖 Joe New Goal: #goal Investigate Hut1
+#description Check Hut1 for safety
+#otherCharacterName None
+#termination Hut1 is safe to enter
+##
+2025-08-11 18:11:33 - executive_node - WARNING - Joe generated goal: Goal Investigate Hut1: Check Hut1 for safety; actors: Joe; termination: Hut1 is safe to enter
+2025-08-11 18:11:33 - executive_node - INFO - 🎯 Published goal for Joe: Goal Investigate Hut1: Check Hut1 for safety; actors: Joe; termination: Hut1 is safe to enter
+2025-08-11 18:11:35 - executive_node - WARNING - 📊 Joe Received situation update
+2025-08-11 18:11:36 - executive_node - INFO - 📋 Published current plan for Joe
+2025-08-11 18:11:36 - executive_node - INFO - 📋 Published current plan for Joe
+2025-08-11 18:11:36 - executive_node - INFO - 📋 Published decided action for Joe: inspect: Hut1 - 
+2025-08-11 18:11:37 - executive_node - WARNING - 🤖 Joe Inspected Hut1:
+	  
+locked wooden cabin 
+2025-08-11 18:11:37 - executive_node - WARNING - 📤 Published action: inspect
+2025-08-11 18:11:37 - executive_node - INFO - 🔄 Joe completing turn
+2025-08-11 18:11:38 - executive_node - WARNING - 🚦 Turn 53 received by Joe
+2025-08-11 18:11:38 - executive_node - WARNING - 🚦 Turn 54 started for Joe
+2025-08-11 18:11:39 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-11 18:11:39 - executive_node - INFO - 📝 Creating plan execution summary for Joe
+2025-08-11 18:11:41 - executive_node - WARNING - 📊 Joe Received situation update
+2025-08-11 18:11:41 - executive_node - INFO - 📝 Summary prompt prepared for Joe
+2025-08-11 18:11:41 - executive_node - INFO - 📋 Published current plan for Joe
+2025-08-11 18:11:41 - executive_node - INFO - 🔄 Joe completing turn
+2025-08-11 18:11:42 - executive_node - WARNING - 🚦 Turn 54 received by Joe
+2025-08-11 18:11:42 - executive_node - WARNING - 🚦 Turn 55 started for Joe
+2025-08-11 18:11:43 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-11 18:11:45 - executive_node - WARNING - 🤖 Joe New Goal: #goal Investigate Hut1
+#description Check Hut1 for safety
+#otherCharacterName None
+#termination Hut1 is safe
+##
+2025-08-11 18:11:45 - executive_node - WARNING - Joe generated goal: Goal Investigate Hut1: Check Hut1 for safety; actors: Joe; termination: Hut1 is safe
+2025-08-11 18:11:45 - executive_node - INFO - 🎯 Published goal for Joe: Goal Investigate Hut1: Check Hut1 for safety; actors: Joe; termination: Hut1 is safe
+2025-08-11 18:11:47 - executive_node - WARNING - 📊 Joe Received situation update
+2025-08-11 18:11:52 - executive_node - INFO - 📋 Published current plan for Joe
+2025-08-11 18:11:52 - executive_node - INFO - 📋 Published current plan for Joe
+2025-08-11 18:11:52 - executive_node - INFO - 📋 Published decided action for Joe: think:  - How do I unlock Hut1?
+2025-08-11 18:11:52 - executive_node - WARNING - Thinking about: {'type': 'think', 'value': 'How do I unlock Hut1?'}
+2025-08-11 18:11:53 - executive_node - WARNING - 🤖 Joe New Thought:  
+#thought Need a key
+## 
+
+2025-08-11 18:11:53 - executive_node - INFO - 📤 Published action: action_25
+2025-08-11 18:11:53 - executive_node - INFO - 🔄 Joe completing turn
+2025-08-11 18:11:54 - executive_node - WARNING - 🚦 Turn 55 received by Joe
+2025-08-11 18:11:54 - executive_node - WARNING - 🚦 Turn 56 started for Joe
+2025-08-11 18:11:55 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-11 18:11:55 - executive_node - INFO - 📋 Published decided action for Joe: inspect: Hut1 - 
+2025-08-11 18:11:56 - executive_node - WARNING - 🤖 Joe Inspected Hut1:
+	  
+locked wooden cabin 
+2025-08-11 18:11:56 - executive_node - WARNING - 📤 Published action: inspect
+2025-08-11 18:11:56 - executive_node - INFO - 🔄 Joe completing turn
+2025-08-11 18:11:57 - executive_node - WARNING - 🚦 Turn 56 received by Joe
+2025-08-11 18:11:57 - executive_node - WARNING - 🚦 Turn 57 started for Joe
+2025-08-11 18:11:58 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-11 18:11:58 - executive_node - INFO - Inventory query for key: False
+2025-08-11 18:11:58 - executive_node - INFO - 📋 Published decided action for Joe: think:  - I need to find a key to unlock Hut1
+2025-08-11 18:11:58 - executive_node - WARNING - Thinking about: {'type': 'think', 'value': 'I need to find a key to unlock Hut1'}
+2025-08-11 18:11:59 - executive_node - WARNING - 🤖 Joe New Thought:  
+#thought Key nearby
+## 
+
+2025-08-11 18:11:59 - executive_node - INFO - 📤 Published action: action_27
+2025-08-11 18:11:59 - executive_node - INFO - 🔄 Joe completing turn
+2025-08-11 18:12:00 - executive_node - WARNING - 🚦 Turn 57 received by Joe
+2025-08-11 18:12:00 - executive_node - WARNING - 🚦 Turn 58 started for Joe
+2025-08-11 18:12:00 - executive_node - WARNING - 📊 Joe Received situation update
+2025-08-11 18:12:01 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-11 18:12:01 - executive_node - INFO - 📝 Creating plan execution summary for Joe
+2025-08-11 18:12:06 - executive_node - INFO - 📝 Summary prompt prepared for Joe
+2025-08-11 18:12:06 - executive_node - INFO - 📋 Published current plan for Joe
+2025-08-11 18:12:06 - executive_node - INFO - 🔄 Joe completing turn
+2025-08-11 18:12:07 - executive_node - WARNING - 🚦 Turn 58 received by Joe
+2025-08-11 18:12:07 - executive_node - WARNING - 🚦 Turn 59 started for Joe
+2025-08-11 18:12:08 - executive_node - WARNING - Received signal 15, initiating shutdown...
+2025-08-11 18:12:08 - executive_node - INFO - Executive Node shutdown initiated for Joe...
+2025-08-11 18:12:08 - executive_node - INFO - Published shutdown event for Joe
+2025-08-11 18:12:08 - executive_node - INFO - Zenoh session closed
+2025-08-11 18:12:08 - executive_node - INFO - Executive Node shutdown complete for Joe
+2025-08-11 18:12:11 - executive_node - WARNING - Received signal 15, initiating shutdown...

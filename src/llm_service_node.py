@@ -87,6 +87,11 @@ class ZenohLLMServiceNode:
         self.server_name = server_name
         self.model_name = model_name
         
+        # Debug mode flag
+        self.debug = str(os.getenv('CWB_DEBUG', '')).lower() in ('1', 'true', 'yes', 'on')
+        if self.debug:
+            logger.info(f'🔧 Debug mode enabled for LLM service')
+        
         # Initialize Zenoh session
         config = zenoh.Config()
         self.session = zenoh.open(config)

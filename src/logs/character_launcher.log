@@ -1,34 +1,101 @@
-2025-08-10 14:33:41 - character_launcher - INFO - ✅ Launcher subscribed to cognitive/launcher/shutdown
-2025-08-10 14:33:41 - character_launcher - INFO - Added character: Samantha
-2025-08-10 14:33:41 - character_launcher - INFO - Added character: Joe
-2025-08-10 14:33:41 - character_launcher - INFO - Added character: Hermit
-2025-08-10 14:33:41 - character_launcher - INFO - Added character: User
-2025-08-10 14:33:42 - character_launcher - INFO - Launching 4 characters...
-2025-08-10 14:33:42 - character_launcher - INFO - Launching shared services...
-2025-08-10 14:33:42 - character_launcher - INFO - ✅ LLM Service Node launched with server: vllm, model: qwen/qwen3-235b-a22b-2507
-2025-08-10 14:33:42 - character_launcher - INFO - ✅ FastAPI Action Display Node launched on port 3000
-2025-08-10 14:33:42 - character_launcher - INFO -    - Web UI available at: http://localhost:3000
-2025-08-10 14:33:42 - character_launcher - INFO - ✅ Map Node launched with map: forest.py
-2025-08-10 14:33:42 - character_launcher - INFO - ⏳ Waiting for Map Node to initialize...
-2025-08-10 14:33:49 - character_launcher - INFO - Launching character: Samantha
-2025-08-10 14:33:49 - character_launcher - INFO - ✅ Samantha memory_node launched
-2025-08-10 14:33:50 - character_launcher - INFO - ✅ Samantha situation_node launched
-2025-08-10 14:33:50 - character_launcher - INFO - ✅ Samantha sense_node launched
-2025-08-10 14:33:51 - character_launcher - INFO - ✅ Samantha executive_node launched
-2025-08-10 14:33:52 - character_launcher - INFO - Launching character: Joe
-2025-08-10 14:33:52 - character_launcher - INFO - ✅ Joe memory_node launched
-2025-08-10 14:33:52 - character_launcher - INFO - ✅ Joe situation_node launched
-2025-08-10 14:33:53 - character_launcher - INFO - ✅ Joe sense_node launched
-2025-08-10 14:33:53 - character_launcher - INFO - ✅ Joe executive_node launched
-2025-08-10 14:33:54 - character_launcher - INFO - Launching character: Hermit
-2025-08-10 14:33:54 - character_launcher - INFO - ✅ Hermit memory_node launched
-2025-08-10 14:33:55 - character_launcher - INFO - ✅ Hermit situation_node launched
-2025-08-10 14:33:55 - character_launcher - INFO - ✅ Hermit sense_node launched
-2025-08-10 14:33:56 - character_launcher - INFO - ✅ Hermit executive_node launched
-2025-08-10 14:33:57 - character_launcher - INFO - Launching character: User
-2025-08-10 14:33:57 - character_launcher - INFO - ✅ User memory_node launched
-2025-08-10 14:33:57 - character_launcher - INFO - ✅ User situation_node launched
-2025-08-10 14:33:58 - character_launcher - INFO - ✅ User sense_node launched
-2025-08-10 14:33:58 - character_launcher - INFO - ✅ User executive_node launched
-2025-08-10 14:33:59 - character_launcher - INFO - ✅ All characters launched
-2025-08-10 14:33:59 - character_launcher - INFO - Monitoring processes...
+2025-08-11 17:58:37 - character_launcher - INFO - ✅ Launcher subscribed to cognitive/launcher/shutdown
+2025-08-11 17:58:37 - character_launcher - INFO - Added character: Samantha
+2025-08-11 17:58:37 - character_launcher - INFO - Added character: Joe
+2025-08-11 17:58:37 - character_launcher - INFO - Added character: Hermit
+2025-08-11 17:58:37 - character_launcher - INFO - Added character: User
+2025-08-11 17:58:39 - character_launcher - INFO - Launching 4 characters...
+2025-08-11 17:58:39 - character_launcher - INFO - Launching shared services...
+2025-08-11 17:58:39 - character_launcher - INFO - ✅ LLM Service Node launched with server: vllm, model: qwen/qwen3-235b-a22b-2507
+2025-08-11 17:58:39 - character_launcher - INFO - ✅ FastAPI Action Display Node launched on port 3000
+2025-08-11 17:58:39 - character_launcher - INFO -    - Web UI available at: http://localhost:3000
+2025-08-11 17:58:39 - character_launcher - INFO - ✅ Map Node launched with map: forest.py
+2025-08-11 17:58:39 - character_launcher - INFO - ⏳ Waiting for Map Node to initialize...
+2025-08-11 17:58:46 - character_launcher - INFO - Launching character: Samantha
+2025-08-11 17:58:46 - character_launcher - INFO - ✅ Samantha memory_node launched
+2025-08-11 17:58:47 - character_launcher - INFO - ✅ Samantha situation_node launched
+2025-08-11 17:58:47 - character_launcher - INFO - ✅ Samantha sense_node launched
+2025-08-11 17:58:48 - character_launcher - INFO - ✅ Samantha executive_node launched
+2025-08-11 17:58:49 - character_launcher - INFO - Launching character: Joe
+2025-08-11 17:58:49 - character_launcher - INFO - ✅ Joe memory_node launched
+2025-08-11 17:58:49 - character_launcher - INFO - ✅ Joe situation_node launched
+2025-08-11 17:58:50 - character_launcher - INFO - ✅ Joe sense_node launched
+2025-08-11 17:58:50 - character_launcher - INFO - ✅ Joe executive_node launched
+2025-08-11 17:58:51 - character_launcher - INFO - Launching character: Hermit
+2025-08-11 17:58:51 - character_launcher - INFO - ✅ Hermit memory_node launched
+2025-08-11 17:58:52 - character_launcher - INFO - ✅ Hermit situation_node launched
+2025-08-11 17:58:52 - character_launcher - INFO - ✅ Hermit sense_node launched
+2025-08-11 17:58:53 - character_launcher - INFO - ✅ Hermit executive_node launched
+2025-08-11 17:58:54 - character_launcher - INFO - Launching character: User
+2025-08-11 17:58:54 - character_launcher - INFO - ✅ User memory_node launched
+2025-08-11 17:58:54 - character_launcher - INFO - ✅ User situation_node launched
+2025-08-11 17:58:55 - character_launcher - INFO - ✅ User sense_node launched
+2025-08-11 17:58:55 - character_launcher - INFO - ✅ User executive_node launched
+2025-08-11 17:58:56 - character_launcher - INFO - ✅ All characters launched
+2025-08-11 17:58:56 - character_launcher - INFO - Monitoring processes...
+2025-08-11 18:12:08 - character_launcher - WARNING - Received shutdown request via Zenoh: {"timestamp": "2025-08-11T18:12:08.214122", "source": "ui", "mode": "save_and_shutdown"}
+2025-08-11 18:12:08 - character_launcher - INFO - 🛑 Initiating graceful shutdown...
+2025-08-11 18:12:08 - character_launcher - INFO - 📨 Sending SIGTERM to 19 processes...
+2025-08-11 18:12:08 - character_launcher - INFO -   ✉️  SIGTERM sent to Samantha process 400275
+2025-08-11 18:12:08 - character_launcher - INFO -   ✉️  SIGTERM sent to Samantha process 400282
+2025-08-11 18:12:08 - character_launcher - INFO -   ✉️  SIGTERM sent to Samantha process 400329
+2025-08-11 18:12:08 - character_launcher - INFO -   ✉️  SIGTERM sent to Samantha process 400332
+2025-08-11 18:12:08 - character_launcher - INFO -   ✉️  SIGTERM sent to Joe process 400393
+2025-08-11 18:12:08 - character_launcher - INFO -   ✉️  SIGTERM sent to Joe process 400396
+2025-08-11 18:12:08 - character_launcher - INFO -   ✉️  SIGTERM sent to Joe process 400442
+2025-08-11 18:12:08 - character_launcher - INFO -   ✉️  SIGTERM sent to Joe process 400483
+2025-08-11 18:12:08 - character_launcher - INFO -   ✉️  SIGTERM sent to Hermit process 400553
+2025-08-11 18:12:08 - character_launcher - INFO -   ✉️  SIGTERM sent to Hermit process 400581
+2025-08-11 18:12:08 - character_launcher - INFO -   ✉️  SIGTERM sent to Hermit process 400628
+2025-08-11 18:12:08 - character_launcher - INFO -   ✉️  SIGTERM sent to Hermit process 400670
+2025-08-11 18:12:08 - character_launcher - INFO -   ✉️  SIGTERM sent to User process 400752
+2025-08-11 18:12:08 - character_launcher - INFO -   ✉️  SIGTERM sent to User process 400773
+2025-08-11 18:12:08 - character_launcher - INFO -   ✉️  SIGTERM sent to User process 400798
+2025-08-11 18:12:08 - character_launcher - INFO -   ✉️  SIGTERM sent to User process 400822
+2025-08-11 18:12:08 - character_launcher - INFO -   ✉️  SIGTERM sent to shared process 399962
+2025-08-11 18:12:08 - character_launcher - INFO -   ✉️  SIGTERM sent to shared process 399963
+2025-08-11 18:12:08 - character_launcher - INFO -   ✉️  SIGTERM sent to shared process 399964
+2025-08-11 18:12:08 - character_launcher - INFO - ⏳ Waiting up to 15s for graceful shutdown...
+2025-08-11 18:12:11 - character_launcher - INFO - 🛑 Initiating graceful shutdown...
+2025-08-11 18:12:11 - character_launcher - INFO - 📨 Sending SIGTERM to 19 processes...
+2025-08-11 18:12:11 - character_launcher - INFO -   ✉️  SIGTERM sent to Samantha process 400275
+2025-08-11 18:12:11 - character_launcher - INFO -   ✉️  SIGTERM sent to Samantha process 400282
+2025-08-11 18:12:11 - character_launcher - INFO -   ✉️  SIGTERM sent to Samantha process 400329
+2025-08-11 18:12:11 - character_launcher - INFO -   ✉️  SIGTERM sent to Samantha process 400332
+2025-08-11 18:12:11 - character_launcher - INFO -   ✉️  SIGTERM sent to Joe process 400393
+2025-08-11 18:12:11 - character_launcher - INFO -   ✉️  SIGTERM sent to Joe process 400396
+2025-08-11 18:12:11 - character_launcher - INFO -   ✉️  SIGTERM sent to Joe process 400442
+2025-08-11 18:12:11 - character_launcher - INFO -   ✉️  SIGTERM sent to Joe process 400483
+2025-08-11 18:12:11 - character_launcher - INFO -   ✉️  SIGTERM sent to Hermit process 400553
+2025-08-11 18:12:11 - character_launcher - INFO -   ✉️  SIGTERM sent to Hermit process 400581
+2025-08-11 18:12:11 - character_launcher - INFO -   ✉️  SIGTERM sent to Hermit process 400628
+2025-08-11 18:12:11 - character_launcher - INFO -   ✉️  SIGTERM sent to Hermit process 400670
+2025-08-11 18:12:11 - character_launcher - INFO -   ✉️  SIGTERM sent to User process 400752
+2025-08-11 18:12:11 - character_launcher - INFO -   ✉️  SIGTERM sent to User process 400773
+2025-08-11 18:12:11 - character_launcher - INFO -   ✉️  SIGTERM sent to User process 400798
+2025-08-11 18:12:11 - character_launcher - INFO -   ✉️  SIGTERM sent to User process 400822
+2025-08-11 18:12:11 - character_launcher - INFO -   ✉️  SIGTERM sent to shared process 399962
+2025-08-11 18:12:11 - character_launcher - INFO -   ✉️  SIGTERM sent to shared process 399963
+2025-08-11 18:12:11 - character_launcher - INFO -   ✉️  SIGTERM sent to shared process 399964
+2025-08-11 18:12:11 - character_launcher - INFO - ⏳ Waiting up to 15s for graceful shutdown...
+2025-08-11 18:12:13 - character_launcher - WARNING -   ⏰ 9 processes still running after 5s...
+2025-08-11 18:12:16 - character_launcher - WARNING -   ⏰ 9 processes still running after 5s...
+2025-08-11 18:12:18 - character_launcher - WARNING -   ⏰ 9 processes still running after 10s...
+2025-08-11 18:12:21 - character_launcher - WARNING -   ⏰ 9 processes still running after 10s...
+2025-08-11 18:12:23 - character_launcher - WARNING -   ⏰ 9 processes still running after 15s...
+2025-08-11 18:12:23 - character_launcher - WARNING - ⚠️  Force killing 9 unresponsive processes...
+2025-08-11 18:12:23 - character_launcher - WARNING -   💀 Force killed Samantha process 400275
+2025-08-11 18:12:23 - character_launcher - WARNING -   💀 Force killed Samantha process 400332
+2025-08-11 18:12:23 - character_launcher - WARNING -   💀 Force killed Joe process 400393
+2025-08-11 18:12:23 - character_launcher - WARNING -   💀 Force killed Joe process 400483
+2025-08-11 18:12:23 - character_launcher - WARNING -   💀 Force killed Hermit process 400553
+2025-08-11 18:12:23 - character_launcher - WARNING -   💀 Force killed Hermit process 400670
+2025-08-11 18:12:23 - character_launcher - WARNING -   💀 Force killed User process 400752
+2025-08-11 18:12:23 - character_launcher - WARNING -   💀 Force killed User process 400822
+2025-08-11 18:12:23 - character_launcher - WARNING -   💀 Force killed shared process 399964
+2025-08-11 18:12:23 - character_launcher - INFO - ✅ Shutdown complete
+2025-08-11 18:12:23 - zenoh.handlers - ERROR - callback error
+Traceback (most recent call last):
+  File "/home/bruce/Downloads/Cognitive_workbench/src/launcher.py", line 98, in _shutdown_request_callback
+    sys.exit(0)
+SystemExit: 0
+2025-08-11 18:12:23 - character_launcher - INFO - ✅ All processes shut down gracefully

@@ -140,7 +140,11 @@ class CharacterLauncher:
                 # Decision on reuse/new world is handled early in main()
                 world_name = map_file.replace('.py', '')
                 map_args.extend(['-m', map_file, '-w', world_name])
-            map_process = subprocess.Popen(map_args)
+            # Propagate optional debug flag to disable map turn timeouts
+            env = os.environ.copy()
+            if env.get('CWB_DEBUG', ''):
+                self.logger.info('Debug mode enabled via CWB_DEBUG - map turn timeout will be disabled')
+            map_process = subprocess.Popen(map_args, env=env)
             self.shared_processes.append(map_process)
             self.logger.info(f'✅ Map Node launched' + (f' with map: {map_file}' if map_file else ''))
             
@@ -160,7 +164,7 @@ class CharacterLauncher:
                 sys.executable, 'memory_node.py', 
                 '-c', character.name, 
                 '-config', json.dumps(character.config)
-            ])
+            ], env=os.environ.copy())
             character.processes.append(memory_process)
             self.logger.info(f'✅ {character.name} memory_node launched')
         except Exception as e:
@@ -175,7 +179,7 @@ class CharacterLauncher:
                 sys.executable, 'situation_node.py', 
                 '-c', character.name, 
                 '-config', json.dumps(character.config)
-            ])
+            ], env=os.environ.copy())
             character.processes.append(situation_process)
             self.logger.info(f'✅ {character.name} situation_node launched')
         except Exception as e:
@@ -190,7 +194,7 @@ class CharacterLauncher:
                 sys.executable, 'sense_node.py', 
                 '-c', character.name, 
                 '-config', json.dumps(character.config)
-            ])
+            ], env=os.environ.copy())
             character.processes.append(sense_process)
             self.logger.info(f'✅ {character.name} sense_node launched')
         except Exception as e:
@@ -205,7 +209,7 @@ class CharacterLauncher:
                 sys.executable, 'executive_node.py', 
                 '-c', character.name, 
                 '-config', json.dumps(character.config)
-            ])
+            ], env=os.environ.copy())
             character.processes.append(executive_process)
             self.logger.info(f'✅ {character.name} executive_node launched')
         except Exception as e:
@@ -330,10 +334,15 @@ def main():
     parser.add_argument('--ui', action='store_true', help='Launch FastAPI web UI')
     parser.add_argument('--ui-port', type=int, default=3000, help='Port for FastAPI web UI (default: 3000)')
     parser.add_argument('--scenario-id', type=str, default=None, help='Optional scenario identifier (forwarded, not used yet)')
+    parser.add_argument('--debug', action='store_true', help='Enable debug mode (disables map turn timeout)')
     
     args = parser.parse_args()
     
     launcher = CharacterLauncher()
+    # Propagate debug mode to environment (read by map_node)
+    if args.debug:
+        os.environ['CWB_DEBUG'] = '1'
+        launcher.logger.warning('Debug mode enabled: map_node will disable turn timeout')
     
     # Load configuration from file
     try:

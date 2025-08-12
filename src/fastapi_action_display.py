@@ -22,6 +22,7 @@ from fastapi.responses import HTMLResponse
 import uvicorn
 from pathlib import Path
 from concurrent.futures import TimeoutError
+import os
 
 # Set up logging
 logger = logging.getLogger(__name__)
@@ -54,6 +55,11 @@ class FastAPIActionDisplayNode:
         # Initialize FastAPI app
         self.app = FastAPI(title="Zenoh Action Display")
         self.port = port
+        
+        # Debug mode flag
+        self.debug = str(os.getenv('CWB_DEBUG', '')).lower() in ('1', 'true', 'yes', 'on')
+        if self.debug:
+            logger.info(f'🔧 Debug mode enabled for FastAPI Action Display')
         
         # Initialize Zenoh session
         config = zenoh.Config()
@@ -1854,7 +1860,7 @@ class FastAPIActionDisplayNode:
                         websocket.send_text(json.dumps(web_data)), 
                         self.event_loop
                     )
-                    future.result(timeout=5.0)
+                    future.result(timeout=5.0 if not self.debug else 600.0)
                 except Exception as e:
                     # Don't remove client on timeout - just log the error
                     if not isinstance(e, TimeoutError):
@@ -1892,7 +1898,7 @@ class FastAPIActionDisplayNode:
                         websocket.send_text(json.dumps(web_data)), 
                         self.event_loop
                     )
-                    future.result(timeout=5.0)
+                    future.result(timeout=5.0 if not self.debug else 600.0)
                 except Exception as e:
                     # Don't remove client on timeout - just log the error
                     if not isinstance(e, TimeoutError):
@@ -1930,7 +1936,7 @@ class FastAPIActionDisplayNode:
                         websocket.send_text(json.dumps(web_data)), 
                         self.event_loop
                     )
-                    future.result(timeout=5.0)
+                    future.result(timeout=5.0 if not self.debug else 600.0)
                 except Exception as e:
                     # Don't remove client on timeout - just log the error
                     if not isinstance(e, TimeoutError):
@@ -1968,7 +1974,7 @@ class FastAPIActionDisplayNode:
                         websocket.send_text(json.dumps(web_data)), 
                         self.event_loop
                     )
-                    future.result(timeout=5.0)
+                    future.result(timeout=5.0 if not self.debug else 600.0)
                 except Exception as e:
                     # Don't remove client on timeout - just log the error
                     if not isinstance(e, TimeoutError):
@@ -2006,7 +2012,7 @@ class FastAPIActionDisplayNode:
                         websocket.send_text(json.dumps(web_data)), 
                         self.event_loop
                     )
-                    future.result(timeout=5.0)
+                    future.result(timeout=5.0 if not self.debug else 600.0)
                 except Exception as e:
                     # Don't remove client on timeout - just log the error
                     if not isinstance(e, TimeoutError):
@@ -2071,7 +2077,7 @@ class FastAPIActionDisplayNode:
                         websocket.send_text(json.dumps(step_complete_data)),
                         self.event_loop
                     )
-                    future.result(timeout=5.0)
+                    future.result(timeout=5.0 if not self.debug else 600.0)
                 except Exception as e:
                     # Don't remove client on timeout - just log the error
                     if not isinstance(e, TimeoutError):

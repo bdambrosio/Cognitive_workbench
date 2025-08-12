@@ -51,6 +51,11 @@ class MapNode:
         # Agent visibility tracking: agent_name -> set of visible agent names
         self.agent_visibility = {}
         
+        # Conversation lock management
+        self.conversation_locks = {}  # character_name -> locked_with_character_name
+        self.lock_request_counts = {}  # (requester, target) -> count of failed attempts
+        self.lock_timeout_threshold = 3  # Number of failed attempts before timeout
+        
         # Persistence setup
         self.world_file = Path(f"data/world/{self.world_name}_world.json")
         self.world_file.parent.mkdir(parents=True, exist_ok=True)
@@ -68,6 +73,8 @@ class MapNode:
             'turn_start_time': None,
             'timeout_seconds': 30
         }
+        # Debug mode: allow launcher to disable turn timeouts via env var
+        self.debug_disable_timeout = str(os.getenv('CWB_DEBUG', '')).lower() in ('1', 'true', 'yes', 'on')
         self.turn_publisher = None
         self.turn_complete_subscriber = None
         
@@ -201,6 +208,22 @@ class MapNode:
             self.handle_map_types
         )
         
+        # Conversation lock queryables
+        self.conversation_lock_acquire_queryable = self.session.declare_queryable(
+            "cognitive/map/conversation/lock/acquire",
+            self.handle_conversation_lock_acquire
+        )
+        
+        self.conversation_lock_release_queryable = self.session.declare_queryable(
+            "cognitive/map/conversation/lock/release",
+            self.handle_conversation_lock_release
+        )
+        
+        self.conversation_lock_status_queryable = self.session.declare_queryable(
+            "cognitive/map/conversation/lock/status/*",
+            self.handle_conversation_lock_status
+        )
+        
         # Subscriber for character announcements
         self.character_announcement_subscriber = self.session.declare_subscriber(
             "cognitive/*/action",
@@ -217,6 +240,12 @@ class MapNode:
         self.shutdown_subscriber = self.session.declare_subscriber(
             "cognitive/shutdown/shared",
             self.shutdown_callback
+        )
+        
+        # Subscriber for character shutdown events (to cleanup locks)
+        self.character_shutdown_subscriber = self.session.declare_subscriber(
+            "cognitive/*/shutdown",
+            self.handle_character_shutdown
         )
         
         logger.info("Map queryables and subscribers set up successfully")
@@ -261,6 +290,8 @@ class MapNode:
             # Turn control state
             self.turn_control_mode = "step"  # "step" or "run"
             self.auto_progression_enabled = False
+            if self.debug_disable_timeout:
+                logger.info("Debug mode detected (CWB_DEBUG). Turn timeout will be disabled.")
             
             logger.info("Turn management system set up successfully")
             logger.info("Manual turn control enabled - starting in STEP mode")
@@ -374,6 +405,15 @@ class MapNode:
         if not self.turn_state['turn_start_time']:
             return
         
+        # In debug mode, disable timeout behavior entirely
+        if self.debug_disable_timeout:
+            try:
+                elapsed = time.time() - self.turn_state['turn_start_time']
+                logger.info(f"⏰ Turn {self.turn_state['turn_number']} elapsed time: {elapsed:.1f}s (debug mode - timeout disabled)")
+            except Exception:
+                pass
+            return
+
         elapsed = time.time() - self.turn_state['turn_start_time']
         if elapsed > self.turn_state['timeout_seconds']:
             # In step mode, don't timeout - just log the elapsed time
@@ -1035,6 +1075,174 @@ class MapNode:
         except Exception as e:
             logger.error(f"Error handling character announcement: {e}")
     
+    def handle_conversation_lock_acquire(self, query):
+        """Handle conversation lock acquisition request."""
+        try:
+            # Parse the query payload
+            if not query.payload:
+                response = {
+                    'success': False,
+                    'error': 'No payload provided'
+                }
+                query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
+                return
+            
+            data = json.loads(query.payload.to_bytes().decode('utf-8'))
+            requester = data.get('requester')
+            target = data.get('target')
+            
+            if not requester or not target:
+                response = {
+                    'success': False,
+                    'error': 'Missing requester or target'
+                }
+                query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
+                return
+            
+            # Attempt to acquire the lock
+            lock_acquired = self.acquire_conversation_lock(requester, target)
+            
+            response = {
+                'success': lock_acquired,
+                'requester': requester,
+                'target': target,
+                'lock_acquired': lock_acquired
+            }
+            
+            if not lock_acquired:
+                response['error'] = 'Lock unavailable'
+            
+            query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
+            logger.info(f"Conversation lock acquire request: {requester} -> {target}, result: {lock_acquired}")
+            
+        except Exception as e:
+            logger.error(f"Error handling conversation lock acquire request: {e}")
+            error_response = {
+                'success': False,
+                'error': str(e)
+            }
+            query.reply(query.key_expr, json.dumps(error_response).encode('utf-8'))
+    
+    def handle_conversation_lock_release(self, query):
+        """Handle conversation lock release request."""
+        try:
+            # Parse the query payload
+            if not query.payload:
+                response = {
+                    'success': False,
+                    'error': 'No payload provided'
+                }
+                query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
+                return
+            
+            data = json.loads(query.payload.to_bytes().decode('utf-8'))
+            character1 = data.get('character1')
+            character2 = data.get('character2')
+            
+            if not character1 or not character2:
+                response = {
+                    'success': False,
+                    'error': 'Missing character1 or character2'
+                }
+                query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
+                return
+            
+            # Release the locks
+            self.release_conversation_locks(character1, character2)
+            
+            response = {
+                'success': True,
+                'character1': character1,
+                'character2': character2,
+                'message': 'Locks released successfully'
+            }
+            
+            query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
+            logger.info(f"Conversation lock release request: {character1} <-> {character2}")
+            
+        except Exception as e:
+            logger.error(f"Error handling conversation lock release request: {e}")
+            error_response = {
+                'success': False,
+                'error': str(e)
+            }
+            query.reply(query.key_expr, json.dumps(error_response).encode('utf-8'))
+    
+    def handle_conversation_lock_status(self, query):
+        """Handle conversation lock status query."""
+        try:
+            # Extract character name from query key
+            key_parts = str(query.key_expr).split('/')
+            character_name = key_parts[-1] if len(key_parts) > 0 else None
+            
+            if not character_name:
+                response = {
+                    'success': False,
+                    'error': 'No character name provided'
+                }
+                query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
+                return
+            
+            # Get the lock status
+            locked_with = self.get_conversation_lock_status(character_name)
+            
+            response = {
+                'success': True,
+                'character': character_name,
+                'locked_with': locked_with,
+                'is_locked': locked_with is not None
+            }
+            
+            query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
+            logger.info(f"Conversation lock status query for {character_name}: locked with {locked_with}")
+            
+        except Exception as e:
+            logger.error(f"Error handling conversation lock status query: {e}")
+            error_response = {
+                'success': False,
+                'error': str(e)
+            }
+            query.reply(query.key_expr, json.dumps(error_response).encode('utf-8'))
+    
+    def handle_character_shutdown(self, sample):
+        """Handle character shutdown events to cleanup conversation locks."""
+        try:
+            # Extract character name from the topic
+            topic = str(sample.key_expr)
+            character_name = topic.split('/')[1] if len(topic.split('/')) > 1 else None
+            
+            if not character_name:
+                logger.warning("Character shutdown event missing character name")
+                return
+            
+            # Clean up any conversation locks for this character
+            if character_name in self.conversation_locks:
+                locked_with = self.conversation_locks[character_name]
+                logger.info(f"🧹 Cleaning up conversation locks for shutting down character {character_name} (locked with {locked_with})")
+                
+                # Release locks for both characters
+                self.release_conversation_locks(character_name, locked_with)
+            
+            # Also check if this character is locked with any other character
+            for char, locked_with_char in list(self.conversation_locks.items()):
+                if locked_with_char == character_name:
+                    logger.info(f"🧹 Cleaning up conversation locks for shutting down character {character_name} (locked by {char})")
+                    self.release_conversation_locks(char, character_name)
+            
+            # Clean up any request counts involving this character
+            keys_to_remove = []
+            for key in self.lock_request_counts:
+                if character_name in key:
+                    keys_to_remove.append(key)
+            
+            for key in keys_to_remove:
+                del self.lock_request_counts[key]
+            
+            logger.info(f"🧹 Cleanup complete for shutting down character {character_name}")
+            
+        except Exception as e:
+            logger.error(f"Error handling character shutdown for cleanup: {e}")
+    
     def run(self):
         """Run the map node"""
         logger.info(f"Map node started with map file: {self.map_file}")
@@ -1138,14 +1346,150 @@ class MapNode:
             logger.error(f'Error in save callback: {e}')
     
     def shutdown_callback(self, sample):
-        """Handle shutdown command from UI."""
+        """Handle shutdown command."""
         try:
-            logger.warning(f'🔌 Map Node received shutdown command')
-            # Request shutdown; let main loop exit and call shutdown() once
+            logger.info("Received shutdown command")
             self.shutdown_requested = True
         except Exception as e:
-            logger.error(f'Error in shutdown callback: {e}')
+            logger.error(f"Error handling shutdown command: {e}")
+
+    def acquire_conversation_lock(self, requester: str, target: str) -> bool:
+        """
+        Attempt to acquire conversation locks for both characters.
+        
+        Args:
+            requester: Name of character requesting the lock
+            target: Name of character to talk to
+            
+        Returns:
+            bool: True if locks acquired, False if not available
+        """
+        try:
+            # Canonicalize character names
+            requester_canon = requester.capitalize()
+            target_canon = target.capitalize()
+            
+            # Check if either character is already locked
+            if (requester_canon in self.conversation_locks or 
+                target_canon in self.conversation_locks):
+                
+                # Increment failed attempt count
+                lock_key = (requester_canon, target_canon)
+                self.lock_request_counts[lock_key] = self.lock_request_counts.get(lock_key, 0) + 1
+                
+                # Check if we should timeout existing locks
+                if self.lock_request_counts[lock_key] >= self.lock_timeout_threshold:
+                    logger.info(f"🔓 Conversation lock timeout triggered for {requester_canon} -> {target_canon} after {self.lock_timeout_threshold} attempts")
+                    self._timeout_conversation_locks(requester_canon, target_canon)
+                    # Clear the request count since we're releasing locks
+                    del self.lock_request_counts[lock_key]
+                    # Now try to acquire locks again
+                    return self._acquire_locks_internal(requester_canon, target_canon)
+                
+                logger.info(f"🔒 Conversation lock unavailable for {requester_canon} -> {target_canon} (attempt {self.lock_request_counts[lock_key]})")
+                return False
+            
+            # Both characters are free, acquire locks
+            return self._acquire_locks_internal(requester_canon, target_canon)
+            
+        except Exception as e:
+            logger.error(f"Error acquiring conversation lock for {requester} -> {target}: {e}")
+            return False
     
+    def _acquire_locks_internal(self, requester: str, target: str) -> bool:
+        """Internal method to actually acquire the locks."""
+        try:
+            # Lock both characters to each other
+            self.conversation_locks[requester] = target
+            self.conversation_locks[target] = requester
+            
+            logger.info(f"🔒 Conversation lock acquired: {requester} <-> {target}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error in internal lock acquisition for {requester} -> {target}: {e}")
+            return False
+    
+    def release_conversation_locks(self, character1: str, character2: str):
+        """
+        Release conversation locks for both characters.
+        
+        Args:
+            character1: First character in conversation
+            character2: Second character in conversation
+        """
+        try:
+            # Canonicalize character names
+            char1_canon = character1.capitalize()
+            char2_canon = character2.capitalize()
+            
+            # Release locks for both characters
+            if char1_canon in self.conversation_locks:
+                del self.conversation_locks[char1_canon]
+            if char2_canon in self.conversation_locks:
+                del self.conversation_locks[char2_canon]
+            
+            # Clear any request counts for this pair
+            lock_keys = [(char1_canon, char2_canon), (char2_canon, char1_canon)]
+            for key in lock_keys:
+                if key in self.lock_request_counts:
+                    del self.lock_request_counts[key]
+            
+            logger.info(f"🔓 Conversation locks released: {char1_canon} <-> {char2_canon}")
+            
+        except Exception as e:
+            logger.error(f"Error releasing conversation locks for {character1} <-> {character2}: {e}")
+    
+    def _timeout_conversation_locks(self, requester: str, target: str):
+        """
+        Timeout and release existing conversation locks.
+        
+        Args:
+            requester: Character requesting the lock (triggering timeout)
+            target: Character they want to talk to
+        """
+        try:
+            # Find which characters are currently locked
+            locked_characters = []
+            
+            # Check if requester is locked
+            if requester in self.conversation_locks:
+                locked_with = self.conversation_locks[requester]
+                locked_characters.extend([requester, locked_with])
+            
+            # Check if target is locked
+            if target in self.conversation_locks:
+                locked_with = self.conversation_locks[target]
+                if locked_with not in locked_characters:
+                    locked_characters.extend([target, locked_with])
+            
+            # Release all locks for the involved characters
+            if locked_characters:
+                logger.info(f"⏰ Timing out conversation locks for: {', '.join(locked_characters)}")
+                for char in locked_characters:
+                    if char in self.conversation_locks:
+                        del self.conversation_locks[char]
+            
+        except Exception as e:
+            logger.error(f"Error timing out conversation locks: {e}")
+    
+    def get_conversation_lock_status(self, character: str) -> Optional[str]:
+        """
+        Get the conversation lock status for a character.
+        
+        Args:
+            character: Name of the character
+            
+        Returns:
+            Optional[str]: Name of character they're locked with, or None if not locked
+        """
+        try:
+            canonical_name = character.capitalize()
+            return self.conversation_locks.get(canonical_name)
+        except Exception as e:
+            logger.error(f"Error getting conversation lock status for {character}: {e}")
+            return None
+
     def start_persistence_thread(self):
         """Start background thread for periodic persistence."""
         self.persistence_thread = threading.Thread(target=self._persistence_loop, daemon=True)

@@ -591,7 +591,7 @@ def is_near(character, target: str) -> bool:
     """Check if a target (resource or character) is near this character."""
     try:
         character_name = character.character_name
-        for reply in character.session.get(f"cognitive/{character_name}/situation/proximity?target={target}", timeout=60.0):
+        for reply in character.session.get(f"cognitive/{character_name}/situation/proximity?target={target}", timeout=6.0 if not character.debug else 600.0):
             if reply.ok:
                 data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
                 if data['success']:
@@ -625,7 +625,7 @@ def _evaluate_condition(character: ZenohExecutiveNode, condition: dict, target: 
                     
             elif condition_type in ['can_see', 'cant_see']:
                 # Query situation_node for visibility
-                for reply in character.session.get(f"cognitive/{character_name}/situation/visibility?target={target}", timeout=60.0):
+                for reply in character.session.get(f"cognitive/{character_name}/situation/visibility?target={target}", timeout=6.0 if not character.debug else 600.0):
                     if reply.ok:
                         data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
                         if data['success']:
@@ -636,7 +636,7 @@ def _evaluate_condition(character: ZenohExecutiveNode, condition: dict, target: 
                     
             elif condition_type in ['has_item', 'hasnt_item']:
                 # Query memory_node for inventory
-                for reply in character.session.get(f"cognitive/{character_name}/memory/inventory?item={target}", timeout=60.0):
+                for reply in character.session.get(f"cognitive/{character_name}/memory/inventory?item={target}", timeout=6.0 if not character.debug else 600.0):
                     if reply.ok:
                         data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
                         if data['success']:
@@ -647,7 +647,7 @@ def _evaluate_condition(character: ZenohExecutiveNode, condition: dict, target: 
                     
             elif condition_type in ['at_location', 'notat_location']:
                 # Query situation_node for location
-                for reply in character.session.get(f"cognitive/{character_name}/situation/location?target={target}", timeout=60.0):
+                for reply in character.session.get(f"cognitive/{character_name}/situation/location?target={target}", timeout=6.0 if not character.debug else 600.0):
                     if reply.ok:
                         data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
                         if data['success']:

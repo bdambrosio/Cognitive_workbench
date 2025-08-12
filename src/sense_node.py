@@ -16,6 +16,7 @@ import argparse
 import logging
 import signal
 from datetime import datetime
+import os
 
 # Configure logging with unbuffered output
 # Console handler with WARNING level (less verbose)
@@ -48,6 +49,11 @@ class ZenohSenseNode:
         # Store character info
         self.character_name = character_name
         self.character_config = character_config or {}
+        
+        # Debug mode flag
+        self.debug = str(os.getenv('CWB_DEBUG', '')).lower() in ('1', 'true', 'yes', 'on')
+        if self.debug:
+            logger.info(f'🔧 Debug mode enabled for {self.character_name}')
         
         # Initialize Zenoh session
         config = zenoh.Config()
