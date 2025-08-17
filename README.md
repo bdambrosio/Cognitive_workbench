@@ -7,6 +7,39 @@ Multiple characters can be defined in a simple 2 1/2 grid world. you define pers
 
 System even has a minimal UI that allows stepping, manual input of simple plans, etc.
 
+8/17 - A huge commit, including:
+Add activity generation and management - Claim: Planning from scratch is a very rare event. Given a new situation, we adopt remembered roles and activities. 
+The new activity system 'remembers' offline, and generates a set of activity templates.
+Right now only instantiated for the lost.yaml scenario - see scenarios/Joe-activities.json and scenarios/Samantha-activities.json.
+You can compile activities for any fully specified scenario by running python3 activity.py <scenario>/yaml - but note most other scenarios aren't complete! See lost.yaml
+
+NPCs and you - two new flags in character specs in scenario.yaml files. Again see lost.yaml
+ - manual: true - means the character doesn't have activities, take turns, etc.
+ - manual_response: true/false - determines whether a manual character responds when spoken to. NPCs set this to true so the only thing they do is respond when spoken to.
+ - in the example beloe 'User' is defined as a character so other characters can 'see' you. Otherwise they just hear a voice from nowhere.
+```yaml
+  Hermit:
+    manual: true
+    manual_response: false
+    location: Hut1
+    character: |
+      Hermit, a 60-year-old male dresses in tatters and is covered in dirt.
+      I know the secrets of the forest but I'm not sure I can trust you.
+    drives:
+      - "hunger, thirst, and shelter"
+
+  User:
+    manual: true
+    manual_response: true
+    character: |
+      User, a 25-year-old male who wears a blue shirt and jeans..
+      I know way more than I let on.
+    drives:
+      - "conversation, exploring my own thoughts and feelings, and those of others."
+      - "encouraging critical thinking"
+      - "helping others stay safe"
+```
+
 ## 🚀 Quick Start
 
 ### 1. Setup Environment
