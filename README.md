@@ -16,7 +16,7 @@ You can compile activities for any fully specified scenario by running python3 a
 2. NPCs and you - two new flags in character specs in scenario.yaml files. Again see lost.yaml
  - manual: true - means the character doesn't have activities, take turns, etc.
  - manual_response: true/false - determines whether a manual character responds when spoken to. NPCs set this to true so the only thing they do is respond when spoken to.
- - in the example beloe 'User' is defined as a character so other characters can 'see' you. Otherwise they just hear a voice from nowhere.
+ - in the example below 'User' is defined as a character so other characters can 'see' you. Otherwise they just hear a voice from nowhere.
 ```yaml
   Hermit:
     manual: true
@@ -43,6 +43,8 @@ You can compile activities for any fully specified scenario by running python3 a
 3. More UI, including display of activities and plans. Hierarchy: characters choose an activity. It has a series of steps, each step translates to a goal. plans are generated to carry out goals. plans are executed as a (conditional) series of actions, each of which is displayed sequentially in the main display area. Much of this is nonsensical at the moment (e.g. picking muchrooms to start a fire), but the infrastructure is now in place!
 
 4. Time slider in UI - characters live! the time slider sets a delay between turns, so you can run CG in the background, come back in a few hours, and ask a character what s/he has been doing. I envision providing characters web access and increased inter-character interaction abilities. AI-friends with lives of their own? CG-Sims? I have no idea where this is going. Your thoughts welcome.
+
+5. Probably lots of other stuff, sorry.
 
 ## 🚀 Quick Start
 
@@ -74,10 +76,9 @@ map: forest.py
 # Cognitive Workbench Configuration
 llm_config:
   server_name: "vllm"
-  model_name: "qwen/qwen3-235b-a22b-2507"
+  model_name: "llama3.3-70B"
 ```
-
-model doesn't actually matter for vllm, it will get model from server
+model doesn't actually matter for vllm, it will get model from server. I've been using llama3.3-70B-FP8. Other reasoning models pbly won't work unless you shut off reasoning.
 
 ```bash
 # Activate virtual environment (if not already active)
