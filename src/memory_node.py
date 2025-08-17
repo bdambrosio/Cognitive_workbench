@@ -468,28 +468,23 @@ class ZenohMemoryNode:
             if not target_item:
                 # Return list of all items in inventory (as a JSON-serializable list)
                 item_names = list(self.inventory.keys())
-                response = {
-                    'success': True,
-                    'value': item_names
-                }
+                response = {'success': True, 'value': item_names, 'binding': None}
                 logger.info(f'📦 Inventory query: returned {len(item_names)} items')
             else:
                 # Check if item is in inventory
+                if 'negated=' in selector:
+                    negated = urllib.parse.unquote(selector.split('negated=')[1].split('&')[0])
+                    negated = negated.lower() == 'true'
+                else:
+                    negated = False
+                # Check if target is in current situation and distance < near_threshold
+                response = None               
                 item_canonical = target_item.capitalize()
                 has_item = item_canonical in self.inventory
-                if has_item:
-                    has_item = item_canonical
+                if has_item:    
+                    response = {'success': True, 'value': not negated, 'binding': item_canonical}
                 else:
-                    for item_name in self.inventory:
-                        if ((not any(ch.isdigit() for ch in target_item) and item_name.startswith(target_item)) 
-                            or item_name == target_item):
-                            has_item = item_name
-                            break
-                
-                response = {
-                    'success': True,
-                    'value': has_item
-                }
+                    response = {'success': True, 'value': negated, 'binding': item_canonical}
                 logger.info(f'📦 Inventory query for {target_item}: {response["value"]}')
             
             query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
@@ -501,8 +496,6 @@ class ZenohMemoryNode:
                 'value': False
             }
             query.reply(query.key_expr, json.dumps(error_response).encode('utf-8'))
-    
-
     
     def add_item(self, item_name: str) -> None:
         """Add an item to the character's inventory."""

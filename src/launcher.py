@@ -46,6 +46,11 @@ class CharacterLauncher:
         # Console handler with WARNING level (less verbose)
         console_handler = logging.StreamHandler(sys.stdout)
         console_handler.setLevel(logging.WARNING)
+
+        # Raise console verbosity when CWB_DEBUG is set
+        _debug_env = str(os.getenv('CWB_DEBUG', '')).lower() in ('1', 'true', 'yes', 'on')
+        if _debug_env:
+            console_handler.setLevel(logging.INFO)
         
         # File handler with INFO level (full logging)
         file_handler = logging.FileHandler('logs/character_launcher.log', mode='w')
@@ -59,6 +64,8 @@ class CharacterLauncher:
             force=True
         )
         self.logger = logging.getLogger('character_launcher')
+        if _debug_env:
+            self.logger.info('🔧 Debug mode enabled for Launcher (console INFO)')
         
         # Register signal handlers for graceful shutdown
         signal.signal(signal.SIGTERM, self._signal_handler)
@@ -74,7 +81,9 @@ class CharacterLauncher:
                 "cognitive/launcher/shutdown",
                 self._shutdown_request_callback
             )
-            self.logger.info('✅ Launcher subscribed to cognitive/launcher/shutdown')
+            # Publisher for ready signal
+            self.ready_publisher = self.zenoh_session.declare_publisher("cognitive/launcher/ready")
+            self.logger.info('✅ Launcher subscribed to cognitive/launcher/shutdown and ready to publish ready signal')
         except Exception as e:
             self.logger.warning(f'⚠️  Could not initialize Zenoh in launcher for shutdown subscription: {e}')
     
@@ -104,7 +113,7 @@ class CharacterLauncher:
         self.characters.append(character)
         self.logger.info(f'Added character: {canonical_name}')
     
-    def launch_shared_services(self, map_file: str = None, launch_ui: bool = False, server_name: str = 'vllm', model_name: str = None, ui_port: int = 3000):
+    def launch_shared_services(self, map_file: str = None, launch_ui: bool = False, server_name: str = 'vllm', model_name: str = None, ui_port: int = 3000, setting: str = None):
         """Launch shared services (LLM service node and map node)."""
         self.logger.info('Launching shared services...')
         
@@ -133,6 +142,7 @@ class CharacterLauncher:
                 self.logger.error(f'❌ Failed to launch FastAPI Action Display Node: {e}')
                 
         
+        time.sleep(2) # give llm node time to start up
         # Launch map node (required for situation awareness)
         try:
             map_args = [sys.executable, 'map_node.py']
@@ -140,6 +150,8 @@ class CharacterLauncher:
                 # Decision on reuse/new world is handled early in main()
                 world_name = map_file.replace('.py', '')
                 map_args.extend(['-m', map_file, '-w', world_name])
+            if setting:
+                map_args.extend(['-s', setting])   
             # Propagate optional debug flag to disable map turn timeouts
             env = os.environ.copy()
             if env.get('CWB_DEBUG', ''):
@@ -215,12 +227,12 @@ class CharacterLauncher:
         except Exception as e:
             self.logger.error(f'❌ Failed to launch {character.name} executive_node: {e}')
     
-    def launch_all_characters(self, map_file: str = None, launch_ui: bool = False, server_name: str = 'vllm', model_name: str = None, ui_port: int = 3000):
+    def launch_all_characters(self, map_file: str = None, launch_ui: bool = False, server_name: str = 'vllm', model_name: str = None, ui_port: int = 3000, setting: str = None):
         """Launch all character instances."""
         self.logger.info(f'Launching {len(self.characters)} characters...')
         
         # Launch shared services first
-        self.launch_shared_services(map_file, launch_ui, server_name, model_name, ui_port)
+        self.launch_shared_services(map_file, launch_ui, server_name, model_name, ui_port, setting)
         time.sleep(2)  # Give shared services time to start
         
         # Launch each character
@@ -229,6 +241,18 @@ class CharacterLauncher:
             time.sleep(1)  # Small delay between characters
         
         self.logger.info('✅ All characters launched')
+        
+        # Publish ready signal with character count
+        try:
+            ready_message = {
+                'status': 'ready',
+                'character_count': len(self.characters),
+                'timestamp': time.time()
+            }
+            self.ready_publisher.put(json.dumps(ready_message))
+            self.logger.info(f'🚀 Published ready signal: {len(self.characters)} characters active')
+        except Exception as e:
+            self.logger.error(f'❌ Failed to publish ready signal: {e}')
     
     def monitor_processes(self):
         """Monitor running processes and restart if needed."""
@@ -358,6 +382,7 @@ def main():
         
         # Extract optional map file from YAML (key: 'map')
         yaml_map_file = config_data.get('map')
+        setting = config_data.get('setting', {})
 
         # Extract characters configuration
         characters_config = config_data.get('characters', [])
@@ -441,7 +466,7 @@ def main():
                                         pass
                 else:
                     print(f"Reusing existing world '{world_name}'")
-        launcher.launch_all_characters(effective_map_file, args.ui, server_name, model_name, ui_port=args.ui_port)
+        launcher.launch_all_characters(effective_map_file, args.ui, server_name, model_name, ui_port=args.ui_port, setting=setting)
         
         # Monitor processes
         launcher.monitor_processes()

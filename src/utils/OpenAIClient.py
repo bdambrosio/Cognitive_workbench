@@ -71,12 +71,8 @@ class OpenAIClient:
                     response = self.client.chat.completions.create(
                             model=self.model_name, 
                             messages=prompt,
-                            max_tokens=max_tokens, 
-                            temperature=temperature, 
-                            top_p=top_p,
-                            stop=stops, 
-                            stream=False,
-                            timeout=30.0
+                            max_completion_tokens=max_tokens, 
+                            timeout=120.0
                         )
                     item = response.choices[0].message
                     return item.content

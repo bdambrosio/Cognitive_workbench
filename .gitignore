@@ -37,3 +37,5 @@ src/logs/character_launcher.log
 src/logs/llm_service_node.log
 src/logs/map_node.log
 src/logs/sense_node.log
+src/logs/character_launcher.log
+src/logs/character_launcher.log

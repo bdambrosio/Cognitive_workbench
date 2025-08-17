@@ -1,0 +1,658 @@
+{
+  "Eat Breakfast": {
+    "name": "Eat Breakfast",
+    "category": "Physiological ADLs",
+    "tags": [
+      "physical",
+      "routine",
+      "solo"
+    ],
+    "when": "daily@morning",
+    "where": [
+      "Hut"
+    ],
+    "start": [
+      "time > 6:00",
+      "place = Hut"
+    ],
+    "stop": [
+      "full",
+      "time > 8:00"
+    ],
+    "duration": [
+      30,
+      60
+    ],
+    "needs": [
+      "food",
+      "hands"
+    ],
+    "steps": [
+      "acquire food",
+      "prepare food for consumption",
+      "consume food"
+    ],
+    "importance": 0.8,
+    "habit": 0.7
+  },
+  "Drink Water": {
+    "name": "Drink Water",
+    "category": "Physiological ADLs",
+    "tags": [
+      "physical",
+      "routine",
+      "solo"
+    ],
+    "when": "daily@morning",
+    "where": [
+      "Hut",
+      "Water"
+    ],
+    "start": [
+      "time > 6:00",
+      "place = Hut or Water"
+    ],
+    "stop": [
+      "hydrated",
+      "time > 8:00"
+    ],
+    "duration": [
+      15,
+      30
+    ],
+    "needs": [
+      "water",
+      "hands"
+    ],
+    "steps": [
+      "acquire drinkable water",
+      "consume water"
+    ],
+    "importance": 0.9,
+    "habit": 0.8
+  },
+  "Sleep": {
+    "name": "Sleep",
+    "category": "Physiological ADLs",
+    "tags": [
+      "physical",
+      "routine",
+      "solo"
+    ],
+    "when": "daily@night",
+    "where": [
+      "Hut"
+    ],
+    "start": [
+      "time > 20:00",
+      "place = Hut"
+    ],
+    "stop": [
+      "rested",
+      "time > 6:00"
+    ],
+    "duration": [
+      480,
+      720
+    ],
+    "needs": [
+      "bed",
+      "darkness"
+    ],
+    "steps": [
+      "prepare bed",
+      "lie down",
+      "fall asleep"
+    ],
+    "importance": 0.9,
+    "habit": 0.8
+  },
+  "Plan Day": {
+    "name": "Plan Day",
+    "category": "Instrumental ADLs/Logistics",
+    "tags": [
+      "mental",
+      "routine",
+      "solo"
+    ],
+    "when": "daily@morning",
+    "where": [
+      "Hut"
+    ],
+    "start": [
+      "time > 6:00",
+      "place = Hut"
+    ],
+    "stop": [
+      "plan complete",
+      "time > 8:00"
+    ],
+    "duration": [
+      30,
+      60
+    ],
+    "needs": [
+      "brain",
+      "paper"
+    ],
+    "steps": [
+      "review schedule",
+      "set priorities",
+      "create plan"
+    ],
+    "importance": 0.7,
+    "habit": 0.6
+  },
+  "Prepare Gear": {
+    "name": "Prepare Gear",
+    "category": "Instrumental ADLs/Logistics",
+    "tags": [
+      "physical",
+      "routine",
+      "solo"
+    ],
+    "when": "daily@morning",
+    "where": [
+      "Hut"
+    ],
+    "start": [
+      "time > 6:00",
+      "place = Hut"
+    ],
+    "stop": [
+      "gear ready",
+      "time > 8:00"
+    ],
+    "duration": [
+      30,
+      60
+    ],
+    "needs": [
+      "gear",
+      "hands"
+    ],
+    "steps": [
+      "inspect personal equipment for damage",
+      "pack essential items",
+      "check weather forecast"
+    ],
+    "importance": 0.8,
+    "habit": 0.7
+  },
+  "Hike": {
+    "name": "Hike",
+    "category": "Mobility & Transport",
+    "tags": [
+      "physical",
+      "outdoors",
+      "solo"
+    ],
+    "when": "opportunistic",
+    "where": [
+      "Forest",
+      "Mountain"
+    ],
+    "start": [
+      "weather permits",
+      "place = Forest or Mountain"
+    ],
+    "stop": [
+      "destination reached",
+      "time > 18:00"
+    ],
+    "duration": [
+      120,
+      360
+    ],
+    "needs": [
+      "hiking boots",
+      "water"
+    ],
+    "steps": [
+      "choose trail",
+      "acquire map",
+      "follow trail"
+    ],
+    "importance": 0.6,
+    "habit": 0.5
+  },
+  "Explore Cave": {
+    "name": "Explore Cave",
+    "category": "Mobility & Transport",
+    "tags": [
+      "physical",
+      "outdoors",
+      "solo"
+    ],
+    "when": "opportunistic",
+    "where": [
+      "Cave"
+    ],
+    "start": [
+      "weather permits",
+      "place = Cave"
+    ],
+    "stop": [
+      "explored cave",
+      "time > 18:00"
+    ],
+    "duration": [
+      120,
+      360
+    ],
+    "needs": [
+      "flashlight",
+      "hands"
+    ],
+    "steps": [
+      "enter cave",
+      "explore passages",
+      "exit cave"
+    ],
+    "importance": 0.5,
+    "habit": 0.4
+  },
+  "Meet Samantha": {
+    "name": "Meet Samantha",
+    "category": "Role/Production",
+    "tags": [
+      "social",
+      "outdoors",
+      "solo"
+    ],
+    "when": "opportunistic",
+    "where": [
+      "Forest",
+      "Clearing"
+    ],
+    "start": [
+      "Samantha available",
+      "place = Forest or Clearing"
+    ],
+    "stop": [
+      "meeting ended",
+      "time > 18:00"
+    ],
+    "duration": [
+      60,
+      180
+    ],
+    "needs": [
+      "Samantha",
+      "social skills"
+    ],
+    "steps": [
+      "locate Samantha",
+      "initiate conversation",
+      "engage in activity together"
+    ],
+    "importance": 0.8,
+    "habit": 0.7
+  },
+  "Converse with Hermit": {
+    "name": "Converse with Hermit",
+    "category": "Role/Production",
+    "tags": [
+      "social",
+      "outdoors",
+      "solo"
+    ],
+    "when": "opportunistic",
+    "where": [
+      "Hut"
+    ],
+    "start": [
+      "Hermit available",
+      "place = Hut"
+    ],
+    "stop": [
+      "conversation ended",
+      "time > 18:00"
+    ],
+    "duration": [
+      60,
+      180
+    ],
+    "needs": [
+      "Hermit",
+      "social skills"
+    ],
+    "steps": [
+      "initiate conversation",
+      "ask questions",
+      "listen to Hermit's responses"
+    ],
+    "importance": 0.7,
+    "habit": 0.6
+  },
+  "Learn Survival Skills": {
+    "name": "Learn Survival Skills",
+    "category": "Learning & Practice",
+    "tags": [
+      "mental",
+      "outdoors",
+      "solo"
+    ],
+    "when": "opportunistic",
+    "where": [
+      "Forest",
+      "Mountain"
+    ],
+    "start": [
+      "weather permits",
+      "place = Forest or Mountain"
+    ],
+    "stop": [
+      "skills learned",
+      "time > 18:00"
+    ],
+    "duration": [
+      120,
+      360
+    ],
+    "needs": [
+      "survival guide",
+      "hands"
+    ],
+    "steps": [
+      "read survival guide",
+      "practice skills",
+      "apply skills in real-world scenario"
+    ],
+    "importance": 0.8,
+    "habit": 0.7
+  },
+  "Reflect on Day": {
+    "name": "Reflect on Day",
+    "category": "Cognitive/Inner",
+    "tags": [
+      "mental",
+      "routine",
+      "solo"
+    ],
+    "when": "daily@evening",
+    "where": [
+      "Hut"
+    ],
+    "start": [
+      "time > 18:00",
+      "place = Hut"
+    ],
+    "stop": [
+      "reflection complete",
+      "time > 20:00"
+    ],
+    "duration": [
+      30,
+      60
+    ],
+    "needs": [
+      "brain",
+      "paper"
+    ],
+    "steps": [
+      "review day's events",
+      "identify accomplishments",
+      "set goals for tomorrow"
+    ],
+    "importance": 0.7,
+    "habit": 0.6
+  },
+  "Play with Samantha": {
+    "name": "Play with Samantha",
+    "category": "Recreation & Leisure",
+    "tags": [
+      "social",
+      "outdoors",
+      "solo"
+    ],
+    "when": "opportunistic",
+    "where": [
+      "Forest",
+      "Clearing"
+    ],
+    "start": [
+      "Samantha available",
+      "place = Forest or Clearing"
+    ],
+    "stop": [
+      "playtime ended",
+      "time > 18:00"
+    ],
+    "duration": [
+      60,
+      180
+    ],
+    "needs": [
+      "Samantha",
+      "playful attitude"
+    ],
+    "steps": [
+      "initiate play",
+      "engage in playful activity",
+      "laugh and have fun"
+    ],
+    "importance": 0.8,
+    "habit": 0.7
+  },
+  "Watch Sunset": {
+    "name": "Watch Sunset",
+    "category": "Recreation & Leisure",
+    "tags": [
+      "physical",
+      "outdoors",
+      "solo"
+    ],
+    "when": "daily@dusk",
+    "where": [
+      "Mountain",
+      "Clearing"
+    ],
+    "start": [
+      "time > 17:00",
+      "place = Mountain or Clearing"
+    ],
+    "stop": [
+      "sunset ended",
+      "time > 19:00"
+    ],
+    "duration": [
+      60,
+      120
+    ],
+    "needs": [
+      "clear view",
+      "eyes"
+    ],
+    "steps": [
+      "find viewing spot",
+      "watch sunset",
+      "appreciate beauty"
+    ],
+    "importance": 0.6,
+    "habit": 0.5
+  },
+  "Emergency Shelter": {
+    "name": "Emergency Shelter",
+    "category": "Safety/Emergency",
+    "tags": [
+      "physical",
+      "outdoors",
+      "solo"
+    ],
+    "when": "opportunistic",
+    "where": [
+      "Forest",
+      "Mountain"
+    ],
+    "start": [
+      "bad weather",
+      "place = Forest or Mountain"
+    ],
+    "stop": [
+      "shelter found",
+      "time > 18:00"
+    ],
+    "duration": [
+      30,
+      120
+    ],
+    "needs": [
+      "shelter materials",
+      "hands"
+    ],
+    "steps": [
+      "locate shelter",
+      "gather materials",
+      "construct shelter"
+    ],
+    "importance": 0.9,
+    "habit": 0.8
+  },
+  "First Aid": {
+    "name": "First Aid",
+    "category": "Safety/Emergency",
+    "tags": [
+      "physical",
+      "outdoors",
+      "solo"
+    ],
+    "when": "opportunistic",
+    "where": [
+      "Forest",
+      "Mountain"
+    ],
+    "start": [
+      "injury occurs",
+      "place = Forest or Mountain"
+    ],
+    "stop": [
+      "treatment complete",
+      "time > 18:00"
+    ],
+    "duration": [
+      30,
+      120
+    ],
+    "needs": [
+      "first aid kit",
+      "hands"
+    ],
+    "steps": [
+      "assess injury",
+      "apply treatment",
+      "monitor condition"
+    ],
+    "importance": 0.9,
+    "habit": 0.8
+  },
+  "Exercise": {
+    "name": "Exercise",
+    "category": "Health Management",
+    "tags": [
+      "physical",
+      "outdoors",
+      "solo"
+    ],
+    "when": "daily@morning",
+    "where": [
+      "Forest",
+      "Clearing"
+    ],
+    "start": [
+      "time > 6:00",
+      "place = Forest or Clearing"
+    ],
+    "stop": [
+      "exercise complete",
+      "time > 8:00"
+    ],
+    "duration": [
+      30,
+      60
+    ],
+    "needs": [
+      "exercise equipment",
+      "hands"
+    ],
+    "steps": [
+      "choose exercise routine",
+      "perform exercises",
+      "stretch and cool down"
+    ],
+    "importance": 0.8,
+    "habit": 0.7
+  },
+  "Maintain Gear": {
+    "name": "Maintain Gear",
+    "category": "Maintenance & Repair",
+    "tags": [
+      "physical",
+      "routine",
+      "solo"
+    ],
+    "when": "daily@evening",
+    "where": [
+      "Hut"
+    ],
+    "start": [
+      "time > 18:00",
+      "place = Hut"
+    ],
+    "stop": [
+      "maintenance complete",
+      "time > 20:00"
+    ],
+    "duration": [
+      30,
+      60
+    ],
+    "needs": [
+      "gear",
+      "hands"
+    ],
+    "steps": [
+      "inspect gear",
+      "clean gear",
+      "repair gear"
+    ],
+    "importance": 0.7,
+    "habit": 0.6
+  },
+  "Fix Shelter": {
+    "name": "Fix Shelter",
+    "category": "Maintenance & Repair",
+    "tags": [
+      "physical",
+      "outdoors",
+      "solo"
+    ],
+    "when": "opportunistic",
+    "where": [
+      "Hut"
+    ],
+    "start": [
+      "shelter damage",
+      "place = Hut"
+    ],
+    "stop": [
+      "repairs complete",
+      "time > 18:00"
+    ],
+    "duration": [
+      60,
+      180
+    ],
+    "needs": [
+      "shelter materials",
+      "hands"
+    ],
+    "steps": [
+      "assess damage",
+      "gather materials",
+      "make repairs"
+    ],
+    "importance": 0.8,
+    "habit": 0.7
+  }
+}

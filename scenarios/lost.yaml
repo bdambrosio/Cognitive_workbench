@@ -4,6 +4,10 @@ llm_config:
   server_name: "vllm"
   model_name: "qwen/qwen3-235b-a22b-2507"
 
+setting: |
+  modern era, setting is a temperate, mixed forest-open landscape with no buildings, no roads, no other signs of humanity. 
+    It is a early morning on what seems like it will be a warm, sunny day. mid-2020s, western, moderate climate.
+    
 characters:
   Samantha:
     character: |

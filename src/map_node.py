@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import asyncio
 import sys
 import os
 import argparse
@@ -10,8 +11,9 @@ import signal
 import time
 import threading
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Dict, Any, Optional
+from utils.zenoh_utils import datetime_handler
 
 # Add current directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -24,6 +26,11 @@ from map import WorldMap, Agent, hash_direction_info, extract_direction_info
 console_handler = logging.StreamHandler(sys.stdout)
 console_handler.setLevel(logging.WARNING)
 
+# Raise console verbosity when CWB_DEBUG is set
+_debug_env = str(os.getenv('CWB_DEBUG', '')).lower() in ('1', 'true', 'yes', 'on')
+if _debug_env:
+    console_handler.setLevel(logging.INFO)
+
 # File handler with INFO level (full logging)
 file_handler = logging.FileHandler('logs/map_node.log', mode='w')
 file_handler.setLevel(logging.INFO)
@@ -35,16 +42,27 @@ logging.basicConfig(
     force=True
 )
 logger = logging.getLogger('map_node')
+if _debug_env:
+    logger.info('🔧 Debug mode enabled for MapNode (console INFO)')
+
+# LLM client import
+try:
+    from llm_client import ZenohLLMClient
+    LLM_CLIENT_AVAILABLE = True
+except ImportError as e:
+    print(f"⚠️  LLM Client not available: {e}")
+    LLM_CLIENT_AVAILABLE = False
+
 
 class MapNode:
-    def __init__(self, map_file: str, world_name: str = None):
+    def __init__(self, map_file: str, world_name: str = None, setting: str = None):
         self.map_file = map_file
         self.world_name = world_name or map_file.replace('.py', '')
         self.world_map = None
         self.session = None
         self.shutdown_requested = False
         self._shutting_down = False
-        
+        self.setting = setting
         # Agent registry: character_name -> Agent instance
         self.agent_registry = {}
         
@@ -78,6 +96,13 @@ class MapNode:
         self.turn_publisher = None
         self.turn_complete_subscriber = None
         
+        # Time advancement system
+        self.turn_delay_minutes = 0  # Default delay between turns in run mode
+        self.time_proposals = []  # List of (character_name, proposed_minutes) tuples
+        self.time_proposal_subscriber = None
+        self.time_delay_setting_subscriber = None
+        self.time_advanced_publisher = None
+        
         # Load the map module
         self.load_map_module()
         
@@ -86,6 +111,11 @@ class MapNode:
         
         # Start persistence thread
         self.start_persistence_thread()
+        self.llm_client = None
+        if LLM_CLIENT_AVAILABLE:
+            self.llm_client = ZenohLLMClient(service_timeout=60.0)
+        
+        self.initialize_setting()
         
     def load_map_module(self):
         """Load the map module from the maps subdirectory"""
@@ -114,6 +144,28 @@ class MapNode:
         except Exception as e:
             logger.error(f"Failed to load map module: {e}")
             raise
+    
+    def initialize_setting(self):
+        """Initialize the setting"""
+        if self.setting:
+            prompt = f"""Given the following setting, create a datetime in isoformat consistent with the setting, analyzing both the era, the season, and the implied time of day.
+            
+#Setting: \n{self.setting}
+##
+
+Response ONLY with the datetime in isoformat.
+Do not include any other text, reasoning, introductory, expository, or markdown.
+            """
+            response = self.llm_client.generate([prompt], max_tokens=100)
+            try:
+                self.world_map.datetime = datetime.fromisoformat(response.text.strip())
+                logger.info(f"Setting datetime to: {self.world_map.datetime}")
+            except Exception as e:
+                logger.error(f"Failed to set datetime: {e}")
+                logger.error(f"Response: {response.text}")
+                self.world_map.datetime = datetime.now()
+                logger.info(f"Setting datetime to now: {self.world_map.datetime}")
+            return self.world_map.datetime
     
     def init_zenoh(self):
         """Initialize Zenoh session and set up queryables"""
@@ -208,6 +260,12 @@ class MapNode:
             self.handle_map_types
         )
         
+        # Simulation time queryable
+        self.simulation_time_queryable = self.session.declare_queryable(
+            "cognitive/map/simulation_time",
+            self.handle_simulation_time
+        )
+        
         # Conversation lock queryables
         self.conversation_lock_acquire_queryable = self.session.declare_queryable(
             "cognitive/map/conversation/lock/acquire",
@@ -259,6 +317,9 @@ class MapNode:
             # Publisher for step complete signals (for FastAPI UI)
             self.step_complete_publisher = self.session.declare_publisher("cognitive/map/step_complete")
             
+            # Publisher for turn control status updates (for FastAPI UI)
+            self.turn_control_publisher = self.session.declare_publisher("cognitive/map/turn_status")
+            
             # Subscriber for turn completion signals
             self.turn_complete_subscriber = self.session.declare_subscriber(
                 "cognitive/map/turn/complete/*",
@@ -287,6 +348,21 @@ class MapNode:
                 self.handle_turn_stop
             )
             
+            # Time advancement system
+            self.time_proposal_subscriber = self.session.declare_subscriber(
+                "cognitive/map/time_proposal",
+                self.handle_time_proposal
+            )
+            
+            self.time_delay_setting_subscriber = self.session.declare_subscriber(
+                "cognitive/map/time_delay_setting",
+                self.handle_time_delay_setting
+            )
+            
+            self.time_advanced_publisher = self.session.declare_publisher(
+                "cognitive/map/time_advanced"
+            )
+            
             # Turn control state
             self.turn_control_mode = "step"  # "step" or "run"
             self.auto_progression_enabled = False
@@ -295,6 +371,10 @@ class MapNode:
             
             logger.info("Turn management system set up successfully")
             logger.info("Manual turn control enabled - starting in STEP mode")
+            logger.info("Time advancement system initialized")
+            
+            # Publish initial turn control status
+            self._publish_turn_control_status()
             
         except Exception as e:
             logger.error(f"Failed to set up turn management: {e}")
@@ -332,6 +412,51 @@ class MapNode:
         self.turn_publisher.put(json.dumps(go_signal).encode('utf-8'))
         
         logger.info(f"🚦 Turn {self.turn_state['turn_number']} started for: {', '.join(active_characters)}")
+
+    def start_new_turn_if_auto(self):
+        """Start a new turn only if auto progression is still enabled."""
+        try:
+            if not self.auto_progression_enabled:
+                logger.info("Auto start skipped: auto-progression disabled")
+                return
+            logger.info("Auto start invoked: starting next turn (auto-progression still enabled)")
+            self.start_new_turn()
+        except Exception as e:
+            logger.error(f"Error in start_new_turn_if_auto: {e}")
+    
+    def delayed_turn_start_threaded(self, delay_minutes):
+        """Start a new turn after the specified delay, checking for changes every 10 seconds."""
+        try:
+            total_delay_seconds = delay_minutes * 60
+            elapsed_seconds = 0
+            
+            while elapsed_seconds < total_delay_seconds:
+                # Sleep in 10-second increments for responsiveness
+                time.sleep(10)
+                elapsed_seconds += 10
+                
+                # Check if delay setting changed
+                if self.turn_delay_minutes != delay_minutes:
+                    logger.info(f"⏰ Turn delay changed from {delay_minutes} to {self.turn_delay_minutes} minutes - recalculating")
+                    # Recalculate remaining time with new delay
+                    remaining_seconds = max(0, (self.turn_delay_minutes * 60) - elapsed_seconds)
+                    if remaining_seconds > 0:
+                        logger.info(f"⏰ Continuing with {remaining_seconds} seconds remaining")
+                        # Continue with remaining time
+                        while elapsed_seconds < (delay_minutes * 60) + remaining_seconds:
+                            time.sleep(10)
+                            elapsed_seconds += 10
+                    break
+            
+            # Only start turn if auto-progression is still enabled
+            if self.auto_progression_enabled:
+                logger.info("⏰ Delay completed - starting next turn")
+                self.start_new_turn_if_auto()
+            else:
+                logger.info("⏰ Delay completed but auto-progression disabled - not starting turn")
+                
+        except Exception as e:
+            logger.error(f"Error in delayed turn start: {e}")
     
     def handle_turn_complete(self, sample):
         """Handle turn completion signals from characters"""
@@ -354,6 +479,9 @@ class MapNode:
             if len(self.turn_state['completed_characters']) >= len(self.turn_state['active_characters']):
                 logger.info(f"🎯 All characters completed turn {self.turn_state['turn_number']}")
                 
+                # Advance simulation time using hybrid logic
+                self.advance_simulation_time()
+                
                 # In Step mode, never auto-progress - always wait for manual step
                 if self.turn_control_mode == "step":
                     logger.info("Step mode - waiting for manual step command")
@@ -373,7 +501,13 @@ class MapNode:
                 # In Run mode, auto-progress to next turn
                 elif self.auto_progression_enabled:
                     logger.info("Run mode - auto-progressing to next turn")
-                    threading.Timer(1.0, self.start_new_turn).start()
+                    if self.turn_delay_minutes > 0:
+                        logger.info(f"Scheduling auto start of next turn with {self.turn_delay_minutes} minute delay")
+                        # Use threading with periodic checks for responsiveness
+                        threading.Timer(1.0, self.delayed_turn_start_threaded, args=[self.turn_delay_minutes]).start()
+                    else:
+                        logger.info("No delay - starting next turn immediately")
+                        self.start_new_turn_if_auto()
                 else:
                     logger.info("Run mode but auto-progression disabled - waiting for manual step")
             
@@ -436,7 +570,8 @@ class MapNode:
             
             # Start next turn only if auto-progression is enabled
             if self.auto_progression_enabled:
-                self.start_new_turn()
+                logger.info("Timeout path: auto-progression enabled - starting next turn")
+                self.start_new_turn_if_auto()
             else:
                 logger.info("Turn timed out but auto-progression disabled - waiting for manual step")
     
@@ -446,6 +581,9 @@ class MapNode:
             logger.info("🎯 Manual Step Turn command received")
             self.turn_control_mode = "step"
             self.auto_progression_enabled = False
+            
+            # Publish turn control status update
+            self._publish_turn_control_status()
             
             # If no turn is currently active, start one
             if not self.turn_state['active_characters']:
@@ -464,6 +602,9 @@ class MapNode:
             self.turn_control_mode = "run"
             self.auto_progression_enabled = True
             
+            # Publish turn control status update
+            self._publish_turn_control_status()
+            
             # If no turn is currently active, start one
             if not self.turn_state['active_characters']:
                 self.start_new_turn()
@@ -480,10 +621,26 @@ class MapNode:
             self.turn_control_mode = "step"
             self.auto_progression_enabled = False
             
+            # Publish turn control status update
+            self._publish_turn_control_status()
+            
             logger.info("Auto-progression disabled - waiting for manual step")
                 
         except Exception as e:
             logger.error(f"Error handling turn stop command: {e}")
+    
+    def _publish_turn_control_status(self):
+        """Publish current turn control status for UI updates"""
+        try:
+            turn_control_data = {
+                'mode': self.turn_control_mode,
+                'auto_progression': self.auto_progression_enabled,
+                'timestamp': time.time()
+            }
+            self.turn_control_publisher.put(json.dumps(turn_control_data).encode())
+            logger.info(f"📤 Published turn control status: mode={self.turn_control_mode}, auto_progression={self.auto_progression_enabled}")
+        except Exception as e:
+            logger.error(f"Error publishing turn control status: {e}")
     
     def handle_map_summary(self, query):
         """Handle map summary queries"""
@@ -900,6 +1057,176 @@ class MapNode:
             }
             query.reply(query.key_expr, json.dumps(error_response).encode('utf-8'))
     
+    def calculate_time_info(self, dt):
+        """Calculate time_info structure from a datetime object"""
+        # Simple period calculation based on hour
+        hour = dt.hour
+        if 6 <= hour < 8:
+            period = "dawn"
+        elif 8 <= hour < 12:
+            period = "morning"
+        elif 12 <= hour < 17:
+            period = "afternoon"
+        elif 17 <= hour < 19:
+            period = "dusk"
+        elif 19 <= hour < 22:
+            period = "evening"
+        else:
+            period = "night"
+        
+        # Simple season calculation based on month
+        month = dt.month
+        if month in [12, 1, 2]:
+            season = "winter"
+        elif month in [3, 4, 5]:
+            season = "spring"
+        elif month in [6, 7, 8]:
+            season = "summer"
+        else:
+            season = "autumn"
+        
+        return {
+            'datetime': dt.isoformat(),
+            'period': period,
+            'season': season,
+            'hour': hour,
+            'month': month
+        }
+
+    def handle_simulation_time(self, query):
+        """Handle simulation time query - returns current datetime, season, period, and weather"""
+        try:
+            # For now, return stub data with constants
+            # TODO: Implement actual time progression and weather simulation
+            if type(self.world_map.datetime) != datetime:
+                self.world_map.datetime = datetime.now()
+            
+            time_info = self.calculate_time_info(self.world_map.datetime)
+            
+            # Stub weather data
+            weather = "sunny"  # TODO: Implement weather simulation
+            
+            response = {
+                'success': True,
+                'time_info': time_info,
+                'weather': weather
+            }
+            
+            query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
+            logger.info(f'⏰ Simulation time query: returned {time_info["period"]} {time_info["season"]} day, {weather}')
+            
+        except Exception as e:
+            logger.error(f'Error handling simulation time query: {e}')
+            error_response = {
+                'success': False,
+                'error': str(e),
+                'time_info': {},
+                'weather': 'unknown'
+            }
+            query.reply(query.key_expr, json.dumps(error_response).encode('utf-8'))
+    
+    def handle_time_proposal(self, sample):
+        """Handle time advancement proposals from characters"""
+        try:
+            data = json.loads(sample.payload.to_bytes().decode('utf-8'))
+            character_name = data.get('character_name')
+            proposed_minutes = data.get('proposed_minutes')
+            
+            if not character_name or proposed_minutes is None:
+                logger.error(f"Invalid time proposal: missing character_name or proposed_minutes")
+                return
+            
+            # Validate proposal
+            if proposed_minutes < 0:
+                logger.error(f"Character {character_name} proposed negative time: {proposed_minutes} minutes")
+                return
+            
+            # Cap at 24 hours (1440 minutes)
+            if proposed_minutes > 1440:
+                logger.warning(f"Character {character_name} proposed time > 24 hours ({proposed_minutes} min), capping at 1440")
+                proposed_minutes = 1440
+            
+            # Store proposal (replace any existing proposal from this character)
+            self.time_proposals = [(name, minutes) for name, minutes in self.time_proposals if name != character_name]
+            self.time_proposals.append((character_name, proposed_minutes))
+            
+            logger.info(f"⏰ Time proposal from {character_name}: {proposed_minutes} minutes")
+            
+        except Exception as e:
+            logger.error(f"Error handling time proposal: {e}")
+    
+    def handle_time_delay_setting(self, sample):
+        """Handle time delay setting changes from UI"""
+        try:
+            data = json.loads(sample.payload.to_bytes().decode('utf-8'))
+            delay_minutes = data.get('delay_minutes')
+            
+            if delay_minutes is None:
+                logger.error("Invalid time delay setting: missing delay_minutes")
+                return
+            
+            # Validate range (0 to 30 minutes)
+            if delay_minutes < 0:
+                delay_minutes = 0
+            elif delay_minutes > 30:
+                delay_minutes = 30
+            
+            self.turn_delay_minutes = delay_minutes
+            logger.info(f"⏰ Turn delay setting updated to {delay_minutes} minutes")
+            
+        except Exception as e:
+            logger.error(f"Error handling time delay setting: {e}")
+    
+    def advance_simulation_time(self):
+        """Advance simulation time using time proposals only"""
+        try:
+            # Determine time advancement using time proposals only
+            advance_minutes = 10  # Default fallback if no proposals
+            
+            if self.time_proposals:
+                # Get minimum proposal
+                proposal_minutes = [minutes for _, minutes in self.time_proposals]
+                advance_minutes = min(proposal_minutes)
+                
+                logger.info(f"⏰ Time proposals: {self.time_proposals}, advancing: {advance_minutes}min")
+            else:
+                logger.info(f"⏰ No time proposals, using default: {advance_minutes}min")
+            
+            # Advance the simulation time
+            if advance_minutes > 0:
+                old_datetime = self.world_map.datetime
+                new_datetime = old_datetime + timedelta(minutes=advance_minutes)
+                self.world_map.datetime = new_datetime
+                
+                # Calculate time_info for old and new times
+                old_time_info = self.calculate_time_info(old_datetime)
+                new_time_info = self.calculate_time_info(new_datetime)
+                
+                # Publish time advancement notification
+                weather = "sunny"  # TODO: Implement weather simulation
+                advancement_data = {
+                    'old_time_info': old_time_info,
+                    'new_time_info': new_time_info,
+                    'weather': weather,
+                    'advance_minutes': advance_minutes
+                }
+                
+                self.time_advanced_publisher.put(json.dumps(advancement_data).encode('utf-8'))
+                
+                logger.info(f"⏰ Time advanced by {advance_minutes} minutes: {old_time_info['datetime']} → {new_time_info['datetime']}")
+                
+                # Log period/season changes
+                if old_time_info['period'] != new_time_info['period']:
+                    logger.info(f"🌅 Period changed: {old_time_info['period']} → {new_time_info['period']}")
+                if old_time_info['season'] != new_time_info['season']:
+                    logger.info(f"🍂 Season changed: {old_time_info['season']} → {new_time_info['season']}")
+            
+            # Clear time proposals for next turn
+            self.time_proposals.clear()
+            
+        except Exception as e:
+            logger.error(f"Error advancing simulation time: {e}")
+    
     def check_visibility_changes(self, moved_agent_name):
         """Check if the moved agent is now visible to other agents"""
         try:
@@ -1068,7 +1395,8 @@ class MapNode:
                             logger.info("First character added - turn management ready")
                             if self.auto_progression_enabled:
                                 logger.info("Auto-progression enabled - starting first turn")
-                                threading.Timer(2.0, self.start_new_turn).start()
+                                logger.info("Scheduling auto start of first turn in 2.0s")
+                                threading.Timer(2.0, self.start_new_turn_if_auto).start()
                             else:
                                 logger.info("Manual control mode - waiting for step command")
                 
@@ -1287,6 +1615,18 @@ class MapNode:
                         # TODO: Restore world map modifications (resources, terrain changes, etc.)
                         logger.info("📂 World map state restored")
                     
+                    # Restore simulation time if available
+                    if 'simulation_time' in world_data:
+                        try:
+                            self.world_map.datetime = datetime.fromisoformat(world_data['simulation_time'])
+                            logger.info(f"📂 Simulation time restored to: {self.world_map.datetime}")
+                        except Exception as e:
+                            logger.warning(f"Failed to restore simulation time: {e}, using current time")
+                            self.world_map.datetime = datetime.now()
+                    else:
+                        logger.info("📂 No simulation time in saved data, using current time")
+                        self.world_map.datetime = datetime.now()
+                    
                     logger.info(f"📂 Loaded world data for '{self.world_name}'")
                     
                     # Start turn management if agents were restored
@@ -1311,6 +1651,7 @@ class MapNode:
                 'world_name': self.world_name,
                 'map_file': self.map_file,
                 'timestamp': datetime.now().isoformat(),
+                'simulation_time': self.world_map.datetime.isoformat(),
                 'agents': []
             }
             
@@ -1562,6 +1903,8 @@ def main():
                        help='Map file name (e.g., forest.py)')
     parser.add_argument('-w', '--world-name', 
                        help='World name (defaults to map file name without .py)')
+    parser.add_argument('-s', '--setting', 
+                       help='Setting text string (defaults to None)')
     
     args = parser.parse_args()
     
@@ -1571,7 +1914,7 @@ def main():
         signal.signal(signal.SIGINT, signal_handler)
         
         # Create and run map node
-        map_node = MapNode(args.map_file, args.world_name)
+        map_node = MapNode(args.map_file, args.world_name, setting=args.setting)
         signal_handler.map_node = map_node  # Store reference for signal handler
         
         map_node.run()

@@ -258,7 +258,7 @@ The reported error is:
 
 Respond with the repaired JSON string. Make sure the string is in a format that can be parsed by the json.loads function. No commentary, no code fences.
 """)]
-        response = self.llm.ask({"json": response, "error": error}, prompt, tag='repair_json', temp=0.2, max_tokens=3500)
+        response = self.ask({"json": response, "error": error}, prompt, tag='repair_json', temp=0.2, max_tokens=3500)
         try:
             return json.loads(response.replace("```json", "").replace("```", "").strip())
         except Exception as e:

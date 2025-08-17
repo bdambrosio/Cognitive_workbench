@@ -1,0 +1,840 @@
+{
+  "activities": {
+    "Eat Breakfast": {
+      "name": "Eat Breakfast",
+      "category": "Physiological ADLs",
+      "tags": [
+        "physical",
+        "routine"
+      ],
+      "when": "daily@morning",
+      "where": [
+        "Hut",
+        "Clearing"
+      ],
+      "start": [
+        "time: 7:00 AM",
+        "place: Hut"
+      ],
+      "stop": [
+        "duration: 30 minutes"
+      ],
+      "duration": [
+        15,
+        30
+      ],
+      "needs": [
+        "food",
+        "hands"
+      ],
+      "steps": [
+        "acquire food",
+        "prepare food for consumption",
+        "consume food"
+      ],
+      "importance": 0.8,
+      "habit": 0.7
+    },
+    "Drink Water": {
+      "name": "Drink Water",
+      "category": "Physiological ADLs",
+      "tags": [
+        "physical",
+        "routine"
+      ],
+      "when": "daily@morning",
+      "where": [
+        "Water",
+        "Hut"
+      ],
+      "start": [
+        "time: 8:00 AM",
+        "place: Water"
+      ],
+      "stop": [
+        "duration: 15 minutes"
+      ],
+      "duration": [
+        5,
+        15
+      ],
+      "needs": [
+        "water",
+        "hands"
+      ],
+      "steps": [
+        "acquire drinkable water",
+        "consume water"
+      ],
+      "importance": 0.9,
+      "habit": 0.8
+    },
+    "Sleep": {
+      "name": "Sleep",
+      "category": "Physiological ADLs",
+      "tags": [
+        "physical",
+        "routine"
+      ],
+      "when": "daily@night",
+      "where": [
+        "Hut",
+        "Clearing"
+      ],
+      "start": [
+        "time: 10:00 PM",
+        "place: Hut"
+      ],
+      "stop": [
+        "duration: 8 hours"
+      ],
+      "duration": [
+        7,
+        9
+      ],
+      "needs": [
+        "shelter",
+        "clothing"
+      ],
+      "steps": [
+        "find shelter",
+        "prepare for sleep",
+        "fall asleep"
+      ],
+      "importance": 0.9,
+      "habit": 0.8
+    },
+    "Plan Hike": {
+      "name": "Plan Hike",
+      "category": "Instrumental ADLs/Logistics",
+      "tags": [
+        "mental",
+        "planning"
+      ],
+      "when": "opportunistic",
+      "where": [
+        "Hut",
+        "Clearing"
+      ],
+      "start": [
+        "time: 9:00 AM",
+        "place: Hut"
+      ],
+      "stop": [
+        "duration: 30 minutes"
+      ],
+      "duration": [
+        15,
+        30
+      ],
+      "needs": [
+        "map",
+        "brain"
+      ],
+      "steps": [
+        "review map",
+        "choose route",
+        "prepare gear"
+      ],
+      "importance": 0.7,
+      "habit": 0.5
+    },
+    "Prepare Gear": {
+      "name": "Prepare Gear",
+      "category": "Instrumental ADLs/Logistics",
+      "tags": [
+        "physical",
+        "planning"
+      ],
+      "when": "opportunistic",
+      "where": [
+        "Hut",
+        "Clearing"
+      ],
+      "start": [
+        "time: 9:30 AM",
+        "place: Hut"
+      ],
+      "stop": [
+        "duration: 30 minutes"
+      ],
+      "duration": [
+        15,
+        30
+      ],
+      "needs": [
+        "gear",
+        "hands"
+      ],
+      "steps": [
+        "inspect personal equipment for damage",
+        "pack essential items",
+        "check weather forecast"
+      ],
+      "importance": 0.7,
+      "habit": 0.5
+    },
+    "Hike": {
+      "name": "Hike",
+      "category": "Mobility & Transport",
+      "tags": [
+        "physical",
+        "outdoors"
+      ],
+      "when": "opportunistic",
+      "where": [
+        "Forest",
+        "Mountain"
+      ],
+      "start": [
+        "time: 10:00 AM",
+        "place: Forest"
+      ],
+      "stop": [
+        "duration: 4 hours"
+      ],
+      "duration": [
+        2,
+        4
+      ],
+      "needs": [
+        "shoes",
+        "clothing"
+      ],
+      "steps": [
+        "start hiking",
+        "follow route",
+        "take breaks"
+      ],
+      "importance": 0.8,
+      "habit": 0.6
+    },
+    "Explore Forest": {
+      "name": "Explore Forest",
+      "category": "Mobility & Transport",
+      "tags": [
+        "physical",
+        "outdoors"
+      ],
+      "when": "opportunistic",
+      "where": [
+        "Forest"
+      ],
+      "start": [
+        "time: 10:00 AM",
+        "place: Forest"
+      ],
+      "stop": [
+        "duration: 2 hours"
+      ],
+      "duration": [
+        1,
+        2
+      ],
+      "needs": [
+        "shoes",
+        "clothing"
+      ],
+      "steps": [
+        "start exploring",
+        "follow trail",
+        "observe surroundings"
+      ],
+      "importance": 0.7,
+      "habit": 0.5
+    },
+    "Climb Mountain": {
+      "name": "Climb Mountain",
+      "category": "Mobility & Transport",
+      "tags": [
+        "physical",
+        "outdoors"
+      ],
+      "when": "opportunistic",
+      "where": [
+        "Mountain"
+      ],
+      "start": [
+        "time: 10:00 AM",
+        "place: Mountain"
+      ],
+      "stop": [
+        "duration: 4 hours"
+      ],
+      "duration": [
+        2,
+        4
+      ],
+      "needs": [
+        "shoes",
+        "clothing"
+      ],
+      "steps": [
+        "start climbing",
+        "follow route",
+        "take breaks"
+      ],
+      "importance": 0.8,
+      "habit": 0.6
+    },
+    "Meditate": {
+      "name": "Meditate",
+      "category": "Cognitive/Inner",
+      "tags": [
+        "mental",
+        "solo"
+      ],
+      "when": "opportunistic",
+      "where": [
+        "Forest",
+        "Clearing"
+      ],
+      "start": [
+        "time: 12:00 PM",
+        "place: Forest"
+      ],
+      "stop": [
+        "duration: 30 minutes"
+      ],
+      "duration": [
+        15,
+        30
+      ],
+      "needs": [
+        "quiet space",
+        "brain"
+      ],
+      "steps": [
+        "find quiet space",
+        "sit comfortably",
+        "focus on breath"
+      ],
+      "importance": 0.6,
+      "habit": 0.4
+    },
+    "Daydream": {
+      "name": "Daydream",
+      "category": "Cognitive/Inner",
+      "tags": [
+        "mental",
+        "solo"
+      ],
+      "when": "opportunistic",
+      "where": [
+        "Forest",
+        "Clearing"
+      ],
+      "start": [
+        "time: 1:00 PM",
+        "place: Forest"
+      ],
+      "stop": [
+        "duration: 30 minutes"
+      ],
+      "duration": [
+        15,
+        30
+      ],
+      "needs": [
+        "quiet space",
+        "brain"
+      ],
+      "steps": [
+        "find quiet space",
+        "let mind wander",
+        "reflect on thoughts"
+      ],
+      "importance": 0.5,
+      "habit": 0.3
+    },
+    "Learn from Hermit": {
+      "name": "Learn from Hermit",
+      "category": "Learning & Practice",
+      "tags": [
+        "mental",
+        "social"
+      ],
+      "when": "opportunistic",
+      "where": [
+        "Hut"
+      ],
+      "start": [
+        "time: 2:00 PM",
+        "place: Hut"
+      ],
+      "stop": [
+        "duration: 1 hour"
+      ],
+      "duration": [
+        30,
+        60
+      ],
+      "needs": [
+        "Hermit",
+        "brain"
+      ],
+      "steps": [
+        "find Hermit",
+        "ask questions",
+        "listen to advice"
+      ],
+      "importance": 0.7,
+      "habit": 0.5
+    },
+    "Practice Survival Skills": {
+      "name": "Practice Survival Skills",
+      "category": "Learning & Practice",
+      "tags": [
+        "physical",
+        "outdoors"
+      ],
+      "when": "opportunistic",
+      "where": [
+        "Forest",
+        "Mountain"
+      ],
+      "start": [
+        "time: 3:00 PM",
+        "place: Forest"
+      ],
+      "stop": [
+        "duration: 2 hours"
+      ],
+      "duration": [
+        1,
+        2
+      ],
+      "needs": [
+        "shoes",
+        "clothing"
+      ],
+      "steps": [
+        "find resources",
+        "build shelter",
+        "start fire"
+      ],
+      "importance": 0.8,
+      "habit": 0.6
+    },
+    "Socialize with Joe": {
+      "name": "Socialize with Joe",
+      "category": "Recreation & Leisure",
+      "tags": [
+        "social",
+        "outdoors"
+      ],
+      "when": "opportunistic",
+      "where": [
+        "Clearing",
+        "Forest"
+      ],
+      "start": [
+        "time: 4:00 PM",
+        "place: Clearing"
+      ],
+      "stop": [
+        "duration: 1 hour"
+      ],
+      "duration": [
+        30,
+        60
+      ],
+      "needs": [
+        "Joe",
+        "brain"
+      ],
+      "steps": [
+        "find Joe",
+        "start conversation",
+        "listen to Joe"
+      ],
+      "importance": 0.7,
+      "habit": 0.5
+    },
+    "Play with Joe": {
+      "name": "Play with Joe",
+      "category": "Recreation & Leisure",
+      "tags": [
+        "social",
+        "outdoors"
+      ],
+      "when": "opportunistic",
+      "where": [
+        "Meadow",
+        "Forest"
+      ],
+      "start": [
+        "time: 5:00 PM",
+        "place: Meadow"
+      ],
+      "stop": [
+        "duration: 1 hour"
+      ],
+      "duration": [
+        30,
+        60
+      ],
+      "needs": [
+        "Joe",
+        "brain"
+      ],
+      "steps": [
+        "find Joe",
+        "suggest activity",
+        "play together"
+      ],
+      "importance": 0.6,
+      "habit": 0.4
+    },
+    "Rest": {
+      "name": "Rest",
+      "category": "Recreation & Leisure",
+      "tags": [
+        "physical",
+        "solo"
+      ],
+      "when": "opportunistic",
+      "where": [
+        "Hut",
+        "Clearing"
+      ],
+      "start": [
+        "time: 6:00 PM",
+        "place: Hut"
+      ],
+      "stop": [
+        "duration: 1 hour"
+      ],
+      "duration": [
+        30,
+        60
+      ],
+      "needs": [
+        "shelter",
+        "clothing"
+      ],
+      "steps": [
+        "find shelter",
+        "lie down",
+        "relax"
+      ],
+      "importance": 0.5,
+      "habit": 0.3
+    },
+    "Check for Hazards": {
+      "name": "Check for Hazards",
+      "category": "Safety/Emergency",
+      "tags": [
+        "physical",
+        "outdoors"
+      ],
+      "when": "daily@morning",
+      "where": [
+        "Forest",
+        "Mountain"
+      ],
+      "start": [
+        "time: 8:00 AM",
+        "place: Forest"
+      ],
+      "stop": [
+        "duration: 30 minutes"
+      ],
+      "duration": [
+        15,
+        30
+      ],
+      "needs": [
+        "eyes",
+        "brain"
+      ],
+      "steps": [
+        "inspect surroundings",
+        "check for wild animals",
+        "check for inclement weather"
+      ],
+      "importance": 0.9,
+      "habit": 0.8
+    },
+    "Prepare for Emergency": {
+      "name": "Prepare for Emergency",
+      "category": "Safety/Emergency",
+      "tags": [
+        "physical",
+        "outdoors"
+      ],
+      "when": "opportunistic",
+      "where": [
+        "Hut",
+        "Clearing"
+      ],
+      "start": [
+        "time: 9:00 AM",
+        "place: Hut"
+      ],
+      "stop": [
+        "duration: 30 minutes"
+      ],
+      "duration": [
+        15,
+        30
+      ],
+      "needs": [
+        "first aid kit",
+        "brain"
+      ],
+      "steps": [
+        "check first aid kit",
+        "pack essential items",
+        "review emergency procedures"
+      ],
+      "importance": 0.8,
+      "habit": 0.6
+    },
+    "Respond to Emergency": {
+      "name": "Respond to Emergency",
+      "category": "Safety/Emergency",
+      "tags": [
+        "physical",
+        "outdoors"
+      ],
+      "when": "opportunistic",
+      "where": [
+        "Forest",
+        "Mountain"
+      ],
+      "start": [
+        "time: 10:00 AM",
+        "place: Forest"
+      ],
+      "stop": [
+        "duration: 1 hour"
+      ],
+      "duration": [
+        30,
+        60
+      ],
+      "needs": [
+        "brain",
+        "first aid kit"
+      ],
+      "steps": [
+        "assess situation",
+        "provide first aid",
+        "seek help"
+      ],
+      "importance": 0.9,
+      "habit": 0.8
+    },
+    "Exercise": {
+      "name": "Exercise",
+      "category": "Health Management",
+      "tags": [
+        "physical",
+        "outdoors"
+      ],
+      "when": "daily@morning",
+      "where": [
+        "Forest",
+        "Mountain"
+      ],
+      "start": [
+        "time: 7:00 AM",
+        "place: Forest"
+      ],
+      "stop": [
+        "duration: 30 minutes"
+      ],
+      "duration": [
+        15,
+        30
+      ],
+      "needs": [
+        "shoes",
+        "clothing"
+      ],
+      "steps": [
+        "start exercising",
+        "follow routine",
+        "stretch"
+      ],
+      "importance": 0.7,
+      "habit": 0.5
+    },
+    "Stretch": {
+      "name": "Stretch",
+      "category": "Health Management",
+      "tags": [
+        "physical",
+        "solo"
+      ],
+      "when": "opportunistic",
+      "where": [
+        "Hut",
+        "Clearing"
+      ],
+      "start": [
+        "time: 8:00 AM",
+        "place: Hut"
+      ],
+      "stop": [
+        "duration: 15 minutes"
+      ],
+      "duration": [
+        10,
+        15
+      ],
+      "needs": [
+        "shelter",
+        "clothing"
+      ],
+      "steps": [
+        "find shelter",
+        "lie down",
+        "stretch"
+      ],
+      "importance": 0.5,
+      "habit": 0.3
+    },
+    "Meditate on Health": {
+      "name": "Meditate on Health",
+      "category": "Health Management",
+      "tags": [
+        "mental",
+        "solo"
+      ],
+      "when": "opportunistic",
+      "where": [
+        "Forest",
+        "Clearing"
+      ],
+      "start": [
+        "time: 9:00 AM",
+        "place: Forest"
+      ],
+      "stop": [
+        "duration: 30 minutes"
+      ],
+      "duration": [
+        15,
+        30
+      ],
+      "needs": [
+        "quiet space",
+        "brain"
+      ],
+      "steps": [
+        "find quiet space",
+        "focus on breath",
+        "reflect on health"
+      ],
+      "importance": 0.6,
+      "habit": 0.4
+    },
+    "Maintain Gear": {
+      "name": "Maintain Gear",
+      "category": "Maintenance & Repair",
+      "tags": [
+        "physical",
+        "outdoors"
+      ],
+      "when": "opportunistic",
+      "where": [
+        "Hut",
+        "Clearing"
+      ],
+      "start": [
+        "time: 10:00 AM",
+        "place: Hut"
+      ],
+      "stop": [
+        "duration: 30 minutes"
+      ],
+      "duration": [
+        15,
+        30
+      ],
+      "needs": [
+        "gear",
+        "hands"
+      ],
+      "steps": [
+        "inspect gear",
+        "clean gear",
+        "repair gear"
+      ],
+      "importance": 0.7,
+      "habit": 0.5
+    },
+    "Repair Shelter": {
+      "name": "Repair Shelter",
+      "category": "Maintenance & Repair",
+      "tags": [
+        "physical",
+        "outdoors"
+      ],
+      "when": "opportunistic",
+      "where": [
+        "Hut",
+        "Clearing"
+      ],
+      "start": [
+        "time: 11:00 AM",
+        "place: Hut"
+      ],
+      "stop": [
+        "duration: 1 hour"
+      ],
+      "duration": [
+        30,
+        60
+      ],
+      "needs": [
+        "shelter",
+        "hands"
+      ],
+      "steps": [
+        "inspect shelter",
+        "gather materials",
+        "repair shelter"
+      ],
+      "importance": 0.8,
+      "habit": 0.6
+    },
+    "Gather Resources": {
+      "name": "Gather Resources",
+      "category": "Maintenance & Repair",
+      "tags": [
+        "physical",
+        "outdoors"
+      ],
+      "when": "opportunistic",
+      "where": [
+        "Forest",
+        "Mountain"
+      ],
+      "start": [
+        "time: 12:00 PM",
+        "place: Forest"
+      ],
+      "stop": [
+        "duration: 1 hour"
+      ],
+      "duration": [
+        30,
+        60
+      ],
+      "needs": [
+        "shoes",
+        "clothing"
+      ],
+      "steps": [
+        "find resources",
+        "gather resources",
+        "store resources"
+      ],
+      "importance": 0.7,
+      "habit": 0.5
+    }
+  }
+}
