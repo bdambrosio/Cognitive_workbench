@@ -7,13 +7,13 @@ Multiple characters can be defined in a simple 2 1/2 grid world. you define pers
 
 System even has a minimal UI that allows stepping, manual input of simple plans, etc.
 
-8/17 - A huge commit, including:
-Add activity generation and management - Claim: Planning from scratch is a very rare event. Given a new situation, we adopt remembered roles and activities. 
+## 8/17 - A huge commit, including: ##
+1. activity generation and management - Claim: Planning from scratch is a very rare event. Given a new situation, we adopt remembered roles and activities. 
 The new activity system 'remembers' offline, and generates a set of activity templates.
 Right now only instantiated for the lost.yaml scenario - see scenarios/Joe-activities.json and scenarios/Samantha-activities.json.
 You can compile activities for any fully specified scenario by running python3 activity.py <scenario>/yaml - but note most other scenarios aren't complete! See lost.yaml
 
-NPCs and you - two new flags in character specs in scenario.yaml files. Again see lost.yaml
+2. NPCs and you - two new flags in character specs in scenario.yaml files. Again see lost.yaml
  - manual: true - means the character doesn't have activities, take turns, etc.
  - manual_response: true/false - determines whether a manual character responds when spoken to. NPCs set this to true so the only thing they do is respond when spoken to.
  - in the example beloe 'User' is defined as a character so other characters can 'see' you. Otherwise they just hear a voice from nowhere.
@@ -39,6 +39,10 @@ NPCs and you - two new flags in character specs in scenario.yaml files. Again se
       - "encouraging critical thinking"
       - "helping others stay safe"
 ```
+
+3. More UI, including display of activities and plans. Hierarchy: characters choose an activity. It has a series of steps, each step translates to a goal. plans are generated to carry out goals. plans are executed as a (conditional) series of actions, each of which is displayed sequentially in the main display area. Much of this is nonsensical at the moment (e.g. picking muchrooms to start a fire), but the infrastructure is now in place!
+
+4. Time slider in UI - characters live! the time slider sets a delay between turns, so you can run CG in the background, come back in a few hours, and ask a character what s/he has been doing. I envision providing characters web access and increased inter-character interaction abilities. AI-friends with lives of their own? CG-Sims? I have no idea where this is going. Your thoughts welcome.
 
 ## 🚀 Quick Start
 
