@@ -3,6 +3,17 @@
 Zenoh utility functions for common operations across nodes.
 """
 
+from datetime import datetime, timedelta
+
+
+def datetime_handler(obj):
+    if isinstance(obj, datetime):
+        return obj.isoformat()  # More standard format
+    elif isinstance(obj, timedelta):
+        return obj.total_seconds()
+    else:
+        return str(obj) 
+
 
 def decode_zenoh_error_payload(reply_str: str) -> str:
     """Decode hex payload from Zenoh error messages.

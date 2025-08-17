@@ -1,3 +1,4 @@
+from datetime import datetime
 import random
 import time
 from enum import Enum, auto
@@ -389,10 +390,11 @@ class Patch:
         return self._slope
 
 class WorldMap:
-    def __init__(self, scenario_module, width=50, height=50):
+    def __init__(self, scenario_module, width=40, height=40):
         self.width = width
         self.height = height
         self.scenario_module = scenario_module
+        self.datetime = datetime.now()
         
         # Get types from scenario module
         self.terrain_types = scenario_module.terrain_types

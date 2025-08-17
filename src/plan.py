@@ -587,90 +587,99 @@ def _validate_condition(condition: Any) -> bool:
         return False
     return True
 
-def is_near(character, target: str) -> bool:
+def is_near(character, target: str, negated: bool) -> bool:
     """Check if a target (resource or character) is near this character."""
     try:
         character_name = character.character_name
-        for reply in character.session.get(f"cognitive/{character_name}/situation/proximity?target={target}", timeout=6.0 if not character.debug else 600.0):
+        for reply in character.session.get(f"cognitive/{character_name}/situation/proximity?target={target}&negated={negated}", timeout=6.0 if not character.debug else 600.0):
             if reply.ok:
                 data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
                 if data['success']:
-                    return data['value']
+                    return {'value': data['value'], 'binding': data['binding']}
             break
     except Exception as e:
         logger.error(f'Error checking proximity for {target}: {e}')
-    return False
+    return {'value': False, 'binding': None}
 
-def _evaluate_condition(character: ZenohExecutiveNode, condition: dict, target: str) -> bool:
+def _evaluate_condition(character: ZenohExecutiveNode, condition: dict) -> bool:
         """Evaluate a condition action dict using distributed node queries."""
         # The key to conditions is access to the character's beliefs and knowledge base.
         # Since this is distributed among nodes, we will used targeted queires by predicate.
         if not condition:
             logger.error('No condition provided {condition}')
-            return False
+            return {'value': False, 'binding': None}
         if not isinstance(condition, dict) or 'type' not in condition or 'target' not in condition:
             logger.error(f'Invalid condition: {condition}')
-            return False
+            return {'value': False, 'binding': None}
         
         condition_type = condition['type']
+        if condition_type in ['notnear', 'notat_location', 'notbelieves', 'hasnt_item', 'cant_see']:
+            negated = True
+        else:
+            negated = False
         target = condition['target']
         character_name = character.character_name
+        result = {'value': False, 'binding': None}
         
         try:
             # Query the appropriate node based on condition type
             if condition_type in ['near', 'notnear']:
                 # Use the extracted is_near function
-                result = is_near(character, target)
-                return not result if condition_type == 'notnear' else result
+                character_name = character.character_name
+                for reply in character.session.get(f"cognitive/{character_name}/situation/proximity?target={target}&negated={negated}", timeout=6.0 if not character.debug else 600.0):
+                    if reply.ok:
+                        data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
+                        if data['success']:
+                            return {'value': data['value'], 'binding': data['binding']}
+                return {'value': False, 'binding': None}
                     
             elif condition_type in ['can_see', 'cant_see']:
                 # Query situation_node for visibility
-                for reply in character.session.get(f"cognitive/{character_name}/situation/visibility?target={target}", timeout=6.0 if not character.debug else 600.0):
+                for reply in character.session.get(f"cognitive/{character_name}/situation/visibility?target={target}&negated={negated}", timeout=6.0 if not character.debug else 600.0):
                     if reply.ok:
                         data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
                         if data['success']:
-                            result = data['value']
                             logger.info(f'Visibility query for {target}: {result}')
-                            return not result if condition_type == 'cant_see' else result
-                    break
-                    
+                            return {'value': data['value'], 'binding': data['binding']}
+                return {'value': False, 'binding': None}
+            
             elif condition_type in ['has_item', 'hasnt_item']:
                 # Query memory_node for inventory
-                for reply in character.session.get(f"cognitive/{character_name}/memory/inventory?item={target}", timeout=6.0 if not character.debug else 600.0):
+                for reply in character.session.get(f"cognitive/{character_name}/memory/inventory?item={target}&negated={negated}", timeout=6.0 if not character.debug else 600.0):
                     if reply.ok:
                         data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
                         if data['success']:
-                            result = data['value']
+                            result = {'value': data['value'], 'binding': data['binding']}
                             logger.info(f'Inventory query for {target}: {result}')
-                            return not result if condition_type == 'hasnt_item' else result
-                    break
+                            return result
+                return {'value': False, 'binding': None}
                     
             elif condition_type in ['at_location', 'notat_location']:
                 # Query situation_node for location
-                for reply in character.session.get(f"cognitive/{character_name}/situation/location?target={target}", timeout=6.0 if not character.debug else 600.0):
+                for reply in character.session.get(f"cognitive/{character_name}/situation/location?target={target}&negated={negated}", timeout=6.0 if not character.debug else 600.0):
                     if reply.ok:
                         data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
                         if data['success']:
-                            result = data['value']
+                            result = {'value': data['value'], 'binding': data['binding']}
                             logger.info(f'Location query for {target}: {result}')
-                            return not result if condition_type == 'notat_location' else result
-                    break
+                            return result
+                return {'value': False, 'binding': None}
                     
             elif condition_type in ['believes', 'notbelieves']:
                 # Stub implementation - user will implement this
                 logger.warning(f'Belief condition {condition_type}({target}) not implemented - returning False')
-                return False
+                return {'value': False, 'binding': None}
             else:
                 logger.error(f'Unknown condition type: {condition_type}')
-                return False
+                return {'value': False, 'binding': None}
                 
         except Exception as e:
             logger.error(f'Error evaluating condition {condition_type}({target}): {e}')
-            return False
+            return {'value': False, 'binding': None}
         
         # If we get here, the query failed or returned no response
         logger.warning(f'Condition evaluation failed for {condition_type}({target}) - returning False')
-        return False
+        return {'value': False, 'binding': None}
 
 def remaining_plan(original_plan: dict, step_stack) -> dict:
     """

@@ -19,7 +19,9 @@ import signal
 import argparse
 from datetime import datetime
 from typing import Dict, List, Any, Union, Optional
+from activity import ActivityManager
 import utils.hash_utils as hash_utils
+from utils.zenoh_utils import datetime_handler
 import plan as plan_module
 from dataclasses import dataclass
 import os
@@ -147,7 +149,6 @@ class ActionRecord:
     # Optional telemetry fields (kept lightweight; None when not applicable)
     step_id: Optional[int] = None
     plan_id: Optional[str] = None
-    frame_path: Optional[List[Any]] = None
     requested_target: Optional[str] = None
     resolved_target: Optional[str] = None
     resolution_status: Optional[str] = None     # resolved | too_far | not_visible | not_in_inventory | ambiguous | not_found | passthrough
@@ -176,6 +177,7 @@ class ZenohExecutiveNode:
         # Debug mode flag - must be set early as it's used throughout initialization
         self.debug = str(os.getenv('CWB_DEBUG', '')).lower() in ('1', 'true', 'yes', 'on')
         if self.debug:
+            console_handler.setLevel(logging.INFO)
             logger.info(f'🔧 Debug mode enabled for {self.character_name}')
         
         # Manual control flags
@@ -218,6 +220,9 @@ class ZenohExecutiveNode:
         
         # Publisher for current plans (character-specific)
         self.current_plan_publisher = self.session.declare_publisher(f"cognitive/{character_name}/current_plan")
+        
+        # Publisher for current activities (character-specific)
+        self.current_activity_publisher = self.session.declare_publisher(f"cognitive/{character_name}/current_activity")
         
         # Backward compatibility properties
         @property
@@ -266,8 +271,18 @@ class ZenohExecutiveNode:
         self.turn_complete_publisher = self.session.declare_publisher(
             f"cognitive/map/turn/complete/{character_name}"
         )
+        self.time_proposal_publisher = self.session.declare_publisher(
+            "cognitive/map/time_proposal"
+        )
         self.waiting_for_turn = True
         self.current_turn_number = 0
+        
+        # Time advancement management
+        self.time_advanced_subscriber = self.session.declare_subscriber(
+            "cognitive/map/time_advanced",
+            self.time_advanced_callback
+        )
+        self.current_time = None  # Will be set when we receive time updates
         
         # Subscriber for shutdown commands (global)
         self.shutdown_subscriber = self.session.declare_subscriber(
@@ -293,6 +308,16 @@ class ZenohExecutiveNode:
                     self.map_types = data
                     break
         self.inspections = {} # cache of inspections
+        self.activities = {}
+        try:
+            self.activities = json.load(open(f'../scenarios/{self.character_name}-activities.json'))
+            if 'activities' in self.activities: # happens sometimes, not sure why
+                self.activities = self.activities['activities']
+        except Exception as e:
+            if not self.manual:
+                logger.error(f'Error loading activities for {self.character_name}: {e}')
+            self.activities = {}
+        self.activity_manager: ActivityManager = ActivityManager(self, self.activities, self.llm_client, self.map_types)
 
         # Register signal handlers for graceful shutdown
         signal.signal(signal.SIGTERM, self._signal_handler)
@@ -302,6 +327,7 @@ class ZenohExecutiveNode:
         logger.info(f'   - Subscribing to: cognitive/{character_name}/sense_data')
         logger.info(f'   - Subscribing to: cognitive/{character_name}/situation/update')
         logger.info(f'   - Subscribing to: cognitive/map/turn/go')
+        logger.info(f'   - Subscribing to: cognitive/map/time_advanced')
         logger.info(f'   - Subscribing to: cognitive/{character_name}/end_dialog')
         logger.info(f'   - Publishing to: cognitive/{character_name}/action')
         logger.info(f'   - Publishing to: cognitive/{character_name}/situation/request_update')
@@ -310,6 +336,7 @@ class ZenohExecutiveNode:
         logger.info(f'   - Publishing to: cognitive/{character_name}/goal')
         logger.info(f'   - Publishing to: cognitive/{character_name}/decided_action')
         logger.info(f'   - Publishing to: cognitive/map/turn/complete/{character_name}')
+        logger.info(f'   - Publishing to: cognitive/map/time_proposal')
     
     def _signal_handler(self, signum, frame):
         """Handle shutdown signals gracefully."""
@@ -398,6 +425,8 @@ class ZenohExecutiveNode:
 
     def _publish_goal(self, goal):
         """Publish current goal to the goal topic for UI display."""
+        if not goal:
+            return
         try:
             goal_data = {
                 'goal': goal.to_string(),
@@ -445,6 +474,50 @@ class ZenohExecutiveNode:
         except Exception as e:
             logger.error(f'Error publishing current plan: {e}')
 
+    def _publish_current_activity(self):
+        """Publish current activity to the current_activity topic for UI display."""
+        try:
+            # Get current activity from activity manager if available
+            current_activity = None
+            current_step = None
+            activity_state = None
+            
+            if hasattr(self, 'activity_manager') and self.activity_manager:
+                current_activity = self.activity_manager.current_activity
+                activity_state = self.activity_manager.current_activity_state
+                if current_activity and activity_state:
+                    current_step = self.activity_manager.activity_step()
+            
+            current_activity_data = {
+                'current_activity': json.dumps(current_activity, indent=2) if current_activity else '',
+                'activity_data': current_activity,
+                'current_step': current_step,
+                'activity_state': activity_state,
+                'timestamp': datetime.now().isoformat(),
+                'character': self.character_name
+            }
+            
+            self.current_activity_publisher.put(json.dumps(current_activity_data, default=datetime_handler))
+            logger.info(f'🎯 Published current activity for {self.character_name}')
+            
+        except Exception as e:
+            logger.error(f'Error publishing current activity: {e}')
+
+    def publish_time_proposal(self, proposed_minutes):
+        """Publish time advancement proposal to map_node."""
+        try:
+            proposal_data = {
+                'character_name': self.character_name,
+                'proposed_minutes': proposed_minutes,
+                'timestamp': datetime.now().isoformat()
+            }
+            
+            self.time_proposal_publisher.put(json.dumps(proposal_data))
+            logger.info(f'⏰ {self.character_name} proposed time advance: {proposed_minutes} minutes')
+            
+        except Exception as e:
+            logger.error(f'Error publishing time proposal: {e}')
+
     def _run_ooda_loop(self):
         """Execute the OODA loop: Observe, Orient, Decide, Act."""
         try:
@@ -463,18 +536,55 @@ class ZenohExecutiveNode:
                             self._complete_turn()
                             return
                 return
+            # Check for active activity and get current step
+            if hasattr(self, 'activity_manager') and self.activity_manager.has_active_activity():
+                should_continue, reason = self.activity_manager.continue_activity()
+                if should_continue:
+                    self.current_step = self.activity_manager.activity_step()  # Get current step without advancing
+                else:
+                    # Abandon current activity
+                    self.activity_manager.step_completion('failure', reason)
+                    self.current_step = None
+                    self.current_activity = None
+                    self.current_goal = None
+                    self.current_plan = None
+                    self._publish_current_activity()
+                    logger.info(f'🚫 {self.character_name} abandoned activity: {reason}')
+                    # Fall through to select new activity
+            
+            # No active activity or current one was abandoned - select new one
+            if hasattr(self, 'activity_manager') and not self.activity_manager.has_active_activity():
+                self.current_step, self.current_activity = self.activity_manager.select_activity()
+                self.current_goal = None
+                self._publish_current_activity()
+                if self.current_step and self.current_activity:
+                    logger.info(f'🎯 {self.character_name} starting new activity: {self.current_activity["name"]}')
 
-            # Orient: Assess current state and goals
-            goal = self._orient(observations)
+            # Convert step to goal or use existing goal/orient
+            new_goal = None
+            if self.current_step:
+                # Only create new goal if we don't have the right one already
+                if not self.current_goal or self.current_goal.name != self.current_step['name']:
+                    new_goal = plan_module.Goal(self.current_step['name'], self.current_step['actors'], self.current_step['description'], self.current_step['termination'])
+
+            self.current_goal = self._orient(observations, new_goal)
+            self._publish_goal(self.current_goal)
+
+            logger.info(f'🎯 {self.character_name} oriented to goal: {self.current_goal.to_string()}')
 
             # Plan: Return existing plan or create single-action plan
-            plan = self._plan(goal)
+            plan = self._plan(self.current_goal)
             if not plan:
+                logger.warning(f'🚫 {self.character_name} no plan found for goal: {self.current_goal.to_string()}')
                 self._complete_turn()
                 return
 
             # Plan Step: Execute current step of plan
             action = self._plan_step(plan)
+            if action:
+                logger.info(f'🎯 {self.character_name} planned action: {action.get("type")}: {action.get("target")} - {action.get("value")}')
+            else:
+                logger.warning(f'🚫 {self.character_name} no action planned')
 
             # Act: Execute the chosen action (if we have one)
             if action is not None:
@@ -535,6 +645,8 @@ class ZenohExecutiveNode:
     def _update_system_prompt(self):
         """Update the system prompt with the current situation."""
         system_prompt = self.observations['static']
+        if self.current_activity:
+            system_prompt += f"\n#Your current hi-level activity is:\n\t{self.current_activity.get('name')}\n"
         if self.current_goal:
             system_prompt += f"\n#Your current goal is:\n\t{self.current_goal.to_string()}\n"
         if self.current_plan:
@@ -611,16 +723,26 @@ class ZenohExecutiveNode:
             self.observations = {'static': system_prompt, 'dynamic': user_prompt}
             return self.observations
 
-    def _orient(self, observations: Dict[str, Any]):
+    def _orient(self, observations: Dict[str, Any], new_goal: plan_module.Goal = None):
         """Orient: Assess current state and drives"""
         """{'static': system_prompt, 'dynamic': user_prompt}"""
+        # If we have a real goal (not placeholder), return it
         if self.current_goal:
             return self.current_goal
-        else:
-            self.map_update_request_publisher.put(json.dumps({'type': 'goal_look'}))
-            system_prompt = observations['static']
-            user_prompt = observations['dynamic']
-            directive = """What would you like to do next? 
+
+        if new_goal and new_goal.name != 'GOAL_NEEDED':
+            self.current_goal = new_goal
+            return self.current_goal
+        
+        # We have placeholder goal or no goal - create a real goal
+        if new_goal and new_goal.name == 'GOAL_NEEDED':
+            logger.info(f'🤔 {self.character_name} received placeholder goal, creating situated goal')
+
+        # Create a new goal based on current situation
+        self.map_update_request_publisher.put(json.dumps({'type': 'goal_look'}))
+        system_prompt = observations['static']
+        user_prompt = observations['dynamic']
+        directive = """What would you like to do next? 
 Consider:
 1. What is the central issue / opportunity / obligation demanding the character's attention?
 2. Given the following available information about the character, the situation, and the surroundings, how can the character best satify their drives?
@@ -645,40 +767,43 @@ be careful to insert line breaks only where shown, separating a value from the n
 Respond ONLY with the above hash-formatted text.
 end your response with </end>
 """
-            # Make LLM call
-            if self.llm_client and not self.shutdown_requested:
-                # Use shorter timeout during shutdown
-                timeout = 5.0 if self.shutdown_requested else None
-                response = self.llm_client.generate(
-                    messages=[system_prompt, user_prompt, directive],
-                    max_tokens=400,
-                    temperature=0.5,
-                    stops=['</end>'],
-                    timeout=timeout
-                )
+        # Make LLM call
+        if self.llm_client and not self.shutdown_requested:
+            # Use shorter timeout during shutdown
+            timeout = 5.0 if self.shutdown_requested else None
+            response = self.llm_client.generate(
+                messages=[system_prompt, user_prompt, directive],
+                max_tokens=400,
+                temperature=0.5,
+                stops=['</end>'],
+                timeout=timeout
+            )
 
-                if response.success:
-                    logger.warning(f'🤖 {self.character_name} New Goal: {response.text.strip()}')
-                    goals = []
-                    forms = hash_utils.findall_forms(response.text)
-                    for goal_hash in forms:
-                        goal = plan_module.validate_and_create_goal(self.character_name, goal_hash)
-                        if goal:
-                            logger.warning(f'{self.character_name} generated goal: {goal.to_string()}')
-                            self.current_goal = goal
-                            self._publish_goal(goal)
-                            return self.current_goal
-                        else:
-                            logger.error(f'Warning: Invalid goal generation response for {goal_hash}')
-                else:
-                    logger.error(f'LLM call failed: {response.error}')
-                    self.current_goal = plan_module.Goal('sleep', actors=[self.character_name])
-            else:   
-                logger.error('LLM client not available')
+            if response.success:
+                logger.warning(f'🤖 {self.character_name} New Goal: {response.text.strip()}')
+                goals = []
+                forms = hash_utils.findall_forms(response.text)
+                for goal_hash in forms:
+                    goal = plan_module.validate_and_create_goal(self.character_name, goal_hash)
+                    if goal:
+                        logger.warning(f'{self.character_name} generated goal: {goal.to_string()}')
+                        self.current_goal = goal
+                        self.current_plan = None  # Clear plan so _plan creates new one for this goal
+                        self._publish_goal(goal)
+                        return self.current_goal
+                    else:
+                        logger.error(f'Warning: Invalid goal generation response for {goal_hash}')
+            else:
+                logger.error(f'LLM call failed: {response.error}')
+                self.current_plan = None
                 self.current_goal = plan_module.Goal('sleep', actors=[self.character_name])
                 self._publish_goal(self.current_goal)
-            
-            return self.current_goal
+        else:   
+            logger.error('LLM client not available')
+            self.current_plan = None
+            self.current_goal = plan_module.Goal('sleep', actors=[self.character_name])
+            self._publish_goal(self.current_goal)
+        return self.current_goal
 
 
     def _plan(self, goal):
@@ -733,7 +858,6 @@ end your response with </end>
                         logger.error(f'No action, target, or value found in LLM response: {response.text}')
                         single_action = {'type': 'sleep', 'target': 'self', 'value': '', 'reason': ''}
                     else:
-                        self._plan_abandoned()  # Clear any existing plan
                         self.current_plan = plan_candidate
                         self.plan_bindings_cache = {}
                         self.plan_summary_completed = False  # Reset for new plan
@@ -754,13 +878,8 @@ end your response with </end>
         
         # Create single-action plan
         if single_action:
-            self._plan_abandoned()  # Clear any existing plan
             self.current_plan = {'plan': [{'type': single_action['type'], 'target': single_action['target'], 'value': single_action['value'], 'reason': single_action.get('reason', '')}]}
-            self.plan_bindings_cache = {}
-        else:
-            self._plan_abandoned()  # Clear any existing plan
-            self.current_plan = {'plan': []}
-        
+            self.plan_bindings_cache = {}        
         self.plan_summary_completed = False  # Reset for new plan
         # Initialize plan identifiers and control-flow events
         self.plan_counter += 1
@@ -847,7 +966,7 @@ end your response with </end>
                     if goal:
                         logger.warning(f'{self.character_name} generated goal: {goal.to_string()}')
                         self.current_goal = goal
-                        self._plan_abandoned()
+                        self.current_plan = None  # Clear plan so _plan creates new one for this goal
                         self._publish_goal(goal)
                         return self.current_goal
                     else:
@@ -855,31 +974,53 @@ end your response with </end>
             else:
                 logger.error(f'LLM call failed: {response.error}')
                 self.current_goal = plan_module.Goal('sleep', actors=[self.character_name])
+                self.current_plan = None  # Clear plan so _plan creates new one for this goal
+                self._publish_goal(self.current_goal)
         else:   
             logger.error('LLM client not available')
             self.current_goal = plan_module.Goal('sleep', actors=[self.character_name])
+            self.current_plan = None  # Clear plan so _plan creates new one for this goal
             self._publish_goal(self.current_goal)
-            
         return self.current_goal
         
     def _plan_completed(self):
         """Handle successful plan completion."""
+        # Existing telemetry and cleanup
         self._summarize_plan_execution()
         self.current_plan = None
         self.plan_bindings_cache = {}
-        self.current_goal = None
         self.action_history = []
         self.plan_state = None
+        
+        # Handle activity advancement
+        if hasattr(self, 'activity_manager') and self.activity_manager.has_active_activity():
+            # Advance to next activity step
+            next_step, activity = self.activity_manager.step_completion('success')
+            self._publish_current_activity()
+            if next_step:
+                # Continue with next step - set new goal to trigger planning
+                self.current_goal = plan_module.Goal(
+                    next_step['name'], 
+                    next_step['actors'], 
+                    next_step['description'], 
+                    next_step['termination']
+                )
+                self._publish_goal(self.current_goal)   
+                logger.info(f'🎯 Activity step completed, advancing to: {next_step["name"]}')
+            else:
+                # Activity completed - clear goal
+                self.current_goal = None
+                self._publish_goal(self.current_goal)
+                logger.info(f'✅ Activity completed for {self.character_name}')
+        else:
+            # No activity - clear goal (existing behavior)
+            self.current_goal = None
+            self._publish_goal(self.current_goal)
+            self._plan_completed()
+        
         self._publish_current_plan()
         
-    def _plan_abandoned(self):
-        """Handle plan abandonment for any reason."""
-        self.current_plan = None
-        self.plan_bindings_cache = {}
-        self.action_history = []
-        self.plan_state = None
-        self._publish_current_plan()
-        
+
     def _plan_step(self, plan):
         """Execute current step of plan and return next action using frame-based stack."""
         # Extract plan steps from dict format
@@ -913,7 +1054,6 @@ end your response with </end>
             logger.error(f'Error in plan execution: {e}')
             logger.error(traceback.print_exc())
             # Clear plan state on error
-            self._plan_abandoned()
             self.plan_state = {
                 'step_stack': plan_module.Stack()
             }
@@ -922,184 +1062,134 @@ end your response with </end>
     def _execute_next_step(self, step_stack):
         """Execute next step using frame-based stack."""
         if step_stack.is_empty():
+            logger.error('Step stack is empty')
             return None
-        
-        current_frame = step_stack.peek()
-        plan = current_frame['plan']
-        idx = current_frame['idx']
-        # Maintain a minimal frame path for telemetry (main/if/while nesting)
-        try:
-            # Build frame path from stack entries (oldest first)
-            frames = step_stack.get_entries() if hasattr(step_stack, 'get_entries') else []
-            self.current_frame_path = []
-            for f in frames:
-                kind = f.get('type', 'main')
-                if kind == 'while':
-                    self.current_frame_path.append([kind, f.get('iteration_count', 0), f.get('return_to', 0)])
-                else:
-                    self.current_frame_path.append([kind, f.get('idx', 0)])
-        except Exception:
-            self.current_frame_path = []
-        
-        # Check if we've completed the current level
+
+        def _cond_outcome(cond):
+            if not cond:
+                return False, None
+            result = plan_module._evaluate_condition(self, cond)
+            return result['value'], result['binding'] if result['binding'] else None
+
+        current = step_stack.peek()
+        plan = current['plan']
+        idx = current['idx']
+
+        # ---- Completed current frame? ----
         if idx >= len(plan):
-            # Handle frame completion based on type
-            if current_frame['type'] == 'while':
-                # While body completed, increment iteration count
-                current_frame['iteration_count'] += 1
-                
-                # Check iteration limit first
-                if current_frame['iteration_count'] >= current_frame['max_iterations']:
-                    # Max iterations reached, exit loop
-                    try:
-                        self.control_flow_events.append({
-                            'event': 'while_exit',
-                            'plan_id': self.current_plan_id,
-                            'frame_path': list(self.current_frame_path),
-                            'exit_reason': 'max_iterations',
-                            'iteration_count': current_frame.get('iteration_count', 0),
-                            'timestamp': datetime.now().isoformat()
-                        })
-                    except Exception:
-                        pass
-                    step_stack.pop()  # Remove while frame
+            if current['type'] == 'while':
+                # Finished one body iteration
+                current['iteration_count'] += 1
+
+                # Hard stop guard
+                if current['iteration_count'] >= current['max_iterations']:
+                    step_stack.pop()
                     if step_stack.is_empty():
-                        # Plan complete
                         self._plan_completed()
                         return None
-                    else:
-                        # Continue at parent level
-                        parent_frame = step_stack.peek()
-                        parent_frame['idx'] = current_frame['return_to']
-                        return self._execute_next_step(step_stack)
-                else:
-                    # Test original condition
-                    condition_action = current_frame['condition']
-                    resolved_target = self._resolve_target(condition_action)
-                    #if plan_module._evaluate_condition(self, condition_action, resolved_target): # _resolve_target returns non False if condition is met!
-                    if resolved_target:
-                        # Condition true, repeat loop
-                        current_frame['idx'] = 0  # Reset to start of body
-                        return self._execute_next_step(step_stack)
-                    else:
-                        # Condition false, exit loop
-                        try:
-                            self.control_flow_events.append({
-                                'event': 'while_exit',
-                                'plan_id': self.current_plan_id,
-                                'frame_path': list(self.current_frame_path),
-                                'exit_reason': 'condition_false',
-                                'iteration_count': current_frame.get('iteration_count', 0),
-                                'timestamp': datetime.now().isoformat()
-                            })
-                        except Exception:
-                            pass
-                        step_stack.pop()  # Remove while frame
-                        if step_stack.is_empty():
-                            # Plan complete
-                            self._plan_completed()
-                            return None
-                        else:
-                            # Continue at parent level
-                            parent_frame = step_stack.peek()
-                            parent_frame['idx'] = current_frame['return_to']
-                            return self._execute_next_step(step_stack)
-            else:
-                # Regular frame completed, pop and continue
-                step_stack.pop()
-                if step_stack.is_empty():
-                    # Plan complete
-                    self._plan_completed()
-                    return None
-                else:
-                    # Continue at parent level
                     parent = step_stack.peek()
-                    parent['idx'] = current_frame.get('return_to', parent['idx'])   # ⟵ NEW
+                    parent['idx'] = current['return_to']
                     return self._execute_next_step(step_stack)
-        
+
+                # Re-evaluate loop condition (pre-test for next iter)
+                outcome, resolved = _cond_outcome(current['condition'])
+
+                if outcome:
+                    current['idx'] = 0  # next iteration
+                    return self._execute_next_step(step_stack)
+                else:
+                    # Exit loop
+                    step_stack.pop()
+                    if step_stack.is_empty():
+                        self._plan_completed()
+                        return None
+                    parent = step_stack.peek()
+                    parent['idx'] = current['return_to']
+                    return self._execute_next_step(step_stack)
+
+            # Generic frame finished (main/if_then/if_else)
+            step_stack.pop()
+            if step_stack.is_empty():
+                self._plan_completed()
+                return None
+            parent = step_stack.peek()
+            parent['idx'] = current.get('return_to', parent['idx'])
+            return self._execute_next_step(step_stack)
+
+        # ---- Still within current frame ----
         step = plan[idx]
-        
-        # Handle different step types
-        if step['type'] in ['move', 'say', 'think', 'take', 'inspect', 'use', 'near', 'look']:
-            # Execute action and advance
-            current_frame['idx'] = idx + 1
+        stype = step.get('type')
+
+        # Primitive actions (spec-compliant)
+        if stype in ('move', 'say', 'think', 'take', 'inspect', 'use'):
+            current['idx'] = idx + 1
             return step
-        
-        elif step['type'] == 'while':
-            # Handle while loop - test condition first
-            condition_action = step.get('condition', None)
-            resolved_target = self._resolve_target(condition_action)
-            # Record condition eval event (entering while?)
-            cond_outcome = plan_module._evaluate_condition(self, condition_action, resolved_target)
-            try:
-                self.control_flow_events.append({
-                    'event': 'while_eval',
-                    'plan_id': self.current_plan_id,
-                    'frame_path': list(self.current_frame_path),
-                    'condition': condition_action,
-                    'resolved_target': resolved_target,
-                    'outcome': bool(cond_outcome),
-                    'timestamp': datetime.now().isoformat()
-                })
-            except Exception:
-                pass
-            if cond_outcome:
-                # Condition true, enter loop
+
+        elif stype == 'while':
+            body = step.get('body', [])
+            if not isinstance(body, list):
+                # Malformed; skip this step
+                logger.warning('While body must be a list; skipping.')
+                current['idx'] = idx + 1
+                return self._execute_next_step(step_stack)
+
+            cond = step.get('condition')
+            outcome, resolved = _cond_outcome(cond)
+
+            if outcome:
                 while_frame = {
-                    'plan': step['body'],
+                    'plan': body,
                     'idx': 0,
                     'type': 'while',
-                    'condition': condition_action,
-                    'return_to': idx + 1,  # Where to go when loop exits
-                    'iteration_count': 0,  # Track current iteration
-                    'max_iterations': 5    # Maximum allowed iterations
+                    'condition': cond,
+                    'return_to': idx + 1,
+                    'iteration_count': 0,
+                    'max_iterations': 5
                 }
                 step_stack.push(while_frame)
                 return self._execute_next_step(step_stack)
             else:
-                # Condition false, skip loop entirely
-                current_frame['idx'] = idx + 1
+                current['idx'] = idx + 1
                 return self._execute_next_step(step_stack)
-        
-        elif step['type'] == 'if':
-            # Handle if-then-else
-            cond = step['condition']
-            cond_target = self._resolve_target(cond)
-            cond_outcome = plan_module._evaluate_condition(self, cond, cond_target)
-            branch = 'then' if cond_outcome else 'else'
-            try:
-                self.control_flow_events.append({
-                    'event': 'if_evaluated',
-                    'plan_id': self.current_plan_id,
-                    'frame_path': list(self.current_frame_path),
-                    'condition': cond,
-                    'resolved_target': cond_target,
-                    'outcome': bool(cond_outcome),
-                    'branch_taken': branch if (branch == 'then' or step.get('else')) else 'skip',
-                    'timestamp': datetime.now().isoformat()
-                })
-            except Exception:
-                pass
-            if branch == 'then' or step.get('else'):
+
+        elif stype == 'if':
+            cond = step.get('condition')
+            then_body = step.get('then')
+            else_body = step.get('else')
+
+            if not isinstance(then_body, list) and else_body is None:
+                # Malformed if (no then and no else): skip
+                logger.warning('If step missing valid then/else; skipping.')
+                current['idx'] = idx + 1
+                return self._execute_next_step(step_stack)
+
+            outcome, resolved = _cond_outcome(cond)
+            branch = 'then' if outcome else ('else' if else_body is not None else None)
+
+            if branch:
                 step_stack.push({
-                    'plan'      : step[branch],
-                    'idx'       : 0,
-                    'type'      : 'if_then' if branch == 'then' else 'if_else',
-                    'return_to' : idx + 1
+                    'plan': step[branch],
+                    'idx': 0,
+                    'type': 'if_then' if branch == 'then' else 'if_else',
+                    'return_to': idx + 1
                 })
             else:
-                current_frame['idx'] = idx + 1
+                current['idx'] = idx + 1
             return self._execute_next_step(step_stack)
-        
+
         else:
-            # Unknown step type, skip it
-            logger.warning(f'Unknown plan step type: {step["type"]}')
-            current_frame['idx'] = idx + 1
+            # Unknown or non-executable type: skip
+            logger.warning(f'Unknown or non-executable step type: {stype}')
+            current['idx'] = idx + 1
             return self._execute_next_step(step_stack)
     
 
     def _act(self, action: Dict[str, Any]) -> bool:
         """Act: Execute the chosen action. Returns True if action succeeded, False if it failed."""
+
+        # Publish time advancement proposal for testing TBD - condition on type
+        proposed_minutes = random.randint(2, 5)
+        self.publish_time_proposal(proposed_minutes)
 
         action = self.current_action if self.current_action else action
         
@@ -1112,7 +1202,6 @@ end your response with </end>
             timestamp=now_ts,
             step_id=self.step_counter,
             plan_id=self.current_plan_id,
-            frame_path=list(self.current_frame_path) if hasattr(self, 'current_frame_path') else None,
             requested_target=action.get('target', ''),
             started_at=now_ts
         )
@@ -1128,70 +1217,28 @@ end your response with </end>
             thought = self.think_about(action)
             return True
             
-        # Capture the originally requested target for UI/reporting
-        requested_target = action.get('target', '')
-        resolved_target = self._resolve_target(action)
-        # Precondition snapshot
-        preconditions = {}
-        resolution_status = None
-        nearest_candidate = None
-        try:
-            target_cap = (requested_target or '').capitalize()
-            views = (self.last_situation_data or {}).get('views', []) if hasattr(self, 'last_situation_data') else []
-            best_dist = None
-            best_name = None
-            best_dir = None
-            for view in views:
-                direction = view.get('direction')
-                for resource in view.get('resources', []):
-                    name = resource.get('name', '')
-                    if ((not any(ch.isdigit() for ch in target_cap) and name.startswith(target_cap)) or name == target_cap):
-                        dist = resource.get('distance', None)
-                        if dist is not None and (best_dist is None or dist < best_dist):
-                            best_dist = dist
-                            best_name = name
-                            best_dir = direction
-                for character in view.get('characters', []):
-                    name = character.get('name', '')
-                    if name == target_cap or target_cap == 'Person':
-                        dist = character.get('distance', None)
-                        if dist is not None and (best_dist is None or dist < best_dist):
-                            best_dist = dist
-                            best_name = name
-                            best_dir = direction
-            if best_name is not None:
-                preconditions['visible'] = True
-                preconditions['distance'] = best_dist
-                preconditions['near'] = (best_dist is not None and best_dist <= 2)
-                nearest_candidate = {'name': best_name, 'distance': best_dist, 'direction': best_dir}
-            else:
-                preconditions['visible'] = False
-        except Exception:
-            pass
-
-        action_record.resolved_target = resolved_target if isinstance(resolved_target, str) else ''
-        action_record.resolution_status = resolution_status
-        action_record.preconditions = preconditions if preconditions else None
-        if not resolved_target:
-            logger.error(f'❌ Cannot resolve target for action: {action}')
-        else:
-            resolution_status = 'resolved'
-            
-        if not resolved_target:
-            if preconditions.get('visible') is False:
-                resolution_status = 'not_visible'
-            elif preconditions.get('near') is False and preconditions.get('visible') is True:
-                resolution_status = 'too_far'
-            else:
-                resolution_status = 'not_found'
         if action['type'].lower() == "move":
-            move_target = resolved_target.strip() if resolved_target else ''
-            move_direction = move_target.lower()
-            
-            # Step 1: Test for compass points first (case insensitive)
-            cardinal_directions = ['north', 'northeast', 'southeast', 'south', 'southwest', 'northwest', 'east', 'west']
-            if move_direction in cardinal_directions:
-                self.move(move_direction)
+            action_type = action['type'].lower()
+            if action_type == "move":
+                move_direction = None
+                move_target = action['target'].strip().lower()
+                # Step 1: Test for compass points first (case insensitive)
+                cardinal_directions = ['north', 'northeast', 'southeast', 'south', 'southwest', 'northwest', 'east', 'west']
+                if move_target in cardinal_directions:
+                    move_direction = move_target
+                else:
+                    cond_action = action.copy()
+                    cond_action['type'] = 'can_see'
+                    cond_action['target'] = move_target.capitalize()
+                    binding = plan_module._evaluate_condition(self, cond_action)
+                    outcome = binding['value']
+                    resolved = binding['binding']
+                    if outcome:
+                        move_direction = self.find_target_direction(resolved)
+                    else:
+                        move_direction = None
+                if move_direction:
+                    self.move(move_direction)
                 # Request situation/map update for UI immediately after move
                 try:
                     self.map_update_request_publisher.put(json.dumps({'type': 'step_look'}))
@@ -1208,6 +1255,10 @@ end your response with </end>
                 return True
         elif action['type'].lower() == "say":
             # Check if we can acquire conversation lock
+            # Capture the originally requested target for UI/reporting
+            requested_target = action.get('target', '')
+            resolved_target = self._resolve_target(action)
+
             if resolved_target and self._acquire_conversation_lock(resolved_target):
                 self.generate_speech(action['value'], resolved_target, mode='say')
             else:
@@ -1216,7 +1267,7 @@ end your response with </end>
                     'type': 'say',
                     'action_id': self.action_counter,
                     'timestamp': datetime.now().isoformat(),
-                    'target': resolved_target if resolved_target else '',
+                    'target': resolved_target if resolved_target else '',                    
                     'requested_target': requested_target,
                     'resolved_target': resolved_target if resolved_target else '',
                     'status': 'failed',
@@ -1228,13 +1279,19 @@ end your response with </end>
                 return False
         elif action['type'].lower() == "take":
             # If resolution failed, publish a failure action with requested_target
-            if not resolved_target:
+            cond_action = action.copy()
+            cond_action['type'] = 'near'
+            cond_action['target'] = action['target'].strip().capitalize()
+            binding = plan_module._evaluate_condition(self, cond_action)
+            outcome = binding['value']
+            resolved = binding['binding']   
+            if not outcome:
                 action_data = {
                     'type': 'take',
                     'action_id': self.action_counter,
                     'timestamp': datetime.now().isoformat(),
                     'target': '',
-                    'requested_target': requested_target,
+                    'requested_target': action['target'],
                     'resolved_target': '',
                     'status': 'failed',
                     'error': 'target not nearby/visible'
@@ -1243,26 +1300,38 @@ end your response with </end>
                 logger.warning('📤 Published action: take (failed)')
                 self.action_counter += 1
                 return False
-            self.take(resolved_target)
+            self.take(resolved)
             self.action_counter += 1
         elif action['type'].lower() == "inspect":
             # Publish inspect action including requested vs resolved target
+            cond_action = action.copy()
+            cond_action['type'] = 'near'
+            cond_action['target'] = action['target'].strip().capitalize()
+            binding = plan_module._evaluate_condition(self, cond_action)
+            outcome = binding['value']
+            resolved = binding['binding']
+            if not outcome:
+                cond_action['type'] = 'has_item'
+                binding = plan_module._evaluate_condition(self, cond_action)
+                outcome = binding['value']
+                resolved = binding['binding']
+
             action_data = {
                 'type': 'inspect',
                 'action_id': self.action_counter,
                 'timestamp': datetime.now().isoformat(),
-                'target': resolved_target if resolved_target else '',
-                'requested_target': requested_target,
-                'resolved_target': resolved_target if resolved_target else ''
+                'target': resolved if resolved else '',
+                'requested_target': action['target'],
+                'resolved_target': resolved if resolved else ''
             }
-            if not resolved_target:
+            if not resolved or not outcome:
                 action_data['status'] = 'failed'
                 action_data['error'] = 'target not nearby/visible'
                 self.action_publisher.put(json.dumps(action_data))
             else:
                 self.action_publisher.put(json.dumps(action_data))
                 # Perform inspect which may populate last_action_result
-                self.inspect(resolved_target)
+                self.inspect(resolved)
                 # Publish result if available so UI can display it
                 try:
                     result_text = action_record.result if isinstance(action_record.result, str) else ''
@@ -1271,7 +1340,7 @@ end your response with </end>
                             'type': 'inspect',
                             'action_id': f"inspect_{int(time.time())}",
                             'timestamp': datetime.now().isoformat(),
-                            'target': resolved_target,
+                            'target': resolved,
                             'llm_response': result_text
                         }
                         self.action_publisher.put(json.dumps(result_action))
@@ -1279,15 +1348,27 @@ end your response with </end>
                     pass
         elif action['type'].lower() == "use":
             # Create action - include requested vs resolved
+            cond_action = action.copy()
+            cond_action['type'] = 'near'
+            cond_action['target'] = action['target'].strip().capitalize()
+            binding = plan_module._evaluate_condition(self, cond_action)
+            outcome = binding['value']
+            resolved = binding['binding']
+            if not outcome:
+                cond_action['type'] = 'has_item'
+                binding = plan_module._evaluate_condition(self, cond_action)
+                outcome = binding['value']
+                resolved = binding['binding']
+
             action_data = {
                 'type': 'use',
                 'action_id': self.action_counter,
                 'timestamp': datetime.now().isoformat(),
-                'target': resolved_target if resolved_target else '',
-                'requested_target': requested_target,
-                'resolved_target': resolved_target if resolved_target else ''
+                'target': resolved if resolved else '',
+                'requested_target': action['target'],
+                'resolved_target': resolved if resolved else ''
             }
-            if not resolved_target:
+            if not resolved:
                 action_data['status'] = 'failed'
                 action_data['error'] = 'target not nearby/visible'
             action_record.result = 'not yet implemented'
@@ -1306,21 +1387,6 @@ end your response with </end>
             action_record.duration_ms = int((action_record.ended_at - action_record.started_at).total_seconds() * 1000)
         except Exception:
             pass
-        if action_record.result is None:
-            if action['type'].lower() == 'move':
-                action_record.outcome_status = 'success'
-            elif action_record.resolution_status in ('too_far', 'not_visible', 'not_found'):
-                action_record.outcome_status = 'failure'
-                if action_record.resolution_status == 'too_far':
-                    action_record.failure_code = 'target_too_far'
-                elif action_record.resolution_status == 'not_visible':
-                    action_record.failure_code = 'target_not_visible'
-                else:
-                    action_record.failure_code = 'target_not_found'
-        if nearest_candidate:
-            if action_record.preconditions is None:
-                action_record.preconditions = {}
-            action_record.preconditions['nearest_candidate'] = nearest_candidate
 
         logger.warning(f'📤 Published action: {action["type"]}')
         self.action_counter += 1
@@ -1393,8 +1459,7 @@ end your response with </end>
         """
         response = self.llm_client.generate([summary_prompt], max_tokens=200, stops=['</end>'])
         self.plan_summary = response.text
-        logger.info(f'📝 Summary prompt prepared for {self.character_name}')
-        logger.debug(f'Summary prompt: {summary_prompt}')
+        logger.info(f'📝 Plan post-mortem prepared for {self.character_name}\n{self.plan_summary}\n')
         
         # Mark as completed to prevent redundant calls
         self.action_history = []
@@ -1443,9 +1508,9 @@ end your response with </end>
     def turn_callback(self, sample):
         """Handle turn "GO" signals."""
         try:
-            logger.warning(f'🚦 Turn {self.current_turn_number} received by {self.character_name}')
             data = json.loads(sample.payload.to_bytes().decode('utf-8'))
             turn_number = data.get('turn_number', 0)
+            logger.warning(f'🚦 Turn {turn_number} received by {self.character_name}')
             active_characters = data.get('active_characters', [])
             
             if self.character_name in active_characters:
@@ -1469,6 +1534,22 @@ end your response with </end>
             self.shutdown_requested = True
         except Exception as e:
             logger.error(f'Error in shutdown callback: {e}')
+    
+    def time_advanced_callback(self, sample):
+        """Handle time advancement notifications from map_node."""
+        try:
+            data = json.loads(sample.payload.to_bytes().decode('utf-8'))
+            new_time_info = data.get('new_time_info', {})
+            
+            if new_time_info and 'datetime' in new_time_info:
+                # Store the current simulation time
+                self.current_time = datetime.fromisoformat(new_time_info['datetime'])
+                logger.info(f'⏰ {self.character_name} received time update: {self.current_time}')
+            else:
+                logger.warning(f'Received time_advanced but no valid time_info in data')
+                
+        except Exception as e:
+            logger.error(f'Error in time_advanced callback: {e}')
     
     def _dialog_end_callback(self, sample):
         """Handle end dialog query from other characters."""
@@ -1529,7 +1610,7 @@ end your response with </end>
             if self.manual:
                 self._publish_goal(self.current_goal)
             else:
-                self._plan_abandoned()
+                self._plan_completed()
             return
         except Exception as e:
             logger.error(f"Goal parsing failed for {self.character_name}: {e}")
@@ -1540,7 +1621,7 @@ end your response with </end>
         """Parse plan input from UI and set current plan."""
         try:
             parsed_plan = plan_module.parse_plan_text(plan_text)
-            self._plan_abandoned()  # Clear any existing plan
+            self._plan_completed()  # Clear any existing plan
             self.current_plan = parsed_plan
             self.plan_bindings_cache = {}
             self.plan_summary_completed = False  # Reset for new plan
@@ -1567,6 +1648,9 @@ end your response with </end>
             return
         if source == 'User' and clean_input.startswith('plan:'):
             self.parse_and_set_plan(clean_input)
+            return
+        if source == 'User' and mode == 'respond':
+            self.publish_dialog_end(source)
             return
         # In manual mode with manual_response disabled, do not auto-respond
         if self.manual and self.manual_response:
@@ -1689,6 +1773,10 @@ End your text with: </end>"""
         """
         Resolve abstract target name to specific instance reference using plan bindings cache.
         This ONLY handles abstract -> specific resolution (e.g., "Berry" -> "Berry23").
+        Note this is merely attempting to resolve the target to a specific map instance. It is NOT evaluating the target wrt the action.
+        Nonetheless, for 'near', for example, we should attempt to resolve to the closest instance, right?
+        too hard.
+        next - only instances in view? Let's say no. That means this must be a map_node query.
         
         Args:
             action: Action dictionary containing 'type' and 'target', or condition dictionary
@@ -2176,6 +2264,8 @@ End your response with:
                         'timestamp': datetime.now().isoformat(),
                         'input': action['value'],
                         'text': response.text.strip(),
+                        'thought': thought,
+                        'character': self.character_name,
                         'source': self.character_name
             }
         if self.action_history:

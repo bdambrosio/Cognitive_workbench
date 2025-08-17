@@ -17,7 +17,7 @@ import signal
 import logging
 from datetime import datetime
 from typing import Dict, List, Any, Set
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request
 from fastapi.responses import HTMLResponse
 import uvicorn
 from pathlib import Path
@@ -30,6 +30,11 @@ console_handler = logging.StreamHandler()
 file_handler = logging.FileHandler('logs/fastapi_action_display.log')
 console_handler.setLevel(logging.INFO)
 file_handler.setLevel(logging.DEBUG)
+
+# Raise console verbosity when CWB_DEBUG is set
+_debug_env = str(os.getenv('CWB_DEBUG', '')).lower() in ('1', 'true', 'yes', 'on')
+if _debug_env:
+    console_handler.setLevel(logging.INFO)
 
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 console_handler.setFormatter(formatter)
@@ -82,6 +87,10 @@ class FastAPIActionDisplayNode:
         self.character_current_plans: Dict[str, str] = {}  # character_name -> current_plan_string
         self.character_current_plans_lock = threading.Lock()
         
+        # Character current activities tracking
+        self.character_current_activities: Dict[str, Dict[str, Any]] = {}  # character_name -> current_activity_data
+        self.character_current_activities_lock = threading.Lock()
+        
         # Character situation data tracking
         self.character_situation_data: Dict[str, Dict[str, Any]] = {}  # character_name -> situation_data
         self.character_situation_data_lock = threading.Lock()
@@ -95,6 +104,10 @@ class FastAPIActionDisplayNode:
             'turn_start_time': None,
             'mode': 'step'  # 'step' or 'run'
         }
+        
+        # System ready state
+        self.system_ready = False
+        self.character_count = 0
         
         # Subscriber for all character actions
         self.action_subscriber = self.session.declare_subscriber(
@@ -112,6 +125,12 @@ class FastAPIActionDisplayNode:
         self.turn_start_subscriber = self.session.declare_subscriber(
             "cognitive/map/turn",
             self.turn_start_callback
+        )
+        
+        # Subscriber for turn control status from map node
+        self.turn_control_subscriber = self.session.declare_subscriber(
+            "cognitive/map/turn_status",
+            self.turn_control_callback
         )
         
         # Subscriber for character goals
@@ -132,10 +151,22 @@ class FastAPIActionDisplayNode:
             self.current_plan_callback
         )
         
+        # Subscriber for character current activities
+        self.current_activity_subscriber = self.session.declare_subscriber(
+            "cognitive/*/current_activity",
+            self.current_activity_callback
+        )
+        
         # Subscriber for character situation data
         self.situation_subscriber = self.session.declare_subscriber(
             "cognitive/*/situation/update",
             self.situation_callback
+        )
+        
+        # Subscriber for launcher ready signal
+        self.ready_subscriber = self.session.declare_subscriber(
+            "cognitive/launcher/ready",
+            self.ready_callback
         )
         
         # Publisher for memory storage
@@ -146,8 +177,20 @@ class FastAPIActionDisplayNode:
         self.turn_run_publisher = self.session.declare_publisher("cognitive/map/turn/run")
         self.turn_stop_publisher = self.session.declare_publisher("cognitive/map/turn/stop")
         
+        # Publisher for time management
+        self.time_delay_publisher = self.session.declare_publisher("cognitive/map/time_delay_setting")
+        
+        # Subscriber for time advancement updates
+        self.time_advanced_subscriber = self.session.declare_subscriber(
+            "cognitive/map/time_advanced",
+            self.time_advanced_callback
+        )
+        
         # Publisher for save commands
         self.save_publisher = self.session.declare_publisher("cognitive/save_all")
+        
+        # Current simulation time tracking
+        self.current_simulation_time = None
         
         # Publishers for shutdown commands
         self.shutdown_executive_publisher = self.session.declare_publisher("cognitive/shutdown/executive")
@@ -226,6 +269,18 @@ class FastAPIActionDisplayNode:
                     'message': 'WebSocket connection established successfully'
                 }
                 await websocket.send_text(json.dumps(test_data))
+                
+                # Send current simulation time if available
+                if self.current_simulation_time:
+                    time_data = {
+                        'type': 'time_update',
+                        'time_info': self.current_simulation_time.get('time_info', {}),
+                        'timestamp': datetime.now().isoformat()
+                    }
+                    await websocket.send_text(json.dumps(time_data))
+                    logger.info(f'📤 Sent current time to new WebSocket connection: {time_data["time_info"].get("datetime", "unknown")}')
+                else:
+                    logger.info('📤 No simulation time available for new WebSocket connection')
             except Exception:
                 pass  # Ignore test message errors
             
@@ -315,30 +370,30 @@ class FastAPIActionDisplayNode:
         async def run_turns():
             """Start automatic turn progression."""
             try:
-                with self.turn_state_lock:
-                    self.turn_state['mode'] = 'run'
+                logger.info(f"🏃 Run command received in FastAPI")
                 
                 self.turn_run_publisher.put(json.dumps({"timestamp": datetime.now().isoformat()}).encode())
+                logger.info(f"🏃 Run command published to map node")
                 
-                # Send turn state update to enable/disable buttons
-                self._send_turn_state_update()
+                # Note: Turn state will be updated when map_node publishes the status change
                 return {"success": True, "message": "Run Turns command sent"}
             except Exception as e:
+                logger.error(f"Error in run_turns: {e}")
                 return {"success": False, "message": f"Error: {str(e)}"}
         
         @self.app.post("/api/turn/stop")
         async def stop_turns():
             """Stop automatic turn progression."""
             try:
-                with self.turn_state_lock:
-                    self.turn_state['mode'] = 'step'
+                logger.info(f"🛑 Stop command received in FastAPI")
                 
                 self.turn_stop_publisher.put(json.dumps({"timestamp": datetime.now().isoformat()}).encode())
+                logger.info(f"🛑 Stop command published to map node")
                 
-                # Send turn state update to enable/disable buttons
-                self._send_turn_state_update()
+                # Note: Turn state will be updated when map_node publishes the status change
                 return {"success": True, "message": "Stop Turns command sent"}
             except Exception as e:
+                logger.error(f"Error in stop_turns: {e}")
                 return {"success": False, "message": f"Error: {str(e)}"}
         
         @self.app.post("/api/save")
@@ -403,6 +458,62 @@ class FastAPIActionDisplayNode:
                 return {"success": True, "message": "Shutdown requested"}
             except Exception as e:
                 return {"success": False, "message": f"Error: {str(e)}"}
+        
+        @self.app.post("/api/time/delay")
+        async def set_time_delay(request: Request):
+            """Set the delay between turns in run mode."""
+            try:
+                data = await request.json()
+                minutes = data.get('minutes')
+                
+                if not isinstance(minutes, int) or not (0 <= minutes <= 30):
+                    return {"success": False, "message": "Minutes must be an integer between 0 and 30"}
+                
+                # Send time delay setting to map_node
+                delay_data = {
+                    "delay_minutes": minutes,
+                    "timestamp": datetime.now().isoformat()
+                }
+                
+                if hasattr(self, 'time_delay_publisher'):
+                    self.time_delay_publisher.put(json.dumps(delay_data))
+                    return {"success": True, "message": f"Turn delay set to {minutes} minutes"}
+                else:
+                    return {"success": False, "message": "Time delay publisher not available"}
+                    
+            except Exception as e:
+                return {"success": False, "message": f"Error: {str(e)}"}
+        
+        @self.app.get("/api/time/initial")
+        async def get_initial_time():
+            """Get initial simulation time information."""
+            try:
+                if hasattr(self, 'session'):
+                    # If we have cached time, return it
+                    if self.current_simulation_time:
+                        return {"success": True, "time_info": self.current_simulation_time}
+                    
+                    # Otherwise, try to query map_node for current time
+                    try:
+                        replies = self.session.get("cognitive/map/simulation_time", timeout_s=5.0)
+                        for reply in replies:
+                            response = json.loads(reply.payload.to_bytes().decode('utf-8'))
+                            if response.get('success'):
+                                # Cache the time for future requests
+                                self.current_simulation_time = response
+                                return {"success": True, "time_info": response}
+                        
+                        return {"success": False, "message": "No response from map_node"}
+                    except Exception as query_error:
+                        logger.warning(f"Failed to query map_node for initial time: {query_error}")
+                        return {"success": False, "message": "Map node not ready yet"}
+                else:
+                    return {"success": False, "message": "Zenoh session not available"}
+                    
+            except Exception as e:
+                return {"success": False, "message": f"Error: {str(e)}"}
+        
+
     
     async def _initiate_shutdown(self):
         """Coordinate system shutdown in proper sequence."""
@@ -834,14 +945,22 @@ class FastAPIActionDisplayNode:
                 
                 <!-- Character data tabs -->
                 <div class="character-data-tabs" id="characterDataTabs">
-                    <div class="character-data-tab active" data-tab="plan">Plan</div>
+                    <div class="character-data-tab active" data-tab="activity">Activity</div>
+                    <div class="character-data-tab" data-tab="plan">Plan</div>
                     <div class="character-data-tab" data-tab="view">View</div>
                 </div>
                 
                 <!-- Character data content -->
                 <div class="character-data-content">
+                    <!-- Activity tab content -->
+                    <div class="character-data-panel active" id="activityPanel">
+                        <div id="activityData" style="color: #888; font-style: italic; text-align: center; padding: 20px;">
+                            No activity data available
+                        </div>
+                    </div>
+                    
                     <!-- Plan tab content -->
-                    <div class="character-data-panel active" id="planPanel">
+                    <div class="character-data-panel" id="planPanel">
                         <div id="characterDataItems">
                             <div style="color: #888; font-style: italic; text-align: center; padding: 20px;">
                                 Select a character to view data
@@ -885,16 +1004,28 @@ class FastAPIActionDisplayNode:
                 <div class="input-section">
                     <h3>Turn Control</h3>
                     <div style="margin-bottom: 15px;">
-                        <button id="stepButton" onclick="stepTurn()" style="background: #4ecdc4; margin-right: 10px;">🎯 Step Turn</button>
-                        <button onclick="runTurns()" style="background: #ffe66d; color: #1a1a1a; margin-right: 10px;">🏃 Run</button>
+                        <button id="stepButton" onclick="stepTurn()" style="background: #555; margin-right: 10px;" disabled>🎯 Step Turn</button>
+                        <button id="runButton" onclick="runTurns()" style="background: #555; color: #888; margin-right: 10px;" disabled>🏃 Run</button>
                         <button onclick="stopTurns()" style="background: #ff6b6b; margin-right: 10px;">⏹️ Stop</button>
                         <button onclick="saveAll()" style="background: #95e1d3; color: #1a1a1a; margin-right: 10px;">💾 Save</button>
                         <button onclick="showShutdownDialog()" style="background: #ff4757; color: white;">🔌 Shutdown</button>
+                    </div>
+                    <div style="margin-bottom: 15px; padding: 10px; background: #333; border-radius: 5px;">
+                        <label for="timeSlider" style="display: block; margin-bottom: 5px; font-size: 14px; color: #ccc;">
+                            Turn Delay: <span id="timeSliderValue">0</span> minutes
+                        </label>
+                        <input type="range" id="timeSlider" min="0" max="30" value="0" style="width: 100%; margin-bottom: 10px;">
+                        <div style="font-size: 12px; color: #888;">
+                            <span>Simulation Time: </span><span id="simulationTime">Loading...</span>
+                        </div>
                     </div>
                     <div id="turnStatus" style="margin-bottom: 10px; font-size: 12px; color: #888;">
                         <span id="turnMode">Mode: Step</span> | 
                         <span id="turnNumber">Turn: 0</span> | 
                         <span id="turnProgress">Progress: 0/0</span>
+                    </div>
+                    <div id="systemStatus" style="margin-bottom: 10px; font-size: 12px; color: #888;">
+                        <span id="systemStatusText">Starting...</span>
                     </div>
                     <div id="turnResult" style="margin-top: 10px;"></div>
                 </div>
@@ -919,6 +1050,12 @@ class FastAPIActionDisplayNode:
         // Character tabs state
         let characterTabs = new Map(); // character_name -> {element, goal, decidedAction}
         let activeCharacter = null;
+        let currentTurnMode = 'step';
+        let commandInProgress = false; // Prevent rapid button clicks
+        
+        // Turn progress tracking
+        let turnActiveCharacters = 0;
+        let turnCompletedCharacters = 0;
         
         // Sidebar resizer state
         let isResizing = false;
@@ -940,6 +1077,9 @@ class FastAPIActionDisplayNode:
                         ws.send('ping');
                     }
                 }, 30000); // Send ping every 30 seconds
+                
+                // Request initial system state
+                // Note: The server will send ready_state when available
             };
             
             ws.onerror = function(error) {
@@ -993,17 +1133,36 @@ class FastAPIActionDisplayNode:
                     handleDecidedActionUpdate(data);
                 } else if (data.type === 'current_plan') {
                     handleCurrentPlanUpdate(data);
+                } else if (data.type === 'current_activity') {
+                    handleCurrentActivityUpdate(data);
                 } else if (data.type === 'situation_data') {
                     handleSituationDataUpdate(data);
+                } else if (data.type === 'turn_mode_update') {
+                    updateTurnMode(data);
+                } else if (data.type === 'turn_start') {
+                    handleTurnStart(data);
                 } else if (data.type === 'turn_state') {
                     updateTurnState(data);
+                } else if (data.type === 'ready_state') {
+                    handleReadyState(data);
+                } else if (data.type === 'time_update') {
+                    handleTimeUpdate(data);
                 } else if (data.type === 'step_complete') {
-                    // Re-enable the Step button when step is complete
+                    // Reset turn progress tracking - turn is complete
+                    turnActiveCharacters = 0;
+                    turnCompletedCharacters = 0;
+                    console.log('Step complete - turn progress reset');
+                    
+                    // Re-enable the Step button when step is complete, but only if not in run mode
                     const stepButton = document.getElementById('stepButton');
-                    stepButton.disabled = false;
-                    stepButton.style.background = '#4ecdc4';
-                    stepButton.title = 'Click to advance to next turn';
-                    console.log('Step complete - re-enabled Step button');
+                    if (currentTurnMode !== 'run') {
+                        stepButton.disabled = false;
+                        stepButton.style.background = '#4ecdc4';
+                        stepButton.title = 'Click to advance to next turn';
+                        console.log('Step complete - re-enabled Step button (not in run mode)');
+                    } else {
+                        console.log('Step complete - keeping Step button disabled (in run mode)');
+                    }
                 } else if (data.type === 'test') {
                     console.log('Test message received:', data.message);
                     // Add a test entry to the action log
@@ -1071,6 +1230,19 @@ class FastAPIActionDisplayNode:
         document.addEventListener('DOMContentLoaded', function() {
             initSidebarResizer();
             initCharacterDataTabs();
+            
+            // Initialize buttons as disabled until system is ready
+            const stepButton = document.getElementById('stepButton');
+            const runButton = document.getElementById('runButton');
+            
+            stepButton.disabled = true;
+            stepButton.style.background = '#555';
+            stepButton.title = 'Waiting for system startup...';
+            
+            runButton.disabled = true;
+            runButton.style.background = '#555';
+            runButton.style.color = '#888';
+            runButton.title = 'Waiting for system startup...';
         });
         
         // Character Data Tab Functions
@@ -1100,10 +1272,24 @@ class FastAPIActionDisplayNode:
                 panel.classList.remove('active');
             });
             
-            if (tabName === 'plan') {
+            if (tabName === 'activity') {
+                document.getElementById('activityPanel').classList.add('active');
+                // Refresh activity display for current character
+                if (activeCharacter) {
+                    updateActivityDataDisplay(activeCharacter);
+                }
+            } else if (tabName === 'plan') {
                 document.getElementById('planPanel').classList.add('active');
+                // Refresh plan display for current character
+                if (activeCharacter) {
+                    updateCharacterDataDisplay(activeCharacter);
+                }
             } else if (tabName === 'view') {
                 document.getElementById('viewPanel').classList.add('active');
+                // Refresh situation display for current character
+                if (activeCharacter) {
+                    updateSituationDataDisplay(activeCharacter);
+                }
             }
         }
         
@@ -1131,6 +1317,7 @@ class FastAPIActionDisplayNode:
                 goal: null,
                 decidedAction: null,
                 currentPlan: null,
+                currentActivity: null,
                 situationData: null
             });
             
@@ -1153,10 +1340,9 @@ class FastAPIActionDisplayNode:
             // Update character content area
             updateCharacterContent(characterName);
             
-            // Update character data display
+            // Update character data display based on active tab
+            updateActivityDataDisplay(characterName);
             updateCharacterDataDisplay(characterName);
-            
-            // Update situation data display
             updateSituationDataDisplay(characterName);
             
             console.log(`Selected character tab: ${characterName}`);
@@ -1246,6 +1432,27 @@ class FastAPIActionDisplayNode:
             }
         }
         
+        function handleCurrentActivityUpdate(currentActivityData) {
+            const characterName = currentActivityData.character;
+            const currentActivity = currentActivityData.current_activity;
+            
+            console.log(`Current activity update for ${characterName}: ${currentActivity ? 'Activity updated' : 'Activity cleared'}`);
+            
+            // Update the stored current activity for this character
+            if (characterTabs.has(characterName)) {
+                const tabData = characterTabs.get(characterName);
+                tabData.currentActivity = currentActivityData;
+                
+                // If this character's tab is currently active and activity tab is selected, update the display
+                if (activeCharacter === characterName) {
+                    updateActivityDataDisplay(characterName);
+                }
+            } else {
+                // Character tab doesn't exist yet, this shouldn't happen
+                console.warn(`Received current activity for unknown character: ${characterName}`);
+            }
+        }
+        
         function handleSituationDataUpdate(situationData) {
             const characterName = situationData.character;
             const situation = situationData.situation_data;
@@ -1264,6 +1471,25 @@ class FastAPIActionDisplayNode:
             } else {
                 // Character tab doesn't exist yet, this shouldn't happen
                 console.warn(`Received situation data for unknown character: ${characterName}`);
+            }
+        }
+        
+        function handleTimeUpdate(timeData) {
+            const timeInfo = timeData.time_info;
+            if (timeInfo && timeInfo.datetime) {
+                const dateTime = new Date(timeInfo.datetime);
+                const displayTime = dateTime.toLocaleString('en-US', {
+                    weekday: 'short',
+                    year: 'numeric',
+                    month: 'short',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+                document.getElementById('simulationTime').textContent = displayTime;
+                console.log('⏰ Time updated via WebSocket:', displayTime);
+            } else {
+                console.warn('Received time update but no valid datetime in data');
             }
         }
         
@@ -1309,6 +1535,89 @@ class FastAPIActionDisplayNode:
             }
             
             dataItemsDiv.innerHTML = content;
+        }
+        
+        function updateActivityDataDisplay(characterName) {
+            const activityDataDiv = document.getElementById('activityData');
+            const tabData = characterTabs.get(characterName);
+            
+            if (!tabData || !tabData.currentActivity) {
+                activityDataDiv.innerHTML = '<div style="color: #888; font-style: italic; text-align: center; padding: 20px;">No activity data available</div>';
+                return;
+            }
+            
+            const activityData = tabData.currentActivity;
+            let content = '';
+            
+            // Add activity name if available
+            if (activityData.activity_data && activityData.activity_data.name) {
+                content += `
+                    <div class="character-data-item">
+                        <div class="character-data-label">Activity Name</div>
+                        <div class="character-data-value">${activityData.activity_data.name}</div>
+                    </div>
+                `;
+            }
+            
+            // Add current step if available
+            if (activityData.current_step && activityData.current_step.name) {
+                content += `
+                    <div class="character-data-item">
+                        <div class="character-data-label">Current Step</div>
+                        <div class="character-data-value">${activityData.current_step.name}</div>
+                    </div>
+                `;
+            }
+            
+            // Add activity steps if available
+            if (activityData.activity_data && activityData.activity_data.steps) {
+                const steps = activityData.activity_data.steps;
+                const currentStepIndex = activityData.activity_state ? activityData.activity_state.current_step_index || 0 : 0;
+                
+                let stepsContent = '';
+                steps.forEach((step, index) => {
+                    const isCurrentStep = index === currentStepIndex;
+                    const stepStyle = isCurrentStep ? 
+                        'background: #2a2a2a; color: #00d4ff; padding: 2px 4px; border-radius: 3px;' : 
+                        'color: #ccc;';
+                    const prefix = isCurrentStep ? '▶ ' : '  ';
+                    stepsContent += `${prefix}<span style="${stepStyle}">${index + 1}. ${step}</span>\n`;
+                });
+                
+                content += `
+                    <div class="character-data-item">
+                        <div class="character-data-label">Activity Steps</div>
+                        <div class="character-data-value"><pre style="white-space: pre-wrap; font-family: 'Courier New', monospace; font-size: 12px; margin: 0; line-height: 1.4;">${stepsContent}</pre></div>
+                    </div>
+                `;
+            }
+            
+            // Add activity state if available
+            if (activityData.activity_state) {
+                content += `
+                    <div class="character-data-item">
+                        <div class="character-data-label">Activity State</div>
+                        <div class="character-data-value"><pre style="white-space: pre-wrap; font-family: 'Courier New', monospace; font-size: 12px; margin: 0;">${JSON.stringify(activityData.activity_state, null, 2)}</pre></div>
+                    </div>
+                `;
+            }
+            
+            // If no content, show raw activity data
+            if (content === '' && activityData.current_activity) {
+                content = `
+                    <div class="character-data-item">
+                        <div class="character-data-label">Raw Activity Data</div>
+                        <div class="character-data-value"><pre style="white-space: pre-wrap; font-family: 'Courier New', monospace; font-size: 12px; margin: 0;">${activityData.current_activity}</pre></div>
+                    </div>
+                `;
+            }
+            
+            // Final fallback
+            if (content === '') {
+                content = '<div style="color: #888; font-style: italic; text-align: center; padding: 20px;">No activity data available</div>';
+            }
+            
+            activityDataDiv.innerHTML = content;
         }
         
         function updateSituationDataDisplay(characterName) {
@@ -1408,17 +1717,203 @@ class FastAPIActionDisplayNode:
             actionLog.scrollTop = actionLog.scrollHeight;
         }
         
+        function isTurnInProgress() {
+            // Check if a turn is currently active using global turn progress tracking
+            const result = turnActiveCharacters > 0 && turnCompletedCharacters < turnActiveCharacters;
+            console.log(`🔍 DEBUG: isTurnInProgress() called - active: ${turnActiveCharacters}, completed: ${turnCompletedCharacters}, result: ${result}`);
+            return result;
+        }
+        
+        function updateTurnMode(turnModeData) {
+            // Clear command lock - backend has confirmed the state change
+            commandInProgress = false;
+            
+            const stepButton = document.getElementById('stepButton');
+            const runButton = document.getElementById('runButton');
+            const stopButton = document.querySelector('button[onclick="stopTurns()"]');
+            
+            console.log(`🔍 DEBUG: updateTurnMode() called with mode=${turnModeData.mode}, commandInProgress was reset to false`);
+
+            // Update global mode for other handlers
+            currentTurnMode = turnModeData.mode;
+
+            // Check if a turn is currently in progress
+            const turnInProgress = isTurnInProgress();
+            console.log(`🔍 DEBUG: Turn in progress: ${turnInProgress}, active: ${turnActiveCharacters}, completed: ${turnCompletedCharacters}`);
+
+            // Shade/enable buttons according to mode AND turn state
+            if (currentTurnMode === 'run') {
+                console.log('🔄 Setting buttons to RUN mode - disabling Step and Run');
+                // Disable Step
+                if (stepButton) {
+                    stepButton.disabled = true;
+                    stepButton.style.background = '#555';
+                    stepButton.title = 'Disabled while running';
+                }
+                // Disable Run
+                if (runButton) {
+                    runButton.disabled = true;
+                    runButton.style.background = '#555';
+                    runButton.style.color = '#888';
+                    runButton.title = 'Already running';
+                }
+                // Keep Stop enabled
+                if (stopButton) {
+                    stopButton.disabled = false;
+                    stopButton.style.background = '#ff6b6b';
+                }
+            } else {
+                // STEP mode - only enable buttons if no turn is in progress
+                if (turnInProgress) {
+                    console.log('🛑 STEP mode but turn in progress - keeping buttons disabled');
+                    // Keep buttons disabled during turn execution
+                    if (stepButton) {
+                        stepButton.disabled = true;
+                        stepButton.style.background = '#555';
+                        stepButton.title = 'Turn in progress - wait for completion';
+                        console.log('🔍 DEBUG: Step button kept disabled due to turn in progress');
+                    }
+                    if (runButton) {
+                        runButton.disabled = true;
+                        runButton.style.background = '#555';
+                        runButton.style.color = '#888';
+                        runButton.title = 'Turn in progress - wait for completion';
+                    }
+                } else {
+                    // FIXED: Don't automatically re-enable Step button when no turn is active
+                    // The Step button should only be enabled when the user explicitly requests it
+                    // This prevents the premature re-enabling that was causing the "instant unshade" problem
+                    console.log('🛑 STEP mode with no turn active - Step button remains disabled until user clicks it');
+                    
+                    // Keep Step button disabled - user must manually click to advance
+                    if (stepButton) {
+                        stepButton.disabled = true;
+                        stepButton.style.background = '#555';
+                        stepButton.title = 'Click Step button to advance to next turn';
+                    }
+                    
+                    // Enable Run button (this is still appropriate)
+                    if (runButton) {
+                        runButton.disabled = false;
+                        runButton.style.background = '#4ecdc4';
+                        runButton.style.color = '#1a1a1a';
+                        runButton.title = 'Start automatic turns';
+                    }
+                }
+                // Stop remains enabled
+                if (stopButton) {
+                    stopButton.disabled = false;
+                    stopButton.style.background = '#ff6b6b';
+                }
+            }
+        }
+        
         function updateTurnState(turnData) {
             const turnMode = document.getElementById('turnMode');
             const turnNumber = document.getElementById('turnNumber');
             const turnProgress = document.getElementById('turnProgress');
             
-            // Update display
+            // Update global turn progress tracking
+            turnActiveCharacters = turnData.active_characters.length;
+            turnCompletedCharacters = turnData.completed_characters.length;
+            
+            console.log(`🔍 DEBUG: updateTurnState() called - active: ${turnActiveCharacters}, completed: ${turnCompletedCharacters}`);
+            
+            // Update display only
             turnMode.textContent = `Mode: ${turnData.mode.charAt(0).toUpperCase() + turnData.mode.slice(1)}`;
             turnNumber.textContent = `Turn: ${turnData.turn_number}`;
             turnProgress.textContent = `Progress: ${turnData.completed_characters.length}/${turnData.active_characters.length}`;
             
-            console.log(`Turn state update: mode=${turnData.mode}, active=${turnData.active_characters.length}, completed=${turnData.completed_characters.length}`);
+            console.log(`🔍 DEBUG: Turn state update: mode=${turnData.mode}, active=${turnActiveCharacters}, completed=${turnCompletedCharacters}`);
+
+            // Update global mode for other handlers
+            currentTurnMode = turnData.mode;
+            console.log(`🔍 DEBUG: Updated currentTurnMode to: ${currentTurnMode}`);
+        }
+        
+        function handleTurnStart(turnData) {
+            console.log(`Turn start: turn=${turnData.turn_number}, active=${turnData.active_characters.length}`);
+            
+            // Update global turn progress tracking
+            turnActiveCharacters = turnData.active_characters.length;
+            turnCompletedCharacters = 0; // Reset completed count for new turn
+            
+            // Shade the Step button during turn execution
+            const stepButton = document.getElementById('stepButton');
+            if (stepButton && currentTurnMode !== 'run') {
+                stepButton.disabled = true;
+                stepButton.style.background = '#555';
+                stepButton.title = 'Turn in progress - waiting for characters to complete actions...';
+                console.log('Step button shaded during turn execution');
+            } else if (stepButton && currentTurnMode === 'run') {
+                console.log('Turn start in run mode - Step button already disabled');
+            }
+        }
+        
+        function handleReadyState(readyData) {
+            const systemStatusText = document.getElementById('systemStatusText');
+            const stepButton = document.getElementById('stepButton');
+            const runButton = document.querySelector('button[onclick="runTurns()"]');
+            
+            if (readyData.system_ready) {
+                // System is ready - enable buttons and update status
+                systemStatusText.textContent = `Ready - ${readyData.character_count} characters active`;
+                systemStatusText.style.color = '#4ecdc4'; // Green color for ready
+                
+                // Enable step and run buttons, but respect current turn mode AND turn state
+                if (currentTurnMode !== 'run') {
+                    // Check if a turn is currently in progress
+                    const turnInProgress = isTurnInProgress();
+                    if (turnInProgress) {
+                        console.log('System ready but turn in progress - keeping buttons disabled');
+                        // Keep buttons disabled during turn execution
+                        stepButton.disabled = true;
+                        stepButton.style.background = '#555';
+                        stepButton.title = 'Turn in progress - wait for completion';
+                        
+                        runButton.disabled = true;
+                        runButton.style.background = '#555';
+                        runButton.style.color = '#888';
+                        runButton.title = 'Turn in progress - wait for completion';
+                    } else {
+                        // No turn active - enable buttons
+                        stepButton.disabled = false;
+                        stepButton.style.background = '#4ecdc4';
+                        stepButton.title = 'Click to advance to next turn';
+                        
+                        runButton.disabled = false;
+                        runButton.style.background = '#ffe66d';
+                        runButton.style.color = '#1a1a1a';
+                        runButton.title = 'Click to run multiple turns';
+                    }
+                } else {
+                    // In run mode, keep buttons disabled
+                    stepButton.disabled = true;
+                    stepButton.style.background = '#555';
+                    stepButton.title = 'Disabled while running';
+                    
+                    runButton.disabled = true;
+                    runButton.style.background = '#555';
+                    runButton.style.color = '#888';
+                    runButton.title = 'Already running';
+                }
+                
+                console.log(`System ready: ${readyData.character_count} characters active, turn mode: ${currentTurnMode}`);
+            } else {
+                // System not ready - disable buttons and update status
+                systemStatusText.textContent = 'Starting...';
+                systemStatusText.style.color = '#888';
+                
+                // Disable step and run buttons
+                stepButton.disabled = true;
+                stepButton.style.background = '#555';
+                stepButton.title = 'Waiting for system startup...';
+                
+                runButton.disabled = true;
+                runButton.style.background = '#555';
+                runButton.style.color = '#888';
+                runButton.title = 'Waiting for system startup...';
+            }
         }
         
         async function sendText() {
@@ -1466,13 +1961,20 @@ class FastAPIActionDisplayNode:
         });
         
         async function stepTurn() {
+            if (commandInProgress) return; // Prevent rapid clicks
+            commandInProgress = true;
+            
             const resultDiv = document.getElementById('turnResult');
             const stepButton = document.getElementById('stepButton');
+            
+            console.log('🔍 DEBUG: stepTurn() called - disabling Step button');
             
             // Immediately disable and shade the button for responsive UI
             stepButton.disabled = true;
             stepButton.style.background = '#555';
             stepButton.title = 'Waiting for all characters to complete their turns...';
+            
+            console.log('🔍 DEBUG: Step button disabled, commandInProgress =', commandInProgress);
             
             try {
                 const response = await fetch('/api/turn/step', {
@@ -1486,6 +1988,9 @@ class FastAPIActionDisplayNode:
                 
                 if (result.success) {
                     resultDiv.innerHTML = `<span class="success">${result.message}</span>`;
+                    console.log('🔍 DEBUG: Step API call succeeded - button should stay disabled');
+                    console.log('🔍 DEBUG: Current turn progress - active:', turnActiveCharacters, 'completed:', turnCompletedCharacters);
+                    // Button stays disabled until step_complete event
                 } else {
                     resultDiv.innerHTML = `<span class="error">Error: ${result.message}</span>`;
                     // Re-enable button if API call failed
@@ -1503,6 +2008,9 @@ class FastAPIActionDisplayNode:
         }
         
         async function runTurns() {
+            if (commandInProgress) return; // Prevent rapid clicks
+            commandInProgress = true;
+            
             const resultDiv = document.getElementById('turnResult');
             try {
                 const response = await fetch('/api/turn/run', {
@@ -1525,6 +2033,9 @@ class FastAPIActionDisplayNode:
         }
         
         async function stopTurns() {
+            if (commandInProgress) return; // Prevent rapid clicks
+            commandInProgress = true;
+            
             const resultDiv = document.getElementById('turnResult');
             try {
                 const response = await fetch('/api/turn/stop', {
@@ -1628,6 +2139,84 @@ class FastAPIActionDisplayNode:
                 }
             } catch (error) {
                 resultDiv.innerHTML = `<span class="error">Error: ${error.message}</span>`;
+            }
+        }
+        
+        // Time slider functions
+        function initTimeSlider() {
+            const slider = document.getElementById('timeSlider');
+            const sliderValue = document.getElementById('timeSliderValue');
+            
+            // Update display when slider moves
+            slider.addEventListener('input', function() {
+                sliderValue.textContent = this.value;
+            });
+            
+            // Send value to server on mouse up (not during drag)
+            slider.addEventListener('mouseup', function() {
+                updateTimeDelay(this.value);
+            });
+            
+            // Also handle touchend for mobile devices
+            slider.addEventListener('touchend', function() {
+                updateTimeDelay(this.value);
+            });
+        }
+        
+        async function updateTimeDelay(minutes) {
+            try {
+                const response = await fetch('/api/time/delay', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ minutes: parseInt(minutes) })
+                });
+                
+                const result = await response.json();
+                if (!result.success) {
+                    console.error('Failed to update time delay:', result.message);
+                }
+            } catch (error) {
+                console.error('Error updating time delay:', error);
+            }
+        }
+        
+
+        
+        // Initialize time slider when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            initTimeSlider();
+            // Get initial simulation time
+            getInitialSimulationTime();
+            // Send initial delay value (0) to backend
+            updateTimeDelay(0);
+        });
+        
+        async function getInitialSimulationTime() {
+            try {
+                const response = await fetch('/api/time/initial');
+                const result = await response.json();
+                
+                if (result.success && result.time_info) {
+                    const timeInfo = result.time_info;
+                    const dateTime = new Date(timeInfo.datetime);
+                    const displayTime = dateTime.toLocaleString('en-US', {
+                        weekday: 'short',
+                        year: 'numeric',
+                        month: 'short',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                    });
+                    document.getElementById('simulationTime').textContent = displayTime;
+                    console.log('⏰ Initial time loaded:', displayTime);
+                } else {
+                    document.getElementById('simulationTime').textContent = 'Starting up...';
+                }
+            } catch (error) {
+                document.getElementById('simulationTime').textContent = 'Starting up...';
+                console.log('Initial time query failed, waiting for WebSocket updates');
             }
         }
     </script>
@@ -1752,6 +2341,26 @@ class FastAPIActionDisplayNode:
             import traceback
             traceback.print_exc()
     
+    def current_activity_callback(self, sample):
+        """Handle incoming character current activities."""
+        try:
+            current_activity_data = json.loads(sample.payload.to_bytes().decode('utf-8'))
+            
+            # Extract character name from topic path
+            topic_path = str(sample.key_expr)
+            character_name = topic_path.split('/')[1]  # cognitive/{character}/current_activity
+            
+            # Store current activity for this character
+            with self.character_current_activities_lock:
+                self.character_current_activities[character_name] = current_activity_data
+            
+            # Send current activity update to web clients
+            self._send_current_activity_to_websockets(current_activity_data, character_name)
+            
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+    
     def situation_callback(self, sample):
         """Handle incoming character situation data."""
         try:
@@ -1777,14 +2386,11 @@ class FastAPIActionDisplayNode:
         try:
             step_data = json.loads(sample.payload.to_bytes().decode('utf-8'))
             
-
-            
             # Update turn state to indicate step is complete
             with self.turn_state_lock:
                 self.turn_state['active_characters'] = []
                 self.turn_state['completed_characters'] = []
                 self.turn_state['turn_start_time'] = None
-
             
             # Send step_complete message to re-enable Step button
             self._send_step_complete_to_websockets()
@@ -1804,12 +2410,81 @@ class FastAPIActionDisplayNode:
                 self.turn_state['completed_characters'] = []
                 self.turn_state['turn_start_time'] = time.time()
             
+            # Send turn start message to web clients
+            self._send_turn_start_to_websockets(turn_data)
+            
             # Send turn state update to web clients
             self._send_turn_state_update()
             
         except Exception as e:
             import traceback
             traceback.print_exc()
+    
+    def turn_control_callback(self, sample):
+        """Handle turn control status updates from map node."""
+        try:
+            turn_control_data = json.loads(sample.payload.to_bytes().decode('utf-8'))
+            
+            with self.turn_state_lock:
+                # Update mode based on map node's actual state
+                self.turn_state['mode'] = turn_control_data.get('mode', 'step')
+                logger.info(f"🔄 Turn control update from map node: mode={self.turn_state['mode']}")
+            
+            # Send just the mode update to the UI
+            self._send_turn_mode_update()
+            
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+    
+    def ready_callback(self, sample):
+        """Handle launcher ready signal."""
+        try:
+            ready_data = json.loads(sample.payload.to_bytes().decode('utf-8'))
+            
+            if ready_data.get('status') == 'ready':
+                self.system_ready = True
+                self.character_count = ready_data.get('character_count', 0)
+                
+                logger.info(f'🚀 System ready signal received: {self.character_count} characters active')
+                
+                # Send ready state update to web clients
+                self._send_ready_state_update()
+                
+                # Send current time to all connected WebSocket clients if available
+                if self.current_simulation_time:
+                    self._send_time_update_to_websockets(self.current_simulation_time.get('time_info', {}))
+                    logger.info(f'📤 Sent current time to all WebSocket clients: {self.current_simulation_time.get("time_info", {}).get("datetime", "unknown")}')
+                else:
+                    logger.info('📤 No simulation time available to send to WebSocket clients')
+                
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+    
+
+    
+    def time_advanced_callback(self, sample):
+        """Handle time advancement updates from map_node."""
+        try:
+            time_data = json.loads(sample.payload.to_bytes().decode('utf-8'))
+            
+            # Extract new time info
+            new_time_info = time_data.get('new_time_info', {})
+            if new_time_info and 'datetime' in new_time_info:
+                # Cache the full time data for future requests
+                self.current_simulation_time = time_data
+                logger.info(f'⏰ Time advanced: {new_time_info["datetime"]}')
+                
+                # Send time update to web clients
+                self._send_time_update_to_websockets(new_time_info)
+            else:
+                logger.warning(f'Received time_advanced but no valid time_info in data')
+                
+        except Exception as e:
+            logger.error(f'Error in time_advanced callback: {e}')
+    
+
     
     def _send_to_websockets(self, action_data: Dict[str, Any], character_name: str):
         """Send action data to all connected WebSocket clients."""
@@ -1985,6 +2660,47 @@ class FastAPIActionDisplayNode:
                 if websocket in self.websocket_connections:
                     self.websocket_connections.remove(websocket)
     
+    def _send_current_activity_to_websockets(self, current_activity_data: Dict[str, Any], character_name: str):
+        """Send current activity data to all connected WebSocket clients."""
+        with self.websocket_lock:
+            if not self.websocket_connections:
+                return
+        
+        # Prepare current activity data for web clients
+        web_data = {
+            'type': 'current_activity',
+            'character': character_name,
+            'current_activity': current_activity_data.get('current_activity', ''),
+            'activity_data': current_activity_data.get('activity_data'),
+            'current_step': current_activity_data.get('current_step'),
+            'activity_state': current_activity_data.get('activity_state'),
+            'timestamp': current_activity_data.get('timestamp', '')
+        }
+        
+        # Send to all connected clients
+        if self.event_loop is None:
+            return
+            
+        with self.websocket_lock:
+            disconnected = []
+            for websocket in self.websocket_connections:
+                try:
+                    # Use asyncio.run_coroutine_threadsafe to send from non-async context
+                    future = asyncio.run_coroutine_threadsafe(
+                        websocket.send_text(json.dumps(web_data)), 
+                        self.event_loop
+                    )
+                    future.result(timeout=5.0 if not self.debug else 600.0)
+                except Exception as e:
+                    # Don't remove client on timeout - just log the error
+                    if not isinstance(e, TimeoutError):
+                        disconnected.append(websocket)
+            
+            # Remove only truly disconnected clients (not timeout errors)
+            for websocket in disconnected:
+                if websocket in self.websocket_connections:
+                    self.websocket_connections.remove(websocket)
+    
     def _send_situation_data_to_websockets(self, situation_data: Dict[str, Any], character_name: str):
         """Send situation data to all connected WebSocket clients."""
         with self.websocket_lock:
@@ -1996,6 +2712,43 @@ class FastAPIActionDisplayNode:
             'type': 'situation_data',
             'character': character_name,
             'situation_data': situation_data,
+            'timestamp': datetime.now().isoformat()
+        }
+        
+        # Send to all connected clients
+        if self.event_loop is None:
+            return
+            
+        with self.websocket_lock:
+            disconnected = []
+            for websocket in self.websocket_connections:
+                try:
+                    # Use asyncio.run_coroutine_threadsafe to send from non-async context
+                    future = asyncio.run_coroutine_threadsafe(
+                        websocket.send_text(json.dumps(web_data)), 
+                        self.event_loop
+                    )
+                    future.result(timeout=5.0 if not self.debug else 600.0)
+                except Exception as e:
+                    # Don't remove client on timeout - just log the error
+                    if not isinstance(e, TimeoutError):
+                        disconnected.append(websocket)
+            
+            # Remove only truly disconnected clients (not timeout errors)
+            for websocket in disconnected:
+                if websocket in self.websocket_connections:
+                    self.websocket_connections.remove(websocket)
+    
+    def _send_time_update_to_websockets(self, time_info: Dict[str, Any]):
+        """Send time update to all connected WebSocket clients."""
+        with self.websocket_lock:
+            if not self.websocket_connections:
+                return
+        
+        # Prepare time data for web clients
+        web_data = {
+            'type': 'time_update',
+            'time_info': time_info,
             'timestamp': datetime.now().isoformat()
         }
         
@@ -2038,9 +2791,9 @@ class FastAPIActionDisplayNode:
                 'completed_characters': self.turn_state['completed_characters'],
                 'step_button_disabled': self.turn_state.get('step_button_disabled', False)
             }
+            logger.info(f"📤 Sending turn state update: mode={self.turn_state['mode']}, turn={self.turn_state['turn_number']}")
 
-
-
+        # Actually send the data to clients
         if self.event_loop:
             try:
                 future = asyncio.run_coroutine_threadsafe(
@@ -2055,6 +2808,106 @@ class FastAPIActionDisplayNode:
                 pass
         else:
             pass
+    
+    def _send_turn_mode_update(self):
+        """Send just the turn mode update to all WebSocket clients."""
+        with self.websocket_lock:
+            if not self.websocket_connections:
+                return
+
+        with self.turn_state_lock:
+            turn_mode_data = {
+                'type': 'turn_mode_update',
+                'mode': self.turn_state['mode']
+            }
+            logger.info(f"📤 Sending turn mode update: mode={self.turn_state['mode']}")
+
+        if self.event_loop:
+            try:
+                future = asyncio.run_coroutine_threadsafe(
+                    self._send_turn_mode_to_all_clients(turn_mode_data), 
+                    self.event_loop
+                )
+                future.result(timeout=1.0)
+            except asyncio.TimeoutError:
+                pass  # Keep clients, timeouts are expected
+            except Exception as e:
+                # Only log other errors
+                pass
+        else:
+            pass
+    
+    def _send_ready_state_update(self):
+        """Send the current ready state to all WebSocket clients."""
+        with self.websocket_lock:
+            if not self.websocket_connections:
+                return
+
+        ready_state_data = {
+            'type': 'ready_state',
+            'system_ready': self.system_ready,
+            'character_count': self.character_count
+        }
+
+        if self.event_loop:
+            try:
+                future = asyncio.run_coroutine_threadsafe(
+                    self._send_ready_state_to_all_clients(ready_state_data), 
+                    self.event_loop
+                )
+                future.result(timeout=1.0)
+            except asyncio.TimeoutError:
+                pass  # Keep clients, timeouts are expected
+            except Exception as e:
+                # Only log other errors
+                pass
+        else:
+            pass
+    
+    async def _send_turn_mode_to_all_clients(self, turn_mode_data: Dict[str, Any]):
+        """Send turn mode update to all connected WebSocket clients."""
+        with self.websocket_lock:
+            disconnected = []
+            for websocket in self.websocket_connections:
+                try:
+                    await websocket.send_text(json.dumps(turn_mode_data))
+                except Exception as e:
+                    disconnected.append(websocket)
+            
+            # Remove disconnected clients
+            for websocket in disconnected:
+                if websocket in self.websocket_connections:
+                    self.websocket_connections.remove(websocket)
+    
+    async def _send_turn_state_to_all_clients(self, turn_state_data: Dict[str, Any]):
+        """Send turn state to all connected WebSocket clients."""
+        with self.websocket_lock:
+            disconnected = []
+            for websocket in self.websocket_connections:
+                try:
+                    await websocket.send_text(json.dumps(turn_state_data))
+                except Exception as e:
+                    disconnected.append(websocket)
+            
+            # Remove disconnected clients
+            for websocket in disconnected:
+                if websocket in self.websocket_connections:
+                    self.websocket_connections.remove(websocket)
+    
+    async def _send_ready_state_to_all_clients(self, ready_state_data: Dict[str, Any]):
+        """Send ready state to all connected WebSocket clients."""
+        with self.websocket_lock:
+            disconnected = []
+            for websocket in self.websocket_connections:
+                try:
+                    await websocket.send_text(json.dumps(ready_state_data))
+                except Exception as e:
+                    disconnected.append(websocket)
+            
+            # Remove disconnected clients
+            for websocket in disconnected:
+                if websocket in self.websocket_connections:
+                    self.websocket_connections.remove(websocket)
     
     def _send_step_complete_to_websockets(self):
         """Send a dedicated step_complete message to all WebSocket clients."""
@@ -2075,6 +2928,43 @@ class FastAPIActionDisplayNode:
                 try:
                     future = asyncio.run_coroutine_threadsafe(
                         websocket.send_text(json.dumps(step_complete_data)),
+                        self.event_loop
+                    )
+                    future.result(timeout=5.0 if not self.debug else 600.0)
+                except Exception as e:
+                    # Don't remove client on timeout - just log the error
+                    if not isinstance(e, TimeoutError):
+                        import traceback
+                        traceback.print_exc()
+                        disconnected.append(websocket)
+
+            # Remove only truly disconnected clients (not timeout errors)
+            for websocket in disconnected:
+                if websocket in self.websocket_connections:
+                    self.websocket_connections.remove(websocket)
+
+    def _send_turn_start_to_websockets(self, turn_data: Dict[str, Any]):
+        """Send a dedicated turn_start message to all WebSocket clients."""
+        with self.websocket_lock:
+            if not self.websocket_connections:
+                return
+
+        turn_start_data = {
+            'type': 'turn_start',
+            'turn_number': turn_data.get('turn_number', 0),
+            'active_characters': turn_data.get('active_characters', []),
+            'timestamp': datetime.now().isoformat()
+        }
+
+        if self.event_loop is None:
+            return
+
+        with self.websocket_lock:
+            disconnected = []
+            for websocket in self.websocket_connections:
+                try:
+                    future = asyncio.run_coroutine_threadsafe(
+                        websocket.send_text(json.dumps(turn_start_data)),
                         self.event_loop
                     )
                     future.result(timeout=5.0 if not self.debug else 600.0)

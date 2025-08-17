@@ -1,13 +1,32 @@
+# Core dependencies
 eclipse-zenoh>=1.4.0
 requests>=2.31.0
 sympy>=1.12.0
 PyYAML>=6.0
+
+# Web framework and server
 fastapi>=0.116.0
 uvicorn[standard]>=0.35.0
-colorama>=0.4.6
-noise>=1.2.2
-networkx>=3.5
+websockets>=15.0.0
+
+# Data processing and scientific computing
 numpy>=2.3.0
 scipy>=1.16.0
+networkx>=3.5
+
+# AI/ML and LLM clients
+openai>=1.98.0
+tqdm>=4.67.0
+
+# GUI and visualization
 PyQt5>=5.15.0
-openai>=1.98.0 
+colorama>=0.4.6
+
+# Utilities and tools
+noise>=1.2.2
+python-dotenv>=1.1.0
+watchfiles>=1.1.0
+
+# Development and testing (optional)
+pytest>=7.4.0
+pytest-asyncio>=0.21.0 

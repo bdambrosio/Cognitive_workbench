@@ -1,29 +1,15 @@
-2025-08-11 17:58:57 - sense_node - INFO - 👁️ Sense Node initialized for character: User
-2025-08-11 17:58:57 - sense_node - INFO - Console Text Sensor ready - will auto-disable if external input detected
-2025-08-11 17:58:57 - sense_node - INFO - Sense Node running - press Ctrl+C to stop2022025-08-11 18:08:27 - sense_node - INFO - 👁️ Visual event received: agent_detected - {'agent_name': 'Joe', 'position': [32, 32], 'distance': 10, 'timestamp': '2025-08-11T18:08:27.068993'}
-2025-08-11 18:12:08 - sense_node - INFO - Received signal 15, initiating shutdown...
-2025-08-11 18:12:08 - sense_node - INFO - Sense Node shutdown initiated...
-2025-08-11 18:12:08 - sense_node - INFO - Sense Node shutdown complete
-FO - 🔄 External input detected - console input disabled to prevent conflicts
-2025-08-11 18:02:04 - sense_node - INFO - 📨 Received external text input from Samantha: "I've been exploring the forest with Joe, trying to find some food and shelter. We just gathered some fallen branches, actually. I'm not really sure what's safe to eat around here, but I'm hoping we can find something soon."
-2025-08-11 18:02:04 - sense_node - INFO - 📤 Published sense data: 0
-2025-08-11 18:02:48 - sense_node - INFO - 📨 Received external text input from Samantha: "I'm not sure, I mean, we just met Joe ourselves, and we're still trying to figure things out. What makes you think it's a good idea to join us?"
-2025-08-11 18:02:48 - sense_node - INFO - 📤 Published sense data: 1
-2025-08-11 18:04:50 - sense_node - INFO - 📨 Received external text input from Joe: "I'm happy to have you stick with us, we're just trying to figure some things out ourselves, like how to build a shelter and find some food and water. We were just discussing heading northeast to gather some materials, want to join us?"
-2025-08-11 18:04:50 - sense_node - INFO - 📤 Published sense data: 2
-2025-08-11 18:05:52 - sense_node - INFO - 📨 Received external text input from User: "plan:
-move(north)"
-2025-08-11 18:05:52 - sense_node - INFO - 📤 Published sense data: 3
-2025-08-11 18:09:21 - sense_node - INFO - 📨 Received external text input from Joe: "I think I see Hut1, let's go check it out"
-2025-08-11 18:09:21 - sense_node - INFO - 📤 Published sense data: 4
-2025-08-11 18:12:08 - sense_node - INFO - Received signal 15, initiating shutdown...
-2025-08-11 18:12:08 - sense_node - INFO - Sense Node shutdown initiated...
-2025-08-11 18:12:08 - sense_node - INFO - Sense Node shutdown complete
-Yeah, that'd be great. thanks!"
-2025-08-11 18:05:21 - sense_node - INFO - 📤 Published sense data: 5
-2025-08-11 18:06:05 - sense_node - INFO - 👁️ Visual event received: agent_detected - {'agent_name': 'User', 'position': [20, 21], 'distance': 5, 'timestamp': '2025-08-11T18:06:05.321512'}
-2025-08-11 18:06:19 - sense_node - INFO - 📨 Received external text input from Samantha: "I found an apple tree, let's check it out, Joe"
-2025-08-11 18:06:19 - sense_node - INFO - 📤 Pub2025-08-11 18:06:23 -2025-08-11 18:07:06 - sense_node - INFO - 📨 Received external text input from Samantha: "I think we have enough materials to build a shelter now, let's head back to our starting point, Joe, I'm getting a bit hungry too, maybe we can find some food on the way"
-2025-08-11 18:07:06 - sense_n2025-08-11 18:12:08 - sense_node - INFO - Received signal 15, initiating shutdown...
-2025-08-11 18:12:08 - sense_node - INFO - 2025-08-11 18:12:08 - sense_node 2025-08-11 18:12:08 - sense_node - INFO - Sense Node shutdown complete
-ode - INFO - Sense Node shutdown complete
+2025-08-17 13:29:34 - sense_node - INFO - 🔧 Debug mode enabled for User
+2025-08-17 13:29:34 - sense_node - INFO - 👁️ Sense Node initialized for character: User
+2025-08-17 13:29:34 - sense_node - INFO - Console Text Sensor ready - will auto-disable if external input detected
+2025-08-17 13:29:34 - sense_node - INFO - Sense Node running - press Ctrl+C to sto2025-02025-08-17 13:31:49 - sense_node - INFO - 👁️ Visual event received: agent_detected - {'agent_name': 'Joe', 'position': [20, 23], 'distance': 10, 'timestamp': '2025-08-17T13:31:49.970271'}
+2025-08-17 13:33:16 - sense_node - INFO - Received signal 2, initiating shutdown...
+2025-08-17 13:33:16 - sense_node - INFO - Sense Node shutdown initiated...
+2025-08-17 13:33:16 - sense_node - INFO - Sense Node shutdown complete
+O - Received signal 2, initiating shutdown...
+2025-08-17 13:33:16 - sense_node - INFO - Sense Node shutdown initiated...
+2025-08-17 13:33:16 - sense_node - INFO - Sense Node shutdown complete
+0:58 - sense_node - INFO - 📨 Received external text input from Joe: "I think we might find some shelter, or maybe some tools or supplies, it's definitely worth checking out, and like you said, it's always safer to travel with a buddy, especially in a place like this, I'm Joe by the way, I don't think we actually introduced ourselves yet"
+2025-08-17 13:30:58 - sense_node - INFO - 📤 Published sense2025-08-12025-08-17 13:31:24 - sense_node - INFO - 👁️ Visual event received: agent_detected - {'agent_name': 'Joe', 'position': [20, 21], 'distance': 1, 'timestamp': '2025-08-17T13:31:24.830901'}
+2025-08-17 13:31:55 - sense_node - INFO - 📨 Received external text input from Joe: "We're here, let's check out Hut1 together"
+2025-08-17 13:31:55 - sense_node - INFO - 📤 Published sense data: 3
+2025-08-17 13:32:16 2025-08-17 13:32:23 - sense_node - INFO - 👁️ Visual event received: agent_detected - {'agent_name': 'Samantha', 'position': [15, 16], 'distance': 9, 'timestamp': '2025-2025-08-17 13:33:16 - se2025-08-17 13:33:16 - sense_node - INFO - Received signal 2,2025-08-17 13:33:16 - se2025-08-17 13:33:16 - sense_node - INFO - Sense Nod2025-08-17 13:33:16 - se2025-08-17 13:33:16 - sense_node - INFO - Sense Node shutdown complete

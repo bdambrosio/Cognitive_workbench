@@ -18,6 +18,7 @@ import os
 from pathlib import Path
 from datetime import datetime
 from typing import Dict, List, Any
+import urllib.parse
 
 
 from utils import hash_utils, zenoh_utils
@@ -334,80 +335,69 @@ class ZenohSituationNode:
         try:
             # Parse query parameters
             selector = str(query.selector)
-            
             # For now, just return the current situation
-            response = {
-                'success': True,
-                'situation': self.situation
-            }
+            response = {'success': True,'situation': self.situation}
             
             query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
             logger.info(f'🧭 Situation query: returned current situation')
             
         except Exception as e:
             logger.error(f'Error handling situation query: {e}')
-            error_response = {
-                'success': False,
-                'error': str(e)
-            }
+            error_response = {'success': False, 'error': str(e) }
             query.reply(query.key_expr, json.dumps(error_response).encode('utf-8'))
     
     def handle_proximity_query(self, query):
-        """Handle proximity queries for condition evaluation."""
+        """Handle proximity queries for condition evaluation.
+        attempts to find a binding that satisfies the condition"""
         try:
             # Parse query parameters
             selector = str(query.selector)
             target = None
-            
+            response = None
             # Extract target from query
             if 'target=' in selector:
                 try:
-                    import urllib.parse
                     target = urllib.parse.unquote(selector.split('target=')[1].split('&')[0])
                 except:
                     pass
-            
             if not target:
-                response = {
-                    'success': False,
-                    'value': False
-                }
+                response = { 'success': False,'value': False, 'binding': None}
             else:
+                if 'negated=' in selector:
+                    negated = urllib.parse.unquote(selector.split('negated=')[1].split('&')[0])
+                    negated = negated.lower() == 'true'
+                else:
+                    negated = False
                 # Check if target is in current situation and distance < near_threshold
                 target_canonical = target.capitalize()
-                is_near = False
-                binding=None
-                
+                response = None
                 for view in self.situation['views']:
                     if view.get('terrain') == target_canonical:
-                        is_near = True
-                        binding = view['direction']
-                    break
-                
-                # Check resources
-                for resource in self.situation.get('resources', []):
-                    if ('name' in resource 
-                        and ((not any(ch.isdigit() for ch in target_canonical) and resource['name'].startswith(target_canonical)) 
-                            or resource['name'] == target_canonical)
-                        and resource.get('distance', float('inf')) < self.near_threshold):
-                        is_near = resource['name']
-                        binding = resource['name']
+                        response = {'success': True, 'value': not negated, 'binding': view['direction']}
                         break
-                
-                # Check characters if not found in resources
-                if not is_near:
-                    for character in self.situation.get('characters', []):
-                        if (target_canonical == 'person' or ('name' in character and character['name'] == target_canonical)) \
-                            and character.get('distance', float('inf')) < self.near_threshold:
-                            is_near = character['name']
-                            binding = character['name']
-                            break
-                
-                response = {
-                    'success': True,
-                    'value': is_near,
-                    'binding': binding
-                }
+                    # Check resources in this direction
+                    if not response:
+                        for resource in view.get('resources', []):
+                            if resource['name'] == target_canonical:
+                                if ((not negated and resource.get('distance', float('inf')) <= self.near_threshold)
+                                    or (negated and resource.get('distance', float('inf')) > self.near_threshold)):
+                                    response = {'success': True, 'value': True, 'binding': resource['name']}
+                                else:
+                                    response = {'success': True, 'value': False, 'binding': resource['name']}
+                                break
+                    # Check characters if not found in resources
+                    if not response:
+                        for character in view.get('characters', []):
+                            if ('name' in character and character['name'] == target_canonical):
+                                if ((not negated and character.get('distance', float('inf')) <= self.near_threshold) 
+                                    or (negated and character.get('distance', float('inf')) > self.near_threshold)):
+                                    response = {'success': True, 'value': True, 'binding': character['name']}
+                                else:
+                                    response = {'success': True, 'value': False, 'binding': character['name']}
+                                break
+
+                if not response:
+                    response = {'success': False, 'value': negated, 'binding': target_canonical}
             
             query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
             logger.info(f'🧭 Proximity query for {target}: {response["value"]}')
@@ -415,10 +405,7 @@ class ZenohSituationNode:
         except Exception as e:
             logger.error(f'Error handling proximity query: {e}')
             traceback.print_exc()
-            error_response = {
-                'success': False,
-                'value': False
-            }
+            error_response = {'success': False,'value': False,'binding': None}
             query.reply(query.key_expr, json.dumps(error_response).encode('utf-8'))
     
     def handle_visibility_query(self, query):
@@ -431,47 +418,41 @@ class ZenohSituationNode:
             # Extract target from query
             if 'target=' in selector:
                 try:
-                    import urllib.parse
                     target = urllib.parse.unquote(selector.split('target=')[1].split('&')[0])
                 except:
                     pass
             
             if not target:
-                response = {
-                    'success': False,
-                    'value': False
-                }
+                response = {'success': False, 'value': False, 'binding': None}
             else:
-                # Check if target is in visible characters list
+                if 'negated=' in selector:
+                    negated = urllib.parse.unquote(selector.split('negated=')[1].split('&')[0])
+                    negated = negated.lower() == 'true'
+                else:
+                    negated = False
+                # Check if target is in current situation and distance < near_threshold
                 target_canonical = target.capitalize()
-                can_see = False
-                binding=None
-                
+                response = None
+
                 # Check if target is in visible terrains
                 for view in self.situation['views']:
                     if view.get('terrain') == target_canonical:
-                        can_see = target_canonical
-                        binding = view['direction']
+                        response = {'success': True, 'value': not negated, 'binding': view['direction']}
                         break
                 # Check resources
                 for resource in self.situation.get('resources', []):
-                    if ('name' in resource 
-                        and ((not any(ch.isdigit() for ch in target_canonical) and resource['name'].startswith(target_canonical)) 
-                            or resource['name'] == target_canonical)):
-                        can_see = resource['name']
-                        binding = resource['name']
+                    # situation resources are strings, not dicts
+                    if resource == target_canonical:
+                        response = {'success': True, 'value': not negated, 'binding': resource['name']}
                         break
                 for character in self.situation.get('characters', []):
-                    if target_canonical == 'person' or ('name' in character and character['name'] == target_canonical):
-                        can_see = character['name']
-                        binding = character['name']
+                    # situation characters are strings, not dicts
+                    if character == target_canonical:
+                        response = {'success': True, 'value': not negated, 'binding': character['name']}
                         break
                 
-                response = {
-                    'success': True,
-                    'value': can_see,
-                    'binding': binding
-                }
+                if not response:
+                    response = {'success': True, 'value': negated, 'binding': target_canonical}
             
             query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
             logger.info(f'🧭 Visibility query for {target}: {response["value"]}')
@@ -479,10 +460,7 @@ class ZenohSituationNode:
         except Exception as e:
             logger.error(f'Error handling visibility query: {e}')
             traceback.print_exc()
-            error_response = {
-                'success': False,
-                'value': False
-            }
+            error_response = {'success': False,'value': False,'binding': None}
             query.reply(query.key_expr, json.dumps(error_response).encode('utf-8'))
     
     def handle_location_query(self, query):
@@ -501,54 +479,54 @@ class ZenohSituationNode:
                     pass
             
             if not target:
-                response = {
-                    'success': False,
-                    'value': False
-                }
+                response = { 'success': False,'value': False, 'binding': None}
             else:
                 # Check if target is in current situation and distance < at_location_threshold
+                if 'negated=' in selector:
+                    negated = urllib.parse.unquote(selector.split('negated=')[1].split('&')[0])
+                    negated = negated.lower() == 'true'
+                else:
+                    negated = False
+                # Check if target is in current situation and distance < near_threshold
                 target_canonical = target.capitalize()
-                at_location = False
-                binding=None
+                response = None
                 # Check terrains
                 for view in self.situation['views']:
                     if view.get('terrain') == target_canonical:
-                        at_location = target_canonical
-                        binding = view['direction']
+                        response = {'success': True, 'value': not negated, 'binding': view['direction']}
                         break
-                # Check resources
-                for resource in self.situation.get('adjacent_resources', []):
-                    if ('name' in resource and ((not any(ch.isdigit() for ch in target_canonical) and resource['name'].startswith(target_canonical)) 
-                        or resource['name'] == target_canonical)
-                        and resource.get('distance', float('inf')) < self.at_location_threshold):
-                        at_location = resource['name']
-                        binding = resource['name']
-                        break
+                    # Check resources in this direction
+                    if not response:
+                        for resource in view.get('resources', []):
+                            if resource['name'] == target_canonical:
+                                if ((not negated and resource.get('distance', float('inf')) <= self.location_threshold) 
+                                     or (negated and resource.get('distance', float('inf')) > self.location_threshold)):
+                                    response = {'success': True, 'value': True, 'binding': resource['name']}
+                                else:
+                                    response = {'success': True, 'value': False, 'binding': resource['name']}
+                                break
                 
-                # Check characters if not found in resources
-                if not at_location:
-                    for character in self.situation.get('adjacent_characters', []):
-                        if target_canonical == 'person' or ('name' in character and character['name'].startswith(target_canonical)):
-                            at_location = character['name']
-                            binding = character['name']
-                            break
+                    # Check characters if not found in resources
+                    if not response:
+                        for character in view.get('characters', []):
+                            if target_canonical == 'person' or ('name' in character and character['name'] == target_canonical):
+                                if ((not negated and character.get('distance', float('inf')) <= self.location_threshold) 
+                                     or (negated and character.get('distance', float('inf')) > self.location_threshold)):
+                                    response = {'success': True, 'value': True, 'binding': character['name']}
+                                else:
+                                    response = {'success': True, 'value': False, 'binding': character['name']}
+                                break
                 
-                response = {
-                    'success': True,
-                    'value': at_location,
-                    'binding': binding
-                }
+                if not response:
+                    response = {'success': False, 'value': False, 'binding': target_canonical}
             
             query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
-            logger.info(f'🧭 Location query for {target}: {response["value"]}')
+            logger.info(f'🧭 Proximity query for {target}: {response["value"]}')
             
         except Exception as e:
             logger.error(f'Error handling location query: {e}')
             traceback.print_exc()
-            error_response = {
-                'success': False,
-                'value': False
-            }
+            error_response = {'success': False, 'value': False, 'binding': None}
             query.reply(query.key_expr, json.dumps(error_response).encode('utf-8'))
     
     def load_situation(self):

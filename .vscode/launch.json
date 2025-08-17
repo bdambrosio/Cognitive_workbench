@@ -17,20 +17,36 @@
             "preLaunchTask": "setup-zenoh-environment"
         },
         {
-            "name": "Debug Launcher (Sam)",
+            "name": "Debug Activity (lost.yaml)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/activity.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/src",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src"
+            },
+            "args": ["../scenarios/lost.yaml"],
+            "justMyCode": false,
+            "stopOnEntry": false,
+            "preLaunchTask": "setup-zenoh-environment"
+        },
+        {
+            "name": "Debug Launcher (Joe - single character)",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/src/launcher.py",
             "console": "integratedTerminal",
             "cwd": "${workspaceFolder}/src",
             "env": {
-                "PYTHONPATH": "${workspaceFolder}/src"
+                "PYTHONPATH": "${workspaceFolder}/src",
+                "CWB_DEBUG": "1"
             },
-            "args": ["sam.yaml", "--ui", "--map-file", "forest.py"],
+            "args": ["joe.yaml", "--ui", "--map-file", "forest.py"],
             "justMyCode": false,
             "stopOnEntry": false,
             "preLaunchTask": "setup-zenoh-environment"
-        },
+            },
         {
             "name": "Debug Launcher (lost)",
             "type": "debugpy",
@@ -39,7 +55,8 @@
             "console": "integratedTerminal",
             "cwd": "${workspaceFolder}/src",
             "env": {
-                "PYTHONPATH": "${workspaceFolder}/src"
+                "PYTHONPATH": "${workspaceFolder}/src",
+                "CWB_DEBUG": "1"
             },
             "args": ["lost.yaml", "--ui", "--map-file", "forest.py"],
             "justMyCode": false,

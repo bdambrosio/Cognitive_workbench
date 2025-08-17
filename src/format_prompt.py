@@ -68,7 +68,7 @@ text_edit = QTextEdit()
 text_edit.setStyleSheet("background-color: #2E2E2E; color: ivory;")  # Dark blue-grey background and ivory text
 text_edit.setPlaceholderText("Paste your text here...")
 text_edit.setTabStopDistance(40)  # Set tab stop distance (in pixels)
-textFont = QFont(); textFont.setPointSize(13)
+textFont = QFont(); textFont.setPointSize(16)
 text_edit.setFont(textFont)  
 layout.addWidget(text_edit)
 
