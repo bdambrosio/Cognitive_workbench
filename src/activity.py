@@ -531,9 +531,9 @@ class ActivityManager:
     
     def _in_cooldown(self, activity, current_time):
         """Check if activity was recently completed (simplified)"""
-        if len(self.activity_history) > 0 and self.activity_history[-1] == activity:
+        if len(self.activity_history) > 0 and self.activity_history[-1]['name'] == activity['name']:
             return True
-        if len(self.activity_history) > 1 and self.activity_history[-2] == activity:
+        if len(self.activity_history) > 1 and self.activity_history[-2]['name'] == activity['name']:
             return True
         # Implement based on your execution history tracking
         return False
@@ -726,6 +726,8 @@ Rate 0-1 how appropriate this activity is given the situation:
         current_duration = current_time - self.current_activity_state['start_time']
         if type(max_duration) == str and all(c.isdigit() for c in max_duration):
             max_duration = int(max_duration)
+        if max_duration < 7*len(self.current_activity['steps']):
+            max_duration = 7*len(self.current_activity['steps'])
         if type(max_duration) == int:
             max_duration = timedelta(minutes=max_duration)
         if type(max_duration) != timedelta:
