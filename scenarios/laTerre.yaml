@@ -13,7 +13,7 @@ setting: |
 
 characters:
   Jean:
-    location: MarquartFarm
+    location: Marquartfarm
     character: |
       Jean Macquart, a hardworking young unmarried peasant farmer working his father's farm.
       You left military service to return to the family farm.
@@ -29,7 +29,7 @@ characters:
       - "immediate needs of survival - food, shelter, health, rest from backbreaking labor"
 
   Francoise:
-    location: FouanFarm
+    location: Fouanfarm
     character: |
       Francoise Fouan, an attractive unmarried young woman from a neighboring peasant family in the same village as Jean.
       You are hardworking and stoic, accustomed to the unending labor required on a farm.

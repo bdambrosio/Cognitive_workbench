@@ -1,0 +1,37 @@
+2025-08-18 11:46:19 - situation_node - INFO - 🔧 Debug mode enabled for User
+2025-08-18 11:46:19 - situation_node - INFO - 📂 No existing situation file for User, starting fresh
+2025-08-18 11:46:19 - situation_node - INFO - 🧭 Situation Node initialized for character: User
+2025-08-18 11:46:19 - situation_node - INFO -    - Subscribing to: cognitive/User/sense_data
+2025-08-18 11:46:19 - situation_node - INFO -    - Subscribing to: cognitive/User/action
+2025-08-18 11:46:19 - situation_node - INFO -    - Publishing to: cognitive/User/situation/update
+2025-08-18 11:46:19 - situation_node - INFO -    - Queryable at: cognitive/User/situation/current_situation
+2025-08-18 11:46:19 - situation_node - INFO -    - Proximity queryable at: cognitive/User/situation/proximity
+2025-08-18 11:46:19 - situation_node - INFO -    - Visibility queryable at: cognitive/User/situation/visibility
+2025-08-18 11:46:19 - situation_node - INFO -    - Location queryable at: cognitive/User/situation/location
+2025-08-18 11:46:19 - situation_node - INFO -    - Storage available at: data/situation/User_situation.json
+2025-08-18 11:46:19 - situation_node - INFO - Situation Node running - press Ctrl+C to stop
+2025-08-18 11:46:21 - situation_node - INFO - 📥 Received action: unknown
+2025-08-18 11:46:21 - situation_node - INFO - Updating map data for User
+2025-08-18 11:46:21 - situation_node - INFO - Updating map data for User
+2025-08-18 11:46:21 - situation_node - INFO - 🗺️ Updated map look data for User
+2025-08-18 11:46:21 - situation_node - INFO - Map look data updated for User
+2025-08-18 11:46:38 - situation_node - INFO - 🗺️ Updated map look data for User
+2025-08-18 11:46:38 - situation_node - INFO - Map look data 2025-08-18 11:46:39 - situation_node - INFO - 📥 Received action: unknown
+2025-08-18 11:46:43 - situation_node - INFO - 📥 Received action: unknown
+2025-08-18 11:46:47 - situation_node - INFO - 📥 Received sense data: text
+2025-08-18 11:46:50 - situation_node - INFO - 📥 Received action: unknown
+2025-08-18 11:46:54 - situation_node - INFO - 📥 Received sense data: text
+2025-08-18 11:46:58 - situation_node - INFO - 📥 Received action: unknown
+2025-08-18 11:47:16 - situation_node - INFO - 📥 Received action: unknown
+� Proximity query for Fallenbranch10: True
+2025-08-18 11:46:42 - situation_node - INFO - Updating map data for Samantha
+2025-08-18 11:46:42 - situation_node - INFO - 🗺️ Updated map look data for Samantha
+2025-08-18 11:46:42 - situation_node - INFO - Map look data updated for Samantha
+2025-08-18 11:46:42 - situation_node - INFO - 📥 Received action: unknown
+2025-08-18 11:46:43 - situation_node - INFO - 📥 Received sense data: text
+2025-08-18 11:46:47 - situation_node - INFO - 📥 Received action: unknown
+2025-08-18 11:46:50 - situation_node - INFO - 📥 Received sense data: text
+2025-08-18 11:46:54 - situation_node - INFO - 📥 Received action: unknown
+2025-08-18 11:46:58 - situation_node - INFO - 📥 Received sense data: text
+2025-08-18 11:47:04 - situation_node - INFO - 📥 Received action: unknown
+2025-08-18 11:47:16 - situation_node - INFO - 📥 Received sense data: text

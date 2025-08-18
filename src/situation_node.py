@@ -376,13 +376,13 @@ class ZenohSituationNode:
                 target_canonical = target.capitalize()
                 response = None
                 for view in self.situation['views']:
-                    if view.get('terrain') == target_canonical:
+                    if view.get('terrain', '').capitalize() == target_canonical:
                         response = {'success': True, 'value': not negated, 'binding': view['direction']}
                         break
                     # Check resources in this direction
                     if not response:
                         for resource in view.get('resources', []):
-                            if resource['name'] == target_canonical:
+                            if resource['name'].capitalize() == target_canonical:
                                 if ((not negated and resource.get('distance', float('inf')) <= self.near_threshold)
                                     or (negated and resource.get('distance', float('inf')) > self.near_threshold)):
                                     response = {'success': True, 'value': True, 'binding': resource['name']}
@@ -392,7 +392,7 @@ class ZenohSituationNode:
                     # Check characters if not found in resources
                     if not response:
                         for character in view.get('characters', []):
-                            if ('name' in character and character['name'] == target_canonical):
+                            if ('name' in character and character['name'].capitalize() == target_canonical):
                                 if ((not negated and character.get('distance', float('inf')) <= self.near_threshold) 
                                     or (negated and character.get('distance', float('inf')) > self.near_threshold)):
                                     response = {'success': True, 'value': True, 'binding': character['name']}
@@ -440,19 +440,19 @@ class ZenohSituationNode:
 
                 # Check if target is in visible terrains
                 for view in self.situation['views']:
-                    if view.get('terrain') == target_canonical:
+                    if view.get('terrain', '').capitalize() == target_canonical:
                         response = {'success': True, 'value': not negated, 'binding': view['direction']}
                         break
                 # Check resources
                 for resource in self.situation.get('resources', []):
                     # situation resources are strings, not dicts
-                    if resource == target_canonical:
-                        response = {'success': True, 'value': not negated, 'binding': resource['name']}
+                    if resource.capitalize() == target_canonical:
+                        response = {'success': True, 'value': not negated, 'binding': resource}
                         break
                 for character in self.situation.get('characters', []):
                     # situation characters are strings, not dicts
-                    if character == target_canonical:
-                        response = {'success': True, 'value': not negated, 'binding': character['name']}
+                        if character == target_canonical:
+                            response = {'success': True, 'value': not negated, 'binding': character}
                         break
                 
                 if not response:
@@ -496,13 +496,13 @@ class ZenohSituationNode:
                 response = None
                 # Check terrains
                 for view in self.situation['views']:
-                    if view.get('terrain') == target_canonical:
+                    if view.get('terrain', '').capitalize() == target_canonical:
                         response = {'success': True, 'value': not negated, 'binding': view['direction']}
                         break
                     # Check resources in this direction
                     if not response:
                         for resource in view.get('resources', []):
-                            if resource['name'] == target_canonical:
+                            if resource['name'].capitalize() == target_canonical:
                                 if ((not negated and resource.get('distance', float('inf')) <= self.location_threshold) 
                                      or (negated and resource.get('distance', float('inf')) > self.location_threshold)):
                                     response = {'success': True, 'value': True, 'binding': resource['name']}
@@ -513,7 +513,7 @@ class ZenohSituationNode:
                     # Check characters if not found in resources
                     if not response:
                         for character in view.get('characters', []):
-                            if target_canonical == 'person' or ('name' in character and character['name'] == target_canonical):
+                            if target_canonical == 'person' or ('name' in character and character['name'].capitalize() == target_canonical):
                                 if ((not negated and character.get('distance', float('inf')) <= self.location_threshold) 
                                      or (negated and character.get('distance', float('inf')) > self.location_threshold)):
                                     response = {'success': True, 'value': True, 'binding': character['name']}

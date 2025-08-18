@@ -1,28 +1,114 @@
-2025-08-17 20:16:01 - executive_node - ERROR - Error in LLM processing: 'ZenohExecutiveNode' object has no attribute 'current_activity'
-2025-08-17 20:16:01 - executive_node - ERROR - Traceback (most recent call last):
-  File "executive_node.py", line 1725, in generate_speech
-    system_prompt += self._update_system_prompt()
-                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "executive_node.py", line 659, in _update_system_prompt
-    if self.current_activity:
-       ^^^^^^^^^^^^^^^^^^^^^
-AttributeError: 'ZenohExecutiveNode' object has no attribute 'current_activi2025-08-17 20:16:45 - executive_node - WARNING - 🚫 Francoise no action planned
-2025-08-17 20:17:04 - executive_node - WARNING - 🚫 Francoise no action planned
-2025-08-17 20:17:26 - executive_node - WARNING - 🚫 Francoise no action planned
-2025-08-17 20:17:50 - executive_node - WARNING - 🚫 Francoise no action planned
-2025-08-17 20:18:16 - executive_node - WARNING - 🚫 Francoise no action planned
-2025-08-17 20:18:58 - executive_node - WARNING - 🚫 Francoise no action planned
-ion planned
-2025-08-17 20:17:18 - executive_node - ERROR - Failed to acquire conversation lock: Lock unavailable
-2025-08-17 20:17:18 - executive_node - ERROR - 📤 Published action: say (failed - lock unavailable)
-2025-08-17 20:17:28 - executive_node - WARNING - 🚫 Jean no action planned
-2025-08-17 20:17:38 - executive_node - ERROR - Failed to acquire conversation lock: Lock unavailable
-2025-08-17 20:17:38 - executive_node - ERROR - 📤 Published action: say (failed - lock unavailable)
-2025-08-17 20:17:58 - executive_node - WARNING - 🚫 Jean no action planned
-2025-08-17 20:18:16 - executive_node - WARNING - 🚫 Jean no action planned
-2025-08-17 20:18:31 - executive_node - ERROR - Failed to acquire conversation lock: Lock unavailable
-2025-08-17 20:18:31 - executive_node - ERROR - 📤 Published action: say (failed - lock unavailable)
-2025-08-17 20:18:37 - executive_node - WARNING - 🚫 Jean no action planned
-2025-08-17 20:18:50 - executive_node - ERROR - Failed to acquire conversation lock: Lock unavailable
-2025-08-17 20:18:50 - executive_node - ERROR - 📤 Published action: say (failed - lock unavailable)
-2025-08-17 20:18:57 - executive_node - WARNING - 🚫 Jean no action planned
+2025-08-18 11:46:21 - executive_node - INFO - 🔧 Debug mode enabled for User
+2025-08-18 11:46:21 - llm_client - INFO - 🤖 Zenoh LLM Client initialized
+2025-08-18 11:46:21 - executive_node - INFO - 🧠 Zenoh Executive Node initialized for character: User
+2025-08-18 11:46:21 - executive_node - INFO -    - Subscribing to: cognitive/User/sense_data
+2025-08-18 11:46:21 - executive_node - INFO -    - Subscribing to: cognitive/User/situation/update
+2025-08-18 11:46:21 - executive_node - INFO -    - Subscribing to: cognitive/map/turn/go
+2025-08-18 11:46:21 - executive_node - INFO -    - Subscribing to: cognitive/map/time_advanced
+2025-08-18 11:46:21 - executive_node - INFO -    - Subscribing to: cognitive/User/end_dialog
+2025-08-18 11:46:21 - executive_node - INFO -    - Publishing to: cognitive/User/action
+2025-08-18 11:46:21 - executive_node - INFO -    - Publishing to: cognitive/User/situation/request_update
+2025-08-18 11:46:21 - executive_node - INFO -    - Publishing to: cognitive/User/memory/store
+2025-08-18 11:46:21 - executive_node - INFO -    - Publishing to: cognitive/User/text_input
+2025-08-18 11:46:21 - executive_node - INFO -    - Publishing to: cognitive/User/goal
+2025-08-18 11:46:21 - executive_node - INFO -    - Publishing to: cognitive/User/decided_action
+2025-08-18 11:46:21 - executive_node - INFO -    - Publishing to: cognitive/map/turn/complete/User
+2025-08-18 11:46:21 - executive_node - INFO -    - Publishing to: cognitive/map/time_proposal
+2025-08-18 11:46:21 - executive_node - INFO - Executive Node running - press Ctrl+C to stop
+2025-08-18 11:46:21 - executive_node - INFO - 📢 Announced character presence: User
+2025-08-18 11:46:21 - executive_node - INFO - 📊 User Received situation update
+2025-08-18 11:46:38 - executive_node - INFO - 📊 User Received situation update
+2025-08-18 11:46:39 - executive_node - INFO - ⏰ ActivityManager for User received time update: 2023-06-15 06:33:00+00:00
+2025-08-18 11:46:39 - executive_node - INFO - ⏰ User received time update: 2023-06-15 06:33:00+00:00
+2025-08-18 11:46:41 - executive_node - INFO - 🚦 Turn 2 received by User
+2025-08-18 11:46:41 - executive_node - INFO - 🚦 Turn 2 started for User
+2025-08-18 11:46:42 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-18 11:46:42 - executive_node - INFO - 🔄 User completing turn
+2025-08-18 11:46:43 - executive_node - INFO - ⏰ User received time update: 2023-06-15 06:37:00+00:00
+2025-08-18 11:46:43 - executive_node - INFO - ⏰ ActivityManager for User received time update: 2023-06-15 06:37:00+00:00
+2025-08-18 11:47:06 - executive_node - INFO - 🚦 Turn 3 received by User
+2025-08-18 11:47:06 - executive_node - INFO - 🚦 Turn 3 started for User
+2025-08-18 11:47:07 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-18 11:47:07 - executive_node - INFO - 🔄 User completing turn
+Turn 3 started for Hermit
+2025-08-18 11:47:07 - executive_node - INFO - 🔄 Hermit completing turn
+es
+2025-08-18 11:46:38 - executive_node - INFO - Thinking about: {'type': 'think', 'value': 'What happened to me?'}
+2025-08-18 11:46:39 - executive_node - INFO - 🤖 Joe New Thought:  
+#thought I'm injured
+
+2025-08-18 11:46:39 - executive_node - INFO - 📤 Published action: action_0
+2025-08-18 11:46:39 - executive_node - INFO - 🔄 Joe completing turn
+2025-08-18 11:46:39 - executi2025-08-18 11:46:39 - executive_node - INFO - ⏰ Samantha received time update: 2023-06-15 06:33:00+00:00
+2025-08-18 11:46:39 - executive_node - INFO - ⏰ ActivityManager for Samantha received 2025-08-18 11:46:41 - executive_node - 2025-08-18 11:46:41 - executive_nod2025-08-18 11:46:41 - executive_node - INFO - 🚦 Turn 2 started for Joe
+2025-08-18 11:46:42 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-18 11:46:42 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-18 11:46:42 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-18 11:46:42 - executive_node - INFO - 🎯 Published goal for Joe: Goal assess injury: assess injury; actors: Joe; termination: assess injury completed
+2025-08-18 11:46:42 - executive_node - INFO - 🎯 Joe oriented to goal: Goal assess injury: assess injury; actors: Joe; termination: assess injury completed
+2025-08-18 11:46:42 - executive_node - INFO - 📋 Published decided action for Joe: say: Samantha - What's going on?
+2025-08-18 11:46:42 - executive_node - INFO - 🎯 Joe planned action: say: Samantha - What's going on?
+2025-08-18 11:46:42 - executive_node - INFO - ⏰ Joe proposed time advance: 4 minutes
+2025-08-18 11:46:42 - executive_node - INFO - 🔒 Conversation lock acquired with Samantha
+2025-08-18 11:46:42 - executive_node - INFO - Saying intent: "What's going on?" to Samantha
+2025-08-18 11:46:42 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-18 11:46:43 - executive2025-08-18 11:46:43 - executive_node - INFO - ⏰ Samantha received time update: 2023-06-15 06:37:00+00:00
+2025-08-18 11:46:43 - executive_node - INFO - ⏰ ActivityManager for Samantha received time update: 2023-06-15 06:37:00+00:00
+2025-08-18 11:46:43 - executive_node - INFO - 📥 Samantha Received text input: "What's going on, Samantha?" (source: Joe)
+2025-08-18 11:46:43 - executive_node - INFO - 📊 Samantha Received situation update
+2025-08-18 11:46:44 - executive_node - INFO - Responding to: "What's going on, Samantha?" from Joe
+2025-08-18 11:46:44 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-18 11:46:44 - executive_node 2025-08-18 11:46:47 - executive_node - INFO - 📥 Joe Received text input: "I'm just out for a hike, enjoying the forest, I just picked up this fallen branch, I'm thinking of using it as a walking stick." (source: Samantha)
+2025-08-18 11:46:47 - executive_node - INFO - 📊 Joe Received situation update
+2025-08-18 11:46:48 - executive_node - INFO - Responding to: "I'm just out for a hike, enjoying the forest, I just picked up this fallen branch, I'm thinking of using it as a walking stick." from Samantha
+2025-08-18 11:46:48 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-18 11:46:48 - executive_node - INFO - 🤔 Natural dialog end check f2025-08-18 11:46:50 - executive_node - INFO - 📥 Samantha Received text input: "I'm injured, I think I need to use that branch as a splint, can I take it from you?" (source: Joe)
+2025-08-18 11:46:50 - executive_node - INFO - 📊 Samantha Received situation update
+2025-08-18 11:46:51 - executive_node - INFO - Responding to: "I'm injured, I think I need to use that branch as a splint, can I take it from you?" from Joe
+2025-08-18 11:46:51 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-18 11:46:51 - executive_node - INFO - 🤔 Natural dialog end check for Joe: False
+2025-08-18 11:46:51 - executive_node - INFO - 🤖 S2025-08-18 11:46:54 - executive_node - INFO - 📥 Joe Received text input: "I'm not sure, I just picked it up and was thinking of using it as a walking stick, are you okay, what happened to you?" (source: Samantha)
+2025-08-18 11:46:54 - executive_node - INFO - 📊 Joe Received situation update
+2025-08-18 11:46:54 - executive_node - INFO - Responding to: "I'm not sure, I just picked it up and was thinking of using it as a walking stick, are you okay, what happened to you?" from Samantha
+2025-08-18 11:46:54 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-18 11:46:55 - execut2025-08-18 11:46:58 - executive_node - INFO - 📥 Samantha Received text input: "I'm not really sure what happened, I just... I don't know, I was just here, and now I'm hurt, I think I need that branch to help me, can I really use it as a splint or something?" (source: Joe)
+2025-08-18 11:46:58 - executive_node - INFO - 📊 Samantha Received situation update
+2025-08-18 11:46:59 - executive_node - INFO - Responding to: "I'm not really sure what happened, I just... I don't know, I was just here, and now I'm hurt, I think I need that branch to help me, can I really use it as a splint or something?" from Joe
+2025-08-18 11:46:59 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-18 11:47:00 - executive_node - INFO - 🤔 Natural dialog end check for Joe: True
+2025-08-18 11:47:00 - executive_node - INFO - 🤖 Samantha Dialog end check: True
+2025-08-18 11:47:00 - executive_node - INFO - 🔓 Conversation lock released with Joe
+2025-08-18 11:47:00 - executive_node - WARNING - 🤖 Samantha Replanning.
+2025-08-18 11:47:04 - executive_node - INFO - 🤖 Samantha New Goal: new
+#goal help Joe with injury
+#description assist Joe with his injury
+#otherCharacterName Joe
+#termination Joe is hel2025-08-18 11:47:04 - executive_node - INFO - 🤖 Joe New Goal: new
+#goal Get walking stick
+#description Ask Samantha for branch
+#otherCharacterName Samantha
+#termination Have branch in hand
+##
+2025-08-18 11:47:04 - executive_node - INFO - Joe generated goal: Goal Get walking stick: Ask Samantha for branch; actors: Joe, Samantha; termination: Have branch in hand
+2025-08-18 11:47:04 - executive_node - INFO - 🎯 Published goal for Joe: Goal 2025-08-18 11:47:06 - executive_node - INFO - 🚦 Turn 3 received by Samantha
+2025-08-18 11:47:06 - executive_node - INFO - 🚦 Turn 3 started for Samantha
+2025-08-18 11:47:07 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-18 11:47:07 - executive_node - INFO - 🎯 Published current activity for Samantha
+2025-08-18 11:47:07 - executive_node - INFO - 🚫 Samantha abandoned activity: Duration limit reached
+2025-08-18 11:47:07 - executive_node - INFO - Pre-filtered activities: 10
+2025-08-18 11:47:16 - executive_node - INFO - 📥 Samantha Received text input: "Can you please give me that branch for a splint?" (source: Joe)
+2025-08-18 11:47:16 - executive_node - INFO - 📊 Samantha Received situation update
+2025-08-18 11:47:21 - executive_node - INFO - 🎯 Samantha selected new activity: Hike
+2025-08-18 11:47:21 - executive_node - INFO - 🎯 Published current activity for Samantha
+2025-08-18 11:47:21 - executive_node - INFO - 🎯 Samantha starting new activity: Hike
+2025-08-18 11:47:21 - executive_node - INFO - 🎯 Published goal for Samantha: Goal start hiking: start hiking; actors: Samantha; termination: start hiking completed
+2025-08-18 11:47:21 - executive_node - INFO - 🎯 Samantha oriented to goal: Goal start hiking: start hiking; actors: Samantha; termination: start hiking completed
+ Joe proposed time advance: 5 minutes
+2025-08-18 11:47:14 - executive_node - INFO - 🔒 Conversation lock acquired with Samantha
+2025-08-18 11:47:14 - executive_node - INFO - Saying intent: "Can you please give me the branch?" to Samantha
+2025-08-18 11:47:14 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-18 11:47:16 - executive_node - INFO - 📤 Joe Sent text input to Samantha: "Can you please give me that branch for a splint?" (source: Joe)
+2025-08-18 11:47:16 - executive_node - INFO - Responding to: "Can you please give me the branch?" from Samantha: Can you please give me that branch for a splint?
+2025-08-18 11:47:16 - executive_node - INFO - 📤 Published action: action_5
+2025-08-18 11:47:16 - executive_node - INFO - 📤 Published action: say
+2025-08-18 11:47:16 - executive_node - INFO - 🔄 Joe completing turn
