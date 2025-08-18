@@ -1,0 +1,598 @@
+{
+  "EatingBreakfast": {
+    "name": "EatingBreakfast",
+    "category": "Physiological ADLs",
+    "tags": [
+      "physical",
+      "routine",
+      "solo"
+    ],
+    "when": "daily@dawn",
+    "where": [
+      "FouanFarm"
+    ],
+    "start": [
+      "time: 6:00 AM"
+    ],
+    "stop": [
+      "duration: 30 minutes"
+    ],
+    "duration": [
+      15,
+      30
+    ],
+    "needs": [
+      "food",
+      "water"
+    ],
+    "steps": [
+      "acquire food",
+      "prepare food for consumption",
+      "consume food"
+    ],
+    "importance": 0.8,
+    "habit": 0.9
+  },
+  "DrinkingWater": {
+    "name": "DrinkingWater",
+    "category": "Physiological ADLs",
+    "tags": [
+      "physical",
+      "routine",
+      "solo"
+    ],
+    "when": "daily@morning",
+    "where": [
+      "FouanFarm"
+    ],
+    "start": [
+      "time: 8:00 AM"
+    ],
+    "stop": [
+      "duration: 15 minutes"
+    ],
+    "duration": [
+      5,
+      15
+    ],
+    "needs": [
+      "water"
+    ],
+    "steps": [
+      "acquire drinkable water",
+      "consume water"
+    ],
+    "importance": 0.9,
+    "habit": 0.95
+  },
+  "Sleeping": {
+    "name": "Sleeping",
+    "category": "Physiological ADLs",
+    "tags": [
+      "physical",
+      "routine",
+      "solo"
+    ],
+    "when": "daily@night",
+    "where": [
+      "FouanFarm"
+    ],
+    "start": [
+      "time: 9:00 PM"
+    ],
+    "stop": [
+      "duration: 8 hours"
+    ],
+    "duration": [
+      480,
+      480
+    ],
+    "needs": [
+      "bed"
+    ],
+    "steps": [
+      "prepare for sleep",
+      "fall asleep"
+    ],
+    "importance": 0.95,
+    "habit": 0.99
+  },
+  "PlanningFarmWork": {
+    "name": "PlanningFarmWork",
+    "category": "Instrumental ADLs/Logistics",
+    "tags": [
+      "mental",
+      "routine",
+      "solo"
+    ],
+    "when": "daily@morning",
+    "where": [
+      "FouanFarm"
+    ],
+    "start": [
+      "time: 7:00 AM"
+    ],
+    "stop": [
+      "duration: 30 minutes"
+    ],
+    "duration": [
+      15,
+      30
+    ],
+    "needs": [
+      "calendar",
+      "weather forecast"
+    ],
+    "steps": [
+      "review schedule",
+      "check weather forecast",
+      "plan tasks"
+    ],
+    "importance": 0.7,
+    "habit": 0.8
+  },
+  "PreparingForMarket": {
+    "name": "PreparingForMarket",
+    "category": "Instrumental ADLs/Logistics",
+    "tags": [
+      "mental",
+      "routine",
+      "solo"
+    ],
+    "when": "seasonal@spring",
+    "where": [
+      "FouanFarm"
+    ],
+    "start": [
+      "time: 8:00 AM"
+    ],
+    "stop": [
+      "duration: 2 hours"
+    ],
+    "duration": [
+      60,
+      120
+    ],
+    "needs": [
+      "products to sell",
+      "market schedule"
+    ],
+    "steps": [
+      "gather products",
+      "pack products",
+      "review market schedule"
+    ],
+    "importance": 0.6,
+    "habit": 0.7
+  },
+  "WalkingToVillage": {
+    "name": "WalkingToVillage",
+    "category": "Mobility & Transport",
+    "tags": [
+      "physical",
+      "routine",
+      "solo"
+    ],
+    "when": "daily@morning",
+    "where": [
+      "FouanFarm",
+      "VillageMarket"
+    ],
+    "start": [
+      "time: 9:00 AM"
+    ],
+    "stop": [
+      "duration: 30 minutes"
+    ],
+    "duration": [
+      15,
+      30
+    ],
+    "needs": [
+      "road"
+    ],
+    "steps": [
+      "start walking",
+      "follow road",
+      "arrive at village"
+    ],
+    "importance": 0.5,
+    "habit": 0.6
+  },
+  "VisitingJean": {
+    "name": "VisitingJean",
+    "category": "Role/Production",
+    "tags": [
+      "social",
+      "routine",
+      "outdoors"
+    ],
+    "when": "daily@afternoon",
+    "where": [
+      "MarquartFarm"
+    ],
+    "start": [
+      "time: 2:00 PM"
+    ],
+    "stop": [
+      "duration: 1 hour"
+    ],
+    "duration": [
+      30,
+      60
+    ],
+    "needs": [
+      "Jean"
+    ],
+    "steps": [
+      "walk to MarquartFarm",
+      "greet Jean",
+      "engage in conversation"
+    ],
+    "importance": 0.8,
+    "habit": 0.9
+  },
+  "HelpingWithHarvest": {
+    "name": "HelpingWithHarvest",
+    "category": "Role/Production",
+    "tags": [
+      "physical",
+      "routine",
+      "outdoors"
+    ],
+    "when": "seasonal@autumn",
+    "where": [
+      "MarquartFarm"
+    ],
+    "start": [
+      "time: 8:00 AM"
+    ],
+    "stop": [
+      "duration: 4 hours"
+    ],
+    "duration": [
+      120,
+      240
+    ],
+    "needs": [
+      "harvesting tools"
+    ],
+    "steps": [
+      "gather harvesting tools",
+      "help with harvesting",
+      "store harvested crops"
+    ],
+    "importance": 0.7,
+    "habit": 0.8
+  },
+  "LearningNewSkills": {
+    "name": "LearningNewSkills",
+    "category": "Learning & Practice",
+    "tags": [
+      "mental",
+      "routine",
+      "solo"
+    ],
+    "when": "daily@evening",
+    "where": [
+      "FouanFarm"
+    ],
+    "start": [
+      "time: 7:00 PM"
+    ],
+    "stop": [
+      "duration: 1 hour"
+    ],
+    "duration": [
+      30,
+      60
+    ],
+    "needs": [
+      "books or resources"
+    ],
+    "steps": [
+      "acquire learning materials",
+      "study materials",
+      "practice new skills"
+    ],
+    "importance": 0.6,
+    "habit": 0.7
+  },
+  "ReflectingOnLife": {
+    "name": "ReflectingOnLife",
+    "category": "Cognitive/Inner",
+    "tags": [
+      "mental",
+      "routine",
+      "solo"
+    ],
+    "when": "daily@night",
+    "where": [
+      "FouanFarm"
+    ],
+    "start": [
+      "time: 9:00 PM"
+    ],
+    "stop": [
+      "duration: 30 minutes"
+    ],
+    "duration": [
+      15,
+      30
+    ],
+    "needs": [
+      "quiet space"
+    ],
+    "steps": [
+      "find quiet space",
+      "reflect on experiences",
+      "set goals"
+    ],
+    "importance": 0.5,
+    "habit": 0.6
+  },
+  "SocializingAtMarket": {
+    "name": "SocializingAtMarket",
+    "category": "Recreation & Leisure",
+    "tags": [
+      "social",
+      "routine",
+      "outdoors"
+    ],
+    "when": "daily@morning",
+    "where": [
+      "VillageMarket"
+    ],
+    "start": [
+      "time: 10:00 AM"
+    ],
+    "stop": [
+      "duration: 1 hour"
+    ],
+    "duration": [
+      30,
+      60
+    ],
+    "needs": [
+      "other villagers"
+    ],
+    "steps": [
+      "walk to market",
+      "greet villagers",
+      "engage in conversation"
+    ],
+    "importance": 0.7,
+    "habit": 0.8
+  },
+  "AttendingChurch": {
+    "name": "AttendingChurch",
+    "category": "Recreation & Leisure",
+    "tags": [
+      "social",
+      "routine",
+      "indoors"
+    ],
+    "when": "daily@morning",
+    "where": [
+      "Church"
+    ],
+    "start": [
+      "time: 9:00 AM"
+    ],
+    "stop": [
+      "duration: 1 hour"
+    ],
+    "duration": [
+      30,
+      60
+    ],
+    "needs": [
+      "church schedule"
+    ],
+    "steps": [
+      "walk to church",
+      "attend mass",
+      "socialize with villagers"
+    ],
+    "importance": 0.8,
+    "habit": 0.9
+  },
+  "PreparingForEmergency": {
+    "name": "PreparingForEmergency",
+    "category": "Safety/Emergency",
+    "tags": [
+      "physical",
+      "routine",
+      "solo"
+    ],
+    "when": "daily@morning",
+    "where": [
+      "FouanFarm"
+    ],
+    "start": [
+      "time: 8:00 AM"
+    ],
+    "stop": [
+      "duration: 30 minutes"
+    ],
+    "duration": [
+      15,
+      30
+    ],
+    "needs": [
+      "emergency supplies"
+    ],
+    "steps": [
+      "check emergency supplies",
+      "restock supplies",
+      "review emergency plan"
+    ],
+    "importance": 0.6,
+    "habit": 0.7
+  },
+  "RespondingToIllness": {
+    "name": "RespondingToIllness",
+    "category": "Safety/Emergency",
+    "tags": [
+      "physical",
+      "opportunistic",
+      "solo"
+    ],
+    "when": "opportunistic",
+    "where": [
+      "FouanFarm"
+    ],
+    "start": [
+      "symptoms appear"
+    ],
+    "stop": [
+      "duration: until recovered"
+    ],
+    "duration": [
+      0,
+      0
+    ],
+    "needs": [
+      "medical supplies"
+    ],
+    "steps": [
+      "identify symptoms",
+      "seek medical help",
+      "follow treatment plan"
+    ],
+    "importance": 0.9,
+    "habit": 0.95
+  },
+  "MaintainingPersonalHygiene": {
+    "name": "MaintainingPersonalHygiene",
+    "category": "Health Management (self-care)",
+    "tags": [
+      "physical",
+      "routine",
+      "solo"
+    ],
+    "when": "daily@morning",
+    "where": [
+      "FouanFarm"
+    ],
+    "start": [
+      "time: 7:00 AM"
+    ],
+    "stop": [
+      "duration: 30 minutes"
+    ],
+    "duration": [
+      15,
+      30
+    ],
+    "needs": [
+      "hygiene supplies"
+    ],
+    "steps": [
+      "wash face and hands",
+      "brush teeth",
+      "change clothes"
+    ],
+    "importance": 0.8,
+    "habit": 0.9
+  },
+  "Exercising": {
+    "name": "Exercising",
+    "category": "Health Management (self-care)",
+    "tags": [
+      "physical",
+      "routine",
+      "solo"
+    ],
+    "when": "daily@afternoon",
+    "where": [
+      "FouanFarm"
+    ],
+    "start": [
+      "time: 3:00 PM"
+    ],
+    "stop": [
+      "duration: 1 hour"
+    ],
+    "duration": [
+      30,
+      60
+    ],
+    "needs": [
+      "exercise equipment"
+    ],
+    "steps": [
+      "choose exercise activity",
+      "perform exercise",
+      "stretch and cool down"
+    ],
+    "importance": 0.7,
+    "habit": 0.8
+  },
+  "FixingFarmEquipment": {
+    "name": "FixingFarmEquipment",
+    "category": "Maintenance & Repair",
+    "tags": [
+      "physical",
+      "routine",
+      "solo"
+    ],
+    "when": "daily@morning",
+    "where": [
+      "FouanFarm"
+    ],
+    "start": [
+      "time: 8:00 AM"
+    ],
+    "stop": [
+      "duration: 1 hour"
+    ],
+    "duration": [
+      30,
+      60
+    ],
+    "needs": [
+      "tools"
+    ],
+    "steps": [
+      "identify broken equipment",
+      "gather repair tools",
+      "fix equipment"
+    ],
+    "importance": 0.6,
+    "habit": 0.7
+  },
+  "CleaningTheHouse": {
+    "name": "CleaningTheHouse",
+    "category": "Maintenance & Repair",
+    "tags": [
+      "physical",
+      "routine",
+      "solo"
+    ],
+    "when": "daily@afternoon",
+    "where": [
+      "FouanFarm"
+    ],
+    "start": [
+      "time: 2:00 PM"
+    ],
+    "stop": [
+      "duration: 1 hour"
+    ],
+    "duration": [
+      30,
+      60
+    ],
+    "needs": [
+      "cleaning supplies"
+    ],
+    "steps": [
+      "gather cleaning supplies",
+      "clean the house",
+      "organize belongings"
+    ],
+    "importance": 0.5,
+    "habit": 0.6
+  }
+}

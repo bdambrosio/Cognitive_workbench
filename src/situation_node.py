@@ -27,10 +27,14 @@ from utils import hash_utils, zenoh_utils
 # Console handler with WARNING level (less verbose)
 console_handler = logging.StreamHandler(sys.stdout)
 console_handler.setLevel(logging.WARNING)
+if os.getenv('CWB_DEBUG', '') in ('1', 'true', 'yes', 'on'):
+    console_handler.setLevel(logging.INFO)
 
 # File handler with INFO level (full logging)
 file_handler = logging.FileHandler('logs/situation_node.log', mode='w')
-file_handler.setLevel(logging.INFO)
+file_handler.setLevel(logging.WARNING)
+if os.getenv('CWB_DEBUG', '') in ('1', 'true', 'yes', 'on'):
+    file_handler.setLevel(logging.INFO)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -252,7 +256,7 @@ class ZenohSituationNode:
         """Update map data through lookup query."""
         try:
             # Query map node for agent look data with timeout
-            logger.warning(f'Updating map data for {self.character_name}')
+            logger.info(f'Updating map data for {self.character_name}')
             for reply in self.session.get(f"cognitive/map/agent/{self.character_name}/look", timeout=4.0 if not self.debug else 600.0):
                 try:
                     if reply.ok:
@@ -293,7 +297,7 @@ class ZenohSituationNode:
                         # Save and publish updated situation
                         self.save_situation()
                         self._publish_situation()
-                        logger.warning(f'Map look data updated for {self.character_name}')
+                        logger.info(f'Map look data updated for {self.character_name}')
                     else:
                         reply_str = str(reply)
                         decoded_error = zenoh_utils.decode_zenoh_error_payload(reply_str)

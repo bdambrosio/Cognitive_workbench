@@ -33,7 +33,9 @@ console_handler.setLevel(logging.WARNING)
 
 # File handler with INFO level (full logging)
 file_handler = logging.FileHandler('logs/executive_node.log', mode='w')
-file_handler.setLevel(logging.INFO)
+file_handler.setLevel(logging.WARNING)
+if os.getenv('CWB_DEBUG', '') in ('1', 'true', 'yes', 'on'):
+    file_handler.setLevel(logging.INFO)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -64,9 +66,9 @@ Output: only valid JSON – no prose, no code fences.
     { "type": "move", "target": "…"},
     { "type": "say", "target": "…", "value": "…" },
     { "type": "think", "value": "…" },
-    { "type": "take", "target": "…" },
-    { "type": "inspect", "target": "…" },
-    { "type": "use", "target": "…" },
+    { "type": "take", "target": "…"},
+    { "type": "inspect", "target": "…", "reason": "…"},
+    { "type": "use", "target": "…", "reason": "…"},
     { "type": "while", "condition": "…" , "body": [ /* steps */ ]},
     { "type": "if", "condition": "…", "then": [ /* steps */ ], "else": [ /* steps */ ] }
   ]
@@ -97,9 +99,9 @@ outside a while or if condition, "type" can take the values "say", "move", "thin
      For thinking about a topic or question, attempting to derive new information, conclusions, or decisions from who you are and what you already explicitly know
  - "take": { "type": "take", "target": "resource_name" } 
      For adding some resource you see to your personal inventory. you must be 'near' the resource to take it.
- - "inspect": { "type": "inspect", "target": "resource_name" } 
+ - "inspect": { "type": "inspect", "target": "resource_name", "reason": "what is it you are hoping to learn? - 5 words max"} 
      For inspecting a resource you see or one in your inventory to understand how to use it.
- - "use": { "type": "use", "target": "resource_name" } 
+ - "use": { "type": "use", "target": "resource_name", "reason": "what outcome do you hope to achieve? - 5 words max"} 
      For using a resource in your inventory in a known way.
 
 In general, a target can be a specific resource_name or character_name or a map type generalization. 
@@ -308,7 +310,9 @@ class ZenohExecutiveNode:
                     self.map_types = data
                     break
         self.inspections = {} # cache of inspections
-        self.activities = {}
+        self.uses = {} # cache of uses
+        self.activities = {} # dictionary of all available activities for initializing activity manager
+
         try:
             self.activities = json.load(open(f'../scenarios/{self.character_name}-activities.json'))
             if 'activities' in self.activities: # happens sometimes, not sure why
@@ -346,7 +350,7 @@ class ZenohExecutiveNode:
     def run(self):
         """Main OODA loop."""
         try:
-            logger.warning('Executive Node running - press Ctrl+C to stop')
+            logger.info('Executive Node running - press Ctrl+C to stop')
             
             # Announce character presence
             self._announce_character()
@@ -418,7 +422,7 @@ class ZenohExecutiveNode:
             target_publisher = self.session.declare_publisher(f"cognitive/{target_character}/text_input")
             target_publisher.put(json.dumps(text_input_data))
             
-            logger.warning(f'📤 {self.character_name} Sent text input to {target_character}: "{message}" (source: {self.character_name})')
+            logger.info(f'📤 {self.character_name} Sent text input to {target_character}: "{message}" (source: {self.character_name})')
             
         except Exception as e:
             logger.error(f'Error sending text input to {target_character}: {e}')
@@ -637,6 +641,13 @@ class ZenohExecutiveNode:
                     formatted_situation += f"\n\t{target}: {inspection}"
             formatted_situation += '\n'
 
+        if self.uses:
+            formatted_situation += f"\n#You have used the following:\n"
+            for target, use in self.uses.items():
+                if target:
+                    formatted_situation += f"\n\t{target}: {use}"
+            formatted_situation += '\n'
+
         if self.plan_summary:
             formatted_situation += f"\n#The summary of your most recent plan before the current one was:\n{self.plan_summary}\n"
 
@@ -645,8 +656,8 @@ class ZenohExecutiveNode:
     def _update_system_prompt(self):
         """Update the system prompt with the current situation."""
         system_prompt = self.observations['static']
-        if self.current_activity:
-            system_prompt += f"\n#Your current hi-level activity is:\n\t{self.current_activity.get('name')}\n"
+        if hasattr(self, 'activity_manager') and self.activity_manager.has_active_activity():
+            system_prompt += f"\n#Your current hi-level activity is:\n\t{self.activity_manager.current_activity.get('name')}\n"
         if self.current_goal:
             system_prompt += f"\n#Your current goal is:\n\t{self.current_goal.to_string()}\n"
         if self.current_plan:
@@ -780,13 +791,13 @@ end your response with </end>
             )
 
             if response.success:
-                logger.warning(f'🤖 {self.character_name} New Goal: {response.text.strip()}')
+                logger.info(f'🤖 {self.character_name} New Goal: {response.text.strip()}')
                 goals = []
                 forms = hash_utils.findall_forms(response.text)
                 for goal_hash in forms:
                     goal = plan_module.validate_and_create_goal(self.character_name, goal_hash)
                     if goal:
-                        logger.warning(f'{self.character_name} generated goal: {goal.to_string()}')
+                        logger.info(f'{self.character_name} generated goal: {goal.to_string()}')
                         self.current_goal = goal
                         self.current_plan = None  # Clear plan so _plan creates new one for this goal
                         self._publish_goal(goal)
@@ -956,7 +967,7 @@ end your response with </end>
             )
 
             if response.success:
-                logger.warning(f'🤖 {self.character_name} New Goal: {response.text.strip()}')
+                logger.info(f'🤖 {self.character_name} New Goal: {response.text.strip()}')
                 goals = []
                 if response.text.strip().lower() == 'current':
                     return self.current_goal
@@ -964,7 +975,7 @@ end your response with </end>
                 for goal_hash in forms:
                     goal = plan_module.validate_and_create_goal(self.character_name, goal_hash)
                     if goal:
-                        logger.warning(f'{self.character_name} generated goal: {goal.to_string()}')
+                        logger.info(f'{self.character_name} generated goal: {goal.to_string()}')
                         self.current_goal = goal
                         self.current_plan = None  # Clear plan so _plan creates new one for this goal
                         self._publish_goal(goal)
@@ -1129,7 +1140,7 @@ end your response with </end>
             body = step.get('body', [])
             if not isinstance(body, list):
                 # Malformed; skip this step
-                logger.warning('While body must be a list; skipping.')
+                logger.error('While body must be a list; skipping.')
                 current['idx'] = idx + 1
                 return self._execute_next_step(step_stack)
 
@@ -1159,7 +1170,7 @@ end your response with </end>
 
             if not isinstance(then_body, list) and else_body is None:
                 # Malformed if (no then and no else): skip
-                logger.warning('If step missing valid then/else; skipping.')
+                logger.error('If step missing valid then/else; skipping.')
                 current['idx'] = idx + 1
                 return self._execute_next_step(step_stack)
 
@@ -1179,7 +1190,7 @@ end your response with </end>
 
         else:
             # Unknown or non-executable type: skip
-            logger.warning(f'Unknown or non-executable step type: {stype}')
+            logger.error(f'Unknown or non-executable step type: {stype}')
             current['idx'] = idx + 1
             return self._execute_next_step(step_stack)
     
@@ -1270,11 +1281,12 @@ end your response with </end>
                     'target': resolved_target if resolved_target else '',                    
                     'requested_target': requested_target,
                     'resolved_target': resolved_target if resolved_target else '',
+                    'text': action.get('value', ''),
                     'status': 'failed',
                     'error': 'conversation lock unavailable'
                 }
                 self.action_publisher.put(json.dumps(action_data))
-                logger.warning('📤 Published action: say (failed - lock unavailable)')
+                logger.error('📤 Published action: say (failed - lock unavailable)')
                 self.action_counter += 1
                 return False
         elif action['type'].lower() == "take":
@@ -1297,7 +1309,7 @@ end your response with </end>
                     'error': 'target not nearby/visible'
                 }
                 self.action_publisher.put(json.dumps(action_data))
-                logger.warning('📤 Published action: take (failed)')
+                logger.error('📤 Published action: take (failed)')
                 self.action_counter += 1
                 return False
             self.take(resolved)
@@ -1331,7 +1343,7 @@ end your response with </end>
             else:
                 self.action_publisher.put(json.dumps(action_data))
                 # Perform inspect which may populate last_action_result
-                self.inspect(resolved)
+                self.inspect(action, resolved)
                 # Publish result if available so UI can display it
                 try:
                     result_text = action_record.result if isinstance(action_record.result, str) else ''
@@ -1371,9 +1383,10 @@ end your response with </end>
             if not resolved:
                 action_data['status'] = 'failed'
                 action_data['error'] = 'target not nearby/visible'
-            action_record.result = 'not yet implemented'
-            self.action_publisher.put(json.dumps(action_data))
-            #self.use(action)
+                self.action_publisher.put(json.dumps(action_data))
+                self.action_counter += 1
+                return False
+            self.use(action, resolved)
         # Request situation/map update for UI after non-move actions that may affect visibility/adjacency
         try:
             if action['type'].lower() in ["take", "inspect", "use"]:
@@ -1388,13 +1401,13 @@ end your response with </end>
         except Exception:
             pass
 
-        logger.warning(f'📤 Published action: {action["type"]}')
+        logger.info(f'📤 Published action: {action["type"]}')
         self.action_counter += 1
         return True
 
     def _handle_interrupt(self):
         """Handle interrupt from sense data or situation updates."""
-        logger.info('🔄 Handling interrupt')
+        logger.warning('🔄 Handling interrupt')
         # TODO: Implement interrupt handling logic
         pass
     
@@ -1488,7 +1501,7 @@ end your response with </end>
             # Process if we have text input
             if text_input and text_input.strip():
                 self.text_input_pending = True
-                logger.warning(f'📥 {self.character_name} Received text input: "{text_input}" (source: {source})')
+                logger.info(f'📥 {self.character_name} Received text input: "{text_input}" (source: {source})')
                 
         except Exception as e:
             logger.error(f'Error processing sense data: {e}')
@@ -1497,7 +1510,7 @@ end your response with </end>
         """Handle incoming situation data."""
         try:
             situation_data = json.loads(sample.payload.to_bytes().decode('utf-8'))
-            logger.warning(f'📊 {self.character_name} Received situation update')
+            logger.info(f'📊 {self.character_name} Received situation update')
             
             # Store situation data for potential use in LLM processing
             self.last_situation_data = situation_data
@@ -1510,13 +1523,13 @@ end your response with </end>
         try:
             data = json.loads(sample.payload.to_bytes().decode('utf-8'))
             turn_number = data.get('turn_number', 0)
-            logger.warning(f'🚦 Turn {turn_number} received by {self.character_name}')
+            logger.info(f'🚦 Turn {turn_number} received by {self.character_name}')
             active_characters = data.get('active_characters', [])
             
             if self.character_name in active_characters:
                 self.current_turn_number = turn_number
                 self.waiting_for_turn = False
-                logger.warning(f'🚦 Turn {turn_number} started for {self.character_name}')
+                logger.info(f'🚦 Turn {turn_number} started for {self.character_name}')
                 
                 # Set interrupt flag to start OODA loop
                 self.interrupt_pending = True
@@ -1561,7 +1574,7 @@ end your response with </end>
                 logger.error(f'Error in end dialog callback: no other character name found in payload')
                 return
                 
-            logger.warning(f'💬 {self.character_name} received end dialog from {other_name}')
+            logger.info(f'💬 {self.character_name} received end dialog from {other_name}')
             
             # Release conversation lock with this character
             self._release_conversation_lock(other_name)
@@ -1676,7 +1689,7 @@ end your response with </end>
             # Check if dialog should naturally end
             if mode == 'respond':
                 are_we_done = self.check_natural_dialog_end(source, text_input)
-                logger.warning(f'🤖 {self.character_name} Dialog end check: {are_we_done}')
+                logger.info(f'🤖 {self.character_name} Dialog end check: {are_we_done}')
                 if are_we_done:
                     reason = f'Dialog end detected with {source}, dialog_history:\n{dialog_history}'
                     self.publish_dialog_end(source)
@@ -1739,7 +1752,7 @@ End your text with: </end>"""
                     text_to_send = response.text.strip()
                     if not text_to_send.lower().startswith('done'):
                         self.send_text_input(source, text_to_send)
-                        logger.warning(f'Responding to: "{text_input}" from {source}: {text_to_send}')
+                        logger.info(f'Responding to: "{text_input}" from {source}: {text_to_send}')
 
                 else:
                     logger.error(f'LLM call failed: {response.error}')
@@ -1749,6 +1762,7 @@ End your text with: </end>"""
         except Exception as e:
             logger.error(f'Error in LLM processing: {e}')
             logger.error(traceback.format_exc())
+            response = None
                     # Create action
         action_data = {
                         'type': 'say' if mode == 'say' else 'response',
@@ -1865,7 +1879,7 @@ End your text with: </end>"""
                     return True
                 return False
             else:
-                logger.warning(f'❓ Unknown action type for resolution: {action_type}')
+                logger.error(f'❓ Unknown action type for resolution: {action_type}')
                 resolved_target = raw_target  # Pass through unchanged
                 return resolved_target
         except Exception as e:
@@ -1881,7 +1895,7 @@ End your text with: </end>"""
         elif resolved_target == raw_target:
             logger.debug(f'✅ Validated "{raw_target}" ({action_type})')
         else:
-            logger.warning(f'❌ Failed to resolve "{raw_target}" ({action_type})')
+            logger.error(f'❌ Failed to resolve "{raw_target}" ({action_type})')
             
         return action
 
@@ -2015,14 +2029,14 @@ End your text with: </end>"""
                 if reply.ok:
                     situation_data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
                     if not situation_data.get('success'):
-                        logger.warning(f'Failed to get situation data: {situation_data.get("error", "Unknown error")}')
+                        logger.error(f'Failed to get situation data: {situation_data.get("error", "Unknown error")}')
                         return None
                     
                     situation = situation_data.get('situation', {})
                     views = situation.get('views', {})
                     
                     if not views:
-                        logger.warning(f'No views available for target search')
+                        logger.error(f'No views available for target search')
                         return None
                     
                     # Search through each direction for the target
@@ -2055,7 +2069,7 @@ End your text with: </end>"""
                 
                 break  # Only process first reply
             
-            logger.warning(f'❌ No response from situation query for target "{target}"')
+            logger.error(f'❌ No response from situation query for target "{target}"')
             return None
             
         except Exception as e:
@@ -2064,7 +2078,7 @@ End your text with: </end>"""
 
     def move(self, move_direction: str):
         """Move the character in the specified direction."""
-        logger.warning(f'Moving {move_direction}')
+        logger.info(f'Moving {move_direction}')
         
         try:
             # Query map node to move the agent
@@ -2076,7 +2090,7 @@ End your text with: </end>"""
                         if move_result.get('success'):
                             logger.info(f'✅ Move successful: {move_direction}')
                         else:
-                            logger.warning(f'❌ Move failed: {move_result.get("error", "Unknown error")}')
+                            logger.error(f'❌ Move failed: {move_result.get("error", "Unknown error")}')
                     else:
                         logger.error(f'❌ Move query failed for {self.character_name}')
                 except Exception as e:
@@ -2119,9 +2133,9 @@ End your text with: </end>"""
                     if data.get('success'):
                         logger.info(f'🗑️ Removed {target} from map')
                     else:
-                        logger.warning(f'⚠️ Failed to remove {target} from map: {data.get("error", "Unknown error")}')
+                        logger.error(f'⚠️ Failed to remove {target} from map: {data.get("error", "Unknown error")}')
                 else:
-                    logger.warning(f'⚠️ Failed to remove {target} from map - no response')
+                    logger.error(f'⚠️ Failed to remove {target} from map - no response')
                 break
 
             return True
@@ -2157,7 +2171,7 @@ End your text with: </end>"""
         logger.info(f'📤 Published take action: {target}')
         return True
     
-    def inspect(self, target: str):
+    def inspect(self, action: dict, target: str):
         """Learn about a resource."""
             # Create and publish action data for logging/display
         action_data = {
@@ -2171,10 +2185,10 @@ End your text with: </end>"""
             system_prompt = self._update_system_prompt()
             user_prompt = self.observations['dynamic']
 
-            directive = f"""You are inspecting: {target}.\n\n 
+            directive = f"""You are inspecting: {target} attempting to learn {action['reason']}.
 respond with a short text description of the resource consistent with its name and situated wrt the information in the situation.
 The description should particularly highlight information relevant to your drives, goal, and current plan.
-It should also include some 'color' to enrich your perception of the resource in the context of the current situation.
+It should also include some 'color' to enrich your perception of the resource in the context of the current situation. 
 The description should be 20 words max.
 Do not include any other introductory, explanatory, discursive, or formatting text in your response.
 End your response with: 
@@ -2191,7 +2205,7 @@ End your response with:
                     stops=['</end>']
                 )
                 if response.success:
-                    logger.warning(f'🤖 {self.character_name} Inspected {target}:\n\t {response.text}')
+                    logger.info(f'🤖 {self.character_name} Inspected {target}:\n\t {response.text}')
                     if self.action_history:
                         self.action_history[-1].result = response.text
                     self.inspections[target] = response.text
@@ -2212,9 +2226,65 @@ End your response with:
                 self.action_history[-1].result = f'inspect failed'
         self.action_publisher.put(json.dumps(action_data))
 
+    def use(self, action: dict, target: str):
+        """Use a resource."""
+            # Create and publish action data for logging/display
+        action_data = {
+                'type': 'use',
+                'target': target,
+                'action_id': f"take_{int(time.time())}",
+                'timestamp': datetime.now().isoformat(),
+                'character': self.character_name
+        }
+        try:
+            system_prompt = self._update_system_prompt()
+            user_prompt = self.observations['dynamic']
+
+            directive = f"""You are attempting to use {target}.\n
+to achieve: {action['reason']}.\n\n 
+respond with a short assessment of the outcome of your attempt to use {target} to achieve {action['reason']}.
+Your assessment may conclude that the use of {target} was successful, or that it was not successful, or that it was not possible to use {target} to achieve {action['reason']}.
+The assessment should include consequences for yourself and the target resource, and be concise and to the point.
+The assessment should be 20 words max.
+Do not include any other introductory, explanatory, discursive, or formatting text in your response.
+End your response with: 
+</end>
+"""
+            if self.llm_client and not self.shutdown_requested:
+                # Use shorter timeout during shutdown
+                timeout = 5.0 if self.shutdown_requested else None
+                response = self.llm_client.generate(
+                    messages=[system_prompt, user_prompt, directive],
+                    max_tokens=50,
+                    temperature=0.7,
+                    timeout=timeout,
+                    stops=['</end>']
+                )
+                if response.success:
+                    logger.info(f'🤖 {self.character_name} Used {target}:\n\t {response.text}')
+                    if self.action_history:
+                        self.action_history[-1].result = response.text
+                    self.uses[target] = response.text
+                    return True
+                else:
+                    logger.error(f'LLM call failed: {response.error}')
+            else:
+                logger.error('LLM client not available')
+
+            logger.info(f'📦 Inspecting {target} for {self.character_name}')
+            if self.action_history:
+                self.action_history[-1].result = f'inspected {target}'
+            return True
+
+        except Exception as e:
+            logger.error(f'Error in inspect operation for {target}: {e}')
+            if self.action_history:
+                self.action_history[-1].result = f'inspect failed'
+        self.action_publisher.put(json.dumps(action_data))
+        
     def think_about(self, action: dict):
         """Think about a value."""
-        logger.warning(f'Thinking about: {action}')
+        logger.info(f'Thinking about: {action}')
         thought = ''
         try:
             system_prompt = self._update_system_prompt()
@@ -2245,7 +2315,7 @@ End your response with:
                 )
 
                 if response.success:
-                    logger.warning(f'🤖 {self.character_name} New Thought: {response.text}')
+                    logger.info(f'🤖 {self.character_name} New Thought: {response.text}')
                     thought = hash_utils.find('thought', response.text)
                     if not thought:
                         logger.error(f'No thought found in LLM response: {response.text}')
