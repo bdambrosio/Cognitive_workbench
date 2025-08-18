@@ -88,12 +88,12 @@ def normalize_name_for_enum_lookup(name: str) -> str:
     """
     Convert any case format to PascalCase with underscores for enum lookup.
     Examples: 
-    - "apple tree" -> "Apple_Tree"
-    - "fallen branch" -> "Fallen_Branch" 
-    - "bus stop" -> "Bus_Stop"
-    - "coffee maker" -> "Coffee_Maker"
-    - "AppleTree" -> "Apple_Tree" (handles camelCase)
-    - "APPLE_TREE" -> "Apple_Tree" (handles UPPER_CASE)
+    - "apple tree" -> "Appletree"
+    - "fallen branch" -> "Fallenbranch" 
+    - "bus stop" -> "Busstop"
+    - "coffee maker" -> "Coffeemaker"
+    - "AppleTree" -> "Appletree" (handles camelCase)
+    - "APPLE_TREE" -> "Appletree" (handles UPPER_CASE)
     """
     if not name or not isinstance(name, str):
         return ""
@@ -101,18 +101,10 @@ def normalize_name_for_enum_lookup(name: str) -> str:
     # Clean and normalize the input
     name = name.strip()
     
-    # Handle camelCase by inserting spaces before capitals
-    # e.g. "AppleTree" -> "Apple Tree"
-    name = re.sub(r'([a-z])([A-Z])', r'\1 \2', name)
-    
-    # Replace non-alphanumeric characters with spaces
-    name = re.sub(r'[^a-zA-Z0-9\s]', ' ', name)
-    
-    # Split into words and filter out empty strings
-    words = [word for word in name.split() if word]
+    name = re.sub(r'[^a-zA-Z0-9\s]', '', name)
     
     # Capitalize each word and join with underscores
-    return '_'.join(word.capitalize() for word in words)
+    return name.capitalize()
 
 def find_enum_member_by_name(enum_class, name: str):
     """

@@ -495,7 +495,7 @@ class FastAPIActionDisplayNode:
                     
                     # Otherwise, try to query map_node for current time
                     try:
-                        replies = self.session.get("cognitive/map/simulation_time", timeout_s=5.0)
+                        replies = self.session.get("cognitive/map/simulation_time", timeout=5.0)
                         for reply in replies:
                             response = json.loads(reply.payload.to_bytes().decode('utf-8'))
                             if response.get('success'):

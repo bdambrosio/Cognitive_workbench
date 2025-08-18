@@ -563,6 +563,8 @@ class ZenohExecutiveNode:
                 self._publish_current_activity()
                 if self.current_step and self.current_activity:
                     logger.info(f'🎯 {self.character_name} starting new activity: {self.current_activity["name"]}')
+                else:
+                    logger.warning(f'🚫 {self.character_name} no activity selected')
 
             # Convert step to goal or use existing goal/orient
             new_goal = None
@@ -588,7 +590,9 @@ class ZenohExecutiveNode:
             if action:
                 logger.info(f'🎯 {self.character_name} planned action: {action.get("type")}: {action.get("target")} - {action.get("value")}')
             else:
-                logger.warning(f'🚫 {self.character_name} no action planned')
+                logger.warning(f'🚫 {self.character_name} no action found for plan: {json.dumps(plan) if type(plan) == dict else plan}')
+                self._complete_turn()
+                return
 
             # Act: Execute the chosen action (if we have one)
             if action is not None:
@@ -1041,6 +1045,7 @@ end your response with </end>
             plan_steps = plan
             
         if not plan_steps or len(plan_steps) == 0:
+            self._plan_completed()
             return None
         
         step_stack = self.plan_state['step_stack']
@@ -1060,6 +1065,8 @@ end your response with </end>
             if action:
                 self.current_action = action
                 self._publish_decided_action(action)
+            else:
+                self._plan_completed()
             return action
         except Exception as e:
             logger.error(f'Error in plan execution: {e}')
@@ -1068,6 +1075,7 @@ end your response with </end>
             self.plan_state = {
                 'step_stack': plan_module.Stack()
             }
+            self._plan_completed()
             return None
     
     def _execute_next_step(self, step_stack):
@@ -1245,7 +1253,7 @@ end your response with </end>
                     outcome = binding['value']
                     resolved = binding['binding']
                     if outcome:
-                        move_direction = self.find_target_direction(resolved)
+                        move_direction = self._find_target_direction(resolved)
                     else:
                         move_direction = None
                 if move_direction:

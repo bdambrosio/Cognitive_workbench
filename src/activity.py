@@ -257,6 +257,7 @@ class ActivityManager:
         self.current_activity_state = None
         self.current_activity_next_step = None
         self.activity_history = []
+        self.previous_activity = None
         
         # Time advancement management
         self.time_advanced_subscriber = self.executive_node.session.declare_subscriber(
@@ -409,7 +410,9 @@ class ActivityManager:
         # Check if we have activities to select from
         if self.activities is None:
             return None, None
-            
+        
+        if self.current_activity_state:
+            self.previous_activity_state = self.current_activity
         # 1. Algorithmic pre-filtering
         candidates = self._pre_filter(situation)
         if len(candidates) > 7:
@@ -491,8 +494,23 @@ class ActivityManager:
     def _location_compatible(self, activity, situation):
         """Check if current location supports activity"""
         current_terrain = situation.get('current_location', {}).get('terrain', 'unknown')
+        views = situation.get('views', {})
+        resources = []
+        for view in views:
+            if view['direction'] == 'Current':
+                resources = view.get('resources', [])
+                break
+        at_resource_locations = []
+        for resource in resources:
+            at_resource_locations.append(resource.get('name'))
         valid_locations = activity.get('where', [])
-        return current_terrain in valid_locations
+        compatible = current_terrain in valid_locations
+        if not compatible:
+            for resource in at_resource_locations:
+                if resource in valid_locations:
+                    compatible = True
+                    break
+        return compatible
     
     def _resources_available(self, activity, situation):
         """Check if needed resources are available"""
@@ -513,6 +531,10 @@ class ActivityManager:
     
     def _in_cooldown(self, activity, current_time):
         """Check if activity was recently completed (simplified)"""
+        if len(self.activity_history) > 0 and self.activity_history[-1] == activity:
+            return True
+        if len(self.activity_history) > 1 and self.activity_history[-2] == activity:
+            return True
         # Implement based on your execution history tracking
         return False
     
@@ -553,59 +575,44 @@ Instantiate the steps for this activity:
     
     def _score_activity_contextual_alignment(self, activity, situation):
         """LLM evaluates how well activity serves character drives"""
-        prompt = f"""Your have three tasks. 
+        prompt = f"""You are considering the following activity: 
+        
+#Activity: {activity['name']}
+{json.dumps(activity, indent=2)}\
+##
+
+In the following context:
 #Context:
 Character: {self.executive_node.character_name}\n
 {self.executive_node.character_config['character']}\n
 Drives: {self.executive_node.character_config['drives']}\n
-Other characters present: {situation.get('characters', [])}
-Activity: {activity['name']} - {activity['steps']}
+Other characters present: {situation.get('characters', [])}\n
+
 Resources available: {self._summarize_resources(situation)}
 Time: {situation.get('time_info', {})}
 Weather: {situation.get('weather', 'unknown')}
 Location: {situation.get('current_location', {})}
 Visible resources: {self._summarize_resources(situation)}
 
+#You have two tasks:
 #Your first task is to evaluate how well this activity serves the character's drives.
 Character drives: {self.executive_node.character_config['drives']}
-Activity: {activity['name']} - {activity['steps']}
 
 Rate 0-1 how well this activity serves the character's drives.
 If the activity serves all the character's drives completely, return a drive_score of 1.0.
 If the activity serves none ofthe character's drives in any way, return a drive_score of 0.0.
 Otherwise, compute a drive_score between 0.0 and 1.0 based on how well the activity serves the character's drives.
 """
-        prompt += f"""##
-
-#Your next task is to evaluate if the current situation meets the start conditions for the activity.
-Activity start conditions: {activity['start']}
-Time: {situation.get('time_info', {})}
-Weather: {situation.get('weather', 'unknown')}
-Location: {situation.get('current_location', {})}
-Visible resources: {self._summarize_resources(situation)}
-Inventory: \n\t{'\n\t'.join(situation.get('inventory', []))}\n
-
-If the start conditions are met, return a start_score of 1.0.
-If the start conditions are not met, return a start_score of 0.0.
-Otherwise, compute a start_score between 0.0 and 1.0 based on how well the start conditions are met.
-
-       
-Return ONLY the numeric score.
-Do not include any other text, introductory, explanatory, markdown, etc.
-End with </end>.
-Rate 0-1 how well the start conditions are met:
-"""
 
         prompt += f"""##
 
-#Your final task is to rate the consistency of this activity in the current situation.
-Activity: \n{json.dumps(activity, indent=2)}
+#Your second task is to rate the consistency of this activity with the overall current situation.
 
 If the fit is perfect, return a consistency_score of 1.0.
 If the activity is inconsistent with the situation and totally inappropriate, return a consistency_score of 0.0.
 Otherwise, compute a consistency_score between 0.0 and 1.0 based on degree of fit.
       
-Return all three scores in a single JSON object with keys 'drive_score', 'start_score', and 'consistency_score'.
+Return the two scores in a single JSON object with keys 'drive_score', and 'consistency_score'.
 Do not include any other text, introductory, explanatory, markdown, etc.
 End with </end>.
 Rate 0-1 how appropriate this activity is given the situation:
@@ -614,18 +621,17 @@ Rate 0-1 how appropriate this activity is given the situation:
         if response.success:
             return response.text
         else:
-            return {'drive_score': 0.5, 'start_score': 0.5, 'consistency_score': 0.5}
+            return {'drive_score': 0.5, 'consistency_score': 0.5}
     
     def _rank_and_select(self, candidates):
         """Final scoring and ranking"""
         for activity in candidates:
             # Weighted combination of scores
             activity['final_score'] = (
-                activity['importance'] * 0.25 +           # Base importance
+                activity['importance'] * 0.30 +           # Base importance
                 activity['habit'] * 0.15 +                # Habit strength  
                 activity['alignment_score']['drive_score'] * 0.35 +          # Drive alignment
-                activity['alignment_score']['start_score'] * 0.15 +          # Start conditions
-                activity['alignment_score']['consistency_score'] * 0.10          # Situational fit
+                activity['alignment_score']['consistency_score'] * 0.20          # Situational fit
             )
         
         # Sort by final score
@@ -725,7 +731,7 @@ Rate 0-1 how appropriate this activity is given the situation:
         if type(max_duration) != timedelta:
             return False
         if max_duration and current_duration > max_duration:
-                return True
+            return True
         
         return False
     
@@ -867,6 +873,36 @@ Rate 0-1 how appropriate this activity is given the situation:
                 
         except Exception as e:
             logger.error(f'Error in ActivityManager time_advanced callback: {e}')
+    
+    def get_next_step_or_activity_name(self):
+        """
+        If there is a current activity and it is active and there is a current_step,
+        returns the next step if there is one, or the activity['name'] if not.
+        If any of the conditions fail, returns None.
+        The current_step pointer is NOT advanced.
+        """
+        # Check if there is a current activity
+        if not self.current_activity:
+            return None
+        
+        # Check if the activity is active
+        if not self.current_activity_state or self.current_activity_state.get('status') != 'active':
+            return None
+        
+        # Check if there is a current_step
+        current_step_index = self.current_activity_state.get('current_step_index')
+        if current_step_index is None:
+            return None
+        
+        steps = self.current_activity.get('steps', [])
+        
+        # Check if there is a next step
+        if current_step_index + 1 < len(steps):
+            # Return the next step name
+            return steps[current_step_index + 1]
+        else:
+            # No next step, return activity name
+            return self.current_activity['name']
     
     def get_default_activity(self, character, situation):
         """Get a default activity for a character in a situation"""
