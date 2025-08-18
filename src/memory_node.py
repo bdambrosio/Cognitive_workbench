@@ -6,6 +6,7 @@ This node provides memory storage and retrieval using Zenoh's built-in storage.
 Replaces ROS2 service complexity with direct Zenoh storage operations.
 """
 
+import traceback
 import zenoh
 import json
 import time
@@ -34,7 +35,9 @@ console_handler.setLevel(logging.WARNING)
 
 # File handler with INFO level (full logging)
 file_handler = logging.FileHandler('logs/memory_node.log', mode='w')
-file_handler.setLevel(logging.INFO)
+file_handler.setLevel(logging.WARNING)
+if os.getenv('CWB_DEBUG', '') in ('1', 'true', 'yes', 'on'):
+    file_handler.setLevel(logging.INFO)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -223,6 +226,7 @@ class ZenohMemoryNode:
                     
         except Exception as e:
             logger.error(f'Error storing data: {e}')
+            traceback.print_exc()
     
     def _action_callback(self, sample):
         """Handle incoming data to store in memory."""
@@ -249,7 +253,7 @@ class ZenohMemoryNode:
                     self.add_conversation_entry(source, 'sent', text.strip(), self.character_name)
                     logger.info(f'💬 Added response to entity {source}: {self.character_name} -> "{text[:50]}..."')
                 else:
-                    logger.warning(f'Missing input or text in cognitive_response action: {data.get("action_id", "unknown")}')
+                    logger.error(f'Missing input or text in cognitive_response action: {data.get("action_id", "unknown")}')
             elif action_type == 'take':
                 # Handle take action by adding item to inventory
                 target = data.get('target', '')
@@ -257,7 +261,7 @@ class ZenohMemoryNode:
                     self.add_item(target)
                     logger.info(f'📦 Added {target} to {self.character_name} inventory via take action')
                 else:
-                    logger.warning(f'Take action missing target: {data.get("action_id", "unknown")}')
+                    logger.error(f'Take action missing target: {data.get("action_id", "unknown")}')
             else:
                 # Store other action types in short-term memory
                 self.short_term_memory.append(data)
@@ -265,6 +269,7 @@ class ZenohMemoryNode:
                 
         except Exception as e:
             logger.error(f'Error storing data: {e}')
+            traceback.print_exc()
     
     def _visual_event_callback(self, sample):
         """Handle visual events to update entity models."""
@@ -510,7 +515,7 @@ class ZenohMemoryNode:
             del self.inventory[item_canonical]
             logger.info(f'📦 Removed {item_canonical} from inventory')
         else:
-            logger.warning(f'📦 Attempted to remove {item_canonical} from inventory but it was not found')
+            logger.error(f'📦 Attempted to remove {item_canonical} from inventory but it was not found')
     
     def has_item(self, item_name: str) -> bool:
         """Check if the character has an item in their inventory."""
@@ -570,7 +575,7 @@ class ZenohMemoryNode:
             self.save_memory()  # Save after closing dialog
             logger.info(f'🔚 Closed dialog with {canonical_entity_name}')
         else:
-            logger.warning(f'Cannot close dialog - entity {canonical_entity_name} not found')
+            logger.error(f'Cannot close dialog - entity {canonical_entity_name} not found')
     
     def dialog_close_callback(self, sample):
         """Handle incoming dialog close events."""
@@ -581,7 +586,7 @@ class ZenohMemoryNode:
             if entity_name:
                 self.close_dialog(entity_name)
             else:
-                logger.warning('Dialog close event missing entity_name')
+                logger.error('Dialog close event missing entity_name')
                 
         except Exception as e:
             logger.error(f'Error handling dialog close event: {e}')

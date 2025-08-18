@@ -1559,6 +1559,49 @@ class FastAPIActionDisplayNode:
                 `;
             }
             
+            // Add activity duration if available
+            if (activityData.activity_data && activityData.activity_data.duration) {
+                const duration = activityData.activity_data.duration;
+                let durationText = '';
+                if (Array.isArray(duration)) {
+                    if (duration.length === 2) {
+                        durationText = `${duration[0]}-${duration[1]} minutes`;
+                    } else if (duration.length === 1) {
+                        durationText = `${duration[0]} minutes`;
+                    }
+                } else {
+                    durationText = `${duration} minutes`;
+                }
+                
+                content += `
+                    <div class="character-data-item">
+                        <div class="character-data-label">Duration</div>
+                        <div class="character-data-value">${durationText}</div>
+                    </div>
+                `;
+            }
+            
+            // Add activity category if available
+            if (activityData.activity_data && activityData.activity_data.category) {
+                content += `
+                    <div class="character-data-item">
+                        <div class="character-data-label">Category</div>
+                        <div class="character-data-value">${activityData.activity_data.category}</div>
+                    </div>
+                `;
+            }
+            
+            // Add activity tags if available
+            if (activityData.activity_data && activityData.activity_data.tags && activityData.activity_data.tags.length > 0) {
+                const tagsText = activityData.activity_data.tags.join(', ');
+                content += `
+                    <div class="character-data-item">
+                        <div class="character-data-label">Tags</div>
+                        <div class="character-data-value">${tagsText}</div>
+                    </div>
+                `;
+            }
+            
             // Add current step if available
             if (activityData.current_step && activityData.current_step.name) {
                 content += `

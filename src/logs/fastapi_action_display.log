@@ -750,3 +750,211 @@ SystemExit: 0
 2025-08-17 13:32:57,374 - __main__ - INFO - 🔄 Turn control update from map node: mode=step
 2025-08-17 13:32:57,374 - __main__ - INFO - 📤 Sending turn mode update: mode=step
 2025-08-17 13:33:05,040 - __main__ - INFO - ⏰ Time advanced: 2024-06-15T07:36:00+00:00
+2025-08-17 18:34:54,620 - __main__ - INFO - 🔧 Debug mode enabled for FastAPI Action Display
+2025-08-17 18:34:55,836 - __main__ - WARNING - Failed to query map_node for initial time: Session.get() got an unexpected keyword argument 'timeout_s'
+2025-08-17 18:34:55,840 - __main__ - INFO - 📤 No simulation time available for new WebSocket connection
+2025-08-17 18:34:55,873 - __main__ - INFO - 🔄 Turn control update from map node: mode=step
+2025-08-17 18:34:55,873 - __main__ - INFO - 📤 Sending turn mode update: mode=step
+2025-08-17 18:35:10,342 - __main__ - INFO - 🚀 System ready signal received: 4 characters active
+2025-08-17 18:35:10,343 - __main__ - INFO - 📤 No simulation time available to send to WebSocket clients
+2025-08-17 18:35:16,549 - __main__ - INFO - 🔄 Turn control update from map node: mode=step
+2025-08-17 18:35:16,549 - __main__ - INFO - 📤 Sending turn mode update: mode=step
+2025-08-17 18:35:45,382 - __main__ - INFO - ⏰ Time advanced: 2024-06-15T06:35:00+00:00
+2025-08-17 18:35:53,128 - __main__ - INFO - 🔄 Turn control update from map node: mode=step
+2025-08-17 18:35:53,128 - __main__ - INFO - 📤 Sending turn mode update: mode=step
+2025-08-17 18:36:19,673 - __main__ - INFO - ⏰ Time advanced: 2024-06-15T06:38:00+00:00
+2025-08-17 18:36:36,386 - __main__ - INFO - 🔄 Turn control update from map node: mode=step
+2025-08-17 18:36:36,387 - __main__ - INFO - 📤 Sending turn mode update: mode=step
+2025-08-17 18:36:37,205 - __main__ - INFO - ⏰ Time advanced: 2024-06-15T06:41:00+00:00
+2025-08-17 18:36:40,575 - __main__ - INFO - 🔄 Turn control update from map node: mode=step
+2025-08-17 18:36:40,576 - __main__ - INFO - 📤 Sending turn mode update: mode=step
+2025-08-17 18:36:42,840 - __main__ - INFO - ⏰ Time advanced: 2024-06-15T06:43:00+00:00
+2025-08-17 18:36:44,415 - __main__ - INFO - 🔄 Turn control update from map node: mode=step
+2025-08-17 18:36:44,416 - __main__ - INFO - 📤 Sending turn mode update: mode=step
+2025-08-17 18:38:06,204 - __main__ - INFO - ⏰ Time advanced: 2024-06-15T06:45:00+00:00
+2025-08-17 18:38:20,317 - __main__ - INFO - 🔄 Turn control update from map node: mode=step
+2025-08-17 18:38:20,317 - __main__ - INFO - 📤 Sending turn mode update: mode=step
+2025-08-17 18:38:25,377 - __main__ - INFO - ⏰ Time advanced: 2024-06-15T06:50:00+00:00
+2025-08-17 18:38:26,817 - __main__ - INFO - 🔄 Turn control update from map node: mode=step
+2025-08-17 18:38:26,818 - __main__ - INFO - 📤 Sending turn mode update: mode=step
+2025-08-17 18:38:34,161 - __main__ - INFO - ⏰ Time advanced: 2024-06-15T06:53:00+00:00
+2025-08-17 18:38:36,742 - __main__ - INFO - 🔄 Turn control update from map node: mode=step
+2025-08-17 18:38:36,742 - __main__ - INFO - 📤 Sending turn mode update: mode=step
+2025-08-17 18:38:38,528 - __main__ - INFO - ⏰ Time advanced: 2024-06-15T06:56:00+00:00
+2025-08-17 18:41:50,262 - __main__ - INFO - 🔧 Debug mode enabled for FastAPI Action Display
+2025-08-17 18:41:51,509 - __main__ - WARNING - Failed to query map_node for initial time: Session.get() got an unexpected keyword argument 'timeout_s'
+2025-08-17 18:41:51,513 - __main__ - INFO - 📤 No simulation time available for new WebSocket connection
+2025-08-17 18:41:51,552 - __main__ - INFO - 🔄 Turn control update from map node: mode=step
+2025-08-17 18:41:51,552 - __main__ - INFO - 📤 Sending turn mode update: mode=step
+2025-08-17 18:42:05,864 - __main__ - INFO - 🚀 System ready signal received: 4 characters active
+2025-08-17 18:42:05,865 - __main__ - INFO - 📤 No simulation time available to send to WebSocket clients
+2025-08-17 18:42:23,678 - __main__ - INFO - 🔄 Turn control update from map node: mode=step
+2025-08-17 18:42:23,679 - __main__ - INFO - 📤 Sending turn mode update: mode=step
+2025-08-17 18:42:52,606 - __main__ - INFO - ⏰ Time advanced: 2024-06-15T06:32:00+00:00
+2025-08-17 18:44:49,633 - __main__ - INFO - 🔄 Turn control update from map node: mode=step
+2025-08-17 18:44:49,633 - __main__ - INFO - 📤 Sending turn mode update: mode=step
+2025-08-17 18:44:50,281 - __main__ - INFO - ⏰ Time advanced: 2024-06-15T06:37:00+00:00
+2025-08-17 18:44:59,749 - __main__ - INFO - 🏃 Run command received in FastAPI
+2025-08-17 18:44:59,749 - __main__ - INFO - 🏃 Run command published to map node
+2025-08-17 18:44:59,750 - __main__ - INFO - 🔄 Turn control update from map node: mode=run
+2025-08-17 18:44:59,751 - __main__ - INFO - 📤 Sending turn mode update: mode=run
+2025-08-17 18:45:23,877 - __main__ - INFO - ⏰ Time advanced: 2024-06-15T06:40:00+00:00
+2025-08-17 18:45:25,975 - __main__ - INFO - ⏰ Time advanced: 2024-06-15T06:42:00+00:00
+2025-08-17 18:45:56,634 - __main__ - INFO - ⏰ Time advanced: 2024-06-15T06:44:00+00:00
+2025-08-17 18:45:59,419 - __main__ - INFO - ⏰ Time advanced: 2024-06-15T06:47:00+00:00
+2025-08-17 18:46:06,067 - __main__ - INFO - ⏰ Time advanced: 2024-06-15T06:57:00+00:00
+2025-08-17 18:46:16,456 - __main__ - INFO - ⏰ Time advanced: 2024-06-15T07:00:00+00:00
+2025-08-17 18:46:17,491 - __main__ - INFO - ⏰ Time advanced: 2024-06-15T07:02:00+00:00
+2025-08-17 18:50:17,456 - __main__ - INFO - 🔧 Debug mode enabled for FastAPI Action Display
+2025-08-17 18:50:18,416 - __main__ - INFO - 🔄 Turn control update from map node: mode=step
+2025-08-17 18:50:18,661 - __main__ - WARNING - Failed to query map_node for initial time: Session.get() got an unexpected keyword argument 'timeout_s'
+2025-08-17 18:50:18,665 - __main__ - INFO - 📤 No simulation time available for new WebSocket connection
+2025-08-17 18:50:32,994 - __main__ - INFO - 🚀 System ready signal received: 4 characters active
+2025-08-17 18:50:32,995 - __main__ - INFO - 📤 No simulation time available to send to WebSocket clients
+2025-08-17 18:50:49,296 - __main__ - INFO - 🔄 Turn control update from map node: mode=step
+2025-08-17 18:50:49,296 - __main__ - INFO - 📤 Sending turn mode update: mode=step
+2025-08-17 18:51:23,240 - __main__ - INFO - ⏰ Time advanced: 2024-06-15T06:34:00+00:00
+2025-08-17 18:52:29,473 - __main__ - INFO - 🔄 Turn control update from map node: mode=step
+2025-08-17 18:52:29,474 - __main__ - INFO - 📤 Sending turn mode update: mode=step
+2025-08-17 18:52:45,708 - __main__ - INFO - ⏰ Time advanced: 2024-06-15T06:37:00+00:00
+2025-08-17 18:53:01,135 - __main__ - INFO - 🏃 Run command received in FastAPI
+2025-08-17 18:53:01,136 - __main__ - INFO - 🏃 Run command published to map node
+2025-08-17 18:53:01,137 - __main__ - INFO - 🔄 Turn control update from map node: mode=run
+2025-08-17 18:53:01,138 - __main__ - INFO - 📤 Sending turn mode update: mode=run
+2025-08-17 18:53:32,890 - __main__ - INFO - ⏰ Time advanced: 2024-06-15T06:39:00+00:00
+2025-08-17 18:53:33,916 - __main__ - INFO - ⏰ Time advanced: 2024-06-15T06:41:00+00:00
+2025-08-17 18:54:09,405 - __main__ - INFO - ⏰ Time advanced: 2024-06-15T06:44:00+00:00
+2025-08-17 18:54:10,441 - __main__ - INFO - ⏰ Time advanced: 2024-06-15T06:47:00+00:00
+2025-08-17 18:54:40,700 - __main__ - INFO - ⏰ Time advanced: 2024-06-15T06:50:00+00:00
+2025-08-17 18:54:43,524 - __main__ - INFO - ⏰ Time advanced: 2024-06-15T06:53:00+00:00
+2025-08-17 18:55:14,431 - __main__ - INFO - ⏰ Time advanced: 2024-06-15T06:56:00+00:00
+2025-08-17 18:55:42,105 - __main__ - INFO - ⏰ Time advanced: 2024-06-15T06:59:00+00:00
+2025-08-17 18:57:30,525 - __main__ - INFO - ⏰ Time advanced: 2024-06-15T07:01:00+00:00
+2025-08-17 18:57:56,326 - __main__ - INFO - ⏰ Time advanced: 2024-06-15T07:03:00+00:00
+2025-08-17 18:58:03,770 - __main__ - INFO - ⏰ Time advanced: 2024-06-15T07:08:00+00:00
+2025-08-17 18:58:32,131 - __main__ - INFO - ⏰ Time advanced: 2024-06-15T07:13:00+00:00
+2025-08-17 18:59:03,427 - __main__ - INFO - ⏰ Time advanced: 2024-06-15T07:17:00+00:00
+2025-08-17 18:59:06,136 - __main__ - INFO - ⏰ Time advanced: 2024-06-15T07:20:00+00:00
+2025-08-17 18:59:32,192 - __main__ - INFO - ⏰ Time advanced: 2024-06-15T07:22:00+00:00
+2025-08-17 18:59:33,227 - __main__ - INFO - ⏰ Time advanced: 2024-06-15T07:25:00+00:00
+2025-08-17 19:00:03,523 - __main__ - INFO - ⏰ Time advanced: 2024-06-15T07:27:00+00:00
+2025-08-17 19:00:04,564 - __main__ - INFO - ⏰ Time advanced: 2024-06-15T07:30:00+00:00
+2025-08-17 19:00:33,159 - __main__ - INFO - ⏰ Time advanced: 2024-06-15T07:34:00+00:00
+2025-08-17 19:01:58,886 - __main__ - INFO - ⏰ Time advanced: 2024-06-15T07:37:00+00:00
+2025-08-17 19:02:01,284 - __main__ - INFO - ⏰ Time advanced: 2024-06-15T07:40:00+00:00
+2025-08-17 19:02:07,898 - __main__ - INFO - ⏰ Time advanced: 2024-06-15T07:45:00+00:00
+2025-08-17 19:02:16,321 - __main__ - INFO - ⏰ Time advanced: 2024-06-15T07:48:00+00:00
+2025-08-17 19:02:28,369 - __main__ - INFO - ⏰ Time advanced: 2024-06-15T07:50:00+00:00
+2025-08-17 19:15:47,475 - __main__ - INFO - 🔧 Debug mode enabled for FastAPI Action Display
+2025-08-17 19:15:48,669 - __main__ - WARNING - Failed to query map_node for initial time: Session.get() got an unexpected keyword argument 'timeout_s'
+2025-08-17 19:15:48,673 - __main__ - INFO - 📤 No simulation time available for new WebSocket connection
+2025-08-17 19:15:49,607 - __main__ - INFO - 🔄 Turn control update from map node: mode=step
+2025-08-17 19:15:49,607 - __main__ - INFO - 📤 Sending turn mode update: mode=step
+2025-08-17 19:16:04,247 - __main__ - INFO - 🚀 System ready signal received: 4 characters active
+2025-08-17 19:16:04,248 - __main__ - INFO - 📤 No simulation time available to send to WebSocket clients
+2025-08-17 19:16:39,292 - __main__ - INFO - 🏃 Run command received in FastAPI
+2025-08-17 19:16:39,293 - __main__ - INFO - 🏃 Run command published to map node
+2025-08-17 19:16:39,294 - __main__ - INFO - 🔄 Turn control update from map node: mode=run
+2025-08-17 19:16:39,295 - __main__ - INFO - 📤 Sending turn mode update: mode=run
+2025-08-17 19:17:09,474 - __main__ - INFO - ⏰ Time advanced: 2024-06-15T06:34:00+00:00
+2025-08-17 19:17:11,769 - __main__ - INFO - ⏰ Time advanced: 2024-06-15T06:37:00+00:00
+2025-08-17 19:17:37,587 - __main__ - INFO - ⏰ Time advanced: 2024-06-15T06:39:00+00:00
+2025-08-17 19:17:39,873 - __main__ - INFO - ⏰ Time advanced: 2024-06-15T06:43:00+00:00
+2025-08-17 19:18:06,754 - __main__ - INFO - ⏰ Time advanced: 2024-06-15T06:45:00+00:00
+2025-08-17 19:18:09,188 - __main__ - INFO - ⏰ Time advanced: 2024-06-15T06:47:00+00:00
+2025-08-17 19:18:10,203 - __main__ - INFO - ⏰ Time advanced: 2024-06-15T06:49:00+00:00
+2025-08-17 19:18:39,672 - __main__ - INFO - ⏰ Time advanced: 2024-06-15T06:52:00+00:00
+2025-08-17 19:18:45,464 - __main__ - INFO - ⏰ Time advanced: 2024-06-15T06:55:00+00:00
+2025-08-17 19:47:40,721 - __main__ - WARNING - Failed to query map_node for initial time: Session.get() got an unexpected keyword argument 'timeout_s'
+2025-08-17 19:47:40,738 - __main__ - INFO - 📤 No simulation time available for new WebSocket connection
+2025-08-17 19:47:41,052 - __main__ - INFO - 🔄 Turn control update from map node: mode=step
+2025-08-17 19:47:41,052 - __main__ - INFO - 📤 Sending turn mode update: mode=step
+2025-08-17 19:47:56,134 - __main__ - INFO - 🚀 System ready signal received: 4 characters active
+2025-08-17 19:47:56,135 - __main__ - INFO - 📤 No simulation time available to send to WebSocket clients
+2025-08-17 19:48:08,675 - __main__ - INFO - 🔄 Turn control update from map node: mode=step
+2025-08-17 19:48:08,676 - __main__ - INFO - 📤 Sending turn mode update: mode=step
+2025-08-17 19:48:31,715 - __main__ - INFO - ⏰ Time advanced: 2025-08-17T19:49:40.989314
+2025-08-17 19:50:44,487 - __main__ - INFO - 🏃 Run command received in FastAPI
+2025-08-17 19:50:44,488 - __main__ - INFO - 🏃 Run command published to map node
+2025-08-17 19:50:44,492 - __main__ - INFO - 🔄 Turn control update from map node: mode=run
+2025-08-17 19:50:44,492 - __main__ - INFO - 📤 Sending turn mode update: mode=run
+2025-08-17 19:50:48,209 - __main__ - INFO - ⏰ Time advanced: 2025-08-17T19:58:41.058409
+2025-08-17 19:50:57,922 - __main__ - INFO - ⏰ Time advanced: 2025-08-17T20:00:41.058409
+2025-08-17 19:51:01,457 - __main__ - INFO - ⏰ Time advanced: 2025-08-17T20:05:41.058409
+2025-08-17 19:51:08,219 - __main__ - INFO - ⏰ Time advanced: 2025-08-17T20:09:41.058409
+2025-08-17 19:51:20,008 - __main__ - INFO - ⏰ Time advanced: 2025-08-17T20:12:41.058409
+2025-08-17 19:51:25,751 - __main__ - INFO - ⏰ Time advanced: 2025-08-17T20:14:41.058409
+2025-08-17 19:51:29,953 - __main__ - INFO - ⏰ Time advanced: 2025-08-17T20:19:41.058409
+2025-08-17 19:51:35,769 - __main__ - INFO - ⏰ Time advanced: 2025-08-17T20:21:41.058409
+2025-08-17 19:51:42,150 - __main__ - INFO - ⏰ Time advanced: 2025-08-17T20:24:41.058409
+2025-08-17 19:51:47,670 - __main__ - INFO - ⏰ Time advanced: 2025-08-17T20:29:41.058409
+2025-08-17 19:51:52,542 - __main__ - INFO - ⏰ Time advanced: 2025-08-17T20:39:41.058409
+2025-08-17 19:52:01,142 - __main__ - INFO - ⏰ Time advanced: 2025-08-17T20:41:41.058409
+2025-08-17 19:52:05,271 - __main__ - INFO - ⏰ Time advanced: 2025-08-17T20:44:41.058409
+2025-08-17 19:52:11,215 - __main__ - INFO - ⏰ Time advanced: 2025-08-17T20:46:41.058409
+2025-08-17 20:05:22,921 - __main__ - INFO - 🔄 Turn control update from map node: mode=step
+2025-08-17 20:05:29,878 - __main__ - WARNING - Failed to query map_node for initial time: Session.get() got an unexpected keyword argument 'timeout_s'
+2025-08-17 20:05:29,882 - __main__ - INFO - 📤 No simulation time available for new WebSocket connection
+2025-08-17 20:05:37,598 - __main__ - INFO - 🚀 System ready signal received: 4 characters active
+2025-08-17 20:05:37,599 - __main__ - INFO - 📤 No simulation time available to send to WebSocket clients
+2025-08-17 20:10:45,198 - __main__ - WARNING - Failed to query map_node for initial time: Session.get() got an unexpected keyword argument 'timeout_s'
+2025-08-17 20:10:45,203 - __main__ - INFO - 📤 No simulation time available for new WebSocket connection
+2025-08-17 20:10:46,276 - __main__ - INFO - 🔄 Turn control update from map node: mode=step
+2025-08-17 20:10:46,276 - __main__ - INFO - 📤 Sending turn mode update: mode=step
+2025-08-17 20:11:00,627 - __main__ - INFO - 🚀 System ready signal received: 4 characters active
+2025-08-17 20:11:00,628 - __main__ - INFO - 📤 No simulation time available to send to WebSocket clients
+2025-08-17 20:11:28,408 - __main__ - INFO - 🔄 Turn control update from map node: mode=step
+2025-08-17 20:11:28,408 - __main__ - INFO - 📤 Sending turn mode update: mode=step
+2025-08-17 20:11:41,066 - __main__ - INFO - ⏰ Time advanced: 1865-07-15T06:34:00+01:00
+2025-08-17 20:12:28,546 - __main__ - INFO - 🏃 Run command received in FastAPI
+2025-08-17 20:12:28,547 - __main__ - INFO - 🏃 Run command published to map node
+2025-08-17 20:12:28,547 - __main__ - INFO - 🔄 Turn control update from map node: mode=run
+2025-08-17 20:12:28,548 - __main__ - INFO - 📤 Sending turn mode update: mode=run
+2025-08-17 20:12:34,711 - __main__ - INFO - ⏰ Time advanced: 1865-07-15T06:44:00+01:00
+2025-08-17 20:12:46,886 - __main__ - INFO - ⏰ Time advanced: 1865-07-15T06:47:00+01:00
+2025-08-17 20:12:57,911 - __main__ - INFO - ⏰ Time advanced: 1865-07-15T06:51:00+01:00
+2025-08-17 20:13:08,917 - __main__ - INFO - ⏰ Time advanced: 1865-07-15T06:55:00+01:00
+2025-08-17 20:13:33,874 - __main__ - INFO - ⏰ Time advanced: 1865-07-15T06:58:00+01:00
+2025-08-17 20:13:39,855 - __main__ - INFO - ⏰ Time advanced: 1865-07-15T07:00:00+01:00
+2025-08-17 20:13:45,936 - __main__ - INFO - ⏰ Time advanced: 1865-07-15T07:10:00+01:00
+2025-08-17 20:13:57,824 - __main__ - INFO - ⏰ Time advanced: 1865-07-15T07:12:00+01:00
+2025-08-17 20:14:01,887 - __main__ - INFO - ⏰ Time advanced: 1865-07-15T07:15:00+01:00
+2025-08-17 20:14:08,027 - __main__ - INFO - ⏰ Time advanced: 1865-07-15T07:17:00+01:00
+2025-08-17 20:14:13,151 - __main__ - INFO - ⏰ Time advanced: 1865-07-15T07:27:00+01:00
+2025-08-17 20:14:25,575 - __main__ - INFO - ⏰ Time advanced: 1865-07-15T07:29:00+01:00
+2025-08-17 20:14:32,722 - __main__ - INFO - ⏰ Time advanced: 1865-07-15T07:39:00+01:00
+2025-08-17 20:14:45,113 - __main__ - INFO - ⏰ Time advanced: 1865-07-15T07:42:00+01:00
+2025-08-17 20:14:51,780 - __main__ - INFO - ⏰ Time advanced: 1865-07-15T07:52:00+01:00
+2025-08-17 20:15:04,284 - __main__ - INFO - ⏰ Time advanced: 1865-07-15T07:55:00+01:00
+2025-08-17 20:15:08,940 - __main__ - INFO - ⏰ Time advanced: 1865-07-15T08:05:00+01:00
+2025-08-17 20:15:21,814 - __main__ - INFO - ⏰ Time advanced: 1865-07-15T08:08:00+01:00
+2025-08-17 20:15:27,467 - __main__ - INFO - ⏰ Time advanced: 1865-07-15T08:18:00+01:00
+2025-08-17 20:15:37,701 - __main__ - INFO - ⏰ Time advanced: 1865-07-15T08:21:00+01:00
+2025-08-17 20:15:40,707 - __main__ - INFO - ⏰ Time advanced: 1865-07-15T08:24:00+01:00
+2025-08-17 20:15:46,614 - __main__ - INFO - ⏰ Time advanced: 1865-07-15T08:26:00+01:00
+2025-08-17 20:15:51,164 - __main__ - INFO - ⏰ Time advanced: 1865-07-15T08:28:00+01:00
+2025-08-17 20:15:58,340 - __main__ - INFO - ⏰ Time advanced: 1865-07-15T08:32:00+01:00
+2025-08-17 20:16:09,288 - __main__ - INFO - ⏰ Time advanced: 1865-07-15T08:35:00+01:00
+2025-08-17 20:16:47,890 - __main__ - INFO - ⏰ Time advanced: 1865-07-15T08:38:00+01:00
+2025-08-17 20:16:57,428 - __main__ - INFO - ⏰ Time advanced: 1865-07-15T08:40:00+01:00
+2025-08-17 20:16:58,793 - __main__ - INFO - ⏰ Time advanced: 1865-07-15T08:44:00+01:00
+2025-08-17 20:17:05,712 - __main__ - INFO - ⏰ Time advanced: 1865-07-15T08:54:00+01:00
+2025-08-17 20:17:17,354 - __main__ - INFO - ⏰ Time advanced: 1865-07-15T08:57:00+01:00
+2025-08-17 20:17:19,225 - __main__ - INFO - ⏰ Time advanced: 1865-07-15T08:59:00+01:00
+2025-08-17 20:17:21,322 - __main__ - INFO - ⏰ Time advanced: 1865-07-15T09:01:00+01:00
+2025-08-17 20:17:28,401 - __main__ - INFO - ⏰ Time advanced: 1865-07-15T09:11:00+01:00
+2025-08-17 20:17:41,064 - __main__ - INFO - ⏰ Time advanced: 1865-07-15T09:13:00+01:00
+2025-08-17 20:17:43,591 - __main__ - INFO - ⏰ Time advanced: 1865-07-15T09:16:00+01:00
+2025-08-17 20:17:50,203 - __main__ - INFO - ⏰ Time advanced: 1865-07-15T09:18:00+01:00
+2025-08-17 20:18:00,810 - __main__ - INFO - ⏰ Time advanced: 1865-07-15T09:21:00+01:00
+2025-08-17 20:18:09,042 - __main__ - INFO - ⏰ Time advanced: 1865-07-15T09:24:00+01:00
+2025-08-17 20:18:11,164 - __main__ - INFO - ⏰ Time advanced: 1865-07-15T09:26:00+01:00
+2025-08-17 20:18:16,764 - __main__ - INFO - ⏰ Time advanced: 1865-07-15T09:36:00+01:00
+2025-08-17 20:18:30,632 - __main__ - INFO - ⏰ Time advanced: 1865-07-15T09:39:00+01:00
+2025-08-17 20:18:32,584 - __main__ - INFO - ⏰ Time advanced: 1865-07-15T09:43:00+01:00
+2025-08-17 20:18:37,359 - __main__ - INFO - ⏰ Time advanced: 1865-07-15T09:47:00+01:00
+2025-08-17 20:18:49,728 - __main__ - INFO - ⏰ Time advanced: 1865-07-15T09:50:00+01:00
+2025-08-17 20:18:51,733 - __main__ - INFO - ⏰ Time advanced: 1865-07-15T09:52:00+01:00
+2025-08-17 20:18:58,853 - __main__ - INFO - ⏰ Time advanced: 1865-07-15T10:02:00+01:00
+2025-08-17 20:19:11,836 - __main__ - INFO - ⏰ Time advanced: 1865-07-15T10:04:00+01:00
+2025-08-17 20:19:12,852 - __main__ - INFO - ⏰ Time advanced: 1865-07-15T10:06:00+01:00

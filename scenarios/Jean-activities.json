@@ -1,0 +1,697 @@
+{
+  "EatingBreakfast": {
+    "name": "EatingBreakfast",
+    "category": "Physiological ADLs",
+    "tags": [
+      "physical",
+      "routine",
+      "solo"
+    ],
+    "when": "daily@morning",
+    "where": [
+      "MarquartFarm"
+    ],
+    "start": [
+      "time: 6:00 AM"
+    ],
+    "stop": [
+      "duration: 30 minutes"
+    ],
+    "duration": [
+      15,
+      30
+    ],
+    "needs": [
+      "food",
+      "utensils"
+    ],
+    "steps": [
+      "acquire food",
+      "prepare food for consumption",
+      "consume food"
+    ],
+    "importance": 0.8,
+    "habit": 0.9
+  },
+  "DrinkingWater": {
+    "name": "DrinkingWater",
+    "category": "Physiological ADLs",
+    "tags": [
+      "physical",
+      "routine",
+      "solo"
+    ],
+    "when": "daily@morning",
+    "where": [
+      "MarquartFarm"
+    ],
+    "start": [
+      "time: 7:00 AM"
+    ],
+    "stop": [
+      "duration: 10 minutes"
+    ],
+    "duration": [
+      5,
+      10
+    ],
+    "needs": [
+      "water"
+    ],
+    "steps": [
+      "acquire drinkable water",
+      "consume water"
+    ],
+    "importance": 0.9,
+    "habit": 0.9
+  },
+  "Sleeping": {
+    "name": "Sleeping",
+    "category": "Physiological ADLs",
+    "tags": [
+      "physical",
+      "routine",
+      "solo"
+    ],
+    "when": "daily@night",
+    "where": [
+      "MarquartFarm"
+    ],
+    "start": [
+      "time: 9:00 PM"
+    ],
+    "stop": [
+      "duration: 8 hours"
+    ],
+    "duration": [
+      480,
+      480
+    ],
+    "needs": [
+      "bed"
+    ],
+    "steps": [
+      "prepare for sleep",
+      "fall asleep"
+    ],
+    "importance": 0.9,
+    "habit": 0.9
+  },
+  "PlanningFarmWork": {
+    "name": "PlanningFarmWork",
+    "category": "Instrumental ADLs/Logistics",
+    "tags": [
+      "mental",
+      "routine",
+      "solo"
+    ],
+    "when": "daily@morning",
+    "where": [
+      "MarquartFarm"
+    ],
+    "start": [
+      "time: 7:30 AM"
+    ],
+    "stop": [
+      "duration: 30 minutes"
+    ],
+    "duration": [
+      15,
+      30
+    ],
+    "needs": [
+      "calendar",
+      "weather forecast"
+    ],
+    "steps": [
+      "review calendar",
+      "check weather forecast",
+      "plan farm work"
+    ],
+    "importance": 0.8,
+    "habit": 0.8
+  },
+  "PreparingTools": {
+    "name": "PreparingTools",
+    "category": "Instrumental ADLs/Logistics",
+    "tags": [
+      "physical",
+      "routine",
+      "solo"
+    ],
+    "when": "daily@morning",
+    "where": [
+      "MarquartFarm"
+    ],
+    "start": [
+      "time: 8:00 AM"
+    ],
+    "stop": [
+      "duration: 30 minutes"
+    ],
+    "duration": [
+      15,
+      30
+    ],
+    "needs": [
+      "tools"
+    ],
+    "steps": [
+      "inspect tools",
+      "clean tools",
+      "prepare tools for use"
+    ],
+    "importance": 0.8,
+    "habit": 0.8
+  },
+  "WalkingToFields": {
+    "name": "WalkingToFields",
+    "category": "Mobility & Transport",
+    "tags": [
+      "physical",
+      "routine",
+      "solo"
+    ],
+    "when": "daily@morning",
+    "where": [
+      "MarquartFarm",
+      "Fields"
+    ],
+    "start": [
+      "time: 8:30 AM"
+    ],
+    "stop": [
+      "duration: 30 minutes"
+    ],
+    "duration": [
+      15,
+      30
+    ],
+    "needs": [
+      "sturdy shoes"
+    ],
+    "steps": [
+      "put on shoes",
+      "walk to fields"
+    ],
+    "importance": 0.8,
+    "habit": 0.8
+  },
+  "PlowingFields": {
+    "name": "PlowingFields",
+    "category": "Role/Production",
+    "tags": [
+      "physical",
+      "routine",
+      "solo"
+    ],
+    "when": "daily@morning",
+    "where": [
+      "Fields"
+    ],
+    "start": [
+      "time: 9:00 AM"
+    ],
+    "stop": [
+      "duration: 4 hours"
+    ],
+    "duration": [
+      240,
+      240
+    ],
+    "needs": [
+      "plow",
+      "oxen"
+    ],
+    "steps": [
+      "harness oxen",
+      "plow fields",
+      "inspect plowed fields"
+    ],
+    "importance": 0.9,
+    "habit": 0.9
+  },
+  "HarvestingCrops": {
+    "name": "HarvestingCrops",
+    "category": "Role/Production",
+    "tags": [
+      "physical",
+      "routine",
+      "solo"
+    ],
+    "when": "seasonal@autumn",
+    "where": [
+      "Fields"
+    ],
+    "start": [
+      "time: 9:00 AM"
+    ],
+    "stop": [
+      "duration: 4 hours"
+    ],
+    "duration": [
+      240,
+      240
+    ],
+    "needs": [
+      "scythe",
+      "basket"
+    ],
+    "steps": [
+      "inspect crops",
+      "harvest crops",
+      "gather harvested crops"
+    ],
+    "importance": 0.9,
+    "habit": 0.8
+  },
+  "FixingEquipment": {
+    "name": "FixingEquipment",
+    "category": "Role/Production",
+    "tags": [
+      "physical",
+      "routine",
+      "solo"
+    ],
+    "when": "opportunistic",
+    "where": [
+      "MarquartFarm"
+    ],
+    "start": [
+      "equipment broken"
+    ],
+    "stop": [
+      "equipment fixed"
+    ],
+    "duration": [
+      30,
+      120
+    ],
+    "needs": [
+      "tools"
+    ],
+    "steps": [
+      "inspect equipment",
+      "identify problem",
+      "fix equipment"
+    ],
+    "importance": 0.8,
+    "habit": 0.6
+  },
+  "LearningNewTechniques": {
+    "name": "LearningNewTechniques",
+    "category": "Learning & Practice",
+    "tags": [
+      "mental",
+      "routine",
+      "solo"
+    ],
+    "when": "opportunistic",
+    "where": [
+      "MarquartFarm"
+    ],
+    "start": [
+      "new technique available"
+    ],
+    "stop": [
+      "technique learned"
+    ],
+    "duration": [
+      60,
+      120
+    ],
+    "needs": [
+      "instructional materials"
+    ],
+    "steps": [
+      "acquire instructional materials",
+      "study materials",
+      "practice technique"
+    ],
+    "importance": 0.6,
+    "habit": 0.4
+  },
+  "ReflectingOnProgress": {
+    "name": "ReflectingOnProgress",
+    "category": "Cognitive/Inner",
+    "tags": [
+      "mental",
+      "routine",
+      "solo"
+    ],
+    "when": "daily@evening",
+    "where": [
+      "MarquartFarm"
+    ],
+    "start": [
+      "time: 6:00 PM"
+    ],
+    "stop": [
+      "duration: 30 minutes"
+    ],
+    "duration": [
+      15,
+      30
+    ],
+    "needs": [
+      "journal"
+    ],
+    "steps": [
+      "write in journal",
+      "reflect on progress",
+      "plan for tomorrow"
+    ],
+    "importance": 0.6,
+    "habit": 0.6
+  },
+  "SocializingWithFrancoise": {
+    "name": "SocializingWithFrancoise",
+    "category": "Recreation & Leisure",
+    "tags": [
+      "social",
+      "routine",
+      "social"
+    ],
+    "when": "daily@afternoon",
+    "where": [
+      "FouanFarm"
+    ],
+    "start": [
+      "time: 2:00 PM"
+    ],
+    "stop": [
+      "duration: 1 hour"
+    ],
+    "duration": [
+      30,
+      60
+    ],
+    "needs": [
+      "Francoise"
+    ],
+    "steps": [
+      "walk to FouanFarm",
+      "greet Francoise",
+      "socialize with Francoise"
+    ],
+    "importance": 0.8,
+    "habit": 0.8
+  },
+  "AttendingChurch": {
+    "name": "AttendingChurch",
+    "category": "Recreation & Leisure",
+    "tags": [
+      "social",
+      "routine",
+      "social"
+    ],
+    "when": "weekly@Sunday",
+    "where": [
+      "Church"
+    ],
+    "start": [
+      "time: 10:00 AM"
+    ],
+    "stop": [
+      "duration: 1 hour"
+    ],
+    "duration": [
+      60,
+      60
+    ],
+    "needs": [
+      "church attire"
+    ],
+    "steps": [
+      "get dressed",
+      "walk to church",
+      "attend mass"
+    ],
+    "importance": 0.8,
+    "habit": 0.8
+  },
+  "HelpingFatherMarquart": {
+    "name": "HelpingFatherMarquart",
+    "category": "Recreation & Leisure",
+    "tags": [
+      "social",
+      "routine",
+      "social"
+    ],
+    "when": "daily@afternoon",
+    "where": [
+      "MarquartFarm"
+    ],
+    "start": [
+      "time: 2:00 PM"
+    ],
+    "stop": [
+      "duration: 1 hour"
+    ],
+    "duration": [
+      30,
+      60
+    ],
+    "needs": [
+      "FatherMarquart"
+    ],
+    "steps": [
+      "offer help",
+      "assist FatherMarquart",
+      "socialize with FatherMarquart"
+    ],
+    "importance": 0.8,
+    "habit": 0.8
+  },
+  "RespondingToEmergency": {
+    "name": "RespondingToEmergency",
+    "category": "Safety/Emergency",
+    "tags": [
+      "physical",
+      "opportunistic",
+      "solo"
+    ],
+    "when": "opportunistic",
+    "where": [
+      "MarquartFarm"
+    ],
+    "start": [
+      "emergency occurs"
+    ],
+    "stop": [
+      "emergency resolved"
+    ],
+    "duration": [
+      15,
+      60
+    ],
+    "needs": [
+      "emergency equipment"
+    ],
+    "steps": [
+      "assess situation",
+      "respond to emergency",
+      "resolve emergency"
+    ],
+    "importance": 0.9,
+    "habit": 0.6
+  },
+  "PreventingAccidents": {
+    "name": "PreventingAccidents",
+    "category": "Safety/Emergency",
+    "tags": [
+      "physical",
+      "routine",
+      "solo"
+    ],
+    "when": "daily@morning",
+    "where": [
+      "MarquartFarm"
+    ],
+    "start": [
+      "time: 8:00 AM"
+    ],
+    "stop": [
+      "duration: 30 minutes"
+    ],
+    "duration": [
+      15,
+      30
+    ],
+    "needs": [
+      "safety equipment"
+    ],
+    "steps": [
+      "inspect equipment",
+      "identify hazards",
+      "mitigate hazards"
+    ],
+    "importance": 0.8,
+    "habit": 0.8
+  },
+  "MaintainingHealth": {
+    "name": "MaintainingHealth",
+    "category": "Health Management",
+    "tags": [
+      "physical",
+      "routine",
+      "solo"
+    ],
+    "when": "daily@morning",
+    "where": [
+      "MarquartFarm"
+    ],
+    "start": [
+      "time: 7:00 AM"
+    ],
+    "stop": [
+      "duration: 30 minutes"
+    ],
+    "duration": [
+      15,
+      30
+    ],
+    "needs": [
+      "health supplies"
+    ],
+    "steps": [
+      "wash hands",
+      "inspect body",
+      "treat any ailments"
+    ],
+    "importance": 0.8,
+    "habit": 0.8
+  },
+  "Exercising": {
+    "name": "Exercising",
+    "category": "Health Management",
+    "tags": [
+      "physical",
+      "routine",
+      "solo"
+    ],
+    "when": "daily@afternoon",
+    "where": [
+      "MarquartFarm"
+    ],
+    "start": [
+      "time: 2:00 PM"
+    ],
+    "stop": [
+      "duration: 1 hour"
+    ],
+    "duration": [
+      30,
+      60
+    ],
+    "needs": [
+      "exercise equipment"
+    ],
+    "steps": [
+      "choose exercise",
+      "perform exercise",
+      "stretch afterwards"
+    ],
+    "importance": 0.6,
+    "habit": 0.6
+  },
+  "FixingFences": {
+    "name": "FixingFences",
+    "category": "Maintenance & Repair",
+    "tags": [
+      "physical",
+      "routine",
+      "solo"
+    ],
+    "when": "opportunistic",
+    "where": [
+      "MarquartFarm"
+    ],
+    "start": [
+      "fence broken"
+    ],
+    "stop": [
+      "fence fixed"
+    ],
+    "duration": [
+      30,
+      120
+    ],
+    "needs": [
+      "tools"
+    ],
+    "steps": [
+      "inspect fence",
+      "identify damage",
+      "fix fence"
+    ],
+    "importance": 0.8,
+    "habit": 0.6
+  },
+  "MaintainingTools": {
+    "name": "MaintainingTools",
+    "category": "Maintenance & Repair",
+    "tags": [
+      "physical",
+      "routine",
+      "solo"
+    ],
+    "when": "daily@afternoon",
+    "where": [
+      "MarquartFarm"
+    ],
+    "start": [
+      "time: 2:00 PM"
+    ],
+    "stop": [
+      "duration: 1 hour"
+    ],
+    "duration": [
+      30,
+      60
+    ],
+    "needs": [
+      "tools"
+    ],
+    "steps": [
+      "inspect tools",
+      "clean tools",
+      "maintain tools"
+    ],
+    "importance": 0.8,
+    "habit": 0.8
+  },
+  "InspectingCrops": {
+    "name": "InspectingCrops",
+    "category": "Maintenance & Repair",
+    "tags": [
+      "physical",
+      "routine",
+      "solo"
+    ],
+    "when": "daily@afternoon",
+    "where": [
+      "Fields"
+    ],
+    "start": [
+      "time: 2:00 PM"
+    ],
+    "stop": [
+      "duration: 1 hour"
+    ],
+    "duration": [
+      30,
+      60
+    ],
+    "needs": [
+      "knowledge of crops"
+    ],
+    "steps": [
+      "walk to fields",
+      "inspect crops",
+      "identify any issues"
+    ],
+    "importance": 0.8,
+    "habit": 0.8
+  }
+}

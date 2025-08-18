@@ -466,7 +466,7 @@ Do not include any other text, reasoning, introductory, expository, or markdown.
             character_name = topic_parts[-1] if len(topic_parts) > 0 else None
             
             if not character_name:
-                logger.warning("Turn complete signal without character name")
+                logger.error("Turn complete signal without character name")
                 return
             
             # Add to completed list
@@ -902,7 +902,7 @@ Do not include any other text, reasoning, introductory, expository, or markdown.
     def handle_agent_look(self, query):
         """Handle agent look command"""
         try:
-            logger.warning(f'Handling agent look command for {query.key_expr}')
+            logger.info(f'Handling agent look command for {query.key_expr}')
             # Extract character name from query key
             key_parts = str(query.key_expr).split('/')
             character_name = key_parts[-2] if len(key_parts) > 1 else None
@@ -939,7 +939,7 @@ Do not include any other text, reasoning, introductory, expository, or markdown.
                 }
             
             query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
-            logger.warning(f'Agent look command handled for {query.key_expr}')
+            logger.info(f'Agent look command handled for {query.key_expr}')
             
         except Exception as e:
             logger.error(f"Error handling agent look: {e}")
@@ -967,7 +967,7 @@ Do not include any other text, reasoning, introductory, expository, or markdown.
                     data = json.loads(payload) if payload else {}
                     direction = data.get('direction', 'current')
             except Exception as e:
-                logger.warning(f"Could not parse move payload, using default direction: {e}")
+                logger.error(f"Could not parse move payload, using default direction: {e}")
             
             # Get agent from registry (case-insensitive)
             canonical_character_name = character_name.capitalize()
@@ -1143,7 +1143,7 @@ Do not include any other text, reasoning, introductory, expository, or markdown.
             
             # Cap at 24 hours (1440 minutes)
             if proposed_minutes > 1440:
-                logger.warning(f"Character {character_name} proposed time > 24 hours ({proposed_minutes} min), capping at 1440")
+                logger.error(f"Character {character_name} proposed time > 24 hours ({proposed_minutes} min), capping at 1440")
                 proposed_minutes = 1440
             
             # Store proposal (replace any existing proposal from this character)
@@ -1540,7 +1540,7 @@ Do not include any other text, reasoning, introductory, expository, or markdown.
             character_name = topic.split('/')[1] if len(topic.split('/')) > 1 else None
             
             if not character_name:
-                logger.warning("Character shutdown event missing character name")
+                logger.error("Character shutdown event missing character name")
                 return
             
             # Clean up any conversation locks for this character
@@ -1621,7 +1621,7 @@ Do not include any other text, reasoning, introductory, expository, or markdown.
                             self.world_map.datetime = datetime.fromisoformat(world_data['simulation_time'])
                             logger.info(f"📂 Simulation time restored to: {self.world_map.datetime}")
                         except Exception as e:
-                            logger.warning(f"Failed to restore simulation time: {e}, using current time")
+                            logger.error(f"Failed to restore simulation time: {e}, using current time")
                             self.world_map.datetime = datetime.now()
                     else:
                         logger.info("📂 No simulation time in saved data, using current time")
