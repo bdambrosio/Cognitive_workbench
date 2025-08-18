@@ -537,7 +537,6 @@ class ZenohExecutiveNode:
                         if not action_succeeded:
                             # Action failed, don't advance plan state but complete turn
                             logger.info(f'Manual action failed for {self.character_name}, will retry same step next turn')
-                            self._complete_turn()
                             return
                 return
             # Check for active activity and get current step
@@ -582,7 +581,6 @@ class ZenohExecutiveNode:
             plan = self._plan(self.current_goal)
             if not plan:
                 logger.warning(f'🚫 {self.character_name} no plan found for goal: {self.current_goal.to_string()}')
-                self._complete_turn()
                 return
 
             # Plan Step: Execute current step of plan
@@ -591,7 +589,6 @@ class ZenohExecutiveNode:
                 logger.info(f'🎯 {self.character_name} planned action: {action.get("type")}: {action.get("target")} - {action.get("value")}')
             else:
                 logger.warning(f'🚫 {self.character_name} no action found for plan: {json.dumps(plan) if type(plan) == dict else plan}')
-                self._complete_turn()
                 return
 
             # Act: Execute the chosen action (if we have one)
@@ -601,12 +598,12 @@ class ZenohExecutiveNode:
                     # Action failed (e.g., conversation lock unavailable), don't advance plan state
                     # but still complete the turn so launcher can continue
                     logger.info(f'Action failed for {self.character_name}, will retry same step next turn')
-                    self._complete_turn()
                     return
             
         except Exception as e:
             logger.error(f'Error in OODA loop: {e}')
             logger.error(traceback.format_exc())
+        return
 
     def format_situation(self):
         """Format the situation data for the LLM."""
@@ -893,8 +890,7 @@ end your response with </end>
         
         # Create single-action plan
         if single_action:
-            self.current_plan = {'plan': [{'type': single_action['type'], 'target': single_action['target'], 'value': single_action['value'], 'reason': single_action.get('reason', '')}]}
-            self.plan_bindings_cache = {}        
+            self.current_plan = {'plan': [{'type': single_action['type'], 'target': single_action['target'], 'value': single_action['value'], 'reason': single_action.get('reason', '')}]}   
         self.plan_summary_completed = False  # Reset for new plan
         # Initialize plan identifiers and control-flow events
         self.plan_counter += 1
@@ -1031,13 +1027,14 @@ end your response with </end>
             # No activity - clear goal (existing behavior)
             self.current_goal = None
             self._publish_goal(self.current_goal)
-            self._plan_completed()
+
         
         self._publish_current_plan()
         
 
     def _plan_step(self, plan):
-        """Execute current step of plan and return next action using frame-based stack."""
+        """Execute current step of plan and return next action using frame-based stack.
+        Invariant ?"""
         # Extract plan steps from dict format
         if isinstance(plan, dict) and 'plan' in plan:
             plan_steps = plan['plan']
@@ -1045,8 +1042,10 @@ end your response with </end>
             plan_steps = plan
             
         if not plan_steps or len(plan_steps) == 0:
-            self._plan_completed()
-            return None
+            self.current_plan = None
+            self._publish_current_plan()
+            logger.error(f'🚫 {self.character_name} no plan steps found')
+            return None # how did we get here?
         
         step_stack = self.plan_state['step_stack']
         
@@ -1085,8 +1084,6 @@ end your response with </end>
             return None
 
         def _cond_outcome(cond):
-            if not cond:
-                return False, None
             result = plan_module._evaluate_condition(self, cond)
             return result['value'], result['binding'] if result['binding'] else None
 

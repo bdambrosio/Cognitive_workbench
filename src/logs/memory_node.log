@@ -1,57 +1,268 @@
-2025-08-18 11:46:18 - memory_node - INFO - 🔧 Debug mode enabled for User
-2025-08-18 11:46:18 - llm_client - INFO - 🤖 Zenoh LLM Client initialized
-2025-08-18 11:46:18 - memory_node - INFO - 📂 No existing memory file, starting fresh
-2025-08-18 11:46:18 - memory_node - INFO - Memory Node initialized for character: User
-2025-08-18 11:46:18 - memory_node - INFO - Storage available at:
-2025-08-18 11:46:18 - memory_node - INFO -   - cognitive/User/memory/short_term/*
-2025-08-18 11:46:18 - memory_node - INFO -   - cognitive/User/memory/chat/*
-2025-08-18 11:46:18 - memory_node - INFO -   - cognitive/User/memory/long_term/*
-2025-08-18 11:46:18 - memory_node - INFO -   - cognitive/User/memory/entity/*
-2025-08-18 11:46:18 - memory_node - INFO -   - cognitive/User/memory/inventory
-2025-08-18 11:46:18 - memory_node - INFO - Subscriptions:
-2025-08-18 11:46:18 - memory_node - INFO -   - cognitive/User/memory/close_dialog
-2025-08-18 11:46:18 - memory_node - INFO - Memory Node running - press Ctrl+C to stop
-2025-08-18 11:46:21 - memory_node - INFO - 📢 Stored character announcement: User
-2025-08-18 11:46:38 - memory_node - INFO - 👥 Created new entity: Samantha
-2025-08-18 11:46:38 - memory_node - INFO - 💾 Saved memory to data/memory/User_memory.json
-2025-08-18 11:46:38 - memory_node - INFO - 👁️ Updated visual detection for Samantha
-2025-08-18 11:46:42 - memory_node - INFO - 👥 Entity dialog query for Samantha: completed
-2025-08-18 11:46:42025-08-18 11:46:42 - memory_node - INFO - 👥 Entity dialog query for Samantha: completed
-2025-08-18 11:46:42 - memory_node - INFO - 👥 Entity dialog query2025-08-18 11:46:42 2025-08-18 11:46:42 - memory_node - INFO - 👥 Entity dialog query 2025-08-18 11:46:42 - 2025-08-18 11:46:42 - memory_node - INFO - 📦 Inventory qu2025-08-18 11:47:07 - memory_node - INFO - 👥 Entity dialog query for Samantha: completed
-2025-08-18 11:47:07 - memory_node - INFO - 👥 Entity dialog query for Hermit: completed
-2025-08-18 11:47:072025-08-18 11:47:07 - memory_node - INFO - 👥 Entity dialog query 2025-08-18 11:47:07 - memory_node - INFO - 👥 Entity dialog query for User: completed
-2025-08-18 11:47:07 - memory_node - INFO - 📦 Inventory query: returned 0 items
- Samantha: completed
-2025-08-18 11:46:42 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
-2025-08-18 11:46:42 - memor2025-08-18 11:46:43 - memory_node - INFO - 👥 Created new entity: Joe
-2025-08-18 11:46:43 - memory_node - INFO - 💾 Saved memory to data/memory/Samantha_memory.json
-2025-08-18 11:46:43 - memory_node - INFO - 💬 Added conversation entry for Joe: Joe "What's going on, Samantha?..."
-2025-08-18 11:46:44 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
-2025-08-18 11:46:44 - memory_node - INFO - Joe natural_dialog_end: rating: 1, should_end: False
-2025-08-18 11:46:44 - memory_node - INFO - 👥 Entity natural_dialog_end query for Joe: completed
-2025-08-18 11:46:47 - memory_node - INFO - 💾 Saved memory to data/memor2025-08-18 11:46:47 - memory_node - INFO - 💾 Saved memory to data/memory/Joe_memory.json
-2025-08-18 11:46:47 - memory_node - INFO - 💬 Added conversation entry for Samantha: Samantha "I'm just out for a hike, enjoying the forest, I ju..."
-2025-08-18 11:46:48 - memory_node - INFO - 👥 Entity dialog query for 2025-08-18 11:46:50 - memory_node - INFO - 💾 Saved memory to data/memory/Samantha_memory.json
-2025-08-18 11:46:50 - memory_node - INFO - 💬 Added conversation entry for Joe: Joe "I'm injured, I think I need to use that branch as ..."
-2025-08-18 11:46:51 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
-2025-08-18 11:46:51 - memory_node - INFO - Joe natural_dialog_end: rating: 2, should_end: False
-2025-08-18 11:46:51 - memory_node - INFO - 👥 Entity natural_dialog_end query for Joe: completed
-2025-08-18 11:46:54 - memory_node - INFO - 💾 Saved memory to data/memory/Samantha_memo2025-08-18 11:46:54 - memory_node - INFO - 💾 Saved memory to data/memory/Joe_memory.json
-2025-08-18 11:46:54 - memory_node - INFO - 💬 Added conversation entry for Samantha: Samantha "I'm not sure, I just picked it up and was thinking..."
-2025-08-18 11:46:54 - memory_node - INFO - 👥 Entity di2025-08-18 11:46:58 - memory_node - INFO - 💾 Saved memory to data/memory/Samantha_memory.json
-2025-08-18 11:46:58 - memory_node - INFO - 💬 Added conversation entry for Joe: Joe "I'm not really sure what happened, I just... I don..."
-2025-08-18 11:46:59 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
-2025-08-18 11:47:00 - memory_node - INFO - Joe natural_dialog_end: rating: 6, should_end: True
-2025-08-18 11:47:00 - memory_node - INFO - 👥 Entity natural_dialog_end query for Joe: completed
-2025-08-18 11:47:04 - memory_node - INFO - 📝 Stored action: dialog_end - action_4
-2025-08-18 11:47:07 - memory_node - INFO - 👥 Entity dialog query for User: completed
-2025-08-18 11:47:07 - memory_node - INFO - 👥 Entity dialog query for Hermit: completed
-2025-08-18 11:47:07 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
-2025-08-18 11:47:07 - memory_node - INFO - 👥 Entity dialog query for Samantha: completed
-2025-08-18 11:47:07 - memory_node - INFO - 📦 Inventory query: returned 1 items
-2025-08-18 11:47:07 - memory_node - INFO - 👥 Entity dialog query for Samantha: completed
-2025-08-18 11:47:07 - memory_node - INFO - 📦 Inventory query: returned 1 items
-2025-08-18 11:47:07 -2025-08-18 11:47:14 - memory_node - INFO - 👥 Entity dialog query for Samantha: completed
-2025-08-18 11:47:16 - memory_node - INFO - 💾 Saved memory 2025-08-18 11:47:16 - memory_node - INFO - 💾 Saved memory to data/memory/Samantha_memory.json
-2025-08-18 11:47:16 - memory_node - INFO - 💬 Added conversation entry for Joe: Joe "Can you please give me that branch for a splint?..."
-entity Joe: Joe -> "Can you please give me that branch for a splint?..."
+2025-08-18 13:28:32 - memory_node - INFO - 🔧 Debug mode enabled for User
+2025-08-18 13:28:33 - llm_client - INFO - 🤖 Zenoh LLM Client initialized
+2025-08-18 13:28:33 - memory_node - INFO - 📂 No existing memory file, starting fresh
+2025-08-18 13:28:33 - memory_node - INFO - Memory Node initialized for character: User
+2025-08-18 13:28:33 - memory_node - INFO - Storage available at:
+2025-08-18 13:28:33 - memory_node - INFO -   - cognitive/User/memory/short_term/*
+2025-08-18 13:28:33 - memory_node - INFO -   - cognitive/User/memory/chat/*
+2025-08-18 13:28:33 - memory_node - INFO -   - cognitive/User/memory/long_term/*
+2025-08-18 13:28:33 - memory_node - INFO -   - cognitive/User/memory/entity/*
+2025-08-18 13:28:33 - memory_node - INFO -   - cognitive/User/memory/inventory
+2025-08-18 13:28:33 - memory_node - INFO - Subscriptions:
+2025-08-18 13:28:33 - memory_node - INFO -   - cognitive/User/memory/close_dialog
+2025-08-18 13:28:33 - memory_node - INFO - Memory Node running - press Ctrl+C to stop
+2025-08-18 13:28:37 - memory_node - INFO - 📢 Stored character announceme2025-08-12025-08-18 13:28:56 - memory_node - INFO - 👥 Created new entity: Samantha
+2025-08-18 13:28:56 - memory_node - INFO - 💾 Saved memory to data/memory/User_memory.json
+2025-08-18 13:28:56 - memory_node - INFO - 👁️ Updated visual detection for Samantha
+2025-08-18 13:28:59 - memory_node - INFO - 👥 Created new entity: Joe
+2025-08-18 13:28:59 - memory_node - IN2025-08-18 13:29:03 - memory_node - INFO - 👥 Entity dialog query for Samantha: completed
+2025-08-18 13:29:03 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-18 13:29:03 - memory_node - INFO - 👥 Entity dialog query for Hermit: completed
+2025-08-18 13:29:03 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-08-18 13:29:40 - memory_node - INFO - 👥 Entity dialog query for Samantha: completed
+2025-08-18 13:29:40 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-18 13:29:40 - memory_node - INFO - 👥 Entity dialog query for Hermit: completed
+2025-08-18 13:29:40 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-08-18 13:29:49 - memory_node - INFO - 👥 Entity dialog query for Samantha: completed
+2025-08-18 13:29:49 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-18 13:29:49 - memory_node - INFO - 👥 Entity dialog query for Hermit: completed
+2025-08-18 13:29:49 - memory_node - INFO - �2025-08-18 13:29:50 - memory_node - 2025-08-18 13:29:59 - memory_node - INFO - 👥 Entity dialog query for Samantha: completed
+2025-08-18 13:29:59 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-18 13:29:59 - memory_node - INFO - 👥 Entity dialog query for Hermit: completed
+2025-08-18 13:29:59 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-08-18 13:30:10 - memory_node - INFO - 👥 Entity dialog query for Samantha: completed
+2025-08-18 13:30:10 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-18 13:30:10 - memory_node - INFO - 👥 Entity dialog query for Hermit: completed
+2025-08-18 13:30:10 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-08-18 13:30:17 - memory_node - INFO - 👥 Entity dialog query for Samantha: completed
+2025-08-18 13:30:17 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-18 13:30:17 - memory_node - INFO - 👥 Entity dialog query for Hermit: completed
+2025-08-18 13:30:17 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-08-18 13:30:29 - memory_node - INFO - 👥 Entity dialog query for Samantha: completed
+2025-08-18 13:30:29 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-18 13:30:29 - memory_node - INFO - 👥 Entity dialog query for Hermit: completed
+2025-08-18 13:30:29 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-08-18 13:30:54 - memory_node - INFO - 👥 Entity dialog query for Samantha: completed
+2025-08-18 13:30:54 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-18 13:30:54 - memory_node - INFO - 👥 Entity dialog query for Hermit: completed
+2025-08-18 13:30:54 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-08-18 13:30:56 - memory_node - INFO - 👥 Entity dialog query for Samantha: completed
+2025-08-18 13:30:56 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-18 13:30:56 - memory_node - INFO - 👥 Entity dialog query for Hermit: completed
+2025-08-18 13:30:56 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-08-18 13:31:05 - memory_node - INFO - 👥 Entity dialog query for Samantha: completed
+2025-08-18 13:31:05 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-18 13:31:05 - memory_node - INFO - 👥 Entity dialog query for Hermit: completed
+2025-08-18 13:31:05 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-08-18 13:31:16 - memory_node - INFO - 👥 Entity dialog query for Samantha: completed
+2025-08-18 13:31:16 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-18 13:31:16 - memory_node - INFO - 👥 Entity dialog query for Hermit: completed
+2025-08-18 13:31:16 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-08-18 13:31:21 - memory_node - INFO - 👥 Entity dialog query for Samantha: completed
+2025-08-18 13:31:21 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-18 13:31:21 - memory_node - INFO - 👥 Entity dialog query for Hermit: completed
+2025-08-18 13:31:21 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-08-18 13:31:27 - memory_node - INFO - 👥 Entity dialog query for Samantha: completed
+2025-08-18 13:31:27 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-18 13:31:27 - memory_node - INFO - 👥 Entity dialog query for Hermit: completed
+2025-08-18 13:31:27 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-08-18 13:31:30 - memory_node - INFO - 👥 Entity dialog query for Samantha: completed
+2025-08-18 13:31:30 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-18 13:31:30 - memory_node - INFO - 👥 Entity dialog query for Hermit: completed
+2025-08-18 13:31:30 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-08-18 13:31:33 - memory_node - INFO - 👥 Entity dialog query for Samantha: completed
+2025-08-18 13:31:33 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-18 13:31:33 - memory_node - INFO - 👥 Entity dialog query for Hermit: completed
+2025-08-18 13:31:33 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-08-18 13:31:52 - memory_node - INFO - 👥 Entity dialog query for Samantha: completed
+2025-08-18 13:31:52 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-18 13:31:52 - memory_node - INFO - 👥 Entity dialog query for Hermit: completed
+2025-08-18 13:31:52 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-08-18 13:31:53 - memory_node - INFO - 👥 Entity dialog query for Samantha: completed
+2025-08-18 13:31:53 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-18 13:31:53 - memory_node - INFO - 👥 Entity dialog query for Hermit: completed
+2025-08-18 13:31:53 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-08-18 13:31:57 - memory_node - INFO - 👥 Entity dialog query for Samantha: completed
+2025-08-18 13:31:57 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-18 13:31:57 - memory_node - INFO - 👥 Entity dialog query for Hermit: completed
+2025-08-18 13:31:57 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-08-18 13:31:58 - memory_node - INFO - 👥 Entity dialog query for Samantha: completed
+2025-08-18 13:31:58 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-18 13:31:58 - memory_node - INFO - 👥 Entity dialog query for Hermit: completed
+2025-08-18 13:31:58 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-08-18 13:32:04 - memory_node - INFO - 👥 Entity dialog query for Samantha: completed
+2025-08-18 13:32:04 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-18 13:32:04 - memory_node - INFO - 👥 Entity dialog query for Hermit: completed
+2025-08-18 13:32:04 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-08-18 13:32:22 - memory_node - INFO - 👥 Entity dialog query for Samantha: completed
+2025-08-18 13:32:22 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-18 13:32:22 - memory_node - INFO - 👥 Entity dialog query for Hermit: completed
+2025-08-18 13:32:22 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-08-18 13:32:28 - memory_node - INFO - 👥 Entity dialog query for Samantha: completed
+2025-08-18 13:32:28 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-18 13:32:28 - memory_node - INFO - 👥 Entity dialog query for Hermit: completed
+2025-08-18 13:32:28 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-08-18 13:32:47 - memory_node - INFO - 👥 Entity dialog query for Samantha: completed
+2025-08-18 13:32:47 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-18 13:32:47 - memory_node - INFO - 👥 Entity dialog query for Hermit: completed
+2025-08-18 13:32:47 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-08-18 13:32:48 - memory_node - INFO - 👥 Entity dialog query for Samantha: completed
+2025-08-18 13:32:48 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-18 13:32:48 - memory_node - INFO - 👥 Entity dialog query for Hermit: completed
+2025-08-18 13:32:48 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-08-18 13:32:48 - memory_node - INFO - 👥 Created new entity: Joe
+2025-08-18 13:32:48 - memory_node - INFO - 💾 Saved memory to data/memory/Hermit_memory.json
+2025-08-18 13:32:48 - memory_node - INFO - 👁️ Updated visual detection for Joe
+2025-08-18 13:32:50 - memory_node - INFO - 👥 Entity dialog query for Samantha: completed
+2025-08-18 13:32:50 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-18 13:32:50 - memory_node - INFO - 👥 Entity dialog query for Hermit: completed
+2025-08-18 13:32:50 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-08-18 13:32:54 - memory_node - INFO - 👥 Entity dialog query for Samantha: completed
+2025-08-18 13:32:54 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-18 13:32:54 - memory_node - INFO - 👥 Entity dialog query for Hermit: completed
+2025-08-18 13:32:54 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-08-18 13:33:00 - memory_node - INFO - 👥 Entity dialog query for Samantha: completed
+2025-08-18 13:33:00 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-18 13:33:00 - memory_node - INFO - 👥 Entity dialog query for Hermit: completed
+2025-08-18 13:33:00 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-08-18 13:33:06 - memory_node - INFO - 👥 Entity dialog query for Samantha: completed
+2025-08-18 13:33:06 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-18 13:33:06 - memory_node - INFO - 👥 Entity dialog query for Hermit: completed
+2025-08-18 13:33:06 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-08-18 13:33:11 - memory_node - INFO - 👥 Entity dialog query for Samantha: completed
+2025-08-18 13:33:11 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-18 13:33:11 - memory_node - INFO - 👥 Entity dialog query for Hermit: completed
+2025-08-18 13:33:11 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2:48 - memory_node - INFO - 👥 Entity dialog query for Hermit: completed
+2025-08-18 13:32:48 - memory_node - INFO - 👥 Entity dialog query for User: completed
+2025-08-18 13:32:48 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-08-18 13:32:50 - memory_node - INFO - 👥 Entity dialog query for Samantha: completed
+2025-08-18 13:32:50 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-18 13:32:50 - memory_node - INFO - 👥 Entity dialog query for Hermit: completed
+2025-08-18 13:32:50 - memory_node - INFO - 👥 Entity dialog query for User: completed
+2025-08-18 13:32:50 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-08-18 13:32:54 - memory_node - INFO - 👥 Entity dialog query for Samantha: completed
+2025-08-18 13:32:54 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-18 13:32:54 - memory_node - INFO - 👥 Entity dialog query for Hermit: completed
+2025-08-18 13:32:54 - memory_node - INFO - 👥 Entity dialog query for User: completed
+2025-08-18 13:32:54 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-08-18 13:33:00 - memory_node - INFO - 👥 Entity dialog query for Samantha: completed
+2025-08-18 13:33:00 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-18 13:33:00 - memory_node - INFO - 👥 Entity dialog query for Hermit: completed
+2025-08-18 13:33:00 - memory_node - INFO - 👥 Entity dialog query for User: completed
+2025-08-18 13:33:00 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-08-18 13:33:06 - memory_node - INFO - 👥 Entity dialog query for Samantha: completed
+2025-08-18 13:33:06 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-18 13:33:06 - memory_node - INFO - 👥 Entity dialog query for Hermit: completed
+2025-08-18 13:33:06 - memory_node - INFO - 👥 Entity dialog query for User: completed
+2025-08-18 13:33:06 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-08-18 13:33:11 - memory_node - INFO - 👥 Entity dialog query for Samantha: completed
+2025-08-18 13:33:11 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-18 13:33:11 - memory_node - INFO - 👥 Entity dialog query for Hermit: completed
+2025-08-18 13:33:11 - memory_node - INFO - 👥 Entity dialog query for User: completed
+2025-08-18 13:33:11 - memory_node - INFO - 📦 Inventory query: returned 0 items
+ query for Joe: completed
+2025-08-18 13:31:57 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-08-18 13:31:57 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-18 13:31:57 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-08-18 13:31:57 - memory_node - INFO - 👥 Created new entity: Unknown
+2025-08-18 13:31:57 - memory_node - INFO - 💾 Saved memory to data/memory/Joe_memory.json
+2025-08-18 13:31:57 - memory_node - INFO - 💬 Added conversation entry for unknown: Joe "I found some food..."
+2025-08-18 13:31:57 - memory_node - INFO - 💬 Added respons2025-08-18 13:31:57 - memory_node - INFO - 👥 Ent2025-08-18 13:31:58 - memory_node - INFO - 👥 Entity dialog query for User: completed
+2025-08-18 13:31:58 - memory_node - INFO - 👥 Entity dialog query for Samantha: completed
+2025-08-18 13:31:58 - memory_node - INFO - 👥 Entity dialog query for Hermit: completed
+2025-08-18 13:31:58 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-18 13:31:58 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-08-18 13:31:58 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-18 13:31:58 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-08-18 13:32:05 - memory_node - INFO - 👥 Entity dialog query for User: completed
+2025-08-18 13:32:05 - memory_node - INFO - 👥 Entity dialog query for Samantha: completed
+2025-08-18 13:32:05 - memory_node - INFO - 👥 Entity dialog query for Hermit: completed
+2025-08-18 13:32:05 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-18 13:32:05 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-08-18 13:32:05 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-18 13:32:05 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-08-18 13:32:21 - memory_node - INFO - 📝 Stored action: move - move_1755549141
+2025-08-18 13:32:22 - memory_node - INFO - 👥 Entity dialog query for User: completed
+2025-08-18 13:32:22 - memory_node - INFO - 👥 Entity dialog query for Samantha: completed
+2025-08-18 13:32:22 - memory_node - INFO - 👥 Entity dialog query for Hermit: completed
+2025-08-18 13:32:22 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-18 13:32:22 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-08-18 13:32:22 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-18 13:32:22 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-08-18 13:32:22 - memory_node - INFO - 📝 Stored action: move - move_1755549142
+2025-08-18 13:32:22 - memory_node - INFO - 📝 Generated summary for Joe: Entity: Joe | First seen: 2025-08-18 13:30 | Total...
+2025-08-18 13:32:28 - memory_node - INFO - 👥 Entity dialog query for User: completed
+2025-08-18 13:32:28 - memory_node - INFO - 👥 Entity dialog query for Samantha: completed
+2025-08-18 13:32:28 - memory_node - INFO - 👥 Entity dialog query for Hermit: completed
+2025-08-18 13:32:28 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-18 13:32:28 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-08-18 13:32:28 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-18 13:32:28 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-08-18 13:32:28 - memory_node - INFO - 📝 Stored action: move - move_1755549148
+2025-08-18 13:32:47 - memory_node - INFO - 👥 Entity dialog query for User: completed
+2025-08-18 13:32:47 - memory_node - INFO - 👥 Entity dialog query for Samantha: completed
+2025-08-18 13:32:47 - memory_node - INFO - 👥 Entity dialog query for Hermit: completed
+2025-08-18 13:32:47 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-18 13:32:47 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-08-18 13:32:47 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-18 13:32:47 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-08-18 13:32:47 - memory_node - INFO - 📝 Stored action: move - move_1755549167
+2025-08-18 13:32:48 - memory_node - INFO - 👥 Entity dialog query for User: completed
+2025-08-18 13:32:48 - memory_node - INFO - 👥 Entity dialog query for Samantha: completed
+2025-08-18 13:32:48 - memory_node - INFO - 👥 Entity dialog query for Hermit: completed
+2025-08-18 13:32:48 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-18 13:32:48 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-08-18 13:32:48 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-18 13:32:48 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-08-18 13:32:48 - memory_node - INFO - 📝 Stored action: move - move_1755549168
+2025-08-18 13:32:50 - memory_node - INFO - 👥 Entity dialog query for User: completed
+2025-08-18 13:32:50 - memory_node - INFO - 👥 Entity dialog query for Samantha: completed
+2025-08-18 13:32:50 - memory_node - INFO - 👥 Entity dialog query for Hermit: completed
+2025-08-18 13:32:50 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-18 13:32:50 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-08-18 13:32:50 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-18 13:32:50 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-08-18 13:32:50 - memory_node - INFO - 📝 Stored action: move - move_1755549170
+2025-08-18 13:32:54 - memory_node - INFO - 👥 Entity dialog query for User: completed
+2025-08-18 13:32:54 - memory_node - INFO - 👥 Entity dialog query for Samantha: completed
+2025-08-18 13:32:54 - memory_node - INFO - 👥 Entity dialog query for Hermit: completed
+2025-08-18 13:32:54 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-18 13:32:54 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-08-18 13:32:54 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-18 13:32:54 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-08-18 13:32:54 - memory_node - INFO - 📦 Inventory query for Hut1: False
+2025-08-18 13:33:00 - memory_node - INFO - 👥 Entity dialog query for User: completed
+2025-08-18 13:33:00 - memory_node - INFO - 👥 Entity dialog query for Samantha: completed
+2025-08-18 13:33:00 - memory_node - INFO - 👥 Entity dialog query for Hermit: completed
+2025-08-18 13:33:00 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-18 13:33:00 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-08-18 13:33:00 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-18 13:33:00 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-08-18 13:33:07 - memory_node - INFO - 👥 Entity dialog query for User: completed
+2025-08-18 13:33:07 - memory_node - INFO - 👥 Entity dialog query for Samantha: completed
+2025-08-18 13:33:07 - memory_node - INFO - 👥 Entity dialog query for Hermit: completed
+2025-08-18 13:33:07 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-18 13:33:07 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-08-18 13:33:07 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-18 13:33:07 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-08-18 13:33:11 - memory_node - INFO - 📝 Stored action: move - move_1755549191
+2025-08-18 13:33:12 - memory_node - INFO - 👥 Entity dialog query for User: completed
+2025-08-18 13:33:12 - memory_node - INFO - 👥 Entity dialog query for Samantha: completed
+2025-08-18 13:33:12 - memory_node - INFO - 👥 Entity dialog query for Hermit: completed
+2025-08-18 13:33:12 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-18 13:33:12 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-08-18 13:33:12 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-18 13:33:12 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-08-18 13:33:12 - memory_node - INFO - 📦 Inventory query for Hut1: False
+ dialog query for Samantha: completed
+2025-08-18 13:33:06 - memory_node - INFO - 📦 Inventory query: returned 5 items
+2025-08-18 13:33:06 - memory_node - INFO - 👥 Entity dialog query for Samantha: completed
+2025-08-18 13:33:06 - memory_node - INFO - 📦 Inventory query: returned 5 items
+2025-08-18 13:33:12 - memory_node - INFO - 👥 Entity dialog query for User: completed
+2025-08-18 13:33:12 - memory_node - INFO - 👥 Entity dialog query for Hermit: completed
+2025-08-18 13:33:12 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-18 13:33:12 - memory_node - INFO - 👥 Entity dialog query for Samantha: completed
+2025-08-18 13:33:12 - memory_node - INFO - 📦 Inventory query: returned 5 items
+2025-08-18 13:33:12 - memory_node - INFO - 👥 Entity dialog query for Samantha: completed
+2025-08-18 13:33:12 - memory_node - INFO - 📦 Inventory query: returned 5 items
