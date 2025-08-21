@@ -33,9 +33,9 @@ data/
 src/logs/llm_client.log
 src/logs/memory_node.log
 src/logs/situation_node.log
-src/logs/character_launcher.log
 src/logs/llm_service_node.log
 src/logs/map_node.log
 src/logs/sense_node.log
 src/logs/character_launcher.log
-src/logs/character_launcher.log
+src/logs/executive_node.log
+src/logs/fastapi_action_display.log

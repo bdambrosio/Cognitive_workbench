@@ -599,29 +599,44 @@ Visible resources: {self._summarize_resources(situation)}
 Character drives: {self.executive_node.character_config['drives']}
 
 Rate 0-1 how well this activity serves the character's drives.
-If the activity serves all the character's drives completely, return a drive_score of 1.0.
-If the activity serves none ofthe character's drives in any way, return a drive_score of 0.0.
-Otherwise, compute a drive_score between 0.0 and 1.0 based on how well the activity serves the character's drives.
+If the activity serves all the character's drives completely, return a drive score of 1.0.
+If the activity serves none of the character's drives in any way, return a drive score of 0.0.
+Otherwise, compute a drive score between 0.0 and 1.0 based on how well the activity serves the character's drives.
 """
 
         prompt += f"""##
 
 #Your second task is to rate the consistency of this activity with the overall current situation.
 
-If the fit is perfect, return a consistency_score of 1.0.
-If the activity is inconsistent with the situation and totally inappropriate, return a consistency_score of 0.0.
-Otherwise, compute a consistency_score between 0.0 and 1.0 based on degree of fit.
+If the fit is perfect, return a consistency score of 1.0.
+If the activity is inconsistent with the situation and totally inappropriate, return a consistency score of 0.0.
+Otherwise, compute a consistency score between 0.0 and 1.0 based on degree of fit.
       
-Return the two scores in a single JSON object with keys 'drive_score', and 'consistency_score'.
+Do not show any reasoning steps or thinking or chain-of-thought. 
+Return the two scores using the following hash-formatted text, where each tag is preceded by a # and followed by a single space, followed by its content:
+#drive 0.0-1.0
+#consistency 0.0-1.0
+##
+
 Do not include any other text, introductory, explanatory, markdown, etc.
 End with </end>.
-Rate 0-1 how appropriate this activity is given the situation:
 """
-        response = self.llm.generate([prompt],max_tokens=100,temperature=0.7,is_json=True, stops=['</end>'])
+        response = self.llm.generate([prompt],max_tokens=100,temperature=0.7, stops=['</end>'])
         if response.success:
-            return response.text
+            response_text = response.text
+            drive = hash_utils.find('drive', response_text)
+            try:
+                drive = float(drive)
+            except:
+                drive = 0.5
+            consistency = hash_utils.find('consistency', response_text)
+            try:
+                consistency = float(consistency)
+            except:
+                consistency = 0.5
+            return {'drive': drive, 'consistency': consistency}
         else:
-            return {'drive_score': 0.5, 'consistency_score': 0.5}
+            return {'drive': 0.5, 'consistency': 0.5}
     
     def _rank_and_select(self, candidates):
         """Final scoring and ranking"""
@@ -630,8 +645,9 @@ Rate 0-1 how appropriate this activity is given the situation:
             activity['final_score'] = (
                 activity['importance'] * 0.30 +           # Base importance
                 activity['habit'] * 0.15 +                # Habit strength  
-                activity['alignment_score']['drive_score'] * 0.35 +          # Drive alignment
-                activity['alignment_score']['consistency_score'] * 0.20          # Situational fit
+                activity['alignment_score']['drive'] * 0.30 +          # Drive alignment
+                activity['alignment_score']['consistency'] * 0.20 +          # Situational fit
+                0.05 if 'social' in activity['tags'] else 0.00     # Social stuff is important!
             )
         
         # Sort by final score

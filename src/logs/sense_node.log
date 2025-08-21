@@ -1,8 +1,10 @@
-2025-08-18 13:28:35 - sense_node - INFO - 🔧 Debug mode enabled for User
-2025-08-18 13:28:35 - sense_node - INFO - 👁️ Sense Node initialized for character: User
-2025-08-18 13:28:35 - sense_node - INFO - Console Text Sensor ready - will auto-disable if external input detected
-2025-08-18 13:28:35 - sense_node - INFO - Sense Node running - press Ctrl+C to sto2025-02025-08-18 13:32:48 - sense_node - INFO - 👁️ Visual event received: agent_detected - {'agent_name': 'Joe', 'position': [21, 32], 'distance': 10, 'timestamp': '2025-08-18T13:32:48.507711'}
-'}
-2025-08-18 13:30:56 - sense_node - INFO - 🔄 External input detected - console input disabled to prevent conflicts
-2025-08-18 13:30:56 - sense_node - INFO - 📨 Received external text input from Joe: "I'm going to use this Fallenbranch7 to make a shelter"
-2025-08-18 13:30:56 - sense_node - INFO - 📤 Published sense data: 0
+2025-08-21 14:05:42 - sense_node - INFO - 🔧 Debug mode enabled for User
+2025-08-21 14:05:42 - sense_node - INFO - 👁️ Sense Node initialized for character: User
+2025-08-21 14:05:42 - sense_node - INFO - Console Text Sensor ready - will auto-disable if external input detected
+2025-08-21 14:05:42 - sense_node - INFO - Sense Node running - press Ctrl+C to sto202025-08-2025-08-21 14:06:44 - sense_node - INFO - 🔄 External input detected - console input disabled to prevent conflicts
+2025-08-21 14:06:44 - sense_node - INFO - 📨 Received external text 202025-08-21 14:07:41 - sense_node - INFO - 👁️ Visual event received: agent_detected - {'agent_name': 'Joe', 'position': [20, 21], 'distance': 1, 'timestamp': '2025-08-21T14:07:41.430751'}
+text input from Joe: "I was just out for a walk, I like the forest, it's really beautiful here, I'm trying to get my bearings, I don't really know where I am or how I got here, do you know2025-08-21 14:06:57 - sense_node - INFO - 📨 Received external text input from Samantha: 2025-08-21 14:07:01 - sense_node - INFO - 📨 Received external text input from Joe: "I'd love to check out the spring with you, sounds like a great idea, I could use a drink of water anyway, do you think it's safe to drink from?"
+2025-08-21 14:07:01 - sense_node - INFO - 📤2025-08-21 14:07:06 - sen2025-08-21 14:07:09 - sense_node - INFO - 📨 Received external text input from Joe: "I think we should head north, the spring you mentioned is probably the one I see 5 units that way, let's go check it out"
+2025-08-21 14:07:09 - sense_node - INFO - 📤 Published sense data: 3
+2025-08-21 14:07:41 - sense_node - INFO - 👁️ Visual event received: agent_detected - {'agent_name': 'Joe', 'position': [2025-08-21 14:07:59 - sense_node - INFO - 📨 Received external text input from Samantha: "What do you think of this forest, Joe, it's really beautiful?"
+2025-08-21 14:07:59 - sense_node - INFO - 📤 Published sense data: 3

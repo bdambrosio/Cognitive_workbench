@@ -3,7 +3,7 @@
 Zenoh Executive Node
 
 This node implements the OODA loop for character decision-making and action execution.
-Replaces ROS2 complexity with simple Zenoh pub/sub.
+
 """
 
 import math
@@ -19,12 +19,14 @@ import signal
 import argparse
 from datetime import datetime
 from typing import Dict, List, Any, Union, Optional
+from Messages import SystemMessage, UserMessage
 from activity import ActivityManager
 import utils.hash_utils as hash_utils
 from utils.zenoh_utils import datetime_handler
 import plan as plan_module
 from dataclasses import dataclass
 import os
+from templates import PLAN_TEMPLATE
 
 # Configure logging with unbuffered output
 # Console handler with WARNING level (less verbose)
@@ -57,90 +59,7 @@ except ImportError as e:
     print(f"⚠️  LLM Client not available: {e}")
     LLM_CLIENT_AVAILABLE = False
 
-PLAN_SYNTAX = """
-Task: Break down the user's high‑level goal into a minimal plan in the JSON format specified below.
-Output: only valid JSON – no prose, no code fences.
 
-{
-  "plan": [
-    { "type": "move", "target": "…"},
-    { "type": "say", "target": "…", "value": "…" },
-    { "type": "think", "value": "…" },
-    { "type": "take", "target": "…"},
-    { "type": "inspect", "target": "…", "reason": "…"},
-    { "type": "use", "target": "…", "reason": "…"},
-    { "type": "while", "condition": "…" , "body": [ /* steps */ ]},
-    { "type": "if", "condition": "…", "then": [ /* steps */ ], "else": [ /* steps */ ] }
-  ]
-}
-
-A plan must include at least 1 step and no more than 6 steps including all nested while and if branches.
-In the following, <resource_name>, <character_name> are placeholders only for KNOWN resources, characters, or maptypes, those appearing above.
-Only dicts of the types below are allowed for the condition of while and if. Condition action type can only be one of the following:
- - "near": {"type": "near", "target": <resource name? or <character_name>} is for checking if the character is near a resource or character.
- - "can_see": {"type": "can_see", "target": <character_name>} is for checking if the character can see a character.
- - "has_item": {"type": "has_item", "target": <resource_name>} is for checking if the character has a resource in their inventory.
- - "at_location": {"type": "at_location", "target": <location_name>} is for checking if the character is at a location.
- - "believes": {"type": "believes", "target": <character_name>} is for checking if the character believes something about another character.
- - "notnear": {"type": "notnear", "target": <resource name? or <character_name>} is for checking if the character is not near a resource or character.
- - "cant_see": {"type": "cant_see", "target": <character_name>} is for checking if the character cannot see a character.
- - "hasnt_item": {"type": "hasnt_item", "target": <resource_name>} is for checking if the character does not have a resource in their inventory.
- - "notat_location": {"type": "notat_location", "target": <resource_name>} is for checking if the character is not at a location.
- - "notbelieves": {"type": "notbelieves", "target": <character_name>} is for checking if the character does not believe something about another character.
-
-outside a while or if condition, "type" can take the values "say", "move", "think", "take", "inspect", or "use":
- - "say": { "type": "say", "target": "character_name", "value": "text to speak" } 
-     for speaking to another character you can see. Use this to seek information, respond, inform the other character, or to maintain 'social chatter' to stay aligned.
-     For a 'say' act, speak only for yourself, and do not include any other introductory, explanatory, discursive, or formatting text in your response.
- - "move": { "type": "move", "target": "cardinal_direction" or 'resource or character name'} 
-     For moving in one of the 8 cardinal directions or in the direction of a resource or character.
-    You can only move in the direction of a resource, character, or terrain type if you can see it.
- - "think": { "type": "think", "value": "text to think about" } 
-     For thinking about a topic or question, attempting to derive new information, conclusions, or decisions from who you are and what you already explicitly know
- - "take": { "type": "take", "target": "resource_name" } 
-     For adding some resource you see to your personal inventory. you must be 'near' the resource to take it.
- - "inspect": { "type": "inspect", "target": "resource_name", "reason": "what is it you are hoping to learn? - 5 words max"} 
-     For inspecting a resource you see or one in your inventory to understand how to use it.
- - "use": { "type": "use", "target": "resource_name", "reason": "what outcome do you hope to achieve? - 5 words max"} 
-     For using a resource in your inventory in a known way.
-
-In general, a target can be a specific resource_name or character_name or a map type generalization. 
-For example, Berry2, Berry, Joe, Clearing (assuming it is a terrain type) are all valid targets. 
-However, if the target is not an instance, the specific resource or character bound to the target is indeterminate. 
-For move, target can also be one of the 8 compass points.
-
-For example, 
-    {"type": "if", "condition": {"type": "near", "target": "Berry"}, "then": [{"type": "move", "target": "Berry"}]}
-is a valid plan. Likewise,
-    {"type": "if", "condition": {"type": "near", "target": "Joe"}, "then": [{"type": "move", "target": "Joe"}]}
-is a valid plan.
-Note that move only moves one step. You can use a while to move repeatedly.
-
-Some actions have conditions that must be met before they can be executed.
-for example, you cannot take a resource unless you are near it.
-you can accomplish this by using the "near" condition in a while form. 
-Assuming, for example, that Cave2 is in your situation view direction Northeast, the following plan will move you to Cave2:
-
-{
-  "plan": [
-    { "type": "while", "body": [ { "type": "move", "target": "Northeast" } ], "condition": { "type": "notnear", "target": "Cave2" } },
-    { "type": "take", "target": "Cave2" }
-  ]
-}
-
-###
-Allowed control‑flow primitives: sequential list (e.g.. [..., ...]), while, and two‑branch if (else is optional).
-{
-  "plan": [
-    { "type": "action", "target": "…", "value": "…" },
-    { "type": " while", "body": [ /* steps */ ], "condition": "…" },
-    { "type": "if", "condition": "…", "then": [ /* steps */ ], "else": [ /* steps */ ] }
-  ]
-}
-
-A plan must include no more than 6 steps including all nested while and if branches.
-A plan must not contain sequential adjacent say actions.
-"""
 
 @dataclass
 class ActionRecord:
@@ -265,6 +184,9 @@ class ZenohExecutiveNode:
         self.current_plan_id: Optional[str] = None
         self.plan_counter: int = 0
         self.step_counter: int = 0
+        self.current_plan_prompt_template:str = ''
+        self.current_plan_prompt_bindings:dict = {}
+        self.plan_log: List[Dict[str, Any]] = [] # log of plans and actions
         # Turn management
         self.turn_subscriber = self.session.declare_subscriber(
             "cognitive/map/turn/go",
@@ -588,7 +510,7 @@ class ZenohExecutiveNode:
             if action:
                 logger.info(f'🎯 {self.character_name} planned action: {action.get("type")}: {action.get("target")} - {action.get("value")}')
             else:
-                logger.warning(f'🚫 {self.character_name} no action found for plan: {json.dumps(plan) if type(plan) == dict else plan}')
+                logger.warning(f'🚫 {self.character_name} no action found for plan, pbly completed')
                 return
 
             # Act: Execute the chosen action (if we have one)
@@ -837,16 +759,17 @@ end your response with </end>
                     for i, memory in enumerate(entity_context['conversation_history']):  # Use last 2 memories
                         goal_prompt += f"\t{memory['source']}: {memory['text']}\n"
 
-                    goal_prompt += "Don't repeat yourself.\n"
-
             if self.action_history and (self.action_history[-1].action['type'].lower() == 'say' or self.action_history[-1].action['type'].lower() == 'response'):
                 directive = f"""\nrespond only with the JSON plan, no other text.\nend your response with </end>"""
             else:
                 directive = f"""\nrespond only with the JSON plan, no other text.\nend your response with </end>"""
+
+            self.current_plan_prompt = system_prompt + user_prompt + goal_prompt + PLAN_TEMPLATE + directive
             # Make LLM call
+            #self.current_plan_prompt= self.llm_client.substitute_bindings(self.current_plan_prompt_template, self.current_plan_prompt_bindings)
             if self.llm_client and not self.shutdown_requested:
                 response = self.llm_client.generate(
-                    messages=[system_prompt, user_prompt, PLAN_SYNTAX, directive],
+                    messages=[system_prompt, user_prompt, goal_prompt, PLAN_TEMPLATE, directive],
                     max_tokens=1500,
                     temperature=0.7,
                     stops=['</end>'],
@@ -960,7 +883,7 @@ end your response with </end>
         # Make LLM call
         if self.llm_client and not self.shutdown_requested:
             response = self.llm_client.generate(
-                messages=[system_prompt, user_prompt, PLAN_SYNTAX, directive],
+                messages=[system_prompt, user_prompt, PLAN_TEMPLATE, directive],
                 max_tokens=200,
                 temperature=0.7,
                 stops=['</end>']
@@ -1064,12 +987,10 @@ end your response with </end>
             if action:
                 self.current_action = action
                 self._publish_decided_action(action)
-            else:
-                self._plan_completed()
             return action
         except Exception as e:
             logger.error(f'Error in plan execution: {e}')
-            logger.error(traceback.print_exc())
+            traceback.print_exc()
             # Clear plan state on error
             self.plan_state = {
                 'step_stack': plan_module.Stack()
@@ -1346,7 +1267,6 @@ end your response with </end>
                 action_data['error'] = 'target not nearby/visible'
                 self.action_publisher.put(json.dumps(action_data))
             else:
-                self.action_publisher.put(json.dumps(action_data))
                 # Perform inspect which may populate last_action_result
                 self.inspect(action, resolved)
                 # Publish result if available so UI can display it
@@ -1388,10 +1308,14 @@ end your response with </end>
             if not resolved:
                 action_data['status'] = 'failed'
                 action_data['error'] = 'target not nearby/visible'
-                self.action_publisher.put(json.dumps(action_data))
-                self.action_counter += 1
                 return False
-            self.use(action, resolved)
+            else:
+                self.use(action, resolved, action_data)
+                action_data['result'] = self.action_history[-1].result
+            self.action_publisher.put(json.dumps(action_data))
+            self.action_counter += 1
+            return True
+
         # Request situation/map update for UI after non-move actions that may affect visibility/adjacency
         try:
             if action['type'].lower() in ["take", "inspect", "use"]:
@@ -1480,9 +1404,74 @@ end your response with </end>
         logger.info(f'📝 Plan post-mortem prepared for {self.character_name}\n{self.plan_summary}\n')
         
         # Mark as completed to prevent redundant calls
-        self.action_history = []
         self.plan_summary_completed = True
+        self.plan_log.append({'goal': self.current_goal.to_string(), 'prompt': self.current_plan_prompt, 'plan': self.current_plan, 'summary': self.plan_summary, 'actions': self.action_history})
+        self.review_planning()
+        self.action_history = []
     
+    def review_planning(self):
+        """Review the planning process and update the plan prompt and bindings."""
+        if len(self.plan_log) < 3:
+            return
+        logger.info(f'📝 Reviewing planning for {self.character_name}')
+        system_prompt = f"""Review the following planning information for one or more planning efforts and recommend improvements to the content or instructions in the Plan syntax or the planning prompt.
+"""
+        
+        actions_text = []
+        for record in self.action_history:
+            action_type = record.action.get('type', 'unknown')
+            target = record.action.get('target', 'unknown')
+            result = record.result if record.result else 'no result recorded'
+            timestamp = record.timestamp.strftime('%H:%M:%S')
+            actions_text.append(f"{timestamp} - {action_type}: {target} -> {result}")
+        
+        actions_summary = '\n'.join(actions_text)
+
+        user_prompt = f"""
+#Plan syntax specification:
+{PLAN_TEMPLATE}
+
+"""
+        for n, item in enumerate(self.plan_log):
+            user_prompt += f"""
+
+#### Planning effort {n+1}
+
+# Goal the plan was created for: 
+{self.plan_log[-1]['goal']}
+
+#Planning prompt:
+{self.plan_log[-1]['prompt']}
+
+#Resulting Plan:
+{json.dumps(self.plan_log[-1]['plan'], indent=2)}
+
+#Actions taken:
+{actions_summary}
+
+#Plan post-mortem summary:
+{self.plan_summary}
+
+"""
+        user_prompt += f"""
+Respond with an analysis of how the plan syntax and or the planning prompt could be improved to better achieve the goal. For example:
+- If the plan syntax is ambiguous or unclear explain what is unclear and how to improve it.
+- If an action alternative is missing or could be modified to be more appropriate, explain what is missing and how to improve it. Provide specific instances where possible.
+- If the planning prompt contins inadequate information about the character's current situation for planning for the goal, suggest additional information that would improve the planning process.
+- If the planning prompt instructions could be improved or re-arranged describe how to improve it.
+
+Identify any other issues with the planning process and recommend improvements.
+
+Provide your response as a list of items with full text descriptions, no other text.
+End your response with </end>
+"""
+
+        response = self.llm_client.ask(bindings={}, prompt=[SystemMessage(content=system_prompt), UserMessage(content=user_prompt)], 
+                                       max_tokens=800, stops=['</end>'], is_json=False)
+        logger.info(f'📝 Planning review for {self.character_name}: {response}')
+        self.plan_log = []
+        
+
     def sense_data_callback(self, sample):
         """Handle incoming sense data."""
         # Check if shutdown has been requested
@@ -1667,7 +1656,7 @@ end your response with </end>
         if source == 'User' and clean_input.startswith('plan:'):
             self.parse_and_set_plan(clean_input)
             return
-        if source == 'User' and mode == 'respond':
+        if self.character_name == 'User' and mode == 'respond':
             self.publish_dialog_end(source)
             return
         # In manual mode with manual_response disabled, do not auto-respond
@@ -2184,16 +2173,16 @@ End your text with: </end>"""
                 'target': target,
                 'action_id': f"take_{int(time.time())}",
                 'timestamp': datetime.now().isoformat(),
-                'character': self.character_name
+                'character': self.character_name,
         }
         try:
             system_prompt = self._update_system_prompt()
             user_prompt = self.observations['dynamic']
 
-            directive = f"""You are inspecting: {target} attempting to learn {action['reason']}.
-respond with a short text description of the resource consistent with its name and situated wrt the information in the situation.
+            directive = f"""You are inspecting: {target} to gather information about {action['reason']}.
+respond with a short text description of the resource consistent with its name and situated in the situation.
 The description should particularly highlight information relevant to your drives, goal, and current plan.
-It should also include some 'color' to enrich your perception of the resource in the context of the current situation. 
+It should specifically provide information relevant to {action['reason']}.
 The description should be 20 words max.
 Do not include any other introductory, explanatory, discursive, or formatting text in your response.
 End your response with: 
@@ -2231,16 +2220,9 @@ End your response with:
                 self.action_history[-1].result = f'inspect failed'
         self.action_publisher.put(json.dumps(action_data))
 
-    def use(self, action: dict, target: str):
+    def use(self, action: dict, target: str, action_data: dict):
         """Use a resource."""
             # Create and publish action data for logging/display
-        action_data = {
-                'type': 'use',
-                'target': target,
-                'action_id': f"take_{int(time.time())}",
-                'timestamp': datetime.now().isoformat(),
-                'character': self.character_name
-        }
         try:
             system_prompt = self._update_system_prompt()
             user_prompt = self.observations['dynamic']
@@ -2270,6 +2252,7 @@ End your response with:
                     if self.action_history:
                         self.action_history[-1].result = response.text
                     self.uses[target] = response.text
+                    action_data['response'] = response.text
                     return True
                 else:
                     logger.error(f'LLM call failed: {response.error}')
@@ -2278,7 +2261,7 @@ End your response with:
 
             logger.info(f'📦 Inspecting {target} for {self.character_name}')
             if self.action_history:
-                self.action_history[-1].result = f'inspected {target}'
+                self.action_history[-1].result = f'{response.text}'
             return True
 
         except Exception as e:
@@ -2551,8 +2534,8 @@ End your response with:
             bool: True if lock is available, False if not
         """
         try:
-            # Query map node to check conversation lock status
-            for reply in self.session.get(f"cognitive/map/conversation/lock/status/{target_character}", 
+            # Query map node to check conversation lock status for current character
+            for reply in self.session.get(f"cognitive/map/conversation/lock/status/{self.character_name}", 
                                         timeout=5.0 if not self.debug else 60.0):
                 if reply.ok:
                     data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
@@ -2562,14 +2545,19 @@ End your response with:
                             logger.info(f'🔓 Conversation lock available with {target_character}')
                             return True
                         else:
-                            locked_with = data.get('locked_with', 'unknown')
-                            logger.info(f'🔒 Conversation lock unavailable with {target_character} (locked with {locked_with})')
-                            return False
+                            locked_with = data.get('locked_with', [])
+                            # Check if we're already locked with the target character
+                            if target_character in locked_with:
+                                logger.info(f'🔒 Already locked with {target_character}')
+                                return False
+                            else:
+                                logger.info(f'🔓 Conversation lock available with {target_character}')
+                                return True
                     else:
                         logger.error(f'Failed to check conversation lock status: {data.get("error", "Unknown error")}')
                         return False
             
-            logger.error(f'No response received for conversation lock status check with {target_character}')
+            logger.error(f'No response received for conversation lock status check')
             return False
             
         except Exception as e:

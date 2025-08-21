@@ -1,37 +1,37 @@
-2025-08-18 13:28:01 - character_launcher - INFO - 🔧 Debug mode enabled for Launcher (console INFO)
-2025-08-18 13:28:01 - character_launcher - INFO - ✅ Launcher subscribed to cognitive/launcher/shutdown and ready to publish ready signal
-2025-08-18 13:28:01 - character_launcher - INFO - Added character: Samantha
-2025-08-18 13:28:01 - character_launcher - INFO - Added character: Joe
-2025-08-18 13:28:01 - character_launcher - INFO - Added character: Hermit
-2025-08-18 13:28:01 - character_launcher - INFO - Added character: User
-2025-08-18 13:28:06 - character_launcher - INFO - Launching 4 characters...
-2025-08-18 13:28:06 - character_launcher - INFO - Launching shared services...
-2025-08-18 13:28:06 - character_launcher - INFO - ✅ LLM Service Node launched with server: vllm, model: llama3.1-8b-instruct
-2025-08-18 13:28:06 - character_launcher - INFO - ✅ FastAPI Action Display Node launched on port 3000
-2025-08-18 13:28:06 - character_launcher - INFO -    - Web UI available at: http://localhost:3000
-2025-08-18 13:28:08 - character_launcher - INFO - Debug mode enabled via CWB_DEBUG - map turn timeout will be disabled
-2025-08-18 13:28:08 - character_launcher - INFO - ✅ Map Node launched with map: forest.py
-2025-08-18 13:28:08 - character_launcher - INFO - ⏳ Waiting for Map Node to initialize...
-2025-08-18 13:28:15 - character_launcher - INFO - Launching character: Samantha
-2025-08-18 13:28:15 - character_launcher - INFO - ✅ Samantha memory_node launched
-2025-08-18 13:28:16 - character_launcher - INFO - ✅ Samantha situation_node launched
-2025-08-18 13:28:16 - character_launcher - INFO - ✅ Samantha sense_node launched
-2025-08-18 13:28:17 - character_launcher - INFO - ✅ Samantha executive_node launched
-2025-08-18 13:28:18 - character_launcher - INFO - Launching character: Joe
-2025-08-18 13:28:18 - character_launcher - INFO - ✅ Joe memory_node launched
-2025-08-18 13:28:18 - character_launcher - INFO - ✅ Joe situation_node launched
-2025-08-18 13:28:19 - character_launcher - INFO - ✅ Joe sense_node launched
-2025-08-18 13:28:19 - character_launcher - INFO - ✅ Joe executive_node launched
-2025-08-18 13:28:20 - character_launcher - INFO - Launching character: Hermit
-2025-08-18 13:28:20 - character_launcher - INFO - ✅ Hermit memory_node launched
-2025-08-18 13:28:21 - character_launcher - INFO - ✅ Hermit situation_node launched
-2025-08-18 13:28:21 - character_launcher - INFO - ✅ Hermit sense_node launched
-2025-08-18 13:28:22 - character_launcher - INFO - ✅ Hermit executive_node launched
-2025-08-18 13:28:23 - character_launcher - INFO - Launching character: User
-2025-08-18 13:28:23 - character_launcher - INFO - ✅ User memory_node launched
-2025-08-18 13:28:23 - character_launcher - INFO - ✅ User situation_node launched
-2025-08-18 13:28:24 - character_launcher - INFO - ✅ User sense_node launched
-2025-08-18 13:28:24 - character_launcher - INFO - ✅ User executive_node launched
-2025-08-18 13:28:25 - character_launcher - INFO - ✅ All characters launched
-2025-08-18 13:28:25 - character_launcher - INFO - 🚀 Published ready signal: 4 characters active
-2025-08-18 13:28:25 - character_launcher - INFO - Monitoring processes...
+2025-08-21 14:05:08 - character_launcher - INFO - 🔧 Debug mode enabled for Launcher (console INFO)
+2025-08-21 14:05:08 - character_launcher - INFO - ✅ Launcher subscribed to cognitive/launcher/shutdown and ready to publish ready signal
+2025-08-21 14:05:08 - character_launcher - INFO - Added character: Samantha
+2025-08-21 14:05:08 - character_launcher - INFO - Added character: Joe
+2025-08-21 14:05:08 - character_launcher - INFO - Added character: Hermit
+2025-08-21 14:05:08 - character_launcher - INFO - Added character: User
+2025-08-21 14:05:11 - character_launcher - INFO - Launching 4 characters...
+2025-08-21 14:05:11 - character_launcher - INFO - Launching shared services...
+2025-08-21 14:05:11 - character_launcher - INFO - ✅ LLM Service Node launched with server: vllm, model: llama3.1-8b-instruct
+2025-08-21 14:05:11 - character_launcher - INFO - ✅ FastAPI Action Display Node launched on port 3000
+2025-08-21 14:05:11 - character_launcher - INFO -    - Web UI available at: http://localhost:3000
+2025-08-21 14:05:13 - character_launcher - INFO - Debug mode enabled via CWB_DEBUG - map turn timeout will be disabled
+2025-08-21 14:05:13 - character_launcher - INFO - ✅ Map Node launched with map: forest.py
+2025-08-21 14:05:13 - character_launcher - INFO - ⏳ Waiting for Map Node to initialize...
+2025-08-21 14:05:20 - character_launcher - INFO - Launching character: Samantha
+2025-08-21 14:05:20 - character_launcher - INFO - ✅ Samantha memory_node launched
+2025-08-21 14:05:21 - character_launcher - INFO - ✅ Samantha situation_node launched
+2025-08-21 14:05:21 - character_launcher - INFO - ✅ Samantha sense_node launched
+2025-08-21 14:05:22 - character_launcher - INFO - ✅ Samantha executive_node launched
+2025-08-21 14:05:23 - character_launcher - INFO - Launching character: Joe
+2025-08-21 14:05:23 - character_launcher - INFO - ✅ Joe memory_node launched
+2025-08-21 14:05:23 - character_launcher - INFO - ✅ Joe situation_node launched
+2025-08-21 14:05:24 - character_launcher - INFO - ✅ Joe sense_node launched
+2025-08-21 14:05:24 - character_launcher - INFO - ✅ Joe executive_node launched
+2025-08-21 14:05:25 - character_launcher - INFO - Launching character: Hermit
+2025-08-21 14:05:25 - character_launcher - INFO - ✅ Hermit memory_node launched
+2025-08-21 14:05:26 - character_launcher - INFO - ✅ Hermit situation_node launched
+2025-08-21 14:05:26 - character_launcher - INFO - ✅ Hermit sense_node launched
+2025-08-21 14:05:27 - character_launcher - INFO - ✅ Hermit executive_node launched
+2025-08-21 14:05:28 - character_launcher - INFO - Launching character: User
+2025-08-21 14:05:28 - character_launcher - INFO - ✅ User memory_node launched
+2025-08-21 14:05:28 - character_launcher - INFO - ✅ User situation_node launched
+2025-08-21 14:05:29 - character_launcher - INFO - ✅ User sense_node launched
+2025-08-21 14:05:29 - character_launcher - INFO - ✅ User executive_node launched
+2025-08-21 14:05:30 - character_launcher - INFO - ✅ All characters launched
+2025-08-21 14:05:30 - character_launcher - INFO - 🚀 Published ready signal: 4 characters active
+2025-08-21 14:05:30 - character_launcher - INFO - Monitoring processes...

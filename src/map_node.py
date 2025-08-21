@@ -70,7 +70,7 @@ class MapNode:
         self.agent_visibility = {}
         
         # Conversation lock management
-        self.conversation_locks = {}  # character_name -> locked_with_character_name
+        self.conversation_locks = {}  # character_name -> set of locked_with_character_names
         self.lock_request_counts = {}  # (requester, target) -> count of failed attempts
         self.lock_timeout_threshold = 3  # Number of failed attempts before timeout
         
@@ -1545,15 +1545,16 @@ Do not include any other text, reasoning, introductory, expository, or markdown.
             
             # Clean up any conversation locks for this character
             if character_name in self.conversation_locks:
-                locked_with = self.conversation_locks[character_name]
-                logger.info(f"🧹 Cleaning up conversation locks for shutting down character {character_name} (locked with {locked_with})")
+                locked_with_set = self.conversation_locks[character_name]
+                logger.info(f"🧹 Cleaning up conversation locks for shutting down character {character_name} (locked with {locked_with_set})")
                 
-                # Release locks for both characters
-                self.release_conversation_locks(character_name, locked_with)
+                # Release locks for all partners
+                for partner in list(locked_with_set):
+                    self.release_conversation_locks(character_name, partner)
             
             # Also check if this character is locked with any other character
-            for char, locked_with_char in list(self.conversation_locks.items()):
-                if locked_with_char == character_name:
+            for char, locked_with_set in list(self.conversation_locks.items()):
+                if character_name in locked_with_set:
                     logger.info(f"🧹 Cleaning up conversation locks for shutting down character {character_name} (locked by {char})")
                     self.release_conversation_locks(char, character_name)
             
@@ -1710,9 +1711,12 @@ Do not include any other text, reasoning, introductory, expository, or markdown.
             requester_canon = requester.capitalize()
             target_canon = target.capitalize()
             
-            # Check if either character is already locked
-            if (requester_canon in self.conversation_locks or 
-                target_canon in self.conversation_locks):
+            # Check if this specific pair is already locked
+            requester_locked_with = self.conversation_locks.get(requester_canon, set())
+            target_locked_with = self.conversation_locks.get(target_canon, set())
+            
+            if (target_canon in requester_locked_with or 
+                requester_canon in target_locked_with):
                 
                 # Increment failed attempt count
                 lock_key = (requester_canon, target_canon)
@@ -1740,9 +1744,15 @@ Do not include any other text, reasoning, introductory, expository, or markdown.
     def _acquire_locks_internal(self, requester: str, target: str) -> bool:
         """Internal method to actually acquire the locks."""
         try:
+            # Initialize sets if they don't exist
+            if requester not in self.conversation_locks:
+                self.conversation_locks[requester] = set()
+            if target not in self.conversation_locks:
+                self.conversation_locks[target] = set()
+            
             # Lock both characters to each other
-            self.conversation_locks[requester] = target
-            self.conversation_locks[target] = requester
+            self.conversation_locks[requester].add(target)
+            self.conversation_locks[target].add(requester)
             
             logger.info(f"🔒 Conversation lock acquired: {requester} <-> {target}")
             return True
@@ -1766,9 +1776,13 @@ Do not include any other text, reasoning, introductory, expository, or markdown.
             
             # Release locks for both characters
             if char1_canon in self.conversation_locks:
-                del self.conversation_locks[char1_canon]
+                self.conversation_locks[char1_canon].discard(char2_canon)
+                if not self.conversation_locks[char1_canon]:
+                    del self.conversation_locks[char1_canon]
             if char2_canon in self.conversation_locks:
-                del self.conversation_locks[char2_canon]
+                self.conversation_locks[char2_canon].discard(char1_canon)
+                if not self.conversation_locks[char2_canon]:
+                    del self.conversation_locks[char2_canon]
             
             # Clear any request counts for this pair
             lock_keys = [(char1_canon, char2_canon), (char2_canon, char1_canon)]
@@ -1795,26 +1809,26 @@ Do not include any other text, reasoning, introductory, expository, or markdown.
             
             # Check if requester is locked
             if requester in self.conversation_locks:
-                locked_with = self.conversation_locks[requester]
-                locked_characters.extend([requester, locked_with])
+                locked_characters.extend(list(self.conversation_locks[requester]))
             
             # Check if target is locked
             if target in self.conversation_locks:
-                locked_with = self.conversation_locks[target]
-                if locked_with not in locked_characters:
-                    locked_characters.extend([target, locked_with])
+                locked_characters.extend(list(self.conversation_locks[target]))
             
             # Release all locks for the involved characters
             if locked_characters:
                 logger.info(f"⏰ Timing out conversation locks for: {', '.join(locked_characters)}")
                 for char in locked_characters:
                     if char in self.conversation_locks:
-                        del self.conversation_locks[char]
+                        self.conversation_locks[char].discard(requester)
+                        self.conversation_locks[char].discard(target)
+                        if not self.conversation_locks[char]:
+                            del self.conversation_locks[char]
             
         except Exception as e:
             logger.error(f"Error timing out conversation locks: {e}")
     
-    def get_conversation_lock_status(self, character: str) -> Optional[str]:
+    def get_conversation_lock_status(self, character: str) -> Optional[list]:
         """
         Get the conversation lock status for a character.
         
@@ -1822,11 +1836,11 @@ Do not include any other text, reasoning, introductory, expository, or markdown.
             character: Name of the character
             
         Returns:
-            Optional[str]: Name of character they're locked with, or None if not locked
+            Optional[list]: List of character names they're locked with, or None if not locked
         """
         try:
             canonical_name = character.capitalize()
-            return self.conversation_locks.get(canonical_name)
+            return list(self.conversation_locks.get(canonical_name, []))
         except Exception as e:
             logger.error(f"Error getting conversation lock status for {character}: {e}")
             return None

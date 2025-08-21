@@ -390,7 +390,7 @@ def main():
     import argparse
     
     parser = argparse.ArgumentParser(description='Zenoh LLM Service Node')
-    parser.add_argument('--server-name', choices=['vllm', 'openai', 'openrouter'], default='vllm', 
+    parser.add_argument('--server-name', choices=['vllm', 'openai', 'openrouter', 'llama.cpp'], default='vllm', 
                        help='LLM server to use (default: vllm)')
     parser.add_argument('--model-name', help='Model name to use with the LLM server')
     

@@ -15,6 +15,7 @@ import logging
 import sys
 from datetime import datetime
 from typing import Dict, List, Any, Optional
+from utils.llm_api import LLM
 from concurrent.futures import Future, ThreadPoolExecutor
 
 # Configure logging with unbuffered output
@@ -61,6 +62,7 @@ class ZenohLLMClient:
         # Initialize Zenoh session
         config = zenoh.Config()
         self.session = zenoh.open(config)
+        self.llm = LLM(server_name='openai', model_name='gpt-4.1')
         
         # Publisher for LLM requests
         self.request_publisher = self.session.declare_publisher("cognitive/llm_request")
@@ -80,6 +82,12 @@ class ZenohLLMClient:
         self._lock = threading.Lock()
         
         logger.info('🤖 Zenoh LLM Client initialized')
+
+    def substitute_bindings(self, prompt, bindings):
+        return self.llm.substitute_bindings(prompt, bindings)
+
+    def ask(self, bindings: Dict[str, Any] = None, prompt: str = None, max_tokens: int = 150, temp: float = 0.7, stops: List[str] = ['</end>'], is_json: bool = False, timeout: float = None) -> LLMResponse:
+        return self.llm.ask(bindings, prompt, max_tokens=max_tokens, temp=temp, stops=stops, is_json=is_json)
     
     def generate(self, 
                 messages: List[str], 

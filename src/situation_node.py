@@ -214,7 +214,7 @@ class ZenohSituationNode:
         """Handle incoming actions to update situation."""
         try:
             data = json.loads(sample.payload.to_bytes().decode('utf-8'))
-            logger.info(f'📥 Received action: {data.get("action_type", "unknown")}')
+            logger.info(f'📥 Received action: {data.get("type", "unknown")}')
             
             if data.get('type') == 'move' or data.get('type') == 'announcement':
                 # Update situation based on action

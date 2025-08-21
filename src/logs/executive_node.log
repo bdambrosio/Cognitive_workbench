@@ -1,618 +1,223 @@
-2025-08-18 13:28:37 - executive_node - INFO - 🔧 Debug mode enabled for User
-2025-08-18 13:28:37 - llm_client - INFO - 🤖 Zenoh LLM Client initialized
-2025-08-18 13:28:37 - executive_node - INFO - 🧠 Zenoh Executive Node initialized for character: User
-2025-08-18 13:28:37 - executive_node - INFO -    - Subscribing to: cognitive/User/sense_data
-2025-08-18 13:28:37 - executive_node - INFO -    - Subscribing to: cognitive/User/situation/update
-2025-08-18 13:28:37 - executive_node - INFO -    - Subscribing to: cognitive/map/turn/go
-2025-08-18 13:28:37 - executive_node - INFO -    - Subscribing to: cognitive/map/time_advanced
-2025-08-18 13:28:37 - executive_node - INFO -    - Subscribing to: cognitive/User/end_dialog
-2025-08-18 13:28:37 - executive_node - INFO -    - Publishing to: cognitive/User/action
-2025-08-18 13:28:37 - executive_node - INFO -    - Publishing to: cognitive/User/situation/request_update
-2025-08-18 13:28:37 - executive_node - INFO -    - Publishing to: cognitive/User/memory/store
-2025-08-18 13:28:37 - executive_node - INFO -    - Publishing to: cognitive/User/text_input
-2025-08-18 13:28:37 - executive_node - INFO -    - Publishing to: cognitive/User/goal
-2025-08-18 13:28:37 - executive_node - INFO -    - Publishing to: cognitive/User/decided_action
-2025-08-18 13:28:37 - executive_node - INFO -    - Publishing to: cognitive/map/turn/complete/User
-2025-08-18 13:28:37 - executive_node - INFO -    - Publishing to: cognitive/map/time_proposal
-2025-08-18 13:28:37 - executive_node - INFO - Executive Node running - press Ctrl+C to stop
-2025-08-18 13:28:37 - executive_node - INFO - 📢 Announced character presence: User
-2025-08-18 13:28:37 - executive_node - INFO - 📊 User Received situation update
-2025-08-18 13:28:56 - executive_node - INFO - 📊 User Received situation update
-2025-08-18 13:28:59 - executive_node - INFO - ⏰ User received time update: 2023-06-15 06:32:00+00:00
-2025-08-18 13:28:59 - executive_node - INFO - ⏰ ActivityManager for User received time update: 2023-06-15 06:32:00+00:00
-2025-08-18 13:29:03 - executive_node - INFO - 🚦 Turn 2 received by User
-2025-08-18 13:29:03 - executive_node - INFO - 🚦 Turn 2 started for User
-2025-08-18 13:29:03 - executive_node - INFO - 👥 Retrieved entity context for Samantha
-2025-08-18 13:29:03 - executive_node - INFO - 👥 Retrieved entity context for Joe
-2025-08-18 13:29:03 - executive_node - INFO - 🔄 User completing turn
-2025-08-18 13:29:33 - executive_node - INFO - ⏰ ActivityManager for User received time update2025-08-18 13:29:33 - execut2025-08-18 13:29:33 - executive_node - INFO - ⏰ User received time update: 2025-08-18 13:29:33 - exec2025-08-18 13:29:39 - executive_node - INFO - 🚦 Turn 3 received by User
-2025-08-18 13:29:39 - executive_node - INFO - 🚦 Turn 3 started for User
-2025-08-18 13:29:39 - executive_node - INFO - 👥 Retrieved entity context for Samantha
-2025-08-18 13:2025-08-18 13:29:40 - executive_node - INFO - 🔄 Hermit completing turn
-2025-08-18 13:29:44 - executive_node - INFO - ⏰ Hermit received ti2025-08-18 13:29:44 - executive_node 2025-08-18 13:29:44 - executive_node - INFO - ⏰ ActivityManager for Hermit received time update: 2023-06-15 06:40:00+00:00
-2025-08-18 13:29:49 - executive_node - INFO - 🚦 Turn 4 receiv2025-08-18 13:29:49 - executive_node - INFO - 🚦 Turn 4 received by User
-2025-08-18 13:22025-08-18 13:29:49 - executive_node - INFO - 🔄 Hermit co2025-08-18 13:2025-08-18 13:29:56 - executive_node - INFO - ⏰ ActivityManager for Hermit received time update: 2023-06-15 06:42:00+00:00
-2025-08-18 13:29:56 - executive_node - INFO - ⏰ Hermit received time update: 2023-06-15 06:42:00+00:00
-2025-08-18 13:29:58 - executive_node - INFO - 🚦 Turn 5 received by Hermit
-2025-08-18 13:29:58 - executive_node - INFO - 🚦 Turn 5 started for Hermit
-2025-08-18 13:29:59 - executive_node - INFO - 🔄 Hermit completing turn
-2025-08-18 13:30:04 - executive_node - INFO - ⏰ Hermit received time update: 2023-06-15 06:45:00+00:00
-2025-08-18 13:30:04 - executive_node - INFO - ⏰ ActivityManager for Hermit received time update: 2023-06-15 06:45:00+00:00
-2025-08-18 13:30:10 - executive_node - INFO - 🚦 Turn 6 received by Hermit
-2025-08-18 13:30:10 - executive_node - INFO - 🚦 Turn 6 started for Hermit
-2025-08-18 13:30:10 - executive_node - INFO - 🔄 Hermit completing turn
-2025-08-18 13:30:12 - executive_node - INFO - ⏰ Hermit received time update: 2023-06-15 06:50:00+00:00
-2025-08-18 13:30:12 - executive_node - INFO - ⏰ ActivityManager for Hermit received time update: 2023-06-15 06:50:00+00:00
-2025-08-18 13:30:16 - executive_node - INFO - 🚦 Turn 7 received by Hermit
-2025-08-18 13:30:16 - executive_node - INFO - 🚦 Turn 7 started for Hermit
-2025-08-18 13:30:17 - executive_node - INFO - 🔄 Hermit completing turn
-2025-08-18 13:30:20 - executive_node - INFO - ⏰ Hermit received time update: 2023-06-15 06:53:00+00:00
-2025-08-18 13:30:20 - executive_node - INFO - ⏰ ActivityManager for Hermit received time update: 2023-06-15 06:53:00+00:00
-2025-08-18 13:30:28 - executive_node - INFO - 🚦 Turn 8 received by Hermit
-2025-08-18 13:30:28 - executive_node - INFO - 🚦 Turn 8 started for Hermit
-2025-08-18 13:30:29 - executive_node - INFO - 🔄 Hermit completing turn
-2025-08-18 13:30:48 - executive_node - INFO - ⏰ Hermit received time update: 2023-06-15 06:57:00+00:00
-2025-08-18 13:30:48 - executive_node - INFO - ⏰ ActivityManager for Hermit received time update: 2023-06-15 06:57:00+00:00
-2025-08-18 13:30:53 - executive_node - INFO - 🚦 Turn 9 received by Hermit
-2025-08-18 13:30:53 - executive_node - INFO - 🚦 Turn 9 started for Hermit
-2025-08-18 13:30:54 - executive_node - INFO - 🔄 Hermit completing turn
-2025-08-18 13:30:56 - executive_node - INFO - ⏰ Hermit received time update: 2023-06-15 06:59:00+00:00
-2025-08-18 13:30:56 - executive_node - INFO - ⏰ ActivityManager for Hermit received time update: 2023-06-15 06:59:00+00:00
-2025-08-18 13:30:56 - executive_node - INFO - 🚦 Turn 10 received by Hermit
-2025-08-18 13:30:56 - executive_node - INFO - 🚦 Turn 10 started for Hermit
-2025-08-18 13:30:56 - executive_node - INFO - 🔄 Hermit completing turn
-2025-08-18 13:31:04 - executive_node - INFO - ⏰ Hermit received time update: 2023-06-15 07:02:00+00:00
-2025-08-18 13:31:04 - executive_node - INFO - 🚦 Turn 11 received by Hermit
-2025-08-18 13:31:04 - executive_node - INFO - ⏰ ActivityManager for Hermit received time update: 2023-06-15 07:02:00+00:00
-2025-08-18 13:31:04 - executive_node - INFO - 🚦 Turn 11 started for Hermit
-2025-08-18 13:31:05 - executive_node - INFO - 🔄 Hermit completing turn
-2025-08-18 13:31:14 - executive_node - INFO - ⏰ ActivityManager for Hermit received time update: 2023-06-15 07:06:00+00:00
-2025-08-18 13:31:14 - executive_node - INFO - 🚦 Turn 12 received by Hermit
-2025-08-18 13:31:14 - executive_node - INFO - ⏰ Hermit received time update: 2023-06-15 07:06:00+00:00
-2025-08-18 13:31:14 - executive_node - INFO - 🚦 Turn 12 started for Hermit
-2025-08-18 13:31:16 - executive_node - INFO - 🔄 Hermit completing turn
-2025-08-18 13:31:21 - executive_node - INFO - ⏰ ActivityManager for Hermit received time update: 2023-06-15 07:08:00+00:00
-2025-08-18 13:31:21 - executive_node - INFO - ⏰ Hermit received time update: 2023-06-15 07:08:00+00:00
-2025-08-18 13:31:21 - executive_node - INFO - 🚦 Turn 13 received by Hermit
-2025-08-18 13:31:21 - executive_node - INFO - 🚦 Turn 13 started for Hermit
-2025-08-18 13:31:21 - executive_node - INFO - 🔄 Hermit completing turn
-2025-08-18 13:31:27 - executive_node - INFO - 🚦 Turn 14 received by Hermit
-2025-08-18 13:31:27 - executive_node - INFO - ⏰ Hermit received time update: 2023-06-15 07:10:00+00:00
-2025-08-18 13:31:27 - executive_node - INFO - ⏰ ActivityManager for Hermit received time update: 2023-06-15 07:10:00+00:00
-2025-08-18 13:31:27 - executive_node - INFO - 🚦 Turn 14 started for Hermit
-2025-08-18 13:31:27 - executive_node - INFO - 🔄 Hermit completing turn
-2025-08-18 13:31:29 - executive_node - INFO - ⏰ ActivityManager for Hermit received time update: 2023-06-15 07:12:00+00:00
-2025-08-18 13:31:29 - executive_node - INFO - ⏰ Hermit received time update: 2023-06-15 07:12:00+00:00
-2025-08-18 13:31:29 - executive_node - INFO - 🚦 Turn 15 received by Hermit
-2025-08-18 13:31:29 - executive_node - INFO - 🚦 Turn 15 started for Hermit
-2025-08-18 13:31:30 - executive_node - INFO - 🔄 Hermit completing turn
-2025-08-18 13:31:32 - executive_node - INFO - ⏰ Hermit received time update: 2023-06-15 07:16:00+00:00
-2025-08-18 13:31:32 - executive_node - INFO - ⏰ ActivityManager for Hermit received time update: 2023-06-15 07:16:00+00:00
-2025-08-18 13:31:32 - executive_node - INFO - 🚦 Turn 16 received by Hermit
-2025-08-18 13:31:32 - executive_node - INFO - 🚦 Turn 16 started for Hermit
-2025-08-18 13:31:33 - executive_node - INFO - 🔄 Hermit completing turn
-2025-08-18 13:31:52 - executive_node - INFO - ⏰ ActivityManager for Hermit received time update: 2023-06-15 07:21:00+00:00
-2025-08-18 13:31:52 - executive_node - INFO - ⏰ Hermit received time update: 2023-06-15 07:21:00+00:00
-2025-08-18 13:31:52 - executive_node - INFO - 🚦 Turn 17 received by Hermit
-2025-08-18 13:31:52 - executive_node - INFO - 🚦 Turn 17 started for Hermit
-2025-08-18 13:31:52 - executive_node - INFO - 🔄 Hermit completing turn
-2025-08-18 13:31:53 - executive_node - INFO - ⏰ ActivityManager for Hermit received time update: 2023-06-15 07:23:00+00:00
-2025-08-18 13:31:53 - executive_node - INFO - ⏰ Hermit received time update: 2023-06-15 07:23:00+00:00
-2025-08-18 13:31:53 - executive_node - INFO - 🚦 Turn 18 received by Hermit
-2025-08-18 13:31:53 - executive_node - INFO - 🚦 Turn 18 started for Hermit
-2025-08-18 13:31:53 - executive_node - INFO - 🔄 Hermit completing turn
-2025-08-18 13:31:56 - executive_node - INFO - ⏰ Hermit received time update: 2023-06-15 07:25:00+00:00
-2025-08-18 13:31:56 - executive_node - INFO - ⏰ ActivityManager for Hermit received time update: 2023-06-15 07:25:00+00:00
-2025-08-18 13:31:56 - executive_node - INFO - 🚦 Turn 19 received by Hermit
-2025-08-18 13:31:56 - executive_node - INFO - 🚦 Turn 19 started for Hermit
-2025-08-18 13:31:57 - executive_node - INFO - 🔄 Hermit completing turn
-2025-08-18 13:31:57 - executive_node - INFO - ⏰ Hermit received time update: 2023-06-15 07:27:00+00:00
-2025-08-18 13:31:57 - executive_node - INFO - ⏰ ActivityManager for Hermit received time update: 2023-06-15 07:27:00+00:00
-2025-08-18 13:31:57 - executive_node - INFO - 🚦 Turn 20 received by Hermit
-2025-08-18 13:31:57 - executive_node - INFO - 🚦 Turn 20 started for Hermit
-2025-08-18 13:31:58 - executive_node - INFO - 🔄 Hermit completing turn
-2025-08-18 13:32:04 - executive_node - INFO - ⏰ Hermit received time update: 2023-06-15 07:32:00+00:00
-2025-08-18 13:32:04 - executive_node - INFO - ⏰ ActivityManager for Hermit received time update: 2023-06-15 07:32:00+00:00
-2025-08-18 13:32:04 - executive_node - INFO - 🚦 Turn 21 received by Hermit
-2025-08-18 13:32:04 - executive_node - INFO - 🚦 Turn 21 started for Hermit
-2025-08-18 13:32:04 - executive_node - INFO - 🔄 Hermit completing turn
-2025-08-18 13:32:21 - executive_node - INFO - ⏰ Hermit received time update: 2023-06-15 07:35:00+00:00
-2025-08-18 13:32:21 - executive_node - INFO - ⏰ ActivityManager for Hermit received time update: 2023-06-15 07:35:00+00:00
-2025-08-18 13:32:21 - executive_node - INFO - 🚦 Turn 22 received by Hermit
-2025-08-18 13:32:21 - executive_node - INFO - 🚦 Turn 22 started for Hermit
-2025-08-18 13:32:22 - executive_node - INFO - 🔄 Hermit completing turn
-2025-08-18 13:32:28 - executive_node - INFO - ⏰ Hermit received time update: 2023-06-15 07:38:00+00:00
-2025-08-18 13:32:28 - executive_node - INFO - ⏰ ActivityManager for Hermit received time update: 2023-06-15 07:38:00+00:00
-2025-08-18 13:32:28 - executive_node - INFO - 🚦 Turn 23 received by Hermit
-2025-08-18 13:32:28 - executive_node - INFO - 🚦 Turn 23 started for Hermit
-2025-08-18 13:32:28 - executive_node - INFO - 🔄 Hermit completing turn
-2025-08-18 13:32:46 - executive_node - INFO - ⏰ ActivityManager for Hermit received time update: 2023-06-15 07:42:00+00:00
-2025-08-18 13:32:46 - executive_node - INFO - ⏰ Hermit received time update: 2023-06-15 07:42:00+00:00
-2025-08-18 13:32:46 - executive_node - INFO - 🚦 Turn 24 received by Hermit
-2025-08-18 13:32:46 - executive_node - INFO - 🚦 Turn 24 started for Hermit
-2025-08-18 13:32:47 - executive_node - INFO - 🔄 Hermit completing turn
-2025-08-18 13:32:47 - executive_node - INFO - ⏰ Hermit received time update: 2023-06-15 07:44:00+00:00
-2025-08-18 13:32:47 - executive_node - INFO - ⏰ ActivityManager for Hermit received time update: 2023-06-15 07:44:00+00:00
-2025-08-18 13:32:47 - executive_node - INFO - 🚦 Turn 25 received by Hermit
-2025-08-18 13:32:47 - executive_node - INFO - 🚦 Turn 25 started for Hermit
-2025-08-18 13:32:48 - executive_node - INFO - 🔄 Hermit completing turn
-2025-08-18 13:32:49 - executive_node - INFO - ⏰ Hermit received time update: 2023-06-15 07:47:00+00:00
-2025-08-18 13:32:49 - executive_node - INFO - ⏰ ActivityManager for Hermit received time update: 2023-06-15 07:47:00+00:00
-2025-08-18 13:32:49 - executive_node - INFO - 🚦 Turn 26 received by Hermit
-2025-08-18 13:32:49 - executive_node - INFO - 🚦 Turn 26 started for Hermit
-2025-08-18 13:32:50 - executive_node - INFO - 👥 Retrieved entity context for Joe
-2025-08-18 13:32:50 - executive_node - INFO - 🔄 Hermit completing turn
-2025-08-18 13:32:54 - executive_node - INFO - ⏰ ActivityManager for Hermit received time update: 2023-06-15 07:51:00+00:00
-2025-08-18 13:32:54 - executive_node - INFO - 🚦 Turn 27 received by Hermit
-2025-08-18 13:32:54 - executive_node - INFO - 🚦 Turn 27 started for Hermit
-2025-08-18 13:32:54 - executive_node - INFO - ⏰ Hermit received time update: 2023-06-15 07:51:00+00:00
-2025-08-18 13:32:54 - executive_node - INFO - 👥 Retrieved entity context for Joe
-2025-08-18 13:32:54 - executive_node - INFO - 🔄 Hermit completing turn
-2025-08-18 13:33:00 - executive_node - INFO - ⏰ Hermit received time update: 2023-06-15 07:54:00+00:00
-2025-08-18 13:33:00 - executive_node - INFO - ⏰ ActivityManager for Hermit received time update: 2023-06-15 07:54:00+00:00
-2025-08-18 13:33:00 - executive_node - INFO - 🚦 Turn 28 received by Hermit
-2025-08-18 13:33:00 - executive_node - INFO - 🚦 Turn 28 started for Hermit
-2025-08-18 13:33:00 - executive_node - INFO - 👥 Retrieved entity context for Joe
-2025-08-18 13:33:00 - executive_node - INFO - 🔄 Hermit completing turn
-2025-08-18 13:33:06 - executive_node - INFO - ⏰ Hermit received time update: 2023-06-15 07:57:00+00:00
-2025-08-18 13:33:06 - executive_node - INFO - ⏰ ActivityManager for Hermit received time update: 2023-06-15 07:57:00+00:00
-2025-08-18 13:33:06 - executive_node - INFO - 🚦 Turn 29 received by Hermit
-2025-08-18 13:33:06 - executive_node - INFO - 🚦 Turn 29 started for Hermit
-2025-08-18 13:33:06 - executive_node - INFO - 👥 Retrieved entity context for Joe
-2025-08-18 13:33:06 - executive_node - INFO - 🔄 Hermit completing turn
-2025-08-18 13:33:11 - executive_node - INFO - ⏰ Hermit received time update: 2023-06-15 08:00:00+00:00
-2025-08-18 13:33:11 - executive_node - INFO - 🚦 Turn 30 received by Hermit
-2025-08-18 13:33:11 - executive_node - INFO - ⏰ ActivityManager for Hermit received time update: 2023-06-15 08:00:00+00:00
-2025-08-18 13:33:11 - executive_node - INFO - 🚦 Turn 30 started for Hermit
-2025-08-18 13:33:11 - executive_node - INFO - 👥 Retrieved entity context for Joe
-2025-08-18 13:33:11 - executive_node - INFO - 🔄 Hermit completing turn
- 13:32:46 - executive_node - INFO - 🚦 Turn 24 started for User
-2025-08-18 13:32:47 - executive_node - INFO - 👥 Retrieved entity context for Samantha
-2025-08-18 13:32:47 - executive_node - INFO - 👥 Retrieved entity context for Joe
-2025-08-18 13:32:47 - executive_node - INFO - 🔄 User completing turn
-2025-08-18 13:32:47 - executive_node - INFO - ⏰ User received time update: 2023-06-15 07:44:00+00:00
-2025-08-18 13:32:47 - executive_node - INFO - ⏰ ActivityManager for User received time update: 2023-06-15 07:44:00+00:00
-2025-08-18 13:32:47 - executive_node - INFO - 🚦 Turn 25 received by User
-2025-08-18 13:32:47 - executive_node - INFO - 🚦 Turn 25 started for User
-2025-08-18 13:32:48 - executive_node - INFO - 👥 Retrieved entity context for Samantha
-2025-08-18 13:32:48 - executive_node - INFO - 👥 Retrieved entity context for Joe
-2025-08-18 13:32:48 - executive_node - INFO - 🔄 User completing turn
-2025-08-18 13:32:49 - executive_node - INFO - ⏰ User received time update: 2023-06-15 07:47:00+00:00
-2025-08-18 13:32:49 - executive_node - INFO - ⏰ ActivityManager for User received time update: 2023-06-15 07:47:00+00:00
-2025-08-18 13:32:49 - executive_node - INFO - 🚦 Turn 26 received by User
-2025-08-18 13:32:49 - executive_node - INFO - 🚦 Turn 26 started for User
-2025-08-18 13:32:50 - executive_node - INFO - 👥 Retrieved entity context for Samantha
-2025-08-18 13:32:50 - executive_node - INFO - 👥 Retrieved entity context for Joe
-2025-08-18 13:32:50 - executive_node - INFO - 🔄 User completing turn
-2025-08-18 13:32:54 - executive_node - INFO - ⏰ User received time update: 2023-06-15 07:51:00+00:00
-2025-08-18 13:32:54 - executive_node - INFO - ⏰ ActivityManager for User received time update: 2023-06-15 07:51:00+00:00
-2025-08-18 13:32:54 - executive_node - INFO - 🚦 Turn 27 received by User
-2025-08-18 13:32:54 - executive_node - INFO - 🚦 Turn 27 started for User
-2025-08-18 13:32:54 - executive_node - INFO - 👥 Retrieved entity context for Samantha
-2025-08-18 13:32:54 - executive_node - INFO - 👥 Retrieved entity context for Joe
-2025-08-18 13:32:54 - executive_node - INFO - 🔄 User completing turn
-2025-08-18 13:33:00 - executive_node - INFO - ⏰ User received time update: 2023-06-15 07:54:00+00:00
-2025-08-18 13:33:00 - executive_node - INFO - ⏰ ActivityManager for User received time update: 2023-06-15 07:54:00+00:00
-2025-08-18 13:33:00 - executive_node - INFO - 🚦 Turn 28 received by User
-2025-08-18 13:33:00 - executive_node - INFO - 🚦 Turn 28 started for User
-2025-08-18 13:33:00 - executive_node - INFO - 👥 Retrieved entity context for Samantha
-2025-08-18 13:33:00 - executive_node - INFO - 👥 Retrieved entity context for Joe
-2025-08-18 13:33:00 - executive_node - INFO - 🔄 User completing turn
-2025-08-18 13:33:06 - executive_node - INFO - ⏰ ActivityManager for User received time update: 2023-06-15 07:57:00+00:00
-2025-08-18 13:33:06 - executive_node - INFO - 🚦 Turn 29 received by User
-2025-08-18 13:33:06 - executive_node - INFO - ⏰ User received time update: 2023-06-15 07:57:00+00:00
-2025-08-18 13:33:06 - executive_node - INFO - 🚦 Turn 29 started for User
-2025-08-18 13:33:06 - executive_node - INFO - 👥 Retrieved entity context for Samantha
-2025-08-18 13:33:06 - executive_node - INFO - 👥 Retrieved entity context for Joe
-2025-08-18 13:33:06 - executive_node - INFO - 🔄 User completing turn
-2025-08-18 13:33:11 - executive_node - INFO - ⏰ User received time update: 2023-06-15 08:00:00+00:00
-2025-08-18 13:33:11 - executive_node - INFO - ⏰ ActivityManager for User received time update: 2023-06-15 08:00:00+00:00
-2025-08-18 13:33:11 - executive_node - INFO - 🚦 Turn 30 received by User
-2025-08-18 13:33:11 - executive_node - INFO - 🚦 Turn 30 started for User
-2025-08-18 13:33:11 - executive_node - INFO - 👥 Retrieved entity context for Samantha
-2025-08-18 13:33:11 - executive_node - INFO - 👥 Retrieved entity context for Joe
-2025-08-18 13:33:11 - executive_node - INFO - 🔄 User completing turn
-utive_node - INFO - 🎯 Joe planned action: move: North - None
-2025-08-18 13:31:14 - executive_node - INFO - ⏰ Joe proposed time advance: 4 minutes
-2025-08-18 13:31:14 - executive_node - INFO - Moving north
-2025-08-18 13:31:14 - executive_node - INFO - ✅ Move successful: north
-2025-08-18 13:31:14 - executive_node - INFO - 🔄 Joe completing turn
-2025-08-18 13:31:14 - executive_node - INFO - ⏰ ActivityManager for Joe received time update: 2023-06-15 07:06:00+00:00
-2025-08-18 13:31:14 - executive_node - INFO - ⏰ Joe received time update: 2023-06-15 07:06:00+00:00
-2025-08-18 13:31:14 - executive_node - INFO - 🚦 Turn 12 received by Joe
-2025-08-18 13:31:14 - executive_node - INFO - 🚦 Turn 12 started for Joe
-2025-08-18 13:31:15 - executive_node - INFO - 📊 Joe Received situation update
-2025-08-18 13:31:15 - executive_node - INFO - 📊 Joe Received situation update
-2025-08-18 13:31:15 - executive_node - INFO - 👥 Retrieved entity context for Samantha
-2025-08-18 13:31:15 - executive_node - INFO - 👥 Retrieved entity context for Joe
-2025-08-18 13:31:15 - executive_node - INFO - 👥 Retrieved entity context for Joe
-2025-08-18 13:31:16 - executive_node - INFO - 🎯 Published goal for Joe: Goal construct shelter: construct shelter; actors: Joe; termination: construct shelter completed
-2025-08-18 13:31:16 - executive_node - INFO - 🎯 Joe oriented to goal: Goal construct shelter: construct shelter; actors: Joe; termination: construct shelter completed
-2025-08-18 13:31:16 - executive_node - INFO - 📋 Published decided action for Joe: move: North - 
-2025-08-18 13:31:16 - executive_node - INFO - 🎯 Joe planned action: move: North - None
-2025-08-18 13:31:16 - executive_node - INFO - ⏰ Joe proposed time advance: 2 minutes
-2025-08-18 13:31:16 - executive_node - INFO - Moving north
-2025-08-18 13:31:16 - executive_node - INFO - ✅ Move successful: north
-2025-08-18 13:31:16 - executive_node - INFO - 🔄 Joe completing turn
-2025-08-18 13:31:16 - executive_node - INFO - 📊 Joe Received situation update
-2025-08-18 13:31:16 - executive_node - INFO - 📊 Joe Received situation update
-2025-08-18 13:31:21 - executive_node - INFO - ⏰ Joe received time update: 2023-06-15 07:08:00+00:00
-2025-08-18 13:31:21 - executive_node - INFO - 🚦 Turn 13 received by Joe
-2025-08-18 13:31:21 - executive_node - INFO - ⏰ ActivityManager for Joe received time update: 2023-06-15 07:08:00+00:00
-2025-08-18 13:31:21 - executive_node - INFO - 🚦 Turn 13 started for Joe
-2025-08-18 13:31:21 - executive_node - INFO - 👥 Retrieved entity context for Samantha
-2025-08-18 13:31:21 - executive_node - INFO - 👥 Retrieved entity context for Joe
-2025-08-18 13:31:21 - executive_node - INFO - 👥 Retrieved entity context for Joe
-2025-08-18 13:31:21 - executive_node - INFO - 🎯 Published goal for Joe: Goal construct shelter: construct shelter; actors: Joe; termination: construct shelter completed
-2025-08-18 13:31:21 - executive_node - INFO - 🎯 Joe oriented to goal: Goal construct shelter: construct shelter; actors: Joe; termination: construct shelter completed
-2025-08-18 13:31:21 - executive_node - INFO - 📋 Published decided action for Joe: move: North - 
-2025-08-18 13:31:21 - executive_node - INFO - 🎯 Joe planned action: move: North - None
-2025-08-18 13:31:21 - executive_node - INFO - ⏰ Joe proposed time advance: 5 minutes
-2025-08-18 13:31:21 - executive_node - INFO - Moving north
-2025-08-18 13:31:21 - executive_node - INFO - ✅ Move successful: north
-2025-08-18 13:31:21 - executive_node - INFO - 🔄 Joe completing turn
-2025-08-18 13:31:21 - executive_node - INFO - 📊 Joe Received situation update
-2025-08-18 13:31:27 - executive_node - INFO - ⏰ ActivityManager for Joe received time update: 2023-06-15 07:10:00+00:00
-2025-08-18 13:31:27 - executive_node - INFO - ⏰ Joe received time update: 2023-06-15 07:10:00+00:00
-2025-08-18 13:31:27 - executive_node - INFO - 🚦 Turn 14 received by Joe
-2025-08-18 13:31:27 - executive_node - INFO - 🚦 Turn 14 started for Joe
-2025-08-18 13:31:27 - executive_node - INFO - 📊 Joe Received situation update
-2025-08-18 13:31:27 - executive_node - INFO - 👥 Retrieved entity context for Samantha
-2025-08-18 13:31:27 - executive_node - INFO - 👥 Retrieved entity context for Joe
-2025-08-18 13:31:27 - executive_node - INFO - 👥 Retrieved entity context for Joe
-2025-08-18 13:31:27 - executive_node - INFO - 🎯 Published goal for Joe: Goal construct shelter: construct shelter; actors: Joe; termination: construct shelter completed
-2025-08-18 13:31:27 - executive_node - INFO - 🎯 Joe oriented to goal: Goal construct shelter: construct shelter; actors: Joe; termination: construct shelter completed
-2025-08-18 13:31:27 - executive_node - INFO - 📋 Published decided action for Joe: move: North - 
-2025-08-18 13:31:27 - executive_node - INFO - 🎯 Joe planned action: move: North - None
-2025-08-18 13:31:27 - executive_node - INFO - ⏰ Joe proposed time advance: 2 minutes
-2025-08-18 13:31:27 - executive_node - INFO - Moving north
-2025-08-18 13:31:27 - executive_node - INFO - ✅ Move successful: north
-2025-08-18 13:31:27 - executive_node - INFO - 🔄 Joe completing turn
-2025-08-18 13:31:27 - executive_node - INFO - 📊 Joe Received situation update
-2025-08-18 13:31:29 - executive_node - INFO - 🚦 Turn 15 received by Joe
-2025-08-18 13:31:29 - executive_node - INFO - 🚦 Turn 15 started for Joe
-2025-08-18 13:31:29 - executive_node - INFO - ⏰ Joe received time update: 2023-06-15 07:12:00+00:00
-2025-08-18 13:31:29 - executive_node - INFO - ⏰ ActivityManager for Joe received time update: 2023-06-15 07:12:00+00:00
-2025-08-18 13:31:30 - executive_node - INFO - 👥 Retrieved entity context for Samantha
-2025-08-18 13:31:30 - executive_node - INFO - 👥 Retrieved entity context for Joe
-2025-08-18 13:31:30 - executive_node - INFO - 👥 Retrieved entity context for Joe
-2025-08-18 13:31:30 - executive_node - INFO - 🎯 Published goal for Joe: Goal construct shelter: construct shelter; actors: Joe; termination: construct shelter completed
-2025-08-18 13:31:30 - executive_node - INFO - 🎯 Joe oriented to goal: Goal construct shelter: construct shelter; actors: Joe; termination: construct shelter completed
-2025-08-18 13:31:30 - executive_node - INFO - 📋 Published decided action for Joe: move: North - 
-2025-08-18 13:31:30 - executive_node - INFO - 🎯 Joe planned action: move: North - None
-2025-08-18 13:31:30 - executive_node - INFO - ⏰ Joe proposed time advance: 4 minutes
-2025-08-18 13:31:30 - executive_node - INFO - Moving north
-2025-08-18 13:31:30 - executive_node - INFO - ✅ Move successful: north
-2025-08-18 13:31:30 - executive_node - INFO - 🔄 Joe completing turn
-2025-08-18 13:31:30 - executive_node - INFO - 📊 Joe Received situation update
-2025-08-18 13:31:30 - executive_node - INFO - 📊 Joe Received situation update
-2025-08-18 13:31:32 - executive_node - INFO - ⏰ Joe received time update: 2023-06-15 07:16:00+00:00
-2025-08-18 13:31:32 - executive_node - INFO - ⏰ ActivityManager for Joe received time update: 2023-06-15 07:16:00+00:00
-2025-08-18 13:31:32 - executive_node - INFO - 📊 Joe Received situation update
-2025-08-18 13:31:32 - executive_node - INFO - 🚦 Turn 16 received by Joe
-2025-08-18 13:31:32 - executive_node - INFO - 🚦 Turn 16 started for Joe
-2025-08-18 13:31:33 - executive_node - INFO - 👥 Retrieved entity context for Samantha
-2025-08-18 13:31:33 - executive_node - INFO - 👥 Retrieved entity context for Joe
-2025-08-18 13:31:33 - executive_node - INFO - 👥 Retrieved entity context for Joe
-2025-08-18 13:31:33 - executive_node - INFO - 🎯 Published goal for Joe: Goal construct shelter: construct shelter; actors: Joe; termination: construct shelter completed
-2025-08-18 13:31:33 - executive_node - INFO - 🎯 Joe oriented to goal: Goal construct shelter: construct shelter; actors: Joe; termination: construct shelter completed
-2025-08-18 13:31:33 - executive_node - INFO - 📋 Published decided action for Joe: move: North - 
-2025-08-18 13:31:33 - executive_node - INFO - 🎯 Joe planned action: move: North - None
-2025-08-18 13:31:33 - executive_node - INFO - ⏰ Joe proposed time advance: 5 minutes
-2025-08-18 13:31:33 - executive_node - INFO - Moving north
-2025-08-18 13:31:33 - executive_node - INFO - ✅ Move successful: north
-2025-08-18 13:31:33 - executive_node - INFO - 🔄 Joe completing turn
-2025-08-18 13:31:33 - executive_node - INFO - 📊 Joe Received situation update
-2025-08-18 13:31:52 - executive_node - INFO - ⏰ Joe received time update: 2023-06-15 07:21:00+00:00
-2025-08-18 13:31:52 - executive_node - INFO - ⏰ ActivityManager for Joe received time update: 2023-06-15 07:21:00+00:00
-2025-08-18 13:31:52 - executive_node - INFO - 🚦 Turn 17 received by Joe
-2025-08-18 13:31:52 - executive_node - INFO - 🚦 Turn 17 started for Joe
-2025-08-18 13:31:52 - executive_node - INFO - 📊 Joe Received situation update
-2025-08-18 13:31:52 - executive_node - INFO - 👥 Retrieved entity context for Samantha
-2025-08-18 13:31:52 - executive_node - INFO - 👥 Retrieved entity context for Joe
-2025-08-18 13:31:52 - executive_node - INFO - 👥 Retrieved entity context for Joe
-2025-08-18 13:31:52 - executive_node - INFO - 🎯 Published goal for Joe: Goal construct shelter: construct shelter; actors: Joe; termination: construct shelter completed
-2025-08-18 13:31:52 - executive_node - INFO - 🎯 Joe oriented to goal: Goal construct shelter: construct shelter; actors: Joe; termination: construct shelter completed
-2025-08-18 13:31:52 - executive_node - INFO - 📋 Published decided action for Joe: take: Berries14 - 
-2025-08-18 13:31:52 - executive_node - INFO - 🎯 Joe planned action: take: Berries14 - None
-2025-08-18 13:31:52 - executive_node - INFO - ⏰ Joe proposed time advance: 2 minutes
-2025-08-18 13:31:52 - executive_node - ERROR - 📤 Published action: take (failed)
-2025-08-18 13:31:52 - executive_node - INFO - Action failed for Joe, will retry same step next turn
-2025-08-18 13:31:52 - executive_node - INFO - 🔄 Joe completing turn
-2025-08-18 13:31:53 - executive_node - INFO - ⏰ Joe received time update: 2023-06-15 07:23:00+00:00
-2025-08-18 13:31:53 - executive_node - INFO - ⏰ ActivityManager for Joe received time update: 2023-06-15 07:23:00+00:00
-2025-08-18 13:31:53 - executive_node - INFO - 🚦 Turn 18 received by Joe
-2025-08-18 13:31:53 - executive_node - INFO - 🚦 Turn 18 started for Joe
-2025-08-18 13:31:53 - executive_node - INFO - 👥 Retrieved entity context for Samantha
-2025-08-18 13:31:53 - executive_node - INFO - 👥 Retrieved entity context for Joe
-2025-08-18 13:31:53 - executive_node - INFO - 👥 Retrieved entity context for Joe
-2025-08-18 13:31:53 - executive_node - INFO - 🎯 Published goal for Joe: Goal construct shelter: construct shelter; actors: Joe; termination: construct shelter completed
-2025-08-18 13:31:53 - executive_node - INFO - 🎯 Joe oriented to goal: Goal construct shelter: construct shelter; actors: Joe; termination: construct shelter completed
-2025-08-18 13:31:53 - executive_node - INFO - 📋 Published decided action for Joe: use: Berries14 - 
-2025-08-18 13:31:53 - executive_node - INFO - 🎯 Joe planned action: use: Berries14 - None
-2025-08-18 13:31:53 - executive_node - INFO - ⏰ Joe proposed time advance: 2 minutes
-2025-08-18 13:31:53 - executive_node - INFO - Inventory query for Berries14: {'value': False, 'binding': 'Berries14'}
-2025-08-18 13:31:56 - executive_node - INFO - 🤖 Joe Used Berries14:
+2025-08-21 14:05:46 - executive_node - INFO - 🔧 Debug mode enabled for User
+2025-08-21 14:05:46 - llm_client - INFO - 🤖 Zenoh LLM Client initialized
+2025-08-21 14:05:46 - executive_node - INFO - 🧠 Zenoh Executive Node initialized for character: User
+2025-08-21 14:05:46 - executive_node - INFO -    - Subscribing to: cognitive/User/sense_data
+2025-08-21 14:05:46 - executive_node - INFO -    - Subscribing to: cognitive/User/situation/update
+2025-08-21 14:05:46 - executive_node - INFO -    - Subscribing to: cognitive/map/turn/go
+2025-08-21 14:05:46 - executive_node - INFO -    - Subscribing to: cognitive/map/time_advanced
+2025-08-21 14:05:46 - executive_node - INFO -    - Subscribing to: cognitive/User/end_dialog
+2025-08-21 14:05:46 - executive_node - INFO -    - Publishing to: cognitive/User/action
+2025-08-21 14:05:46 - executive_node - INFO -    - Publishing to: cognitive/User/situation/request_update
+2025-08-21 14:05:46 - executive_node - INFO -    - Publishing to: cognitive/User/memory/store
+2025-08-21 14:05:46 - executive_node - INFO -    - Publishing to: cognitive/User/text_input
+2025-08-21 14:05:46 - executive_node - INFO -    - Publishing to: cognitive/User/goal
+2025-08-21 14:05:46 - executive_node - INFO -    - Publishing to: cognitive/User/decided_action
+2025-08-21 14:05:46 - executive_node - INFO -    - Publishing to: cognitive/map/turn/complete/User
+2025-08-21 14:05:46 - executive_node - INFO -    - Publishing to: cognitive/map/time_proposal
+2025-08-21 14:05:46 - executive_node - INFO - Executive Node running - press Ctrl+C to stop
+2025-08-21 14:05:46 - executive_node - INFO - 📢 Announced character presence: User
+2025-08-21 14:05:46 - executive_node - INFO - 📊 User Received situation update
+2025-08-21 14:05:53 - executive_node - INFO - 🚦 Turn 1 received by User
+2025-08-21 14:05:53 - executive_node - INFO - 🚦 Turn 1 started for User
+2025-08-21 14:05:54 - executive_node - INFO - 🔄 User completing turn
+2025-08-21 14:06:08 - executive_node - INFO - 📊 User Received situation update
+2025-08-21 14:06:11 - executive_node - INFO - ⏰ ActivityManager for User received time update: 2023-06-15 06:32:00+00:00
+2025-08-21 14:06:11 - executive_node -2025-08-21 14:06:11 - executive_node - INFO - ⏰ Hermit received2025-08-21 14:06:21 - executive_node - I2025-08-21 14:06:21 - executive_node - INFO - 🚦 Turn 2 received by Hermit
+2025-08-21 14:06:21 - executive_n2025-08-21 14:06:21 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-21 14:06:21 - executi2025-08-21 14:06:25 - executive_node - INFO2025-08-21 14:06:25 - executive_node - INFO - ⏰ User receive2025-08-21 14:06:25 - executive_node - IN2025-08-21 14:06:25 - executive_node - INFO - ⏰ ActivityManager for User received 2025-08-21 14:06:39 - executive_node - 2025-08-21 14:06:39 - executive_node -2025-08-21 14:06:39 - executive_node 2025-08-21 14:06:39 - executive_node - I2025-08-21 14:06:40 - executive_nod2025-08-21 14:06:40 - executive_node - 2025-08-21 14:06:44 - executive_node - INFO - ⏰ Hermit received time update: 2023-06-15 06:39:00+00:00
+2025-08-21 14:06:2025-08-21 14:06:44 - executive_node - INFO - ⏰ ActivityManager for User received time update: 2023-06-15 2025-08-21 14:07:34 - executive_node - INFO - 🚦 Turn 4 received by Hermit
+2025-08-21 14:07:34 - executive_node - INFO - 🚦 Turn 4 started for Hermit
+2025-08-21 14:07:35 - executive_node - INFO - 🔄 Hermit completing turn
+2025-08-21 14:07:41 - executive_node - INFO - 🚦 Turn 5 received by Hermit
+2025-08-21 14:07:41 - executive_node - INFO - 🚦 Turn 5 started for Hermit
+2025-08-21 14:07:41 - executive_node - INFO - ⏰ ActivityManager for Hermit received time update: 2023-06-15 06:43:00+00:00
+2025-08-21 14:07:41 - executive_node - INFO - ⏰ Hermit received time update: 2023-06-15 06:43:00+00:00
+2025-08-21 14:07:41 - executive_node - INFO - 🔄 Hermit completing turn
+2025-08-21 14:07:42 - executive_node - INFO - ⏰ ActivityManager for Hermit received time update: 2023-06-15 06:45:00+00:00
+2025-08-21 14:07:42 - executive_node - INFO - ⏰ Hermit received time update: 2023-06-15 06:45:00+00:00
+2025-08-21 14:07:42 - executive_node - INFO - 🚦 Turn 6 received by Hermit
+2025-08-21 14:07:42 - executive_node - INFO - 🚦 Turn 6 started for Hermit
+2025-08-21 14:07:42 - executive_node - INFO - 🔄 Hermit completing turn
+2025-08-21 14:07:45 - executive_node - INFO - ⏰ ActivityManager for Hermit received time update: 2023-06-15 06:48:00+00:00
+2025-08-21 14:07:45 - executive_node - INFO - ⏰ Hermit received time update: 2023-06-15 06:48:00+00:00
+2025-08-21 14:07:45 - executive_node - INFO - 🚦 Turn 7 received by Hermit
+2025-08-21 14:07:45 - executive_node - INFO - 🚦 Turn 7 started for Hermit
+2025-08-21 14:07:45 - executive_node - INFO - 🔄 Hermit completing turn
+2025-08-21 14:07:51 - executive_node - INFO - ⏰ Hermit received time update: 2023-06-15 06:58:00+00:00
+2025-08-21 14:07:51 - executive_node - INFO - ⏰ ActivityManager for Hermit received time update: 2023-06-15 06:58:00+00:00
+2025-08-21 14:07:51 - executive_node - INFO - 🚦 Turn 8 received by Hermit
+2025-08-21 14:07:51 - executive_node - INFO - 🚦 Turn 8 started for Hermit
+2025-08-21 14:07:52 - executive_node - INFO - 🔄 Hermit completing turn
+2025-08-21 14:08:01 - executive_node - INFO - ⏰ ActivityManager for Hermit received time update: 2023-06-15 07:00:00+00:00
+2025-08-21 14:08:01 - executive_node - INFO - ⏰ Hermit received time update: 2023-06-15 07:00:00+00:00
+2025-08-21 14:08:01 - executive_node - INFO - 🚦 Turn 9 received by Hermit
+2025-08-21 14:08:01 - executive_node - INFO - 🚦 Turn 9 started for Hermit
+2025-08-21 14:08:02 - executive_node - INFO - 🔄 Hermit completing turn
+2025-08-21 14:08:05 - executive_node - INFO - ⏰ Hermit received time update: 2023-06-15 07:05:00+00:00
+2025-08-21 14:08:05 - executive_node - INFO - ⏰ ActivityManager for Hermit received time update: 2023-06-15 07:05:00+00:00
+2025-08-21 14:08:05 - executive_node - INFO - 🚦 Turn 10 received by Hermit
+2025-08-21 14:08:05 - executive_node - INFO - 🚦 Turn 10 started for Hermit
+2025-08-21 14:08:05 - executive_node - INFO - 🔄 Hermit completing turn
+ for User received time update: 2023-06-15 07:00:00+00:00
+2025-08-21 14:08:01 - executive_node - INFO - ⏰ User received time update: 2023-06-15 07:00:00+00:00
+2025-08-21 14:08:01 - executive_node - INFO - 🚦 Turn 9 received by User
+2025-08-21 14:08:01 - executive_node - INFO - 🚦 Turn 9 started for User
+2025-08-21 14:08:01 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-21 14:08:01 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-21 14:08:01 - executive_node - INFO - 🔄 User completing turn
+2025-08-21 14:08:05 - executive_node - INFO - ⏰ ActivityManager for User received time update: 2023-06-15 07:05:00+00:00
+2025-08-21 14:08:05 - executive_node - INFO - 🚦 Turn 10 received by User
+2025-08-21 14:08:05 - executive_node - INFO - 🚦 Turn 10 started for User
+2025-08-21 14:08:05 - executive_node - INFO - ⏰ User received time update: 2023-06-15 07:05:00+00:00
+2025-08-21 14:08:05 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-21 14:08:05 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-21 14:08:05 - executive_node - INFO - 🔄 User completing turn
+ executive_2025-08-21 14:06:47 - executive_node - INFO - 📥 Joe Received text input: "Hi, nice to meet you too, Joe, I was just out for a hike, enjoying the forest, what brings you here?" (source: Samantha)
+2025-08-21 14:06:47 - executive_node - INFO - 📊 Joe Receive2025-08-21 14:06:52 - executive_node - INFO - 📥 Samantha Received text input: "I was just out for a walk, I like the forest, it's really beautiful here, I'm trying to get my bearings, I don't really know where I am or how I got here, do you know this area at all?" (source: Joe)
+2025-08-21 14:06:52 - executive_node - INFO - 📊 Samantha Received situation update
+2025-08-21 14:06:53 - executive_node - INFO - Responding to: "I was just out for a walk, I like the forest, it's really beautiful here, I'm trying to get my bearings, I don't really know where I am or how I got here, do you know this area at all?" from Joe
+2025-08-21 14:06:53 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-21 14:06:53 - executive_node - INFO - 🤔 Natural dialog end check for Joe: False
+2025-08-21 14:06:53 - executive_node - INFO - 🤖 Samantha Dialog end check: False
+2025-08-21 14:06:57 - executive_node - INFO - 📤 Samantha Sent text input to Joe: "I don't know this area that well either, to be honest, I was just out for a hike and I got a bit turned around, but I think I saw a spring not too far from here, would you like to go check it out with me?" (source: Sama2025-08-21 14:06:57 - executive_node - INFO - 📥 Joe Received text input: "I don't know this area that well either, to be honest, I was just out for a hike and I got a bit turned around, but I think I saw a spring not too far from here, would you like to go check it out with me?" (source: Samantha)
+2025-08-21 14:06:57 - executive_node - INFO - 📊 Joe Received situation update
+2025-08-21 14:06:57 - executive_node - INFO - Responding to: "I don't know this area that well either, to be honest, I was just out for a hike and I got a bit turne2025-08-21 14:07:01 - executive_node - INFO - 📥 Samantha Received text input: "I'd love to check out the spring with you, sounds like a great idea, I could use a drink of water anyway, do you think it's safe to drink from?" (source: Joe)
+2025-08-21 14:07:01 - executive_node - INFO - 📊 Samantha Received situation update
+2025-08-21 14:07:01 - executive_node - INFO - Responding to: "I'd love to check out the spring with you, sounds like a great idea, I could use a drink of water anyway, do you think it's safe to drink from?" from Joe
+2025-08-21 14:07:01 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-21 14:07:02 - executive_node - INFO - 🤔 Natural dialog end check for Joe: False
+2025-08-21 14:07:02 - executive_node - INFO - 🤖 Samantha Dialog end check: False
+2025-08-21 14:07:06 - executive_node - INFO - 📤 Samantha Sent text input to Joe: "I think it's probably okay, I've drunk from springs before and been fine, but we should be careful, I don't know if this one is safe or not, let's go take a look and see if it looks clean, I'm a bit thirsty too, so it would be great if we could2025-08-21 14:07:06 - executive_node - INFO - 📥 Joe Received text input: "I think it's probably okay, I've drunk from springs before and been fine, but we should be careful, I don't know if this one is safe or not, let's go take a look and see if it looks clean, I'm a bit thirsty too, so it would be great if we could find some safe water" (source: Samantha)
+2025-08-21 14:07:06 - executive_node - INFO - 📊 Joe Received situation update
+2025-08-21 14:07:06 - executive_node - INFO - Responding to: "I think it's probably okay, I've drunk from springs before and been fine, but we should be carefu2025-08-21 14:07:09 - executive_node - INFO - 📥 Samantha Received text input: "I think we should head north, the spring you mentioned is probably the one I see 5 units that way, let's go check it out" (source: Joe)
+2025-08-21 14:07:09 - executive_node - INFO - 📊 Samantha Received situation update
+2025-08-21 14:07:10 - executive_node - INFO - Responding to: "I think we should head north, the spring you mentioned is probably the one I see 5 units that way, let's go check it out" from Joe
+2025-08-21 14:07:10 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-21 14:07:11 - executive_node - INFO - 🤔 Natural dialog end check for Joe: True
+2025-08-21 14:07:11 - executive_node - INFO - 🤖 Samantha Dialog end check: True
+2025-08-21 14:07:11 - executive_node - INFO - 🔓 Conversation lock released with Joe
+2025-08-21 14:07:11 - executive_node - WARNING - 🤖 Samantha Replanning.
+2025-08-21 14:07:16 - executive_node - INFO - 🤖 Samantha New Goal: new
+#goal find safe drinking water
+#description find water with Joe safely
+#otherCharacterName Joe
+#termination drinking water completed
+##
+2025-08-21 14:07:16 - executive_node - INFO - Samantha generated goal: Goal find safe drinking water: find water with Joe safely; actors: Samantha, Joe; termination: drinking water completed
+2025-08-21 14:07:16 - executive_node - INFO - 🎯 Published goal for Samantha: Goal find safe drinking water: find water with Joe safely; actors: Samantha, Joe; termination: drinking water completed
+2025-08-21 14:07:16 - executive_nod2025-08-21 14:07:16 - executive_node - INFO2025-08-21 14:07:34 - executive_node - INFO - 🚦 Turn 4 received by Samantha
+2025-08-21 14:07:34 - executive_node - INFO - 🚦 Turn 4 started for Samantha
+2025-08-21 14:07:35 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-21 14:07:35 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-21 14:07:35 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-21 14:07:35 - executive_node - INFO - 🎯 Published goal for Samantha: Goal find safe drinking water: find water with Joe safely; actors: Samantha, Joe; termination: drinking water completed
+2025-08-21 14:07:35 - executive_node - INFO - 🎯 Samantha oriented to goal: Goal find safe drinking water: find water with Joe safely; actors: Samantha, Joe; termination: drinking water completed
+2025-08-21 14:07:35 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-21 14:07:41 - executive_node - INFO - 📊 Samantha Received situation update
+2025-08-21 14:07:41 - executive_node - INFO - 📋 Published current plan for Samantha
+2025-08-21 14:07:41 - executive_node - INFO - 📋 Published decided action for Samantha: move: North - 
+2025-08-21 14:07:41 - executive_node - INFO - 🎯 Samantha planned action: move: North - None
+2025-08-21 14:07:41 - executive_node - INFO - ⏰ Samantha proposed time advance: 5 minutes
+2025-08-21 14:07:41 - executive_node - INFO - Moving north
+2025-08-21 14:07:41 - executive_node - INFO - ✅ Move successful: north
+2025-08-21 14:07:41 - executive_node - INFO - 🔄 Samantha completing turn
+2025-08-21 14:07:41 - executive_node - INFO - ⏰ Samantha received time update: 2023-06-15 06:43:00+00:00
+2025-08-21 14:07:41 - executive_node - INFO - 🚦 Turn 5 received by Samantha
+2025-08-21 14:07:41 - executive_node - INFO - 🚦 Turn 5 started for Samantha
+2025-08-21 14:07:41 - executive_node - INFO - ⏰ ActivityManager for Samantha received time update: 2023-06-15 06:43:00+00:00
+2025-08-21 14:07:41 - executive_node - INFO - 📊 Samantha Received situation update
+2025-08-21 14:07:42 - executive_node - INFO - 📊 Samantha Received situation update
+2025-08-21 14:07:42 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-21 14:07:42 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-21 14:07:42 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-21 14:07:42 - executive_node - INFO - 🎯 Published goal for Samantha: Goal find safe drinking water: find water with Joe safely; actors: Samantha, Joe; termination: drinking water completed
+2025-08-21 14:07:42 - executive_node - INFO - 🎯 Samantha oriented to goal: Goal find safe drinking water: find water with Joe safely; actors: Samantha, Joe; termination: drinking water completed
+2025-08-21 14:07:42 - executive_node - INFO - 📋 Published decided action for Samantha: inspect: Spring3 - 
+2025-08-21 14:07:42 - executive_node - INFO - 🎯 Samantha planned action: inspect: Spring3 - None
+2025-08-21 14:07:42 - executive_node - INFO - ⏰ Samantha proposed time advance: 5 minutes
+2025-08-21 14:07:42 - executive_node - INFO - Inventory query for Spring3: {'value': False, 'binding': 'Spring3'}
+2025-08-21 14:07:42 - executive_node - INFO - 📤 Published action: inspect
+2025-08-21 14:07:42 - executive_node - INFO - 🔄 Samantha completing turn
+2025-08-21 14:07:42 - executive_node - INFO - ⏰ Samantha received time update: 2023-06-15 06:45:00+00:00
+2025-08-21 14:07:42 - executive_node - INFO - ⏰ ActivityManager for Samantha received time update: 2023-06-15 06:45:00+00:00
+2025-08-21 14:07:42 - executive_node - INFO - 🚦 Turn 6 received by Samantha
+2025-08-21 14:07:42 - executive_node - INFO - 🚦 Turn 6 started for Samantha
+2025-08-21 14:07:43 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-21 14:07:43 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-21 14:07:43 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-21 14:07:43 - executive_node - INFO - 🎯 Published goal for Samantha: Goal find safe drinking water: find water with Joe safely; actors: Samantha, Joe; termination: drinking water completed
+2025-08-21 14:07:43 - executive_node - INFO - 🎯 Samantha oriented to goal: Goal find safe drinking water: find water with Joe safely; actors: Samantha, Joe; termination: drinking water completed
+2025-08-21 14:07:43 - executive_node - INFO - 📋 Published decided action for Samantha: use: Spring3 - 
+2025-08-21 14:07:43 - executive_node - INFO - 🎯 Samantha planned action: use: Spring3 - None
+2025-08-21 14:07:43 - executive_node - INFO - ⏰ Samantha proposed time advance: 5 minutes
+2025-08-21 14:07:43 - executive_node - INFO - Inventory query for Spring3: {'value': False, 'binding': 'Spring3'}
+2025-08-21 14:07:45 - executive_node - INFO - 🤖 Samantha Used Spring3:
 	  
-Berries14 eaten, success, energy restored.
+Success, drank water, refreshed. 
 
-2025-08-18 13:31:56 - executive_node - INFO - 📤 Published action: use
-2025-08-18 13:31:56 - executive_node - INFO - 🔄 Joe completing turn
-2025-08-18 13:31:56 - executive_node - INFO - ⏰ Joe received time update: 2023-06-15 07:25:00+00:00
-2025-08-18 13:31:56 - executive_node - INFO - ⏰ ActivityManager for Joe received time update: 2023-06-15 07:25:00+00:00
-2025-08-18 13:31:56 - executive_node - INFO - 🚦 Turn 19 received by Joe
-2025-08-18 13:31:56 - executive_node - INFO - 🚦 Turn 19 started for Joe
-2025-08-18 13:31:57 - executive_node - INFO - 👥 Retrieved entity context for Samantha
-2025-08-18 13:31:57 - executive_node - INFO - 👥 Retrieved entity context for Joe
-2025-08-18 13:31:57 - executive_node - INFO - 👥 Retrieved entity context for Joe
-2025-08-18 13:31:57 - executive_node - INFO - 🎯 Published goal for Joe: Goal construct shelter: construct shelter; actors: Joe; termination: construct shelter completed
-2025-08-18 13:31:57 - executive_node - INFO - 🎯 Joe oriented to goal: Goal construct shelter: construct shelter; actors: Joe; termination: construct shelter completed
-2025-08-18 13:31:57 - executive_node - INFO - 📋 Published decided action for Joe: say: Samantha - I found some food
-2025-08-18 13:31:57 - executive_node - INFO - 🎯 Joe planned action: say: Samantha - I found some food
-2025-08-18 13:31:57 - executive_node - INFO - ⏰ Joe proposed time advance: 5 minutes
-2025-08-18 13:31:57 - executive_node - ERROR - Failed to acquire conversation lock: Lock unavailable
-2025-08-18 13:31:57 - executive_node - ERROR - 📤 Published action: say (failed - lock unavailable)
-2025-08-18 13:31:57 - executive_node - INFO - Action failed for Joe, will retry same step next turn
-2025-08-18 13:31:57 - executive_node - INFO - 🔄 Joe completing turn
-2025-08-18 13:31:57 - executive_node - INFO - ⏰ Joe received time update: 2023-06-15 07:27:00+00:00
-2025-08-18 13:31:57 - executive_node - INFO - ⏰ ActivityManager for Joe received time update: 2023-06-15 07:27:00+00:00
-2025-08-18 13:31:57 - executive_node - INFO - 📊 Joe Received situation update
-2025-08-18 13:31:57 - executive_node - INFO - 🚦 Turn 20 received by Joe
-2025-08-18 13:31:57 - executive_node - INFO - 🚦 Turn 20 started for Joe
-2025-08-18 13:31:58 - executive_node - INFO - 👥 Retrieved entity context for Samantha
-2025-08-18 13:31:58 - executive_node - INFO - 👥 Retrieved entity context for Joe
-2025-08-18 13:31:58 - executive_node - INFO - 👥 Retrieved entity context for Joe
-2025-08-18 13:31:58 - executive_node - INFO - 🎯 Published goal for Joe: Goal construct shelter: construct shelter; actors: Joe; termination: construct shelter completed
-2025-08-18 13:31:58 - executive_node - INFO - 🎯 Joe oriented to goal: Goal construct shelter: construct shelter; actors: Joe; termination: construct shelter completed
-2025-08-18 13:31:58 - executive_node - INFO - 📝 Creating plan execution summary for Joe
-2025-08-18 13:32:04 - executive_node - INFO - 📝 Plan post-mortem prepared for Joe
+2025-08-21 14:07:45 - executive_node - INFO - 🔄 Samantha completing turn
+2025-08-21 14:07:45 - executive_node - INFO - ⏰ Samantha received time update: 2023-06-15 06:48:00+00:00
+2025-08-21 14:07:45 - executive_node - INFO - ⏰ ActivityManager for Samantha received time update: 2023-06-15 06:48:00+00:00
+2025-08-21 14:07:45 - executive_node - INFO - 🚦 Turn 7 received by Samantha
+2025-08-21 14:07:45 - executive_node - INFO - 🚦 Turn 7 started for Samantha
+2025-08-21 14:07:46 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-21 14:07:46 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-21 14:07:46 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-21 14:07:46 - executive_node - INFO - 🎯 Published goal for Samantha: Goal find safe drinking water: find water with Joe safely; actors: Samantha, Joe; termination: drinking water completed
+2025-08-21 14:07:46 - executive_node - INFO - 🎯 Samantha oriented to goal: Goal find safe drinking water: find water with Joe safely; actors: Samantha, Joe; termination: drinking water completed
+2025-08-21 14:07:46 - executive_node - INFO - 📝 Creating plan execution summary for Samantha
+2025-08-21 14:07:50 - executive_node - INFO - 📝 Plan post-mortem prepared for Samantha
  as instructed: 
-The goal was to construct shelter, but the plan executed involved moving north multiple times, taking and eating Berries14, and attempting to communicate with Samantha. The actions taken included six moves north, taking Berries14, eating it to restore energy, and saying something to Samantha. The observed results were successful movement north, successful eating of Berries14 with energy restoration, but no recorded results for taking Berries14 and saying something to Samantha. The goal of constructing shelter was not achieved. 
-
-2025-08-18 13:32:04 - executive_node - INFO - 🎯 Published current activity for Joe
-2025-08-18 13:32:04 - executive_node - INFO - ✅ Activity completed for Joe
-2025-08-18 13:32:04 - executive_node - INFO - 📋 Published current plan for Joe
-2025-08-18 13:32:04 - executive_node - INFO - 📋 Published current plan for Joe
-2025-08-18 13:32:04 - executive_node - WARNING - 🚫 Joe no action found for plan: {"plan": [{"type": "move", "target": "North"}, {"type": "while", "condition": {"type": "notnear", "target": "Berries14"}, "body": [{"type": "move", "target": "North"}]}, {"type": "take", "target": "Berries14"}, {"type": "use", "target": "Berries14", "reason": "Eat"}, {"type": "say", "target": "Samantha", "value": "I found some food"}]}
-2025-08-18 13:32:04 - executive_node - INFO - 🔄 Joe completing turn
-2025-08-18 13:32:04 - executive_node - INFO - ⏰ Joe received time update: 2023-06-15 07:32:00+00:00
-2025-08-18 13:32:04 - executive_node - INFO - 🚦 Turn 21 received by Joe
-2025-08-18 13:32:04 - executive_node - INFO - ⏰ ActivityManager for Joe received time update: 2023-06-15 07:32:00+00:00
-2025-08-18 13:32:04 - executive_node - INFO - 🚦 Turn 21 started for Joe
-2025-08-18 13:32:05 - executive_node - INFO - 👥 Retrieved entity context for Samantha
-2025-08-18 13:32:05 - executive_node - INFO - 👥 Retrieved entity context for Joe
-2025-08-18 13:32:05 - executive_node - INFO - 👥 Retrieved entity context for Joe
-2025-08-18 13:32:05 - executive_node - INFO - Pre-filtered activities: 5
-2025-08-18 13:32:14 - executive_node - INFO - 🎯 Joe selected new activity: First Aid
-2025-08-18 13:32:14 - executive_node - INFO - 🎯 Published current activity for Joe
-2025-08-18 13:32:14 - executive_node - INFO - 🎯 Joe starting new activity: First Aid
-2025-08-18 13:32:14 - executive_node - INFO - 🎯 Published goal for Joe: Goal assess injury: assess injury; actors: Joe; termination: assess injury completed
-2025-08-18 13:32:14 - executive_node - INFO - 🎯 Joe oriented to goal: Goal assess injury: assess injury; actors: Joe; termination: assess injury completed
-2025-08-18 13:32:21 - executive_node - INFO - 📋 Published current plan for Joe
-2025-08-18 13:32:21 - executive_node - INFO - 📋 Published decided action for Joe: move: West - 
-2025-08-18 13:32:21 - executive_node - INFO - 🎯 Joe planned action: move: West - None
-2025-08-18 13:32:21 - executive_node - INFO - ⏰ Joe proposed time advance: 3 minutes
-2025-08-18 13:32:21 - executive_node - INFO - Moving west
-2025-08-18 13:32:21 - executive_node - INFO - ✅ Move successful: west
-2025-08-18 13:32:21 - executive_node - INFO - 🔄 Joe completing turn
-2025-08-18 13:32:21 - executive_node - INFO - ⏰ Joe received time update: 2023-06-15 07:35:00+00:00
-2025-08-18 13:32:21 - executive_node - INFO - ⏰ ActivityManager for Joe received time update: 2023-06-15 07:35:00+00:00
-2025-08-18 13:32:21 - executive_node - INFO - 🚦 Turn 22 received by Joe
-2025-08-18 13:32:21 - executive_node - INFO - 🚦 Turn 22 started for Joe
-2025-08-18 13:32:21 - executive_node - INFO - 📊 Joe Received situation update
-2025-08-18 13:32:21 - executive_node - INFO - 📊 Joe Received situation update
-2025-08-18 13:32:22 - executive_node - INFO - 👥 Retrieved entity context for Samantha
-2025-08-18 13:32:22 - executive_node - INFO - 👥 Retrieved entity context for Joe
-2025-08-18 13:32:22 - executive_node - INFO - 👥 Retrieved entity context for Joe
-2025-08-18 13:32:22 - executive_node - INFO - 🎯 Published goal for Joe: Goal assess injury: assess injury; actors: Joe; termination: assess injury completed
-2025-08-18 13:32:22 - executive_node - INFO - 🎯 Joe oriented to goal: Goal assess injury: assess injury; actors: Joe; termination: assess injury completed
-2025-08-18 13:32:22 - executive_node - INFO - 📋 Published decided action for Joe: move: West - 
-2025-08-18 13:32:22 - executive_node - INFO - 🎯 Joe planned action: move: West - None
-2025-08-18 13:32:22 - executive_node - INFO - ⏰ Joe proposed time advance: 4 minutes
-2025-08-18 13:32:22 - executive_node - INFO - Moving west
-2025-08-18 13:32:22 - executive_node - INFO - ✅ Move successful: west
-2025-08-18 13:32:22 - executive_node - INFO - 🔄 Joe completing turn
-2025-08-18 13:32:22 - executive_node - INFO - 📊 Joe Received situation update
-2025-08-18 13:32:28 - executive_node - INFO - ⏰ ActivityManager for Joe received time update: 2023-06-15 07:38:00+00:00
-2025-08-18 13:32:28 - executive_node - INFO - ⏰ Joe received time update: 2023-06-15 07:38:00+00:00
-2025-08-18 13:32:28 - executive_node - INFO - 📊 Joe Received situation update
-2025-08-18 13:32:28 - executive_node - INFO - 🚦 Turn 23 received by Joe
-2025-08-18 13:32:28 - executive_node - INFO - 🚦 Turn 23 started for Joe
-2025-08-18 13:32:28 - executive_node - INFO - 👥 Retrieved entity context for Samantha
-2025-08-18 13:32:28 - executive_node - INFO - 👥 Retrieved entity context for Joe
-2025-08-18 13:32:28 - executive_node - INFO - 👥 Retrieved entity context for Joe
-2025-08-18 13:32:28 - executive_node - INFO - 🎯 Published goal for Joe: Goal assess injury: assess injury; actors: Joe; termination: assess injury completed
-2025-08-18 13:32:28 - executive_node - INFO - 🎯 Joe oriented to goal: Goal assess injury: assess injury; actors: Joe; termination: assess injury completed
-2025-08-18 13:32:28 - executive_node - INFO - 📋 Published decided action for Joe: move: West - 
-2025-08-18 13:32:28 - executive_node - INFO - 🎯 Joe planned action: move: West - None
-2025-08-18 13:32:28 - executive_node - INFO - ⏰ Joe proposed time advance: 4 minutes
-2025-08-18 13:32:28 - executive_node - INFO - Moving west
-2025-08-18 13:32:28 - executive_node - INFO - ✅ Move successful: west
-2025-08-18 13:32:28 - executive_node - INFO - 🔄 Joe completing turn
-2025-08-18 13:32:28 - executive_node - INFO - 📊 Joe Received situation update
-2025-08-18 13:32:46 - executive_node - INFO - ⏰ Joe received time update: 2023-06-15 07:42:00+00:00
-2025-08-18 13:32:46 - executive_node - INFO - ⏰ ActivityManager for Joe received time update: 2023-06-15 07:42:00+00:00
-2025-08-18 13:32:46 - executive_node - INFO - 🚦 Turn 24 received by Joe
-2025-08-18 13:32:46 - executive_node - INFO - 🚦 Turn 24 started for Joe
-2025-08-18 13:32:46 - executive_node - INFO - 📊 Joe Received situation update
-2025-08-18 13:32:47 - executive_node - INFO - 👥 Retrieved entity context for Samantha
-2025-08-18 13:32:47 - executive_node - INFO - 👥 Retrieved entity context for Joe
-2025-08-18 13:32:47 - executive_node - INFO - 👥 Retrieved entity context for Joe
-2025-08-18 13:32:47 - executive_node - INFO - 🎯 Published goal for Joe: Goal assess injury: assess injury; actors: Joe; termination: assess injury completed
-2025-08-18 13:32:47 - executive_node - INFO - 🎯 Joe oriented to goal: Goal assess injury: assess injury; actors: Joe; termination: assess injury completed
-2025-08-18 13:32:47 - executive_node - INFO - 📋 Published decided action for Joe: move: West - 
-2025-08-18 13:32:47 - executive_node - INFO - 🎯 Joe planned action: move: West - None
-2025-08-18 13:32:47 - executive_node - INFO - ⏰ Joe proposed time advance: 5 minutes
-2025-08-18 13:32:47 - executive_node - INFO - Moving west
-2025-08-18 13:32:47 - executive_node - INFO - ✅ Move successful: west
-2025-08-18 13:32:47 - executive_node - INFO - 🔄 Joe completing turn
-2025-08-18 13:32:47 - executive_node - INFO - ⏰ ActivityManager for Joe received time update: 2023-06-15 07:44:00+00:00
-2025-08-18 13:32:47 - executive_node - INFO - ⏰ Joe received time update: 2023-06-15 07:44:00+00:00
-2025-08-18 13:32:47 - executive_node - INFO - 🚦 Turn 25 received by Joe
-2025-08-18 13:32:47 - executive_node - INFO - 🚦 Turn 25 started for Joe
-2025-08-18 13:32:47 - executive_node - INFO - 📊 Joe Received situation update
-2025-08-18 13:32:48 - executive_node - INFO - 👥 Retrieved entity context for Samantha
-2025-08-18 13:32:48 - executive_node - INFO - 👥 Retrieved entity context for Joe
-2025-08-18 13:32:48 - executive_node - INFO - 👥 Retrieved entity context for Joe
-2025-08-18 13:32:48 - executive_node - INFO - 🎯 Published goal for Joe: Goal assess injury: assess injury; actors: Joe; termination: assess injury completed
-2025-08-18 13:32:48 - executive_node - INFO - 🎯 Joe oriented to goal: Goal assess injury: assess injury; actors: Joe; termination: assess injury completed
-2025-08-18 13:32:48 - executive_node - INFO - 📋 Published decided action for Joe: move: West - 
-2025-08-18 13:32:48 - executive_node - INFO - 🎯 Joe planned action: move: West - None
-2025-08-18 13:32:48 - executive_node - INFO - ⏰ Joe proposed time advance: 3 minutes
-2025-08-18 13:32:48 - executive_node - INFO - Moving west
-2025-08-18 13:32:48 - executive_node - INFO - ✅ Move successful: west
-2025-08-18 13:32:48 - executive_node - INFO - 🔄 Joe completing turn
-2025-08-18 13:32:48 - executive_node - INFO - 📊 Joe Received situation update
-2025-08-18 13:32:48 - executive_node - INFO - 📊 Joe Received situation update
-2025-08-18 13:32:49 - executive_node - INFO - ⏰ Joe received time update: 2023-06-15 07:47:00+00:00
-2025-08-18 13:32:49 - executive_node - INFO - ⏰ ActivityManager for Joe received time update: 2023-06-15 07:47:00+00:00
-2025-08-18 13:32:49 - executive_node - INFO - 🚦 Turn 26 received by Joe
-2025-08-18 13:32:49 - executive_node - INFO - 🚦 Turn 26 started for Joe
-2025-08-18 13:32:49 - executive_node - INFO - 📊 Joe Received situation update
-2025-08-18 13:32:50 - executive_node - INFO - 👥 Retrieved entity context for Samantha
-2025-08-18 13:32:50 - executive_node - INFO - 👥 Retrieved entity context for Joe
-2025-08-18 13:32:50 - executive_node - INFO - 👥 Retrieved entity context for Joe
-2025-08-18 13:32:50 - executive_node - INFO - 🎯 Published goal for Joe: Goal assess injury: assess injury; actors: Joe; termination: assess injury completed
-2025-08-18 13:32:50 - executive_node - INFO - 🎯 Joe oriented to goal: Goal assess injury: assess injury; actors: Joe; termination: assess injury completed
-2025-08-18 13:32:50 - executive_node - INFO - 📋 Published decided action for Joe: move: West - 
-2025-08-18 13:32:50 - executive_node - INFO - 🎯 Joe planned action: move: West - None
-2025-08-18 13:32:50 - executive_node - INFO - ⏰ Joe proposed time advance: 4 minutes
-2025-08-18 13:32:50 - executive_node - INFO - Moving west
-2025-08-18 13:32:50 - executive_node - INFO - ✅ Move successful: west
-2025-08-18 13:32:50 - executive_node - INFO - 🔄 Joe completing turn
-2025-08-18 13:32:50 - executive_node - INFO - 📊 Joe Received situation update
-2025-08-18 13:32:54 - executive_node - INFO - ⏰ Joe received time update: 2023-06-15 07:51:00+00:00
-2025-08-18 13:32:54 - executive_node - INFO - ⏰ ActivityManager for Joe received time update: 2023-06-15 07:51:00+00:00
-2025-08-18 13:32:54 - executive_node - INFO - 🚦 Turn 27 received by Joe
-2025-08-18 13:32:54 - executive_node - INFO - 🚦 Turn 27 started for Joe
-2025-08-18 13:32:54 - executive_node - INFO - 👥 Retrieved entity context for Samantha
-2025-08-18 13:32:54 - executive_node - INFO - 👥 Retrieved entity context for Joe
-2025-08-18 13:32:54 - executive_node - INFO - 👥 Retrieved entity context for Joe
-2025-08-18 13:32:54 - executive_node - INFO - 🎯 Published goal for Joe: Goal assess injury: assess injury; actors: Joe; termination: assess injury completed
-2025-08-18 13:32:54 - executive_node - INFO - 🎯 Joe oriented to goal: Goal assess injury: assess injury; actors: Joe; termination: assess injury completed
-2025-08-18 13:32:54 - executive_node - INFO - 📋 Published decided action for Joe: use: Hut1 - 
-2025-08-18 13:32:54 - executive_node - INFO - 🎯 Joe planned action: use: Hut1 - None
-2025-08-18 13:32:54 - executive_node - INFO - ⏰ Joe proposed time advance: 4 minutes
-2025-08-18 13:32:54 - executive_node - INFO - Inventory query for Hut1: {'value': False, 'binding': 'Hut1'}
-2025-08-18 13:32:57 - executive_node - INFO - 🤖 Joe Used Hut1:
-	  
-Failed to use Hut1, still need shelter 
-2025-08-18 13:32:57 - executive_node - INFO - 📤 Published action: use
-2025-08-18 13:32:57 - executive_node - INFO - 🔄 Joe completing turn
-2025-08-18 13:32:57 - executive_node - INFO - 📊 Joe Received situation update
-2025-08-18 13:33:00 - executive_node - INFO - ⏰ ActivityManager for Joe received time update: 2023-06-15 07:54:00+00:00
-2025-08-18 13:33:00 - executive_node - INFO - ⏰ Joe received time update: 2023-06-15 07:54:00+00:00
-2025-08-18 13:33:00 - executive_node - INFO - 🚦 Turn 28 received by Joe
-2025-08-18 13:33:00 - executive_node - INFO - 🚦 Turn 28 started for Joe
-2025-08-18 13:33:00 - executive_node - INFO - 📊 Joe Received situation update
-2025-08-18 13:33:00 - executive_node - INFO - 👥 Retrieved entity context for Samantha
-2025-08-18 13:33:00 - executive_node - INFO - 👥 Retrieved entity context for Joe
-2025-08-18 13:33:00 - executive_node - INFO - 👥 Retrieved entity context for Joe
-2025-08-18 13:33:00 - executive_node - INFO - 🎯 Published goal for Joe: Goal assess injury: assess injury; actors: Joe; termination: assess injury completed
-2025-08-18 13:33:00 - executive_node - INFO - 🎯 Joe oriented to goal: Goal assess injury: assess injury; actors: Joe; termination: assess injury completed
-2025-08-18 13:33:00 - executive_node - INFO - 📝 Creating plan execution summary for Joe
-2025-08-18 13:33:06 - executive_node - INFO - 📝 Plan post-mortem prepared for Joe
+The goal was to find safe drinking water with Joe safely. Actions taken included moving north, inspecting Berries12 and Spring3, and using Spring3. The observed results were that after inspecting Spring3, the water was used and the outcome was successful, with the individual drinking the wat2025-08-21 14:07:51 - executive_node - INFO - 📝 Plan post-mortem prepared for Joe
  
-The goal was to assess injury, but the plan executed involved moving west and attempting to use Hut1 for shelter. Actions taken included multiple moves in the west direction, followed by an attempt to use Hut1, which failed as the need for shelter remained. The observed results indicate that the goal of assessing injury was not addressed, and the attempt to use Hut1 for shelter was unsuccessful. 
+The goal was to find a spring water source, with Joe and Samantha as actors, and the plan involved moving north, inspecting Spring3 to ensure it was clean, and then using it to get water. The actions taken included moving north, inspecting Spring3, and using it, with the inspection not recording any result but the use of the spring resulting in success, where they drank water and got refreshed, ultimately achieving the goal of arriving at the spring water source. 
 
-2025-08-18 13:33:06 - executive_node - INFO - 🎯 Published current activity for Joe
-2025-08-18 13:33:06 - executive_node - INFO - 🎯 Published goal for Joe: Goal apply treatment: apply treatment; actors: Joe; termination: apply treatment completed
-2025-08-18 13:33:06 - executive_node - INFO - 🎯 Activity step completed, advancing to: apply treatment
-2025-08-18 13:33:06 - executive_node - INFO - 📋 Published current plan for Joe
-2025-08-18 13:33:06 - executive_node - INFO - 🎯 Published current activity for Joe
-2025-08-18 13:33:06 - executive_node - INFO - 🎯 Published goal for Joe: Goal monitor condition: monitor condition; actors: Joe; termination: monitor condition completed
-2025-08-18 13:33:06 - executive_node - INFO - 🎯 Activity step completed, advancing to: monitor condition
-2025-08-18 13:33:06 - executive_node - INFO - 📋 Published current plan for Joe
-2025-08-18 13:33:06 - executive_node - WARNING - 🚫 Joe no action found for plan: {"plan": [{"type": "move", "target": "West"}, {"type": "while", "body": [{"type": "move", "target": "West"}], "condition": {"type": "notnear", "target": "Hut1"}}, {"type": "use", "target": "Hut1", "reason": "shelter"}]}
-2025-08-18 13:33:06 - executive_node - INFO - 🔄 Joe completing turn
-2025-08-18 13:33:06 - executive_node - INFO - ⏰ Joe received time update: 2023-06-15 07:57:00+00:00
-2025-08-18 13:33:06 - executive_node - INFO - ⏰ ActivityManager for Joe received time update: 2023-06-15 07:57:00+00:00
-2025-08-18 13:33:06 - executive_node - INFO - 🚦 Turn 29 received by Joe
-2025-08-18 13:33:06 - executive_node - INFO - 🚦 Turn 29 started for Joe
-2025-08-18 13:33:07 - executive_node - INFO - 👥 Retrieved entity context for Samantha
-2025-08-18 13:33:07 - executive_node - INFO - 👥 Retrieved entity context for Joe
-2025-08-18 13:33:07 - executive_node - INFO - 👥 Retrieved entity context for Joe
-2025-08-18 13:33:07 - executive_node - INFO - 🎯 Published goal for Joe: Goal monitor condition: monitor condition; actors: Joe; termination: monitor condition completed
-2025-08-18 13:33:07 - executive_node - INFO - 🎯 Joe oriented to goal: Goal monitor condition: monitor condition; actors: Joe; termination: monitor condition completed
-2025-08-18 13:33:11 - executive_node - INFO - 📋 Published current plan for Joe
-2025-08-18 13:33:11 - executive_node - INFO - 📋 Published decided action for Joe: move: West - 
-2025-08-18 13:33:11 - executive_node - INFO - 🎯 Joe planned action: move: West - None
-2025-08-18 13:33:11 - executive_node - INFO - ⏰ Joe proposed time advance: 3 minutes
-2025-08-18 13:33:11 - executive_node - INFO - Moving west
-2025-08-18 13:33:11 - executive_node - INFO - ✅ Move successful: west
-2025-08-18 13:33:11 - executive_node - INFO - 🔄 Joe completing turn
-2025-08-18 13:33:11 - executive_node - INFO - 📊 Joe Received situation update
-2025-08-18 13:33:11 - executive_node - INFO - 📊 Joe Received situation update
-2025-08-18 13:33:11 - executive_node - INFO - ⏰ Joe received time update: 2023-06-15 08:00:00+00:00
-2025-08-18 13:33:11 - executive_node - INFO - ⏰ ActivityManager for Joe received time update: 2023-06-15 08:00:00+00:00
-2025-08-18 13:33:11 - executive_node - INFO - 🚦 Turn 30 received by Joe
-2025-08-18 13:33:11 - executive_node - INFO - 🚦 Turn 30 started for Joe
-2025-08-18 13:33:12 - executive_node - INFO - 👥 Retrieved entity context for Samantha
-2025-08-18 13:33:12 - executive_node - INFO - 👥 Retrieved entity context for Joe
-2025-08-18 13:33:12 - executive_node - INFO - 👥 Retrieved entity context for Joe
-2025-08-18 13:33:12 - executive_node - INFO - 🎯 Published goal for Joe: Goal monitor condition: monitor condition; actors: Joe; termination: monitor condition completed
-2025-08-18 13:33:12 - executive_node - INFO - 🎯 Joe oriented to goal: Goal monitor condition: monitor condition; actors: Joe; termination: monitor condition completed
-2025-08-18 13:33:12 - executive_node - INFO - 📋 Published decided action for Joe: use: Hut1 - 
-2025-08-18 13:33:12 - executive_node - INFO - 🎯 Joe planned action: use: Hut1 - None
-2025-08-18 13:33:12 - executive_node - INFO - ⏰ Joe proposed time advance: 2 minutes
-2025-08-18 13:33:12 - executive_node - INFO - Inventory query for Hut1: {'value': False, 'binding': 'Hut1'}
-2025-08-18 13:33:13 - executive_node - INFO - 🤖 Joe Used Hut1:
-	  
-Failed to use Hut1, still need shelter 
-2025-08-18 13:33:13 - executive_node - INFO - 📤 Published action: use
-2025-08-18 13:33:13 - executive_node - INFO - 🔄 Joe completing turn
-�� Samantha planned action: take: Fallenbranch2 - None
-2025-08-18 13:33:00 - executive_node - INFO - ⏰ Samantha proposed time advance: 3 minutes
-2025-08-18 13:33:00 - executive_node - INFO - 📦 Taking Fallenbranch2 for Samantha
-2025-08-18 13:33:00 - executive_node - INFO - 🗑️ Removed Fallenbranch2 from map
-2025-08-18 13:33:00 - executive_node - INFO - 📤 Published take action: Fallenbranch2
-2025-08-18 13:33:00 - executive_node - INFO - 📤 Published action: take
-2025-08-18 13:33:00 - executive_node - INFO - 🔄 Samantha completing turn
-2025-08-18 13:33:00 - executive_node - INFO - ⏰ Samantha received time update: 2023-06-15 07:54:00+00:00
-2025-08-18 13:33:00 - executive_node - INFO - ⏰ ActivityManager for Samantha received time update: 2023-06-15 07:54:00+00:00
-2025-08-18 13:33:00 - executive_node - INFO - 🚦 Turn 28 received by Samantha
-2025-08-18 13:33:00 - executive_node - INFO - 🚦 Turn 28 started for Samantha
-2025-08-18 13:33:01 - executive_node - INFO - 👥 Retrieved entity context for Joe
-2025-08-18 13:33:01 - executive_node - INFO - 👥 Retrieved entity context for Samantha
-2025-08-18 13:33:01 - executive_node - INFO - 👥 Retrieved entity context for Samantha
-2025-08-18 13:33:01 - executive_node - INFO - 🎯 Published goal for Samantha: Goal start fire: start fire; actors: Samantha; termination: start fire completed
-2025-08-18 13:33:01 - executive_node - INFO - 🎯 Samantha oriented to goal: Goal start fire: start fire; actors: Samantha; termination: start fire completed
-2025-08-18 13:33:01 - executive_node - INFO - 📋 Published decided action for Samantha: use: Fallenbranch2 - 
-2025-08-18 13:33:01 - executive_node - INFO - 🎯 Samantha planned action: use: Fallenbranch2 - None
-2025-08-18 13:33:01 - executive_node - INFO - ⏰ Samantha proposed time advance: 3 minutes
-2025-08-18 13:33:02 - executive_node - INFO - 🤖 Samantha Used Fallenbranch2:
-	  
-Failed to make fire with Fallenbranch2.
+2025-08-21 14:07:51 - executive_node - INFO - 🎯 Published current activity for Joe
+2025-08-21 14:07:51 - executive_node - INFO - 🎯 Published goal for Joe: Goal engage in acti2025-08-21 14:07:51 - executive_node - INFO - ⏰ Samantha received time update: 2023-06-15 06:58:00+00:00
+2025-08-21 14:07:51 - executive_node - INFO - ⏰ ActivityManager for Samantha received time update: 2023-06-15 06:58:00+00:00
+2025-08-21 14:07:51 - executive_node - INFO - 🚦 Turn 8 received by Samantha
+2025-08-21 14:07:51 - executive_node - INFO - 🚦 Turn 8 started for Samantha
+2025-08-21 14:07:51 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-21 14:07:51 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-21 14:07:51 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-21 14:07:51 - executive_node - INFO - 🎯 Published goal for Samantha: Goal start conversation: start conversation; actors: Samantha; termination: start conversation completed
+2025-08-21 2025-08-21 14:07:52 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-21 14:07:52 - executive_node - INFO - 👥 Retrieved entity context for Joe2025-08-21 14:07:56 - executive_node - INFO - 📋 Published current plan for Samantha
+2025-08-21 14:07:56 - executive_node - INFO - 📋 Published decided action for Samantha: say: Joe - What do you think of this forest?
+2025-08-21 14:07:56 - executive_node - INFO - 🎯 Samantha planned action: say: Joe - What do you think of this forest?
+2025-08-21 14:07:56 - executive_node - INFO - ⏰ Samantha proposed time advance: 2 minutes
+2025-08-21 14:07:56 - executive_node - INFO - 🔒 C2025-08-21 14:07:59 - executive_node - INFO - 📥 Joe Received text input: "What do you think of this forest, Joe, it's really beautiful?" (source: Samantha)
+2025-08-21 14:07:59 - executive_node - INFO - 📊 Joe Received situation update
+2025-08-21 14:08:01 - executive_node - INFO - 📋 Published current plan for Joe
+2025-08-21 14:08:01 - executive_node - INFO - 📋 Published decided action for Joe: move: North - 
+2025-08-21 14:08:01 - executive_node - INFO - 🎯 Joe planned action: move: North - None
+2025-08-21 14:08:01 - executive_node - INFO - ⏰ Joe proposed time advance: 5 minutes
+2025-08-21 14:08:01 - executive_node - INFO - Moving north
+2025-08-21 14:08:01 - executive_node - INFO - ✅ Move successful: north
+2025-08-21 14:08:01 - executive_node - INFO - 🔄 Joe 2025-08-21 14:082025-08-21 14:08:01 - executive_node - INFO - ⏰ Joe received time update: 2023-06-15 07:02025-08-21 2025-08-21 14:08:01 - executive_node - INFO - ⏰ ActivityManager for Joe received time update: 2023-06-15 07:00:00+00:00
+2025-08-21 14:08:01 - executive_node - INFO - 🚦 Turn 9 received by Joe
+2025-08-21 14:08:01 - executive_node - INFO - 🚦 Turn 9 started for Joe
+2025-08-21 14:08:01 - executive_node - INFO - 📊 Joe Received situation update
+2025-08-21 14:08:02 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-21 14:08:02 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-21 14:08:02 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-21 14:08:02 - executive_node - INFO - 🎯 Published goal for Joe: Goal engage in activity together: engage in activity together; actors: Joe; termination: engage in activity together completed
+2025-08-21 14:08:02 - executive_node - INFO - 🎯 Joe oriented to goal: Goal engage in activity together: engage in activity together; actors: Joe; termination: engage in activity together completed
+2025-08-21 14:08:02 - executive_node - INFO - 📋 Published decided action 2025-08-21 14:08:05 - executive_node - INFO - 📝 Plan post-mortem prepared for Samantha
+ 
+The goal was to start a conversation, which was attempted by Samantha saying to Joe, "What do you think of this forest, Joe, it's really beautiful?" The action was taken at 14:07:56, and the observed result was the initiation of a conversation, as the plan was executed as intended, with the message being conveyed to Joe. 
 
-2025-08-18 13:33:02 - executive_node - INFO - 📤 Published action: use
-2025-08-18 13:33:02 - executive_node - INFO - 🔄 Samantha completing turn
-2025-08-18 13:33:06 - executive_node - INFO - ⏰ ActivityManager for Samantha received time update: 2023-06-15 07:57:00+00:00
-2025-08-18 13:33:06 - executive_node - INFO - 🚦 Turn 29 received by Samantha
-2025-08-18 13:33:06 - executive_node - INFO - ⏰ Samantha received time update: 2023-06-15 07:57:00+00:00
-2025-08-18 13:33:06 - executive_node - INFO - 🚦 Turn 29 started for Samantha
-2025-08-18 13:33:06 - executive_node - INFO - 👥 Retrieved entity context for Joe
-2025-08-18 13:33:06 - executive_node - INFO - 👥 Retrieved entity context for Samantha
-2025-08-18 13:33:06 - executive_node - INFO - 👥 Retrieved entity context for Samantha
-2025-08-18 13:33:06 - executive_node - INFO - 🎯 Published goal for Samantha: Goal start fire: start fire; actors: Samantha; termination: start fire completed
-2025-08-18 13:33:06 - executive_node - INFO - 🎯 Samantha oriented to goal: Goal start fire: start fire; actors: Samantha; termination: start fire completed
-2025-08-18 13:33:06 - executive_node - INFO - 📝 Creating plan execution summary for Samantha
-2025-08-18 13:33:11 - executive_node - INFO - 📊 Samantha Received situation update
-2025-08-18 13:33:11 - executive_node - INFO - 📝 Plan post-mortem prepared for Samantha
- as instructed: 
-Samantha attempted to start a fire, taking a fallen branch and trying to use it to make fire, but the attempt failed, resulting in no fire being started, with the action of using the branch to make fire not being successful, thus the goal of starting a fire was not achieved. 
-
-2025-08-18 13:33:11 - executive_node - INFO - 🎯 Published current activity for Samantha
-2025-08-18 13:33:11 - executive_node - INFO - ✅ Activity completed for Samantha
-2025-08-18 13:33:11 - executive_node - INFO - 📋 Published current plan for Samantha
-2025-08-18 13:33:11 - executive_node - INFO - 📋 Published current plan for Samantha
-2025-08-18 13:33:11 - executive_node - WARNING - 🚫 Samantha no action found for plan: {"plan": [{"type": "take", "target": "Fallenbranch2"}, {"type": "use", "target": "Fallenbranch2", "reason": "make fire"}]}
-2025-08-18 13:33:11 - executive_node - INFO - 🔄 Samantha completing turn
-2025-08-18 13:33:11 - executive_node - INFO - ⏰ ActivityManager for Samantha received time update: 2023-06-15 08:00:00+00:00
-2025-08-18 13:33:11 - executive_node - INFO - ⏰ Samantha received time update: 2023-06-15 08:00:00+00:00
-2025-08-18 13:33:11 - executive_node - INFO - 🚦 Turn 30 received by Samantha
-2025-08-18 13:33:11 - executive_node - INFO - 🚦 Turn 30 started for Samantha
-2025-08-18 13:33:12 - executive_node - INFO - 👥 Retrieved entity context for Joe
-2025-08-18 13:33:12 - executive_node - INFO - 👥 Retrieved entity context for Samantha
-2025-08-18 13:33:12 - executive_node - INFO - 👥 Retrieved entity context for Samantha
-2025-08-18 13:33:12 - executive_node - INFO - Pre-filtered activities: 10
-2025-08-18 13:33:13 - executive_node - INFO - 📊 Samantha Received situation update
+2025-08-21 14:08:05 - executive_node - INFO - 🎯 Published current activity for Samantha
+2025-08-21 14:08:05 - executive_node - INFO - 🎯 Published goal for Samantha: Goal listen to Joe: listen to Joe; actors2025-08-21 14:08:05 - executive_node - INFO - ⏰ Joe received time update: 2023-06-15 07:05:00+00:00
+2025-08-21 14:08:05 - executive_node - INFO - 🚦 Turn 10 received by Joe
+2025-08-21 14:08:05 - executive_node - INFO - ⏰ ActivityManager for Joe received time update: 2023-06-15 07:05:00+00:00
+2025-08-21 14:08:05 - executive_node - INFO - 🚦 Turn 10 started for Joe
+2025-08-21 14:08:05 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-21 14:08:05 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-21 14:08:05 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-21 14:08:05 - executive_node - INFO - 🎯 Published goal for Joe: Goal engage in activity together: engage in activity together; actors: Joe; termination: engage in activity 2025-08-21 14:08:06 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-21 14:08:06 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-21 14:08:06 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-21 14:08:06 - executive_node - INFO - 🎯 Published goal for Samantha: Goal listen to Joe: listen to Joe; actors: Samantha; termination: listen to Joe completed
+2025-08-21 14:08:06 - executive_node - INFO - 🎯 Samantha oriented to goal: Goal listen to Joe: listen to Joe; actors: Samantha; termination: listen to Joe completed
+': 'What is Hut1?'}
