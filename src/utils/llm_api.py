@@ -70,13 +70,7 @@ class LLM():
             IMAGE_PATH.mkdir(parents=True, exist_ok=True)
             print(f"Directory '{IMAGE_PATH}' created.")
 
-    def run_request(self, bindings, prompt, top_p=1.0, temperature=0.7, max_tokens=400, stops=[], log=False, trace=True):
-        global vllm_model
-        #
-        ### first substitute for {{$var-name}} in prompt
-        #
-        global pattern
-        #print(f'run_request {bindings}\n{prompt}\n')
+    def substitute_bindings(self, prompt, bindings):
         if bindings is None or len(bindings) == 0:
             substituted_prompt = [{'role':message.role, 'content':message.content} for message in prompt]
         else:
@@ -96,6 +90,15 @@ class LLM():
                         raise ValueError(f'unbound prompt variable {var}')
                 substituted_prompt.append({'role':message.role, 'content':new_content})
 
+        return substituted_prompt
+
+    def run_request(self, substituted_prompt, top_p=1.0, temperature=0.7, max_tokens=400, stops=[], log=False, trace=True):
+        global vllm_model
+        #
+        ### first substitute for {{$var-name}} in prompt
+        #
+        global pattern
+        #print(f'run_request {bindings}\n{prompt}\n')
         if trace:
             print(f'\n{json.dumps(substituted_prompt)}\n')      
         if log:
@@ -113,11 +116,11 @@ class LLM():
                                           json={"model":self.model, 
                                                 "prompt":content, "temperature":0.0,
                                                "top_p":top_p, "max_tokens":max_tokens, "stop":stops})
-        else:
+        elif 'llama.cpp' in self.server_name:
             url = 'http://localhost:5000/v1/chat/completions'
             response =  requests.post(url, headers={"Content-Type":"application/json"},
                             json={"messages":substituted_prompt, "temperature":temperature,
-                                    "top_p":top_p, "max_tokens":max_tokens, "stop":stops})
+                                    "top_p":top_p, "max_tokens":max_tokens, "stop":stops, "reasoning_effort": "low"})
         if response.status_code == 200:
             if 'vllm' in self.server_name:
                 text = response.json()['choices'][0]['text']
@@ -161,7 +164,8 @@ class LLM():
             if response_prime_needed and type(prompt_msgs[-1]) != AssistantMessage:
                 prompt_msgs = prompt_msgs + [AssistantMessage(content='')]
             print(f'{tag}...', end='')
-            response = self.run_request(input, prompt_msgs, top_p=top_p, temperature=temp, max_tokens=max_tokens, stops=stops, log=log, trace=trace)
+            substituted_prompt = self.substitute_bindings(prompt_msgs, input)
+            response = self.run_request(substituted_prompt, top_p=top_p, temperature=temp, max_tokens=max_tokens, stops=stops, log=log, trace=trace)
             #response = response.replace('<|im_end|>', '')
             elapsed = time.time()-start
             print(f'{elapsed:.2f}')
@@ -195,7 +199,7 @@ class LLM():
                         response = response.strip()
                     response = json.loads(response)
                 except Exception as e:
-                    response = self.repair_json(response, e)
+                    response = self.repair_json(substituted_prompt, response, e)
             if log:
                 logger.info(f'Response:\n{response}\n')
                 #logger.handlers[0].flush()
@@ -204,7 +208,7 @@ class LLM():
             traceback.print_exc()
             return None
        
-    def repair_json(self, response, error):
+    def repair_json(self, prompt,response, error):
         """Repair JSON if it is invalid"""
 
         if not response.startswith('{')and '{' in response:
@@ -247,18 +251,22 @@ class LLM():
 
         # Ok, ask llm
         prompt = [UserMessage(content="""You are a JSON repair tool.
-Your task is to repair the following JSON:
+An LLM received the following prompt and returned invalid JSON. Your task is to repair the JSON.
 
-<json>
+The prompt was:
+{{$prompt}}
+
+The returned JSON was:
 {{$json}}
-</json> 
 
-The reported error is:
+The reported error was:
 {{$error}}
 
+If it seems the JSON was truncated, it may have exceeded the max_tokens limit. In that case, try shortening some string values and completing the JSON according to the prompt.
 Respond with the repaired JSON string. Make sure the string is in a format that can be parsed by the json.loads function. No commentary, no code fences.
 """)]
-        response = self.ask({"json": response, "error": error}, prompt, tag='repair_json', temp=0.2, max_tokens=3500)
+
+        response = self.ask({"json": response, "error": error, "prompt": prompt}, prompt, tag='repair_json', temp=0.2, max_tokens=3500)
         try:
             return json.loads(response.replace("```json", "").replace("```", "").strip())
         except Exception as e:
