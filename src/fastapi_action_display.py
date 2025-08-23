@@ -1696,6 +1696,8 @@ class FastAPIActionDisplayNode:
             } else {
                 if (typeLower === 'take' && actionData.target) {
                     actorLabel = ` ${actionData.target}`;
+                } else if (typeLower === 'scan' && actionData.target) {
+                    actorLabel = ` ${actionData.target}`;
                 }
             }
             html += `<span class="action-type">${actionData.action_type}</span>${actorLabel}`;
@@ -1718,6 +1720,14 @@ class FastAPIActionDisplayNode:
                         actionDetails.push(`Requested: ${actionData.requested_target}`);
                     }
                     if (actionData.value) actionDetails.push(`Value: ${actionData.value}`);
+                    // Add scan-specific details
+                    if (typeLower === 'scan') {
+                        if (actionData.out) actionDetails.push(`Variable: ${actionData.out}`);
+                        if (actionData.result) actionDetails.push(`Found: ${actionData.result}`);
+                        if (actionData.variable_bound && actionData.bound_value) {
+                            actionDetails.push(`Bound: ${actionData.variable_bound} = ${actionData.bound_value}`);
+                        }
+                    }
                     // Append status/error inline without adding vertical height
                     if ((actionData.status && actionData.status.toLowerCase() === 'failed') || actionData.error) {
                         const status = actionData.status ? actionData.status.toUpperCase() : 'FAILED';

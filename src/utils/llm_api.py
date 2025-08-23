@@ -12,8 +12,9 @@ from utils.OpenAIClient import OpenAIClient
 import utils.OpenRouterClient as OpenRouterClient
 
 MODEL = '' # set by simulation from config.py
-logger = logging.getLogger('simulation_core')
-#logger.setLevel(logging.DEBUG)
+
+# Create logger that inherits from parent app's logging configuration
+logger = logging.getLogger('llm_api')
 
 api_key = None
 try:
@@ -202,7 +203,6 @@ class LLM():
                     response = self.repair_json(substituted_prompt, response, e)
             if log:
                 logger.info(f'Response:\n{response}\n')
-                #logger.handlers[0].flush()
             return response
         except Exception as e:
             traceback.print_exc()

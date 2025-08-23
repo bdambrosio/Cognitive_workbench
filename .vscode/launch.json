@@ -17,7 +17,7 @@
             "preLaunchTask": "setup-zenoh-environment"
         },
         {
-            "name": "Debug Activity (laTerre.yaml)",
+            "name": "Debug Activity (lost.yaml)",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/src/activity.py",
@@ -26,12 +26,26 @@
             "env": {
                 "PYTHONPATH": "${workspaceFolder}/src"
             },
-            "args": ["../scenarios/laTerre.yaml"],
+            "args": ["../scenarios/lost.yaml"],
             "justMyCode": false,
             "stopOnEntry": false,
             "preLaunchTask": "setup-zenoh-environment"
         },
         {
+            "name": "Debug Activity (ABetterLife.yaml)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/activity.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/src",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src"
+            },
+            "args": ["../scenarios/ABetterLife.yaml"],
+            "justMyCode": false,
+            "stopOnEntry": false,
+            "preLaunchTask": "setup-zenoh-environment"
+        },{
             "name": "Debug Launcher (Joe - single character)",
             "type": "debugpy",
             "request": "launch",

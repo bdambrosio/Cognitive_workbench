@@ -16,7 +16,6 @@ import zenoh
 #from sentence_transformers import SentenceTransformer
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from Messages import SystemMessage
-from llm_client import ZenohLLMClient
 from utils import hash_utils
 
 # Type checking imports
@@ -24,14 +23,13 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from executive_node import ZenohExecutiveNode
 
-
 # Configure logging with unbuffered output
 # Console handler with WARNING level (less verbose)
 console_handler = logging.StreamHandler(sys.stdout)
-console_handler.setLevel(logging.WARNING)
+console_handler.setLevel(logging.INFO)
 
 # File handler with INFO level (full logging)
-file_handler = logging.FileHandler('logs/executive_node.log', mode='w')
+file_handler = logging.FileHandler('logs/activity.log', mode='w')
 file_handler.setLevel(logging.INFO)
 
 logging.basicConfig(
@@ -41,7 +39,25 @@ logging.basicConfig(
     handlers=[console_handler, file_handler],
     force=True
 )
-logger = logging.getLogger('executive_node')
+logger = logging.getLogger('activity')
+
+# Add dedicated handler for llm_api logger
+llm_api_logger = logging.getLogger('llm_api')
+llm_api_file_handler = logging.FileHandler('logs/llm_api.log', mode='a')
+llm_api_file_handler.setLevel(logging.INFO)
+llm_api_file_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s', '%Y-%m-%d %H:%M:%S'))
+llm_api_logger.addHandler(llm_api_file_handler)
+llm_api_logger.setLevel(logging.INFO)
+
+# Add dedicated handler for llm_client logger
+llm_client_logger = logging.getLogger('llm_client')
+llm_client_file_handler = logging.FileHandler('logs/llm_client.log', mode='a')
+llm_client_file_handler.setLevel(logging.INFO)
+llm_client_file_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s', '%Y-%m-%d %H:%M:%S'))
+llm_client_logger.addHandler(llm_client_file_handler)
+llm_client_logger.setLevel(logging.INFO)
+from llm_client import ZenohLLMClient
+
 map_types = None
 
 # Default activity used when no suitable activities are found
@@ -60,171 +76,98 @@ DEFAULT_ACTIVITY = {
     "habit": 0.0
 }
 
-ontology_prompt = """You are creating an ontology for everyday activities. Attend especially to the era, setting, and locale, these will often be fantasy or historical settings.
-INPUT:
-#Setting: a string including era, locale, climate, tech, norms:
-    {setting}
-##
-
-#Additional information about the setting:
-    {map_types}
-##
-    
-#Character: roles, obligations, skills, preferences, constraints:
-    {character}
-##
-    
-# Other Characters:
-    {other_characters}
-##
-
-Include mental, physical, and social 'activities' that are possible and consisten with the character in this setting in your ontology.
-
-OUTPUT (JSON):
-
-- places[] - places the character can be in the setting
-- tools[] - tools the character can use in the setting
-- roles[] - roles the character can play in the setting
-- norms_rules[] - norms and rules the character must follow in the setting
-- hazards[] - hazards the character must avoid in the setting
-- social_graph[] - social graph of the character in the setting
-- time_windows - Either:
-    - One of: dawn,morning, afternoon, dusk, evening, night
-    - [start,end] (24 hour clock)
-- affordances - e.g. place->[activities_possible]
-
-respond only with the JSON, no other text.
-end your response with </end>
-"""
+from templates import ONTOLOGY_TEMPLATE, ACTIVITIES_TEMPLATE
 llm_client = None
 
-def get_ontology(context, character_name, character, other_characters, map_types_str):
-    """Get the ontology for a given setting and character."""
 
-    other_characters_str = ''
-    for other_character_name, other_character_desc in other_characters.items():
-        if other_character_name != character_name:
-            other_characters_str += f"\n\t{other_character_name}: {other_character_desc}"
-
-    return ontology_prompt.format(setting=context, character=character, other_characters=other_characters_str, map_types=map_types_str)
-
-def get_ontology_from_zenoh(context, character_name, character, other_characters):
+def create_ontology(context, character_name, character, character_drives, other_characters):
     global llm_client
     """Get the ontology for a given setting and character from Zenoh."""
     # Initialize Zenoh session
-    if map_types:
-        map_types_str = f'\n#Available map types:'
-        if map_types.get('terrain_types'):
-            map_types_str += f"\n\tTerrains: {', '.join(map_types['terrain_types'])}"
-        if map_types.get('pathway_types'):
-            map_types_str += f"\n\tPathways {', '.join(map_types['infrastructure_types'])}"
-        if map_types.get('property_types'):
-            map_types_str += f"\n\tProperties: {', '.join(map_types['property_types'])}"
-        if map_types.get('resource_types'):
-            map_types_str += f"\n\tResources: {', '.join(map_types['resource_types'])}"
-        map_types_str += '\n'
-    else:
-        map_types_str = ''
-
-    prompt = get_ontology(context, character_name, character, other_characters, map_types_str=map_types_str)
 
     if llm_client:
-        response = llm_client.generate(
-                    messages=[prompt],
+        map_types_str = ''    
+        if map_types:
+            map_types_str = f'\n#Available map types:'
+            if map_types.get('terrain_types'):
+                map_types_str += f"\n\tTerrains: {', '.join(map_types['terrain_types'])}"
+            if map_types.get('pathway_types'):
+                map_types_str += f"\n\tPathways {', '.join(map_types['infrastructure_types'])}"
+            if map_types.get('property_types'):
+                map_types_str += f"\n\tProperties: {', '.join(map_types['property_types'])}"
+            if map_types.get('resource_types'):
+                map_types_str += f"\n\tResources: {', '.join(map_types['resource_types'])}"
+            map_types_str += '\n'
+
+        other_characters_str = ''
+        for other_character_name, other_character_desc in other_characters.items():
+            if other_character_name != character_name:
+                other_characters_str += f"\n\t{other_character_name}: {other_character_desc}"
+        
+        character_drives_str = '\n'.join(character_drives)   
+
+        response = llm_client.ask({"setting": context, 
+                                   "character": character, 
+                                   "character_drives": character_drives_str, 
+                                   "other_characters": other_characters_str, 
+                                   "map_types": map_types_str},
+                    [SystemMessage(content=ONTOLOGY_TEMPLATE)],
                     max_tokens=1500,
-                    temperature=0.7,
+                    temp=0.7,
                     stops=['</end>'],
-                    is_json=True
+                    is_json=True,
+                    log=True
                 )
 
-    if response.success:
-        print(f'🤖  Activity taxonomy: \n{response.text}')
-        return response.text
+    if type(response) == dict:
+        print(f'🤖  Activity taxonomy: \n{response}')
+        return response
     else:
-        print(f'❌ Failed to get ontology: {response.error}')
+        print(f'❌ Failed to get ontology: {response}')
         return None
 
-def get_activities(context, character_name, character, other_characters, ontology):
-    prompt = """You are generating a comprehensive activity list for a character. 
-CHARACTER: 
-{{$character}}
-##
+def create_activities(context, character_name, character, character_drives, other_characters, ontology):
 
-TASK: Generate 24-30 activities as a JSON object, with the keys being the activity names. Distribute across these categories:
-- Physiological ADLs (eating, drinking, sleeping) - 3-4 activities situated in the setting and your available roles
-- Instrumental ADLs/Logistics (planning, preparing) - 2-3 activities  situated in the setting and your available roles
-- Mobility & Transport  - 2-3 activities situated in the setting and your available roles
-- Role/Production - 3-4 activities situated in the setting and your available roles
-- Learning & Practice - 1-2 activities situated in the setting and your available roles
-- Cognitive/Inner - 1-2 activities situated in the setting and your available roles
-- Recreation & Leisure - 2-3 activities situated in the setting and your available roles
-- Safety/Emergency - 2-3 activities, pro-active or reactive, situated in the setting and your available roles
-- Health Management (self-care) - 2-3 activities situated in the setting and your available roles
-- Maintenance & Repair - 2-3 activities situated in the setting and your available roles
-##
-
-<period> is one of: dawn, morning, afternoon, dusk, evening, night
-<season> is one of: winter, spring, summer, autumn
-
-Each Activity should conform to this schema:
-{
-  "name": "string",
-  "category": <category from above>,
-  "tags": ["physical","mental","social","solo","outdoors","survival","routine"],
-  "when": "daily@<period> | opportunistic | seasonal@<season>", 
-  "where": ["place ids"],
-  "start": ["simple predicates (time/window, place, weather, drive)"],
-  "stop": ["simple predicates or duration cap"],
-  "duration": [min_minutes, max_minutes],
-  "needs": ["tools or innate capacities"],
-  "steps": ["3–5 terse steps; optional #safe markers"],
-  "importance": 0.0,
-  "habit": 0.0
-}
-
-The following ontology can be used to fill in the details of activities:
-ONTOLOGY: 
-{{$ontology}}
-##
-
-Social activities are a priority. Be sure to include social activities in your output. 
-Social activites are only possible with other characters. 
-#Characters you can interact with:
-{{$other_characters}}
-##
-
-#Step Guidelines:
-Generate steps that can serve as achievable planning goals. Each step should:
-
-- Be outcome-focused rather than method-focused: "acquire drinkable water" rather than "purify water using specific method"
-- Have clear success criteria: "locate edible resources within area" rather than "find food" (too vague)
-- Be situationally adaptable: "prepare food for consumption" rather than "cook food over fire" (assumes fire available)
-- Avoid meta-cognitive abstractions: "identify today's priorities" rather than "set goals" (too abstract)
-- Specify scope when needed: "inspect personal equipment for damage" rather than "inspect gear" (scope unclear)
-
-Do not include any other text, introductory, explanatory, markdown, etc.
-End with </end>.
-"""
     other_characters_str = ''
     for other_character_name, other_character_desc in other_characters.items():
         if other_character_name != character_name:
             other_characters_str += f"\n\t{other_character_name}: {other_character_desc}"
 
+    character_drives_str = '\n'.join(character_drives)
+
     if llm_client:
-        response = llm_client.generate(
-                    messages=[prompt],
-                    bindings={"ontology": json.dumps(ontology, indent=2), "character": character, "other_characters": other_characters_str  },
+        map_types_str = ''    
+        if map_types:
+            map_types_str = f'\n#Available map types:'
+            if map_types.get('terrain_types'):
+                map_types_str += f"\n\tTerrains: {', '.join(map_types['terrain_types'])}"
+            if map_types.get('pathway_types'):
+                map_types_str += f"\n\tPathways {', '.join(map_types['infrastructure_types'])}"
+            if map_types.get('property_types'):
+                map_types_str += f"\n\tProperties: {', '.join(map_types['property_types'])}"
+            if map_types.get('resource_types'):
+                map_types_str += f"\n\tResources: {', '.join(map_types['resource_types'])}"
+            map_types_str += '\n'
+
+        response = llm_client.ask({"character": character, 
+                                   "character_drives": character_drives_str, 
+                                   "other_characters": other_characters_str, 
+                                   "ontology": json.dumps(ontology, indent=2),
+                                   "map_types": map_types_str,
+                                   "setting": context},
+                    [SystemMessage(content=ACTIVITIES_TEMPLATE)],
                     max_tokens=6000,
-                    temperature=0.7,
+                    temp=0.7,
                     stops=['</end>'],
-                    is_json=True
+                    is_json=True,
+                    log=True
                 )
 
-    if response.success:
-        print(f'🤖  Activities: \n{response.text}')
-        return response.text
+    if type(response) == dict:
+        print(f'🤖  Activities: \n{response}')
+        return response
     else:
-        print(f'❌ Failed to get activities: {response.error}')
+        print(f'❌ Failed to get activities: {response}')
         return None
 
 def load_scenario(scenario_path):
@@ -235,6 +178,17 @@ def load_scenario(scenario_path):
     except Exception as e:
         print(f"❌ Error loading scenario file {scenario_path}: {e}")
         return None
+
+def save_ontology(character_name, ontology, scenario_dir):
+    """Save activities to a JSON file in the scenarios directory."""
+    filename = f"{character_name}-activity-ontology.json"
+    filepath = os.path.join(scenario_dir, filename)
+    try:
+        with open(filepath, 'w') as file:
+            json.dump(ontology, file, indent=2)
+        print(f"✅ Saved ontology for {character_name} to {filepath}")
+    except Exception as e:
+        print(f"❌ Error saving ontology for {character_name}: {e}")
 
 def save_activities(character_name, activities, scenario_dir):
     """Save activities to a JSON file in the scenarios directory."""
@@ -361,12 +315,12 @@ class ActivityManager:
                         situation['datetime'] = datetime.fromisoformat(situation['time_info'].get('datetime')) if situation['time_info'].get('datetime') else datetime.now()
                         break
                     else:
-                        logger.error(f"Failed to get time data: {time_data}")
+                        logger.error(f"Failed to get time data")
                         situation['time_info'] = {'period': 'unknown', 'season': 'unknown'}
                         situation['weather'] = 'unknown'
                         situation['datetime'] = datetime.now()
                 else:
-                    logger.error(f"Failed to get time data: {time_reply}")
+                    logger.error(f"Failed to get time data")
                     situation['time_info'] = {'period': 'unknown', 'season': 'unknown'}
                     situation['weather'] = 'unknown'
                     situation['datetime'] = datetime.now()
@@ -997,14 +951,17 @@ def main():
     except Exception as e:
         logger.error(f'❌ Failed to launch Map Node: {e}')
 
-    if not map_types:
+    while not map_types:
         for reply in session.get("cognitive/map/types", timeout=25.0):
             if reply.ok:
                 data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
                 if data.get('success'):
                     map_types = data
                     break
-
+    if not map_types:
+        logger.error(f"❌ Failed to get map types")
+        return
+    
     # Get scenario directory for output files
     scenario_dir = os.path.dirname(args.scenario)
     
@@ -1018,21 +975,25 @@ def main():
             continue
         
         # Get character description
-        character_desc = character_data.get('character', '')
+        character_desc = character_data.get('character', '') + '\n' + character_data.get('status', '')
+        character_drives = character_data.get('drives', [])
         if not character_desc:
             print(f"⚠️  No character description for {character_name}, skipping")
             continue
         
         # Get ontology
         print(f"🔍 Getting ontology for {character_name}...")
-        ontology = get_ontology_from_zenoh(setting, character_name, character_desc, characters)
+        ontology = create_ontology(setting, character_name, character_desc, character_drives, characters)
         if not ontology:
             print(f"❌ Failed to get ontology for {character_name}, skipping")
             continue
+        # Save ontology to file
+        save_ontology(character_name, ontology, scenario_dir)   
+        
         
         # Get activities
         print(f"🎯 Getting activities for {character_name}...")
-        activities = get_activities(setting, character_name, character_desc, characters, ontology)
+        activities = create_activities(setting, character_name, character_desc, character_drives, characters, ontology)
         if not activities:
             print(f"❌ Failed to get activities for {character_name}, skipping")
             continue

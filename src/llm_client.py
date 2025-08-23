@@ -18,22 +18,7 @@ from typing import Dict, List, Any, Optional
 from utils.llm_api import LLM
 from concurrent.futures import Future, ThreadPoolExecutor
 
-# Configure logging with unbuffered output
-# Console handler with WARNING level (less verbose)
-console_handler = logging.StreamHandler(sys.stdout)
-console_handler.setLevel(logging.WARNING)
-
-# File handler with INFO level (full logging)
-file_handler = logging.FileHandler('logs/llm_client.log', mode='w')
-file_handler.setLevel(logging.INFO)
-
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    datefmt='%Y-%m-%d %H:%M:%S',
-    handlers=[console_handler, file_handler],
-    force=True
-)
+# Create logger that inherits from parent app's logging configuration
 logger = logging.getLogger('llm_client')
 
 
@@ -86,8 +71,12 @@ class ZenohLLMClient:
     def substitute_bindings(self, prompt, bindings):
         return self.llm.substitute_bindings(prompt, bindings)
 
-    def ask(self, bindings: Dict[str, Any] = None, prompt: str = None, max_tokens: int = 150, temp: float = 0.7, stops: List[str] = ['</end>'], is_json: bool = False, timeout: float = None) -> LLMResponse:
-        return self.llm.ask(bindings, prompt, max_tokens=max_tokens, temp=temp, stops=stops, is_json=is_json)
+    def ask(self, bindings: Dict[str, Any] = None, prompt: str = None, max_tokens: int = 150, temp: float = 0.7, stops: List[str] = ['</end>'], is_json: bool = False, log: bool = False) -> LLMResponse:
+        #substituted_prompt = self.substitute_bindings(prompt, bindings)
+        #logger.info(f'📤 Sent LLM request {substituted_prompt}')
+        response = self.llm.ask(bindings, prompt, max_tokens=max_tokens, temp=temp, stops=stops, is_json=is_json, log=log)
+        #logger.info(f'📤 Received LLM response {response}')
+        return response
     
     def generate(self, 
                 messages: List[str], 
@@ -164,7 +153,7 @@ class ZenohLLMClient:
         # Publish request
         self.request_publisher.put(json.dumps(request_data))
         
-        logger.debug(f'📤 Sent LLM request {request_id}')
+        #logger.debug(f'📤 Sent LLM request {request_id}')
         
         return future
     
@@ -205,7 +194,7 @@ class ZenohLLMClient:
                 if not future.done():
                     future.cancel()
                 del self.pending_requests[request_id]
-                logger.info(f'❌ Cancelled LLM request {request_id}')
+                #logger.info(f'❌ Cancelled LLM request {request_id}')
     
     def cleanup(self):
         """Clean up resources."""

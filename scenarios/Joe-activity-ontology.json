@@ -1,0 +1,128 @@
+{
+  "places": [
+    "Forest",
+    "Clearing",
+    "Meadow",
+    "Water",
+    "Mountain",
+    "Thicket",
+    "Spring",
+    "Cave",
+    "Appletree",
+    "Hut"
+  ],
+  "tools": [
+    "Berries",
+    "Mushrooms",
+    "Appletree",
+    "Fallenbranch",
+    "Spring",
+    "Backpack",
+    "Food",
+    "Water",
+    "Other items (from backpack)"
+  ],
+  "roles": [
+    "Explorer",
+    "Forager",
+    "Problem-solver",
+    "Companion",
+    "Protector",
+    "Investigator",
+    "Outsider",
+    "Survivor",
+    "Budding Scientist"
+  ],
+  "norms_rules": [
+    "Be wary of unknown dangers in the wilderness.",
+    "Prioritize safety and immediate physiological needs.",
+    "Respect companions' boundaries and wariness.",
+    "Follow your curiosity but avoid recklessness.",
+    "Care for the environment; minimize impact on nature.",
+    "Attempt communication before confrontation with strangers.",
+    "Aid others when possible, but protect yourself first."
+  ],
+  "hazards": [
+    "Unknown terrain (steep Mountain, dense Thicket, hidden Cave)",
+    "Poisonous or unsafe Mushrooms and Berries",
+    "Accident or physical injury (falls, sprains)",
+    "Dehydration or lack of food",
+    "Exposure (heat, unexpected weather changes)",
+    "Wild animals (implied, not explicitly listed)",
+    "The Hermit (potentially adversarial, unknown intentions)",
+    "Getting lost (no roads, no landmarks)",
+    "Isolation (social hazard)"
+  ],
+  "social_graph": [
+    {
+      "character": "Samantha",
+      "relation": "Potential Companion, but wary. Shared predicament. Both new to each other."
+    },
+    {
+      "character": "Hermit",
+      "relation": "Potential source of knowledge, but possible threat. Trust must be built."
+    },
+    {
+      "character": "User",
+      "relation": "Unknown motives, helpful advisor or observer. Little known."
+    }
+  ],
+  "time_windows": "morning",
+  "affordances": {
+    "Forest": [
+      "Forage for mushrooms, berries",
+      "Hide or take cover",
+      "Observe or study plants/animals",
+      "Explore for clues or paths",
+      "Talk privately"
+    ],
+    "Clearing": [
+      "Rest",
+      "Scan area for threats or resources",
+      "Eat and drink",
+      "Social interaction"
+    ],
+    "Meadow": [
+      "Search for edible plants",
+      "Relax and gather strength",
+      "Watch sky/weather"
+    ],
+    "Mountain": [
+      "Scout for location/orientation",
+      "Take in a broad view",
+      "Risk physical hazards (falling, slipping)"
+    ],
+    "Water": [
+      "Drink (after checking safety)",
+      "Refill water supply",
+      "Clean up",
+      "Look for aquatic life"
+    ],
+    "Appletree": [
+      "Gather food",
+      "Rest in shade",
+      "Climb for lookout"
+    ],
+    "Spring": [
+      "Refill water",
+      "Freshen up",
+      "Check for wildlife"
+    ],
+    "Cave": [
+      "Seek shelter",
+      "Hide from danger",
+      "Explore for resources",
+      "Face darkness/unknown risk"
+    ],
+    "Thicket": [
+      "Forage carefully",
+      "Hide or remain unseen",
+      "Face minor hazards (thorns, limited visibility)"
+    ],
+    "Hut": [
+      "Seek safety/shelter",
+      "Search for clues about the mystery",
+      "Interact with Hermit (potential help/threat)"
+    ]
+  }
+}

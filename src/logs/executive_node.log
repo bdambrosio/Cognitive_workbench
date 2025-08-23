@@ -1,223 +1,678 @@
-2025-08-21 14:05:46 - executive_node - INFO - 🔧 Debug mode enabled for User
-2025-08-21 14:05:46 - llm_client - INFO - 🤖 Zenoh LLM Client initialized
-2025-08-21 14:05:46 - executive_node - INFO - 🧠 Zenoh Executive Node initialized for character: User
-2025-08-21 14:05:46 - executive_node - INFO -    - Subscribing to: cognitive/User/sense_data
-2025-08-21 14:05:46 - executive_node - INFO -    - Subscribing to: cognitive/User/situation/update
-2025-08-21 14:05:46 - executive_node - INFO -    - Subscribing to: cognitive/map/turn/go
-2025-08-21 14:05:46 - executive_node - INFO -    - Subscribing to: cognitive/map/time_advanced
-2025-08-21 14:05:46 - executive_node - INFO -    - Subscribing to: cognitive/User/end_dialog
-2025-08-21 14:05:46 - executive_node - INFO -    - Publishing to: cognitive/User/action
-2025-08-21 14:05:46 - executive_node - INFO -    - Publishing to: cognitive/User/situation/request_update
-2025-08-21 14:05:46 - executive_node - INFO -    - Publishing to: cognitive/User/memory/store
-2025-08-21 14:05:46 - executive_node - INFO -    - Publishing to: cognitive/User/text_input
-2025-08-21 14:05:46 - executive_node - INFO -    - Publishing to: cognitive/User/goal
-2025-08-21 14:05:46 - executive_node - INFO -    - Publishing to: cognitive/User/decided_action
-2025-08-21 14:05:46 - executive_node - INFO -    - Publishing to: cognitive/map/turn/complete/User
-2025-08-21 14:05:46 - executive_node - INFO -    - Publishing to: cognitive/map/time_proposal
-2025-08-21 14:05:46 - executive_node - INFO - Executive Node running - press Ctrl+C to stop
-2025-08-21 14:05:46 - executive_node - INFO - 📢 Announced character presence: User
-2025-08-21 14:05:46 - executive_node - INFO - 📊 User Received situation update
-2025-08-21 14:05:53 - executive_node - INFO - 🚦 Turn 1 received by User
-2025-08-21 14:05:53 - executive_node - INFO - 🚦 Turn 1 started for User
-2025-08-21 14:05:54 - executive_node - INFO - 🔄 User completing turn
-2025-08-21 14:06:08 - executive_node - INFO - 📊 User Received situation update
-2025-08-21 14:06:11 - executive_node - INFO - ⏰ ActivityManager for User received time update: 2023-06-15 06:32:00+00:00
-2025-08-21 14:06:11 - executive_node -2025-08-21 14:06:11 - executive_node - INFO - ⏰ Hermit received2025-08-21 14:06:21 - executive_node - I2025-08-21 14:06:21 - executive_node - INFO - 🚦 Turn 2 received by Hermit
-2025-08-21 14:06:21 - executive_n2025-08-21 14:06:21 - executive_node - INFO - 👥 Retrieved entity context for Samantha
-2025-08-21 14:06:21 - executi2025-08-21 14:06:25 - executive_node - INFO2025-08-21 14:06:25 - executive_node - INFO - ⏰ User receive2025-08-21 14:06:25 - executive_node - IN2025-08-21 14:06:25 - executive_node - INFO - ⏰ ActivityManager for User received 2025-08-21 14:06:39 - executive_node - 2025-08-21 14:06:39 - executive_node -2025-08-21 14:06:39 - executive_node 2025-08-21 14:06:39 - executive_node - I2025-08-21 14:06:40 - executive_nod2025-08-21 14:06:40 - executive_node - 2025-08-21 14:06:44 - executive_node - INFO - ⏰ Hermit received time update: 2023-06-15 06:39:00+00:00
-2025-08-21 14:06:2025-08-21 14:06:44 - executive_node - INFO - ⏰ ActivityManager for User received time update: 2023-06-15 2025-08-21 14:07:34 - executive_node - INFO - 🚦 Turn 4 received by Hermit
-2025-08-21 14:07:34 - executive_node - INFO - 🚦 Turn 4 started for Hermit
-2025-08-21 14:07:35 - executive_node - INFO - 🔄 Hermit completing turn
-2025-08-21 14:07:41 - executive_node - INFO - 🚦 Turn 5 received by Hermit
-2025-08-21 14:07:41 - executive_node - INFO - 🚦 Turn 5 started for Hermit
-2025-08-21 14:07:41 - executive_node - INFO - ⏰ ActivityManager for Hermit received time update: 2023-06-15 06:43:00+00:00
-2025-08-21 14:07:41 - executive_node - INFO - ⏰ Hermit received time update: 2023-06-15 06:43:00+00:00
-2025-08-21 14:07:41 - executive_node - INFO - 🔄 Hermit completing turn
-2025-08-21 14:07:42 - executive_node - INFO - ⏰ ActivityManager for Hermit received time update: 2023-06-15 06:45:00+00:00
-2025-08-21 14:07:42 - executive_node - INFO - ⏰ Hermit received time update: 2023-06-15 06:45:00+00:00
-2025-08-21 14:07:42 - executive_node - INFO - 🚦 Turn 6 received by Hermit
-2025-08-21 14:07:42 - executive_node - INFO - 🚦 Turn 6 started for Hermit
-2025-08-21 14:07:42 - executive_node - INFO - 🔄 Hermit completing turn
-2025-08-21 14:07:45 - executive_node - INFO - ⏰ ActivityManager for Hermit received time update: 2023-06-15 06:48:00+00:00
-2025-08-21 14:07:45 - executive_node - INFO - ⏰ Hermit received time update: 2023-06-15 06:48:00+00:00
-2025-08-21 14:07:45 - executive_node - INFO - 🚦 Turn 7 received by Hermit
-2025-08-21 14:07:45 - executive_node - INFO - 🚦 Turn 7 started for Hermit
-2025-08-21 14:07:45 - executive_node - INFO - 🔄 Hermit completing turn
-2025-08-21 14:07:51 - executive_node - INFO - ⏰ Hermit received time update: 2023-06-15 06:58:00+00:00
-2025-08-21 14:07:51 - executive_node - INFO - ⏰ ActivityManager for Hermit received time update: 2023-06-15 06:58:00+00:00
-2025-08-21 14:07:51 - executive_node - INFO - 🚦 Turn 8 received by Hermit
-2025-08-21 14:07:51 - executive_node - INFO - 🚦 Turn 8 started for Hermit
-2025-08-21 14:07:52 - executive_node - INFO - 🔄 Hermit completing turn
-2025-08-21 14:08:01 - executive_node - INFO - ⏰ ActivityManager for Hermit received time update: 2023-06-15 07:00:00+00:00
-2025-08-21 14:08:01 - executive_node - INFO - ⏰ Hermit received time update: 2023-06-15 07:00:00+00:00
-2025-08-21 14:08:01 - executive_node - INFO - 🚦 Turn 9 received by Hermit
-2025-08-21 14:08:01 - executive_node - INFO - 🚦 Turn 9 started for Hermit
-2025-08-21 14:08:02 - executive_node - INFO - 🔄 Hermit completing turn
-2025-08-21 14:08:05 - executive_node - INFO - ⏰ Hermit received time update: 2023-06-15 07:05:00+00:00
-2025-08-21 14:08:05 - executive_node - INFO - ⏰ ActivityManager for Hermit received time update: 2023-06-15 07:05:00+00:00
-2025-08-21 14:08:05 - executive_node - INFO - 🚦 Turn 10 received by Hermit
-2025-08-21 14:08:05 - executive_node - INFO - 🚦 Turn 10 started for Hermit
-2025-08-21 14:08:05 - executive_node - INFO - 🔄 Hermit completing turn
- for User received time update: 2023-06-15 07:00:00+00:00
-2025-08-21 14:08:01 - executive_node - INFO - ⏰ User received time update: 2023-06-15 07:00:00+00:00
-2025-08-21 14:08:01 - executive_node - INFO - 🚦 Turn 9 received by User
-2025-08-21 14:08:01 - executive_node - INFO - 🚦 Turn 9 started for User
-2025-08-21 14:08:01 - executive_node - INFO - 👥 Retrieved entity context for Joe
-2025-08-21 14:08:01 - executive_node - INFO - 👥 Retrieved entity context for Samantha
-2025-08-21 14:08:01 - executive_node - INFO - 🔄 User completing turn
-2025-08-21 14:08:05 - executive_node - INFO - ⏰ ActivityManager for User received time update: 2023-06-15 07:05:00+00:00
-2025-08-21 14:08:05 - executive_node - INFO - 🚦 Turn 10 received by User
-2025-08-21 14:08:05 - executive_node - INFO - 🚦 Turn 10 started for User
-2025-08-21 14:08:05 - executive_node - INFO - ⏰ User received time update: 2023-06-15 07:05:00+00:00
-2025-08-21 14:08:05 - executive_node - INFO - 👥 Retrieved entity context for Joe
-2025-08-21 14:08:05 - executive_node - INFO - 👥 Retrieved entity context for Samantha
-2025-08-21 14:08:05 - executive_node - INFO - 🔄 User completing turn
- executive_2025-08-21 14:06:47 - executive_node - INFO - 📥 Joe Received text input: "Hi, nice to meet you too, Joe, I was just out for a hike, enjoying the forest, what brings you here?" (source: Samantha)
-2025-08-21 14:06:47 - executive_node - INFO - 📊 Joe Receive2025-08-21 14:06:52 - executive_node - INFO - 📥 Samantha Received text input: "I was just out for a walk, I like the forest, it's really beautiful here, I'm trying to get my bearings, I don't really know where I am or how I got here, do you know this area at all?" (source: Joe)
-2025-08-21 14:06:52 - executive_node - INFO - 📊 Samantha Received situation update
-2025-08-21 14:06:53 - executive_node - INFO - Responding to: "I was just out for a walk, I like the forest, it's really beautiful here, I'm trying to get my bearings, I don't really know where I am or how I got here, do you know this area at all?" from Joe
-2025-08-21 14:06:53 - executive_node - INFO - 👥 Retrieved entity context for Joe
-2025-08-21 14:06:53 - executive_node - INFO - 🤔 Natural dialog end check for Joe: False
-2025-08-21 14:06:53 - executive_node - INFO - 🤖 Samantha Dialog end check: False
-2025-08-21 14:06:57 - executive_node - INFO - 📤 Samantha Sent text input to Joe: "I don't know this area that well either, to be honest, I was just out for a hike and I got a bit turned around, but I think I saw a spring not too far from here, would you like to go check it out with me?" (source: Sama2025-08-21 14:06:57 - executive_node - INFO - 📥 Joe Received text input: "I don't know this area that well either, to be honest, I was just out for a hike and I got a bit turned around, but I think I saw a spring not too far from here, would you like to go check it out with me?" (source: Samantha)
-2025-08-21 14:06:57 - executive_node - INFO - 📊 Joe Received situation update
-2025-08-21 14:06:57 - executive_node - INFO - Responding to: "I don't know this area that well either, to be honest, I was just out for a hike and I got a bit turne2025-08-21 14:07:01 - executive_node - INFO - 📥 Samantha Received text input: "I'd love to check out the spring with you, sounds like a great idea, I could use a drink of water anyway, do you think it's safe to drink from?" (source: Joe)
-2025-08-21 14:07:01 - executive_node - INFO - 📊 Samantha Received situation update
-2025-08-21 14:07:01 - executive_node - INFO - Responding to: "I'd love to check out the spring with you, sounds like a great idea, I could use a drink of water anyway, do you think it's safe to drink from?" from Joe
-2025-08-21 14:07:01 - executive_node - INFO - 👥 Retrieved entity context for Joe
-2025-08-21 14:07:02 - executive_node - INFO - 🤔 Natural dialog end check for Joe: False
-2025-08-21 14:07:02 - executive_node - INFO - 🤖 Samantha Dialog end check: False
-2025-08-21 14:07:06 - executive_node - INFO - 📤 Samantha Sent text input to Joe: "I think it's probably okay, I've drunk from springs before and been fine, but we should be careful, I don't know if this one is safe or not, let's go take a look and see if it looks clean, I'm a bit thirsty too, so it would be great if we could2025-08-21 14:07:06 - executive_node - INFO - 📥 Joe Received text input: "I think it's probably okay, I've drunk from springs before and been fine, but we should be careful, I don't know if this one is safe or not, let's go take a look and see if it looks clean, I'm a bit thirsty too, so it would be great if we could find some safe water" (source: Samantha)
-2025-08-21 14:07:06 - executive_node - INFO - 📊 Joe Received situation update
-2025-08-21 14:07:06 - executive_node - INFO - Responding to: "I think it's probably okay, I've drunk from springs before and been fine, but we should be carefu2025-08-21 14:07:09 - executive_node - INFO - 📥 Samantha Received text input: "I think we should head north, the spring you mentioned is probably the one I see 5 units that way, let's go check it out" (source: Joe)
-2025-08-21 14:07:09 - executive_node - INFO - 📊 Samantha Received situation update
-2025-08-21 14:07:10 - executive_node - INFO - Responding to: "I think we should head north, the spring you mentioned is probably the one I see 5 units that way, let's go check it out" from Joe
-2025-08-21 14:07:10 - executive_node - INFO - 👥 Retrieved entity context for Joe
-2025-08-21 14:07:11 - executive_node - INFO - 🤔 Natural dialog end check for Joe: True
-2025-08-21 14:07:11 - executive_node - INFO - 🤖 Samantha Dialog end check: True
-2025-08-21 14:07:11 - executive_node - INFO - 🔓 Conversation lock released with Joe
-2025-08-21 14:07:11 - executive_node - WARNING - 🤖 Samantha Replanning.
-2025-08-21 14:07:16 - executive_node - INFO - 🤖 Samantha New Goal: new
-#goal find safe drinking water
-#description find water with Joe safely
-#otherCharacterName Joe
-#termination drinking water completed
+2025-08-23 13:42:38 - executive_node - INFO - 🔧 Debug mode enabled for User
+2025-08-23 13:42:38 - llm_client - INFO - 🤖 Zenoh LLM Client initialized
+2025-08-23 13:42:38 - executive_node - INFO - 🧠 Zenoh Executive Node initialized for character: User
+2025-08-23 13:42:38 - executive_node - INFO -    - Subscribing to: cognitive/User/sense_data
+2025-08-23 13:42:38 - executive_node - INFO -    - Subscribing to: cognitive/User/situation/update
+2025-08-23 13:42:38 - executive_node - INFO -    - Subscribing to: cognitive/map/turn/go
+2025-08-23 13:42:38 - executive_node - INFO -    - Subscribing to: cognitive/map/time_advanced
+2025-08-23 13:42:38 - executive_node - INFO -    - Subscribing to: cognitive/User/end_dialog
+2025-08-23 13:42:38 - executive_node - INFO -    - Publishing to: cognitive/User/action
+2025-08-23 13:42:38 - executive_node - INFO -    - Publishing to: cognitive/User/situation/request_update
+2025-08-23 13:42:38 - executive_node - INFO -    - Publishing to: cognitive/User/memory/store
+2025-08-23 13:42:38 - executive_node - INFO -    - Publishing to: cognitive/User/text_input
+2025-08-23 13:42:38 - executive_node - INFO -    - Publishing to: cognitive/User/goal
+2025-08-23 13:42:38 - executive_node - INFO -    - Publishing to: cognitive/User/decided_action
+2025-08-23 13:42:38 - executive_node - INFO -    - Publishing to: cognitive/map/turn/complete/User
+2025-08-23 13:42:38 - executive_node - INFO -    - Publishing to: cognitive/map/time_proposal
+2025-08-23 13:42:38 - executive_node - INFO - Executive Node running - press Ctrl+C to stop
+2025-08-23 13:42:38 - executive_node - INFO - 📢 Announced character presence: User
+2025-08-23 13:42:39 - executive_node - INFO - 📊 User Received situation update
+2025-08-23 13:44:11 - executive_node - INFO - 🚦 Turn 1 received by User
+2025-08-23 13:44:11 - executive_node - INFO - 🚦 Turn 1 started for User
+2025-08-23 13:44:11 - executive_node - INFO - 🔄 User completin2025-082025-08-23 13:44:32 - executive_node - INFO - 📊 User Received situation update
+2025-08-23 13:44:43 - executive_node2025-08-23 13:44:43 - activity - INFO - ⏰ ActivityManager for Hermit received time update: 2023-06-15 06:35:00+00:00
+2025-08-23 13:44:43 - executive_node - INFO - ⏰ Hermit received time update: 2023-06-15 06:35:00+00:00
+2025-08-23 13:44:43 - executive_node - INFO - 🚦 Turn 2 received by Hermit
+2025-08-23 13:44:43 - executive_n2025-08-23 13:44:44 - executive_node - INFO - 🔄 User completing turn
+2025-08-23 13:44:44 - activity - INFO - ⏰ ActivityManager for User received time update: 2023-06-15 06:37:00+00:00
+2025-08-23 13:44:44 - executive_no2025-08-23 13:44:44 - activity - INFO - ⏰ ActivityManager for Hermit received time update: 2023-06-15 06:37:00+00:00
+2025-08-23 13:44:44 - executive_node - INFO - 🚦 Turn 3 received by Hermit
+2025-08-23 13:44:44 - e2025-08-23 13:44:45 - executive_node - INFO - 🔄 User completing turn
+2025-08-23 13:44:50 - executive_node - INFO - ⏰ User r2025-08-23 13:44:50 - executive_node - INFO - ⏰ Hermit received time update: 2023-06-15 06:39:00+00:00
+2025-08-23 13:44:50 - executive_node - INFO - 🚦 Turn 4 received by Hermit
+2025-08-23 13:44:50 - executive_node - INFO - 🚦 Turn 4 started for Hermit
+2025-08-23 13:44:50 - activity - INFO - ⏰ ActivityMan2025-08-23 13:44:51 - executive_node - INFO - 🔄 User completing turn
+2025-08-23 13:45:03 - activity - INFO - ⏰ ActivityManager for User received time update: 2023-06-15 06:49:00+00:00
+2025-08-23 13:45:03 - executive_node - INFO - 🚦 Turn 5 received by User
+2025-08-23 13:45:03 - executive_node - INFO - 🚦 Turn 5 started for User
+2025-08-23 13:45:03 - executive_node - INFO - ⏰ User received time update: 2023-06-15 06:49:00+00:00
+2025-08-23 13:45:03 - executive_node - INFO - 🔄 User completing turn
+2025-08-23 13:45:24 - executive_node - INFO - ⏰ User received time update: 2023-06-15 06:51:00+00:00
+2025-08-23 13:45:24 - activity - INFO - ⏰ ActivityManager for User received time update: 2023-06-15 06:51:00+00:00
+2025-08-23 13:45:24 - executive_node - INFO - 🚦 Turn 6 received by User
+2025-08-23 13:45:24 - executive_node - INFO - 🚦 Turn 6 started for User
+2025-08-23 13:45:24 - executive_node - INFO - 🔄 User completing turn
+2025-08-23 13:45:33 - executive_node - INFO - ⏰ User received time update: 2023-06-12025-08-23 13:45:2025-08-23 13:45:33 - activity - INFO - ⏰ ActivityManager for User received time updat2025-08-23 13:45:33 - activity - INFO - ⏰ ActivityManager for Hermit received time update: 2023-06-15 06:54:00+00:00
+2025-08-23 13:45:33 - executive_node - INFO - 🚦 Turn 7 re2025-08-23 13:45:34 - executive_node - INFO - 🔄 User completing turn
+2025-08-23 13:45:44 - activity - INFO - ⏰ ActivityManager for User received time update: 2023-06-15 06:56:00+00:00
+2025-08-23 13:45:44 - executive_node - INFO - ⏰ User received time update: 2023-06-15 06:56:00+00:00
+2025-08-23 13:45:44 - executive_node - INFO - 🚦 Turn 8 received by User
+2025-08-23 13:45:44 - executive_node - INFO - 🚦 Turn 8 started for User
+2025-08-23 13:45:45 - executive_node - INFO - 🔄 User completing turn
+2025-08-23 13:45:45 - executive_node - INFO - ⏰ User received time update: 2023-06-15 07:00:00+00:00
+2025-08-23 13:45:45 - executive_node - INFO - 🚦 Turn 9 received by User
+2025-08-23 13:45:45 - executive_node - INFO - �2025-08-23 13:45:45 - execut2025-08-23 13:45:45 - activity - INFO - ⏰ ActivityManager for User received2025-08-23 13:45:45 - executive_node - I2025-08-23 13:45:46 - executive_node - INFO - 🔄 User completing turn
+2025-08-23 13:46:15 - activity - INFO - ⏰ ActivityManager for User received time update: 2023-06-15 07:02:00+00:00
+2025-08-23 13:46:15 - executive_node - INFO - ⏰ User received time update: 2023-06-15 07:02:00+00:00
+2025-08-23 13:46:15 - executive_node - INFO - 🚦 Turn 10 received by User
+2025-08-23 13:46:15 - executive_node - INFO - 🚦 Turn 10 started for User
+2025-08-23 13:46:15 - executive_node - INFO - 🔄 User completing turn
+2025-08-23 13:46:17 - executive_node - INFO - ⏰ User received time update: 2023-06-15 07:06:00+00:00
+2025-08-23 13:46:17 - activity - INFO - ⏰ ActivityManager for User received time update: 2023-06-15 07:06:00+00:00
+2025-08-23 13:46:17 - executive_node - INFO - 🚦 Turn 11 received by User
+2025-08-23 13:46:17 - executive_node - INFO - 🚦 Turn 11 started for User
+2025-08-23 13:46:18 - executive_node - INFO - 🔄 User completing turn
+2025-08-23 13:46:38 - executive_node - INFO - ⏰ User received time update: 2023-06-15 07:16:00+00:00
+2025-08-23 13:46:38 - activity - INFO - ⏰ ActivityManager for User received time update: 2023-06-15 07:16:00+00:00
+2025-08-23 13:46:38 - executive_node - INFO - 🚦 Turn 12 received by User
+2025-08-23 13:46:38 - executive_node - INFO - 🚦 Turn 12 started for User
+2025-08-23 13:46:38 - executive_node - INFO - 🔄 User completing turn
+2025-08-23 13:47:06 - activity - INFO - ⏰ ActivityManager for User received time update: 2023-06-15 07:20:00+00:00
+2025-08-23 13:47:06 - executi2025-08-23 13:47:06 - executive_node - INFO - ⏰ Hermit received time upd2025-08-23 13:47:06 - executive_node - INFO - 🚦 Turn 13 received by User
+2025-08-23 13:47:06 - executive_node - INFO - 🚦 Turn 13 started for Use202025-08-23 13:47:07 - executive_node - INFO - 🔄 User completing turn
+2025-08-23 13:47:26 - executive_node - INFO - ⏰ User received time update: 2023-06-15 07:22:00+00:00
+2025-08-23 13:47:26 - activity - INFO - ⏰ ActivityManager for User received time update: 2023-06-15 07:22:00+00:00
+2025-08-23 13:47:26 - executive_node - INFO - 🚦 Turn 14 received by User
+2025-08-23 13:47:26 - executive_node - INFO - 🚦 Turn 14 started for User
+2025-08-23 13:47:27 - executive_node - INFO - 🔄 User completing turn
+2025-08-23 13:47:35 - executive_node - INFO - 🚦 Turn 15 received by User
+2025-08-23 13:47:35 - executive_node - INFO - 🚦 Turn 15 started for User
+2025-08-23 13:47:35 - activity - INFO - ⏰ ActivityManager for User received time update: 2023-06-15 07:24:00+00:00
+2025-08-23 13:47:35 - executive_node - INFO - ⏰ User received time update: 2023-06-15 07:24:00+00:00
+2025-08-23 13:47:36 - executive_node - INFO - 🔄 User completing turn
+2025-08-23 13:47:58 - executive_node - INFO - ⏰ User received time update: 2023-06-15 07:26:00+00:00
+2025-08-23 13:47:58 - activity - INFO - ⏰ ActivityManager for User received time update: 2023-06-15 07:26:00+00:00
+2025-08-23 13:47:58 - executive_node - INFO - 🚦 Turn 16 received by User
+2025-08-23 13:47:58 - executive_node - INFO - 🚦 Turn 16 started for User
+2025-08-23 13:47:58 - executive_node - INFO - 🔄 User completing turn
+2025-08-23 13:48:24 - activity - INFO - ⏰ ActivityManager for User received time update: 2023-06-15 07:30:00+00:00
+2025-08-23 13:48:24 - executive_node - INFO - ⏰ User received time update: 2023-06-15 07:30:00+00:00
+2025-08-23 13:48:24 - executive_node - INFO - 🚦 Turn 17 received by User
+2025-08-23 13:48:24 - executive_node - INFO - 🚦 Turn 17 started for User
+2025-08-23 13:48:25 - executive_node - INFO - 🔄 User completing turn
+2025-08-23 13:48:34 - executive_node - INFO - ⏰ User received time update: 2023-06-15 07:35:00+00:00
+2025-08-23 13:48:34 - activity - INFO - ⏰ ActivityManager for User received time update: 2023-06-15 07:35:00+00:00
+2025-08-23 13:48:34 - executive_node - INFO - 🚦 Turn 18 received by User
+2025-08-23 13:48:34 - executive_node - INFO - 🚦 Turn 18 started for User
+2025-08-23 13:48:34 - executive_node - INFO - 🔄 User completing turn
+2025-08-23 13:48:42 - activity - INFO - ⏰ ActivityManager for User received time update: 2023-06-15 07:39:00+00:00
+2025-08-23 13:48:42 - executive_node - INFO - ⏰ User received time update: 2023-06-15 07:39:00+00:00
+2025-08-23 13:48:42 - executive_node - INFO - 🚦 Turn 19 received by User
+2025-08-23 13:48:42 - executive_node - INFO - 🚦 Turn 19 started for User
+2025-08-23 13:48:42 - executive_node - INFO - 🔄 User completing turn
+2025-08-23 13:49:11 - activity - INFO - ⏰ ActivityManager for User received time update: 2023-06-15 07:41:00+00:00
+2025-08-23 13:49:11 - executive_node - INFO - ⏰ User received time update: 2023-06-15 07:41:00+00:00
+2025-08-23 13:49:11 - executive_node - INFO - 🚦 Turn 20 received by User
+2025-08-23 13:49:11 - executive_node - INFO - 🚦 Turn 20 started for User
+2025-08-23 13:49:12 - executive_node - INFO - 🔄 User completing turn
+2025-08-23 13:50:04 - activity - INFO - ⏰ ActivityManager for User received time update: 2023-06-15 07:44:00+00:00
+2025-08-23 13:50:04 - executive_node - INFO - ⏰ User received time update: 2023-06-15 07:44:00+00:00
+ turn
+2025-08-23 13:50:04 - activity - INFO - ⏰ ActivityManager for Hermit received time update: 2023-06-15 07:44:00+00:00
+2025-08-23 13:50:04 - executive_node - INFO - ⏰ Hermit received time update: 2023-06-15 07:44:00+00:00
+e - INFO - 🤖 Samantha New Goal: #goal Explore Forest Safely
+#description Find safe place to live
+#otherCharacterName None
+#termination Found safe place
 ##
-2025-08-21 14:07:16 - executive_node - INFO - Samantha generated goal: Goal find safe drinking water: find water with Joe safely; actors: Samantha, Joe; termination: drinking water completed
-2025-08-21 14:07:16 - executive_node - INFO - 🎯 Published goal for Samantha: Goal find safe drinking water: find water with Joe safely; actors: Samantha, Joe; termination: drinking water completed
-2025-08-21 14:07:16 - executive_nod2025-08-21 14:07:16 - executive_node - INFO2025-08-21 14:07:34 - executive_node - INFO - 🚦 Turn 4 received by Samantha
-2025-08-21 14:07:34 - executive_node - INFO - 🚦 Turn 4 started for Samantha
-2025-08-21 14:07:35 - executive_node - INFO - 👥 Retrieved entity context for Joe
-2025-08-21 14:07:35 - executive_node - INFO - 👥 Retrieved entity context for Samantha
-2025-08-21 14:07:35 - executive_node - INFO - 👥 Retrieved entity context for Samantha
-2025-08-21 14:07:35 - executive_node - INFO - 🎯 Published goal for Samantha: Goal find safe drinking water: find water with Joe safely; actors: Samantha, Joe; termination: drinking water completed
-2025-08-21 14:07:35 - executive_node - INFO - 🎯 Samantha oriented to goal: Goal find safe drinking water: find water with Joe safely; actors: Samantha, Joe; termination: drinking water completed
-2025-08-21 14:07:35 - executive_node - INFO - 👥 Retrieved entity context for Joe
-2025-08-21 14:07:41 - executive_node - INFO - 📊 Samantha Received situation update
-2025-08-21 14:07:41 - executive_node - INFO - 📋 Published current plan for Samantha
-2025-08-21 14:07:41 - executive_node - INFO - 📋 Published decided action for Samantha: move: North - 
-2025-08-21 14:07:41 - executive_node - INFO - 🎯 Samantha planned action: move: North - None
-2025-08-21 14:07:41 - executive_node - INFO - ⏰ Samantha proposed time advance: 5 minutes
-2025-08-21 14:07:41 - executive_node - INFO - Moving north
-2025-08-21 14:07:41 - executive_node - INFO - ✅ Move successful: north
-2025-08-21 14:07:41 - executive_node - INFO - 🔄 Samantha completing turn
-2025-08-21 14:07:41 - executive_node - INFO - ⏰ Samantha received time update: 2023-06-15 06:43:00+00:00
-2025-08-21 14:07:41 - executive_node - INFO - 🚦 Turn 5 received by Samantha
-2025-08-21 14:07:41 - executive_node - INFO - 🚦 Turn 5 started for Samantha
-2025-08-21 14:07:41 - executive_node - INFO - ⏰ ActivityManager for Samantha received time update: 2023-06-15 06:43:00+00:00
-2025-08-21 14:07:41 - executive_node - INFO - 📊 Samantha Received situation update
-2025-08-21 14:07:42 - executive_node - INFO - 📊 Samantha Received situation update
-2025-08-21 14:07:42 - executive_node - INFO - 👥 Retrieved entity context for Joe
-2025-08-21 14:07:42 - executive_node - INFO - 👥 Retrieved entity context for Samantha
-2025-08-21 14:07:42 - executive_node - INFO - 👥 Retrieved entity context for Samantha
-2025-08-21 14:07:42 - executive_node - INFO - 🎯 Published goal for Samantha: Goal find safe drinking water: find water with Joe safely; actors: Samantha, Joe; termination: drinking water completed
-2025-08-21 14:07:42 - executive_node - INFO - 🎯 Samantha oriented to goal: Goal find safe drinking water: find water with Joe safely; actors: Samantha, Joe; termination: drinking water completed
-2025-08-21 14:07:42 - executive_node - INFO - 📋 Published decided action for Samantha: inspect: Spring3 - 
-2025-08-21 14:07:42 - executive_node - INFO - 🎯 Samantha planned action: inspect: Spring3 - None
-2025-08-21 14:07:42 - executive_node - INFO - ⏰ Samantha proposed time advance: 5 minutes
-2025-08-21 14:07:42 - executive_node - INFO - Inventory query for Spring3: {'value': False, 'binding': 'Spring3'}
-2025-08-21 14:07:42 - executive_node - INFO - 📤 Published action: inspect
-2025-08-21 14:07:42 - executive_node - INFO - 🔄 Samantha completing turn
-2025-08-21 14:07:42 - executive_node - INFO - ⏰ Samantha received time update: 2023-06-15 06:45:00+00:00
-2025-08-21 14:07:42 - executive_node - INFO - ⏰ ActivityManager for Samantha received time update: 2023-06-15 06:45:00+00:00
-2025-08-21 14:07:42 - executive_node - INFO - 🚦 Turn 6 received by Samantha
-2025-08-21 14:07:42 - executive_node - INFO - 🚦 Turn 6 started for Samantha
-2025-08-21 14:07:43 - executive_node - INFO - 👥 Retrieved entity context for Joe
-2025-08-21 14:07:43 - executive_node - INFO - 👥 Retrieved entity context for Samantha
-2025-08-21 14:07:43 - executive_node - INFO - 👥 Retrieved entity context for Samantha
-2025-08-21 14:07:43 - executive_node - INFO - 🎯 Published goal for Samantha: Goal find safe drinking water: find water with Joe safely; actors: Samantha, Joe; termination: drinking water completed
-2025-08-21 14:07:43 - executive_node - INFO - 🎯 Samantha oriented to goal: Goal find safe drinking water: find water with Joe safely; actors: Samantha, Joe; termination: drinking water completed
-2025-08-21 14:07:43 - executive_node - INFO - 📋 Published decided action for Samantha: use: Spring3 - 
-2025-08-21 14:07:43 - executive_node - INFO - 🎯 Samantha planned action: use: Spring3 - None
-2025-08-21 14:07:43 - executive_node - INFO - ⏰ Samantha proposed time advance: 5 minutes
-2025-08-21 14:07:43 - executive_node - INFO - Inventory query for Spring3: {'value': False, 'binding': 'Spring3'}
-2025-08-21 14:07:45 - executive_node - INFO - 🤖 Samantha Used Spring3:
-	  
-Success, drank water, refreshed. 
+2025-08-23 13:45:19 - executive_node - INFO - Samantha generated goal: Goal Explore Forest Safely: Find safe place to live; actors: Samantha; termination: Found safe place
+2025-08-23 13:45:19 - executive_node - INFO - 🔄 Samantha cleared plan_bindings for new plan
+2025-08-23 13:45:19 - executive_node - INFO - 🎯 Published goal for Samantha: Goal Explore Forest Safely: Find safe place to live; actors: Samantha; termination: Found safe place
+2025-08-23 13:45:19 - executive_node - INFO - 🎯 Published goal for Samantha: Goal Explore Forest Safely: Find safe place to live; actors: Samantha; termination: Found safe place
+2025-08-23 13:45:19 - executive_node - INFO - 🎯 Samantha oriented to goal: Goal Explore Forest Safely: Find safe place to live; actors: Samantha; termination: Found safe place
+2025-08-23 13:45:24 - executive_node - INFO - ✅ Plan validation passed
+2025-08-23 13:45:24 - executive_node - INFO - 📋 Samantha generated new plan: {
+  "plan": [
+    {
+      "type": "scan",
+      "target": "Berries",
+      "out": "found_berries"
+    },
+    {
+      "type": "move",
+      "target": "$found_berries"
+    },
+    {
+      "type": "take",
+      "target": "$found_berries"
+    }
+  ]
+}
+2025-08-23 13:45:24 - executive_node - INFO - 🔄 Samantha cleared plan_bindings for new plan
+2025-08-23 13:45:24 - executive_node - INFO - 📋 Samantha assigned LLM-generated plan with 3 steps
+2025-08-23 13:45:24 - executive_node - INFO - 📋 Published current plan for Samantha
+2025-08-23 13:45:24 - executive_node - INFO - 📋 Published decided action for Samantha: scan: Berries - 
+2025-08-23 13:45:24 - executive_node - INFO - 🎯 Samantha planned action: scan: Berries - None
+2025-08-23 13:45:24 - executive_node - INFO - ⏰ Samantha proposed time advance: 2 minutes
+2025-08-23 13:45:24 - executive_node - INFO - 🔗 Samantha bound variable: found_berries = Berries4
+2025-08-23 13:45:24 - executive_node - INFO - 📤 Published action: scan (success)
+2025-08-23 13:45:24 - executive_node - INFO - 🔄 Samantha completing turn
+2025-08-23 13:45:24 - activity - INFO - ⏰ ActivityManager for Samantha received time update: 2023-06-15 06:51:00+00:00
+2025-08-23 13:45:24 - executive_node - INFO - ⏰ Samantha received time update: 2023-06-15 06:51:00+00:00
+2025-08-23 13:45:24 - executive_node - INFO - 🚦 Turn 6 received by Samantha
+2025-08-23 13:45:24 - executive_node - INFO - 🚦 Turn 6 started for Samantha
+2025-08-23 13:45:25 - executive_node - INFO - 📋 Published decided action for Samantha: move: $found_berries - 
+2025-08-23 13:45:25 - executive_node - INFO - 🎯 Samantha planned action: move: $found_berries - None
+2025-08-23 13:45:25 - executive_node - INFO - ⏰ Samantha proposed time advance: 3 minutes
+2025-08-23 13:45:25 - executive_node - INFO - Visibility query for $found_berries: {'value': False, 'binding': None}
+2025-08-23 13:45:25 - executive_node - INFO - 🔄 Samantha completing turn
+2025-08-23 13:45:26 - executive_node - INFO - Responding to: "I guess I'll just have to leaf you hanging for the punchline!" from Joe
+2025-08-23 13:45:26 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-23 13:45:26 - executive_node - INFO - 🤔 Natural dialog end check for Joe: True
+2025-08-23 13:45:26 - executive_node - INFO - 🤖 Samantha Dialog end check: True
+2025-08-23 13:45:26 - executive_node - INFO - 🔓 Conversation lock released with Joe
+2025-08-23 13:45:26 - executive_node - WARNING - 🤖 Samantha Replanning.
+2025-08-23 13:45:26 - executive_node - ERROR - Var2025-08-23 13:45:26 - executive_node - INFO - 🔓 Conversation lock released with Samantha
+2025-08-23 13:45:26 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-23 13:45:26 - executive_node - WARNING - 🤖 Joe Replanning.
+2025-08-23 13:45:322025-08-23 13:45:32 - executive_node - INFO - 🤖 Samantha New Goal: new
+#goal Investigate Joe's Joke
+#description Understand the joke and its meaning
+#otherCharacterName Joe
+#termination Joke fully understood
+##
+2025-08-23 13:45:32 - executive_node - INFO - Samantha generated goal: Goal Investigate Joe's Joke: Understand the joke and its meaning; actors: Samantha, Joe; termination: Joke fully understood
+2025-08-23 13:45:32 - executive_node - INFO - 🔄 Samantha cleared plan_bindings for replan
+2025-08-23 13:45:32 - executive_node - INFO - 🎯 Published goal for Samantha: Goal Investigate Joe's Joke: Understand the joke and its meaning; actors: Samantha, Joe; termination: Joke fully understood
+2025-08-23 2025-08-23 13:45:33 - executive_node - INFO - 📝 Plan post-mortem2025-08-23 13:45:33 - executive_node - INFO - ⏰ Samantha received time update: 2023-06-15 06:54:00+00:00
+2025-08-23 13:45:33 - executive_node - INFO - 🚦 Turn 7 received by Samantha
+2025-08-23 13:45:33 - executive_node - INFO - 🚦 Turn 7 started for Samantha
+2025-08-23 13:45:33 - activity - INFO - ⏰ ActivityManager for Samantha received time update: 2023-06-15 06:54:00+00:00
+2025-08-23 13:45:34 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-23 13:45:40 - executive_node - INFO - ✅ Plan validation passed
+2025-08-23 13:45:40 - executive_node - INFO - 📋 Samantha generated new plan: {
+  "plan": [
+    {
+      "type": "think",
+      "value": "Joe's joke meaning"
+    },
+    {
+      "type": "say",
+      "target": "Joe",
+      "value": "What did you mean by leaf you hanging?"
+    }
+  ]
+}
+2025-08-23 13:45:40 - executive_node - INFO - 🔄 Samantha cleared plan_bindings for new plan
+2025-08-23 13:45:40 - executive_node - INFO - 📋 Samantha assigned LLM-generated plan with 2 steps
+2025-08-23 13:45:40 - executive_node - INFO - 📋 Published current plan for Samantha
+2025-08-23 13:45:40 - executive_node - INFO - 📋 Published decided action for Samantha: think:  - Joe's joke meaning
+2025-08-23 13:45:40 - executive_node - INFO - 🎯 Samantha planned action: think: None - Joe's joke meaning
+2025-08-23 13:45:40 - executive_node - INFO - ⏰ Samantha proposed time advance: 2 minutes
+2025-08-23 13:45:40 - executive_node - INFO - Thinking about: {'type': 'think', 'value': "Joe's joke meaning"}
+2025-08-23 13:45:42 - executive_node - INFO - 🤖 Samantha New Thought:  
+#thought Joe's joke is a clue
 
-2025-08-21 14:07:45 - executive_node - INFO - 🔄 Samantha completing turn
-2025-08-21 14:07:45 - executive_node - INFO - ⏰ Samantha received time update: 2023-06-15 06:48:00+00:00
-2025-08-21 14:07:45 - executive_node - INFO - ⏰ ActivityManager for Samantha received time update: 2023-06-15 06:48:00+00:00
-2025-08-21 14:07:45 - executive_node - INFO - 🚦 Turn 7 received by Samantha
-2025-08-21 14:07:45 - executive_node - INFO - 🚦 Turn 7 started for Samantha
-2025-08-21 14:07:46 - executive_node - INFO - 👥 Retrieved entity context for Joe
-2025-08-21 14:07:46 - executive_node - INFO - 👥 Retrieved entity context for Samantha
-2025-08-21 14:07:46 - executive_node - INFO - 👥 Retrieved entity context for Samantha
-2025-08-21 14:07:46 - executive_node - INFO - 🎯 Published goal for Samantha: Goal find safe drinking water: find water with Joe safely; actors: Samantha, Joe; termination: drinking water completed
-2025-08-21 14:07:46 - executive_node - INFO - 🎯 Samantha oriented to goal: Goal find safe drinking water: find water with Joe safely; actors: Samantha, Joe; termination: drinking water completed
-2025-08-21 14:07:46 - executive_node - INFO - 📝 Creating plan execution summary for Samantha
-2025-08-21 14:07:50 - executive_node - INFO - 📝 Plan post-mortem prepared for Samantha
+2025-08-23 13:45:42 - executive_node - INFO - �2025-08-23 13:45:43 - executive_node - INFO - ✅ Plan validation passed
+2025-08-23 13:45:43 - executive_2025-08-23 13:45:44 - executive_node - INFO - ⏰ Samantha received time update: 2023-06-15 06:56:00+00:00
+2025-08-23 13:45:44 - activity - INFO - ⏰ ActivityManager for Samantha received time update: 2023-06-15 06:56:00+00:00
+2025-08-23 13:45:44 - executive_node - INFO - 🚦 Turn 8 received by Samantha
+2025-08-23 13:45:44 - executive_node - INFO - 🚦 Turn 8 started for Samantha
+2025-08-23 13:45:45 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-23 13:45:45 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-23 13:45:45 - executive_node - INFO - 📋 Published decided action for Samantha: say: Joe - What did you mean by leaf you hanging?
+2025-08-23 13:45:45 - executive_node - INFO - 🎯 Samantha planned action: say: Joe - What did you mean by leaf you hanging?
+2025-08-23 13:45:45 - executive_node - INFO - ⏰ Samantha proposed time advance: 4 minutes
+2025-08-23 13:45:45 - executive_node - ERROR - 📤 Published action: say (failed - lock unavailable)
+2025-08-23 13:45:45 - executive_node - INFO - Action failed for Samantha
+2025-08-23 13:45:45 - executive_node - INFO - 🔄 Samantha completing turn
+2025-08-23 13:45:45 - executive_node - INFO - ⏰ Samantha received time update: 2023-06-15 07:00:00+00:00
+2025-08-23 13:45:45 - activity - INFO - ⏰ ActivityManager for Samantha received time update: 2023-06-15 07:00:00+00:00
+2025-08-23 13:45:45 - executive_node - INFO - 🚦 Turn 9 received by Samantha
+2025-08-23 13:45:45 - executive_node - INFO - 🚦 Turn 9 started for Samantha
+2025-08-23 13:45:46 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-23 13:45:46 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-23 13:45:46 - executive_node - INFO - 🎯 Published current activity for Samantha
+2025-08-23 13:45:46 - executive_node - INFO - 🚫 Samantha abandoned activity: Duration limit reached
+2025-08-23 13:45:46 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-23 13:45:46 - activity - INFO - Pre-filtered activities: 9
+2025-08-23 13:46:01 - activity - INFO - 🔄 No suitable activities found for Samantha, using fallback
+2025-08-23 13:46:01 - activity - INFO - 🎯 Samantha selected new activity: goal_fallback
+2025-08-23 13:46:01 - executive_node - INFO - 🎯 Published current activity for Samantha
+2025-08-23 13:46:01 - executive_node - INFO - 🎯 Samantha starting new activity: goal_fallback
+2025-08-23 13:46:01 - executive_node - INFO - 🤔 Samantha received placeholder goal, creating situated goal
+2025-08-23 13:46:01 - executive_node - INFO - 📊 Samantha Received situation update
+2025-08-23 13:46:05 - executive_node - INFO - 🤖 Samantha New Goal: #goal Investigate Joe's joke clue
+#description Follow up on Joe's joke
+#otherCharacterName Joe
+#termination Clue understood clearly
+##
+2025-08-23 13:46:05 - executive_node - INFO - Samantha generated goal: Goal Investigate Joe's joke clue: Follow up on Joe's joke; actors: Samantha, Joe; termination: Clue understood clearly
+2025-08-23 13:46:05 - executive_node - INFO - 🔄 Samantha cleared plan_bindings for new plan
+2025-08-23 13:46:05 - executive_node - INFO - 🎯 Published goal for Samantha: Goal Investigate Joe's joke clue: Follow up on Joe's joke; actors: Samantha, Joe; termination: Clue understood clearly
+2025-08-23 13:46:05 - executive_node - INFO - 🎯 Published goal for Samantha: Goal Investigate Joe's joke clue: Follow up on Joe's joke; actors: Samantha, Joe; termination: Clue understood clearly
+2025-08-23 13:46:05 - executive_node - INFO - 🎯 Samantha oriented to goal: Goal Investigate Joe's joke clue: Follow up on Joe's joke; actors: Samantha, Joe; termination: Clue understood clearly
+2025-08-23 13:46:05 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-23 13:46:11 - executive_node - INFO - ✅ Plan validation passed
+2025-08-23 13:46:11 - executive_node - INFO - 📋 Samantha generated new plan: {
+  "plan": [
+    {
+      "type": "think",
+      "value": "Joe's joke meaning"
+    },
+    {
+      "type": "say",
+      "target": "Joe",
+      "value": "What did you mean by the tree joke?"
+    }
+  ]
+}
+2025-08-23 13:46:11 - executive_node - INFO - 🔄 Samantha cleared plan_bindings for new plan
+2025-08-23 13:46:11 - executive_node - INFO - 📋 Samantha assigned LLM-generated plan with 2 steps
+2025-08-23 13:46:11 - executive_node - INFO - 📋 Published current plan for Samantha
+2025-08-23 13:46:11 - executive_node - INFO - 📋 Published decided action for Samantha: think:  - Joe's joke meaning
+2025-08-23 13:46:11 - executive_node - INFO - 🎯 Samantha planned action: think: None - Joe's joke meaning
+2025-08-23 13:46:11 - executive_node - INFO - ⏰ Samantha proposed time advance: 4 minutes
+2025-08-23 13:46:11 - executive_node - INFO - Thinking about: {'type': 'think', 'value': "Joe's joke meaning"}
+2025-08-23 13:46:13 - executive_node - INFO - 🤖 Samantha New Thought:  
+#thought Joe's clue is cryptic
+
+2025-08-23 13:46:13 - executive_node - INFO - 📤 Published action: action_6
+2025-02025-08-23 13:46:15 - executive_node - INFO - ✅ Plan validation pass2025-08-23 13:46:15 - activity - INFO - ⏰ ActivityManager for Samantha received time update: 2023-06-15 07:02:00+00:00
+2025-08-23 13:46:15 - executive_node - INFO - ⏰ Samantha received time update: 2023-06-15 07:02:00+00:00
+2025-08-23 13:46:15 - executive_node - INFO - 🚦 Turn 10 received by Samantha
+2025-08-23 13:46:15 - executive_node - INFO - 🚦 Turn 10 started for Samantha
+2025-08-23 13:46:15 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-23 13:46:15 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-23 13:46:15 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-23 13:46:15 - executive_node - INFO - 📋 Published decided action for Samantha: say: Joe - What did you mean by the tree joke?
+2025-08-23 13:46:15 - executive_node - INFO - 🎯 Samantha planned action: say: Joe - What did you mean by the tree joke?
+2025-08-23 13:46:15 - executive_node - INFO - ⏰ Samantha proposed time advance: 4 minutes
+2025-08-23 13:46:15 - executive_node - INFO - 🔒 Conversation lock acquired with Joe
+2025-08-23 13:46:15 - executive_node - INFO - Saying intent: "What did you mean by the tree joke?" to Joe
+2025-08-23 13:46:15 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-23 13:46:16 - executive_node - INFO - 📊 Samantha Received situation update
+2025-08-23 13:46:17 - executive_node - INFO - 📤 Samantha Sent text input to Joe: "What did you mean by the tree joke, Joe?" (source: Samantha)
+2025-08-23 13:46:17 - executive_node - INFO - Responding to: "What did you mean by the tree joke?" from Joe: What did you mean by the tree joke, Joe?
+2025-08-23 13:46:17 - executive_node - INFO - 📤 Published action: action_7
+2025-08-23 13:46:17 - executive_node - INFO - 📤 Published action: say
+2025-08-23 13:46:17 - executive_node - INFO - 🔄 Samantha completing turn
+2025-08-23 13:46:17 - activity - INFO - ⏰ ActivityManager for Samantha received time update: 2023-06-15 07:06:00+00:00
+2025-08-23 13:46:17 - executive_node - INFO - ⏰ Samantha received time update: 2023-06-15 07:06:00+00:00
+2025-08-23 13:46:17 - executive_node - INFO - 🚦 Turn 11 received by Samantha
+2025-08-23 13:46:17 - executive_node - INFO - 🚦 Turn 11 started for Samantha
+2025-08-23 13:46:18 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-23 13:46:18 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-23 13:46:18 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-23 13:46:18 - executive_node - INFO - 🤖 Samantha completed current frame main
+2025-08-23 13:46:18 - executive_node - INFO - 📝 Creating plan execution summary for Samantha
+2025-08-23 13:46:25 - executive_node - INFO - 📝 Plan post-mortem prepared for Samantha
  as instructed: 
-The goal was to find safe drinking water with Joe safely. Actions taken included moving north, inspecting Berries12 and Spring3, and using Spring3. The observed results were that after inspecting Spring3, the water was used and the outcome was successful, with the individual drinking the wat2025-08-21 14:07:51 - executive_node - INFO - 📝 Plan post-mortem prepared for Joe
- 
-The goal was to find a spring water source, with Joe and Samantha as actors, and the plan involved moving north, inspecting Spring3 to ensure it was clean, and then using it to get water. The actions taken included moving north, inspecting Spring3, and using it, with the inspection not recording any result but the use of the spring resulting in success, where they drank water and got refreshed, ultimately achieving the goal of arriving at the spring water source. 
+The goal was to investigate Joe's joke clue, with the plan involving thinking about the joke's meaning and asking Joe for clarification. Actions taken included scanning for berries, moving to a location, thinking about the joke, and asking Joe about the joke. The observed results were that Joe's joke was considered a clue, the clue was deemed cryptic, and a question was posed to Joe about the tree joke. The plan was partially executed, with the question being asked, but the outcome of the question was not recorded. 
 
-2025-08-21 14:07:51 - executive_node - INFO - 🎯 Published current activity for Joe
-2025-08-21 14:07:51 - executive_node - INFO - 🎯 Published goal for Joe: Goal engage in acti2025-08-21 14:07:51 - executive_node - INFO - ⏰ Samantha received time update: 2023-06-15 06:58:00+00:00
-2025-08-21 14:07:51 - executive_node - INFO - ⏰ ActivityManager for Samantha received time update: 2023-06-15 06:58:00+00:00
-2025-08-21 14:07:51 - executive_node - INFO - 🚦 Turn 8 received by Samantha
-2025-08-21 14:07:51 - executive_node - INFO - 🚦 Turn 8 started for Samantha
-2025-08-21 14:07:51 - executive_node - INFO - 👥 Retrieved entity context for Joe
-2025-08-21 14:07:51 - executive_node - INFO - 👥 Retrieved entity context for Samantha
-2025-08-21 14:07:51 - executive_node - INFO - 👥 Retrieved entity context for Samantha
-2025-08-21 14:07:51 - executive_node - INFO - 🎯 Published goal for Samantha: Goal start conversation: start conversation; actors: Samantha; termination: start conversation completed
-2025-08-21 2025-08-21 14:07:52 - executive_node - INFO - 👥 Retrieved entity context for Samantha
-2025-08-21 14:07:52 - executive_node - INFO - 👥 Retrieved entity context for Joe2025-08-21 14:07:56 - executive_node - INFO - 📋 Published current plan for Samantha
-2025-08-21 14:07:56 - executive_node - INFO - 📋 Published decided action for Samantha: say: Joe - What do you think of this forest?
-2025-08-21 14:07:56 - executive_node - INFO - 🎯 Samantha planned action: say: Joe - What do you think of this forest?
-2025-08-21 14:07:56 - executive_node - INFO - ⏰ Samantha proposed time advance: 2 minutes
-2025-08-21 14:07:56 - executive_node - INFO - 🔒 C2025-08-21 14:07:59 - executive_node - INFO - 📥 Joe Received text input: "What do you think of this forest, Joe, it's really beautiful?" (source: Samantha)
-2025-08-21 14:07:59 - executive_node - INFO - 📊 Joe Received situation update
-2025-08-21 14:08:01 - executive_node - INFO - 📋 Published current plan for Joe
-2025-08-21 14:08:01 - executive_node - INFO - 📋 Published decided action for Joe: move: North - 
-2025-08-21 14:08:01 - executive_node - INFO - 🎯 Joe planned action: move: North - None
-2025-08-21 14:08:01 - executive_node - INFO - ⏰ Joe proposed time advance: 5 minutes
-2025-08-21 14:08:01 - executive_node - INFO - Moving north
-2025-08-21 14:08:01 - executive_node - INFO - ✅ Move successful: north
-2025-08-21 14:08:01 - executive_node - INFO - 🔄 Joe 2025-08-21 14:082025-08-21 14:08:01 - executive_node - INFO - ⏰ Joe received time update: 2023-06-15 07:02025-08-21 2025-08-21 14:08:01 - executive_node - INFO - ⏰ ActivityManager for Joe received time update: 2023-06-15 07:00:00+00:00
-2025-08-21 14:08:01 - executive_node - INFO - 🚦 Turn 9 received by Joe
-2025-08-21 14:08:01 - executive_node - INFO - 🚦 Turn 9 started for Joe
-2025-08-21 14:08:01 - executive_node - INFO - 📊 Joe Received situation update
-2025-08-21 14:08:02 - executive_node - INFO - 👥 Retrieved entity context for Samantha
-2025-08-21 14:08:02 - executive_node - INFO - 👥 Retrieved entity context for Joe
-2025-08-21 14:08:02 - executive_node - INFO - 👥 Retrieved entity context for Joe
-2025-08-21 14:08:02 - executive_node - INFO - 🎯 Published goal for Joe: Goal engage in activity together: engage in activity together; actors: Joe; termination: engage in activity together completed
-2025-08-21 14:08:02 - executive_node - INFO - 🎯 Joe oriented to goal: Goal engage in activity together: engage in activity together; actors: Joe; termination: engage in activity together completed
-2025-08-21 14:08:02 - executive_node - INFO - 📋 Published decided action 2025-08-21 14:08:05 - executive_node - INFO - 📝 Plan post-mortem prepared for Samantha
- 
-The goal was to start a conversation, which was attempted by Samantha saying to Joe, "What do you think of this forest, Joe, it's really beautiful?" The action was taken at 14:07:56, and the observed result was the initiation of a conversation, as the plan was executed as intended, with the message being conveyed to Joe. 
+2025-08-23 13:46:25 - executive_node - INFO - 🎯 Published current activity for Samantha
+2025-08-23 13:46:25 - executive_node - INFO - ✅ Activity completed for Samantha
+2025-08-23 13:46:25 - executive_node - INFO - 📋 Published current plan for Samantha
+2025-08-23 13:46:25 - executive_node - WARNING - 🚫 Samantha no action found for plan, pbly completed
+2025-08-23 13:46:25 - executive_node - INFO - 🔄 Samantha completing turn
+2025-08-23 13:46:38 - activity - INFO - ⏰ ActivityManager for Samantha received time update: 2023-06-15 07:16:00+00:00
+2025-08-23 13:46:38 - executive_node - INFO - ⏰ Samantha received time update: 2023-06-15 07:16:00+00:00
+2025-08-23 13:46:38 - executive_node - INFO - 🚦 Turn 12 received by Samantha
+2025-08-23 13:46:38 - executive_node - INFO - 🚦 Turn 12 started for Samantha
+2025-08-23 13:46:38 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-23 13:46:38 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-23 13:46:38 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-23 13:46:38 - activity - INFO - Pre-filtered activities: 9
+2025-08-23 13:46:51 - activity - INFO - 🔄 No suitable activities found for Samantha, using fallback
+2025-08-23 13:46:51 - activity - INFO - 🎯 Samantha selected new activity: goal_fallback
+2025-08-23 13:46:51 - executive_node - INFO - 🎯 Published current activity for Samantha
+2025-08-23 13:46:51 - executive_node - INFO - 🎯 Samantha starting new activity: goal_fallback
+2025-08-23 13:46:51 - executive_node - INFO - 🤔 Samantha received placeholder goal, creating situated goal
+2025-08-23 13:46:52 - executive_node - INFO - 📊 Samantha Received situation update
+2025-08-23 13:46:58 - executive_node - INFO - 🤖 Samantha New Goal: #goal Investigate Joe's joke clue
+#description Ask Joe about tree joke meaning
+#otherCharacterName Joe
+#termination Joe explains joke clearly
+## 
+#goal Find safe place to rest
+#description Search for nearby hut or cave
+#otherCharacterName None
+#termination Find suitable shelter location
+## 
+#goal Gather food and resources
+#description Search for berries and mushrooms
+#otherCharacterName None
+#termination Collect sufficient food resources
+##
+2025-08-23 13:46:58 - executive_node - INFO - Samantha generated goal: Goal Investigate Joe's joke clue: Ask Joe about tree joke meaning; actors: Samantha, Joe; termination: Joe explains joke clearly
+2025-08-23 13:46:58 - executive_node - INFO - 🔄 Samantha cleared plan_bindings for new plan
+2025-08-23 13:46:58 - executive_node - INFO - 🎯 Published goal for Samantha: Goal Investigate Joe's joke clue: Ask Joe about tree joke meaning; actors: Samantha, Joe; termination: Joe explains joke clearly
+2025-08-23 13:46:58 - executive_node - INFO - 🎯 Published goal for Samantha: Goal Investigate Joe's joke clue: Ask Joe about tree joke meaning; actors: Samantha, Joe; termination: Joe explains joke clearly
+2025-08-23 13:46:58 - executive_node - INFO - 🎯 Samantha oriented to goal: Goal Investigate Joe's joke clue: Ask Joe about tree joke meaning; actors: Samantha, Joe; termination: Joe explains joke clearly
+2025-08-23 13:46:58 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-23 13:47:06 - executive_node - WARNING - ❌ Plan validation failed
+2025-08-23 13:47:06 - executive_node - ERROR - Invalid plan JSON in LLM response: {'plan': [{'type': 'say', 'target': 'Joe', 'value': 'What did you mean by the tree joke?'}, {'type': 'think', 'value': "Joe's joke meaning"}, {'type': 'wait', 'condition': {'type': 'believes', 'target': 'Joe'}, 'target': 'Joe explains joke clearly'}]}
+2025-08-23 13:47:06 - executive_node - ERROR - No action, target, or value found in LLM response: {'plan': [{'type': 'say', 'target': 'Joe', 'value': 'What did you mean by the tree joke?'}, {'type': 'think', 'value': "Joe's joke meaning"}, {'type': 'wait', 'condition': {'type': 'believes', 'target': 'Joe'}, 'target': 'Joe explains joke clearly'}]}
+2025-08-23 13:47:06 - executive_node - INFO - 🔄 Samantha cleared plan_bindings for single-action plan
+2025-08-23 13:47:06 - executive_node - INFO - 📋 Samantha created single-action plan: sleep
+2025-08-23 13:47:06 - executive_node - INFO - 📋 Published current plan for Samantha
+2025-08-23 13:47:06 - executive_node - ERROR - Unknown or non-executable step type: sleep
+2025-08-23 13:47:06 - executive_node - INFO - 🤖 Samantha completed current frame main
+2025-08-23 13:47:06 - executive_node - INFO - 🎯 Published current activity for Samantha
+2025-08-23 13:47:06 - executive_node - INFO - ✅ Activity completed for Samantha
+2025-08-23 13:47:06 - executive_node - INFO - 📋 Published current plan for Samantha
+2025-08-23 13:47:06 - executive_node - WARNING - 🚫 Samantha no action found for plan, pbly completed
+2025-08-23 13:47:06 - executive_node - INFO - 🔄 Samantha completing turn
+2025-08-23 13:47:06 - executive_node - INFO - ⏰ Samantha received time update: 2023-06-15 07:20:00+00:00
+2025-08-23 13:47:06 - activity - INFO - ⏰ ActivityManager for Samantha received time update: 2023-06-15 07:20:00+00:00
+2025-08-23 13:47:06 - executive_node - INFO - 🚦 Turn 13 received by Samantha
+2025-08-23 13:47:06 - executive_node - INFO - 🚦 Turn 13 started for Samantha
+2025-08-23 13:47:07 - executive_node - INFO - 📊 Samantha Received situation update
+2025-08-23 13:47:07 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-23 13:47:07 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-23 13:47:07 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-23 13:47:07 - activity - INFO - Pre-filtered activities: 9
+2025-08-23 13:47:14 - executive_node - INFO - 📥 Samantha Received text input: "I was just trying to be funny, I guess it was a bit of a tree-mendous fail, haha, I mean, I was trying to make a joke about leaving you hanging for the punchline, like a leaf on a tree, get it?" (source: Joe)
+2025-08-23 13:47:14 - executive_node - INFO - 📊 Samantha Received situation update
+2025-08-23 13:47:19 - activity - INFO - 🔄 No suitable activities found for Samantha, using fallback
+2025-08-23 13:47:19 - activity - INFO - 🎯 Samantha selected new activity: goal_fallback
+2025-08-23 13:47:19 - executive_node - INFO - 🎯 Published current activity for Samantha
+2025-08-23 13:47:19 - executive_node - INFO - 🎯 Samantha starting new activity: goal_fallback
+2025-08-23 13:47:19 - executive_node - INFO - 🤔 Samantha received placeholder goal, creating situated goal
+2025-08-23 13:47:21 - executive_node - INFO - 🤖 Samantha New Goal: #goal Investigate Joe's joke clue
+#description Ask Joe about tree joke meaning
+#otherCharacterName Joe
+#termination Joe explains joke clearly
+## 
+<end>
+2025-08-23 13:47:21 - executive_node - INFO - Samantha generated goal: Goal Investigate Joe's joke clue: Ask Joe about tree joke meaning; actors: Samantha, Joe; termination: Joe explains joke clearly
+2025-08-23 13:47:21 - executive_node - INFO - 🔄 Samantha cleared plan_bindings for new plan
+2025-08-23 13:47:21 - executive_node - INFO - 🎯 Published goal for Samantha: Goal Investigate Joe's joke clue: Ask Joe about tree joke meaning; actors: Samantha, Joe; termination: Joe explains joke clearly
+2025-08-23 13:47:21 - executive_node - INFO - 🎯 Published goal for Samantha: Goal Investigate Joe's joke clue: Ask Joe about tree joke meaning; actors: Samantha, Joe; termination: Joe explains joke clearly
+2025-08-23 13:47:21 - executive_node - INFO - 🎯 Samantha oriented to goal: Goal Investigate Joe's joke clue: Ask Joe about tree joke meaning; actors: Samantha, Joe; termination: Joe explains joke clearly
+2025-08-23 13:47:21 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-23 13:47:26 - executive_node - INFO - ✅ Plan validation passed
+2025-08-23 13:47:26 - executive_node - INFO - 📋 Samantha generated new plan: {
+  "plan": [
+    {
+      "type": "say",
+      "target": "Joe",
+      "value": "What did you mean by the tree joke?"
+    },
+    {
+      "type": "think",
+      "value": "Joe's joke meaning"
+    }
+  ]
+}
+2025-08-23 13:47:26 - executive_node - INFO - 🔄 Samantha cleared plan_bindings for new plan
+2025-08-23 13:47:26 - executive_node - INFO - 📋 Samantha assigned LLM-generated plan with 2 steps
+2025-08-23 13:47:26 - executive_node - INFO - 📋 Published current plan for Samantha
+2025-08-23 13:47:26 - executive_node - INFO - 📋 Published decided action for Samantha: say: Joe - What did you mean by the tree joke?
+2025-08-23 13:47:26 - executive_node - INFO - 🎯 Samantha planned action: say: Joe - What did you mean by the tree joke?
+2025-08-23 13:47:26 - executive_node - INFO - ⏰ Samantha proposed time advance: 4 minutes
+2025-08-23 13:47:26 - executive_node - ERROR - Failed to acquire conversation lock: Lock unavailable
+2025-08-23 13:47:26 - executive_node - ERROR - 📤 Published action: say (failed - lock unavailable)
+2025-08-23 13:47:26 - executive_node - INFO - Action failed for Samantha
+2025-08-23 13:47:26 - executive_node - INFO - 🔄 Samantha completing turn
+2025-08-23 13:47:26 - activity - INFO - ⏰ ActivityManager for Samantha received time update: 2023-06-15 07:22:00+00:00
+2025-08-23 13:47:26 - executive_node - INFO - ⏰ Samantha received time update: 2023-06-15 07:22:00+00:00
+2025-08-23 13:47:26 - executive_node - INFO - 🚦 Turn 14 received by Samantha
+2025-08-23 13:47:26 - executive_node - INFO - 🚦 Turn 14 started for Samantha
+2025-08-23 13:47:27 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-23 13:47:27 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-23 13:47:27 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-23 13:47:27 - executive_node - INFO - 📋 Published decided action for Samantha: think:  - Joe's joke meaning
+2025-08-23 13:47:27 - executive_node - INFO - 🎯 Samantha planned action: think: None - Joe's joke meaning
+2025-08-23 13:47:27 - executive_node - INFO - ⏰ Samantha proposed time advance: 2 minutes
+2025-08-23 13:47:27 - executive_node - INFO - Thinking about: {'type': 'think', 'value': "Joe's joke meaning"}
+2025-08-23 13:47:29 - executive_node - INFO - 🤖 Samantha New Thought:  
+#thought Joe's joke is a riddle
 
-2025-08-21 14:08:05 - executive_node - INFO - 🎯 Published current activity for Samantha
-2025-08-21 14:08:05 - executive_node - INFO - 🎯 Published goal for Samantha: Goal listen to Joe: listen to Joe; actors2025-08-21 14:08:05 - executive_node - INFO - ⏰ Joe received time update: 2023-06-15 07:05:00+00:00
-2025-08-21 14:08:05 - executive_node - INFO - 🚦 Turn 10 received by Joe
-2025-08-21 14:08:05 - executive_node - INFO - ⏰ ActivityManager for Joe received time update: 2023-06-15 07:05:00+00:00
-2025-08-21 14:08:05 - executive_node - INFO - 🚦 Turn 10 started for Joe
-2025-08-21 14:08:05 - executive_node - INFO - 👥 Retrieved entity context for Samantha
-2025-08-21 14:08:05 - executive_node - INFO - 👥 Retrieved entity context for Joe
-2025-08-21 14:08:05 - executive_node - INFO - 👥 Retrieved entity context for Joe
-2025-08-21 14:08:05 - executive_node - INFO - 🎯 Published goal for Joe: Goal engage in activity together: engage in activity together; actors: Joe; termination: engage in activity 2025-08-21 14:08:06 - executive_node - INFO - 👥 Retrieved entity context for Joe
-2025-08-21 14:08:06 - executive_node - INFO - 👥 Retrieved entity context for Samantha
-2025-08-21 14:08:06 - executive_node - INFO - 👥 Retrieved entity context for Samantha
-2025-08-21 14:08:06 - executive_node - INFO - 🎯 Published goal for Samantha: Goal listen to Joe: listen to Joe; actors: Samantha; termination: listen to Joe completed
-2025-08-21 14:08:06 - executive_node - INFO - 🎯 Samantha oriented to goal: Goal listen to Joe: listen to Joe; actors: Samantha; termination: listen to Joe completed
-': 'What is Hut1?'}
+2025-08-23 13:47:29 - executive_node - INFO - 📤 Published action: action_10
+2025-08-23 13:47:29 - executive_node - INFO - 🔄 Samantha completing turn
+2025-08-23 13:47:30 - executive_node - INFO - Responding to: "I was just trying to be funny, I guess it was a bit of a tree-mendous fail, haha, I mean, I was trying to make a joke about leaving you hanging for the punchline, like a leaf on a tree, get it?" from Joe
+2025-08-23 13:47:30 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-23 13:47:30 - executive_node - INFO - 🤔 Natural dialog end check for Joe: False
+2025-08-23 13:47:30 - executive_node - INFO - 🤖 Samantha Dialog end check: False
+2025-08-23 13:47:35 - executive_node - INFO - 📤 Samantha Sent text input to Joe: "I think I get it now, you were trying to make a joke about leaving me hanging, like a leaf on a tree, but I'm still not sure what the actual punchline is, can you just tell me what the tree went to the party for?" (source: Samantha)
+2025-08-23 13:47:35 - executive_node - INFO - Responding to: "I was just trying to be funny, I guess it was a bit of a tree-mendous fail, haha, I mean, I was trying to make a joke about leaving you hanging for the punchline, l2025-08-23 13:47:35 - executive_node - INFO - 📥 Joe Received text input: "I think I get it now, you were trying to make a joke about leaving me hanging, like a leaf on a tree, but I'm still not sure what the actual punchline is, can you just tell me what the tree went to the party for?" (source: Samantha)
+2025-08-23 13:47:35 - e2025-08-23 13:47:35 - executive_node - INFO - ⏰ Samantha received time update: 2023-06-15 07:24:00+00:00
+2025-08-23 13:47:35 - activity - INFO - ⏰ ActivityManager for Samantha received time update: 2023-06-15 07:24:00+00:00
+2025-08-23 13:47:35 - executive_node - INFO - 🚦 Turn 15 received by Samantha
+2025-08-23 13:47:35 - executive_node - INFO - 🚦 Turn 15 started for Samantha
+2025-08-23 13:47:36 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-23 13:47:36 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-23 13:47:36 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-23 13:47:36 - executive_node - INFO - 🤖 Samantha completed current frame main
+2025-08-23 13:47:36 - executive_node - INFO - 📝 Creating plan execution summary for Samantha
+2025-08-23 13:47:44 - executive_node - INFO - 📝 Plan post-mortem prepared for Samantha
+ 
+The goal was to investigate Joe's joke clue by asking him about the tree joke meaning. To achieve this, Samantha asked Joe about the joke and then thought about its meaning. The actions taken included saying "What did you mean by the tree joke?" to Joe and thinking about the joke's meaning. The observed results were that Joe did not provide a clear explanation, and Samantha was still unsure about the punchline, prompting her to ask another question about the tree going to the party. 
+
+2025-08-23 13:47:44 - executive_node - INFO - 📝 Reviewing planning for Samantha
+2025-08-23 13:47:55 - executive_node - INFO - 💬 Samantha received end dialog from Joe
+2025-08-23 13:47:55 - executive_node - INFO - 🔓 Conversation lock released with Joe
+2025-08-23 13:47:55 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-23 13:47:55 - executive_node - WARNING - 🤖 Samantha Replanning.
+2025-08-23 13:47:55 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-23 13:47:58 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-08-23 13:47:58 - executive_node - INFO - 📝 Planning review for Samantha: 1. **Plan Syntax: Inadequate Support for Conversation Continuity**
+   - The syntax allows only a single "say" action and blocks sequential "say" actions, even though conversation-driven goals (like "get a clear answer from Joe") often require back-and-forth exchanges. This restriction artificially limits natural dialog flow and makes it hard to persist until the goal (clear explanation) is reached.
+   - **Recommendation:** Allow multi-turn dialog blocks by introducing a "repeat/while" dialogue action or relaxing the "no sequential say actions" rule when current goal is conversational in nature.
+
+2. **Plan Syntax: No Feedback Handling or Goal-Driven Conversation Loop**
+   - The current plan syntax lacks mechanisms to react based on the conversation's outcome (e.g., if Joe's explanation is still unclear, follow up with another question).
+   - **Recommendation:** Add goal-completion detection to the plan syntax, for example, by permitting a "while" block that keeps asking or responding until a condition is met (such as "Joe explains joke clearly"), or by adding a special "clarity achieved" condition.
+
+3. **Plan Syntax: Lack of Confirmation/Clarification Patterns**
+   - Realistic conversations involve confirming understanding (meta-dialog), but plan syntax doesn't support "acknowledge" or "clarify" actions, nor structured ways to rephrase or probe.
+   - **Recommendation:** Add explicit actions or patterns for follow-up questions, confirmations, or clarifications, or encourage their use via instruction/example.
+
+4. **Planning Prompt: Goal Definition Not Sufficiently Granular**
+   - The definition of "Joe explains joke clearly" is subjective within planning context. Planners may lack cues for what would count as "clarity."
+   - **Recommendation:** Clearly specify, within the prompt, what constitutes a "clear explanation" (e.g., Joe provides a direct, unambiguous answer), or supply example completions.
+
+5. **Planning Prompt: Missing Recent Action/State Feedback**
+   - The prompt hints at previous actions but does not state whether the previous say-action was responded to, nor whether the planner should expect or check for a reply in the next step.
+   - **Recommendation:** Provide clear info on conversational state, last utterance by both parties, and whether a reply is pending or completed.
+
+6. **Plan Syntax: No Way to Reference or Store Dialog History**
+   - There's no "memory" or handling of dialog state or message history (e.g., did Joe explain, or is Samantha stil2025-08-23 13:47:58 - executive_node - INFO - ⏰ Joe received time update: 2023-06-15 07:26:00+00:00
+2025-08-23 13:47:58 - activity - INFO - ⏰ ActivityManager for Joe received time update: 2023-06-15 07:26:00+00:00
+2025-08-23 13:47:58 - executive_node - INFO - 🚦 Turn 16 received by Joe
+2025-08-23 13:47:58 - executive_node - INFO - 🚦 Turn 16 started for Joe
+2025-08-23 13:48:03 - executive_node - INFO - 🤖 Joe New Goal: new
+#goal answer tree party question
+#description provide actual punchline to Samantha
+#otherCharacterName Samantha
+#termination punchline delivered to Samantha
+##
+2025-08-23 13:48:03 - executive_node - INFO - Joe generated goal: Goal answer tree party question: provide actual punchline to Samantha; actors: Joe, Samantha; termination: punchline delivered to Samantha
+2025-08-23 13:48:03 - executive_node - INFO - 🔄 Joe cleared plan_bindings for replan
+2025-08-23 13:48:03 - executive_node - INFO - 🎯 Published goal for Joe: Goal answer tree party question: provide actual punchline to Samantha; actors: Joe, Samantha; termination: punchline delivered to Samantha
+2025-08-23 13:48:03 - executive_node - INFO - 📤 Published action: action_11
+2025-08-23 13:48:04 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-23 13:48:04 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-23 13:48:04 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-23 13:48:04 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-23 13:48:10 - executive_node - INFO - ✅ Plan validation passed
+2025-08-23 13:48:10 - executive_node - INFO - 📋 Joe generated new plan: {
+  "plan": [
+    {
+      "type": "say",
+      "target": "Samantha",
+      "value": "The tree went to the party because it wanted to branch out and meet new people!"
+    }
+  ]
+}
+2025-08-23 13:48:10 - executive_node - INFO - 🔄 Joe cleared plan_bindings for new plan
+2025-08-23 13:48:10 - executive_node - INFO - 📋 Joe assigned LLM-generated plan with 1 steps
+2025-08-23 13:48:10 - executive_node - INFO - 📋 Published current plan for Joe
+2025-08-23 13:48:10 - executive_node - INFO - 📋 Published decided action for Joe: say: Samantha - The tree went to the party because it wanted to branch out and meet new people!
+2025-08-23 13:48:10 - executive_node - INFO - 🎯 Joe planned action: say: Samantha - The tree went to the party because it wanted to branch out and meet new people!
+2025-08-23 13:48:10 - executive_node - INFO - ⏰ Joe proposed time advance: 4 minutes
+2025-08-23 13:48:10 - executive_node - INFO - 🔒 Conversation lock acquired with Samantha
+2025-08-23 13:48:10 - executive_node - INFO - Saying intent: "The tree went to the party because it wanted to branch out and meet new people!" to Samantha
+2025-08-23 13:48:10 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-23 13:48:13 - executive_node - INFO - 📤 Joe Sent text input to Samantha: "The tree went to the party because it wanted to branch out and meet new people!" (source: Joe)
+2025-08-23 13:48:13 - executive_node - INFO - Responding to: "The tree went to the party because it wanted to branch out and meet new people!" from Samantha: The tree went to the party because it wanted to branch out and meet new people!
+2025-08-23 13:48:13 - executive_node - INFO - 📤 P2025-08-23 13:48:13 - executive_node - INFO - 📥 Samantha Received text input: "The tree went to the party because it wanted to branch out and meet new people!" (source:2025-08-23 13:48:24 - activity - INFO - ⏰ ActivityManager for Joe received time update: 2023-06-15 07:30:00+00:00
+2025-08-23 13:48:24 - executive_node - INFO - ⏰ Joe received time update: 2023-06-15 07:30:00+00:00
+2025-08-23 13:48:24 - executive_node - INFO - 🚦 Turn 17 received by Joe
+2025-08-23 13:48:24 - executive_node - INFO - 🚦 Turn 17 started for Joe
+2025-08-23 13:48:25 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-23 13:48:25 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-23 13:48:25 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-23 13:48:25 - executive_node - INFO - 🤖 Joe completed current frame main
+2025-08-23 13:48:25 - executive_node - INFO - 📝 Creating plan execution summary for Joe
+2025-08-23 13:48:27 - executive_node - INFO - 💬 Joe received end dialog from Samantha
+2025-08-23 13:48:27 - executive_node - INFO - 🔓 Conversation lock released with Samantha
+2025-08-23 13:48:27 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-23 13:48:27 - executive_node - WARNING - 🤖 Joe Replanning.
+2025-08-23 13:48:27 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-23 13:48:33 - executive_node - INFO - 🤖 Joe New Goal: new
+#goal Find Hut1 for safety
+#description Locate Hut1 for shelter
+#otherCharacterName None
+#termination Arrived at Hut1 location
+##
+2025-08-23 13:48:33 - executive_node - INFO - Joe generated goal: Goal Find Hut1 for safety: Locate Hut1 for shelter; actors: Joe; termination: Arrived at Hut1 location
+2025-08-23 13:48:33 - executive_node - INFO - 🔄 Joe cleared plan_bindings for replan
+2025-08-23 13:48:33 - executive_node - INFO - 🎯 Published goal for Joe: Goal Find Hut1 for safety: Locate Hut1 for shelter; actors: Joe; termination: Arrived at Hut1 location
+2025-08-23 13:48:34 - executive_node - INFO - 📝 Plan post-mortem prepared for Joe
+ after the summary: 
+The goal was to deliver a punchline to Samantha, which was achieved through a plan involving a single action of saying the punchline to her. The actions taken included two attempts to say the punchline, with the second attempt successfully delivering the result "The tree went to the party because it wanted to branch out and meet new people!" to Samantha. The observed result was the successful delivery of the punchline, meeting the goal of providing the actual punchline to Samantha. 
+
+2025-08-23 13:48:34 - executive_node - INFO - 🎯 Published current activity for Joe
+2025-08-23 13:48:34 - executive_node - INFO - 🎯 Published goal for Joe: Goal watch for reaction—if positive, continue banter: watch for reaction—if positive, continue banter; actors: Joe; termination: watch for reaction—if positive, continue banter completed
+2025-08-23 13:48:34 - executive_node - INFO - 🎯 Activity step completed, advancing to: watch for reaction—if positive, continue banter
+2025-08-23 13:48:34 - executive_node - INFO - 📋 Published current plan for Joe
+2025-08-23 13:48:34 - executive_node - WARNING - 🚫 Joe no action found for plan, pbly completed
+2025-08-23 13:48:34 - executive_node - INFO - 🔄 Joe completing turn
+2025-08-23 13:48:34 - executive_node - INFO - ⏰ Joe received time update: 2023-06-15 07:35:00+00:00
+2025-08-23 13:48:34 - activity - INFO - ⏰ ActivityManager for Joe received time update: 2023-06-15 07:35:00+00:00
+2025-08-23 13:48:34 - executive_node - INFO - 🚦 Turn 18 received by Joe
+2025-08-23 13:48:34 - executive_node - INFO - 🚦 Turn 18 started for Joe
+2025-08-23 13:48:35 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-23 13:48:35 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-23 13:48:35 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-23 13:48:42 - executive_node - WARNING - ❌ Plan validation failed
+2025-08-23 13:48:42 - executive_node - ERROR - Invalid plan JSON in LLM response: {'plan': [{'type': 'say', 'target': 'Samantha', 'value': 'So, did I finally branch out into comedy?'}, {'type': 'wait', 'condition': {'type': 'can_see', 'target': 'Samantha'}, 'target': 'Samantha'}]}
+2025-08-23 13:48:42 - executive_node - ERROR - No action, target, or value found in LLM response: {'plan': [{'type': 'say', 'target': 'Samantha', 'value': 'So, did I finally branch out into comedy?'}, {'type': 'wait', 'condition': {'type': 'can_see', 'target': 'Samantha'}, 'target': 'Samantha'}]}
+2025-08-23 13:48:42 - executive_node - INFO - 🔄 Joe cleared plan_bindings for single-action plan
+2025-08-23 13:48:42 - executive_node - INFO - 📋 Joe created single-action plan: sleep
+2025-08-23 13:48:42 - executive_node - INFO - 📋 Published current plan for Joe
+2025-08-23 13:48:42 - executive_node - ERROR - Unknown or non-executable step type: sleep
+2025-08-23 13:48:42 - executive_node - INFO - 🤖 Joe completed current frame main
+2025-08-23 13:48:42 - executive_node - INFO - 🎯 Published current activity for Joe
+2025-08-23 13:48:42 - executive_node - INFO - 🎯 Published goal for Joe: Goal encourage Samantha to join in: encourage Samantha to join in; actors: Joe; termination: encourage Samantha to join in completed
+2025-08-23 13:48:42 - executive_node - INFO - 🎯 Activity step completed, advancing to: encourage Samantha to join in
+2025-08-23 13:48:42 - executive_node - INFO - 📋 Published current plan for Joe
+2025-08-23 13:48:42 - executive_node - WARNING - 🚫 Joe no action found for plan, pbly completed
+2025-08-23 13:48:42 - executive_node - INFO - 🔄 Joe completing turn
+2025-08-23 13:48:42 - executive_node - INFO - ⏰ Joe received time update: 2023-06-15 07:39:00+00:00
+2025-08-23 13:48:42 - activity - INFO - ⏰ ActivityManager for Joe received time update: 2023-06-15 07:39:00+00:00
+2025-08-23 13:48:42 - executive_node - INFO - 🚦 Turn 19 received by Joe
+2025-08-23 13:48:42 - executive_node - INFO - 🚦 Turn 19 started for Joe
+2025-08-23 13:48:43 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-23 13:48:43 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-23 13:48:43 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-23 13:48:49 - executive_node - INFO - ✅ Plan validation passed
+2025-08-23 13:48:49 - executive_node - INFO - 📋 Joe generated new plan: {
+  "plan": [
+    {
+      "type": "say",
+      "target": "Samantha",
+      "value": "Hey, now that we've got the tree joke out of the way, want to explore this forest with me?"
+    }
+  ]
+}
+2025-08-23 13:48:49 - executive_node - INFO - 🔄 Joe cleared plan_bindings for new plan
+2025-08-23 13:48:49 - executive_node - INFO - 📋 Joe assigned LLM-generated plan with 1 steps
+2025-08-23 13:48:49 - executive_node - INFO - 📋 Published current plan for Joe
+2025-08-23 13:48:49 - executive_node - INFO - 📋 Published decided action for Joe: say: Samantha - Hey, now that we've got the tree joke out of the way, want to explore this forest with me?
+2025-08-23 13:48:49 - executive_node - INFO - 🎯 Joe planned action: say: Samantha - Hey, now that we've got the tree joke out of the way, want to explore this forest with me?
+2025-08-23 13:48:49 - executive_node - INFO - ⏰ Joe proposed time advance: 2 minutes
+2025-08-23 13:48:49 - executive_node - INFO - 🔒 Conversation lock acquired with Samantha
+2025-08-23 13:48:49 - executive_node - INFO - Saying intent: "Hey, now that we've got the tree joke out of the way, want to explore this forest with me?" to Samantha
+2025-08-23 13:48:49 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-23 13:48:53 - executive_node - INFO - 📤 Joe Sent text input to Samantha: "Hey, now that we've got the tree joke out of the way, want to explore this forest with me and see what kind of cool stuff we can find?" (source: Joe)
+2025-08-23 13:48:53 - executive_node - INFO - Responding to: "Hey, now that we've got the tree joke out of the way, want to explore this forest with me?" from Samantha: Hey, now that we've got the tree joke out of the way, want to explore this forest with me and see what kind of cool stuff we can find?
+2025-08-23 13:48:53 - executive_node - INFO - 📤 Published action: action_13
+2025-08-23 13:48:53 - executive_node - INFO - 📤 Published action: say
+2025-08-23 13:48:53 - executive_node - INFO - 🔄 Joe completing turn
+2025-08-23 13:49:11 - executive_node - INFO - ⏰ Joe received time update: 2023-06-15 07:41:00+00:00
+2025-08-23 13:49:11 - activity - INFO - ⏰ ActivityManager for Joe received time update: 2023-06-15 07:41:00+00:00
+2025-08-23 13:49:11 - executive_node - INFO - 🚦 Turn 20 received by Joe
+2025-08-23 13:49:11 - executive_node - INFO - 🚦 Turn 20 started for Joe
+2025-08-23 13:49:12 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-23 13:49:12 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-23 13:49:12 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-23 13:49:12 - executive_node - INFO - 🤖 Joe completed current frame main
+2025-08-23 13:49:12 - executive_node - INFO - 📝 Creating plan execution summary for Joe
+2025-08-23 13:49:19 - executive_node - INFO - 📝 Plan post-mortem prepared for Joe
+ 
+The goal was to encourage Samantha to join in, which was attempted through a plan involving Joe saying a specific phrase to her. The action taken was Joe saying "Hey, now that we've got the tree joke out of the way, want to explore this forest with me and see what kind of cool stuff we can find?" to Samantha. The observed result is not explicitly stated, but the action was completed as planned. 
+
+2025-08-23 13:49:37 - executive_node - INFO - 📝 Reviewing planning for Joe
+2025-08-23 13:49:37 - executive_node - INFO - 📥 Joe Received text input: "I'm still thinking about the joke, but sure, I'd love to explore the forest with you, what kind of cool stuff are you thinking we might find?" (source: Samantha)
+2025-08-23 13:49:37 - executive_node - INFO - 📊 Joe Received situation update
+2025-08-23 13:49:46 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-08-23 13:49:51 - executive_node - INFO - 📝 Planning review for Joe: 1. **Plan Syntax: Lack of Expressiveness for Social/Non-verbal Actions**
+   - Issue: The allowed action types are heavily object- or resource-focused (e.g., move, take, scan), with “say” as the only explicitly social action. In encouraging someone to join in, non-verbal or soft-skill actions (smiling, gesturing, waving, inviting with a gesture, etc.) may be just as or more important than words.
+   - Recommendation: Add more social interaction primitives (e.g., "gesture", "invite", "smile", "laugh", or "nod") to the plan syntax, to enable richer, more naturalistic social planning.
+
+2. **Plan Syntax: Restrictive 'say' Action Constraints**
+   - Issue: The instruction “A plan must not contain sequential say actions” prevents nuanced multi-step conversations, which may be necessary to persuade or encourage someone. Many real conversations require a short dialogue (e.g., first validating their feelings, then suggesting an action).
+   - Recommendation: Either relax this rule OR clarify how planners can integrate multiple speech acts in a single step (“value” may need to allow a conversational exchange), or permit a limited conversational sequence if justified by the goal.
+
+3. **Plan Syntax: Cannot Target Groups or Multiple Participants**
+   - Issue: The syntax restricts "say" targets to a single "character_name". Group encouragement (e.g., encouraging multiple people) is sometimes critical for group dynamics.
+   - Recommendation: Allow "target" to accept a list (e.g., ["Samantha","User"]) or symbols such as "all_nearby" to broaden applicability.
+
+4. **Plan Syntax: Missing 'offer_activity' or 'suggest' Action**
+   - Issue: The act of encouraging someone to join in may not always be a direct invitation—but an indirect suggestion or offer of a joint activity/resource. The plan syntax does not account for these subtle encouragement strategies.
+   - Recommendation: Add an "offer" or "suggest" action type (with structured arguments) that encapsulates these less-direct forms of encouragement.
+
+5. **Condition Syntax: No Support for Social State Conditions**
+   - Issue: There’s no action type for checking the emotional state or social willingness of another character. “believes” and “notbelieves” are too abstract for most encouragement scenarios.
+   - Recommendation: Add support for conditions like {"type":"is_engaged", "target":"character_name"} or {"type":"emotion", "target":"character_name", "value":"interested"}.
+
+6. **Prompt: Insufficient Guidance for Social Context or Mood**
+   - Issue: The prompt is detailed with facts, but gives relatively little information about Samantha's current mood or state of mind, which is critical for planning encouragement.
+   - Recommendation: Include at least a brief summary of Samantha’s emotional state, level of receptivity, social disposition, or relationship to Joe, to better inform action selection.
+
+7. **Prompt: Overemphasis on ‘Resource’ Information**
+   - Issue: The prompt contains lots of environmental/resource visibility info, none of which is relevant to the social/encouragement task, cluttering the planning context.
+   - Recommendation: For purely social goals, consider omitting or deprioritizing the environmental scan, or clearly demarcating it as "nonessential" unless helpful for a secondary encouragement strategy (e.g., suggesting gathering berries together).
+
+8. **Prompt: Tutorial Repetition and Length**
+   - Issue: The specification of the plan syntax is provided in full before every round, adding verbosity and impeding rapid comprehension for agents or humans.
+   - Recommendation: Reference the syntax specification by link or as an appendix, and give only a concise reminder or updates per prompt.
+
+9. **Feedback Loop: Lack of Outcome or Effect Tracking**
+   - Issue: The plan post-mortem does not report on Samantha’s actual response, which prevents calibration and
+2025-08-23 13:50:04 - executive_node - INFO - 🎯 Published current activity for Joe
+2025-08-23 13:50:04 - executive_node - INFO - 🎯 Published goal for Joe: Goal ease back to productive tasks: ease back to productive tasks; actors: Joe; termination: ease back to productive tasks completed
+2025-08-23 13:50:04 - executive_node - INFO - 🎯 Activity step completed, advancing to: ease back to productive tasks
+2025-08-23 13:50:04 - executive_node - INFO - 📋 Published current plan for Joe
+2025-08-23 13:50:04 - executive_node - WARNING - 🚫 Joe no action found for plan, pbly completed
+2025-08-23 13:50:04 - executive_node - INFO - 🔄 Joe completing turn
+2025-08-23 13:50:04 - activity - INFO - ⏰ ActivityManager for Joe received time update: 2023-06-15 07:44:00+00:00
+2025-08-23 13:50:04 - executive_node - INFO - ⏰ Joe received time update: 2023-06-15 07:44:00+00:00
+2025-08-23 13:50:05 - executive_node - INFO - Responding to: "I'm still thinking about the joke, but sure, I'd love to explore the forest with you, what kind of cool stuff are you thinking we might find?" from Samantha
+2025-08-23 13:50:05 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+2025-08-23 13:50:06 - executive_node - INFO - 🤔 Natural dialog end check for Samantha: False
+2025-08-23 13:50:06 - executive_node - INFO - 🤖 Joe Dialog end check: False
+2025-08-23 13:50:10 - executive_node - INFO - 📤 Joe Sent text input to2025-08-23 13:50:10 - executive_node - INFO - 📥 Samantha Received text input: "I'm thinking we might find some berries, or maybe some mushrooms, I've seen some fallen branches around here too, who knows, maybe we'll stumble upon a spring or something, the forest seems pretty dense, so I'm sure we'll find something interesting" (source: Joe)
+2025-08-23 13:50:10 - executive_node - INFO - 📊 Samantha Received situation update
+2025-08-23 13:50:11 - executive_node - INFO - Responding to: "I'm thinking we might find some berries, or maybe some mushrooms, I've seen some fallen branches around here too, who knows, maybe we'll stumble upon a spring or something, the forest seems pretty dense, so I'm sure we'll find something interesting" from Joe
+2025-08-23 13:50:11 - executive_node - INFO - 👥 Retrieved entity con2025-08-23 13:50:11 - executive_node - INFO - 💬 Joe received end dialog from Samantha
+2025-08-23 13:50:11 - executive_node - INFO - 🔓 Conversation lock released with Samantha
+2025-08-23 13:50:11 - executive_node - INFO - 👥 Retrieved entity context for Samantha
+oe
+2025-08-23 13:50:11 - executive_node - WARNING - 🤖 Samantha Replanning.
+2025-08-23 13:50:11 - executive_node - INFO - ✅ Plan validation passed
+2025-08-23 13:50:11 - executive_node - INFO - 👥 Retrieved entity context for Joe
+2025-08-23 13:50:15 - executive_node - INFO - 🤖 Samantha New Goal: new
+#goal Explore forest with Joe
+#description Find cool stuff in forest
+#otherCharacterName Joe
+#termination Find something interesting
+##
+2025-08-23 13:50:15 - executive_node - INFO - Samantha generated goal: Goal Explore forest with Joe: Find cool stuff in forest; actors: Samantha, Joe; termination: Find something interesting
+2025-08-23 13:50:15 - executive_node - INFO - 🔄 Samantha cleared plan_bindings for replan
+2025-08-23 13:50:15 - executive_node - INFO - 🎯 Published goal for Samantha: Goal Explore forest with Joe: Find cool stuff in forest; actors: Samantha, Joe; termination: Find something interesting
+2025-08-23 13:50:15 - executive_node - INFO - 📤 Published action: action_18
+2025-08-23 13:57:07 - executive_node - INFO - 📊 Samantha Received situation update

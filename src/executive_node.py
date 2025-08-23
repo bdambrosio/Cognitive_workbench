@@ -177,6 +177,7 @@ class ZenohExecutiveNode:
         self.current_plan = None
         self.plan_state = None
         self.plan_bindings_cache = {}
+        self.plan_bindings = {}  # Store scan action results: {var_name: scan_result}
         self.plan_summary_completed = False  # Track if current plan has been summarized
         self.plan_summary = None
         # Control-flow telemetry and plan/step identifiers
@@ -397,6 +398,10 @@ class ZenohExecutiveNode:
             self.current_plan_publisher.put(json.dumps(current_plan_data))
             logger.info(f'📋 Published current plan for {self.character_name}')
             
+            # Log plan_bindings if they exist
+            if hasattr(self, 'plan_bindings') and self.plan_bindings:
+                logger.info(f'🔗 {self.character_name} current plan_bindings: {self.plan_bindings}')
+            
         except Exception as e:
             logger.error(f'Error publishing current plan: {e}')
 
@@ -488,16 +493,17 @@ class ZenohExecutiveNode:
                     logger.warning(f'🚫 {self.character_name} no activity selected')
 
             # Convert step to goal or use existing goal/orient
-            new_goal = None
+            new_goal = None # this should only be if we have a new step
             if self.current_step:
                 # Only create new goal if we don't have the right one already
                 if not self.current_goal or self.current_goal.name != self.current_step['name']:
                     new_goal = plan_module.Goal(self.current_step['name'], self.current_step['actors'], self.current_step['description'], self.current_step['termination'])
 
+            prev_goal = self.current_goal
             self.current_goal = self._orient(observations, new_goal)
-            self._publish_goal(self.current_goal)
-
-            logger.info(f'🎯 {self.character_name} oriented to goal: {self.current_goal.to_string()}')
+            if self.current_goal != prev_goal:
+                self._publish_goal(self.current_goal)
+                logger.info(f'🎯 {self.character_name} oriented to goal: {self.current_goal.to_string()}')
 
             # Plan: Return existing plan or create single-action plan
             plan = self._plan(self.current_goal)
@@ -517,9 +523,8 @@ class ZenohExecutiveNode:
             if action is not None:
                 action_succeeded = self._act(action)
                 if not action_succeeded:
-                    # Action failed (e.g., conversation lock unavailable), don't advance plan state
-                    # but still complete the turn so launcher can continue
-                    logger.info(f'Action failed for {self.character_name}, will retry same step next turn')
+                    # Action failed (e.g., conversation lock unavailable)
+                    logger.info(f'Action failed for {self.character_name}')
                     return
             
         except Exception as e:
@@ -723,6 +728,9 @@ end your response with </end>
                         logger.info(f'{self.character_name} generated goal: {goal.to_string()}')
                         self.current_goal = goal
                         self.current_plan = None  # Clear plan so _plan creates new one for this goal
+                        self.plan_bindings = {}  # Clear scan variables for new plan
+                        logger.info(f'🔄 {self.character_name} cleared plan_bindings for new plan')
+                        self.plan_bindings_cache = {}
                         self._publish_goal(goal)
                         return self.current_goal
                     else:
@@ -730,11 +738,13 @@ end your response with </end>
             else:
                 logger.error(f'LLM call failed: {response.error}')
                 self.current_plan = None
+                self.plan_bindings = {}  # Clear scan variables for new plan
                 self.current_goal = plan_module.Goal('sleep', actors=[self.character_name])
                 self._publish_goal(self.current_goal)
         else:   
             logger.error('LLM client not available')
             self.current_plan = None
+            self.plan_bindings = {}  # Clear scan variables for new plan
             self.current_goal = plan_module.Goal('sleep', actors=[self.character_name])
             self._publish_goal(self.current_goal)
         return self.current_goal
@@ -786,6 +796,8 @@ end your response with </end>
                         if not valid:
                             logger.error(f'Invalid plan JSON in LLM response: {response.text}')
                             plan_candidate = None
+                        else:
+                            logger.info(f'📋 {self.character_name} generated new plan: {json.dumps(plan_candidate, indent=2)}')
                     except Exception as e:
                         logger.error(f'Invalid plan JSON in LLM response: {e}')
                         plan_candidate = None
@@ -794,6 +806,9 @@ end your response with </end>
                         single_action = {'type': 'sleep', 'target': 'self', 'value': '', 'reason': ''}
                     else:
                         self.current_plan = plan_candidate
+                        self.plan_bindings = {}  # Clear scan variables for new plan
+                        logger.info(f'🔄 {self.character_name} cleared plan_bindings for new plan')
+                        logger.info(f'📋 {self.character_name} assigned LLM-generated plan with {len(plan_candidate["plan"])} steps')
                         self.plan_bindings_cache = {}
                         self.plan_summary_completed = False  # Reset for new plan
                         # Initialize plan identifiers and control-flow events
@@ -814,6 +829,9 @@ end your response with </end>
         # Create single-action plan
         if single_action:
             self.current_plan = {'plan': [{'type': single_action['type'], 'target': single_action['target'], 'value': single_action['value'], 'reason': single_action.get('reason', '')}]}   
+            self.plan_bindings = {}  # Clear scan variables for new plan
+            logger.info(f'🔄 {self.character_name} cleared plan_bindings for single-action plan')
+            logger.info(f'📋 {self.character_name} created single-action plan: {single_action["type"]}')
         self.plan_summary_completed = False  # Reset for new plan
         # Initialize plan identifiers and control-flow events
         self.plan_counter += 1
@@ -901,6 +919,8 @@ end your response with </end>
                         logger.info(f'{self.character_name} generated goal: {goal.to_string()}')
                         self.current_goal = goal
                         self.current_plan = None  # Clear plan so _plan creates new one for this goal
+                        self.plan_bindings = {}  # Clear scan variables for new plan
+                        logger.info(f'🔄 {self.character_name} cleared plan_bindings for replan')
                         self._publish_goal(goal)
                         return self.current_goal
                     else:
@@ -909,11 +929,13 @@ end your response with </end>
                 logger.error(f'LLM call failed: {response.error}')
                 self.current_goal = plan_module.Goal('sleep', actors=[self.character_name])
                 self.current_plan = None  # Clear plan so _plan creates new one for this goal
+                logger.info(f'🔄 {self.character_name} cleared plan_bindings for sleep goal (replan failed)')
                 self._publish_goal(self.current_goal)
         else:   
             logger.error('LLM client not available')
             self.current_goal = plan_module.Goal('sleep', actors=[self.character_name])
             self.current_plan = None  # Clear plan so _plan creates new one for this goal
+            logger.info(f'🔄 {self.character_name} cleared plan_bindings for sleep goal (LLM unavailable)')
             self._publish_goal(self.current_goal)
         return self.current_goal
         
@@ -922,6 +944,9 @@ end your response with </end>
         # Existing telemetry and cleanup
         self._summarize_plan_execution()
         self.current_plan = None
+        if hasattr(self, 'plan_bindings') and self.plan_bindings:
+            logger.info(f'🔄 {self.character_name} cleared plan_bindings (plan completed)')
+            self.plan_bindings = {}
         self.plan_bindings_cache = {}
         self.action_history = []
         self.plan_state = None
@@ -1014,6 +1039,7 @@ end your response with </end>
 
         # ---- Completed current frame? ----
         if idx >= len(plan):
+            logger.info(f'🤖 {self.character_name} completed current frame {current["type"]}')
             if current['type'] == 'while':
                 # Finished one body iteration
                 current['iteration_count'] += 1
@@ -1056,9 +1082,11 @@ end your response with </end>
         # ---- Still within current frame ----
         step = plan[idx]
         stype = step.get('type')
+        
+        logger.debug(f'🔄 {self.character_name} executing plan step {idx + 1}/{len(plan)}: {stype} action')
 
         # Primitive actions (spec-compliant)
-        if stype in ('move', 'say', 'think', 'take', 'inspect', 'use'):
+        if stype in ('move', 'say', 'think', 'take', 'inspect', 'use', 'scan'):
             current['idx'] = idx + 1
             return step
 
@@ -1315,6 +1343,30 @@ end your response with </end>
             self.action_publisher.put(json.dumps(action_data))
             self.action_counter += 1
             return True
+        elif action['type'].lower() == "scan":
+            scan_result = self._execute_scan_action(action)
+            action_record.result = scan_result
+            
+            # Publish scan action result to FastAPI
+            action_data = {
+                'type': 'scan',
+                'action_id': self.action_counter,
+                'timestamp': datetime.now().isoformat(),
+                'target': action.get('target', ''),
+                'out': action.get('out', ''),
+                'result': scan_result,
+                'status': 'success' if scan_result else 'failed',
+                'variable_bound': action.get('out', '') if scan_result else '',
+                'bound_value': scan_result if scan_result else ''
+            }
+            self.action_publisher.put(json.dumps(action_data))
+            logger.info(f'📤 Published action: scan ({"success" if scan_result else "failed"})')
+            self.action_counter += 1
+            
+            return True if scan_result else False
+        else:
+            logger.error(f'❌ Unknown action type: {action.get("type", "unknown")}')
+            return False
 
         # Request situation/map update for UI after non-move actions that may affect visibility/adjacency
         try:
@@ -1344,8 +1396,8 @@ end your response with </end>
         """Complete the current turn and prepare for the next one."""
         logger.info(f'🔄 {self.character_name} completing turn')
         # Reset turn-specific state
-        self.text_input_pending = False
-        self.interrupt_pending = False
+        #self.text_input_pending = False
+        #self.interrupt_pending = False
         
         # Publish turn completion
         turn_data = {
@@ -1630,6 +1682,9 @@ End your response with </end>
             parsed_plan = plan_module.parse_plan_text(plan_text)
             self._plan_completed()  # Clear any existing plan
             self.current_plan = parsed_plan
+            self.plan_bindings = {}  # Clear scan variables for new plan
+            logger.info(f'🔄 {self.character_name} cleared plan_bindings for UI-assigned plan')
+            logger.info(f'📋 {self.character_name} assigned UI plan with {len(parsed_plan["plan"])} steps')
             self.plan_bindings_cache = {}
             self.plan_summary_completed = False  # Reset for new plan
             self._publish_current_plan()
@@ -1797,6 +1852,20 @@ End your text with: </end>"""
         
         if not raw_target:
             return None
+            
+        # Check if target is a variable reference ($variable_name)
+        if isinstance(raw_target, str) and raw_target.startswith('$'):
+            var_name = raw_target[1:]  # Remove $ prefix
+            if var_name in self.plan_bindings:
+                bound_value = self.plan_bindings[var_name]
+                logger.info(f'🔗 {self.character_name} resolved variable ${var_name} -> {bound_value}')
+                # Replace the target with the bound value for further resolution
+                action = action.copy()
+                action['target'] = bound_value
+                raw_target = bound_value
+            else:
+                logger.error(f'❌ {self.character_name} variable ${var_name} not bound in plan_bindings')
+                return False
             
         # Check plan bindings cache first
         cache_key = raw_target
@@ -2014,6 +2083,58 @@ End your text with: </end>"""
         except Exception as e:
             logger.error(f'Error resolving resource instance {raw_target}: {e}')
             return False
+            
+    def _execute_scan_action(self, action: Dict[str, Any]) -> str:
+        """Execute scan action and return the found target name."""
+        target = action.get('target', '')
+        var_name = action.get('out', '')
+        
+        # Search in last_situation_data for matching character or resource
+        found_target = self._find_target_in_situation(target)
+        
+        # Store result in plan_bindings if var_name provided
+        if var_name and found_target:
+            self.plan_bindings[var_name] = found_target
+            logger.info(f'🔗 {self.character_name} bound variable: {var_name} = {found_target}')
+        elif var_name and not found_target:
+            logger.warning(f'⚠️ {self.character_name} scan failed to find target "{target}" for variable {var_name}')
+        elif not var_name:
+            logger.error(f'🔍 {self.character_name} scan found target "{target}" but no variable to bind')
+        
+        return found_target if found_target else ''
+
+    def _find_target_in_situation(self, target: str) -> str:
+        """Search last_situation_data for target, return first match found."""
+        if not self.last_situation_data:
+            return ''
+            
+        target_lower = target.lower()
+        
+        # Search characters first
+        for view in self.last_situation_data.get('views', []):
+            if 'characters' in view:
+                for character in view['characters']:
+                    char_name = character.get('name', '')
+                    if (char_name.lower() == target_lower or 
+                        target_lower == 'person' or
+                        char_name.lower().startswith(target_lower)):
+                        return char_name
+                        
+            # Search resources
+            if 'resources' in view:
+                for resource in view['resources']:
+                    resource_name = resource.get('name', '')
+                    if (resource_name.lower() == target_lower or
+                        resource_name.lower().startswith(target_lower)):
+                        return resource_name
+                        
+            # Search terrain
+            if 'terrain' in view:
+                terrain = view['terrain']
+                if terrain.lower() == target_lower:
+                    return terrain
+                    
+        return ''
             
     def _find_target_direction(self, target: str) -> str:
         """Find which direction a target (character or resource) is visible in."""

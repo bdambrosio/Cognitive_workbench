@@ -11,7 +11,6 @@ import signal
 import argparse
 from datetime import datetime
 from typing import Dict, List, Any, Union, Optional
-from activity import ActivityManager
 import utils.hash_utils as hash_utils
 from utils.zenoh_utils import datetime_handler
 import plan as plan_module
@@ -52,34 +51,37 @@ except ImportError as e:
 ONTOLOGY_TEMPLATE = """You are creating an ontology for everyday activities. Attend especially to the era, setting, and locale, these will often be fantasy or historical settings.
 INPUT:
 #Setting: a string including era, locale, climate, tech, norms:
-    {setting}
+    {{$setting}}
 ##
 
 #Additional information about the setting:
-    {map_types}
+    {{$map_types}}
 ##
     
-#Character: roles, obligations, skills, preferences, constraints:
-    {character}
+#Character personality:
+{{$character}}
+##
+
+#Character drives:    
+{{$character_drives}}
 ##
     
 # Other Characters:
-    {other_characters}
+    {{$other_characters}}
 ##
 
 Include mental, physical, and social 'activities' that are possible and consisten with the character in this setting in your ontology.
 
 OUTPUT (JSON):
 
-- places[] - places the character can be in the setting
-- tools[] - tools the character can use in the setting
-- roles[] - roles the character can play in the setting
-- norms_rules[] - norms and rules the character must follow in the setting
-- hazards[] - hazards the character must avoid in the setting
-- social_graph[] - social graph of the character in the setting
+- places[] - places the character can be in the setting - map terrain types or resource types only
+- tools[] - tools the character can use in the setting - resource types or items from character status or inventory
+- roles[] - roles the character can adopt in the setting
+- norms_rules[] - norms and rules the character must follow in the setting - character personality or map norms
+- hazards[] - hazards the character must avoid in the setting - map terrains, resources, hazards, or specific other characters
+- social_graph[] - social graph of the character in the setting - character personality or map social graph
 - time_windows - Either:
-    - One of: dawn,morning, afternoon, dusk, evening, night
-    - [start,end] (24 hour clock)
+    - One of: dawn, morning, afternoon, dusk, evening, night
 - affordances - e.g. place->[activities_possible]
 
 respond only with the JSON, no other text.
@@ -90,6 +92,8 @@ llm_client = None
 ACTIVITIES_TEMPLATE = """You are generating a comprehensive activity list for a character. 
 CHARACTER: 
 {{$character}}
+{{$character_drives}}
+{{$map_types}}
 ##
 
 TASK: Generate 24-30 activities as a JSON object, with the keys being the activity names. Distribute across these categories:
@@ -114,17 +118,15 @@ Each Activity should conform to this schema:
   "category": <category from above>,
   "tags": ["physical","mental","social","solo","outdoors","survival","routine"],
   "when": "daily@<period> | opportunistic | seasonal@<season>", 
-  "where": ["place ids"],
-  "start": ["simple predicates (time/window, place, weather, drive)"],
-  "stop": ["simple predicates or duration cap"],
+  "where": ["place ids"], - drawn from ontology places
   "duration": [min_minutes, max_minutes],
-  "needs": ["tools or innate capacities"],
-  "steps": ["3–5 terse steps; optional #safe markers"],
+  "needs": ["tools or innate capacities"], - drawn from ontology tools or character status or inventory
+  "steps": ["3–5 terse steps that will serve as planning goals"],
   "importance": 0.0,
   "habit": 0.0
 }
 
-The following ontology can be used to fill in the details of activities:
+The following ontology must be used to fill in the details of activities:
 ONTOLOGY: 
 {{$ontology}}
 ##
@@ -181,6 +183,8 @@ Output: only valid JSON – no prose, no code fences.
   "plan": [
     { "type": "move", "target": "…"},
     { "type": "say", "target": "…", "value": "…" },
+    { "type": "scan", "target": "resource_type", "out": "variable_name to assign the scan result to" },
+    { "type": "wait", "condition": "condition_name", "target": "condition_target" },
     { "type": "think", "value": "…" },
     { "type": "take", "target": "…"},
     { "type": "inspect", "target": "…", "reason": "…"},
@@ -190,27 +194,41 @@ Output: only valid JSON – no prose, no code fences.
   ]
 }
 
+Example workflow using scan and variables:
+{
+  "plan": [
+    { "type": "scan", "target": "Berries", "out": "found_berries" },
+    { "type": "move", "target": "$found_berries" },
+    { "type": "take", "target": "$found_berries" }
+  ]
+}
+
 A plan must include at least 1 step and no more than 6 steps including all nested while and if branches.
 In the following, <resource_name>, <character_name> are placeholders only for KNOWN resources, characters, or maptypes, those appearing above.
+Variables bound by scan actions can be referenced in subsequent actions and conditions using $variable_name syntax.
 Only dicts of the types below are allowed for the condition of while and if. Condition action type can only be one of the following:
- - "near": {"type": "near", "target": <resource name? or <character_name>} is for checking if the character is near a resource or character.
- - "can_see": {"type": "can_see", "target": <character_name>} is for checking if the character can see a character.
- - "has_item": {"type": "has_item", "target": <resource_name>} is for checking if the character has a resource in their inventory.
+ - "near": {"type": "near", "target": <resource name> or <character_name> or "$variable_name"} is for checking if the character is near a resource or character.
+ - "can_see": {"type": "can_see", "target": <character_name> or "$variable_name"} is for checking if the character can see a character.
+ - "has_item": {"type": "has_item", "target": <resource_name> or "$variable_name"} is for checking if the character has a resource in their inventory.
  - "at_location": {"type": "at_location", "target": <location_name>} is for checking if the character is at a location.
  - "believes": {"type": "believes", "target": <character_name>} is for checking if the character believes something about another character.
- - "notnear": {"type": "notnear", "target": <resource name? or <character_name>} is for checking if the character is not near a resource or character.
- - "cant_see": {"type": "cant_see", "target": <character_name>} is for checking if the character cannot see a character.
- - "hasnt_item": {"type": "hasnt_item", "target": <resource_name>} is for checking if the character does not have a resource in their inventory.
- - "notat_location": {"type": "notat_location", "target": <resource_name>} is for checking if the character is not at a location.
+ - "notnear": {"type": "notnear", "target": <resource name> or <character_name> or "$variable_name"} is for checking if the character is not near a resource or character.
+ - "cant_see": {"type": "cant_see", "target": <character_name> or "$variable_name"} is for checking if the character cannot see a character.
+ - "hasnt_item": {"type": "hasnt_item", "target": <resource_name> or "$variable_name"} is for checking if the character does not have a resource in their inventory.
+ - "notat_location": {"type": "notat_location", "target": <location_name> or "$variable_name"} is for checking if the character is not at a location.
  - "notbelieves": {"type": "notbelieves", "target": <character_name>} is for checking if the character does not believe something about another character.
 
-outside a while or if condition, "type" can take the values "say", "move", "think", "take", "inspect", or "use":
- - "say": { "type": "say", "target": "character_name", "value": "text to speak" } 
-     for speaking to another character you can see. Use this to seek information, respond, inform the other character, or to maintain 'social chatter' to stay aligned.
-     For a 'say' act, speak only for yourself, and do not include any other introductory, explanatory, discursive, or formatting text in your response.
+outside a while or if condition, "type" can take the values "say", "move", "think", "take", "inspect", "use", or "scan":
  - "move": { "type": "move", "target": "cardinal_direction" or 'resource or character name'} 
      Move one step in one of the 8 cardinal directions or in the direction of a resource or character.
     You can only move in the direction of a resource, character, or terrain type if you can see it.
+ - "say": { "type": "say", "target": "character_name", "value": "text to speak" } 
+     for speaking to another character you can see. Use this to seek information, respond, inform the other character, or to maintain 'social chatter' to stay aligned.
+     For a 'say' act, speak only for yourself, and do not include any other introductory, explanatory, discursive, or formatting text in your response.
+ - "scan": { "type": "scan", "target": "resource_type", "out": "variable_name to assign the scan result to" }
+     Scan a resource type to find the first matching instance in your current situation.
+ - "wait": { "type": "wait", "condition": "condition_name", "target": "condition_target" }
+     Wait for a condition to be true. The condition must be one of the Condition actions listed earlier.
  - "think": { "type": "think", "value": "text to think about" } 
      Think about a topic or question, attempting to derive new information, conclusions, or decisions from who you are and what you already explicitly know
  - "take": { "type": "take", "target": "resource_name" } 
@@ -220,6 +238,6 @@ outside a while or if condition, "type" can take the values "say", "move", "thin
  - "use": { "type": "use", "target": "resource_name", "reason": "what outcome do you hope to achieve? - 5 words max"} 
      Using a resource in your inventory. You may reuse resources.You must be 'near' the resource to use it. You may want to inspect the resource first to learn the effect of using it.
 
-A plan must include no more than 6 steps including all nested while and if branches.
+A plan must include no more than 8 steps including all nested while and if branches.
 A plan must not contain sequential say actions.
 """
