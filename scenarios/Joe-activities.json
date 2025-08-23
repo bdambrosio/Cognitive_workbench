@@ -1,656 +1,1167 @@
 {
-  "Eat Breakfast": {
-    "name": "Eat Breakfast",
+  "Eat Rations from Backpack": {
+    "name": "Eat Rations from Backpack",
     "category": "Physiological ADLs",
     "tags": [
       "physical",
-      "routine",
-      "solo"
+      "solo",
+      "survival",
+      "routine"
     ],
     "when": "daily@morning",
     "where": [
-      "Hut"
+      "Clearing"
     ],
     "start": [
-      "time > 6:00",
-      "place = Hut"
+      "after waking",
+      "hunger cues",
+      "in or near camp"
     ],
     "stop": [
-      "full",
-      "time > 8:00"
+      "after eating portioned ration",
+      "satiation",
+      "max 30 minutes"
     ],
     "duration": [
-      30,
-      60
-    ],
-    "needs": [
-      "food",
-      "hands"
-    ],
-    "steps": [
-      "acquire food",
-      "prepare food for consumption",
-      "consume food"
-    ],
-    "importance": 0.8,
-    "habit": 0.7
-  },
-  "Drink Water": {
-    "name": "Drink Water",
-    "category": "Physiological ADLs",
-    "tags": [
-      "physical",
-      "routine",
-      "solo"
-    ],
-    "when": "daily@morning",
-    "where": [
-      "Hut",
-      "Water"
-    ],
-    "start": [
-      "time > 6:00",
-      "place = Hut or Water"
-    ],
-    "stop": [
-      "hydrated",
-      "time > 8:00"
-    ],
-    "duration": [
-      15,
+      10,
       30
     ],
     "needs": [
-      "water",
-      "hands"
+      "Food",
+      "Backpack"
     ],
     "steps": [
-      "acquire drinkable water",
-      "consume water"
+      "determine hunger level and available food",
+      "portion out ration from backpack",
+      "consume food slowly and observe any spoilage",
+      "replace leftover food securely"
     ],
     "importance": 0.9,
     "habit": 0.8
   },
-  "Sleep": {
-    "name": "Sleep",
+  "Drink Water from Spring": {
+    "name": "Drink Water from Spring",
     "category": "Physiological ADLs",
     "tags": [
       "physical",
-      "routine",
-      "solo"
-    ],
-    "when": "daily@night",
-    "where": [
-      "Hut"
-    ],
-    "start": [
-      "time > 20:00",
-      "place = Hut"
-    ],
-    "stop": [
-      "rested",
-      "time > 6:00"
-    ],
-    "duration": [
-      480,
-      720
-    ],
-    "needs": [
-      "bed",
-      "darkness"
-    ],
-    "steps": [
-      "prepare bed",
-      "lie down",
-      "fall asleep"
-    ],
-    "importance": 0.9,
-    "habit": 0.8
-  },
-  "Plan Day": {
-    "name": "Plan Day",
-    "category": "Instrumental ADLs/Logistics",
-    "tags": [
-      "mental",
-      "routine",
-      "solo"
+      "solo",
+      "outdoors",
+      "survival"
     ],
     "when": "daily@morning",
     "where": [
-      "Hut"
+      "Spring",
+      "Clearing"
     ],
     "start": [
-      "time > 6:00",
-      "place = Hut"
+      "thirst cues",
+      "easy access to spring/clearing"
     ],
     "stop": [
-      "plan complete",
-      "time > 8:00"
+      "after hydration",
+      "maximum 20 minutes"
     ],
     "duration": [
-      30,
-      60
+      5,
+      20
     ],
     "needs": [
-      "brain",
-      "paper"
+      "Spring",
+      "Water Bottle",
+      "Backpack"
     ],
     "steps": [
-      "review schedule",
-      "set priorities",
-      "create plan"
+      "walk to spring or water source",
+      "assess water clarity and potential hazards",
+      "refill and drink from water bottle",
+      "monitor for adverse effects"
     ],
-    "importance": 0.7,
-    "habit": 0.6
-  },
-  "Prepare Gear": {
-    "name": "Prepare Gear",
-    "category": "Instrumental ADLs/Logistics",
-    "tags": [
-      "physical",
-      "routine",
-      "solo"
-    ],
-    "when": "daily@morning",
-    "where": [
-      "Hut"
-    ],
-    "start": [
-      "time > 6:00",
-      "place = Hut"
-    ],
-    "stop": [
-      "gear ready",
-      "time > 8:00"
-    ],
-    "duration": [
-      30,
-      60
-    ],
-    "needs": [
-      "gear",
-      "hands"
-    ],
-    "steps": [
-      "inspect personal equipment for damage",
-      "pack essential items",
-      "check weather forecast"
-    ],
-    "importance": 0.8,
+    "importance": 0.95,
     "habit": 0.7
   },
-  "Hike": {
-    "name": "Hike",
-    "category": "Mobility & Transport",
+  "Rest in Shade": {
+    "name": "Rest in Shade",
+    "category": "Physiological ADLs",
     "tags": [
       "physical",
+      "solo",
       "outdoors",
-      "solo"
+      "routine"
     ],
-    "when": "opportunistic",
+    "when": "daily@afternoon",
     "where": [
-      "Forest",
-      "Mountain"
+      "Appletree",
+      "Meadow"
     ],
     "start": [
-      "weather permits",
-      "place = Forest or Mountain"
+      "fatigue or heat",
+      "afternoon sun"
     ],
     "stop": [
-      "destination reached",
-      "time > 18:00"
+      "after feeling rested",
+      "30 minutes max"
     ],
     "duration": [
-      120,
-      360
+      10,
+      30
     ],
     "needs": [
-      "hiking boots",
-      "water"
+      "Appletree"
     ],
     "steps": [
-      "choose trail",
-      "acquire map",
-      "follow trail"
+      "locate shaded spot under appletree or in meadow",
+      "sit or lie down comfortably",
+      "monitor body temperature and energy level",
+      "get up once rested"
     ],
     "importance": 0.6,
     "habit": 0.5
   },
-  "Explore Cave": {
-    "name": "Explore Cave",
+  "Sleep for Recovery": {
+    "name": "Sleep for Recovery",
+    "category": "Physiological ADLs",
+    "tags": [
+      "physical",
+      "solo",
+      "routine",
+      "survival"
+    ],
+    "when": "daily@night",
+    "where": [
+      "Clearing",
+      "Cave",
+      "Hut"
+    ],
+    "start": [
+      "after sunset",
+      "fatigue",
+      "safe resting location"
+    ],
+    "stop": [
+      "naturally upon waking",
+      "6-8 hours"
+    ],
+    "duration": [
+      360,
+      480
+    ],
+    "needs": [
+      "Backpack"
+    ],
+    "steps": [
+      "clear area of debris and check for hazards",
+      "arrange backpack as pillow",
+      "lie down and maintain alertness to sounds",
+      "wake early to assess safety"
+    ],
+    "importance": 1.0,
+    "habit": 0.9
+  },
+  "Plan Today\u2019s Priorities": {
+    "name": "Plan Today\u2019s Priorities",
+    "category": "Instrumental ADLs/Logistics",
+    "tags": [
+      "mental",
+      "solo",
+      "routine"
+    ],
+    "when": "daily@dawn",
+    "where": [
+      "Clearing"
+    ],
+    "start": [
+      "after waking",
+      "quiet, uninterrupted time"
+    ],
+    "stop": [
+      "action plan identified",
+      "max 20 minutes"
+    ],
+    "duration": [
+      10,
+      20
+    ],
+    "needs": [
+      "Backpack",
+      "Mental focus"
+    ],
+    "steps": [
+      "review current condition and supplies",
+      "identify urgent needs (food, water, shelter, clues)",
+      "outline possible actions for the day",
+      "share plan with companion if present"
+    ],
+    "importance": 0.8,
+    "habit": 0.6
+  },
+  "Prepare Shelter Site": {
+    "name": "Prepare Shelter Site",
+    "category": "Instrumental ADLs/Logistics",
+    "tags": [
+      "physical",
+      "outdoors",
+      "routine",
+      "survival"
+    ],
+    "when": "opportunistic",
+    "where": [
+      "Clearing",
+      "Cave",
+      "Hut"
+    ],
+    "start": [
+      "prior to dusk",
+      "clouds gathering",
+      "settled location"
+    ],
+    "stop": [
+      "site is comfortable",
+      "hazards minimized",
+      "max 45 minutes"
+    ],
+    "duration": [
+      20,
+      45
+    ],
+    "needs": [
+      "Fallenbranch",
+      "Backpack"
+    ],
+    "steps": [
+      "scan area for flat, safe ground",
+      "remove rocks, sticks, loose debris",
+      "arrange fallen branches for windbreak or cover",
+      "setup backpack as headrest or barrier"
+    ],
+    "importance": 0.85,
+    "habit": 0.5
+  },
+  "Inventory Resources": {
+    "name": "Inventory Resources",
+    "category": "Instrumental ADLs/Logistics",
+    "tags": [
+      "mental",
+      "solo",
+      "routine"
+    ],
+    "when": "daily@morning",
+    "where": [
+      "Clearing"
+    ],
+    "start": [
+      "after waking",
+      "before departure from camp"
+    ],
+    "stop": [
+      "resources counted",
+      "max 15 minutes"
+    ],
+    "duration": [
+      7,
+      15
+    ],
+    "needs": [
+      "Backpack",
+      "Food",
+      "Water"
+    ],
+    "steps": [
+      "gather backpack and visible resources",
+      "account for food, water, and other items",
+      "check freshness and condition",
+      "prioritize replenishment for low-stock items"
+    ],
+    "importance": 0.7,
+    "habit": 0.7
+  },
+  "Scout for Good Pathways": {
+    "name": "Scout for Good Pathways",
     "category": "Mobility & Transport",
     "tags": [
       "physical",
       "outdoors",
+      "exploration",
       "solo"
     ],
-    "when": "opportunistic",
+    "when": "daily@morning",
     "where": [
-      "Cave"
+      "Forest",
+      "Clearing",
+      "Mountain"
     ],
     "start": [
-      "weather permits",
-      "place = Cave"
+      "after eating",
+      "motivation to explore"
     ],
     "stop": [
-      "explored cave",
-      "time > 18:00"
+      "viable routes found",
+      "max 45 minutes"
     ],
     "duration": [
-      120,
-      360
+      20,
+      45
     ],
     "needs": [
-      "flashlight",
-      "hands"
+      "Backpack",
+      "Shoes"
     ],
     "steps": [
-      "enter cave",
-      "explore passages",
-      "exit cave"
+      "circle perimeter of current area for visible trails",
+      "note landmarks and terrain hazards",
+      "identify best direction for further exploration",
+      "return to companion with findings"
     ],
-    "importance": 0.5,
+    "importance": 0.7,
     "habit": 0.4
   },
-  "Meet Samantha": {
-    "name": "Meet Samantha",
-    "category": "Role/Production",
+  "Travel Toward Hut1": {
+    "name": "Travel Toward Hut1",
+    "category": "Mobility & Transport",
     "tags": [
-      "social",
+      "physical",
       "outdoors",
+      "scientific",
+      "goal-oriented",
       "solo"
     ],
     "when": "opportunistic",
     "where": [
       "Forest",
-      "Clearing"
+      "Mountain",
+      "Clearing",
+      "Hut"
     ],
     "start": [
-      "Samantha available",
-      "place = Forest or Clearing"
+      "identified route to Hut1",
+      "daylight"
     ],
     "stop": [
-      "meeting ended",
-      "time > 18:00"
+      "arrived at visible hut",
+      "max 120 minutes"
     ],
     "duration": [
-      60,
-      180
+      30,
+      120
     ],
     "needs": [
-      "Samantha",
-      "social skills"
+      "Backpack",
+      "Water"
     ],
     "steps": [
-      "locate Samantha",
-      "initiate conversation",
-      "engage in activity together"
+      "move steadily in direction of probable hut location",
+      "avoid dense thickets or unstable mountain terrain",
+      "observe signs of human presence",
+      "reach hut and scan perimeter for dangers"
     ],
-    "importance": 0.8,
-    "habit": 0.7
+    "importance": 1.0,
+    "habit": 0.3
   },
-  "Converse with Hermit": {
-    "name": "Converse with Hermit",
+  "Navigate Dense Thicket": {
+    "name": "Navigate Dense Thicket",
+    "category": "Mobility & Transport",
+    "tags": [
+      "physical",
+      "outdoors",
+      "problem-solving",
+      "survival"
+    ],
+    "when": "opportunistic",
+    "where": [
+      "Thicket",
+      "Forest"
+    ],
+    "start": [
+      "blocked path",
+      "need to shortcut"
+    ],
+    "stop": [
+      "reached open terrain",
+      "30 minutes max"
+    ],
+    "duration": [
+      10,
+      30
+    ],
+    "needs": [
+      "Backpack",
+      "Fallenbranch"
+    ],
+    "steps": [
+      "identify least-dense section of thicket",
+      "move branches aside using fallen branch",
+      "protect body from thorns and scratches",
+      "exit into accessible clearing"
+    ],
+    "importance": 0.6,
+    "habit": 0.2
+  },
+  "Forage for Edible Plants": {
+    "name": "Forage for Edible Plants",
     "category": "Role/Production",
     "tags": [
-      "social",
+      "physical",
       "outdoors",
+      "survival",
+      "problem-solving",
       "solo"
     ],
     "when": "opportunistic",
     "where": [
+      "Forest",
+      "Meadow",
+      "Appletree"
+    ],
+    "start": [
+      "food stocks low",
+      "hunger or interest in variety"
+    ],
+    "stop": [
+      "enough food found",
+      "unsafe conditions",
+      "60 minutes elapsed"
+    ],
+    "duration": [
+      20,
+      60
+    ],
+    "needs": [
+      "Berries",
+      "Mushrooms",
+      "Appletree"
+    ],
+    "steps": [
+      "scan for familiar edible plants/fruit",
+      "assess plant type using basic knowledge",
+      "gather safe portions",
+      "test for adverse reactions in small amounts"
+    ],
+    "importance": 0.75,
+    "habit": 0.1
+  },
+  "Investigate Clues about Location": {
+    "name": "Investigate Clues about Location",
+    "category": "Role/Production",
+    "tags": [
+      "mental",
+      "outdoors",
+      "scientific",
+      "problem-solving"
+    ],
+    "when": "opportunistic",
+    "where": [
+      "Forest",
+      "Clearing",
       "Hut"
     ],
     "start": [
-      "Hermit available",
-      "place = Hut"
+      "discovery of unusual objects",
+      "active investigation"
     ],
     "stop": [
-      "conversation ended",
-      "time > 18:00"
+      "lead pursued to end",
+      "max 40 minutes"
     ],
     "duration": [
-      60,
-      180
+      15,
+      40
     ],
     "needs": [
-      "Hermit",
-      "social skills"
+      "Backpack",
+      "Other items (from backpack)"
     ],
     "steps": [
-      "initiate conversation",
-      "ask questions",
-      "listen to Hermit's responses"
+      "search area for signs of prior occupation",
+      "document notable clues (tools, marks, litter)",
+      "analyze relation to possible escape or danger",
+      "share theories with Samantha"
+    ],
+    "importance": 0.8,
+    "habit": 0.2
+  },
+  "Strengthen Camp Perimeter": {
+    "name": "Strengthen Camp Perimeter",
+    "category": "Role/Production",
+    "tags": [
+      "physical",
+      "survival",
+      "protector",
+      "problem-solving"
+    ],
+    "when": "daily@dusk",
+    "where": [
+      "Clearing",
+      "Cave"
+    ],
+    "start": [
+      "before dark",
+      "if threats perceived"
+    ],
+    "stop": [
+      "barricades in place",
+      "30 minutes elapsed"
+    ],
+    "duration": [
+      10,
+      30
+    ],
+    "needs": [
+      "Fallenbranch"
+    ],
+    "steps": [
+      "gather fallen branches and available material",
+      "construct basic barriers around camp",
+      "identify weak spots and reinforce",
+      "check for animal tracks"
     ],
     "importance": 0.7,
-    "habit": 0.6
+    "habit": 0.5
   },
-  "Learn Survival Skills": {
-    "name": "Learn Survival Skills",
+  "Ask Samantha to Share Skills": {
+    "name": "Ask Samantha to Share Skills",
+    "category": "Role/Production",
+    "tags": [
+      "mental",
+      "social",
+      "companion",
+      "learning"
+    ],
+    "when": "daily@afternoon",
+    "where": [
+      "Clearing"
+    ],
+    "start": [
+      "Samantha present",
+      "both at relative ease"
+    ],
+    "stop": [
+      "knowledge shared",
+      "30 minutes max"
+    ],
+    "duration": [
+      10,
+      30
+    ],
+    "needs": [
+      "Companion",
+      "Curiosity"
+    ],
+    "steps": [
+      "initiate honest conversation with Samantha",
+      "ask about hiking, foraging, or survival techniques",
+      "listen and exchange relevant knowledge",
+      "show appreciation for her input"
+    ],
+    "importance": 0.85,
+    "habit": 0.2
+  },
+  "Observe Animal Tracks": {
+    "name": "Observe Animal Tracks",
     "category": "Learning & Practice",
     "tags": [
       "mental",
       "outdoors",
-      "solo"
+      "scientific",
+      "budding scientist"
     ],
     "when": "opportunistic",
     "where": [
       "Forest",
+      "Meadow",
+      "Spring"
+    ],
+    "start": [
+      "evidence of wildlife",
+      "curiosity"
+    ],
+    "stop": [
+      "tracks identified or lost",
+      "30 minutes max"
+    ],
+    "duration": [
+      10,
+      30
+    ],
+    "needs": [
+      "Mental focus"
+    ],
+    "steps": [
+      "inspect ground for tracks or scat",
+      "compare to known animal types",
+      "determine direction of travel",
+      "discuss findings with companion"
+    ],
+    "importance": 0.65,
+    "habit": 0.3
+  },
+  "Practice Map-Making": {
+    "name": "Practice Map-Making",
+    "category": "Learning & Practice",
+    "tags": [
+      "mental",
+      "problem-solving",
+      "scientific",
+      "solo"
+    ],
+    "when": "opportunistic",
+    "where": [
+      "Clearing",
+      "Forest",
       "Mountain"
     ],
     "start": [
-      "weather permits",
-      "place = Forest or Mountain"
+      "idle moment",
+      "acquired clues and landmarks"
     ],
     "stop": [
-      "skills learned",
-      "time > 18:00"
+      "rough map completed",
+      "15 minutes spent"
     ],
     "duration": [
-      120,
-      360
+      10,
+      15
     ],
     "needs": [
-      "survival guide",
-      "hands"
+      "Mental focus",
+      "Other items (from backpack)"
     ],
     "steps": [
-      "read survival guide",
-      "practice skills",
-      "apply skills in real-world scenario"
+      "recall features of terrain and note landmarks",
+      "sketch basic layout of the area and key resources",
+      "identify routes between major points",
+      "use map as planning reference"
     ],
-    "importance": 0.8,
-    "habit": 0.7
+    "importance": 0.6,
+    "habit": 0.1
   },
-  "Reflect on Day": {
-    "name": "Reflect on Day",
+  "Reflect on How I Got Here": {
+    "name": "Reflect on How I Got Here",
     "category": "Cognitive/Inner",
     "tags": [
       "mental",
+      "solo",
       "routine",
-      "solo"
-    ],
-    "when": "daily@evening",
-    "where": [
-      "Hut"
-    ],
-    "start": [
-      "time > 18:00",
-      "place = Hut"
-    ],
-    "stop": [
-      "reflection complete",
-      "time > 20:00"
-    ],
-    "duration": [
-      30,
-      60
-    ],
-    "needs": [
-      "brain",
-      "paper"
-    ],
-    "steps": [
-      "review day's events",
-      "identify accomplishments",
-      "set goals for tomorrow"
-    ],
-    "importance": 0.7,
-    "habit": 0.6
-  },
-  "Play with Samantha": {
-    "name": "Play with Samantha",
-    "category": "Recreation & Leisure",
-    "tags": [
-      "social",
-      "outdoors",
-      "solo"
-    ],
-    "when": "opportunistic",
-    "where": [
-      "Forest",
-      "Clearing"
-    ],
-    "start": [
-      "Samantha available",
-      "place = Forest or Clearing"
-    ],
-    "stop": [
-      "playtime ended",
-      "time > 18:00"
-    ],
-    "duration": [
-      60,
-      180
-    ],
-    "needs": [
-      "Samantha",
-      "playful attitude"
-    ],
-    "steps": [
-      "initiate play",
-      "engage in playful activity",
-      "laugh and have fun"
-    ],
-    "importance": 0.8,
-    "habit": 0.7
-  },
-  "Watch Sunset": {
-    "name": "Watch Sunset",
-    "category": "Recreation & Leisure",
-    "tags": [
-      "physical",
-      "outdoors",
-      "solo"
+      "introspection"
     ],
     "when": "daily@dusk",
     "where": [
-      "Mountain",
+      "Meadow",
       "Clearing"
     ],
     "start": [
-      "time > 17:00",
-      "place = Mountain or Clearing"
+      "quiet moment",
+      "unsure feelings"
     ],
     "stop": [
-      "sunset ended",
-      "time > 19:00"
+      "clarity or acceptance",
+      "20 minutes spent"
     ],
     "duration": [
-      60,
-      120
+      10,
+      20
     ],
     "needs": [
-      "clear view",
-      "eyes"
+      "Peaceful setting"
     ],
     "steps": [
-      "find viewing spot",
-      "watch sunset",
-      "appreciate beauty"
+      "sit in solitude away from distractions",
+      "review known facts about current situation",
+      "consider memories and gaps",
+      "journal or mentally note ideas and questions"
     ],
-    "importance": 0.6,
-    "habit": 0.5
+    "importance": 0.5,
+    "habit": 0.3
   },
-  "Emergency Shelter": {
-    "name": "Emergency Shelter",
-    "category": "Safety/Emergency",
+  "Assess Emotional State": {
+    "name": "Assess Emotional State",
+    "category": "Cognitive/Inner",
     "tags": [
-      "physical",
-      "outdoors",
-      "solo"
-    ],
-    "when": "opportunistic",
-    "where": [
-      "Forest",
-      "Mountain"
-    ],
-    "start": [
-      "bad weather",
-      "place = Forest or Mountain"
-    ],
-    "stop": [
-      "shelter found",
-      "time > 18:00"
-    ],
-    "duration": [
-      30,
-      120
-    ],
-    "needs": [
-      "shelter materials",
-      "hands"
-    ],
-    "steps": [
-      "locate shelter",
-      "gather materials",
-      "construct shelter"
-    ],
-    "importance": 0.9,
-    "habit": 0.8
-  },
-  "First Aid": {
-    "name": "First Aid",
-    "category": "Safety/Emergency",
-    "tags": [
-      "physical",
-      "outdoors",
-      "solo"
-    ],
-    "when": "opportunistic",
-    "where": [
-      "Forest",
-      "Mountain"
-    ],
-    "start": [
-      "injury occurs",
-      "place = Forest or Mountain"
-    ],
-    "stop": [
-      "treatment complete",
-      "time > 18:00"
-    ],
-    "duration": [
-      30,
-      120
-    ],
-    "needs": [
-      "first aid kit",
-      "hands"
-    ],
-    "steps": [
-      "assess injury",
-      "apply treatment",
-      "monitor condition"
-    ],
-    "importance": 0.9,
-    "habit": 0.8
-  },
-  "Exercise": {
-    "name": "Exercise",
-    "category": "Health Management",
-    "tags": [
-      "physical",
-      "outdoors",
-      "solo"
+      "mental",
+      "solo",
+      "routine",
+      "health"
     ],
     "when": "daily@morning",
     "where": [
-      "Forest",
+      "Meadow",
       "Clearing"
     ],
     "start": [
-      "time > 6:00",
-      "place = Forest or Clearing"
+      "after waking",
+      "feeling uneasy"
     ],
     "stop": [
-      "exercise complete",
-      "time > 8:00"
+      "status noted",
+      "5 minutes spent"
     ],
     "duration": [
-      30,
-      60
+      2,
+      5
     ],
     "needs": [
-      "exercise equipment",
-      "hands"
+      "Self-awareness"
     ],
     "steps": [
-      "choose exercise routine",
-      "perform exercises",
-      "stretch and cool down"
+      "pause and review feelings (anxiety, curiosity, fear)",
+      "decide if mood affects today\u2019s ability to function",
+      "share state with companion if trust allows"
+    ],
+    "importance": 0.5,
+    "habit": 0.4
+  },
+  "Tell Samantha a Story": {
+    "name": "Tell Samantha a Story",
+    "category": "Recreation & Leisure",
+    "tags": [
+      "social",
+      "companion",
+      "creative",
+      "outdoors"
+    ],
+    "when": "daily@evening",
+    "where": [
+      "Clearing",
+      "Meadow"
+    ],
+    "start": [
+      "relaxed mood",
+      "evening camp"
+    ],
+    "stop": [
+      "story ends",
+      "max 20 minutes"
+    ],
+    "duration": [
+      7,
+      20
+    ],
+    "needs": [
+      "Imagination",
+      "Companion"
+    ],
+    "steps": [
+      "invite Samantha to listen as you tell a favorite memory or made-up tale",
+      "engage her with humor or mystery",
+      "respond to her reactions or questions",
+      "encourage her to share, too"
+    ],
+    "importance": 0.8,
+    "habit": 0.2
+  },
+  "Stargaze Together": {
+    "name": "Stargaze Together",
+    "category": "Recreation & Leisure",
+    "tags": [
+      "social",
+      "companion",
+      "outdoors",
+      "routine"
+    ],
+    "when": "daily@night",
+    "where": [
+      "Meadow",
+      "Clearing"
+    ],
+    "start": [
+      "clear sky",
+      "after dinner"
+    ],
+    "stop": [
+      "desire wanes",
+      "max 30 minutes"
+    ],
+    "duration": [
+      10,
+      30
+    ],
+    "needs": [
+      "Companion",
+      "Clear weather"
+    ],
+    "steps": [
+      "lie back with Samantha on open ground",
+      "identify constellations or create stories about stars",
+      "share quiet conversation or comfortable silence",
+      "watch for unusual activity in the sky"
+    ],
+    "importance": 0.75,
+    "habit": 0.3
+  },
+  "Joke Around to Diffuse Tension": {
+    "name": "Joke Around to Diffuse Tension",
+    "category": "Recreation & Leisure",
+    "tags": [
+      "social",
+      "companion",
+      "routine"
+    ],
+    "when": "opportunistic",
+    "where": [
+      "Clearing",
+      "Forest"
+    ],
+    "start": [
+      "awkward moment",
+      "visible tension"
+    ],
+    "stop": [
+      "laughter shared",
+      "5 minutes elapsed"
+    ],
+    "duration": [
+      1,
+      5
+    ],
+    "needs": [
+      "Companion"
+    ],
+    "steps": [
+      "crack a light-hearted joke or pun",
+      "watch for reaction\u2014if positive, continue banter",
+      "encourage Samantha to join in",
+      "ease back to productive tasks"
+    ],
+    "importance": 0.7,
+    "habit": 0.2
+  },
+  "Survey for Immediate Threats": {
+    "name": "Survey for Immediate Threats",
+    "category": "Safety/Emergency",
+    "tags": [
+      "physical",
+      "mental",
+      "protector",
+      "solo"
+    ],
+    "when": "daily@dawn",
+    "where": [
+      "Clearing"
+    ],
+    "start": [
+      "upon waking",
+      "before leaving camp"
+    ],
+    "stop": [
+      "area deemed safe",
+      "max 15 minutes"
+    ],
+    "duration": [
+      5,
+      15
+    ],
+    "needs": [
+      "Focus",
+      "Fallenbranch"
+    ],
+    "steps": [
+      "scan camp perimeter for animal or human activity",
+      "listen for unusual sounds",
+      "inspect for signs of environmental changes",
+      "clear minor hazards"
     ],
     "importance": 0.8,
     "habit": 0.7
   },
-  "Maintain Gear": {
-    "name": "Maintain Gear",
-    "category": "Maintenance & Repair",
+  "Set Emergency Signal": {
+    "name": "Set Emergency Signal",
+    "category": "Safety/Emergency",
     "tags": [
       "physical",
-      "routine",
-      "solo"
+      "protector",
+      "problem-solving"
     ],
-    "when": "daily@evening",
+    "when": "opportunistic",
     "where": [
-      "Hut"
+      "Clearing",
+      "Meadow"
     ],
     "start": [
-      "time > 18:00",
-      "place = Hut"
+      "perceived rescue possibility",
+      "companion lost"
     ],
     "stop": [
-      "maintenance complete",
-      "time > 20:00"
+      "signal visible and ready",
+      "10 minutes elapsed"
     ],
     "duration": [
-      30,
+      5,
+      10
+    ],
+    "needs": [
+      "Fallenbranch",
+      "Other items (from backpack)"
+    ],
+    "steps": [
+      "gather branches or bright clothing",
+      "arrange visible signal shape on ground",
+      "ensure visibility from sky or distance",
+      "brief Samantha if present"
+    ],
+    "importance": 0.7,
+    "habit": 0.1
+  },
+  "Respond to Injury/Illness": {
+    "name": "Respond to Injury/Illness",
+    "category": "Safety/Emergency",
+    "tags": [
+      "physical",
+      "survival",
+      "protector"
+    ],
+    "when": "opportunistic",
+    "where": [
+      "anywhere"
+    ],
+    "start": [
+      "injury occurs",
+      "illness symptoms"
+    ],
+    "stop": [
+      "stabilized",
+      "help sought",
+      "max 60 minutes"
+    ],
+    "duration": [
+      10,
       60
     ],
     "needs": [
-      "gear",
-      "hands"
+      "Other items (from backpack)",
+      "Water"
     ],
     "steps": [
-      "inspect gear",
-      "clean gear",
-      "repair gear"
+      "assess extent of injury or symptoms",
+      "use available items for first aid",
+      "keep affected person calm and hydrated",
+      "monitor for complication or seek aid"
+    ],
+    "importance": 0.95,
+    "habit": 0.2
+  },
+  "Wash Up at Spring": {
+    "name": "Wash Up at Spring",
+    "category": "Health Management (self-care)",
+    "tags": [
+      "physical",
+      "routine",
+      "self-care",
+      "outdoors"
+    ],
+    "when": "daily@evening",
+    "where": [
+      "Spring"
+    ],
+    "start": [
+      "day\u2019s end",
+      "before sleep"
+    ],
+    "stop": [
+      "cleaned off dirt/sweat",
+      "10 minutes max"
+    ],
+    "duration": [
+      5,
+      10
+    ],
+    "needs": [
+      "Spring",
+      "Water"
+    ],
+    "steps": [
+      "walk to spring",
+      "rinse hands, face, arms, and neck",
+      "check for ticks or scrapes",
+      "pat dry with available cloth"
     ],
     "importance": 0.7,
-    "habit": 0.6
+    "habit": 0.8
   },
-  "Fix Shelter": {
-    "name": "Fix Shelter",
+  "Inspect for Ticks and Injuries": {
+    "name": "Inspect for Ticks and Injuries",
+    "category": "Health Management (self-care)",
+    "tags": [
+      "physical",
+      "solo",
+      "routine",
+      "health"
+    ],
+    "when": "daily@night",
+    "where": [
+      "Clearing",
+      "Cave",
+      "Hut"
+    ],
+    "start": [
+      "before sleep",
+      "after travel"
+    ],
+    "stop": [
+      "full-body check completed",
+      "7 minutes"
+    ],
+    "duration": [
+      3,
+      7
+    ],
+    "needs": [
+      "Self-awareness"
+    ],
+    "steps": [
+      "remove shirt/roll up sleeves",
+      "inspect skin for bites or scratches",
+      "apply basic care with water if found",
+      "share concerns with companion if needed"
+    ],
+    "importance": 0.85,
+    "habit": 0.7
+  },
+  "Do Stretching Routine": {
+    "name": "Do Stretching Routine",
+    "category": "Health Management (self-care)",
+    "tags": [
+      "physical",
+      "solo",
+      "routine",
+      "health"
+    ],
+    "when": "daily@morning",
+    "where": [
+      "Meadow",
+      "Clearing"
+    ],
+    "start": [
+      "waking up",
+      "muscle stiffness"
+    ],
+    "stop": [
+      "loosened up",
+      "8 minutes"
+    ],
+    "duration": [
+      3,
+      8
+    ],
+    "needs": [
+      "Backpack (as mat)"
+    ],
+    "steps": [
+      "select clear patch of ground",
+      "perform upper and lower body stretches",
+      "focus on any sore areas",
+      "finish when mobility improves"
+    ],
+    "importance": 0.6,
+    "habit": 0.7
+  },
+  "Repair Clothing or Backpack": {
+    "name": "Repair Clothing or Backpack",
+    "category": "Maintenance & Repair",
+    "tags": [
+      "physical",
+      "problem-solving",
+      "routine"
+    ],
+    "when": "opportunistic",
+    "where": [
+      "Clearing",
+      "Hut"
+    ],
+    "start": [
+      "found damage",
+      "gear checks"
+    ],
+    "stop": [
+      "fix secured",
+      "max 20 minutes"
+    ],
+    "duration": [
+      5,
+      20
+    ],
+    "needs": [
+      "Other items (from backpack)",
+      "Backpack"
+    ],
+    "steps": [
+      "examine seams, straps, and tears",
+      "use available materials to patch holes or secure rips",
+      "test for functionality",
+      "replace damaged item in pack"
+    ],
+    "importance": 0.65,
+    "habit": 0.3
+  },
+  "Patrol for Loose Branches": {
+    "name": "Patrol for Loose Branches",
     "category": "Maintenance & Repair",
     "tags": [
       "physical",
       "outdoors",
-      "solo"
+      "routine",
+      "survival"
     ],
-    "when": "opportunistic",
+    "when": "daily@dawn",
     "where": [
-      "Hut"
+      "Clearing",
+      "Forest"
     ],
     "start": [
-      "shelter damage",
-      "place = Hut"
+      "after wind or storm",
+      "morning routine"
     ],
     "stop": [
-      "repairs complete",
-      "time > 18:00"
+      "loose branches cleared",
+      "20 minutes max"
     ],
     "duration": [
-      60,
-      180
+      7,
+      20
     ],
     "needs": [
-      "shelter materials",
-      "hands"
+      "Fallenbranch"
     ],
     "steps": [
-      "assess damage",
-      "gather materials",
-      "make repairs"
+      "scan walkways and campsite perimeter",
+      "move or stack loose branches off paths",
+      "check for hanging deadwood overhead",
+      "alert companion if hazardous"
+    ],
+    "importance": 0.6,
+    "habit": 0.4
+  },
+  "Check Condition of Foraged Food": {
+    "name": "Check Condition of Foraged Food",
+    "category": "Maintenance & Repair",
+    "tags": [
+      "physical",
+      "problem-solving",
+      "routine",
+      "health"
+    ],
+    "when": "daily@evening",
+    "where": [
+      "Clearing"
+    ],
+    "start": [
+      "after foraging",
+      "before evening meal"
+    ],
+    "stop": [
+      "all foraged food inspected",
+      "10 minutes"
+    ],
+    "duration": [
+      3,
+      10
+    ],
+    "needs": [
+      "Foraged food",
+      "Mental focus"
+    ],
+    "steps": [
+      "sort foraged items by type",
+      "inspect for rot, mold, or evidence of parasites",
+      "discard risky or unfamiliar items",
+      "prepare safe food for storage or consumption"
     ],
     "importance": 0.8,
     "habit": 0.7

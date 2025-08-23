@@ -1,0 +1,176 @@
+{
+  "places": [
+    "Office",
+    "Meeting Room",
+    "Company Lobby",
+    "Coffee Shop (nearby)",
+    "Street outside office",
+    "Personal car",
+    "Bus stop",
+    "Closet (for coats, briefcase)",
+    "Restroom",
+    "Mailbox (in lobby)",
+    "Residential Home (Hu's Apartment)",
+    "University Campus (Ding's workplace)",
+    "Park"
+  ],
+  "tools": [
+    "Smartphone",
+    "Laptop",
+    "Tablet",
+    "Pen and notepad",
+    "Coffee maker",
+    "Desktop computer",
+    "Printer",
+    "Company documents (insurance contracts, presentations, reports)",
+    "Keycard (for office)",
+    "Business cards",
+    "Personal vehicle/car keys",
+    "ID badge",
+    "Fridge (office or home)",
+    "Shower (home)",
+    "Closet (home clothes storage)"
+  ],
+  "roles": [
+    "Insurance Executive (Hu Manli)",
+    "Competitor (Xue)",
+    "Client (Xiaoyu)",
+    "Spouse (Ding)",
+    "Potential Rival (Wang)",
+    "Potential Adversary (Qiu)",
+    "Commuter",
+    "Presenter (in meetings)",
+    "Boss/Manager (to subordinates)",
+    "Colleague",
+    "Mentor",
+    "Friend/Confidante"
+  ],
+  "norms_rules": [
+    "Maintain professional decorum in the office",
+    "Arrive punctually to meetings",
+    "Dress professionally (business attire)",
+    "Respect client confidentiality",
+    "Obey company protocol in communications and negotiations",
+    "Avoid direct confrontation or gossip in professional settings",
+    "Respond promptly to emails/phone calls during business hours",
+    "Avoid public displays of emotion related to personal issues",
+    "Show politeness and respect to colleagues, clients, and superiors",
+    "Do not bring personal or marital issues into workspaces"
+  ],
+  "hazards": [
+    "Losing clients to competitors (especially Xue)",
+    "Damage to professional reputation",
+    "Exposure of marital problems in social/professional circles",
+    "Stress and burnout from overwork",
+    "Gossip among staff and clients",
+    "Accusations of professional misconduct",
+    "Oversleeping and being late due to personal stress",
+    "Creating enmity by confronting colleagues/clients too forcefully"
+  ],
+  "social_graph": [
+    {
+      "name": "Ding (Husband)",
+      "relationship": "Married, Strained (suspected affair), personal trust issue"
+    },
+    {
+      "name": "Xiaoyu (Client)",
+      "relationship": "Valuable client, professional, may flirt"
+    },
+    {
+      "name": "Xue (Competitor)",
+      "relationship": "Rival, aggressive competition for clients"
+    },
+    {
+      "name": "Wang (Ding's student)",
+      "relationship": "Potential rival for Ding's affections, indirect adversary"
+    },
+    {
+      "name": "Qiu (Widow, Ding's mistress)",
+      "relationship": "Adversary, wants to destroy Hu's career and marriage"
+    },
+    {
+      "name": "Yangho (Xue's client)",
+      "relationship": "Loose acquaintance via business circles"
+    }
+  ],
+  "time_windows": "morning",
+  "affordances": {
+    "Office": [
+      "Review documents",
+      "Prepare presentations",
+      "Send emails",
+      "Make/receive calls",
+      "Host meetings",
+      "Strategize against competitors",
+      "Monitor client portfolios",
+      "Practice negotiation"
+    ],
+    "Meeting Room": [
+      "Meet with clients",
+      "Give presentations",
+      "Seal deals/negotiations",
+      "Network with colleagues"
+    ],
+    "Coffee Shop": [
+      "Buy coffee",
+      "Informal meetings",
+      "Observe competitors",
+      "Network, overhear gossip"
+    ],
+    "Street": [
+      "Commute",
+      "People-watch",
+      "Short stress-relief walks",
+      "Transition between locations"
+    ],
+    "Car": [
+      "Commute",
+      "Private phone calls",
+      "Reflect and plan"
+    ],
+    "Closet": [
+      "Organize wardrobe",
+      "Change attire"
+    ],
+    "Restroom": [
+      "Personal hygiene",
+      "Private conversations"
+    ],
+    "Home": [
+      "Prepare for work",
+      "Monitor marital situation",
+      "Rest"
+    ],
+    "Park": [
+      "Exercise",
+      "Take a break"
+    ],
+    "University": [
+      "Monitor Ding and Wang (if visiting campus)",
+      "Gather information"
+    ]
+  },
+  "drives_map": {
+    "succeed at work": [
+      "Review documents",
+      "Prepare presentations",
+      "Meet clients",
+      "Seal deals",
+      "Monitor competitors",
+      "Strategic planning",
+      "Professional networking"
+    ],
+    "outshine Xue": [
+      "Win contracts from mutual clients",
+      "Undercut Xue's proposals",
+      "Demonstrate superior service",
+      "Collect information on competitor tactics"
+    ],
+    "stable marriage as background to a prosperous life": [
+      "Monitor marital partner's fidelity",
+      "Engage in meaningful conversations with Ding",
+      "Balance work/personal time",
+      "Seek support/advice from friends"
+    ]
+  }
+}

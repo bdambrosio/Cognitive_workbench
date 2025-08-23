@@ -1,0 +1,124 @@
+{
+  "places": [
+    "Forest",
+    "Clearing",
+    "Meadow",
+    "Mountain",
+    "Water",
+    "Thicket",
+    "Spring",
+    "Cave",
+    "Appletree",
+    "Hut"
+  ],
+  "tools": [
+    "backpack",
+    "food",
+    "water",
+    "hiking pants",
+    "pendleton shirt",
+    "Fallenbranch",
+    "Berries",
+    "Mushrooms"
+  ],
+  "roles": [
+    "explorer",
+    "survivor",
+    "friend/companion",
+    "philosopher",
+    "adventurer",
+    "watcher",
+    "forager",
+    "outsider"
+  ],
+  "norms_rules": [
+    "be wary of strangers",
+    "respect the wild environment",
+    "do not harm living things unnecessarily",
+    "share knowledge with trusted others",
+    "do not trust blindly",
+    "explore with curiosity",
+    "seek safety for self and companions",
+    "navigate using intuition and reasoning"
+  ],
+  "hazards": [
+    "unfamiliar terrain (e.g., Mountain, Thicket)",
+    "dangerous mushrooms or berries",
+    "getting lost in the Forest",
+    "exposure to elements (heat, cold, rain)",
+    "wild animals (unseen)",
+    "trusting the wrong person",
+    "emotional distress or fear",
+    "encounter with Hermit (potential threat/unknown intentions)"
+  ],
+  "social_graph": [
+    {
+      "name": "Joe",
+      "relationship": "Potential companion, also lost, trust uncertain, possible friend or rival"
+    },
+    {
+      "name": "Hermit",
+      "relationship": "Unknown, source of answers or danger, trust is a challenge"
+    },
+    {
+      "name": "User",
+      "relationship": "Mysterious, protective, potential guide/confidant, knowledge not fully shared"
+    }
+  ],
+  "time_windows": "morning",
+  "affordances": {
+    "Forest": [
+      "explore surroundings",
+      "forage for food (berries, mushrooms)",
+      "philosophical reflection",
+      "seek safety",
+      "hide from unknown threats",
+      "navigate quietly"
+    ],
+    "Clearing": [
+      "rest and eat",
+      "observe the sky/sunrise",
+      "initiate conversation with others",
+      "set up temporary camp",
+      "reflect or journal"
+    ],
+    "Meadow": [
+      "gather wildflowers",
+      "move quickly across open space",
+      "look for food or water sources"
+    ],
+    "Mountain": [
+      "observe surroundings from higher ground",
+      "plan route",
+      "test physical fitness/climb"
+    ],
+    "Water": [
+      "refill water supplies",
+      "wash",
+      "follow water course for navigation"
+    ],
+    "Thicket": [
+      "seek cover/hide",
+      "risk getting scratched or lost"
+    ],
+    "Spring": [
+      "collect clean water",
+      "rest/refill",
+      "reflect quietly"
+    ],
+    "Cave": [
+      "seek physical shelter",
+      "investigate for resources",
+      "risk from darkness or animals"
+    ],
+    "Appletree": [
+      "gather fruit for food",
+      "climb to observe area"
+    ],
+    "Hut": [
+      "seek information or advice (Hermit)",
+      "request help or shelter",
+      "risk conflict or rejection"
+    ]
+  }
+}

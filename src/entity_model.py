@@ -108,7 +108,8 @@ Do not include any other introductory, explanatory, discursive, or formatting te
 End your response with: 
 </end>"""
 
-        response = self.llm_client.generate([system_prompt], bindings={'transcript': dialog_history, 'name': self.entity_name, 'other_name': self.entity_name}, stops=['</end>'], max_tokens=20)
+        response = self.llm_client.generate([system_prompt, user_prompt], bindings={'transcript': dialog_history, 'name': self.entity_name, 'other_name': self.entity_name}, 
+                                            stops=['</end>'], max_tokens=20)
         if response.success:
             response=response.text
             me = hash_utils.find(f'{self.character_name}', response)

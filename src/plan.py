@@ -418,6 +418,24 @@ def _parse_action_line(line, line_number):
                 colon_pos = args_str.find(':')
                 target = args_str[:colon_pos].strip()
                 value = args_str[colon_pos+1:].strip()
+            elif action == 'scan':
+                # scan(target, out_variable) - scan(Berries, found_berries)
+                args = []
+                if args_str.strip():
+                    raw_args = [arg.strip() for arg in args_str.split(',')]
+                    args = raw_args
+                
+                if len(args) != 2:
+                    raise ValueError(f"Line {line_number}: scan action requires exactly 2 arguments: target and out variable")
+                
+                target = args[0]
+                out_var = args[1]
+                
+                return {
+                    'type': action,
+                    'target': target,
+                    'out': out_var
+                }
             else:
                 # Split arguments - handle commas in quoted strings
                 args = []
@@ -426,16 +444,28 @@ def _parse_action_line(line, line_number):
                     raw_args = [arg.strip() for arg in args_str.split(',')]
                     args = raw_args
                 
-                # Determine target and value
-                target = args[0] if len(args) > 0 and action != 'think' else ''
-                value = args[1] if len(args) > 1 and action != 'think' else ''
-                value = args[0] if len(args) > 0 and action == 'think' else ''
-            
-            return {
-                'type': action,
-                'target': target,
-                'value': value
-            }
+                # Determine target and value based on action type
+                if action == 'think':
+                    # think only needs value, not target
+                    value = args[0] if len(args) > 0 else ''
+                    target = ''
+                elif action in ['move', 'take', 'inspect', 'use']:
+                    # These actions only need target, not value
+                    target = args[0] if len(args) > 0 else ''
+                    value = ''
+                else:
+                    # Default case: first arg is target, second is value
+                    target = args[0] if len(args) > 0 else ''
+                    value = args[1] if len(args) > 1 else ''
+                
+                # Build the result based on what's needed
+                result = {'type': action}
+                if target:
+                    result['target'] = target
+                if value:
+                    result['value'] = value
+                
+                return result
         else:
             raise ValueError(f"Line {line_number}: Invalid action format '{line}'")
 
@@ -456,8 +486,14 @@ def verify_plan(plan_json: Any) -> bool:
     """
     try:
         plan_dict = _load(plan_json)
-        return _validate_top(plan_dict)
-    except Exception:
+        valid = _validate_top(plan_dict)
+        if valid:
+            logger.info(f'✅ Plan validation passed')
+        else:
+            logger.warning(f'❌ Plan validation failed')
+        return valid
+    except Exception as e:
+        logger.error(f'❌ Plan validation error: {e}')
         # Any raised error means invalid
         return False
 
@@ -465,7 +501,7 @@ def verify_plan(plan_json: Any) -> bool:
 # helpers
 # ---------------------------------------------------------------------------
 
-_ALLOWED_TYPES = {"action", "say", "move", "think", "take", "inspect", "use", "while", "if", "near", "look"}
+_ALLOWED_TYPES = {"action", "say", "move", "think", "take", "inspect", "use", "scan", "while", "if", "near", "look"}
 _ALLOWED_CONDITION_TYPES = {"near", "can_see", "has_item", "notnear", "cant_see", "hasnt_item", "at_location", "notat_location", "believes", "notbelieves"}
 
 REQ_KEYS = {
@@ -476,6 +512,7 @@ REQ_KEYS = {
     "take": {"type", "target"},
     "inspect": {"type", "target"},
     "use": {"type", "target"},
+    "scan": {"type", "target", "out"},
     "while": {"type", "body", "condition"},
     "if": {"type", "condition", "then"},          # "else" is optional
     "near": {"type", "target"},
@@ -489,6 +526,7 @@ OPTIONAL_KEYS = {
     "take": {"reason", "value"},
     "inspect": {"reason", "value"},
     "use": {"reason", "value"},
+    "scan": set(),  # scan has no optional keys
     "while": {"reason", "value"},
     "if": {"else"},
     "near": {"reason", "value"},
@@ -523,9 +561,16 @@ def _load(plan_json: Any) -> Dict[str, Any]:
 
 def _validate_top(plan) -> bool:
     if isinstance(plan, dict) and 'plan' in plan:
-        return _validate_steps(plan['plan'])
+        plan_steps = plan['plan']
+        if not _validate_steps(plan_steps):
+            return False
+        # Add variable reference validation
+        return _validate_variable_references(plan_steps)
     if isinstance(plan, list):
-        return _validate_steps(plan)
+        if not _validate_steps(plan):
+            return False
+        # Add variable reference validation
+        return _validate_variable_references(plan)
     if isinstance(plan, dict):
         return _validate_step(plan)
     return False
@@ -585,6 +630,52 @@ def _validate_condition(condition: Any) -> bool:
     keys = set(condition.keys())
     if not REQ_CONDITION_KEYS[condition.get("type", None)].issubset(keys):
         return False
+    return True
+
+def _validate_variable_references(plan_steps: List[Any]) -> bool:
+    """
+    Validate that all variable references ($variable_name) are bound by scan actions.
+    This is a basic validation - detailed dependency analysis is Phase 2.
+    """
+    bound_variables = set()
+    variable_references = []
+    
+    def collect_variables_and_references(steps):
+        for step in steps:
+            if isinstance(step, dict):
+                step_type = step.get('type', '')
+                
+                # Collect bound variables from scan actions
+                if step_type == 'scan':
+                    out_var = step.get('out', '')
+                    if out_var:
+                        bound_variables.add(out_var)
+                
+                # Collect variable references from targets
+                target = step.get('target', '')
+                if isinstance(target, str) and target.startswith('$'):
+                    var_name = target[1:]  # Remove $ prefix
+                    variable_references.append((var_name, step_type))
+                
+                # Handle nested structures
+                if step_type == 'while' and 'body' in step:
+                    collect_variables_and_references(step['body'])
+                if step_type == 'if':
+                    if 'then' in step:
+                        collect_variables_and_references(step['then'])
+                    if 'else' in step:
+                        collect_variables_and_references(step['else'])
+            elif isinstance(step, list):
+                collect_variables_and_references(step)
+    
+    collect_variables_and_references(plan_steps)
+    
+    # Check that all referenced variables are bound
+    for var_name, step_type in variable_references:
+        if var_name not in bound_variables:
+            logger.error(f'Variable ${var_name} referenced in {step_type} action but not bound by any scan action')
+            return False
+    
     return True
 
 def is_near(character, target: str, negated: bool) -> bool:
