@@ -27,6 +27,11 @@ import plan as plan_module
 from dataclasses import dataclass
 import os
 from templates import PLAN_TEMPLATE
+from utils.state_utils import tick_state, apply_restore, initialize_character_states
+from utils.condition_utils import deref_plan_target
+
+    
+
 
 # Configure logging with unbuffered output
 # Console handler with WARNING level (less verbose)
@@ -144,6 +149,8 @@ class ZenohExecutiveNode:
         
         # Publisher for current activities (character-specific)
         self.current_activity_publisher = self.session.declare_publisher(f"cognitive/{character_name}/current_activity")
+        # Publisher for current internal state (character-specific)
+        self.current_state_publisher = self.session.declare_publisher(f"cognitive/{character_name}/current_state")
         
         # Backward compatibility properties
         @property
@@ -188,6 +195,20 @@ class ZenohExecutiveNode:
         self.current_plan_prompt_template:str = ''
         self.current_plan_prompt_bindings:dict = {}
         self.plan_log: List[Dict[str, Any]] = [] # log of plans and actions
+        # Local physiology/state. 0=good, 100=worst.
+        self.self_state: Dict[str, Dict[str, float]] = initialize_character_states()
+        self.last_state_update_time: Optional[datetime] = None
+
+        # Publish initial state snapshot so UI has data before first time advance
+        try:
+            state_payload = {
+                'character': self.character_name,
+                'timestamp': datetime.now().isoformat(),
+                'state': self.self_state
+            }
+            self.current_state_publisher.put(json.dumps(state_payload))
+        except Exception:
+            pass
         # Turn management
         self.turn_subscriber = self.session.declare_subscriber(
             "cognitive/map/turn/go",
@@ -370,17 +391,28 @@ class ZenohExecutiveNode:
     def _publish_decided_action(self, action):
         """Publish decided action to the decided_action topic for UI display."""
         try:
+            # Prefer displaying a bound variable value if target references a plan variable
+            raw_target = action.get('target', '')
+            display_target = raw_target
+            try:
+                if isinstance(raw_target, str) and raw_target.startswith('$'):
+                    var_name = raw_target[1:]
+                    if var_name in self.plan_bindings:
+                        display_target = self.plan_bindings[var_name]
+            except Exception:
+                pass
+
             decided_action_data = {
-                'decided_action': f"{action['type']}: {action.get('target', '')} - {action.get('value', '')}",
+                'decided_action': f"{action['type']}: {display_target} - {action.get('value', '')}",
                 'type': action['type'],
-                'target': action.get('target', ''), 
+                'target': display_target,
+                'requested_target': raw_target,
                 'value': action.get('value', ''),
                 'timestamp': datetime.now().isoformat(),
                 'character': self.character_name
             }
             
             self.decided_action_publisher.put(json.dumps(decided_action_data))
-            logger.info(f'📋 Published decided action for {self.character_name}: {decided_action_data["decided_action"]}')
             
         except Exception as e:
             logger.error(f'Error publishing decided action: {e}')
@@ -452,6 +484,38 @@ class ZenohExecutiveNode:
     def _run_ooda_loop(self):
         """Execute the OODA loop: Observe, Orient, Decide, Act."""
         try:
+            # Tick local physiology/state using global simulation time if available
+            try:
+                if self.current_time is not None:
+                    # Initialize last update on first tick
+                    if self.last_state_update_time is None:
+                        self.last_state_update_time = self.current_time
+                    else:
+                        dt_minutes = max(0.0, (self.current_time - self.last_state_update_time).total_seconds() / 60.0)
+                        if dt_minutes > 0:
+                            tick_state(self.self_state, dt_minutes)
+                            self.last_state_update_time = self.current_time
+                            # Log cap condition
+                            try:
+                                hunger_val = float(self.self_state.get('hunger', {}).get('value', 0.0))
+                                if hunger_val >= 100.0:
+                                    logger.error(f'🍽️ {self.character_name} hunger reached 100 (worst)')
+                            except Exception:
+                                pass
+                            # Publish state snapshot for UI
+                            try:
+                                state_payload = {
+                                    'character': self.character_name,
+                                    'timestamp': datetime.now().isoformat(),
+                                    'state': self.self_state
+                                }
+                                self.current_state_publisher.put(json.dumps(state_payload))
+                            except Exception:
+                                pass
+            except Exception:
+                # Non-fatal; continue OODA
+                pass
+
             # Observe: Collect current situation and sense data
             observations = self._observe()
 
@@ -513,9 +577,7 @@ class ZenohExecutiveNode:
 
             # Plan Step: Execute current step of plan
             action = self._plan_step(plan)
-            if action:
-                logger.info(f'🎯 {self.character_name} planned action: {action.get("type")}: {action.get("target")} - {action.get("value")}')
-            else:
+            if not action:
                 logger.warning(f'🚫 {self.character_name} no action found for plan, pbly completed')
                 return
 
@@ -626,6 +688,19 @@ class ZenohExecutiveNode:
                 
             # Build user prompt with context
             user_prompt += self.format_situation()
+            # Include current self state (e.g., hunger)
+            try:
+                if hasattr(self, 'self_state') and isinstance(self.self_state, dict) and self.self_state:
+                    user_prompt += f"\n#Your current state:"
+                    for key, data in self.self_state.items():
+                        try:
+                            val = float(data.get('value', 0.0))
+                            user_prompt += f"\n\t{key.capitalize()}: {val:.1f}/100"
+                        except Exception:
+                            pass
+                    user_prompt += '\n'
+            except Exception:
+                pass
             entity_context = None
             entity_context = self.get_entity_context(self.character_name, 10)
             if entity_context:
@@ -996,6 +1071,27 @@ end your response with </end>
             return None # how did we get here?
         
         step_stack = self.plan_state['step_stack']
+
+        # Guardrails: abort if any state dimension exceeds threshold (Phase 1: 95)
+        try:
+            if hasattr(self, 'self_state') and isinstance(self.self_state, dict):
+                for key, data in self.self_state.items():
+                    val = float(data.get('value', 0.0))
+                    if val >= 95.0:
+                        logger.error(f'🚫 {self.character_name} aborting plan due to state threshold: {key}={val:.1f}')
+                        # Terminate current plan as failure
+                        self.current_plan = None
+                        self._publish_current_plan()
+                        # Terminate current activity if present
+                        if hasattr(self, 'activity_manager') and self.activity_manager.has_active_activity():
+                            try:
+                                self.activity_manager.step_completion('failure', 'state_threshold')
+                                self._publish_current_activity()
+                            except Exception:
+                                pass
+                        return None
+        except Exception:
+            pass
         
         # Initialize stack if empty with main plan frame
         if step_stack.is_empty():
@@ -1186,7 +1282,9 @@ end your response with </end>
             action_type = action['type'].lower()
             if action_type == "move":
                 move_direction = None
-                move_target = action['target'].strip().lower()
+                # Dereference variable targets (e.g., $var -> bound value)
+                raw_target = deref_plan_target(self.plan_bindings, action.get('target', ''))
+                move_target = raw_target.strip().lower()
                 # Step 1: Test for compass points first (case insensitive)
                 cardinal_directions = ['north', 'northeast', 'southeast', 'south', 'southwest', 'northwest', 'east', 'west']
                 if move_target in cardinal_directions:
@@ -1222,7 +1320,8 @@ end your response with </end>
             # Check if we can acquire conversation lock
             # Capture the originally requested target for UI/reporting
             requested_target = action.get('target', '')
-            resolved_target = self._resolve_target(action)
+            raw_target = deref_plan_target(self.plan_bindings, requested_target)
+            resolved_target = deref_plan_target(self.plan_bindings, raw_target)
 
             if resolved_target and self._acquire_conversation_lock(resolved_target):
                 self.generate_speech(action['value'], resolved_target, mode='say')
@@ -1246,8 +1345,9 @@ end your response with </end>
         elif action['type'].lower() == "take":
             # If resolution failed, publish a failure action with requested_target
             cond_action = action.copy()
+            cond_action['target'] = deref_plan_target(self.plan_bindings, cond_action.get('target', ''))
             cond_action['type'] = 'near'
-            cond_action['target'] = action['target'].strip().capitalize()
+            cond_action['target'] = cond_action['target'].strip().capitalize()
             binding = plan_module._evaluate_condition(self, cond_action)
             outcome = binding['value']
             resolved = binding['binding']   
@@ -1271,16 +1371,21 @@ end your response with </end>
         elif action['type'].lower() == "inspect":
             # Publish inspect action including requested vs resolved target
             cond_action = action.copy()
+            cond_action['target'] = deref_plan_target(self.plan_bindings, cond_action.get('target', ''))
             cond_action['type'] = 'near'
-            cond_action['target'] = action['target'].strip().capitalize()
+            cond_action['target'] = cond_action['target'].strip().capitalize()
             binding = plan_module._evaluate_condition(self, cond_action)
             outcome = binding['value']
             resolved = binding['binding']
             if not outcome:
-                cond_action['type'] = 'has_item'
-                binding = plan_module._evaluate_condition(self, cond_action)
-                outcome = binding['value']
-                resolved = binding['binding']
+                # Only allow inventory fallback when target is a type (no digits)
+                tgt = cond_action.get('target', '')
+                has_digits = any(ch.isdigit() for ch in tgt) if isinstance(tgt, str) else False
+                if not has_digits:
+                    cond_action['type'] = 'has_item'
+                    binding = plan_module._evaluate_condition(self, cond_action)
+                    outcome = binding['value']
+                    resolved = binding['binding']
 
             action_data = {
                 'type': 'inspect',
@@ -1314,8 +1419,17 @@ end your response with </end>
         elif action['type'].lower() == "use":
             # Create action - include requested vs resolved
             cond_action = action.copy()
+            # Dereference variable targets
+            try:
+                rt = cond_action.get('target', '')
+                if isinstance(rt, str) and rt.startswith('$'):
+                    vn = rt[1:]
+                    if vn in self.plan_bindings:
+                        cond_action['target'] = self.plan_bindings[vn]
+            except Exception:
+                pass
             cond_action['type'] = 'near'
-            cond_action['target'] = action['target'].strip().capitalize()
+            cond_action['target'] = cond_action['target'].strip().capitalize()
             binding = plan_module._evaluate_condition(self, cond_action)
             outcome = binding['value']
             resolved = binding['binding']
@@ -1340,6 +1454,27 @@ end your response with </end>
             else:
                 self.use(action, resolved, action_data)
                 action_data['result'] = self.action_history[-1].result
+                # Apply simple hunger restore if using an edible resource (Phase 1 heuristic)
+                try:
+                    target_lower = (resolved or '').lower()
+                    if any(k in target_lower for k in ['berry', 'berries', 'food']):
+                        apply_restore(self.self_state, 'hunger', amount=30.0)
+                        hunger_val = float(self.self_state.get('hunger', {}).get('value', 0.0))
+                        logger.info(f'🍽️ {self.character_name} ate {resolved}; hunger now {hunger_val:.1f}')
+                        if hunger_val >= 100.0:
+                            logger.error(f'🍽️ {self.character_name} hunger reached 100 (worst)')
+                        # Publish state snapshot for UI after restore
+                        try:
+                            state_payload = {
+                                'character': self.character_name,
+                                'timestamp': datetime.now().isoformat(),
+                                'state': self.self_state
+                            }
+                            self.current_state_publisher.put(json.dumps(state_payload))
+                        except Exception:
+                            pass
+                except Exception:
+                    pass
             self.action_publisher.put(json.dumps(action_data))
             self.action_counter += 1
             return True
@@ -1466,7 +1601,7 @@ end your response with </end>
         if len(self.plan_log) < 3:
             return
         logger.info(f'📝 Reviewing planning for {self.character_name}')
-        system_prompt = f"""Review the following planning information for one or more planning efforts and recommend improvements to the content or instructions in the Plan syntax or the planning prompt.
+        system_prompt = f"""Review the following planning information for one or more planning efforts and recommend improvements to the format or content of the PLAN_TEMPLATE.
 """
         
         actions_text = []
@@ -1854,18 +1989,10 @@ End your text with: </end>"""
             return None
             
         # Check if target is a variable reference ($variable_name)
-        if isinstance(raw_target, str) and raw_target.startswith('$'):
-            var_name = raw_target[1:]  # Remove $ prefix
-            if var_name in self.plan_bindings:
-                bound_value = self.plan_bindings[var_name]
-                logger.info(f'🔗 {self.character_name} resolved variable ${var_name} -> {bound_value}')
-                # Replace the target with the bound value for further resolution
-                action = action.copy()
-                action['target'] = bound_value
-                raw_target = bound_value
-            else:
-                logger.error(f'❌ {self.character_name} variable ${var_name} not bound in plan_bindings')
-                return False
+        raw_target = deref_plan_target(self.plan_bindings, raw_target)
+        if raw_target is False:
+            logger.error(f'❌ {self.character_name} variable dereferencing failed')
+            return False
             
         # Check plan bindings cache first
         cache_key = raw_target
@@ -1884,9 +2011,9 @@ End your text with: </end>"""
         try:
             # Context-aware resolution based on action type
             action_type = action['type'].lower()
-            negated = False
-            if 'hasnt' in action_type or 'cant' in action_type or 'not' in action_type:
-                negated = True
+            # Use proper negation detection from condition_utils
+            from utils.condition_utils import is_negated_condition
+            negated = is_negated_condition(action_type)
 
             if action_type == "move":
                 move_target = action['target'].strip()
@@ -1960,7 +2087,8 @@ End your text with: </end>"""
         else:
             logger.error(f'❌ Failed to resolve "{raw_target}" ({action_type})')
             
-        return action
+        # Ensure we return the resolved target, not the action dict
+        return resolved_target
 
     def _resolve_visible_instance(self, negated: bool, raw_target: str) -> Union[str, bool]:
         """Resolve abstract visible instance to specific visible instance."""
@@ -2104,37 +2232,49 @@ End your text with: </end>"""
         return found_target if found_target else ''
 
     def _find_target_in_situation(self, target: str) -> str:
-        """Search last_situation_data for target, return first match found."""
+        """Search last_situation_data for target, return nearest match found (by distance)."""
         if not self.last_situation_data:
             return ''
             
         target_lower = target.lower()
         
-        # Search characters first
+        best_name = ''
+        best_dist = float('inf')
+        
         for view in self.last_situation_data.get('views', []):
+            # Characters
             if 'characters' in view:
                 for character in view['characters']:
                     char_name = character.get('name', '')
-                    if (char_name.lower() == target_lower or 
+                    if (char_name and (
+                        char_name.lower() == target_lower or
                         target_lower == 'person' or
-                        char_name.lower().startswith(target_lower)):
-                        return char_name
-                        
-            # Search resources
+                        char_name.lower().startswith(target_lower))):
+                        dist = float(character.get('distance', 1e9))
+                        if dist < best_dist or (dist == best_dist and char_name < best_name):
+                            best_name = char_name
+                            best_dist = dist
+            # Resources
             if 'resources' in view:
                 for resource in view['resources']:
                     resource_name = resource.get('name', '')
-                    if (resource_name.lower() == target_lower or
-                        resource_name.lower().startswith(target_lower)):
-                        return resource_name
-                        
-            # Search terrain
+                    if (resource_name and (
+                        resource_name.lower() == target_lower or
+                        resource_name.lower().startswith(target_lower))):
+                        dist = float(resource.get('distance', 1e9))
+                        if dist < best_dist or (dist == best_dist and resource_name < best_name):
+                            best_name = resource_name
+                            best_dist = dist
+            # Terrain exact match (no distance available; treat as mid priority)
             if 'terrain' in view:
                 terrain = view['terrain']
-                if terrain.lower() == target_lower:
-                    return terrain
-                    
-        return ''
+                if isinstance(terrain, str) and terrain.lower() == target_lower:
+                    # Prefer any finite distance match over terrain
+                    if best_name == '':
+                        best_name = terrain
+                        best_dist = 1e8
+        
+        return best_name
             
     def _find_target_direction(self, target: str) -> str:
         """Find which direction a target (character or resource) is visible in."""
@@ -2241,19 +2381,24 @@ End your text with: </end>"""
             logger.info(f'📦 Taking {target} for {self.character_name}')
             if self.action_history:
                 self.action_history[-1].result = f'taking {target}'
-                        # Remove the resource from the map
-            for reply in self.session.get(f"cognitive/map/resource/remove/{target}", timeout=2.0 if not self.debug else 600.0   ):
+            # Remove the resource from the map
+            removed = False
+            last_error = ''
+            for reply in self.session.get(f"cognitive/map/resource/remove/{target}", timeout=2.0 if not self.debug else 600.0):
                 if reply.ok:
                     data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
                     if data.get('success'):
                         logger.info(f'🗑️ Removed {target} from map')
+                        removed = True
                     else:
-                        logger.error(f'⚠️ Failed to remove {target} from map: {data.get("error", "Unknown error")}')
+                        last_error = data.get('error', 'Unknown error')
+                        logger.error(f'⚠️ Failed to remove {target} from map: {last_error}')
                 else:
+                    last_error = 'No response from map_node'
                     logger.error(f'⚠️ Failed to remove {target} from map - no response')
                 break
 
-            return True
+            return removed
 
         try:
             result = _do_take(target)
@@ -2263,28 +2408,30 @@ End your text with: </end>"""
                 'target': target,
                 'action_id': f"take_{int(time.time())}",
                 'timestamp': datetime.now().isoformat(),
-                'character': self.character_name
+                'character': self.character_name,
+                'status': 'success' if result else 'failed'
             }
             self.action_publisher.put(json.dumps(action_data))
-            logger.info(f'📤 Published take action: {target}')
-            return True
+            logger.info(f'📤 Published take action: {target} ({action_data["status"]})')
+            return result
 
         except Exception as e:
             logger.error(f'Error in take operation for {target}: {e}')
             if self.action_history:
                 self.action_history[-1].result = f'take failed'
 
-        # Create and publish action data for logging/display
+        # Create and publish failure action data for logging/display
         action_data = {
             'type': 'take',
             'target': target,
             'action_id': f"take_{int(time.time())}",
             'timestamp': datetime.now().isoformat(),
-            'character': self.character_name
+            'character': self.character_name,
+            'status': 'failed'
         }
         self.action_publisher.put(json.dumps(action_data))
-        logger.info(f'📤 Published take action: {target}')
-        return True
+        logger.info(f'📤 Published take action: {target} (failed)')
+        return False
     
     def inspect(self, action: dict, target: str):
         """Learn about a resource."""

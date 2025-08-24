@@ -156,6 +156,11 @@ class FastAPIActionDisplayNode:
             "cognitive/*/current_activity",
             self.current_activity_callback
         )
+        # Subscriber for character current state
+        self.current_state_subscriber = self.session.declare_subscriber(
+            "cognitive/*/current_state",
+            self.current_state_callback
+        )
         
         # Subscriber for character situation data
         self.situation_subscriber = self.session.declare_subscriber(
@@ -232,6 +237,7 @@ class FastAPIActionDisplayNode:
         print('   - Subscribing to: cognitive/*/goal (character goals)')
         print('   - Subscribing to: cognitive/*/decided_action (character decided actions)')
         print('   - Subscribing to: cognitive/*/current_plan (character current plans)')
+        print('   - Subscribing to: cognitive/*/current_state (character current state)')
         print('   - Subscribing to: cognitive/map/step_complete (step completion)')
         print('   - Subscribing to: cognitive/map/turn (turn start)')
         print('   - Publishing to: cognitive/{character}/text_input (dynamic)')
@@ -948,6 +954,7 @@ class FastAPIActionDisplayNode:
                     <div class="character-data-tab active" data-tab="activity">Activity</div>
                     <div class="character-data-tab" data-tab="plan">Plan</div>
                     <div class="character-data-tab" data-tab="view">View</div>
+                    <div class="character-data-tab" data-tab="state">State</div>
                 </div>
                 
                 <!-- Character data content -->
@@ -972,6 +979,13 @@ class FastAPIActionDisplayNode:
                     <div class="character-data-panel" id="viewPanel">
                         <div id="situationData" style="color: #888; font-style: italic; text-align: center; padding: 20px;">
                             No situation data available
+                        </div>
+                    </div>
+                    
+                    <!-- State tab content -->
+                    <div class="character-data-panel" id="statePanel">
+                        <div id="stateData" style="color: #888; font-style: italic; text-align: center; padding: 20px;">
+                            No state data available
                         </div>
                     </div>
                 </div>
@@ -1049,6 +1063,10 @@ class FastAPIActionDisplayNode:
         
         // Character tabs state
         let characterTabs = new Map(); // character_name -> {element, goal, decidedAction}
+        // Track which characters have announced themselves
+        let announcedCharacters = new Set();
+        // Remember last ready state payload for gating
+        let lastReadyData = null;
         let activeCharacter = null;
         let currentTurnMode = 'step';
         let commandInProgress = false; // Prevent rapid button clicks
@@ -1126,6 +1144,26 @@ class FastAPIActionDisplayNode:
                     // Check if this is an announcement to create a character tab
                     if (data.action_type === 'announcement') {
                         createCharacterTab(data.character);
+                        try { announcedCharacters.add(data.character); } catch (e) {}
+                        // If system is ready and all expected characters have announced, select first and enable controls
+                        try {
+                            if (lastReadyData && lastReadyData.system_ready) {
+                                const expected = Array.isArray(lastReadyData.characters_active) ? lastReadyData.characters_active.length : (lastReadyData.character_count || 0);
+                                if (expected > 0 && announcedCharacters.size >= expected) {
+                                    if (!activeCharacter) {
+                                        const first = lastReadyData.characters_active && lastReadyData.characters_active[0] ? lastReadyData.characters_active[0] : data.character;
+                                        selectCharacterTab(first);
+                                    }
+                                    // Enable controls if not in run mode
+                                    const stepButton = document.getElementById('stepButton');
+                                    const runButton = document.querySelector('button[onclick="runTurns()"]');
+                                    if (currentTurnMode !== 'run') {
+                                        stepButton.disabled = false; stepButton.style.background = '#4ecdc4'; stepButton.title = 'Click to advance to next turn';
+                                        runButton.disabled = false; runButton.style.background = '#ffe66d'; runButton.style.color = '#1a1a1a'; runButton.title = 'Click to run multiple turns';
+                                    }
+                                }
+                            }
+                        } catch (e) {}
                     }
                 } else if (data.type === 'goal') {
                     handleGoalUpdate(data);
@@ -1135,6 +1173,8 @@ class FastAPIActionDisplayNode:
                     handleCurrentPlanUpdate(data);
                 } else if (data.type === 'current_activity') {
                     handleCurrentActivityUpdate(data);
+                } else if (data.type === 'current_state') {
+                    handleCurrentStateUpdate(data);
                 } else if (data.type === 'situation_data') {
                     handleSituationDataUpdate(data);
                 } else if (data.type === 'turn_mode_update') {
@@ -1289,6 +1329,11 @@ class FastAPIActionDisplayNode:
                 // Refresh situation display for current character
                 if (activeCharacter) {
                     updateSituationDataDisplay(activeCharacter);
+                }
+            } else if (tabName === 'state') {
+                document.getElementById('statePanel').classList.add('active');
+                if (activeCharacter) {
+                    updateStateDataDisplay(activeCharacter);
                 }
             }
         }
@@ -1450,6 +1495,23 @@ class FastAPIActionDisplayNode:
             } else {
                 // Character tab doesn't exist yet, this shouldn't happen
                 console.warn(`Received current activity for unknown character: ${characterName}`);
+            }
+        }
+
+        function handleCurrentStateUpdate(currentStateData) {
+            const characterName = currentStateData.character;
+            console.log(`Current state update for ${characterName}`);
+            if (characterTabs.has(characterName)) {
+                const tabData = characterTabs.get(characterName);
+                tabData.currentState = currentStateData;
+                if (activeCharacter === characterName) {
+                    updateStateDataDisplay(characterName);
+                }
+            } else {
+                console.warn(`Received current state for unknown character: ${characterName}`);
+                createCharacterTab(characterName);
+                const tabData = characterTabs.get(characterName);
+                tabData.currentState = currentStateData;
             }
         }
         
@@ -1661,6 +1723,27 @@ class FastAPIActionDisplayNode:
             }
             
             activityDataDiv.innerHTML = content;
+        }
+
+        function updateStateDataDisplay(characterName) {
+            const stateDiv = document.getElementById('stateData');
+            if (!stateDiv) return;
+            if (!characterTabs.has(characterName)) {
+                stateDiv.innerHTML = '<div style="color: #888; font-style: italic; text-align: center; padding: 20px;">Character not found</div>';
+                return;
+            }
+            const tabData = characterTabs.get(characterName);
+            const state = tabData.currentState ? tabData.currentState.state || {} : {};
+            if (!state || Object.keys(state).length === 0) {
+                stateDiv.innerHTML = '<div style="color: #888; font-style: italic; text-align: center; padding: 20px;">No state data available</div>';
+                return;
+            }
+            let html = '';
+            Object.keys(state).forEach(key => {
+                const v = state[key] && typeof state[key].value !== 'undefined' ? state[key].value : '';
+                html += `<div class="character-data-item"><div class="character-data-label">${key.charAt(0).toUpperCase() + key.slice(1)}</div><div class="character-data-value">${v}/100</div></div>`;
+            });
+            stateDiv.innerHTML = html;
         }
         
         function updateSituationDataDisplay(characterName) {
@@ -1907,14 +1990,32 @@ class FastAPIActionDisplayNode:
             const systemStatusText = document.getElementById('systemStatusText');
             const stepButton = document.getElementById('stepButton');
             const runButton = document.querySelector('button[onclick="runTurns()"]');
+            // Remember last ready payload
+            try { lastReadyData = readyData; } catch (e) {}
             
             if (readyData.system_ready) {
                 // System is ready - enable buttons and update status
                 systemStatusText.textContent = `Ready - ${readyData.character_count} characters active`;
                 systemStatusText.style.color = '#4ecdc4'; // Green color for ready
+
+                // Auto-select first character if none selected yet
+                try {
+                    // Gate on both ready and announced count
+                    const expected = Array.isArray(readyData.characters_active) ? readyData.characters_active.length : (readyData.character_count || 0);
+                    const allAnnounced = (expected > 0) && (announcedCharacters.size >= expected);
+                    if (!activeCharacter && allAnnounced && Array.isArray(readyData.characters_active) && readyData.characters_active.length > 0) {
+                        const firstCharacter = readyData.characters_active[0];
+                        if (!characterTabs.has(firstCharacter)) {
+                            createCharacterTab(firstCharacter);
+                        }
+                        selectCharacterTab(firstCharacter);
+                    }
+                } catch (e) { /* no-op */ }
                 
                 // Enable step and run buttons, but respect current turn mode AND turn state
                 if (currentTurnMode !== 'run') {
+                    // Only enable when at least one character has announced and is selected
+                    const canEnable = activeCharacter && announcedCharacters.size > 0;
                     // Check if a turn is currently in progress
                     const turnInProgress = isTurnInProgress();
                     if (turnInProgress) {
@@ -1930,14 +2031,14 @@ class FastAPIActionDisplayNode:
                         runButton.title = 'Turn in progress - wait for completion';
                     } else {
                         // No turn active - enable buttons
-                        stepButton.disabled = false;
-                        stepButton.style.background = '#4ecdc4';
-                        stepButton.title = 'Click to advance to next turn';
+                        stepButton.disabled = !canEnable;
+                        stepButton.style.background = canEnable ? '#4ecdc4' : '#555';
+                        stepButton.title = canEnable ? 'Click to advance to next turn' : 'Waiting for character to appear...';
                         
-                        runButton.disabled = false;
-                        runButton.style.background = '#ffe66d';
-                        runButton.style.color = '#1a1a1a';
-                        runButton.title = 'Click to run multiple turns';
+                        runButton.disabled = !canEnable;
+                        runButton.style.background = canEnable ? '#ffe66d' : '#555';
+                        runButton.style.color = canEnable ? '#1a1a1a' : '#888';
+                        runButton.title = canEnable ? 'Click to run multiple turns' : 'Waiting for character to appear...';
                     }
                 } else {
                     // In run mode, keep buttons disabled
@@ -2413,6 +2514,23 @@ class FastAPIActionDisplayNode:
         except Exception as e:
             import traceback
             traceback.print_exc()
+
+    def current_state_callback(self, sample):
+        """Handle incoming character current internal state."""
+        try:
+            current_state_data = json.loads(sample.payload.to_bytes().decode('utf-8'))
+            # Extract character name from topic path
+            topic_path = str(sample.key_expr)
+            character_name = topic_path.split('/')[1]  # cognitive/{character}/current_state
+            # Store current state for this character
+            if not hasattr(self, 'character_current_states'):
+                self.character_current_states = {}
+            self.character_current_states[character_name] = current_state_data
+            # Send current state update to web clients
+            self._send_current_state_to_websockets(current_state_data, character_name)
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
     
     def situation_callback(self, sample):
         """Handle incoming character situation data."""
@@ -2750,6 +2868,35 @@ class FastAPIActionDisplayNode:
                         disconnected.append(websocket)
             
             # Remove only truly disconnected clients (not timeout errors)
+            for websocket in disconnected:
+                if websocket in self.websocket_connections:
+                    self.websocket_connections.remove(websocket)
+
+    def _send_current_state_to_websockets(self, current_state_data: Dict[str, Any], character_name: str):
+        """Send current internal state data to all connected WebSocket clients."""
+        with self.websocket_lock:
+            if not self.websocket_connections:
+                return
+        web_data = {
+            'type': 'current_state',
+            'character': character_name,
+            'state': current_state_data.get('state', {}),
+            'timestamp': current_state_data.get('timestamp', '')
+        }
+        if self.event_loop is None:
+            return
+        with self.websocket_lock:
+            disconnected = []
+            for websocket in self.websocket_connections:
+                try:
+                    future = asyncio.run_coroutine_threadsafe(
+                        websocket.send_text(json.dumps(web_data)),
+                        self.event_loop
+                    )
+                    future.result(timeout=5.0 if not self.debug else 600.0)
+                except Exception as e:
+                    if not isinstance(e, TimeoutError):
+                        disconnected.append(websocket)
             for websocket in disconnected:
                 if websocket in self.websocket_connections:
                     self.websocket_connections.remove(websocket)

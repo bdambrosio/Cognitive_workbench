@@ -1,14 +1,7 @@
-2025-08-23 13:42:35 - sense_node - INFO - 🔧 Debug mode enabled for User
-2025-08-23 13:42:35 - sense_node - INFO - 👁️ Sense Node initialized for character: User
-2025-08-23 13:42:35 - sense_node - INFO - Console Text Sensor ready - will auto-disable if external input detected
-2025-08-23 13:42:35 - sense_node - INFO - Sense Node running - press Ctrl+C to sto2025-08-23 13:44:48 - sense_node - INFO - 🔄 External input detected - console input disabled to prevent conflicts
-2025-08-23 13:44:48 - sense_node - INFO - 📨 Received external text input from Samantha: "I'm not sure, why did the tree go to the party in the forest?"
-2025-08-23 13:44:48 - sense_node - INFO - 📤 Published sense2025-08-22025-08-23 13:46:17 - sense_node - INFO - 📨 Received external text input from Samantha: "What did you mean by the tree joke, Joe?"
-2025-08-23 13:46:17 - sense_node - INFO - 📤 Published sense data: 1
-2025-08-23 13:47:35 - sense_node - INFO - 📨 Received external text input from Samantha: "I think I get it now, you were trying to make a joke about leaving me hanging, like a leaf on a tree, but I'm still not sure what the actual punchline is, can you just tell me what the tree went to the party for?"
-2025-08-23 13:47:35 - sense_node - INFO - 📤 Publish2025-08-23 13:48:2025-08-23 13:49:19 - sense_node - INFO - 📨 Received external text input from Samantha: "I'm still thinking about the joke, but sure, I'd love to explore the forest with you, what kind of cool stuff are you thinking we might find?"
-2025-08-23 13:49:19 - sense_node - INFO - 📤 Published sense data: 3
-: "Hey, now that we've got the tree joke out of the way, want to explore this forest with me and see what kind of cool stuff we can find?"
-2025-08-23 13:48:53 - sense_node - INFO - 📤 Published sense data: 4
-2025-08-23 13:50:10 - sense_node - INFO - 📨 Received external text input from Joe: "I'm thinking we might find some berries, or maybe some mushrooms, I've seen some fallen branches around here too, who knows, maybe we'll stumble upon a spring or something, the forest seems pretty dense, so I'm sure we'll find something interesting"
-2025-08-23 13:50:10 - sense_node - INFO - 📤 Published sense data: 5
+2025-08-24 16:29:22 - sense_node - INFO - 🔧 Debug mode enabled for Joe
+2025-08-24 16:29:22 - sense_node - INFO - 👁️ Sense Node initialized for character: Joe
+2025-08-24 16:29:22 - sense_node - INFO - Console Text Sensor ready - will auto-disable if external input detected
+2025-08-24 16:29:22 - sense_node - INFO - Sense Node running - press Ctrl+C to stop
+2025-08-24 16:45:32 - sense_node - INFO - Received signal 2, initiating shutdown...
+2025-08-24 16:45:32 - sense_node - INFO - Sense Node shutdown initiated...
+2025-08-24 16:45:32 - sense_node - INFO - Sense Node shutdown complete

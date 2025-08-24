@@ -696,46 +696,136 @@ def _evaluate_condition(character: ZenohExecutiveNode, condition: dict) -> bool:
         """Evaluate a condition action dict using distributed node queries."""
         # The key to conditions is access to the character's beliefs and knowledge base.
         # Since this is distributed among nodes, we will used targeted queires by predicate.
-        if not condition:
-            logger.error('No condition provided {condition}')
-            return {'value': False, 'binding': None}
-        if not isinstance(condition, dict) or 'type' not in condition or 'target' not in condition:
-            logger.error(f'Invalid condition: {condition}')
+        
+        # Use shared utilities for validation and variable dereferencing
+        from utils.condition_utils import validate_condition_structure, deref_plan_target, normalize_condition_type
+        
+        if not validate_condition_structure(condition):
             return {'value': False, 'binding': None}
         
         condition_type = condition['type']
-        if condition_type in ['notnear', 'notat_location', 'notbelieves', 'hasnt_item', 'cant_see']:
-            negated = True
-        else:
-            negated = False
-        target = condition['target']
+        normalized_type, negated = normalize_condition_type(condition_type)
+        target = deref_plan_target(character.plan_bindings, condition['target'])
         character_name = character.character_name
         result = {'value': False, 'binding': None}
         
+        # Local fast-path helpers using last_situation_data
+        def _target_matches(name: str, target_str: str) -> bool:
+            if not isinstance(name, str):
+                return False
+            if not isinstance(target_str, str):
+                return False
+            # Exec semantics: if target has no digits, allow prefix match; else require exact
+            has_digits = any(ch.isdigit() for ch in target_str)
+            return name == target_str or (not has_digits and name.startswith(target_str))
+        
+        def _local_find_visible(tgt: str):
+            try:
+                if not getattr(character, 'last_situation_data', None):
+                    return None
+                tcap = tgt.capitalize() if isinstance(tgt, str) else tgt
+                data = character.last_situation_data or {}
+                for view in data.get('views', []):
+                    if 'characters' in view:
+                        for c in view['characters']:
+                            nm = c.get('name', '')
+                            if nm and (nm == tcap or tcap == 'Person'):
+                                return nm
+                    if 'resources' in view:
+                        for r in view['resources']:
+                            nm = r.get('name', '')
+                            if nm and _target_matches(nm, tcap):
+                                return nm
+                    if 'terrain' in view:
+                        terr = view.get('terrain')
+                        if isinstance(terr, str) and terr == tcap:
+                            return terr
+                return None
+            except Exception:
+                return None
+        
+        def _local_find_near(tgt: str):
+            try:
+                if not getattr(character, 'last_situation_data', None):
+                    return None
+                tcap = tgt.capitalize() if isinstance(tgt, str) else tgt
+                data = character.last_situation_data or {}
+                for view in data.get('views', []):
+                    if 'characters' in view:
+                        for c in view['characters']:
+                            if float(c.get('distance', 20)) <= 2 and (c.get('name', '') == tcap or tcap == 'Person'):
+                                return c.get('name', '')
+                    if 'resources' in view:
+                        for r in view['resources']:
+                            if float(r.get('distance', 20)) <= 2:
+                                nm = r.get('name', '')
+                                if nm and _target_matches(nm, tcap):
+                                    return nm
+                    if 'terrain' in view:
+                        terr = view.get('terrain')
+                        if isinstance(terr, str) and terr == tcap:
+                            return terr
+                return None
+            except Exception:
+                return None
+        
+        def _local_find_at(tgt: str):
+            try:
+                if not getattr(character, 'last_situation_data', None):
+                    return None
+                tcap = tgt.capitalize() if isinstance(tgt, str) else tgt
+                data = character.last_situation_data or {}
+                for view in data.get('views', []):
+                    if 'characters' in view:
+                        for c in view['characters']:
+                            if float(c.get('distance', 20)) <= 1 and (c.get('name', '') == tcap or tcap == 'Person'):
+                                return c.get('name', '')
+                    if 'resources' in view:
+                        for r in view['resources']:
+                            if float(r.get('distance', 20)) <= 2:
+                                nm = r.get('name', '')
+                                if nm and _target_matches(nm, tcap):
+                                    return nm
+                    if 'terrain' in view:
+                        terr = view.get('terrain')
+                        if isinstance(terr, str) and terr == tcap:
+                            return terr
+                return None
+            except Exception:
+                return None
+        
         try:
-            # Query the appropriate node based on condition type
-            if condition_type in ['near', 'notnear']:
-                # Use the extracted is_near function
-                character_name = character.character_name
+            # Query the appropriate node based on normalized condition type
+            if normalized_type == 'near':
+                # Local fast path
+                binding = _local_find_near(target)
+                if binding is not None:
+                    return {'value': (not negated), 'binding': binding} if not negated else {'value': False, 'binding': None}
+                # Fallback to distributed query
                 for reply in character.session.get(f"cognitive/{character_name}/situation/proximity?target={target}&negated={negated}", timeout=6.0 if not character.debug else 600.0):
                     if reply.ok:
                         data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
                         if data['success']:
                             return {'value': data['value'], 'binding': data['binding']}
-                return {'value': False, 'binding': None}
+                # If no local match and negated, treat as True; otherwise False
+                return {'value': True, 'binding': None} if negated else {'value': False, 'binding': None}
                     
-            elif condition_type in ['can_see', 'cant_see']:
-                # Query situation_node for visibility
+            elif normalized_type == 'can_see':
+                # Local fast path
+                binding = _local_find_visible(target)
+                if binding is not None:
+                    return {'value': (not negated), 'binding': binding} if not negated else {'value': False, 'binding': None}
+                # Fallback
                 for reply in character.session.get(f"cognitive/{character_name}/situation/visibility?target={target}&negated={negated}", timeout=6.0 if not character.debug else 600.0):
                     if reply.ok:
                         data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
                         if data['success']:
                             logger.info(f'Visibility query for {target}: {result}')
                             return {'value': data['value'], 'binding': data['binding']}
-                return {'value': False, 'binding': None}
+                return {'value': True, 'binding': None} if negated else {'value': False, 'binding': None}
             
-            elif condition_type in ['has_item', 'hasnt_item']:
-                # Query memory_node for inventory
+            elif normalized_type == 'has_item':
+                # Prefer distributed memory_node for authoritative inventory
                 for reply in character.session.get(f"cognitive/{character_name}/memory/inventory?item={target}&negated={negated}", timeout=6.0 if not character.debug else 600.0):
                     if reply.ok:
                         data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
@@ -745,23 +835,27 @@ def _evaluate_condition(character: ZenohExecutiveNode, condition: dict) -> bool:
                             return result
                 return {'value': False, 'binding': None}
                     
-            elif condition_type in ['at_location', 'notat_location']:
-                # Query situation_node for location
+            elif normalized_type == 'at_location':
+                # Local fast path
+                binding = _local_find_at(target)
+                if binding is not None:
+                    return {'value': (not negated), 'binding': binding} if not negated else {'value': False, 'binding': None}
+                # Fallback
                 for reply in character.session.get(f"cognitive/{character_name}/situation/location?target={target}&negated={negated}", timeout=6.0 if not character.debug else 600.0):
                     if reply.ok:
                         data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
                         if data['success']:
                             result = {'value': data['value'], 'binding': data['binding']}
-                            logger.info(f'Location query for {target}: {result}')
+                            logger.info(f'Location query for {target}: {target}')
                             return result
-                return {'value': False, 'binding': None}
+                return {'value': True, 'binding': None} if negated else {'value': False, 'binding': None}
                     
-            elif condition_type in ['believes', 'notbelieves']:
+            elif normalized_type == 'believes':
                 # Stub implementation - user will implement this
                 logger.warning(f'Belief condition {condition_type}({target}) not implemented - returning False')
                 return {'value': False, 'binding': None}
             else:
-                logger.error(f'Unknown condition type: {condition_type}')
+                logger.error(f'Unknown condition type: {condition_type} (normalized: {normalized_type})')
                 return {'value': False, 'binding': None}
                 
         except Exception as e:
