@@ -17,6 +17,21 @@
             "preLaunchTask": "setup-zenoh-environment"
         },
         {
+            "name": "Debug Activity (Joe.yaml)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/activity.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/src",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src"
+            },
+            "args": ["../scenarios/joe.yaml"],
+            "justMyCode": false,
+            "stopOnEntry": false,
+            "preLaunchTask": "setup-zenoh-environment"
+        },
+        {
             "name": "Debug Activity (lost.yaml)",
             "type": "debugpy",
             "request": "launch",
@@ -182,6 +197,21 @@
                 "PYTHONPATH": "${workspaceFolder}/src"
             },
             "args": ["--port", "3100", "--ui-base-port", "3000"],
+            "justMyCode": false,
+            "stopOnEntry": false,
+            "preLaunchTask": "setup-zenoh-environment"
+        },
+        {
+            "name": "Launch Current Buffer",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/src",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src"
+            },
+            "args": [],
             "justMyCode": false,
             "stopOnEntry": false,
             "preLaunchTask": "setup-zenoh-environment"

@@ -163,8 +163,10 @@ Do not include any other text, reasoning, introductory, expository, or markdown.
             except Exception as e:
                 logger.error(f"Failed to set datetime: {e}")
                 logger.error(f"Response: {response.text}")
-                self.world_map.datetime = datetime.now()
-                logger.info(f"Setting datetime to now: {self.world_map.datetime}")
+                # Use a reasonable default simulation time instead of real-world time
+                default_time = datetime(2024, 6, 15, 12, 0, 0)  # Midday, summer
+                self.world_map.datetime = default_time
+                logger.info(f"Setting datetime to default simulation time: {self.world_map.datetime}")
             return self.world_map.datetime
     
     def init_zenoh(self):
@@ -543,7 +545,7 @@ Do not include any other text, reasoning, introductory, expository, or markdown.
         if self.debug_disable_timeout:
             try:
                 elapsed = time.time() - self.turn_state['turn_start_time']
-                logger.info(f"⏰ Turn {self.turn_state['turn_number']} elapsed time: {elapsed:.1f}s (debug mode - timeout disabled)")
+                #logger.info(f"⏰ Turn {self.turn_state['turn_number']} elapsed time: {elapsed:.1f}s (debug mode - timeout disabled)")
             except Exception:
                 pass
             return
@@ -1099,7 +1101,9 @@ Do not include any other text, reasoning, introductory, expository, or markdown.
             # For now, return stub data with constants
             # TODO: Implement actual time progression and weather simulation
             if type(self.world_map.datetime) != datetime:
-                self.world_map.datetime = datetime.now()
+                # Use a reasonable default simulation time instead of real-world time
+                default_time = datetime(2024, 6, 15, 12, 0, 0)  # Midday, summer
+                self.world_map.datetime = default_time
             
             time_info = self.calculate_time_info(self.world_map.datetime)
             
@@ -1623,10 +1627,14 @@ Do not include any other text, reasoning, introductory, expository, or markdown.
                             logger.info(f"📂 Simulation time restored to: {self.world_map.datetime}")
                         except Exception as e:
                             logger.error(f"Failed to restore simulation time: {e}, using current time")
-                            self.world_map.datetime = datetime.now()
+                            # Use a reasonable default simulation time instead of real-world time
+                            default_time = datetime(2024, 6, 15, 12, 0, 0)  # Midday, summer
+                            self.world_map.datetime = default_time
                     else:
                         logger.info("📂 No simulation time in saved data, using current time")
-                        self.world_map.datetime = datetime.now()
+                        # Use a reasonable default simulation time instead of real-world time
+                        default_time = datetime(2024, 6, 15, 12, 0, 0)  # Midday, summer
+                        self.world_map.datetime = default_time
                     
                     logger.info(f"📂 Loaded world data for '{self.world_name}'")
                     

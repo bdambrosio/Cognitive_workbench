@@ -17,6 +17,7 @@ import zenoh
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from Messages import SystemMessage
 from utils import hash_utils
+from utils.state_utils import calculate_state_activity_alignment, get_known_states
 
 # Type checking imports
 from typing import TYPE_CHECKING
@@ -109,6 +110,7 @@ def create_ontology(context, character_name, character, character_drives, other_
         response = llm_client.ask({"setting": context, 
                                    "character": character, 
                                    "character_drives": character_drives_str, 
+                                    "states": get_known_states(),
                                    "other_characters": other_characters_str, 
                                    "map_types": map_types_str},
                     [SystemMessage(content=ONTOLOGY_TEMPLATE)],
@@ -151,6 +153,7 @@ def create_activities(context, character_name, character, character_drives, othe
 
         response = llm_client.ask({"character": character, 
                                    "character_drives": character_drives_str, 
+                                   "states": get_known_states(),
                                    "other_characters": other_characters_str, 
                                    "ontology": json.dumps(ontology, indent=2),
                                    "map_types": map_types_str,
@@ -211,6 +214,7 @@ class ActivityManager:
         self.current_activity_state = None
         self.current_activity_next_step = None
         self.activity_history = []
+        self.activity_state_deltas = []
         self.previous_activity = None
         
         # Time advancement management
@@ -312,18 +316,18 @@ class ActivityManager:
                     if time_data.get('success'):
                         situation['time_info'] = time_data.get('time_info', {})
                         situation['weather'] = time_data.get('weather', 'unknown')
-                        situation['datetime'] = datetime.fromisoformat(situation['time_info'].get('datetime')) if situation['time_info'].get('datetime') else datetime.now()
+                        situation['datetime'] = datetime.fromisoformat(situation['time_info'].get('datetime')) if situation['time_info'].get('datetime') else None
                         break
                     else:
                         logger.error(f"Failed to get time data")
                         situation['time_info'] = {'period': 'unknown', 'season': 'unknown'}
                         situation['weather'] = 'unknown'
-                        situation['datetime'] = datetime.now()
+                        situation['datetime'] = None
                 else:
                     logger.error(f"Failed to get time data")
                     situation['time_info'] = {'period': 'unknown', 'season': 'unknown'}
                     situation['weather'] = 'unknown'
-                    situation['datetime'] = datetime.now()
+                    situation['datetime'] = None
         except Exception as e:
             logger.warning(f"Failed to get time data: {e}")
             situation['time_info'] = {'period': 'unknown', 'season': 'unknown'}
@@ -344,6 +348,10 @@ class ActivityManager:
             situation['plan_summary'] = self.executive_node.plan_summary
         else:
             situation['plan_summary'] = None
+        
+        # Get character state for state-activity alignment
+        if hasattr(self.executive_node, 'self_state'):
+            situation['character_state'] = self.executive_node.self_state
         
         return situation
         
@@ -376,7 +384,7 @@ class ActivityManager:
         candidates = self._score_contextual_alignment(candidates, situation, active_goal)
         
         # 3. Final ranking and selection
-        selected_activity = self._rank_and_select(candidates)
+        selected_activity = self._rank_and_select(candidates, situation)
         if not selected_activity:
             # No suitable activity found - use default fallback
             logger.info(f"🔄 No suitable activities found for {self.executive_node.character_name}, using fallback")
@@ -385,10 +393,32 @@ class ActivityManager:
         # Initialize the new activity
         instantiated_activity = self._instantiate_activity(selected_activity, situation)
         self.current_activity = instantiated_activity
+        
+        # Record start state for state delta tracking
+        start_state = {}
+        if hasattr(self.executive_node, 'self_state'):
+            start_state = {k: v.copy() for k, v in self.executive_node.self_state.items()}
+        
+        # Ensure start_time is timezone-naive datetime or use current simulation time
+        start_time = situation.get('datetime')
+        if not start_time:
+            # Fallback to current simulation time if available
+            if hasattr(self, 'current_time') and self.current_time:
+                start_time = self.current_time
+            elif hasattr(self, 'time_info') and self.time_info and 'datetime' in self.time_info:
+                start_time = datetime.fromisoformat(self.time_info['datetime'])
+            else:
+                logger.warning(f"No simulation time available for {self.executive_node.character_name}, using placeholder")
+                start_time = 'unknown'
+        
+        if isinstance(start_time, datetime) and start_time.tzinfo is not None:
+            start_time = start_time.replace(tzinfo=None)
+        
         self.current_activity_state = {
-            'start_time': situation.get('datetime', 'unknown'),
+            'start_time': start_time,
             'current_step_index': 0,
-            'status': 'active'
+            'status': 'active',
+            'start_state': start_state
         }
         
         # Return first step of the new activity
@@ -592,7 +622,11 @@ End with </end>.
         else:
             return {'drive': 0.5, 'consistency': 0.5}
     
-    def _rank_and_select(self, candidates):
+    def get_available_states(self) -> list:
+        """Get list of available state names"""
+        return get_known_states()
+    
+    def _rank_and_select(self, candidates, situation):
         """Final scoring and ranking"""
         for activity in candidates:
             # Weighted combination of scores
@@ -601,6 +635,7 @@ End with </end>.
                 activity['habit'] * 0.15 +                # Habit strength  
                 activity['alignment_score']['drive'] * 0.30 +          # Drive alignment
                 activity['alignment_score']['consistency'] * 0.20 +          # Situational fit
+                calculate_state_activity_alignment(activity, situation.get('character_state')) * 0.05 +  # State alignment
                 0.05 if 'social' in activity['tags'] else 0.00     # Social stuff is important!
             )
         
@@ -631,18 +666,27 @@ End with </end>.
         
         # Check if stop conditions are met
         if self._stop_conditions_met(self.current_activity, situation):
+            # Record state delta for stopped activity
+            end_state = self.executive_node.self_state.copy() if hasattr(self.executive_node, 'self_state') else None
+            self._record_state_delta('stopped', end_state)
             return False, "Stop conditions met"
         
         # Check if activity should be interrupted by higher priority goals
         if self._should_interrupt(situation):
+            # Record state delta for interrupted activity
+            end_state = self.executive_node.self_state.copy() if hasattr(self.executive_node, 'self_state') else None
+            self._record_state_delta('interrupted', end_state)
             return False, "Interrupted by higher priority goal"
         
         # Check if activity duration limits are reached
-        if self._duration_exceeded(situation):
-            return False, "Duration limit reached"
+        #if self._duration_exceeded(situation):
+        #    return False, "Duration limit reached"
         
         # Check if character needs are satisfied
         if self._needs_satisfied(situation):
+            # Record state delta for satisfied needs
+            end_state = self.executive_node.self_state.copy() if hasattr(self.executive_node, 'self_state') else None
+            self._record_state_delta('needs_satisfied', end_state)
             return False, "Character needs satisfied"
         
         # Activity should continue
@@ -793,10 +837,70 @@ End with </end>.
             self._abandon_activity(reason)
             return None, None
     
+    def _record_state_delta(self, completion_status: str, end_state: dict = None):
+        """Record state changes when an activity ends"""
+        if not self.current_activity or not self.current_activity_state:
+            return
+        
+        start_state = self.current_activity_state.get('start_state', {})
+        if not start_state:
+            logger.warning(f"No start state recorded for {self.current_activity['name']}")
+            return
+        
+        # Calculate duration using simulation time, not real-world time
+        start_time = self.current_activity_state.get('start_time')
+        duration_minutes = 0
+        if start_time and isinstance(start_time, datetime):
+            # Use simulation time from time_info, fallback to current_time if available
+            current_time = None
+            if hasattr(self, 'current_time') and self.current_time:
+                current_time = self.current_time
+            elif hasattr(self, 'time_info') and self.time_info and 'datetime' in self.time_info:
+                current_time = datetime.fromisoformat(self.time_info['datetime'])
+            
+            if current_time and isinstance(current_time, datetime):
+                # Ensure both datetimes are timezone-naive for consistent subtraction
+                if start_time.tzinfo is not None:
+                    start_time = start_time.replace(tzinfo=None)
+                if current_time.tzinfo is not None:
+                    current_time = current_time.replace(tzinfo=None)
+                duration_minutes = (current_time - start_time).total_seconds() / 60
+            else:
+                logger.warning(f"Could not determine current simulation time for duration calculation")
+        
+        # Record state delta
+        state_delta = {
+            'activity_name': self.current_activity['name'],
+            'start_time': start_time,
+            'duration_minutes': round(duration_minutes, 1),
+            'start_state': start_state,
+            'end_state': end_state,
+            'completion_status': completion_status
+        }
+        
+        # Store in activity history
+        if hasattr(self, 'activity_state_deltas'):
+            self.activity_state_deltas.append(state_delta)
+        
+        # Log the delta for debugging
+        logger.info(f"📊 State delta recorded for {self.current_activity['name']}: {completion_status}")
+        if end_state:
+            for state_name, state_data in start_state.items():
+                if state_name in end_state:
+                    start_val = state_data.get('value', 0)
+                    end_val = end_state[state_name].get('value', 0)
+                    change = end_val - start_val
+                    if abs(change) > 0.1:  # Only log significant changes
+                        logger.info(f"  {state_name}: {start_val:.1f} → {end_val:.1f} (Δ{change:+.1f})")
+    
     def _complete_activity(self):
         """Mark activity as successfully completed"""
         if not self.current_activity or not self.current_activity_state:
             return
+        
+        # Record state delta before clearing
+        end_state = self.executive_node.self_state.copy() if hasattr(self.executive_node, 'self_state') else None
+        self._record_state_delta('completed', end_state)
         
         # Store in history
         history_entry = {
@@ -815,6 +919,10 @@ End with </end>.
         """Abandon current activity due to step failure"""
         if not self.current_activity or not self.current_activity_state:
             return
+        
+        # Record state delta before clearing
+        end_state = self.executive_node.self_state.copy() if hasattr(self.executive_node, 'self_state') else None
+        self._record_state_delta('abandoned', end_state)
         
         # Store in history
         history_entry = {

@@ -75,7 +75,7 @@ Include mental, physical, and social 'activities' that are possible and consiste
 OUTPUT (JSON):
 
 - places[] - places the character can be in the setting - map terrain types or resource types only
-- tools[] - tools the character can use in the setting - resource types or items from character status or inventory
+- tools[] - tools the character can use in the setting, including edible resource types available in the setting (e.g. Berries)- resource types or items from character status or inventory
 - roles[] - roles the character can adopt in the setting
 - norms_rules[] - norms and rules the character must follow in the setting - character personality or map norms
 - hazards[] - hazards the character must avoid in the setting - map terrains, resources, hazards, or specific other characters
@@ -83,6 +83,7 @@ OUTPUT (JSON):
 - time_windows - Either:
     - One of: dawn, morning, afternoon, dusk, evening, night
 - affordances - e.g. place->[activities_possible]
+- states[] - physiological and psychological states the character can experience, including: {{$states}}
 
 respond only with the JSON, no other text.
 end your response with </end>
@@ -114,13 +115,14 @@ TASK: Generate 24-30 activities as a JSON object, with the keys being the activi
 
 Each Activity should conform to this schema:
 {
-  "name": "string",
+  "name": "string", ** even though the activity name is also the object key, also include it inside the object.
   "category": <category from above>,
   "tags": ["physical","mental","social","solo","outdoors","survival","routine"],
   "when": "daily@<period> | opportunistic | seasonal@<season>", 
   "where": ["place ids"], - drawn from ontology places
   "duration": [min_minutes, max_minutes],
   "needs": ["tools or innate capacities"], - drawn from ontology tools or character status or inventory
+  "states_addressed": [one or more items from the ontology states field], - what physiological/psychological needs this activity satisfies
   "steps": ["3–5 terse steps that will serve as planning goals"],
   "importance": 0.0,
   "habit": 0.0
@@ -131,9 +133,9 @@ ONTOLOGY:
 {{$ontology}}
 ##
 
-Social activities are a priority. Be sure to include social activities in your output. 
-Social activites are only possible with other characters. 
-#Characters you can interact with:
+Include self-care actions that remediate physiological needs (e.g. eating reduces hunger, rest reduces fatigue, injury or sickness). Make sure to specify which states each activity addresses in the "states_addressed" field.
+
+#Characters you can interact with (if any):
 {{$other_characters}}
 ##
 
@@ -145,6 +147,11 @@ Generate steps that can serve as achievable planning goals. Each step should:
 - Be situationally adaptable: "prepare food for consumption" rather than "cook food over fire" (assumes fire available)
 - Avoid meta-cognitive abstractions: "identify today's priorities" rather than "set goals" (too abstract)
 - Specify scope when needed: "inspect personal equipment for damage" rather than "inspect gear" (scope unclear)
+
+#State Alignment Guidelines:
+- Activities that address urgent physiological needs (high hunger, fatigue, injury) will be prioritized by the system
+- Use "states_addressed" to specify which needs the activity satisfies (e.g., eating activities address "hunger")
+- Consider the character's current state when designing activities - hungry characters should have access to hunger-reducing activities
 
 Do not include any other text, introductory, explanatory, markdown, etc.
 End with </end>.
@@ -159,6 +166,7 @@ Consider:
 5. Goals must be distinct from one another.
 6. Goals must be consistent with the character's drives and emotional stance.
 7. Goals must be consistent with the available map types.
+8. Consider your current state (e.g., hunger, fatigue, injury); survival-critical state should bias goals toward remediation.
 
 Nothing in this or other instructions limits your use of deception or surprise.
                   
@@ -178,6 +186,29 @@ end your response with </end>
 
 PLAN_TEMPLATE = """Task: Decompose down your current goal into a minimal plan in the JSON format specified below.
 Output: only valid JSON – no prose, no code fences.
+
+Meta-spec (machine-readable constraints – copy these rules):
+{
+  "actions": ["move","say","think","take","inspect","use","scan","while","if"],
+  "conditions": [
+    "near","notnear","can_see","cant_see","has_item","hasnt_item","at_location","notat_location","believes","notbelieves"
+  ],
+  "required_fields": {
+    "move": ["type","target"],
+    "say": ["type","target","value"],
+    "think": ["type","value"],
+    "take": ["type","target"],
+    "inspect": ["type","target","reason"],
+    "use": ["type","target","reason"],
+    "scan": ["type","target","out"],
+    "while": ["type","condition","body"],
+    "if": ["type","condition","then"]
+  },
+  "variables": {"syntax": "$name", "must_be_bound_before_use": true},
+  "max_steps": 6,
+  "expand_patterns": true,
+  "no_sequential_say": true
+}
 
 {
   "plan": [
@@ -199,7 +230,27 @@ Example workflow using scan and variables:
   "plan": [
     { "type": "scan", "target": "Berries", "out": "found_berries" },
     { "type": "move", "target": "$found_berries" },
-    { "type": "take", "target": "$found_berries" }
+    { "type": "take", "target": "$found_berries" },
+    { "type": "use", "target": "$found_berries", "reason": "eat to reduce hunger" }
+  ]
+}
+
+Patterns you may reuse (guidance only – always expand to primitive steps in output):
+ - approach(X): while notnear(X): move(X)
+ - obtain(X): while notnear(X): move(X), then take(X)
+ - consume(X, reason): while notnear(X): move(X), then take(X), then use(X, reason)
+
+Do not output macros; always expand patterns into primitive steps in the final JSON.
+
+Worked example using a loop to approach a distant target:
+{
+  "plan": [
+    { "type": "scan", "target": "Berries", "out": "found_berries" },
+    { "type": "while", "condition": { "type": "notnear", "target": "$found_berries" }, "body": [
+      { "type": "move", "target": "$found_berries" }
+    ]},
+    { "type": "take", "target": "$found_berries" },
+    { "type": "use", "target": "$found_berries", "reason": "eat to reduce hunger" }
   ]
 }
 
@@ -236,7 +287,7 @@ outside a while or if condition, "type" can take the values "say", "move", "thin
  - "inspect": { "type": "inspect", "target": "resource_name", "reason": "what is it you are hoping to learn? - 5 words max"} 
      Inspect a resource or character to learn something about it. Must be 'near' the resource or character to inspect it. reason focuses the inspection on some specific aspect of the resource or character.
  - "use": { "type": "use", "target": "resource_name", "reason": "what outcome do you hope to achieve? - 5 words max"} 
-     Using a resource in your inventory. You may reuse resources.You must be 'near' the resource to use it. You may want to inspect the resource first to learn the effect of using it.
+     Using a resource in your inventory. You may reuse resources. You must be 'near' the resource to use it. You may want to inspect the resource first to learn the effect of using it. Some resources are consumables; using edible resources (e.g., Berries) can reduce hunger.
 
 A plan must include no more than 8 steps including all nested while and if branches.
 A plan must not contain sequential say actions.
