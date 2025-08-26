@@ -1,0 +1,129 @@
+{
+  "places": [
+    "Field",
+    "Farm",
+    "Village",
+    "Market",
+    "Well",
+    "River",
+    "Grassland",
+    "Forest"
+  ],
+  "tools": [
+    "Hoe",
+    "Plough",
+    "Cart",
+    "Bucket",
+    "Sickle",
+    "Pitchfork",
+    "Bread",
+    "Cheese",
+    "Milk",
+    "Well Water"
+  ],
+  "roles": [
+    "Farmhand",
+    "Son",
+    "Potential Suitor",
+    "Market Customer",
+    "Villager"
+  ],
+  "norms_rules": [
+    "Respect elders and parents, especially the farm patriarch",
+    "Work the land diligently from sunup",
+    "Avoid public displays of affection",
+    "Keep clear of scandal and gossip",
+    "Attend church regularly",
+    "Speak plainly but show respect to the local hierarchy (priest, landowners)",
+    "Help neighbors in times of need"
+  ],
+  "hazards": [
+    "River (drowning hazard)",
+    "Fatigue from overwork",
+    "Injury from farm equipment",
+    "Illness from poor water or weather",
+    "Gossip (social hazard)",
+    "FatherMarquart (displeasure or unfair inheritance)",
+    "Wild animals in Forest"
+  ],
+  "social_graph": [
+    {
+      "name": "FatherMarquart",
+      "relation": "Father, farm patriarch, authority, gatekeeper of inheritance"
+    },
+    {
+      "name": "MotherMarquart",
+      "relation": "Mother, supporter, cares for family welfare"
+    },
+    {
+      "name": "Francoise",
+      "relation": "Potential suitor, fellow villager, object of interest"
+    },
+    {
+      "name": "Villagers",
+      "relation": "Peers, important for reputation and assistance"
+    },
+    {
+      "name": "Priest",
+      "relation": "Spiritual authority"
+    }
+  ],
+  "time_windows": "morning",
+  "affordances": {
+    "Field": [
+      "Plough field",
+      "Sow seeds",
+      "Harvest crops",
+      "Tend to livestock"
+    ],
+    "Farm": [
+      "Feed animals",
+      "Repair fences",
+      "Milk cows",
+      "Prepare farm tools",
+      "Eat breakfast"
+    ],
+    "Village": [
+      "Greet neighbors",
+      "Gather news",
+      "Visit church",
+      "Attend market"
+    ],
+    "Market": [
+      "Sell produce",
+      "Buy goods",
+      "Meet villagers",
+      "Socialize with Francoise"
+    ],
+    "Well": [
+      "Draw water",
+      "Wash face",
+      "Socialize briefly"
+    ],
+    "River": [
+      "Catch fish",
+      "Wash tools",
+      "Cool off"
+    ],
+    "Grassland": [
+      "Graze livestock",
+      "Gather wild herbs"
+    ],
+    "Forest": [
+      "Gather wood",
+      "Hunt small game",
+      "Seek privacy"
+    ]
+  },
+  "states": [
+    "hunger",
+    "fatigue",
+    "injury",
+    "thirst",
+    "anger",
+    "hope",
+    "worry",
+    "pride",
+    "frustration"
+  ]
+}

@@ -1,0 +1,185 @@
+{
+  "places": [
+    "Farm",
+    "Field",
+    "Village",
+    "Market",
+    "Grassland",
+    "Forest",
+    "Well",
+    "River",
+    "Church"
+  ],
+  "tools": [
+    "Hoe",
+    "Sickle",
+    "Basket",
+    "Bucket",
+    "Apron",
+    "Bread",
+    "Bucket for water",
+    "Wool (raw/fiber)",
+    "Mill",
+    "Firewood",
+    "Blacksmith",
+    "Eggs",
+    "Vegetables"
+  ],
+  "roles": [
+    "Daughter",
+    "Farm laborer",
+    "Village maiden",
+    "Market-goer",
+    "Churchgoer",
+    "Caretaker",
+    "Prospective bride",
+    "Neighbor"
+  ],
+  "norms_rules": [
+    "Work diligently and without complaint.",
+    "Be modest and reserved in speech and dress.",
+    "Avoid being alone with unmarried men.",
+    "Attend church regularly.",
+    "Respect elders and authority figures.",
+    "Do not speak openly of desires or dreams.",
+    "Guard your family\u2019s reputation.",
+    "Help family before self.",
+    "Avoid idleness during daylight.",
+    "Do not challenge village traditions publicly.",
+    "Accept and serve guests with humility.",
+    "Avoid gossip, but beware of being subject to it."
+  ],
+  "hazards": [
+    "River (risk of drowning/falling in)",
+    "Forest (dangerous animals, getting lost)",
+    "Overexertion in fields (heatstroke, injury)",
+    "Scandal (damage to reputation)",
+    "Untrustworthy men",
+    "Sharp farm tools (injury)",
+    "Well (drowning hazard)",
+    "Market thieves",
+    "Illness"
+  ],
+  "social_graph": [
+    {
+      "name": "Jean Macquart",
+      "relation": "potential suitor, neighbor, fellow peasant",
+      "interactions": [
+        "work together",
+        "meet at market",
+        "church encounters",
+        "occasional shy conversation"
+      ]
+    },
+    {
+      "name": "FatherMarquart",
+      "relation": "neighboring patriarch",
+      "interactions": [
+        "formal greeting",
+        "work exchange",
+        "observed from a distance"
+      ]
+    },
+    {
+      "name": "MotherMarquart",
+      "relation": "neighboring matriarch",
+      "interactions": [
+        "polite conversation",
+        "help with farm chores",
+        "sharing of news or food"
+      ]
+    },
+    {
+      "name": "Village Women",
+      "relation": "peers, potential rivals/gossipers",
+      "interactions": [
+        "work, gossip, share chores"
+      ]
+    },
+    {
+      "name": "Priest",
+      "relation": "moral authority, confessor",
+      "interactions": [
+        "church attendance",
+        "confession"
+      ]
+    },
+    {
+      "name": "Family Members (Fouan)",
+      "relation": "immediate family",
+      "interactions": [
+        "daily work",
+        "support",
+        "shared meals"
+      ]
+    }
+  ],
+  "time_windows": "morning",
+  "affordances": {
+    "Farm": [
+      "milking cows",
+      "collecting eggs",
+      "feeding animals",
+      "weeding",
+      "harvesting vegetables",
+      "carrying water"
+    ],
+    "Field": [
+      "weeding",
+      "planting",
+      "harvesting",
+      "resting under tree briefly"
+    ],
+    "Village": [
+      "greeting neighbors",
+      "avoiding gossip",
+      "buying and selling at market"
+    ],
+    "Market": [
+      "bartering goods",
+      "buying bread or salt",
+      "checking on prices",
+      "socializing cautiously"
+    ],
+    "Grassland": [
+      "gathering wild herbs",
+      "watching livestock",
+      "walking to village"
+    ],
+    "Forest": [
+      "gathering firewood",
+      "picking berries",
+      "avoiding dangerous animals"
+    ],
+    "Well": [
+      "drawing water",
+      "briefly chatting with other women",
+      "resting in the shade"
+    ],
+    "Church": [
+      "praying",
+      "confession",
+      "joining public worship",
+      "observing villagers"
+    ],
+    "River": [
+      "washing clothes",
+      "fetching water",
+      "reflecting in solitude"
+    ]
+  },
+  "states": [
+    "hunger",
+    "fatigue",
+    "injury",
+    "thirst",
+    "hope",
+    "anxiety",
+    "embarrassment",
+    "contentment",
+    "loneliness",
+    "anticipation",
+    "relief",
+    "worry"
+  ]
+}

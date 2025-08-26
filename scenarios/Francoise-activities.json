@@ -1,7 +1,813 @@
 {
-  "EatingBreakfast": {
-    "name": "EatingBreakfast",
+  "Eat Simple Meal with Family": {
+    "name": "Eat Simple Meal with Family",
     "category": "Physiological ADLs",
+    "tags": [
+      "physical",
+      "routine",
+      "social",
+      "indoors"
+    ],
+    "when": "daily@morning",
+    "where": [
+      "Farm"
+    ],
+    "duration": [
+      20,
+      40
+    ],
+    "needs": [
+      "Bread",
+      "Eggs",
+      "Vegetables"
+    ],
+    "states_addressed": [
+      "hunger",
+      "contentment"
+    ],
+    "steps": [
+      "gather available food from stores",
+      "portion food among family members",
+      "eat meal together at kitchen table",
+      "clear dishes and remaining food"
+    ],
+    "importance": 0.9,
+    "habit": 1.0
+  },
+  "Drink Fresh Water from Well": {
+    "name": "Drink Fresh Water from Well",
+    "category": "Physiological ADLs",
+    "tags": [
+      "physical",
+      "solo",
+      "routine",
+      "outdoors"
+    ],
+    "when": "daily@morning",
+    "where": [
+      "Well"
+    ],
+    "duration": [
+      10,
+      20
+    ],
+    "needs": [
+      "Bucket for water"
+    ],
+    "states_addressed": [
+      "thirst",
+      "relief"
+    ],
+    "steps": [
+      "walk to the village well",
+      "draw water using bucket",
+      "drink deeply and wash hands",
+      "refill bucket for household use"
+    ],
+    "importance": 0.95,
+    "habit": 1.0
+  },
+  "Take Rest on Field Edge": {
+    "name": "Take Rest on Field Edge",
+    "category": "Physiological ADLs",
+    "tags": [
+      "physical",
+      "solo",
+      "outdoors",
+      "routine"
+    ],
+    "when": "opportunistic",
+    "where": [
+      "Field"
+    ],
+    "duration": [
+      5,
+      15
+    ],
+    "needs": [
+      "Apron"
+    ],
+    "states_addressed": [
+      "fatigue",
+      "contentment"
+    ],
+    "steps": [
+      "find shade beneath a solitary tree",
+      "sit down and remove headscarf",
+      "rest breath till heart slows",
+      "rise and return to work"
+    ],
+    "importance": 0.8,
+    "habit": 0.6
+  },
+  "Sleep in Family House": {
+    "name": "Sleep in Family House",
+    "category": "Physiological ADLs",
+    "tags": [
+      "physical",
+      "routine",
+      "indoors"
+    ],
+    "when": "daily@night",
+    "where": [
+      "Farm"
+    ],
+    "duration": [
+      420,
+      480
+    ],
+    "needs": [
+      "Wool (raw/fiber)"
+    ],
+    "states_addressed": [
+      "fatigue",
+      "relief"
+    ],
+    "steps": [
+      "complete nightly chores",
+      "wash face and hands",
+      "lie down on straw mattress",
+      "sleep till first light"
+    ],
+    "importance": 1.0,
+    "habit": 1.0
+  },
+  "Plan Day\u2019s Chores": {
+    "name": "Plan Day\u2019s Chores",
+    "category": "Instrumental ADLs/Logistics",
+    "tags": [
+      "mental",
+      "routine",
+      "solo"
+    ],
+    "when": "daily@dawn",
+    "where": [
+      "Farm"
+    ],
+    "duration": [
+      10,
+      15
+    ],
+    "needs": [
+      "Innate planning ability"
+    ],
+    "states_addressed": [
+      "anticipation",
+      "worry"
+    ],
+    "steps": [
+      "review yesterday\u2019s unfinished tasks",
+      "assess harvest or animal needs",
+      "set out order of chores for the day",
+      "inform family of key priorities"
+    ],
+    "importance": 0.7,
+    "habit": 1.0
+  },
+  "Prepare Food for Cooking": {
+    "name": "Prepare Food for Cooking",
+    "category": "Instrumental ADLs/Logistics",
+    "tags": [
+      "physical",
+      "routine",
+      "indoors",
+      "solo"
+    ],
+    "when": "daily@morning",
+    "where": [
+      "Farm"
+    ],
+    "duration": [
+      20,
+      40
+    ],
+    "needs": [
+      "Vegetables",
+      "Eggs",
+      "Bucket for water"
+    ],
+    "states_addressed": [
+      "anticipation"
+    ],
+    "steps": [
+      "gather eggs and vegetables from farm",
+      "wash produce with drawn water",
+      "peel or cut as needed",
+      "arrange for cooking over fire"
+    ],
+    "importance": 0.8,
+    "habit": 1.0
+  },
+  "Fetch Water for Household": {
+    "name": "Fetch Water for Household",
+    "category": "Mobility & Transport",
+    "tags": [
+      "physical",
+      "routine",
+      "outdoors",
+      "solo"
+    ],
+    "when": "daily@morning",
+    "where": [
+      "Well",
+      "Farm"
+    ],
+    "duration": [
+      15,
+      30
+    ],
+    "needs": [
+      "Bucket for water"
+    ],
+    "states_addressed": [
+      "relief",
+      "anticipation"
+    ],
+    "steps": [
+      "carry empty bucket from house",
+      "wait turn at well if others present",
+      "draw water with steady motion",
+      "bring bucket home without spilling"
+    ],
+    "importance": 0.85,
+    "habit": 1.0
+  },
+  "Walk to Market with Produce": {
+    "name": "Walk to Market with Produce",
+    "category": "Mobility & Transport",
+    "tags": [
+      "physical",
+      "social",
+      "outdoors"
+    ],
+    "when": "seasonal@summer",
+    "where": [
+      "Farm",
+      "Grassland",
+      "Market"
+    ],
+    "duration": [
+      30,
+      50
+    ],
+    "needs": [
+      "Basket",
+      "Eggs",
+      "Vegetables"
+    ],
+    "states_addressed": [
+      "anticipation",
+      "worry"
+    ],
+    "steps": [
+      "prepare produce in basket",
+      "walk along grassland path to market",
+      "avoid mud and animal droppings",
+      "arrive at market with goods intact"
+    ],
+    "importance": 0.75,
+    "habit": 0.7
+  },
+  "Harvest Vegetables from Field": {
+    "name": "Harvest Vegetables from Field",
+    "category": "Role/Production",
+    "tags": [
+      "physical",
+      "routine",
+      "outdoors",
+      "solo"
+    ],
+    "when": "seasonal@autumn",
+    "where": [
+      "Field"
+    ],
+    "duration": [
+      60,
+      120
+    ],
+    "needs": [
+      "Basket",
+      "Sickle"
+    ],
+    "states_addressed": [
+      "anticipation",
+      "fatigue"
+    ],
+    "steps": [
+      "bring basket and sickle to field",
+      "identify ripe vegetables",
+      "cut and gather produce without waste",
+      "carry harvest back to farm"
+    ],
+    "importance": 0.9,
+    "habit": 1.0
+  },
+  "Feed and Tend Animals": {
+    "name": "Feed and Tend Animals",
+    "category": "Role/Production",
+    "tags": [
+      "physical",
+      "routine",
+      "outdoors"
+    ],
+    "when": "daily@morning",
+    "where": [
+      "Farm"
+    ],
+    "duration": [
+      30,
+      40
+    ],
+    "needs": [
+      "Bucket",
+      "Apron"
+    ],
+    "states_addressed": [
+      "contentment",
+      "anticipation"
+    ],
+    "steps": [
+      "gather feed from store",
+      "fill buckets or troughs",
+      "inspect animals for injuries",
+      "clean up pen or barn floor"
+    ],
+    "importance": 0.92,
+    "habit": 1.0
+  },
+  "Weed Rows in Field": {
+    "name": "Weed Rows in Field",
+    "category": "Role/Production",
+    "tags": [
+      "physical",
+      "routine",
+      "outdoors"
+    ],
+    "when": "daily@morning",
+    "where": [
+      "Field"
+    ],
+    "duration": [
+      40,
+      70
+    ],
+    "needs": [
+      "Hoe",
+      "Apron"
+    ],
+    "states_addressed": [
+      "fatigue",
+      "contentment"
+    ],
+    "steps": [
+      "fetch hoe and apron",
+      "bend to remove largest weeds",
+      "hoe between vegetable rows",
+      "gather weeds for animal bedding"
+    ],
+    "importance": 0.8,
+    "habit": 1.0
+  },
+  "Barter Goods at Market": {
+    "name": "Barter Goods at Market",
+    "category": "Role/Production",
+    "tags": [
+      "social",
+      "outdoors",
+      "routine"
+    ],
+    "when": "seasonal@summer",
+    "where": [
+      "Market"
+    ],
+    "duration": [
+      40,
+      70
+    ],
+    "needs": [
+      "Basket",
+      "Eggs",
+      "Vegetables"
+    ],
+    "states_addressed": [
+      "hope",
+      "embarrassment",
+      "anticipation"
+    ],
+    "steps": [
+      "arrange produce on stall or ground",
+      "greet neighbors and buyers",
+      "bargain modestly without causing offense",
+      "receive coins or barter for needed goods"
+    ],
+    "importance": 0.7,
+    "habit": 0.6
+  },
+  "Practice Spinning Wool": {
+    "name": "Practice Spinning Wool",
+    "category": "Learning & Practice",
+    "tags": [
+      "physical",
+      "solo",
+      "indoors",
+      "routine"
+    ],
+    "when": "opportunistic",
+    "where": [
+      "Farm"
+    ],
+    "duration": [
+      25,
+      40
+    ],
+    "needs": [
+      "Wool (raw/fiber)"
+    ],
+    "states_addressed": [
+      "hope",
+      "contentment"
+    ],
+    "steps": [
+      "gather raw wool from store",
+      "card fibers to remove debris",
+      "spin thread steadily",
+      "collect spun yarn for later use"
+    ],
+    "importance": 0.6,
+    "habit": 0.3
+  },
+  "Observe Neighboring Farms for Ideas": {
+    "name": "Observe Neighboring Farms for Ideas",
+    "category": "Learning & Practice",
+    "tags": [
+      "mental",
+      "solo",
+      "outdoors"
+    ],
+    "when": "opportunistic",
+    "where": [
+      "Grassland",
+      "Farm"
+    ],
+    "duration": [
+      20,
+      35
+    ],
+    "needs": [
+      "Innate observation"
+    ],
+    "states_addressed": [
+      "hope",
+      "anticipation"
+    ],
+    "steps": [
+      "walk by fields and boundary fences",
+      "note crop row arrangement",
+      "observe animal types and shelters",
+      "consider improvements for own family\u2019s farm"
+    ],
+    "importance": 0.5,
+    "habit": 0.2
+  },
+  "Reflect Quietly by River": {
+    "name": "Reflect Quietly by River",
+    "category": "Cognitive/Inner",
+    "tags": [
+      "mental",
+      "solo",
+      "outdoors"
+    ],
+    "when": "opportunistic",
+    "where": [
+      "River"
+    ],
+    "duration": [
+      15,
+      25
+    ],
+    "needs": [
+      "Innate reflection"
+    ],
+    "states_addressed": [
+      "hope",
+      "anxiety",
+      "contentment"
+    ],
+    "steps": [
+      "find peaceful spot along riverbank",
+      "sit safely and watch water flow",
+      "let mind wander to dreams and worries",
+      "rise before being missed"
+    ],
+    "importance": 0.6,
+    "habit": 0.2
+  },
+  "Worry about Reputation": {
+    "name": "Worry about Reputation",
+    "category": "Cognitive/Inner",
+    "tags": [
+      "mental",
+      "solo",
+      "routine"
+    ],
+    "when": "opportunistic",
+    "where": [
+      "Farm",
+      "Market",
+      "Village"
+    ],
+    "duration": [
+      5,
+      20
+    ],
+    "needs": [
+      "Innate caution"
+    ],
+    "states_addressed": [
+      "anxiety",
+      "worry",
+      "embarrassment"
+    ],
+    "steps": [
+      "consider recent words and actions",
+      "recall rumors or glances from villagers",
+      "plan to avoid scandal",
+      "resolve to speak and act carefully"
+    ],
+    "importance": 0.6,
+    "habit": 1.0
+  },
+  "Walk to Church Service": {
+    "name": "Walk to Church Service",
+    "category": "Recreation & Leisure",
+    "tags": [
+      "physical",
+      "social",
+      "outdoors"
+    ],
+    "when": "weekly@morning",
+    "where": [
+      "Village",
+      "Church"
+    ],
+    "duration": [
+      20,
+      30
+    ],
+    "needs": [
+      "Apron",
+      "Best dress"
+    ],
+    "states_addressed": [
+      "contentment",
+      "anticipation"
+    ],
+    "steps": [
+      "wash and dress modestly",
+      "walk with family or neighbors",
+      "arrive quietly at church",
+      "greet priest and parishioners"
+    ],
+    "importance": 0.7,
+    "habit": 1.0
+  },
+  "Listen to Village Gossip": {
+    "name": "Listen to Village Gossip",
+    "category": "Recreation & Leisure",
+    "tags": [
+      "social",
+      "mental",
+      "routine"
+    ],
+    "when": "opportunistic",
+    "where": [
+      "Village",
+      "Market",
+      "Well"
+    ],
+    "duration": [
+      10,
+      20
+    ],
+    "needs": [
+      "innate caution"
+    ],
+    "states_addressed": [
+      "anticipation",
+      "anxiety"
+    ],
+    "steps": [
+      "stand near women at well or corner",
+      "listen quietly while working hands",
+      "note any new scandal or news",
+      "guard own tongue from too much talk"
+    ],
+    "importance": 0.5,
+    "habit": 0.7
+  },
+  "Pluck Wildflowers on Walk": {
+    "name": "Pluck Wildflowers on Walk",
+    "category": "Recreation & Leisure",
+    "tags": [
+      "physical",
+      "solo",
+      "outdoors"
+    ],
+    "when": "seasonal@spring",
+    "where": [
+      "Grassland",
+      "Field"
+    ],
+    "duration": [
+      10,
+      20
+    ],
+    "needs": [
+      "Apron"
+    ],
+    "states_addressed": [
+      "contentment",
+      "hope"
+    ],
+    "steps": [
+      "search for bright blooms along path",
+      "pluck flowers without damaging roots",
+      "arrange in apron or hand",
+      "bring home or leave as offering"
+    ],
+    "importance": 0.45,
+    "habit": 0.3
+  },
+  "Guard Against Scandal": {
+    "name": "Guard Against Scandal",
+    "category": "Safety/Emergency",
+    "tags": [
+      "mental",
+      "routine",
+      "social"
+    ],
+    "when": "opportunistic",
+    "where": [
+      "Village",
+      "Farm"
+    ],
+    "duration": [
+      5,
+      30
+    ],
+    "needs": [
+      "innate vigilance"
+    ],
+    "states_addressed": [
+      "worry",
+      "anxiety",
+      "relief"
+    ],
+    "steps": [
+      "avoid being alone with unmarried men",
+      "correct family members who speak rashly",
+      "keep distance from known gossips",
+      "dress modestly and work visibly"
+    ],
+    "importance": 0.9,
+    "habit": 1.0
+  },
+  "Treat Minor Injury": {
+    "name": "Treat Minor Injury",
+    "category": "Safety/Emergency",
+    "tags": [
+      "physical",
+      "routine",
+      "solo"
+    ],
+    "when": "opportunistic",
+    "where": [
+      "Farm",
+      "Field",
+      "Village"
+    ],
+    "duration": [
+      10,
+      20
+    ],
+    "needs": [
+      "Apron",
+      "water"
+    ],
+    "states_addressed": [
+      "injury",
+      "worry",
+      "relief"
+    ],
+    "steps": [
+      "inspect for cuts or scrapes",
+      "wash wound with clean water",
+      "bind with clean cloth or apron",
+      "rest until bleeding stops"
+    ],
+    "importance": 0.8,
+    "habit": 0.2
+  },
+  "Keep Watch for Market Thieves": {
+    "name": "Keep Watch for Market Thieves",
+    "category": "Safety/Emergency",
+    "tags": [
+      "mental",
+      "routine",
+      "social"
+    ],
+    "when": "seasonal@summer",
+    "where": [
+      "Market"
+    ],
+    "duration": [
+      10,
+      50
+    ],
+    "needs": [
+      "innate vigilance"
+    ],
+    "states_addressed": [
+      "worry",
+      "anticipation"
+    ],
+    "steps": [
+      "watch baskets and pockets at all times",
+      "keep goods close and visible",
+      "signal neighbors if suspicious persons present",
+      "report theft to market authority"
+    ],
+    "importance": 0.7,
+    "habit": 0.6
+  },
+  "Wash Hands and Face": {
+    "name": "Wash Hands and Face",
+    "category": "Health Management (self-care)",
+    "tags": [
+      "physical",
+      "solo",
+      "routine"
+    ],
+    "when": "daily@morning",
+    "where": [
+      "Well",
+      "Farm"
+    ],
+    "duration": [
+      5,
+      10
+    ],
+    "needs": [
+      "Bucket for water"
+    ],
+    "states_addressed": [
+      "relief",
+      "contentment"
+    ],
+    "steps": [
+      "draw fresh water from well",
+      "rinse hands and face thoroughly",
+      "dry with apron",
+      "repeat after dirty chores as needed"
+    ],
+    "importance": 0.8,
+    "habit": 1.0
+  },
+  "Inspect for Signs of Illness": {
+    "name": "Inspect for Signs of Illness",
+    "category": "Health Management (self-care)",
+    "tags": [
+      "physical",
+      "solo",
+      "routine"
+    ],
+    "when": "opportunistic",
+    "where": [
+      "Farm"
+    ],
+    "duration": [
+      5,
+      10
+    ],
+    "needs": [
+      "innate awareness"
+    ],
+    "states_addressed": [
+      "worry",
+      "relief"
+    ],
+    "steps": [
+      "notice unusual pains or fevers",
+      "check skin for rashes or sores",
+      "rest and drink water if sickly",
+      "notify family for help if needed"
+    ],
+    "importance": 0.85,
+    "habit": 0.8
+  },
+  "Comb and Tie Hair": {
+    "name": "Comb and Tie Hair",
+    "category": "Health Management (self-care)",
     "tags": [
       "physical",
       "routine",
@@ -9,590 +815,131 @@
     ],
     "when": "daily@dawn",
     "where": [
-      "FouanFarm"
-    ],
-    "start": [
-      "time: 6:00 AM"
-    ],
-    "stop": [
-      "duration: 30 minutes"
-    ],
-    "duration": [
-      15,
-      30
-    ],
-    "needs": [
-      "food",
-      "water"
-    ],
-    "steps": [
-      "acquire food",
-      "prepare food for consumption",
-      "consume food"
-    ],
-    "importance": 0.8,
-    "habit": 0.9
-  },
-  "DrinkingWater": {
-    "name": "DrinkingWater",
-    "category": "Physiological ADLs",
-    "tags": [
-      "physical",
-      "routine",
-      "solo"
-    ],
-    "when": "daily@morning",
-    "where": [
-      "FouanFarm"
-    ],
-    "start": [
-      "time: 8:00 AM"
-    ],
-    "stop": [
-      "duration: 15 minutes"
+      "Farm"
     ],
     "duration": [
       5,
-      15
+      10
     ],
     "needs": [
-      "water"
+      "Comb"
+    ],
+    "states_addressed": [
+      "relief",
+      "contentment",
+      "anticipation"
     ],
     "steps": [
-      "acquire drinkable water",
-      "consume water"
+      "comb out night\u2019s tangles",
+      "tie hair neatly with ribbon or string",
+      "inspect for lice or dirt",
+      "cover with headscarf"
     ],
-    "importance": 0.9,
-    "habit": 0.95
+    "importance": 0.7,
+    "habit": 1.0
   },
-  "Sleeping": {
-    "name": "Sleeping",
-    "category": "Physiological ADLs",
+  "Sharpen Sickle or Hoe": {
+    "name": "Sharpen Sickle or Hoe",
+    "category": "Maintenance & Repair",
     "tags": [
       "physical",
       "routine",
-      "solo"
+      "solo",
+      "outdoors"
     ],
-    "when": "daily@night",
+    "when": "weekly@dawn",
     "where": [
-      "FouanFarm"
-    ],
-    "start": [
-      "time: 9:00 PM"
-    ],
-    "stop": [
-      "duration: 8 hours"
-    ],
-    "duration": [
-      480,
-      480
-    ],
-    "needs": [
-      "bed"
-    ],
-    "steps": [
-      "prepare for sleep",
-      "fall asleep"
-    ],
-    "importance": 0.95,
-    "habit": 0.99
-  },
-  "PlanningFarmWork": {
-    "name": "PlanningFarmWork",
-    "category": "Instrumental ADLs/Logistics",
-    "tags": [
-      "mental",
-      "routine",
-      "solo"
-    ],
-    "when": "daily@morning",
-    "where": [
-      "FouanFarm"
-    ],
-    "start": [
-      "time: 7:00 AM"
-    ],
-    "stop": [
-      "duration: 30 minutes"
+      "Farm",
+      "Blacksmith"
     ],
     "duration": [
       15,
-      30
+      25
     ],
     "needs": [
-      "calendar",
-      "weather forecast"
+      "Sickle",
+      "Hoe",
+      "Blacksmith"
+    ],
+    "states_addressed": [
+      "anticipation",
+      "relief"
     ],
     "steps": [
-      "review schedule",
-      "check weather forecast",
-      "plan tasks"
+      "inspect tools for dull edges",
+      "bring to blacksmith if needed",
+      "sharpen blade until clean and smooth",
+      "return tool to storage safely"
     ],
     "importance": 0.7,
-    "habit": 0.8
+    "habit": 0.5
   },
-  "PreparingForMarket": {
-    "name": "PreparingForMarket",
-    "category": "Instrumental ADLs/Logistics",
-    "tags": [
-      "mental",
-      "routine",
-      "solo"
-    ],
-    "when": "seasonal@spring",
-    "where": [
-      "FouanFarm"
-    ],
-    "start": [
-      "time: 8:00 AM"
-    ],
-    "stop": [
-      "duration: 2 hours"
-    ],
-    "duration": [
-      60,
-      120
-    ],
-    "needs": [
-      "products to sell",
-      "market schedule"
-    ],
-    "steps": [
-      "gather products",
-      "pack products",
-      "review market schedule"
-    ],
-    "importance": 0.6,
-    "habit": 0.7
-  },
-  "WalkingToVillage": {
-    "name": "WalkingToVillage",
-    "category": "Mobility & Transport",
+  "Mend Apron or Work Dress": {
+    "name": "Mend Apron or Work Dress",
+    "category": "Maintenance & Repair",
     "tags": [
       "physical",
       "routine",
+      "indoors",
       "solo"
     ],
-    "when": "daily@morning",
+    "when": "weekly@evening",
     "where": [
-      "FouanFarm",
-      "VillageMarket"
-    ],
-    "start": [
-      "time: 9:00 AM"
-    ],
-    "stop": [
-      "duration: 30 minutes"
+      "Farm"
     ],
     "duration": [
-      15,
-      30
+      20,
+      35
     ],
     "needs": [
-      "road"
+      "Needle",
+      "Thread",
+      "Apron"
+    ],
+    "states_addressed": [
+      "anticipation",
+      "relief"
     ],
     "steps": [
-      "start walking",
-      "follow road",
-      "arrive at village"
+      "inspect clothes for tears or worn spots",
+      "set aside time after supper",
+      "patch holes and tighten loose seams",
+      "store mended item for next day"
     ],
-    "importance": 0.5,
-    "habit": 0.6
+    "importance": 0.7,
+    "habit": 0.4
   },
-  "VisitingJean": {
-    "name": "VisitingJean",
-    "category": "Role/Production",
-    "tags": [
-      "social",
-      "routine",
-      "outdoors"
-    ],
-    "when": "daily@afternoon",
-    "where": [
-      "MarquartFarm"
-    ],
-    "start": [
-      "time: 2:00 PM"
-    ],
-    "stop": [
-      "duration: 1 hour"
-    ],
-    "duration": [
-      30,
-      60
-    ],
-    "needs": [
-      "Jean"
-    ],
-    "steps": [
-      "walk to MarquartFarm",
-      "greet Jean",
-      "engage in conversation"
-    ],
-    "importance": 0.8,
-    "habit": 0.9
-  },
-  "HelpingWithHarvest": {
-    "name": "HelpingWithHarvest",
-    "category": "Role/Production",
+  "Sweep and Clean Living Area": {
+    "name": "Sweep and Clean Living Area",
+    "category": "Maintenance & Repair",
     "tags": [
       "physical",
-      "routine",
-      "outdoors"
-    ],
-    "when": "seasonal@autumn",
-    "where": [
-      "MarquartFarm"
-    ],
-    "start": [
-      "time: 8:00 AM"
-    ],
-    "stop": [
-      "duration: 4 hours"
-    ],
-    "duration": [
-      120,
-      240
-    ],
-    "needs": [
-      "harvesting tools"
-    ],
-    "steps": [
-      "gather harvesting tools",
-      "help with harvesting",
-      "store harvested crops"
-    ],
-    "importance": 0.7,
-    "habit": 0.8
-  },
-  "LearningNewSkills": {
-    "name": "LearningNewSkills",
-    "category": "Learning & Practice",
-    "tags": [
-      "mental",
-      "routine",
-      "solo"
-    ],
-    "when": "daily@evening",
-    "where": [
-      "FouanFarm"
-    ],
-    "start": [
-      "time: 7:00 PM"
-    ],
-    "stop": [
-      "duration: 1 hour"
-    ],
-    "duration": [
-      30,
-      60
-    ],
-    "needs": [
-      "books or resources"
-    ],
-    "steps": [
-      "acquire learning materials",
-      "study materials",
-      "practice new skills"
-    ],
-    "importance": 0.6,
-    "habit": 0.7
-  },
-  "ReflectingOnLife": {
-    "name": "ReflectingOnLife",
-    "category": "Cognitive/Inner",
-    "tags": [
-      "mental",
-      "routine",
-      "solo"
-    ],
-    "when": "daily@night",
-    "where": [
-      "FouanFarm"
-    ],
-    "start": [
-      "time: 9:00 PM"
-    ],
-    "stop": [
-      "duration: 30 minutes"
-    ],
-    "duration": [
-      15,
-      30
-    ],
-    "needs": [
-      "quiet space"
-    ],
-    "steps": [
-      "find quiet space",
-      "reflect on experiences",
-      "set goals"
-    ],
-    "importance": 0.5,
-    "habit": 0.6
-  },
-  "SocializingAtMarket": {
-    "name": "SocializingAtMarket",
-    "category": "Recreation & Leisure",
-    "tags": [
-      "social",
-      "routine",
-      "outdoors"
-    ],
-    "when": "daily@morning",
-    "where": [
-      "VillageMarket"
-    ],
-    "start": [
-      "time: 10:00 AM"
-    ],
-    "stop": [
-      "duration: 1 hour"
-    ],
-    "duration": [
-      30,
-      60
-    ],
-    "needs": [
-      "other villagers"
-    ],
-    "steps": [
-      "walk to market",
-      "greet villagers",
-      "engage in conversation"
-    ],
-    "importance": 0.7,
-    "habit": 0.8
-  },
-  "AttendingChurch": {
-    "name": "AttendingChurch",
-    "category": "Recreation & Leisure",
-    "tags": [
-      "social",
       "routine",
       "indoors"
     ],
     "when": "daily@morning",
     "where": [
-      "Church"
-    ],
-    "start": [
-      "time: 9:00 AM"
-    ],
-    "stop": [
-      "duration: 1 hour"
+      "Farm"
     ],
     "duration": [
-      30,
-      60
+      10,
+      20
     ],
     "needs": [
-      "church schedule"
+      "Broom",
+      "Apron"
+    ],
+    "states_addressed": [
+      "contentment",
+      "relief"
     ],
     "steps": [
-      "walk to church",
-      "attend mass",
-      "socialize with villagers"
-    ],
-    "importance": 0.8,
-    "habit": 0.9
-  },
-  "PreparingForEmergency": {
-    "name": "PreparingForEmergency",
-    "category": "Safety/Emergency",
-    "tags": [
-      "physical",
-      "routine",
-      "solo"
-    ],
-    "when": "daily@morning",
-    "where": [
-      "FouanFarm"
-    ],
-    "start": [
-      "time: 8:00 AM"
-    ],
-    "stop": [
-      "duration: 30 minutes"
-    ],
-    "duration": [
-      15,
-      30
-    ],
-    "needs": [
-      "emergency supplies"
-    ],
-    "steps": [
-      "check emergency supplies",
-      "restock supplies",
-      "review emergency plan"
+      "gather dirt and straw from floor",
+      "shake bedding outdoors",
+      "wipe surfaces with damp cloth",
+      "dispose sweepings outside"
     ],
     "importance": 0.6,
-    "habit": 0.7
-  },
-  "RespondingToIllness": {
-    "name": "RespondingToIllness",
-    "category": "Safety/Emergency",
-    "tags": [
-      "physical",
-      "opportunistic",
-      "solo"
-    ],
-    "when": "opportunistic",
-    "where": [
-      "FouanFarm"
-    ],
-    "start": [
-      "symptoms appear"
-    ],
-    "stop": [
-      "duration: until recovered"
-    ],
-    "duration": [
-      0,
-      0
-    ],
-    "needs": [
-      "medical supplies"
-    ],
-    "steps": [
-      "identify symptoms",
-      "seek medical help",
-      "follow treatment plan"
-    ],
-    "importance": 0.9,
-    "habit": 0.95
-  },
-  "MaintainingPersonalHygiene": {
-    "name": "MaintainingPersonalHygiene",
-    "category": "Health Management (self-care)",
-    "tags": [
-      "physical",
-      "routine",
-      "solo"
-    ],
-    "when": "daily@morning",
-    "where": [
-      "FouanFarm"
-    ],
-    "start": [
-      "time: 7:00 AM"
-    ],
-    "stop": [
-      "duration: 30 minutes"
-    ],
-    "duration": [
-      15,
-      30
-    ],
-    "needs": [
-      "hygiene supplies"
-    ],
-    "steps": [
-      "wash face and hands",
-      "brush teeth",
-      "change clothes"
-    ],
-    "importance": 0.8,
-    "habit": 0.9
-  },
-  "Exercising": {
-    "name": "Exercising",
-    "category": "Health Management (self-care)",
-    "tags": [
-      "physical",
-      "routine",
-      "solo"
-    ],
-    "when": "daily@afternoon",
-    "where": [
-      "FouanFarm"
-    ],
-    "start": [
-      "time: 3:00 PM"
-    ],
-    "stop": [
-      "duration: 1 hour"
-    ],
-    "duration": [
-      30,
-      60
-    ],
-    "needs": [
-      "exercise equipment"
-    ],
-    "steps": [
-      "choose exercise activity",
-      "perform exercise",
-      "stretch and cool down"
-    ],
-    "importance": 0.7,
-    "habit": 0.8
-  },
-  "FixingFarmEquipment": {
-    "name": "FixingFarmEquipment",
-    "category": "Maintenance & Repair",
-    "tags": [
-      "physical",
-      "routine",
-      "solo"
-    ],
-    "when": "daily@morning",
-    "where": [
-      "FouanFarm"
-    ],
-    "start": [
-      "time: 8:00 AM"
-    ],
-    "stop": [
-      "duration: 1 hour"
-    ],
-    "duration": [
-      30,
-      60
-    ],
-    "needs": [
-      "tools"
-    ],
-    "steps": [
-      "identify broken equipment",
-      "gather repair tools",
-      "fix equipment"
-    ],
-    "importance": 0.6,
-    "habit": 0.7
-  },
-  "CleaningTheHouse": {
-    "name": "CleaningTheHouse",
-    "category": "Maintenance & Repair",
-    "tags": [
-      "physical",
-      "routine",
-      "solo"
-    ],
-    "when": "daily@afternoon",
-    "where": [
-      "FouanFarm"
-    ],
-    "start": [
-      "time: 2:00 PM"
-    ],
-    "stop": [
-      "duration: 1 hour"
-    ],
-    "duration": [
-      30,
-      60
-    ],
-    "needs": [
-      "cleaning supplies"
-    ],
-    "steps": [
-      "gather cleaning supplies",
-      "clean the house",
-      "organize belongings"
-    ],
-    "importance": 0.5,
     "habit": 0.6
   }
 }

@@ -1,7 +1,4 @@
-2025-08-24 16:29:22 - sense_node - INFO - 🔧 Debug mode enabled for Joe
-2025-08-24 16:29:22 - sense_node - INFO - 👁️ Sense Node initialized for character: Joe
-2025-08-24 16:29:22 - sense_node - INFO - Console Text Sensor ready - will auto-disable if external input detected
-2025-08-24 16:29:22 - sense_node - INFO - Sense Node running - press Ctrl+C to stop
-2025-08-24 16:45:32 - sense_node - INFO - Received signal 2, initiating shutdown...
-2025-08-24 16:45:32 - sense_node - INFO - Sense Node shutdown initiated...
-2025-08-24 16:45:32 - sense_node - INFO - Sense Node shutdown complete
+2025-08-25 18:29:12 - sense_node - INFO - 🔧 Debug mode enabled for Joe
+2025-08-25 18:29:12 - sense_node - INFO - 👁️ Sense Node initialized for character: Joe
+2025-08-25 18:29:12 - sense_node - INFO - Console Text Sensor ready - will auto-disable if external input detected
+2025-08-25 18:29:12 - sense_node - INFO - Sense Node running - press Ctrl+C to stop

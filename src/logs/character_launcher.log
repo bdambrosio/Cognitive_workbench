@@ -1,38 +1,19 @@
-2025-08-24 16:29:08 - character_launcher - INFO - 🔧 Debug mode enabled for Launcher (console INFO)
-2025-08-24 16:29:09 - character_launcher - INFO - ✅ Launcher subscribed to cognitive/launcher/shutdown and ready to publish ready signal
-2025-08-24 16:29:09 - character_launcher - INFO - Added character: Joe
-2025-08-24 16:29:10 - character_launcher - INFO - Launching 1 characters...
-2025-08-24 16:29:10 - character_launcher - INFO - Launching shared services...
-2025-08-24 16:29:10 - character_launcher - INFO - ✅ LLM Service Node launched with server: vllm, model: llama3.1-8b-instruct
-2025-08-24 16:29:10 - character_launcher - INFO - ✅ FastAPI Action Display Node launched on port 3000
-2025-08-24 16:29:10 - character_launcher - INFO -    - Web UI available at: http://localhost:3000
-2025-08-24 16:29:12 - character_launcher - INFO - Debug mode enabled via CWB_DEBUG - map turn timeout will be disabled
-2025-08-24 16:29:12 - character_launcher - INFO - ✅ Map Node launched with map: forest.py
-2025-08-24 16:29:12 - character_launcher - INFO - ⏳ Waiting for Map Node to initialize...
-2025-08-24 16:29:19 - character_launcher - INFO - Launching character: Joe
-2025-08-24 16:29:19 - character_launcher - INFO - ✅ Joe memory_node launched
-2025-08-24 16:29:20 - character_launcher - INFO - ✅ Joe situation_node launched
-2025-08-24 16:29:20 - character_launcher - INFO - ✅ Joe sense_node launched
-2025-08-24 16:29:21 - character_launcher - INFO - ✅ Joe executive_node launched
-2025-08-24 16:29:22 - character_launcher - INFO - ✅ All characters launched
-2025-08-24 16:29:22 - character_launcher - INFO - 🚀 Published ready signal: 1 characters active
-2025-08-24 16:29:22 - character_launcher - INFO - Monitoring processes...
-2025-08-24 16:45:32 - character_launcher - INFO - Received signal 2, initiating shutdown...
-2025-08-24 16:45:37 - character_launcher - INFO - 🛑 Initiating graceful shutdown...
-2025-08-24 16:45:37 - character_launcher - INFO - 📨 Sending SIGTERM to 7 processes...
-2025-08-24 16:45:37 - character_launcher - INFO -   ✉️  SIGTERM sent to Joe process 307443
-2025-08-24 16:45:37 - character_launcher - INFO -   ✉️  SIGTERM sent to Joe process 307450
-2025-08-24 16:45:37 - character_launcher - INFO -   ✉️  SIGTERM sent to Joe process 307464
-2025-08-24 16:45:37 - character_launcher - INFO -   ✉️  SIGTERM sent to Joe process 307473
-2025-08-24 16:45:37 - character_launcher - INFO -   ✉️  SIGTERM sent to shared process 307106
-2025-08-24 16:45:37 - character_launcher - INFO -   ✉️  SIGTERM sent to shared process 307107
-2025-08-24 16:45:37 - character_launcher - INFO -   ✉️  SIGTERM sent to shared process 307145
-2025-08-24 16:45:37 - character_launcher - INFO - ⏳ Waiting up to 15s for graceful shutdown...
-2025-08-24 16:45:42 - character_launcher - WARNING -   ⏰ 3 processes still running after 5s...
-2025-08-24 16:45:47 - character_launcher - WARNING -   ⏰ 3 processes still running after 10s...
-2025-08-24 16:45:52 - character_launcher - WARNING -   ⏰ 3 processes still running after 15s...
-2025-08-24 16:45:52 - character_launcher - WARNING - ⚠️  Force killing 3 unresponsive processes...
-2025-08-24 16:45:52 - character_launcher - WARNING -   💀 Force killed Joe process 307443
-2025-08-24 16:45:52 - character_launcher - WARNING -   💀 Force killed Joe process 307473
-2025-08-24 16:45:52 - character_launcher - WARNING -   💀 Force killed shared process 307145
-2025-08-24 16:45:52 - character_launcher - INFO - ✅ Shutdown complete
+2025-08-25 18:28:57 - character_launcher - INFO - 🔧 Debug mode enabled for Launcher (console INFO)
+2025-08-25 18:28:58 - character_launcher - INFO - ✅ Launcher subscribed to cognitive/launcher/shutdown and ready to publish ready signal
+2025-08-25 18:28:58 - character_launcher - INFO - Added character: Joe
+2025-08-25 18:28:59 - character_launcher - INFO - Launching 1 characters...
+2025-08-25 18:28:59 - character_launcher - INFO - Launching shared services...
+2025-08-25 18:28:59 - character_launcher - INFO - ✅ LLM Service Node launched with server: vllm, model: llama3.1-8b-instruct
+2025-08-25 18:28:59 - character_launcher - INFO - ✅ FastAPI Action Display Node launched on port 3000
+2025-08-25 18:28:59 - character_launcher - INFO -    - Web UI available at: http://localhost:3000
+2025-08-25 18:29:01 - character_launcher - INFO - Debug mode enabled via CWB_DEBUG - map turn timeout will be disabled
+2025-08-25 18:29:01 - character_launcher - INFO - ✅ Map Node launched with map: forest.py
+2025-08-25 18:29:01 - character_launcher - INFO - ⏳ Waiting for Map Node to initialize...
+2025-08-25 18:29:08 - character_launcher - INFO - Launching character: Joe
+2025-08-25 18:29:08 - character_launcher - INFO - ✅ Joe memory_node launched
+2025-08-25 18:29:09 - character_launcher - INFO - ✅ Joe situation_node launched
+2025-08-25 18:29:09 - character_launcher - INFO - ✅ Joe sense_node launched
+2025-08-25 18:29:10 - character_launcher - INFO - ✅ Joe executive_node launched
+2025-08-25 18:29:11 - character_launcher - INFO - ✅ All characters launched
+2025-08-25 18:29:11 - character_launcher - INFO - 🚀 Published ready signal: 1 characters active
+2025-08-25 18:29:11 - character_launcher - INFO - Monitoring processes...

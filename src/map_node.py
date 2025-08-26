@@ -89,7 +89,7 @@ class MapNode:
             'active_characters': [],
             'completed_characters': [],
             'turn_start_time': None,
-            'timeout_seconds': 30
+            'timeout_seconds': 60
         }
         # Debug mode: allow launcher to disable turn timeouts via env var
         self.debug_disable_timeout = str(os.getenv('CWB_DEBUG', '')).lower() in ('1', 'true', 'yes', 'on')

@@ -1,64 +1,349 @@
-2025-08-24 16:29:22 - memory_node - INFO - 🔧 Debug mode enabled for Joe
-2025-08-24 16:29:22 - llm_client - INFO - 🤖 Zenoh LLM Client initialized
-2025-08-24 16:29:22 - memory_node - INFO - 📂 No existing memory file, starting fresh
-2025-08-24 16:29:22 - memory_node - INFO - Memory Node initialized for character: Joe
-2025-08-24 16:29:22 - memory_node - INFO - Storage available at:
-2025-08-24 16:29:22 - memory_node - INFO -   - cognitive/Joe/memory/short_term/*
-2025-08-24 16:29:22 - memory_node - INFO -   - cognitive/Joe/memory/chat/*
-2025-08-24 16:29:22 - memory_node - INFO -   - cognitive/Joe/memory/long_term/*
-2025-08-24 16:29:22 - memory_node - INFO -   - cognitive/Joe/memory/entity/*
-2025-08-24 16:29:22 - memory_node - INFO -   - cognitive/Joe/memory/inventory
-2025-08-24 16:29:22 - memory_node - INFO - Subscriptions:
-2025-08-24 16:29:22 - memory_node - INFO -   - cognitive/Joe/memory/close_dialog
-2025-08-24 16:29:22 - memory_node - INFO - Memory Node running - press Ctrl+C to stop
-2025-08-24 16:29:26 - memory_node - INFO - 📢 Stored character announcement: Joe
-2025-08-24 16:29:30 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
-2025-08-24 16:29:30 - memory_node - INFO - 📦 Inventory query: returned 0 items
-2025-08-24 16:29:30 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
-2025-08-24 16:29:30 - memory_node - INFO - 📦 Inventory query: returned 0 items
-2025-08-24 16:29:54 - memory_node - INFO - 📝 Stored action: scan - 0
-2025-08-24 16:30:01 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
-2025-08-24 16:30:01 - memory_node - INFO - 📦 Inventory query: returned 0 items
-2025-08-24 16:30:01 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
-2025-08-24 16:30:01 - memory_node - INFO - 📦 Inventory query: returned 0 items
-2025-08-24 16:30:01 - memory_node - INFO - 📝 Stored action: move - move_1756078201
-2025-08-24 16:30:02 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
-2025-08-24 16:30:02 - memory_node - INFO - 📦 Inventory query: returned 0 items
-2025-08-24 16:30:02 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
-2025-08-24 16:30:02 - memory_node - INFO - 📦 Inventory query: returned 0 items
-2025-08-24 16:30:02 - memory_node - INFO - 📝 Stored action: move - move_1756078202
-2025-08-24 16:30:03 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
-2025-08-24 16:30:03 - memory_node - INFO - 📦 Inventory query: returned 0 items
-2025-08-24 16:30:03 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
-2025-08-24 16:30:03 - memory_node - INFO - 📦 Inventory query: returned 0 items
-2025-08-24 16:30:03 - memory_node - INFO - 📝 Stored action: move - move_1756078203
-2025-08-24 16:30:04 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
-2025-08-24 16:30:04 - memory_node - INFO - 📦 Inventory query: returned 0 items
-2025-08-24 16:30:04 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
-2025-08-24 16:30:04 - memory_node - INFO - 📦 Inventory query: returned 0 items
-2025-08-24 16:30:04 - memory_node - INFO - 📝 Stored action: move - move_1756078204
-2025-08-24 16:30:05 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
-2025-08-24 16:30:05 - memory_node - INFO - 📦 Inventory query: returned 0 items
-2025-08-24 16:30:05 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
-2025-08-24 16:30:05 - memory_node - INFO - 📦 Inventory query: returned 0 items
-2025-08-24 16:30:05 - memory_node - INFO - 📝 Stored action: move - move_1756078205
-2025-08-24 16:30:06 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
-2025-08-24 16:30:06 - memory_node - INFO - 📦 Inventory query: returned 0 items
-2025-08-24 16:30:06 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
-2025-08-24 16:30:06 - memory_node - INFO - 📦 Inventory query: returned 0 items
-2025-08-24 16:30:12 - memory_node - ERROR - Take action missing target: 1
-2025-08-24 16:30:13 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
-2025-08-24 16:30:13 - memory_node - INFO - 📦 Inventory query: returned 0 items
-2025-08-24 16:30:13 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
-2025-08-24 16:30:13 - memory_node - INFO - 📦 Inventory query: returned 0 items
-2025-08-24 16:30:13 - memory_node - INFO - 📦 Inventory query for Berries6: False
-2025-08-24 16:30:14 - memory_node - INFO - 📝 Stored action: use - 2
-2025-08-24 16:30:15 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
-2025-08-24 16:30:15 - memory_node - INFO - 📦 Inventory query: returned 0 items
-2025-08-24 16:30:15 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
-2025-08-24 16:30:15 - memory_node - INFO - 📦 Inventory query: returned 0 items
-2025-08-24 16:45:32 - memory_node - INFO - Received signal 2, initiating shutdown...
-2025-08-24 16:45:33 - memory_node - INFO - Memory Node shutdown initiated...
-2025-08-24 16:45:33 - memory_node - INFO - 💾 Saved memory to data/memory/Joe_memory.json
-2025-08-24 16:45:33 - memory_node - INFO - Memory Node shutdown complete
-2025-08-24 16:45:37 - memory_node - INFO - Received signal 15, initiating shutdown...
+2025-08-25 18:29:12 - memory_node - INFO - 🔧 Debug mode enabled for Joe
+2025-08-25 18:29:12 - llm_client - INFO - 🤖 Zenoh LLM Client initialized
+2025-08-25 18:29:12 - memory_node - INFO - 📂 No existing memory file, starting fresh
+2025-08-25 18:29:12 - memory_node - INFO - Memory Node initialized for character: Joe
+2025-08-25 18:29:12 - memory_node - INFO - Storage available at:
+2025-08-25 18:29:12 - memory_node - INFO -   - cognitive/Joe/memory/short_term/*
+2025-08-25 18:29:12 - memory_node - INFO -   - cognitive/Joe/memory/chat/*
+2025-08-25 18:29:12 - memory_node - INFO -   - cognitive/Joe/memory/long_term/*
+2025-08-25 18:29:12 - memory_node - INFO -   - cognitive/Joe/memory/entity/*
+2025-08-25 18:29:12 - memory_node - INFO -   - cognitive/Joe/memory/inventory
+2025-08-25 18:29:12 - memory_node - INFO - Subscriptions:
+2025-08-25 18:29:12 - memory_node - INFO -   - cognitive/Joe/memory/close_dialog
+2025-08-25 18:29:12 - memory_node - INFO - Memory Node running - press Ctrl+C to stop
+2025-08-25 18:29:15 - memory_node - INFO - 📢 Stored character announcement: Joe
+2025-08-25 18:36:02 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:36:02 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-08-25 18:36:02 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:36:02 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-08-25 18:36:32 - memory_node - INFO - 📝 Stored action: scan - 0
+2025-08-25 18:36:36 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:36:36 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-08-25 18:36:36 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:36:36 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-08-25 18:36:36 - memory_node - INFO - 📝 Stored action: move - move_1756172196
+2025-08-25 18:36:37 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:36:37 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-08-25 18:36:37 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:36:37 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-08-25 18:36:37 - memory_node - INFO - 📝 Stored action: move - move_1756172197
+2025-08-25 18:36:38 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:36:38 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-08-25 18:36:38 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:36:38 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-08-25 18:36:38 - memory_node - INFO - 📝 Stored action: move - move_1756172198
+2025-08-25 18:36:39 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:36:39 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-08-25 18:36:39 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:36:39 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-08-25 18:36:39 - memory_node - INFO - 📦 Added Berries13 to inventory
+2025-08-25 18:36:39 - memory_node - INFO - 📦 Added Berries13 to Joe inventory via take action
+2025-08-25 18:36:40 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:36:40 - memory_node - INFO - 📦 Inventory query: returned 1 items
+2025-08-25 18:36:40 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:36:40 - memory_node - INFO - 📦 Inventory query: returned 1 items
+2025-08-25 18:36:41 - memory_node - INFO - 📝 Stored action: use - 3
+2025-08-25 18:36:42 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:36:42 - memory_node - INFO - 📦 Inventory query: returned 1 items
+2025-08-25 18:36:42 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:36:42 - memory_node - INFO - 📦 Inventory query: returned 1 items
+2025-08-25 18:36:48 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:36:48 - memory_node - INFO - 📦 Inventory query: returned 1 items
+2025-08-25 18:36:48 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:36:48 - memory_node - INFO - 📦 Inventory query: returned 1 items
+2025-08-25 18:37:20 - memory_node - INFO - 📝 Stored action: scan - 4
+2025-08-25 18:37:21 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:37:21 - memory_node - INFO - 📦 Inventory query: returned 1 items
+2025-08-25 18:37:21 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:37:21 - memory_node - INFO - 📦 Inventory query: returned 1 items
+2025-08-25 18:37:21 - memory_node - INFO - 📝 Stored action: move - move_1756172241
+2025-08-25 18:37:22 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:37:22 - memory_node - INFO - 📦 Inventory query: returned 1 items
+2025-08-25 18:37:22 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:37:22 - memory_node - INFO - 📦 Inventory query: returned 1 items
+2025-08-25 18:37:22 - memory_node - INFO - 📝 Stored action: move - move_1756172242
+2025-08-25 18:37:23 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:37:23 - memory_node - INFO - 📦 Inventory query: returned 1 items
+2025-08-25 18:37:23 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:37:23 - memory_node - INFO - 📦 Inventory query: returned 1 items
+2025-08-25 18:37:23 - memory_node - INFO - 📝 Stored action: move - move_1756172243
+2025-08-25 18:37:24 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:37:24 - memory_node - INFO - 📦 Inventory query: returned 1 items
+2025-08-25 18:37:24 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:37:24 - memory_node - INFO - 📦 Inventory query: returned 1 items
+2025-08-25 18:37:24 - memory_node - INFO - 📝 Stored action: move - move_1756172244
+2025-08-25 18:37:25 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:37:25 - memory_node - INFO - 📦 Inventory query: returned 1 items
+2025-08-25 18:37:25 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:37:25 - memory_node - INFO - 📦 Inventory query: returned 1 items
+2025-08-25 18:37:25 - memory_node - INFO - 📝 Stored action: move - move_1756172245
+2025-08-25 18:37:26 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:37:26 - memory_node - INFO - 📦 Inventory query: returned 1 items
+2025-08-25 18:37:26 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:37:26 - memory_node - INFO - 📦 Inventory query: returned 1 items
+2025-08-25 18:37:26 - memory_node - ERROR - Take action missing target: 5
+2025-08-25 18:37:27 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:37:27 - memory_node - INFO - 📦 Inventory query: returned 1 items
+2025-08-25 18:37:27 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:37:27 - memory_node - INFO - 📦 Inventory query: returned 1 items
+2025-08-25 18:37:27 - memory_node - INFO - 📦 Inventory query for Berries1: False
+2025-08-25 18:37:28 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:37:28 - memory_node - INFO - 📦 Inventory query: returned 1 items
+2025-08-25 18:37:28 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:37:28 - memory_node - INFO - 📦 Inventory query: returned 1 items
+2025-08-25 18:37:35 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:37:35 - memory_node - INFO - 📦 Inventory query: returned 1 items
+2025-08-25 18:37:35 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:37:35 - memory_node - INFO - 📦 Inventory query: returned 1 items
+2025-08-25 18:38:02 - memory_node - INFO - 📝 Stored action: scan - 6
+2025-08-25 18:38:03 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:38:03 - memory_node - INFO - 📦 Inventory query: returned 1 items
+2025-08-25 18:38:03 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:38:03 - memory_node - INFO - 📦 Inventory query: returned 1 items
+2025-08-25 18:38:03 - memory_node - INFO - 📝 Stored action: move - move_1756172283
+2025-08-25 18:38:04 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:38:04 - memory_node - INFO - 📦 Inventory query: returned 1 items
+2025-08-25 18:38:04 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:38:04 - memory_node - INFO - 📦 Inventory query: returned 1 items
+2025-08-25 18:38:04 - memory_node - INFO - 📦 Added Berries1 to inventory
+2025-08-25 18:38:04 - memory_node - INFO - 📦 Added Berries1 to Joe inventory via take action
+2025-08-25 18:38:05 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:38:05 - memory_node - INFO - 📦 Inventory query: returned 2 items
+2025-08-25 18:38:05 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:38:05 - memory_node - INFO - 📦 Inventory query: returned 2 items
+2025-08-25 18:38:06 - memory_node - INFO - 📝 Stored action: use - 9
+2025-08-25 18:38:07 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:38:07 - memory_node - INFO - 📦 Inventory query: returned 2 items
+2025-08-25 18:38:07 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:38:07 - memory_node - INFO - 📦 Inventory query: returned 2 items
+2025-08-25 18:38:13 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:38:13 - memory_node - INFO - 📦 Inventory query: returned 2 items
+2025-08-25 18:38:13 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:38:13 - memory_node - INFO - 📦 Inventory query: returned 2 items
+2025-08-25 18:38:40 - memory_node - INFO - 📝 Stored action: scan - 10
+2025-08-25 18:38:41 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:38:41 - memory_node - INFO - 📦 Inventory query: returned 2 items
+2025-08-25 18:38:41 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:38:41 - memory_node - INFO - 📦 Inventory query: returned 2 items
+2025-08-25 18:38:41 - memory_node - INFO - 📝 Stored action: move - move_1756172321
+2025-08-25 18:38:42 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:38:42 - memory_node - INFO - 📦 Inventory query: returned 2 items
+2025-08-25 18:38:42 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:38:42 - memory_node - INFO - 📦 Inventory query: returned 2 items
+2025-08-25 18:38:42 - memory_node - INFO - 📝 Stored action: move - move_1756172322
+2025-08-25 18:38:43 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:38:43 - memory_node - INFO - 📦 Inventory query: returned 2 items
+2025-08-25 18:38:43 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:38:43 - memory_node - INFO - 📦 Inventory query: returned 2 items
+2025-08-25 18:38:43 - memory_node - INFO - 📝 Stored action: move - move_1756172323
+2025-08-25 18:38:44 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:38:44 - memory_node - INFO - 📦 Inventory query: returned 2 items
+2025-08-25 18:38:44 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:38:44 - memory_node - INFO - 📦 Inventory query: returned 2 items
+2025-08-25 18:38:44 - memory_node - INFO - 📝 Stored action: move - move_1756172324
+2025-08-25 18:38:45 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:38:45 - memory_node - INFO - 📦 Inventory query: returned 2 items
+2025-08-25 18:38:45 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:38:45 - memory_node - INFO - 📦 Inventory query: returned 2 items
+2025-08-25 18:38:45 - memory_node - INFO - 📝 Stored action: move - move_1756172325
+2025-08-25 18:38:46 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:38:46 - memory_node - INFO - 📦 Inventory query: returned 2 items
+2025-08-25 18:38:46 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:38:46 - memory_node - INFO - 📦 Inventory query: returned 2 items
+2025-08-25 18:38:46 - memory_node - ERROR - Take action missing target: 11
+2025-08-25 18:38:47 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:38:47 - memory_node - INFO - 📦 Inventory query: returned 2 items
+2025-08-25 18:38:47 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:38:47 - memory_node - INFO - 📦 Inventory query: returned 2 items
+2025-08-25 18:38:47 - memory_node - INFO - 📦 Inventory query for Berries15: False
+2025-08-25 18:38:48 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:38:48 - memory_node - INFO - 📦 Inventory query: returned 2 items
+2025-08-25 18:38:48 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:38:48 - memory_node - INFO - 📦 Inventory query: returned 2 items
+2025-08-25 18:38:55 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:38:55 - memory_node - INFO - 📦 Inventory query: returned 2 items
+2025-08-25 18:38:55 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:38:55 - memory_node - INFO - 📦 Inventory query: returned 2 items
+2025-08-25 18:39:19 - memory_node - INFO - 📝 Stored action: scan - 12
+2025-08-25 18:39:20 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:39:20 - memory_node - INFO - 📦 Inventory query: returned 2 items
+2025-08-25 18:39:20 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:39:20 - memory_node - INFO - 📦 Inventory query: returned 2 items
+2025-08-25 18:39:20 - memory_node - INFO - 📝 Stored action: move - move_1756172360
+2025-08-25 18:39:21 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:39:21 - memory_node - INFO - 📦 Inventory query: returned 2 items
+2025-08-25 18:39:21 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:39:21 - memory_node - INFO - 📦 Inventory query: returned 2 items
+2025-08-25 18:39:21 - memory_node - INFO - 📦 Added Berries15 to inventory
+2025-08-25 18:39:21 - memory_node - INFO - 📦 Added Berries15 to Joe inventory via take action
+2025-08-25 18:39:22 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:39:22 - memory_node - INFO - 📦 Inventory query: returned 3 items
+2025-08-25 18:39:22 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:39:22 - memory_node - INFO - 📦 Inventory query: returned 3 items
+2025-08-25 18:39:23 - memory_node - INFO - 📝 Stored action: use - 15
+2025-08-25 18:39:24 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:39:24 - memory_node - INFO - 📦 Inventory query: returned 3 items
+2025-08-25 18:39:24 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:39:24 - memory_node - INFO - 📦 Inventory query: returned 3 items
+2025-08-25 18:39:30 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:39:30 - memory_node - INFO - 📦 Inventory query: returned 3 items
+2025-08-25 18:39:30 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:39:30 - memory_node - INFO - 📦 Inventory query: returned 3 items
+2025-08-25 18:39:53 - memory_node - INFO - 📝 Stored action: scan - 16
+2025-08-25 18:39:54 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:39:54 - memory_node - INFO - 📦 Inventory query: returned 3 items
+2025-08-25 18:39:54 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:39:54 - memory_node - INFO - 📦 Inventory query: returned 3 items
+2025-08-25 18:39:54 - memory_node - INFO - 📝 Stored action: move - move_1756172394
+2025-08-25 18:39:55 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:39:55 - memory_node - INFO - 📦 Inventory query: returned 3 items
+2025-08-25 18:39:55 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:39:55 - memory_node - INFO - 📦 Inventory query: returned 3 items
+2025-08-25 18:39:55 - memory_node - INFO - 📝 Stored action: move - move_1756172395
+2025-08-25 18:39:56 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:39:56 - memory_node - INFO - 📦 Inventory query: returned 3 items
+2025-08-25 18:39:56 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:39:56 - memory_node - INFO - 📦 Inventory query: returned 3 items
+2025-08-25 18:39:56 - memory_node - INFO - 📝 Stored action: move - move_1756172396
+2025-08-25 18:39:57 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:39:57 - memory_node - INFO - 📦 Inventory query: returned 3 items
+2025-08-25 18:39:57 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:39:57 - memory_node - INFO - 📦 Inventory query: returned 3 items
+2025-08-25 18:39:57 - memory_node - INFO - 📝 Stored action: move - move_1756172397
+2025-08-25 18:39:58 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:39:58 - memory_node - INFO - 📦 Inventory query: returned 3 items
+2025-08-25 18:39:58 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:39:58 - memory_node - INFO - 📦 Inventory query: returned 3 items
+2025-08-25 18:39:59 - memory_node - INFO - 📝 Stored action: use - 17
+2025-08-25 18:40:00 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:40:00 - memory_node - INFO - 📦 Inventory query: returned 3 items
+2025-08-25 18:40:00 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:40:00 - memory_node - INFO - 📦 Inventory query: returned 3 items
+2025-08-25 18:40:05 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:40:05 - memory_node - INFO - 📦 Inventory query: returned 3 items
+2025-08-25 18:40:05 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:40:05 - memory_node - INFO - 📦 Inventory query: returned 3 items
+2025-08-25 18:40:29 - memory_node - INFO - 📝 Stored action: scan - 18
+2025-08-25 18:40:30 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:40:30 - memory_node - INFO - 📦 Inventory query: returned 3 items
+2025-08-25 18:40:30 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:40:30 - memory_node - INFO - 📦 Inventory query: returned 3 items
+2025-08-25 18:40:30 - memory_node - INFO - 📝 Stored action: move - move_1756172430
+2025-08-25 18:40:31 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:40:31 - memory_node - INFO - 📦 Inventory query: returned 3 items
+2025-08-25 18:40:31 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:40:31 - memory_node - INFO - 📦 Inventory query: returned 3 items
+2025-08-25 18:40:31 - memory_node - INFO - 📝 Stored action: move - move_1756172431
+2025-08-25 18:40:32 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:40:32 - memory_node - INFO - 📦 Inventory query: returned 3 items
+2025-08-25 18:40:32 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:40:32 - memory_node - INFO - 📦 Inventory query: returned 3 items
+2025-08-25 18:40:32 - memory_node - INFO - 📝 Stored action: move - move_1756172432
+2025-08-25 18:40:33 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:40:33 - memory_node - INFO - 📦 Inventory query: returned 3 items
+2025-08-25 18:40:33 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:40:33 - memory_node - INFO - 📦 Inventory query: returned 3 items
+2025-08-25 18:40:33 - memory_node - INFO - 📝 Stored action: move - move_1756172433
+2025-08-25 18:40:34 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:40:34 - memory_node - INFO - 📦 Inventory query: returned 3 items
+2025-08-25 18:40:34 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:40:34 - memory_node - INFO - 📦 Inventory query: returned 3 items
+2025-08-25 18:40:34 - memory_node - INFO - 📝 Stored action: move - move_1756172434
+2025-08-25 18:40:35 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:40:35 - memory_node - INFO - 📦 Inventory query: returned 3 items
+2025-08-25 18:40:35 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:40:35 - memory_node - INFO - 📦 Inventory query: returned 3 items
+2025-08-25 18:40:35 - memory_node - ERROR - Take action missing target: 19
+2025-08-25 18:40:36 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:40:36 - memory_node - INFO - 📦 Inventory query: returned 3 items
+2025-08-25 18:40:36 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:40:36 - memory_node - INFO - 📦 Inventory query: returned 3 items
+2025-08-25 18:40:36 - memory_node - INFO - 📦 Inventory query for Berries11: False
+2025-08-25 18:40:37 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:40:37 - memory_node - INFO - 📦 Inventory query: returned 3 items
+2025-08-25 18:40:37 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:40:37 - memory_node - INFO - 📦 Inventory query: returned 3 items
+2025-08-25 18:40:43 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:40:43 - memory_node - INFO - 📦 Inventory query: returned 3 items
+2025-08-25 18:40:43 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:40:43 - memory_node - INFO - 📦 Inventory query: returned 3 items
+2025-08-25 18:41:06 - memory_node - INFO - 📝 Stored action: scan - 20
+2025-08-25 18:41:07 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:41:07 - memory_node - INFO - 📦 Inventory query: returned 3 items
+2025-08-25 18:41:07 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:41:07 - memory_node - INFO - 📦 Inventory query: returned 3 items
+2025-08-25 18:41:07 - memory_node - INFO - 📝 Stored action: move - move_1756172467
+2025-08-25 18:41:08 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:41:08 - memory_node - INFO - 📦 Inventory query: returned 3 items
+2025-08-25 18:41:08 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:41:08 - memory_node - INFO - 📦 Inventory query: returned 3 items
+2025-08-25 18:41:08 - memory_node - INFO - 📝 Stored action: move - move_1756172468
+2025-08-25 18:41:09 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:41:09 - memory_node - INFO - 📦 Inventory query: returned 3 items
+2025-08-25 18:41:09 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:41:09 - memory_node - INFO - 📦 Inventory query: returned 3 items
+2025-08-25 18:41:09 - memory_node - INFO - 📝 Stored action: move - move_1756172469
+2025-08-25 18:41:10 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:41:10 - memory_node - INFO - 📦 Inventory query: returned 3 items
+2025-08-25 18:41:10 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:41:10 - memory_node - INFO - 📦 Inventory query: returned 3 items
+2025-08-25 18:41:10 - memory_node - INFO - 📝 Stored action: move - move_1756172470
+2025-08-25 18:41:11 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:41:11 - memory_node - INFO - 📦 Inventory query: returned 3 items
+2025-08-25 18:41:11 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:41:11 - memory_node - INFO - 📦 Inventory query: returned 3 items
+2025-08-25 18:41:11 - memory_node - INFO - 📦 Added Berries11 to inventory
+2025-08-25 18:41:11 - memory_node - INFO - 📦 Added Berries11 to Joe inventory via take action
+2025-08-25 18:41:12 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:41:12 - memory_node - INFO - 📦 Inventory query: returned 4 items
+2025-08-25 18:41:12 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:41:12 - memory_node - INFO - 📦 Inventory query: returned 4 items
+2025-08-25 18:41:13 - memory_node - INFO - 📝 Stored action: use - 23
+2025-08-25 18:41:14 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:41:14 - memory_node - INFO - 📦 Inventory query: returned 4 items
+2025-08-25 18:41:14 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:41:14 - memory_node - INFO - 📦 Inventory query: returned 4 items
+2025-08-25 18:41:20 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:41:20 - memory_node - INFO - 📦 Inventory query: returned 4 items
+2025-08-25 18:41:20 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:41:20 - memory_node - INFO - 📦 Inventory query: returned 4 items
+2025-08-25 18:41:41 - memory_node - INFO - 📝 Stored action: scan - 24
+2025-08-25 18:41:42 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:41:42 - memory_node - INFO - 📦 Inventory query: returned 4 items
+2025-08-25 18:41:42 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:41:42 - memory_node - INFO - 📦 Inventory query: returned 4 items
+2025-08-25 18:41:42 - memory_node - INFO - 📝 Stored action: move - move_1756172502
+2025-08-25 18:41:43 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:41:43 - memory_node - INFO - 📦 Inventory query: returned 4 items
+2025-08-25 18:41:43 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:41:43 - memory_node - INFO - 📦 Inventory query: returned 4 items
+2025-08-25 18:41:43 - memory_node - INFO - 📝 Stored action: move - move_1756172503
+2025-08-25 18:41:44 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:41:44 - memory_node - INFO - 📦 Inventory query: returned 4 items
+2025-08-25 18:41:44 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:41:44 - memory_node - INFO - 📦 Inventory query: returned 4 items
+2025-08-25 18:41:44 - memory_node - INFO - 📝 Stored action: move - move_1756172504
+2025-08-25 18:41:45 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:41:45 - memory_node - INFO - 📦 Inventory query: returned 4 items
+2025-08-25 18:41:45 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:41:45 - memory_node - INFO - 📦 Inventory query: returned 4 items
+2025-08-25 18:41:45 - memory_node - INFO - 📝 Stored action: move - move_1756172505
+2025-08-25 18:41:46 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:41:46 - memory_node - INFO - 📦 Inventory query: returned 4 items
+2025-08-25 18:41:46 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:41:46 - memory_node - INFO - 📦 Inventory query: returned 4 items
+2025-08-25 18:41:46 - memory_node - INFO - 📝 Stored action: move - move_1756172506
+2025-08-25 18:41:47 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:41:47 - memory_node - INFO - 📦 Inventory query: returned 4 items
+2025-08-25 18:41:47 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:41:47 - memory_node - INFO - 📦 Inventory query: returned 4 items
+2025-08-25 18:41:47 - memory_node - ERROR - Take action missing target: 25
+2025-08-25 18:41:48 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:41:48 - memory_node - INFO - 📦 Inventory query: returned 4 items
+2025-08-25 18:41:48 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:41:48 - memory_node - INFO - 📦 Inventory query: returned 4 items
+2025-08-25 18:41:48 - memory_node - INFO - 📦 Inventory query for Berries7: False
+2025-08-25 18:41:49 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:41:49 - memory_node - INFO - 📦 Inventory query: returned 4 items
+2025-08-25 18:41:49 - memory_node - INFO - 👥 Entity dialog query for Joe: completed
+2025-08-25 18:41:49 - memory_node - INFO - 📦 Inventory query: returned 4 items

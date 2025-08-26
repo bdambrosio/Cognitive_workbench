@@ -22,12 +22,14 @@ from typing import Dict, List, Any, Union, Optional
 from Messages import SystemMessage, UserMessage
 from activity import ActivityManager
 import utils.hash_utils as hash_utils
+from utils.llm_api import LLM
 from utils.zenoh_utils import datetime_handler
 import plan as plan_module
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 import os
 from templates import PLAN_TEMPLATE
 from utils.state_utils import tick_state, apply_restore, initialize_character_states
+from utils.format_utils import format_views_compact
 from utils.condition_utils import deref_plan_target
 
     
@@ -85,6 +87,10 @@ class ActionRecord:
     ended_at: Optional[datetime] = None
     duration_ms: Optional[int] = None
     notes: Optional[str] = None
+    # Phase 1 telemetry
+    hunger_after: Optional[float] = None
+    proposed_minutes: Optional[int] = None
+    simulation_time: Optional[str] = None
 
 class ZenohExecutiveNode:
     """
@@ -131,6 +137,10 @@ class ZenohExecutiveNode:
 
         # Publisher for map update requests (character-specific)
         self.map_update_request_publisher = self.session.declare_publisher(f"cognitive/{character_name}/situation/request_update")
+        # Publisher for plan logs (analytics)
+        self.plan_log_publisher = self.session.declare_publisher(
+            f"cognitive/{character_name}/planning/plan_log"
+        )
         
         # Publisher for memory storage (character-specific)
         self.memory_publisher = self.session.declare_publisher(f"cognitive/{character_name}/memory/store")
@@ -167,7 +177,7 @@ class ZenohExecutiveNode:
         self.llm_client = None
         if LLM_CLIENT_AVAILABLE:
             self.llm_client = ZenohLLMClient(service_timeout=30.0 if not self.debug else 600.0)
-        
+        self.llm = LLM(server_name="openai", model_name="gpt-4.1")
         # Internal state
         self.action_counter = 0
         self.last_sense_data = None
@@ -195,8 +205,12 @@ class ZenohExecutiveNode:
         self.current_plan_prompt_template:str = ''
         self.current_plan_prompt_bindings:dict = {}
         self.plan_log: List[Dict[str, Any]] = [] # log of plans and actions
+        # Track simulation time at plan boundaries
+        self.current_plan_start_sim_iso: Optional[str] = None
         # Local physiology/state. 0=good, 100=worst.
         self.self_state: Dict[str, Dict[str, float]] = initialize_character_states()
+        # Local cache of inventory item ids (exact strings)
+        self.inventory_cache: List[str] = []
         self.last_state_update_time: Optional[datetime] = None
 
         # Publish initial state snapshot so UI has data before first time advance
@@ -622,7 +636,9 @@ class ZenohExecutiveNode:
                     formatted_situation += '\n'
 
         if self.last_situation_data and self.last_situation_data.get('views'):
-            formatted_situation += f"\n#You can see the following:\n"+json.dumps(self.last_situation_data['views'], indent=2)
+            compact_views = format_views_compact(self.last_situation_data['views'])
+            if compact_views:
+                formatted_situation += f"\n#You can see the following:\n" + compact_views
 
         if self.inspections:
             formatted_situation += f"\n#You have inspected the following:\n"
@@ -708,7 +724,7 @@ class ZenohExecutiveNode:
                 for i, memory in enumerate(entity_context['conversation_history']):  # Use last 2 memories
                     user_prompt += f"\n\t{memory['source']}: {memory['text']}"
                 user_prompt += '\n'
-            # get inventory
+            # get inventory and cache exact ids
             inventory = []
             for reply in self.session.get(f"cognitive/{self.character_name}/memory/inventory", timeout=2.0 if not self.debug else 600.0):
                 if reply.ok:
@@ -719,6 +735,11 @@ class ZenohExecutiveNode:
                             inventory.extend(value)
                         elif value:
                             inventory.append(value)
+            # update local cache
+            try:
+                self.inventory_cache = [str(v) for v in inventory]
+            except Exception:
+                self.inventory_cache = []
             if inventory:
                 user_prompt += f'\n#Your inventory includes:'
                 for item in inventory:
@@ -849,7 +870,7 @@ end your response with </end>
             else:
                 directive = f"""\nrespond only with the JSON plan, no other text.\nend your response with </end>"""
 
-            self.current_plan_prompt = system_prompt + user_prompt + goal_prompt + PLAN_TEMPLATE + directive
+            self.current_plan_prompt = system_prompt + user_prompt + goal_prompt
             # Make LLM call
             #self.current_plan_prompt= self.llm_client.substitute_bindings(self.current_plan_prompt_template, self.current_plan_prompt_bindings)
             if self.llm_client and not self.shutdown_requested:
@@ -891,6 +912,16 @@ end your response with </end>
                         self.current_plan_id = f"p_{self.plan_counter}"
                         self.control_flow_events = []
                         self.step_counter = 0
+                        # Capture simulation time at plan start
+                        try:
+                            for time_reply in self.session.get("cognitive/map/simulation_time", timeout=2.0 if not self.debug else 600.0):
+                                if time_reply.ok:
+                                    time_data = json.loads(time_reply.ok.payload.to_bytes().decode('utf-8'))
+                                    if time_data.get('success'):
+                                        self.current_plan_start_sim_iso = time_data.get('time_info', {}).get('datetime')
+                                        break
+                        except Exception:
+                            self.current_plan_start_sim_iso = None
                         self._publish_current_plan()
                         self.plan_state = {'step_stack': plan_module.Stack()}
                         return self.current_plan
@@ -913,6 +944,16 @@ end your response with </end>
         self.current_plan_id = f"p_{self.plan_counter}"
         self.control_flow_events = []
         self.step_counter = 0
+        # Capture simulation time at plan start (single-action plans)
+        try:
+            for time_reply in self.session.get("cognitive/map/simulation_time", timeout=2.0 if not self.debug else 600.0):
+                if time_reply.ok:
+                    time_data = json.loads(time_reply.ok.payload.to_bytes().decode('utf-8'))
+                    if time_data.get('success'):
+                        self.current_plan_start_sim_iso = time_data.get('time_info', {}).get('datetime')
+                        break
+        except Exception:
+            self.current_plan_start_sim_iso = None
         self._publish_current_plan()
         # Initialize plan state for new plan
         self.plan_state = {'step_stack': plan_module.Stack()}
@@ -1266,12 +1307,33 @@ end your response with </end>
             requested_target=action.get('target', ''),
             started_at=now_ts
         )
+        # Record proposed minutes for this step (used in plan metrics)
+        try:
+            action_record.proposed_minutes = int(proposed_minutes)
+        except Exception:
+            action_record.proposed_minutes = None
         self.action_history.append(action_record)
         
         if action['type'].lower() == "sleep":
             action_data = {'type': 'sleep','action_id': self.action_counter,'timestamp': datetime.now().isoformat(),'target': self.character_name}
             self.action_publisher.put(json.dumps(action_data))
             action_record.result = 'slept'
+            # Record per-action telemetry
+            try:
+                action_record.hunger_after = float(self.self_state.get('hunger', {}).get('value', 0.0))
+            except Exception:
+                action_record.hunger_after = None
+            action_record.proposed_minutes = proposed_minutes
+            # Best-effort simulation time capture
+            try:
+                for time_reply in self.session.get("cognitive/map/simulation_time", timeout=2.0 if not self.debug else 600.0):
+                    if time_reply.ok:
+                        time_data = json.loads(time_reply.ok.payload.to_bytes().decode('utf-8'))
+                        if time_data.get('success'):
+                            action_record.simulation_time = time_data.get('time_info', {}).get('datetime')
+                            break
+            except Exception:
+                pass
             time.sleep(1)  # Sleep for 1 second
             return True
         if action['type'].lower() == 'think':
@@ -1285,6 +1347,11 @@ end your response with </end>
                 # Dereference variable targets (e.g., $var -> bound value)
                 raw_target = deref_plan_target(self.plan_bindings, action.get('target', ''))
                 move_target = raw_target.strip().lower()
+                # Telemetry: store resolved target string if available
+                try:
+                    action_record.resolved_target = raw_target
+                except Exception:
+                    pass
                 # Step 1: Test for compass points first (case insensitive)
                 cardinal_directions = ['north', 'northeast', 'southeast', 'south', 'southwest', 'northwest', 'east', 'west']
                 if move_target in cardinal_directions:
@@ -1302,6 +1369,11 @@ end your response with </end>
                         move_direction = None
                 if move_direction:
                     self.move(move_direction)
+                    # Telemetry snapshot after action
+                    try:
+                        action_record.hunger_after = float(self.self_state.get('hunger', {}).get('value', 0.0))
+                    except Exception:
+                        action_record.hunger_after = None
                 # Request situation/map update for UI immediately after move
                 try:
                     self.map_update_request_publisher.put(json.dumps({'type': 'step_look'}))
@@ -1323,6 +1395,11 @@ end your response with </end>
             raw_target = deref_plan_target(self.plan_bindings, requested_target)
             resolved_target = deref_plan_target(self.plan_bindings, raw_target)
 
+            # Telemetry: store resolved target
+            try:
+                action_record.resolved_target = resolved_target if resolved_target else ''
+            except Exception:
+                pass
             if resolved_target and self._acquire_conversation_lock(resolved_target):
                 self.generate_speech(action['value'], resolved_target, mode='say')
             else:
@@ -1340,6 +1417,9 @@ end your response with </end>
                 }
                 self.action_publisher.put(json.dumps(action_data))
                 logger.error('📤 Published action: say (failed - lock unavailable)')
+                # Telemetry failure tagging
+                action_record.outcome_status = 'failure'
+                action_record.failure_code = 'lock:conversation_unavailable'
                 self.action_counter += 1
                 return False
         elif action['type'].lower() == "take":
@@ -1351,6 +1431,11 @@ end your response with </end>
             binding = plan_module._evaluate_condition(self, cond_action)
             outcome = binding['value']
             resolved = binding['binding']   
+            # Telemetry: store resolved target
+            try:
+                action_record.resolved_target = resolved if resolved else ''
+            except Exception:
+                pass
             if not outcome:
                 action_data = {
                     'type': 'take',
@@ -1364,6 +1449,9 @@ end your response with </end>
                 }
                 self.action_publisher.put(json.dumps(action_data))
                 logger.error('📤 Published action: take (failed)')
+                # Telemetry failure tagging
+                action_record.outcome_status = 'failure'
+                action_record.failure_code = 'precondition:near'
                 self.action_counter += 1
                 return False
             self.take(resolved)
@@ -1377,6 +1465,11 @@ end your response with </end>
             binding = plan_module._evaluate_condition(self, cond_action)
             outcome = binding['value']
             resolved = binding['binding']
+            # Telemetry: store resolved target
+            try:
+                action_record.resolved_target = resolved if resolved else ''
+            except Exception:
+                pass
             if not outcome:
                 # Only allow inventory fallback when target is a type (no digits)
                 tgt = cond_action.get('target', '')
@@ -1399,9 +1492,17 @@ end your response with </end>
                 action_data['status'] = 'failed'
                 action_data['error'] = 'target not nearby/visible'
                 self.action_publisher.put(json.dumps(action_data))
+                # Telemetry failure tagging
+                action_record.outcome_status = 'failure'
+                action_record.failure_code = 'precondition:near'
             else:
                 # Perform inspect which may populate last_action_result
                 self.inspect(action, resolved)
+                # Telemetry snapshot after action
+                try:
+                    action_record.hunger_after = float(self.self_state.get('hunger', {}).get('value', 0.0))
+                except Exception:
+                    action_record.hunger_after = None
                 # Publish result if available so UI can display it
                 try:
                     result_text = action_record.result if isinstance(action_record.result, str) else ''
@@ -1433,6 +1534,11 @@ end your response with </end>
             binding = plan_module._evaluate_condition(self, cond_action)
             outcome = binding['value']
             resolved = binding['binding']
+            # Telemetry: store resolved target
+            try:
+                action_record.resolved_target = resolved if resolved else ''
+            except Exception:
+                pass
             if not outcome:
                 cond_action['type'] = 'has_item'
                 binding = plan_module._evaluate_condition(self, cond_action)
@@ -1447,9 +1553,12 @@ end your response with </end>
                 'requested_target': action['target'],
                 'resolved_target': resolved if resolved else ''
             }
-            if not resolved:
+            if not outcome or not resolved:
                 action_data['status'] = 'failed'
                 action_data['error'] = 'target not nearby/visible'
+                # Telemetry failure tagging (choose specific reason if known)
+                action_record.outcome_status = 'failure'
+                action_record.failure_code = 'precondition:near' if binding and not binding.get('value') else 'precondition:has_item'
                 return False
             else:
                 self.use(action, resolved, action_data)
@@ -1475,12 +1584,22 @@ end your response with </end>
                             pass
                 except Exception:
                     pass
+                # Telemetry snapshot after action (post-use may alter hunger)
+                try:
+                    action_record.hunger_after = float(self.self_state.get('hunger', {}).get('value', 0.0))
+                except Exception:
+                    action_record.hunger_after = None
             self.action_publisher.put(json.dumps(action_data))
             self.action_counter += 1
             return True
         elif action['type'].lower() == "scan":
             scan_result = self._execute_scan_action(action)
             action_record.result = scan_result
+            # Telemetry snapshot after action
+            try:
+                action_record.hunger_after = float(self.self_state.get('hunger', {}).get('value', 0.0))
+            except Exception:
+                action_record.hunger_after = None
             
             # Publish scan action result to FastAPI
             action_data = {
@@ -1583,16 +1702,122 @@ end your response with </end>
         {actions_summary}
         
         Please provide a concise paragraph summarizing this plan execution, including the goal, actions taken, and observed results.
+        Conclude with a hash-formatted numerical assessment of the plan's success or failure in meeting the goal.
+        this should be a number between 0 and 100, where 0 is the worst and 100 is the best, formatted as follows:
+
+        #score nn
+        ##
+
         Do not include any other introductory, explanatory, discursive, or formatting text in your response.
         End your text with: </end>
         """
         response = self.llm_client.generate([summary_prompt], max_tokens=200, stops=['</end>'])
         self.plan_summary = response.text
+        goal_score = hash_utils.find('score', self.plan_summary)
+        if goal_score:
+            try:
+                goal_score = int(goal_score)
+            except Exception:
+                goal_score = 0
+        else:
+            goal_score = 0
         logger.info(f'📝 Plan post-mortem prepared for {self.character_name}\n{self.plan_summary}\n')
         
         # Mark as completed to prevent redundant calls
         self.plan_summary_completed = True
-        self.plan_log.append({'goal': self.current_goal.to_string(), 'prompt': self.current_plan_prompt, 'plan': self.current_plan, 'summary': self.plan_summary, 'actions': self.action_history})
+        # Phase 1 metrics aggregation
+        try:
+            # Hunger series
+            hunger_values = [ar.hunger_after for ar in self.action_history if ar.hunger_after is not None]
+            hunger_start = hunger_values[0] if hunger_values else float(self.self_state.get('hunger', {}).get('value', 0.0))
+            hunger_end = hunger_values[-1] if hunger_values else hunger_start
+            hunger_min = min(hunger_values) if hunger_values else hunger_start
+            hunger_max = max(hunger_values) if hunger_values else hunger_start
+            hunger_delta = hunger_end - hunger_start
+            # Steps and outcomes
+            steps_total = len(self.action_history)
+            moves = sum(1 for ar in self.action_history if ar.action.get('type','').lower()=='move')
+            takes = sum(1 for ar in self.action_history if ar.action.get('type','').lower()=='take')
+            uses = sum(1 for ar in self.action_history if ar.action.get('type','').lower()=='use')
+            inspects = sum(1 for ar in self.action_history if ar.action.get('type','').lower()=='inspect')
+            failures = sum(1 for ar in self.action_history if getattr(ar, 'outcome_status', None) == 'failure')
+            # Time (proposed)
+            minutes_advanced = sum((ar.proposed_minutes or 0) for ar in self.action_history)
+            # Time (actual via simulation time, if available)
+            actual_minutes = None
+            try:
+                plan_start = self.current_plan_start_sim_iso
+                plan_end = None
+                for time_reply in self.session.get("cognitive/map/simulation_time", timeout=2.0 if not self.debug else 600.0):
+                    if time_reply.ok:
+                        time_data = json.loads(time_reply.ok.payload.to_bytes().decode('utf-8'))
+                        if time_data.get('success'):
+                            plan_end = time_data.get('time_info', {}).get('datetime')
+                            break
+                if plan_start and plan_end:
+                    from datetime import datetime as _dt
+                    start_dt = _dt.fromisoformat(plan_start)
+                    end_dt = _dt.fromisoformat(plan_end)
+                    delta = end_dt - start_dt
+                    actual_minutes = int(delta.total_seconds() // 60)
+            except Exception:
+                actual_minutes = None
+            # Inventory deltas (best-effort; requires exact ids in logs later if needed)
+            items_taken = [ar.action.get('target','') for ar in self.action_history if ar.action.get('type','').lower()=='take']
+            items_used = [ar.action.get('target','') for ar in self.action_history if ar.action.get('type','').lower()=='use']
+
+            metrics = {
+                'time': {
+                    'minutes_advanced': minutes_advanced,
+                    'actual_minutes': actual_minutes
+                },
+                'steps': {
+                    'total': steps_total,
+                    'moves': moves,
+                    'takes': takes,
+                    'uses': uses,
+                    'inspects': inspects,
+                    'failures': failures
+                },
+                'hunger': {
+                    'start': hunger_start,
+                    'end': hunger_end,
+                    'min': hunger_min,
+                    'max': hunger_max,
+                    'delta': hunger_delta
+                },
+                'inventory': {
+                    'taken': items_taken,
+                    'used': items_used
+                }
+            }
+        except Exception:
+            metrics = {}
+
+        # Add goal satisfaction score to metrics for reflection scoring
+        if 'goal_satisfaction' not in metrics:
+            metrics['goal_satisfaction'] = goal_score / 100.0 if goal_score is not None else 0.0
+
+        entry = {
+            'goal': self.current_goal.to_string() if self.current_goal else '',
+            'prompt': self.current_plan_prompt,
+            'plan': self.current_plan,
+            'summary': self.plan_summary,
+            'actions': [asdict(ar) for ar in self.action_history],
+            'metrics': metrics
+        }
+        self.plan_log.append(entry)
+        # Publish and persist JSONL
+        try:
+            self.plan_log_publisher.put(json.dumps(entry))
+        except Exception:
+            pass
+        try:
+            os.makedirs('data', exist_ok=True)
+            with open('data/plans.jsonl', 'a') as f:
+                f.write(json.dumps(entry, default=datetime_handler) + '\n')
+        except Exception as e:
+            logger.error(f'Error writing plan log to file: {e}')
         self.review_planning()
         self.action_history = []
     
@@ -1604,40 +1829,36 @@ end your response with </end>
         system_prompt = f"""Review the following planning information for one or more planning efforts and recommend improvements to the format or content of the PLAN_TEMPLATE.
 """
         
-        actions_text = []
-        for record in self.action_history:
-            action_type = record.action.get('type', 'unknown')
-            target = record.action.get('target', 'unknown')
-            result = record.result if record.result else 'no result recorded'
-            timestamp = record.timestamp.strftime('%H:%M:%S')
-            actions_text.append(f"{timestamp} - {action_type}: {target} -> {result}")
-        
-        actions_summary = '\n'.join(actions_text)
-
         user_prompt = f"""
 #Plan syntax specification:
 {PLAN_TEMPLATE}
 
 """
         for n, item in enumerate(self.plan_log):
+            # Build a compact metrics summary per plan (Phase 1)
+            m = item.get('metrics', {})
+            steps = m.get('steps', {})
+            hunger = m.get('hunger', {})
+            time_m = m.get('time', {})
+            metrics_summary = f"steps: {steps.get('total', 0)}, failures: {steps.get('failures', 0)}, minutes: {time_m.get('minutes_advanced', 0)}, hunger Δ: {hunger.get('delta', 0)}"
             user_prompt += f"""
 
 #### Planning effort {n+1}
 
 # Goal the plan was created for: 
-{self.plan_log[-1]['goal']}
+{item.get('goal','')}
 
 #Planning prompt:
-{self.plan_log[-1]['prompt']}
+{item.get('prompt','')}
 
 #Resulting Plan:
-{json.dumps(self.plan_log[-1]['plan'], indent=2)}
+{json.dumps(item.get('plan',{}), indent=2)}
 
-#Actions taken:
-{actions_summary}
+#Plan metrics (Phase 1):
+{metrics_summary}
 
 #Plan post-mortem summary:
-{self.plan_summary}
+{item.get('summary','')}
 
 """
         user_prompt += f"""
@@ -1652,10 +1873,10 @@ Identify any other issues with the planning process and recommend improvements.
 Provide your response as a list of items with full text descriptions, no other text.
 End your response with </end>
 """
-
-        response = self.llm_client.ask(bindings={}, prompt=[SystemMessage(content=system_prompt), UserMessage(content=user_prompt)], 
+        logger.info(f'📝 Planning review for {self.character_name}:\n{system_prompt}\n{user_prompt}')
+        response = self.llm.ask(bindings={}, prompt=[SystemMessage(content=system_prompt), UserMessage(content=user_prompt)], 
                                        max_tokens=800, stops=['</end>'], is_json=False)
-        logger.info(f'📝 Planning review for {self.character_name}: {response}')
+        logger.info(f'📝 Planning review for {self.character_name}:\n {response}')
         self.plan_log = []
         
 

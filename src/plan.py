@@ -711,13 +711,10 @@ def _evaluate_condition(character: ZenohExecutiveNode, condition: dict) -> bool:
         
         # Local fast-path helpers using last_situation_data
         def _target_matches(name: str, target_str: str) -> bool:
-            if not isinstance(name, str):
+            if not isinstance(name, str) or not isinstance(target_str, str):
                 return False
-            if not isinstance(target_str, str):
-                return False
-            # Exec semantics: if target has no digits, allow prefix match; else require exact
-            has_digits = any(ch.isdigit() for ch in target_str)
-            return name == target_str or (not has_digits and name.startswith(target_str))
+            # For non-scan semantics: always require exact id equality
+            return name == target_str
         
         def _local_find_visible(tgt: str):
             try:
@@ -795,9 +792,24 @@ def _evaluate_condition(character: ZenohExecutiveNode, condition: dict) -> bool:
                 return None
         
         try:
+            # Reject type-level targets (no digits) for non-scan contexts
+            try:
+                if isinstance(target, str) and not any(ch.isdigit() for ch in target):
+                    # Only scan accepts resource types; conditions/actions require instance ids
+                    return {'value': False, 'binding': None}
+            except Exception:
+                pass
+
             # Query the appropriate node based on normalized condition type
             if normalized_type == 'near':
-                # Local fast path
+                # Treat exact inventory id as near
+                try:
+                    inv = getattr(character, 'inventory_cache', []) or []
+                    if isinstance(target, str) and target in inv:
+                        return {'value': (not negated), 'binding': target} if not negated else {'value': False, 'binding': None}
+                except Exception:
+                    pass
+                # Local fast path in views
                 binding = _local_find_near(target)
                 if binding is not None:
                     return {'value': (not negated), 'binding': binding} if not negated else {'value': False, 'binding': None}
