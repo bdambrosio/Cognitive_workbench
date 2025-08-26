@@ -17,6 +17,21 @@
             "preLaunchTask": "setup-zenoh-environment"
         },
         {
+            "name": "Debug Activity (laTerre.yaml)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/activity.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/src",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src"
+            },
+            "args": ["../scenarios/laTerre.yaml"],
+            "justMyCode": false,
+            "stopOnEntry": false,
+            "preLaunchTask": "setup-zenoh-environment"
+        },
+        {
             "name": "Debug Activity (Joe.yaml)",
             "type": "debugpy",
             "request": "launch",
@@ -206,6 +221,21 @@
             "type": "debugpy",
             "request": "launch",
             "program": "${file}",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/src",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src"
+            },
+            "args": [],
+            "justMyCode": false,
+            "stopOnEntry": false,
+            "preLaunchTask": "setup-zenoh-environment"
+        },
+        {
+            "name": "Reflection Review",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/reflection.py",
             "console": "integratedTerminal",
             "cwd": "${workspaceFolder}/src",
             "env": {

@@ -79,6 +79,7 @@ DEFAULT_ACTIVITY = {
 
 from templates import ONTOLOGY_TEMPLATE, ACTIVITIES_TEMPLATE
 llm_client = None
+from utils.format_utils import format_views_compact
 
 
 def create_ontology(context, character_name, character, character_drives, other_characters):
@@ -277,8 +278,10 @@ class ActivityManager:
             # Extract views if available
             if last_data.get('views'):
                 situation['views'] = last_data['views']
+                situation['views_compact'] = format_views_compact(last_data['views'])
             else:
                 situation['views'] = {}
+                situation['views_compact'] = ''
             entity_context = self.executive_node.get_entity_context(self.executive_node.character_name, 10)
             situation['thoughts'] = 'No thoughts available'
             if entity_context:
@@ -307,6 +310,7 @@ class ActivityManager:
             situation['adjacent_resources'] = []
             situation['adjacent_characters'] = []
             situation['views'] = {}
+            situation['views_compact'] = ''
         
         # Get simulation time from map_node
         try:
@@ -577,6 +581,7 @@ Time: {situation.get('time_info', {})}
 Weather: {situation.get('weather', 'unknown')}
 Location: {situation.get('current_location', {})}
 Visible resources: {self._summarize_resources(situation)}
+Views (compact, one JSON object per line):\n{situation.get('views_compact', '')}
 
 #You have two tasks:
 #Your first task is to evaluate how well this activity serves the character's drives.

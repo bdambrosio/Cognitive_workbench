@@ -187,7 +187,7 @@ end your response with </end>
 PLAN_TEMPLATE = """Task: Decompose down your current goal into a minimal plan in the JSON format specified below.
 Output: only valid JSON – no prose, no code fences.
 
-Meta-spec (machine-readable constraints – copy these rules):
+Meta-spec (strictly observe these rules in your output):
 {
   "actions": ["move","say","think","take","inspect","use","scan","while","if"],
   "conditions": [
@@ -277,7 +277,7 @@ outside a while or if condition, "type" can take the values "say", "move", "thin
      for speaking to another character you can see. Use this to seek information, respond, inform the other character, or to maintain 'social chatter' to stay aligned.
      For a 'say' act, speak only for yourself, and do not include any other introductory, explanatory, discursive, or formatting text in your response.
  - "scan": { "type": "scan", "target": "resource_type", "out": "variable_name to assign the scan result to" }
-     Scan a resource type to find the first matching instance in your current situation.
+     Scan a resource type to find the nearest matching instance in your current situation.
  - "wait": { "type": "wait", "condition": "condition_name", "target": "condition_target" }
      Wait for a condition to be true. The condition must be one of the Condition actions listed earlier.
  - "think": { "type": "think", "value": "text to think about" } 

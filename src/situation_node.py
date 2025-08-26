@@ -109,6 +109,13 @@ class ZenohSituationNode:
             f"cognitive/{character_name}/action",
             self.action_callback
         )
+
+        # Subscriber for explicit situation update requests (step_look, etc.)
+        # Executive publishes to this topic after actions that change visibility/adjacency
+        self.request_update_subscriber = self.session.declare_subscriber(
+            f"cognitive/{character_name}/situation/request_update",
+            self.map_update_callback
+        )
         
         # Subscriber for map update requests (character-specific)
         self.map_update_request_subscriber = self.session.declare_subscriber(
@@ -171,6 +178,7 @@ class ZenohSituationNode:
         logger.info(f'🧭 Situation Node initialized for character: {character_name}')
         logger.info(f'   - Subscribing to: cognitive/{character_name}/sense_data')
         logger.info(f'   - Subscribing to: cognitive/{character_name}/action')
+        logger.info(f'   - Subscribing to: cognitive/{character_name}/situation/request_update')
         logger.info(f'   - Publishing to: cognitive/{character_name}/situation/update')
         logger.info(f'   - Queryable at: cognitive/{character_name}/situation/current_situation')
         logger.info(f'   - Proximity queryable at: cognitive/{character_name}/situation/proximity')
