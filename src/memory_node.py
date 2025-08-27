@@ -262,6 +262,15 @@ class ZenohMemoryNode:
                     logger.info(f'📦 Added {target} to {self.character_name} inventory via take action')
                 else:
                     logger.error(f'Take action missing target: {data.get("action_id", "unknown")}')
+            elif action_type == 'place':
+                # Handle place action by removing item from inventory if placement succeeded
+                target = data.get('target', '')
+                status = data.get('status', 'success')
+                if target and status == 'success':
+                    self.remove_item(target)
+                    logger.info(f'🧺 Removed {target} from {self.character_name} inventory via place action')
+                elif not target:
+                    logger.error(f'Place action missing target: {data.get("action_id", "unknown")}')
             else:
                 # Store other action types in short-term memory
                 self.short_term_memory.append(data)

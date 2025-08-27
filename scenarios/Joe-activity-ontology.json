@@ -3,114 +3,117 @@
     "Forest",
     "Clearing",
     "Meadow",
-    "Mountain",
     "Water",
+    "Mountain",
+    "Spring",
     "Cave",
-    "Thicket",
-    "Appletree",
-    "Spring"
+    "Thicket"
   ],
   "tools": [
-    "Backpack",
-    "Food (packed)",
-    "Water (bottle)",
-    "Fallenbranch",
     "Berries",
     "Mushrooms",
-    "Appletree (apples)"
+    "Appletree",
+    "Fallenbranch",
+    "Spring",
+    "Backpack",
+    "Food",
+    "Water bottle",
+    "Pocket knife",
+    "Map (if present)"
   ],
   "roles": [
-    "Forager",
     "Explorer",
-    "Investigator",
+    "Forager",
+    "Problem Solver",
     "Survivor",
-    "Companion (potential)"
+    "Investigator",
+    "Seeker",
+    "Companion (if others are present)"
   ],
   "norms_rules": [
+    "Prioritize safety and survival",
+    "Respect the natural environment",
     "Avoid unnecessary risks",
-    "Use minimal impact on environment",
-    "Remain wary of strangers",
-    "Value logical problem-solving",
-    "Prioritize basic needs",
-    "Act informally unless safety or curiosity demands precision"
+    "Be curious and observant",
+    "Act independently but open to teamwork",
+    "Avoid direct confrontation unless necessary",
+    "Do not consume unknown flora unless identified as safe"
   ],
   "hazards": [
-    "Cave (potential injury, wild animals)",
-    "Mushrooms (possible poison)",
-    "Mountain (fall risk, exposure)",
-    "Thicket (scratches, entanglement)",
-    "Water (drowning, slippery banks)",
-    "Unknown persons (social/emotional danger)",
-    "Insects or ticks"
+    "Poisonous Berries",
+    "Poisonous Mushrooms",
+    "Thick Underbrush (Thicket)",
+    "Steep Areas (Mountain)",
+    "Wild Animals (implied hazard)",
+    "Dehydration",
+    "Exposure",
+    "Getting lost",
+    "Slippery Rocks near Water",
+    "Entrapment in Cave"
   ],
   "social_graph": [
     {
       "name": "Joe",
       "relationship": "self"
-    },
-    {
-      "name": "Unknown other person",
-      "relationship": "stranger, possible threat or ally"
     }
   ],
   "time_windows": "morning",
   "affordances": {
     "Forest": [
-      "Hide",
-      "Forage (berries, mushrooms)",
-      "Gather fallen branches",
-      "Explore",
-      "Observe wildlife"
+      "exploring",
+      "foraging",
+      "seeking shelter",
+      "identifying plants",
+      "navigating",
+      "climbing"
     ],
     "Clearing": [
-      "Rest",
-      "Scan for landmarks",
-      "Eat",
-      "Socialize (if other present)"
+      "resting",
+      "surveying area",
+      "setting up temporary camp",
+      "eating"
     ],
     "Meadow": [
-      "Rest",
-      "Observe sunrise",
-      "Forage (flowers, possibly berries)"
-    ],
-    "Mountain": [
-      "Climb",
-      "Scout for views/exits",
-      "Risk assessment"
+      "resting",
+      "spotting landmarks",
+      "gathering edible plants"
     ],
     "Water": [
-      "Refill water",
-      "Clean self or clothes",
-      "Observe aquatic life"
+      "drinking",
+      "washing",
+      "refilling bottles",
+      "following downstream"
     ],
-    "Cave": [
-      "Shelter",
-      "Investigate",
-      "Hide"
-    ],
-    "Thicket": [
-      "Find hidden resources",
-      "Hide",
-      "Risk injury"
-    ],
-    "Appletree": [
-      "Harvest apples",
-      "Observe insects"
+    "Mountain": [
+      "climbing for vantage",
+      "navigating terrain",
+      "avoiding hazards"
     ],
     "Spring": [
-      "Gather water",
-      "Rest",
-      "Observe surroundings"
+      "collecting water",
+      "resting"
+    ],
+    "Cave": [
+      "sheltering",
+      "exploring",
+      "hiding"
+    ],
+    "Thicket": [
+      "hiding",
+      "foraging carefully",
+      "avoiding injury"
     ]
   },
   "states": [
     "hunger",
+    "thirst",
     "fatigue",
     "injury",
-    "thirst",
-    "confusion",
+    "curiosity",
     "anxiety",
+    "loneliness",
     "hope",
-    "loneliness"
+    "alertness",
+    "confusion"
   ]
 }

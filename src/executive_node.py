@@ -1223,7 +1223,7 @@ end your response with </end>
         logger.debug(f'🔄 {self.character_name} executing plan step {idx + 1}/{len(plan)}: {stype} action')
 
         # Primitive actions (spec-compliant)
-        if stype in ('move', 'say', 'think', 'take', 'inspect', 'use', 'scan'):
+        if stype in ('move', 'say', 'think', 'take', 'place', 'inspect', 'use', 'scan'):
             current['idx'] = idx + 1
             return step
 
@@ -1456,6 +1456,55 @@ end your response with </end>
                 return False
             self.take(resolved)
             self.action_counter += 1
+        elif action['type'].lower() == "place":
+            # Precondition: must have item in inventory (has_item)
+            cond_action = action.copy()
+            # Dereference variable targets
+            try:
+                rt = cond_action.get('target', '')
+                if isinstance(rt, str) and rt.startswith('$'):
+                    vn = rt[1:]
+                    if vn in self.plan_bindings:
+                        cond_action['target'] = self.plan_bindings[vn]
+            except Exception:
+                pass
+            cond_action['type'] = 'has_item'
+            cond_action['target'] = cond_action['target'].strip().capitalize()
+            binding = plan_module._evaluate_condition(self, cond_action)
+            outcome = binding['value']
+            resolved = binding['binding']
+            # Telemetry: store resolved target
+            try:
+                action_record.resolved_target = resolved if resolved else ''
+            except Exception:
+                pass
+            action_data = {
+                'type': 'place',
+                'action_id': self.action_counter,
+                'timestamp': datetime.now().isoformat(),
+                'target': resolved if resolved else '',
+                'requested_target': action.get('target', ''),
+                'resolved_target': resolved if resolved else ''
+            }
+            if not outcome or not resolved:
+                action_data['status'] = 'failed'
+                action_data['error'] = 'item not in inventory'
+                self.action_publisher.put(json.dumps(action_data))
+                # Telemetry failure tagging
+                action_record.outcome_status = 'failure'
+                action_record.failure_code = 'precondition:has_item'
+                self.action_counter += 1
+                return False
+            # Perform place on map
+            ok = self.place(resolved)
+            # Telemetry snapshot after action
+            if ok:
+                try:
+                    action_record.hunger_after = float(self.self_state.get('hunger', {}).get('value', 0.0))
+                except Exception:
+                    action_record.hunger_after = None
+            self.action_counter += 1
+            return ok
         elif action['type'].lower() == "inspect":
             # Publish inspect action including requested vs resolved target
             cond_action = action.copy()
@@ -2652,6 +2701,72 @@ End your text with: </end>"""
         }
         self.action_publisher.put(json.dumps(action_data))
         logger.info(f'📤 Published take action: {target} (failed)')
+        return False
+
+    def place(self, target: str):
+        """Place a resource from inventory onto the current map square."""
+        # Update the most recent action record with the result
+        if self.action_history:
+            self.action_history[-1].result = f'placing {target}'
+
+        def _do_place(target: str):
+            logger.info(f'📦 Placing {target} for {self.character_name}')
+            if self.action_history:
+                self.action_history[-1].result = f'placing {target}'
+
+            placed = False
+            last_error = ''
+            try:
+                payload = json.dumps({'character_name': self.character_name}).encode('utf-8')
+            except Exception:
+                payload = None
+            for reply in self.session.get(f"cognitive/map/resource/place/{target}", payload=payload, timeout=2.0 if not self.debug else 600.0):
+                if reply.ok:
+                    data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
+                    if data.get('success'):
+                        logger.info(f'🧺 Placed {target} onto map')
+                        placed = True
+                    else:
+                        last_error = data.get('error', 'Unknown error')
+                        logger.error(f'⚠️ Failed to place {target} on map: {last_error}')
+                else:
+                    last_error = 'No response from map_node'
+                    logger.error(f'⚠️ Failed to place {target} on map - no response')
+                break
+
+            return placed
+
+        try:
+            result = _do_place(target)
+            # Create and publish action data for logging/display
+            action_data = {
+                'type': 'place',
+                'target': target,
+                'action_id': f"place_{int(time.time())}",
+                'timestamp': datetime.now().isoformat(),
+                'character': self.character_name,
+                'status': 'success' if result else 'failed'
+            }
+            self.action_publisher.put(json.dumps(action_data))
+            logger.info(f'📤 Published place action: {target} ({action_data["status"]})')
+            return result
+
+        except Exception as e:
+            logger.error(f'Error in place operation for {target}: {e}')
+            if self.action_history:
+                self.action_history[-1].result = f'place failed'
+
+        # Create and publish failure action data for logging/display
+        action_data = {
+            'type': 'place',
+            'target': target,
+            'action_id': f"place_{int(time.time())}",
+            'timestamp': datetime.now().isoformat(),
+            'character': self.character_name,
+            'status': 'failed'
+        }
+        self.action_publisher.put(json.dumps(action_data))
+        logger.info(f'📤 Published place action: {target} (failed)')
         return False
     
     def inspect(self, action: dict, target: str):

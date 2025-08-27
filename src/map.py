@@ -663,7 +663,9 @@ class WorldMap:
         candidates = []
         for candidate in self.resource_registry:
             if self.resource_registry[candidate]['type'] == resource_type:
-                candidates.append(self.resource_registry[candidate]['location'])
+                loc = self.resource_registry[candidate].get('location')
+                if isinstance(loc, (list, tuple)) and len(loc) == 2:
+                    candidates.append(loc)
         if len(candidates) == 0:
             return random.randint(0, self.width-1), random.randint(0, self.height-1)
         return random.choice(candidates)
@@ -1150,26 +1152,62 @@ class WorldMap:
         #print(f"DEBUG: Placed {self.scenario_module.required_resource_name} resource {resource_id} at ({market_x}, {market_y})")
 
     def remove_resource(self, resource_id):
-        """Remove a resource from the map completely."""
+        """Detach a resource from the map patch but keep it in the registry.
+
+        This models picking up the resource (e.g., via take). The resource's
+        location is set to None and it is removed from its patch listing.
+        """
         try:
             if resource_id not in self.resource_registry:
                 return False
-            
-            # Get location from stored data
+
             resource_data = self.resource_registry[resource_id]
-            x, y = resource_data['location']
-            
-            # Remove from patch
-            if resource_id in self.patches[x][y].resources:
-                del self.patches[x][y].resources[resource_id]
-            
-            # Remove from registry
-            del self.resource_registry[resource_id]
-            
+            # If it currently has a location on the map, remove it from that patch
+            loc = resource_data.get('location')
+            if isinstance(loc, (list, tuple)) and len(loc) == 2:
+                x, y = loc
+                if 0 <= x < self.width and 0 <= y < self.height:
+                    if resource_id in self.patches[x][y].resources:
+                        del self.patches[x][y].resources[resource_id]
+
+            # Keep in registry but mark as off-map
+            self.resource_registry[resource_id]['location'] = None
+
             return True
-            
+
         except Exception as e:
             print(f"Error removing resource {resource_id}: {e}")
+            return False
+
+    def place_resource(self, resource_id, x, y):
+        """Place or move a resource instance onto the map at (x, y).
+
+        - If the resource was already placed elsewhere, it will be moved.
+        - No terrain restrictions are enforced here (policy handled elsewhere).
+        """
+        try:
+            if resource_id not in self.resource_registry:
+                print(f"ERROR: Resource {resource_id} not found")
+                return False
+            if not (0 <= x < self.width and 0 <= y < self.height):
+                print(f"ERROR: Invalid placement location ({x},{y}) for resource {resource_id}")
+                return False
+
+            # If currently on map somewhere else, remove from that patch
+            current_loc = self.resource_registry[resource_id].get('location')
+            if isinstance(current_loc, (list, tuple)) and len(current_loc) == 2:
+                cx, cy = current_loc
+                if 0 <= cx < self.width and 0 <= cy < self.height:
+                    if resource_id in self.patches[cx][cy].resources:
+                        del self.patches[cx][cy].resources[resource_id]
+
+            # Set new location and add to target patch
+            self.resource_registry[resource_id]['location'] = (x, y)
+            self.patches[x][y].resources[resource_id] = 1
+            return True
+
+        except Exception as e:
+            print(f"Error placing resource {resource_id} at ({x},{y}): {e}")
             return False
 
     def generate_infrastructure(self):

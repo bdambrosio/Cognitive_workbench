@@ -1,525 +1,566 @@
-2025-08-25 18:29:11 - situation_node - INFO - 🔧 Debug mode enabled for Joe
-2025-08-25 18:29:11 - situation_node - INFO - 📂 No existing situation file for Joe, starting fresh
-2025-08-25 18:29:11 - situation_node - INFO - 🧭 Situation Node initialized for character: Joe
-2025-08-25 18:29:11 - situation_node - INFO -    - Subscribing to: cognitive/Joe/sense_data
-2025-08-25 18:29:11 - situation_node - INFO -    - Subscribing to: cognitive/Joe/action
-2025-08-25 18:29:11 - situation_node - INFO -    - Subscribing to: cognitive/Joe/situation/request_update
-2025-08-25 18:29:11 - situation_node - INFO -    - Publishing to: cognitive/Joe/situation/update
-2025-08-25 18:29:11 - situation_node - INFO -    - Queryable at: cognitive/Joe/situation/current_situation
-2025-08-25 18:29:11 - situation_node - INFO -    - Proximity queryable at: cognitive/Joe/situation/proximity
-2025-08-25 18:29:11 - situation_node - INFO -    - Visibility queryable at: cognitive/Joe/situation/visibility
-2025-08-25 18:29:11 - situation_node - INFO -    - Location queryable at: cognitive/Joe/situation/location
-2025-08-25 18:29:11 - situation_node - INFO -    - Storage available at: data/situation/Joe_situation.json
-2025-08-25 18:29:11 - situation_node - INFO - Situation Node running - press Ctrl+C to stop
-2025-08-25 18:29:15 - situation_node - INFO - 📥 Received action: announcement
-2025-08-25 18:29:15 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:29:15 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:29:15 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:29:15 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:29:16 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:29:16 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:29:16 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:36:15 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:36:15 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:36:15 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:36:15 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:36:15 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:36:15 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:36:32 - situation_node - INFO - 📥 Received action: scan
-2025-08-25 18:36:36 - situation_node - INFO - 🧭 Proximity query for Berries13: True
-2025-08-25 18:36:36 - situation_node - INFO - 🧭 Situation query: returned current situation
-2025-08-25 18:36:36 - situation_node - INFO - 📥 Received action: move
-2025-08-25 18:36:36 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:36:36 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:36:36 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:36:36 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:36:36 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:36:36 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:36:36 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:36:36 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:36:36 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:36:37 - situation_node - INFO - 🧭 Proximity query for Berries13: True
-2025-08-25 18:36:37 - situation_node - INFO - 🧭 Situation query: returned current situation
-2025-08-25 18:36:37 - situation_node - INFO - 📥 Received action: move
-2025-08-25 18:36:37 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:36:37 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:36:37 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:36:37 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:36:37 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:36:37 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:36:37 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:36:37 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:36:37 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:36:38 - situation_node - INFO - 🧭 Proximity query for Berries13: True
-2025-08-25 18:36:38 - situation_node - INFO - 🧭 Situation query: returned current situation
-2025-08-25 18:36:38 - situation_node - INFO - 📥 Received action: move
-2025-08-25 18:36:38 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:36:38 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:36:38 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:36:38 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:36:38 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:36:38 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:36:38 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:36:38 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:36:38 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:36:39 - situation_node - INFO - 📥 Received action: take
-2025-08-25 18:36:39 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:36:39 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:36:39 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:36:39 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:36:39 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:36:39 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:36:41 - situation_node - INFO - 📥 Received action: use
-2025-08-25 18:37:02 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:37:02 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:37:02 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:37:02 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:37:02 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:37:02 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:37:20 - situation_node - INFO - 📥 Received action: scan
-2025-08-25 18:37:21 - situation_node - INFO - 🧭 Proximity query for Berries1: True
-2025-08-25 18:37:21 - situation_node - INFO - 🧭 Situation query: returned current situation
-2025-08-25 18:37:21 - situation_node - INFO - 📥 Received action: move
-2025-08-25 18:37:21 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:37:21 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:37:21 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:37:21 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:37:21 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:37:21 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:37:21 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:37:21 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:37:21 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:37:22 - situation_node - INFO - 🧭 Proximity query for Berries1: True
-2025-08-25 18:37:22 - situation_node - INFO - 🧭 Situation query: returned current situation
-2025-08-25 18:37:22 - situation_node - INFO - 📥 Received action: move
-2025-08-25 18:37:22 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:37:22 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:37:22 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:37:22 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:37:22 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:37:22 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:37:22 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:37:22 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:37:22 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:37:23 - situation_node - INFO - 🧭 Proximity query for Berries1: True
-2025-08-25 18:37:23 - situation_node - INFO - 🧭 Situation query: returned current situation
-2025-08-25 18:37:23 - situation_node - INFO - 📥 Received action: move
-2025-08-25 18:37:23 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:37:23 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:37:23 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:37:23 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:37:23 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:37:23 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:37:23 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:37:23 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:37:23 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:37:24 - situation_node - INFO - 🧭 Proximity query for Berries1: True
-2025-08-25 18:37:24 - situation_node - INFO - 🧭 Situation query: returned current situation
-2025-08-25 18:37:24 - situation_node - INFO - 📥 Received action: move
-2025-08-25 18:37:24 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:37:24 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:37:24 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:37:24 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:37:24 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:37:24 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:37:24 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:37:24 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:37:24 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:37:25 - situation_node - INFO - 🧭 Proximity query for Berries1: True
-2025-08-25 18:37:25 - situation_node - INFO - 🧭 Situation query: returned current situation
-2025-08-25 18:37:25 - situation_node - INFO - 📥 Received action: move
-2025-08-25 18:37:25 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:37:25 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:37:25 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:37:25 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:37:25 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:37:25 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:37:25 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:37:25 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:37:25 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:37:26 - situation_node - INFO - 🧭 Proximity query for Berries1: False
-2025-08-25 18:37:26 - situation_node - INFO - 📥 Received action: take
-2025-08-25 18:37:27 - situation_node - INFO - 🧭 Proximity query for Berries1: False
-2025-08-25 18:37:49 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:37:49 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:37:49 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:37:49 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:37:49 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:37:49 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:38:02 - situation_node - INFO - 📥 Received action: scan
-2025-08-25 18:38:03 - situation_node - INFO - 🧭 Proximity query for Berries1: True
-2025-08-25 18:38:03 - situation_node - INFO - 🧭 Situation query: returned current situation
-2025-08-25 18:38:03 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:38:03 - situation_node - INFO - 📥 Received action: move
-2025-08-25 18:38:03 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:38:03 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:38:03 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:38:03 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:38:03 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:38:03 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:38:03 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:38:03 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:38:04 - situation_node - INFO - 📥 Received action: take
-2025-08-25 18:38:04 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:38:04 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:38:04 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:38:04 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:38:04 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:38:04 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:38:06 - situation_node - INFO - 📥 Received action: use
-2025-08-25 18:38:27 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:38:27 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:38:27 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:38:27 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:38:27 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:38:27 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:38:40 - situation_node - INFO - 📥 Received action: scan
-2025-08-25 18:38:41 - situation_node - INFO - 🧭 Proximity query for Berries15: True
-2025-08-25 18:38:41 - situation_node - INFO - 🧭 Situation query: returned current situation
-2025-08-25 18:38:41 - situation_node - INFO - 📥 Received action: move
-2025-08-25 18:38:41 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:38:41 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:38:41 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:38:41 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:38:41 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:38:41 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:38:41 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:38:41 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:38:41 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:38:42 - situation_node - INFO - 🧭 Proximity query for Berries15: True
-2025-08-25 18:38:42 - situation_node - INFO - 🧭 Situation query: returned current situation
-2025-08-25 18:38:42 - situation_node - INFO - 📥 Received action: move
-2025-08-25 18:38:42 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:38:42 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:38:42 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:38:42 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:38:42 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:38:42 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:38:42 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:38:42 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:38:42 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:38:43 - situation_node - INFO - 🧭 Proximity query for Berries15: True
-2025-08-25 18:38:43 - situation_node - INFO - 🧭 Situation query: returned current situation
-2025-08-25 18:38:43 - situation_node - INFO - 📥 Received action: move
-2025-08-25 18:38:43 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:38:43 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:38:43 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:38:43 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:38:43 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:38:43 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:38:43 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:38:43 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:38:43 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:38:44 - situation_node - INFO - 🧭 Proximity query for Berries15: True
-2025-08-25 18:38:44 - situation_node - INFO - 🧭 Situation query: returned current situation
-2025-08-25 18:38:44 - situation_node - INFO - 📥 Received action: move
-2025-08-25 18:38:44 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:38:44 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:38:44 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:38:44 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:38:44 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:38:44 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:38:44 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:38:44 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:38:44 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:38:45 - situation_node - INFO - 🧭 Proximity query for Berries15: True
-2025-08-25 18:38:45 - situation_node - INFO - 🧭 Situation query: returned current situation
-2025-08-25 18:38:45 - situation_node - INFO - 📥 Received action: move
-2025-08-25 18:38:45 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:38:45 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:38:45 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:38:45 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:38:45 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:38:45 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:38:45 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:38:45 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:38:45 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:38:46 - situation_node - INFO - 🧭 Proximity query for Berries15: False
-2025-08-25 18:38:46 - situation_node - INFO - 📥 Received action: take
-2025-08-25 18:38:47 - situation_node - INFO - 🧭 Proximity query for Berries15: False
-2025-08-25 18:39:07 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:39:07 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:39:07 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:39:07 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:39:07 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:39:07 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:39:19 - situation_node - INFO - 📥 Received action: scan
-2025-08-25 18:39:20 - situation_node - INFO - 🧭 Proximity query for Berries15: True
-2025-08-25 18:39:20 - situation_node - INFO - 🧭 Situation query: returned current situation
-2025-08-25 18:39:20 - situation_node - INFO - 📥 Received action: move
-2025-08-25 18:39:20 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:39:20 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:39:20 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:39:20 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:39:20 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:39:20 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:39:20 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:39:20 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:39:20 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:39:21 - situation_node - INFO - 📥 Received action: take
-2025-08-25 18:39:21 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:39:21 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:39:21 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:39:21 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:39:21 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:39:21 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:39:23 - situation_node - INFO - 📥 Received action: use
-2025-08-25 18:39:43 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:39:43 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:39:43 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:39:43 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:39:43 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:39:43 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:39:53 - situation_node - INFO - 📥 Received action: scan
-2025-08-25 18:39:54 - situation_node - INFO - 🧭 Proximity query for Spring3: True
-2025-08-25 18:39:54 - situation_node - INFO - 🧭 Situation query: returned current situation
-2025-08-25 18:39:54 - situation_node - INFO - 📥 Received action: move
-2025-08-25 18:39:54 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:39:54 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:39:54 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:39:54 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:39:54 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:39:54 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:39:54 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:39:54 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:39:54 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:39:55 - situation_node - INFO - 🧭 Proximity query for Spring3: True
-2025-08-25 18:39:55 - situation_node - INFO - 🧭 Situation query: returned current situation
-2025-08-25 18:39:55 - situation_node - INFO - 📥 Received action: move
-2025-08-25 18:39:55 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:39:55 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:39:55 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:39:55 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:39:55 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:39:55 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:39:55 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:39:55 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:39:55 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:39:56 - situation_node - INFO - 🧭 Proximity query for Spring3: True
-2025-08-25 18:39:56 - situation_node - INFO - 🧭 Situation query: returned current situation
-2025-08-25 18:39:56 - situation_node - INFO - 📥 Received action: move
-2025-08-25 18:39:56 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:39:56 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:39:56 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:39:56 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:39:56 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:39:56 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:39:56 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:39:56 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:39:56 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:39:57 - situation_node - INFO - 🧭 Proximity query for Spring3: True
-2025-08-25 18:39:57 - situation_node - INFO - 🧭 Situation query: returned current situation
-2025-08-25 18:39:57 - situation_node - INFO - 📥 Received action: move
-2025-08-25 18:39:57 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:39:57 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:39:57 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:39:57 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:39:57 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:39:57 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:39:57 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:39:57 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:39:57 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:39:59 - situation_node - INFO - 📥 Received action: use
-2025-08-25 18:40:17 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:40:17 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:40:17 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:40:17 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:40:17 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:40:17 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:40:29 - situation_node - INFO - 📥 Received action: scan
-2025-08-25 18:40:30 - situation_node - INFO - 🧭 Proximity query for Berries11: True
-2025-08-25 18:40:30 - situation_node - INFO - 🧭 Situation query: returned current situation
-2025-08-25 18:40:30 - situation_node - INFO - 📥 Received action: move
-2025-08-25 18:40:30 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:40:30 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:40:30 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:40:30 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:40:30 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:40:30 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:40:30 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:40:30 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:40:30 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:40:31 - situation_node - INFO - 🧭 Proximity query for Berries11: True
-2025-08-25 18:40:31 - situation_node - INFO - 🧭 Situation query: returned current situation
-2025-08-25 18:40:31 - situation_node - INFO - 📥 Received action: move
-2025-08-25 18:40:31 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:40:31 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:40:31 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:40:31 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:40:31 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:40:31 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:40:31 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:40:31 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:40:31 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:40:32 - situation_node - INFO - 🧭 Proximity query for Berries11: True
-2025-08-25 18:40:32 - situation_node - INFO - 🧭 Situation query: returned current situation
-2025-08-25 18:40:32 - situation_node - INFO - 📥 Received action: move
-2025-08-25 18:40:32 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:40:32 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:40:32 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:40:32 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:40:32 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:40:32 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:40:32 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:40:32 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:40:32 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:40:33 - situation_node - INFO - 🧭 Proximity query for Berries11: True
-2025-08-25 18:40:33 - situation_node - INFO - 🧭 Situation query: returned current situation
-2025-08-25 18:40:33 - situation_node - INFO - 📥 Received action: move
-2025-08-25 18:40:33 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:40:33 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:40:33 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:40:33 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:40:33 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:40:33 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:40:33 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:40:33 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:40:33 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:40:34 - situation_node - INFO - 🧭 Proximity query for Berries11: True
-2025-08-25 18:40:34 - situation_node - INFO - 🧭 Situation query: returned current situation
-2025-08-25 18:40:34 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:40:34 - situation_node - INFO - 📥 Received action: move
-2025-08-25 18:40:34 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:40:34 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:40:34 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:40:34 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:40:34 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:40:34 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:40:34 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:40:34 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:40:35 - situation_node - INFO - 🧭 Proximity query for Berries11: False
-2025-08-25 18:40:35 - situation_node - INFO - 📥 Received action: take
-2025-08-25 18:40:36 - situation_node - INFO - 🧭 Proximity query for Berries11: False
-2025-08-25 18:40:56 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:40:56 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:40:56 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:40:56 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:40:56 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:40:56 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:41:06 - situation_node - INFO - 📥 Received action: scan
-2025-08-25 18:41:07 - situation_node - INFO - 🧭 Proximity query for Berries11: True
-2025-08-25 18:41:07 - situation_node - INFO - 🧭 Situation query: returned current situation
-2025-08-25 18:41:07 - situation_node - INFO - 📥 Received action: move
-2025-08-25 18:41:07 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:41:07 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:41:07 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:41:07 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:41:07 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:41:07 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:41:07 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:41:07 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:41:07 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:41:08 - situation_node - INFO - 🧭 Proximity query for Berries11: True
-2025-08-25 18:41:08 - situation_node - INFO - 🧭 Situation query: returned current situation
-2025-08-25 18:41:08 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:41:08 - situation_node - INFO - 📥 Received action: move
-2025-08-25 18:41:08 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:41:08 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:41:08 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:41:08 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:41:08 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:41:08 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:41:08 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:41:08 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:41:09 - situation_node - INFO - 🧭 Proximity query for Berries11: True
-2025-08-25 18:41:09 - situation_node - INFO - 🧭 Situation query: returned current situation
-2025-08-25 18:41:09 - situation_node - INFO - 📥 Received action: move
-2025-08-25 18:41:09 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:41:09 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:41:09 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:41:09 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:41:09 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:41:09 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:41:09 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:41:09 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:41:09 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:41:10 - situation_node - INFO - 🧭 Proximity query for Berries11: True
-2025-08-25 18:41:10 - situation_node - INFO - 🧭 Situation query: returned current situation
-2025-08-25 18:41:10 - situation_node - INFO - 📥 Received action: move
-2025-08-25 18:41:10 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:41:10 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:41:10 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:41:10 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:41:10 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:41:10 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:41:10 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:41:10 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:41:10 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:41:11 - situation_node - INFO - 📥 Received action: take
-2025-08-25 18:41:11 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:41:11 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:41:11 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:41:11 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:41:11 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:41:11 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:41:13 - situation_node - INFO - 📥 Received action: use
-2025-08-25 18:41:31 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:41:31 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:41:31 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:41:31 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:41:31 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:41:31 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:41:41 - situation_node - INFO - 📥 Received action: scan
-2025-08-25 18:41:42 - situation_node - INFO - 🧭 Proximity query for Berries7: True
-2025-08-25 18:41:42 - situation_node - INFO - 🧭 Situation query: returned current situation
-2025-08-25 18:41:42 - situation_node - INFO - 📥 Received action: move
-2025-08-25 18:41:42 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:41:42 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:41:42 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:41:42 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:41:42 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:41:42 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:41:42 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:41:42 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:41:42 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:41:43 - situation_node - INFO - 🧭 Proximity query for Berries7: True
-2025-08-25 18:41:43 - situation_node - INFO - 🧭 Situation query: returned current situation
-2025-08-25 18:41:43 - situation_node - INFO - 📥 Received action: move
-2025-08-25 18:41:43 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:41:43 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:41:43 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:41:43 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:41:43 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:41:43 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:41:43 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:41:43 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:41:43 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:41:44 - situation_node - INFO - 🧭 Proximity query for Berries7: True
-2025-08-25 18:41:44 - situation_node - INFO - 🧭 Situation query: returned current situation
-2025-08-25 18:41:44 - situation_node - INFO - 📥 Received action: move
-2025-08-25 18:41:44 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:41:44 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:41:44 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:41:44 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:41:44 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:41:44 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:41:44 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:41:44 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:41:44 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:41:45 - situation_node - INFO - 🧭 Proximity query for Berries7: True
-2025-08-25 18:41:45 - situation_node - INFO - 🧭 Situation query: returned current situation
-2025-08-25 18:41:45 - situation_node - INFO - 📥 Received action: move
-2025-08-25 18:41:45 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:41:45 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:41:45 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:41:45 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:41:45 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:41:45 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:41:45 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:41:45 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:41:45 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:41:46 - situation_node - INFO - 🧭 Proximity query for Berries7: True
-2025-08-25 18:41:46 - situation_node - INFO - 🧭 Situation query: returned current situation
-2025-08-25 18:41:46 - situation_node - INFO - 📥 Received action: move
-2025-08-25 18:41:46 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:41:46 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:41:46 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:41:46 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:41:46 - situation_node - INFO - Updating map data for Joe
-2025-08-25 18:41:46 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:41:46 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:41:46 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-08-25 18:41:46 - situation_node - INFO - Map look data updated for Joe
-2025-08-25 18:41:47 - situation_node - INFO - 🧭 Proximity query for Berries7: False
-2025-08-25 18:41:47 - situation_node - INFO - 📥 Received action: take
-2025-08-25 18:41:48 - situation_node - INFO - 🧭 Proximity query for Berries7: False
+2025-08-26 18:20:22 - situation_node - INFO - 🔧 Debug mode enabled for Jim
+2025-08-26 18:20:22 - situation_node - INFO - 📂 No existing situation file for Jim, starting fresh
+2025-08-26 18:20:22 - situation_node - INFO - 🧭 Situation Node initialized for character: Jim
+2025-08-26 18:20:22 - situation_node - INFO -    - Subscribing to: cognitive/Jim/sense_data
+2025-08-26 18:20:22 - situation_node - INFO -    - Subscribing to: cognitive/Jim/action
+2025-08-26 18:20:22 - situation_node - INFO -    - Subscribing to: cognitive/Jim/situation/request_update
+2025-08-26 18:20:22 - situation_node - INFO -    - Publishing to: cognitive/Jim/situation/update
+2025-08-26 18:20:22 - situation_node - INFO -    - Queryable at: cognitive/Jim/situation/current_situation
+2025-08-26 18:20:22 - situation_node - INFO -    - Proximity queryable at: cognitive/Jim/situation/proximity
+2025-08-26 18:20:22 - situation_node - INFO -    - Visibility queryable at: cognitive/Jim/situation/visibility
+2025-08-26 18:20:22 - situation_node - INFO -    - Location queryable at: cognitive/Jim/situation/location
+2025-08-26 18:20:22 - situation_node - INFO -    - Storage available at: data/situation/Jim_situation.json
+2025-08-26 18:20:22 - situation_node - INFO - Situation Node running - press Ctrl+C to stop
+2025-08-26 18:20:27 - situation_node - INFO - 📥 Received action: announcement
+2025-08-26 18:20:27 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:20:27 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:20:27 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:20:27 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:20:27 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:20:27 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:20:27 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:24:05 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:24:05 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:24:05 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:24:05 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:24:05 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:24:05 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:24:30 - situation_node - INFO - 📥 Received action: scan
+2025-08-26 18:29:23 - situation_node - INFO - 📥 Received action: take
+2025-08-26 18:29:23 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:29:23 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:29:23 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:29:23 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:29:23 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:29:23 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:29:25 - situation_node - INFO - 📥 Received action: use
+2025-08-26 18:29:44 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:29:44 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:29:44 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:29:44 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:29:44 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:29:44 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:29:54 - situation_node - INFO - 📥 Received action: scan
+2025-08-26 18:29:55 - situation_node - INFO - 🧭 Proximity query for Berries14: True
+2025-08-26 18:29:55 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-08-26 18:29:55 - situation_node - INFO - 📥 Received action: move
+2025-08-26 18:29:55 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:29:55 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:29:55 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:29:55 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:29:55 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:29:55 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:29:55 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:29:55 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:29:55 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:29:56 - situation_node - INFO - 📥 Received action: take
+2025-08-26 18:29:56 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:29:56 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:29:56 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:29:56 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:29:56 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:29:56 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:29:58 - situation_node - INFO - 📥 Received action: use
+2025-08-26 18:30:16 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:30:16 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:30:16 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:30:16 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:30:16 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:30:16 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:30:27 - situation_node - INFO - 📥 Received action: scan
+2025-08-26 18:30:28 - situation_node - INFO - 🧭 Proximity query for Berries6: True
+2025-08-26 18:30:28 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-08-26 18:30:28 - situation_node - INFO - 📥 Received action: move
+2025-08-26 18:30:28 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:30:28 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:30:28 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:30:28 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:30:28 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:30:28 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:30:28 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:30:28 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:30:28 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:30:29 - situation_node - INFO - 🧭 Proximity query for Berries6: True
+2025-08-26 18:30:29 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-08-26 18:30:29 - situation_node - INFO - 📥 Received action: move
+2025-08-26 18:30:29 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:30:29 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:30:29 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:30:29 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:30:29 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:30:29 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:30:29 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:30:29 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:30:29 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:30:30 - situation_node - INFO - 📥 Received action: take
+2025-08-26 18:30:30 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:30:30 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:30:30 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:30:30 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:30:30 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:30:30 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:30:32 - situation_node - INFO - 📥 Received action: use
+2025-08-26 18:30:52 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:30:53 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:30:53 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:30:53 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:30:53 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:30:53 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:31:10 - situation_node - INFO - 📥 Received action: scan
+2025-08-26 18:31:11 - situation_node - INFO - 🧭 Proximity query for Berries8: True
+2025-08-26 18:31:11 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-08-26 18:31:11 - situation_node - INFO - 📥 Received action: move
+2025-08-26 18:31:11 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:31:11 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:31:11 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:31:11 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:31:11 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:31:11 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:31:11 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:31:11 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:31:11 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:31:12 - situation_node - INFO - 🧭 Proximity query for Berries8: True
+2025-08-26 18:31:12 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-08-26 18:31:12 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:31:12 - situation_node - INFO - 📥 Received action: move
+2025-08-26 18:31:12 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:31:12 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:31:12 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:31:12 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:31:12 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:31:12 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:31:12 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:31:12 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:31:13 - situation_node - INFO - 📥 Received action: take
+2025-08-26 18:31:13 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:31:13 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:31:13 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:31:13 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:31:13 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:31:13 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:31:16 - situation_node - INFO - 📥 Received action: use
+2025-08-26 18:31:17 - situation_node - INFO - 📥 Received action: scan
+2025-08-26 18:31:18 - situation_node - INFO - 🧭 Proximity query for Spring1: True
+2025-08-26 18:31:18 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-08-26 18:31:18 - situation_node - INFO - 📥 Received action: move
+2025-08-26 18:31:18 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:31:18 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:31:18 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:31:18 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:31:18 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:31:18 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:31:18 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:31:18 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:31:18 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:31:19 - situation_node - INFO - 🧭 Proximity query for Spring1: True
+2025-08-26 18:31:19 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-08-26 18:31:19 - situation_node - INFO - 📥 Received action: move
+2025-08-26 18:31:19 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:31:19 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:31:19 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:31:19 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:31:19 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:31:19 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:31:19 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:31:19 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:31:19 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:31:20 - situation_node - INFO - 🧭 Proximity query for Spring1: True
+2025-08-26 18:31:20 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-08-26 18:31:20 - situation_node - INFO - 📥 Received action: move
+2025-08-26 18:31:20 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:31:20 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:31:20 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:31:20 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:31:20 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:31:20 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:31:20 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:31:20 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:31:20 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:31:21 - situation_node - INFO - 🧭 Proximity query for Spring1: True
+2025-08-26 18:31:21 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-08-26 18:31:21 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:31:21 - situation_node - INFO - 📥 Received action: move
+2025-08-26 18:31:21 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:31:21 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:31:21 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:31:21 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:31:21 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:31:21 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:31:21 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:31:21 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:31:22 - situation_node - INFO - 🧭 Proximity query for Spring1: True
+2025-08-26 18:31:22 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-08-26 18:31:22 - situation_node - INFO - 📥 Received action: move
+2025-08-26 18:31:22 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:31:22 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:31:22 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:31:22 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:31:22 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:31:22 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:31:22 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:31:22 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:31:22 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:31:45 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:31:45 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:31:45 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:31:45 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:31:45 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:31:45 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:32:03 - situation_node - INFO - 📥 Received action: scan
+2025-08-26 18:32:04 - situation_node - INFO - 🧭 Proximity query for Berries11: True
+2025-08-26 18:32:04 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-08-26 18:32:04 - situation_node - INFO - 📥 Received action: move
+2025-08-26 18:32:04 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:32:04 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:32:04 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:32:04 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:32:04 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:32:04 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:32:04 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:32:04 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:32:04 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:32:05 - situation_node - INFO - 📥 Received action: take
+2025-08-26 18:32:05 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:32:05 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:32:05 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:32:05 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:32:05 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:32:05 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:32:07 - situation_node - INFO - 📥 Received action: use
+2025-08-26 18:32:08 - situation_node - INFO - 📥 Received action: scan
+2025-08-26 18:32:09 - situation_node - INFO - 🧭 Proximity query for Spring1: True
+2025-08-26 18:32:09 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-08-26 18:32:09 - situation_node - INFO - 📥 Received action: move
+2025-08-26 18:32:09 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:32:09 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:32:09 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:32:09 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:32:09 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:32:09 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:32:09 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:32:09 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:32:09 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:32:10 - situation_node - INFO - 🧭 Proximity query for Spring1: True
+2025-08-26 18:32:10 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-08-26 18:32:10 - situation_node - INFO - 📥 Received action: move
+2025-08-26 18:32:10 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:32:10 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:32:10 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:32:10 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:32:10 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:32:10 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:32:10 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:32:10 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:32:10 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:32:11 - situation_node - INFO - 🧭 Proximity query for Spring1: True
+2025-08-26 18:32:11 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-08-26 18:32:11 - situation_node - INFO - 📥 Received action: move
+2025-08-26 18:32:11 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:32:11 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:32:11 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:32:11 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:32:11 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:32:11 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:32:11 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:32:11 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:32:11 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:32:12 - situation_node - INFO - 🧭 Proximity query for Spring1: True
+2025-08-26 18:32:12 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-08-26 18:32:12 - situation_node - INFO - 📥 Received action: move
+2025-08-26 18:32:12 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:32:12 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:32:12 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:32:12 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:32:12 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:32:12 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:32:12 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:32:12 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:32:12 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:32:13 - situation_node - INFO - 🧭 Proximity query for Spring1: True
+2025-08-26 18:32:13 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-08-26 18:32:13 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:32:13 - situation_node - INFO - 📥 Received action: move
+2025-08-26 18:32:13 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:32:13 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:32:13 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:32:13 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:32:13 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:32:13 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:32:13 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:32:13 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:32:14 - situation_node - INFO - 🧭 Proximity query for Spring1: False
+2025-08-26 18:32:36 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:32:36 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:32:36 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:32:36 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:32:36 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:32:36 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:32:54 - situation_node - INFO - 📥 Received action: scan
+2025-08-26 18:32:55 - situation_node - INFO - 🧭 Proximity query for Berries7: True
+2025-08-26 18:32:55 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-08-26 18:32:55 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:32:55 - situation_node - INFO - 📥 Received action: move
+2025-08-26 18:32:55 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:32:56 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:32:56 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:32:56 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:32:56 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:32:56 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:32:56 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:32:56 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:32:56 - situation_node - INFO - 🧭 Proximity query for Berries7: True
+2025-08-26 18:32:56 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-08-26 18:32:56 - situation_node - INFO - 📥 Received action: move
+2025-08-26 18:32:56 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:32:56 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:32:56 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:32:56 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:32:56 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:32:57 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:32:57 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:32:57 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:32:57 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:32:57 - situation_node - INFO - 🧭 Proximity query for Berries7: True
+2025-08-26 18:32:57 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-08-26 18:32:57 - situation_node - INFO - 📥 Received action: move
+2025-08-26 18:32:57 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:32:57 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:32:58 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:32:58 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:32:58 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:32:58 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:32:58 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:32:58 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:32:58 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:32:58 - situation_node - INFO - 🧭 Proximity query for Berries7: True
+2025-08-26 18:32:58 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-08-26 18:32:58 - situation_node - INFO - 📥 Received action: move
+2025-08-26 18:32:58 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:32:58 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:32:59 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:32:59 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:32:59 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:32:59 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:32:59 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:32:59 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:32:59 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:33:00 - situation_node - INFO - 🧭 Proximity query for Berries7: True
+2025-08-26 18:33:00 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-08-26 18:33:00 - situation_node - INFO - 📥 Received action: move
+2025-08-26 18:33:00 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:33:00 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:33:00 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:33:00 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:33:00 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:33:00 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:33:00 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:33:00 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:33:00 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:33:01 - situation_node - INFO - 🧭 Proximity query for Berries7: False
+2025-08-26 18:33:01 - situation_node - INFO - 📥 Received action: take
+2025-08-26 18:33:02 - situation_node - INFO - 🧭 Proximity query for Berries7: False
+2025-08-26 18:33:03 - situation_node - INFO - 📥 Received action: scan
+2025-08-26 18:33:04 - situation_node - INFO - 🧭 Proximity query for Spring2: True
+2025-08-26 18:33:04 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-08-26 18:33:04 - situation_node - INFO - 📥 Received action: move
+2025-08-26 18:33:04 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:33:04 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:33:04 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:33:04 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:33:04 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:33:04 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:33:04 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:33:04 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:33:04 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:33:05 - situation_node - INFO - 🧭 Proximity query for Spring2: True
+2025-08-26 18:33:05 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-08-26 18:33:05 - situation_node - INFO - 📥 Received action: move
+2025-08-26 18:33:05 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:33:05 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:33:05 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:33:05 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:33:05 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:33:05 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:33:05 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:33:05 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:33:05 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:33:06 - situation_node - INFO - 🧭 Proximity query for Spring2: True
+2025-08-26 18:33:06 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-08-26 18:33:06 - situation_node - INFO - 📥 Received action: move
+2025-08-26 18:33:06 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:33:06 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:33:06 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:33:06 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:33:06 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:33:06 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:33:06 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:33:06 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:33:06 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:33:07 - situation_node - INFO - 🧭 Proximity query for Spring2: True
+2025-08-26 18:33:07 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-08-26 18:33:07 - situation_node - INFO - 📥 Received action: move
+2025-08-26 18:33:07 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:33:07 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:33:07 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:33:07 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:33:07 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:33:07 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:33:07 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:33:07 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:33:07 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:33:08 - situation_node - INFO - 🧭 Proximity query for Spring2: True
+2025-08-26 18:33:08 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-08-26 18:33:08 - situation_node - INFO - 📥 Received action: move
+2025-08-26 18:33:08 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:33:08 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:33:08 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:33:08 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:33:08 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:33:08 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:33:08 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:33:08 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:33:08 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:33:09 - situation_node - INFO - 🧭 Proximity query for Spring2: False
+2025-08-26 18:33:30 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:33:30 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:33:30 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:33:30 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:33:30 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:33:30 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:33:46 - situation_node - INFO - 📥 Received action: scan
+2025-08-26 18:33:47 - situation_node - INFO - 🧭 Proximity query for Berries3: True
+2025-08-26 18:33:47 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-08-26 18:33:47 - situation_node - INFO - 📥 Received action: move
+2025-08-26 18:33:47 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:33:47 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:33:47 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:33:47 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:33:47 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:33:47 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:33:47 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:33:48 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:33:48 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:33:48 - situation_node - INFO - 🧭 Proximity query for Berries3: True
+2025-08-26 18:33:48 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-08-26 18:33:48 - situation_node - INFO - 📥 Received action: move
+2025-08-26 18:33:48 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:33:48 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:33:48 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:33:48 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:33:48 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:33:48 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:33:48 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:33:49 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:33:49 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:33:49 - situation_node - INFO - 🧭 Proximity query for Berries3: True
+2025-08-26 18:33:49 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-08-26 18:33:49 - situation_node - INFO - 📥 Received action: move
+2025-08-26 18:33:49 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:33:49 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:33:49 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:33:49 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:33:49 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:33:50 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:33:50 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:33:50 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:33:50 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:33:50 - situation_node - INFO - 🧭 Proximity query for Berries3: True
+2025-08-26 18:33:50 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-08-26 18:33:50 - situation_node - INFO - 📥 Received action: move
+2025-08-26 18:33:50 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:33:50 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:33:50 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:33:50 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:33:50 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:33:51 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:33:51 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:33:51 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:33:51 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:33:51 - situation_node - INFO - 🧭 Proximity query for Berries3: True
+2025-08-26 18:33:51 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-08-26 18:33:51 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:33:51 - situation_node - INFO - 📥 Received action: move
+2025-08-26 18:33:51 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:33:51 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:33:51 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:33:51 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:33:52 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:33:52 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:33:52 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:33:52 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:33:52 - situation_node - INFO - 🧭 Proximity query for Berries3: False
+2025-08-26 18:33:52 - situation_node - INFO - 📥 Received action: take
+2025-08-26 18:33:53 - situation_node - INFO - 🧭 Proximity query for Berries3: False
+2025-08-26 18:33:54 - situation_node - INFO - 📥 Received action: scan
+2025-08-26 18:33:55 - situation_node - INFO - 🧭 Proximity query for Spring2: True
+2025-08-26 18:33:55 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-08-26 18:33:55 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:33:55 - situation_node - INFO - 📥 Received action: move
+2025-08-26 18:33:55 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:33:56 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:33:56 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:33:56 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:33:56 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:33:56 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:33:56 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:33:56 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:33:57 - situation_node - INFO - 🧭 Proximity query for Spring2: True
+2025-08-26 18:33:57 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-08-26 18:33:57 - situation_node - INFO - 📥 Received action: move
+2025-08-26 18:33:57 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:33:57 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:33:57 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:33:57 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:33:57 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:33:57 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:33:57 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:33:57 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:33:57 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:33:58 - situation_node - INFO - 🧭 Proximity query for Spring2: True
+2025-08-26 18:33:58 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-08-26 18:33:58 - situation_node - INFO - 📥 Received action: move
+2025-08-26 18:33:58 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:33:58 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:33:58 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:33:58 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:33:58 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:33:58 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:33:58 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:33:58 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:33:58 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:33:59 - situation_node - INFO - 🧭 Proximity query for Spring2: True
+2025-08-26 18:33:59 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-08-26 18:33:59 - situation_node - INFO - 📥 Received action: move
+2025-08-26 18:33:59 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:33:59 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:33:59 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:33:59 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:33:59 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:33:59 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:33:59 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:33:59 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:33:59 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:34:00 - situation_node - INFO - 🧭 Proximity query for Spring2: True
+2025-08-26 18:34:00 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-08-26 18:34:00 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:34:00 - situation_node - INFO - 📥 Received action: move
+2025-08-26 18:34:00 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:34:00 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:34:00 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:34:00 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:34:00 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:34:00 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:34:00 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:34:00 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:34:01 - situation_node - INFO - 🧭 Proximity query for Spring2: False
+2025-08-26 18:34:22 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:34:22 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:34:22 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:34:22 - situation_node - INFO - Updating map data for Jim
+2025-08-26 18:34:22 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-08-26 18:34:22 - situation_node - INFO - Map look data updated for Jim
+2025-08-26 18:34:38 - situation_node - INFO - 📥 Received action: scan
+2025-08-26 18:38:20 - situation_node - INFO - Received signal 2, initiating shutdown...
+2025-08-26 18:38:21 - situation_node - INFO - Situation Node shutdown initiated...
+2025-08-26 18:38:23 - situation_node - INFO - Zenoh session closed
+2025-08-26 18:38:23 - situation_node - INFO - Situation Node shutdown complete
