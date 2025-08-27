@@ -72,7 +72,7 @@ INPUT:
 
 Include mental, physical, and social 'activities' that are possible and consisten with the character in this setting in your ontology.
 
-OUTPUT (JSON):
+OUTPUT (JSON) (All names - places, tools, roles, norms, hazards, social_graph - must be unique and must consistent of letters only - no spaces or special characters)
 
 - places[] - places the character can be in the setting - map terrain types or resource types only
 - tools[] - tools the character can use in the setting, including edible resource types available in the setting (e.g. Berries)- resource types or items from character status or inventory
@@ -189,7 +189,7 @@ Output: only valid JSON – no prose, no code fences.
 
 Meta-spec (strictly observe these rules in your output):
 {
-  "actions": ["move","say","think","take","inspect","use","scan","while","if"],
+  "actions": ["move","say","think","take","place","inspect","use","scan","while","if"],
   "conditions": [
     "near","notnear","can_see","cant_see","has_item","hasnt_item","at_location","notat_location","believes","notbelieves"
   ],
@@ -198,6 +198,7 @@ Meta-spec (strictly observe these rules in your output):
     "say": ["type","target","value"],
     "think": ["type","value"],
     "take": ["type","target"],
+    "place": ["type","target"],
     "inspect": ["type","target","reason"],
     "use": ["type","target","reason"],
     "scan": ["type","target","out"],
@@ -205,7 +206,7 @@ Meta-spec (strictly observe these rules in your output):
     "if": ["type","condition","then"]
   },
   "variables": {"syntax": "$name", "must_be_bound_before_use": true},
-  "max_steps": 6,
+  "max_steps": 8,
   "expand_patterns": true,
   "no_sequential_say": true
 }
@@ -254,7 +255,7 @@ Worked example using a loop to approach a distant target:
   ]
 }
 
-A plan must include at least 1 step and no more than 6 steps including all nested while and if branches.
+A plan must include at least 1 step and no more than 8 steps including all nested while and if branches.
 In the following, <resource_name>, <character_name> are placeholders only for KNOWN resources, characters, or maptypes, those appearing above.
 Variables bound by scan actions can be referenced in subsequent actions and conditions using $variable_name syntax.
 Only dicts of the types below are allowed for the condition of while and if. Condition action type can only be one of the following:
@@ -268,8 +269,10 @@ Only dicts of the types below are allowed for the condition of while and if. Con
  - "hasnt_item": {"type": "hasnt_item", "target": <resource_name> or "$variable_name"} is for checking if the character does not have a resource in their inventory.
  - "notat_location": {"type": "notat_location", "target": <location_name> or "$variable_name"} is for checking if the character is not at a location.
  - "notbelieves": {"type": "notbelieves", "target": <character_name>} is for checking if the character does not believe something about another character.
+ - "bound": {"type": "bound", "target": "$variable_name"} is true when the variable has a binding (not None/empty) in the current plan.
+ - "notbound": {"type": "notbound", "target": "$variable_name"} is true when the variable has no binding in the current plan.
 
-outside a while or if condition, "type" can take the values "say", "move", "think", "take", "inspect", "use", or "scan":
+outside a while or if condition, "type" can take the values "say", "move", "think", "take", "place", "inspect", "use", or "scan":
  - "move": { "type": "move", "target": "cardinal_direction" or 'resource or character name'} 
      Move one step in one of the 8 cardinal directions or in the direction of a resource or character.
     You can only move in the direction of a resource, character, or terrain type if you can see it.
@@ -284,6 +287,8 @@ outside a while or if condition, "type" can take the values "say", "move", "thin
      Think about a topic or question, attempting to derive new information, conclusions, or decisions from who you are and what you already explicitly know
  - "take": { "type": "take", "target": "resource_name" } 
      Add a resource you to your personal inventory. you must be near the resource to take it.
+ - "place": { "type": "place", "target": "resource_name" } 
+     Remove a resource from your personal inventory and place it in the setting at your current location.
  - "inspect": { "type": "inspect", "target": "resource_name", "reason": "what is it you are hoping to learn? - 5 words max"} 
      Inspect a resource or character to learn something about it. Must be 'near' the resource or character to inspect it. reason focuses the inspection on some specific aspect of the resource or character.
  - "use": { "type": "use", "target": "resource_name", "reason": "what outcome do you hope to achieve? - 5 words max"} 

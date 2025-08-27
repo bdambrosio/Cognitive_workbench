@@ -12,6 +12,61 @@ import re
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 
+def format_python_structure(text):
+    """Format Python literal structures (dicts, lists) with line breaks for readability.
+    
+    Safely parses Python literals and adds line breaks after top-level key-value pairs
+    or list items to improve readability. Outputs clean, unescaped quotes.
+    """
+    try:
+        # Try to parse as Python literal
+        parsed = literal_eval(text.strip())
+        
+        if isinstance(parsed, dict):
+            # Format dict with line breaks after each top-level key-value pair
+            formatted_lines = []
+            for i, (key, value) in enumerate(parsed.items()):
+                if i > 0:
+                    formatted_lines.append('')  # Add blank line between items
+                # Use clean quotes instead of repr() for better readability
+                formatted_lines.append(f"'{key}': {_format_value_clean(value)}")
+            return '\n'.join(formatted_lines)
+            
+        elif isinstance(parsed, list):
+            # Format list with line breaks after each item
+            formatted_lines = []
+            for i, item in enumerate(parsed):
+                if i > 0:
+                    formatted_lines.append('')  # Add blank line between items
+                formatted_lines.append(_format_value_clean(item))
+            return '\n'.join(formatted_lines)
+            
+        else:
+            # Not a dict or list, return as-is
+            return text
+            
+    except (ValueError, SyntaxError, RecursionError):
+        # If parsing fails, return original text unchanged
+        return text
+
+
+def _format_value_clean(value):
+    """Format a value with clean, unescaped quotes for better readability."""
+    if isinstance(value, str):
+        return f"'{value}'"
+    elif isinstance(value, dict):
+        # Format nested dicts inline but clean
+        items = [f"'{k}': {_format_value_clean(v)}" for k, v in value.items()]
+        return '{' + ', '.join(items) + '}'
+    elif isinstance(value, list):
+        # Format nested lists inline but clean
+        items = [_format_value_clean(item) for item in value]
+        return '[' + ', '.join(items) + ']'
+    else:
+        # For numbers, booleans, None, etc., use str() for clean output
+        return str(value)
+
+
 def import_file():
     file_path, _ = QFileDialog.getOpenFileName(
         window,
@@ -29,7 +84,13 @@ def import_file():
 
 def format_text():
     raw_text = text_edit.toPlainText()
+    
+    # First: Apply existing \n literal replacement
     formatted_text = raw_text.replace("\\t", "\t").replace("\\n", "\n")
+    
+    # Second: Apply Python structure formatting to improve readability
+    formatted_text = format_python_structure(formatted_text)
+    
     text_edit.setPlainText(formatted_text)
 
 def clear_text():

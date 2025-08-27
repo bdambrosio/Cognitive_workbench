@@ -219,6 +219,12 @@ Do not include any other text, reasoning, introductory, expository, or markdown.
             "cognitive/map/resource/remove/*",
             self.handle_resource_remove
         )
+
+        # Resource place queryable
+        self.resource_place_queryable = self.session.declare_queryable(
+            "cognitive/map/resource/place/*",
+            self.handle_resource_place
+        )
         
         # Terrain queryable
         self.terrain_queryable = self.session.declare_queryable(
@@ -757,6 +763,62 @@ Do not include any other text, reasoning, introductory, expository, or markdown.
                 'success': False,
                 'error': str(e)
             }
+            query.reply(query.key_expr, json.dumps(error_response).encode('utf-8'))
+
+    def handle_resource_place(self, query):
+        """Handle resource placement queries. Places resource at agent's current location.
+
+        Topic: cognitive/map/resource/place/<resource_name>
+        Payload (optional): {"character_name": "Name"} to identify agent; if omitted, fails.
+        """
+        try:
+            key_parts = str(query.key_expr).split('/')
+            resource_name = key_parts[-1] if len(key_parts) > 0 else None
+            if not resource_name:
+                raise ValueError("No resource name provided")
+
+            # Parse payload for character name
+            character_name = None
+            if query.payload:
+                try:
+                    payload = query.payload.to_bytes().decode('utf-8')
+                    data = json.loads(payload) if payload else {}
+                    character_name = data.get('character_name')
+                except Exception:
+                    pass
+            if not character_name:
+                response = {'success': False, 'error': 'Missing character_name in payload'}
+                query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
+                return
+
+            canonical_character_name = character_name.capitalize()
+            if canonical_character_name not in self.agent_registry:
+                response = {'success': False, 'error': f"Agent for character '{character_name}' not found"}
+                query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
+                return
+
+            agent = self.agent_registry[canonical_character_name]
+            x, y = agent.x, agent.y
+
+            # Resolve resource by name
+            resource = self.world_map.get_resource_by_name(resource_name)
+            if not resource:
+                response = {'success': False, 'error': f"Resource '{resource_name}' not found"}
+                query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
+                return
+
+            resource_id = resource['name']
+            success = self.world_map.place_resource(resource_id, x, y)
+
+            if success:
+                response = {'success': True, 'message': f"Resource '{resource_name}' placed at ({x},{y})"}
+            else:
+                response = {'success': False, 'error': f"Failed to place resource '{resource_name}'"}
+
+            query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
+        except Exception as e:
+            logger.error(f"Error handling resource placement query: {e}")
+            error_response = {'success': False, 'error': str(e)}
             query.reply(query.key_expr, json.dumps(error_response).encode('utf-8'))
     
     def handle_terrain_query(self, query):

@@ -1,0 +1,124 @@
+{
+  "places": [
+    "Forest",
+    "Clearing",
+    "Meadow",
+    "Mountain",
+    "Water",
+    "Cave",
+    "Thicket",
+    "Spring"
+  ],
+  "tools": [
+    "Berries",
+    "Mushrooms",
+    "Appletree",
+    "Fallenbranch",
+    "Spring",
+    "Backpack",
+    "Food",
+    "Water"
+  ],
+  "roles": [
+    "Explorer",
+    "Forager",
+    "Survivor",
+    "Investigator",
+    "CompanionSeeker"
+  ],
+  "norms_rules": [
+    "AvoidUnnecessaryRisks",
+    "ObserveAndRecord",
+    "UseResourcesResponsibly",
+    "TrustCautiously",
+    "RespectNature",
+    "MaintainCuriosity"
+  ],
+  "hazards": [
+    "Cave",
+    "Mountain",
+    "UnknownOtherPerson",
+    "Thicket",
+    "UnidentifiedMushrooms",
+    "AccidentalInjury",
+    "Dehydration",
+    "Exposure"
+  ],
+  "social_graph": [
+    "UnknownOtherPerson",
+    "Self"
+  ],
+  "time_windows": "morning",
+  "affordances": {
+    "Forest": [
+      "forage",
+      "observeWildlife",
+      "hide",
+      "navigate",
+      "collectWood",
+      "rest"
+    ],
+    "Clearing": [
+      "rest",
+      "observeSky",
+      "signalForHelp",
+      "camp"
+    ],
+    "Meadow": [
+      "gatherBerries",
+      "explore",
+      "sunbathe"
+    ],
+    "Mountain": [
+      "scoutSurroundings",
+      "climb",
+      "findShelter"
+    ],
+    "Water": [
+      "refillWater",
+      "wash",
+      "observeAquaticLife"
+    ],
+    "Cave": [
+      "seekShelter",
+      "investigate",
+      "hide"
+    ],
+    "Thicket": [
+      "forage",
+      "hide",
+      "riskInjury"
+    ],
+    "Spring": [
+      "collectWater",
+      "rest"
+    ],
+    "Appletree": [
+      "harvestApples",
+      "observeInsects"
+    ],
+    "Berries": [
+      "gather",
+      "eat"
+    ],
+    "Mushrooms": [
+      "gather",
+      "analyzeEdibility"
+    ],
+    "Fallenbranch": [
+      "collect",
+      "useForTool"
+    ]
+  },
+  "states": [
+    "hunger",
+    "fatigue",
+    "injury",
+    "thirst",
+    "confusion",
+    "loneliness",
+    "anxiety",
+    "curiosity",
+    "hope"
+  ]
+}

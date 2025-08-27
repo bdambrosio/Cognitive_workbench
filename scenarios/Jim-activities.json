@@ -1,0 +1,1046 @@
+{
+  "Eat Foraged Berries": {
+    "name": "Eat Foraged Berries",
+    "category": "Physiological ADLs",
+    "tags": [
+      "physical",
+      "solo",
+      "outdoors",
+      "survival",
+      "routine"
+    ],
+    "when": "opportunistic",
+    "where": [
+      "Meadow",
+      "Thicket",
+      "Forest"
+    ],
+    "duration": [
+      10,
+      20
+    ],
+    "needs": [
+      "Berries",
+      "Forager",
+      "Backpack"
+    ],
+    "states_addressed": [
+      "hunger"
+    ],
+    "steps": [
+      "identify safe-looking berries in the area",
+      "gather enough berries for a meal",
+      "inspect for signs of spoilage or bugs",
+      "consume collected berries",
+      "monitor for adverse reactions"
+    ],
+    "importance": 0.8,
+    "habit": 0.3
+  },
+  "Drink From Spring": {
+    "name": "Drink From Spring",
+    "category": "Physiological ADLs",
+    "tags": [
+      "physical",
+      "solo",
+      "outdoors",
+      "survival",
+      "routine"
+    ],
+    "when": "daily@morning",
+    "where": [
+      "Spring",
+      "Water"
+    ],
+    "duration": [
+      5,
+      15
+    ],
+    "needs": [
+      "Spring",
+      "Water",
+      "Backpack"
+    ],
+    "states_addressed": [
+      "thirst"
+    ],
+    "steps": [
+      "locate nearby spring or water source",
+      "verify water is clear and flowing",
+      "collect water using bottle or hands",
+      "drink until thirst is quenched",
+      "refill water container if possible"
+    ],
+    "importance": 1.0,
+    "habit": 0.7
+  },
+  "Rest In Clearing": {
+    "name": "Rest In Clearing",
+    "category": "Physiological ADLs",
+    "tags": [
+      "physical",
+      "solo",
+      "outdoors",
+      "routine"
+    ],
+    "when": "daily@afternoon",
+    "where": [
+      "Clearing",
+      "Meadow",
+      "Forest"
+    ],
+    "duration": [
+      15,
+      45
+    ],
+    "needs": [
+      "Survivor"
+    ],
+    "states_addressed": [
+      "fatigue"
+    ],
+    "steps": [
+      "find a suitable open spot with shade",
+      "clear area of rocks and debris",
+      "lie down to rest muscles",
+      "monitor for sounds indicating threats",
+      "sleep lightly to recover energy"
+    ],
+    "importance": 0.7,
+    "habit": 0.6
+  },
+  "Eat From Backpack Supplies": {
+    "name": "Eat From Backpack Supplies",
+    "category": "Physiological ADLs",
+    "tags": [
+      "physical",
+      "solo",
+      "routine"
+    ],
+    "when": "daily@evening",
+    "where": [
+      "Meadow",
+      "Clearing",
+      "Cave"
+    ],
+    "duration": [
+      10,
+      20
+    ],
+    "needs": [
+      "Food",
+      "Backpack",
+      "Survivor"
+    ],
+    "states_addressed": [
+      "hunger"
+    ],
+    "steps": [
+      "locate and open backpack",
+      "assess remaining food supplies",
+      "select and consume food as needed",
+      "seal up leftovers in pack",
+      "monitor hunger level"
+    ],
+    "importance": 0.9,
+    "habit": 0.4
+  },
+  "Plan Route Out Of Forest": {
+    "name": "Plan Route Out Of Forest",
+    "category": "Instrumental ADLs/Logistics",
+    "tags": [
+      "mental",
+      "solo",
+      "outdoors",
+      "survival"
+    ],
+    "when": "daily@morning",
+    "where": [
+      "Forest",
+      "Clearing",
+      "Mountain"
+    ],
+    "duration": [
+      10,
+      30
+    ],
+    "needs": [
+      "Investigator"
+    ],
+    "states_addressed": [
+      "confusion",
+      "hope"
+    ],
+    "steps": [
+      "analyze immediate surroundings for landmarks",
+      "identify possible high points for scouting",
+      "guess most likely direction of civilization",
+      "determine hazards along potential routes",
+      "set primary and alternative exit paths"
+    ],
+    "importance": 0.9,
+    "habit": 0.4
+  },
+  "Inventory Supplies": {
+    "name": "Inventory Supplies",
+    "category": "Instrumental ADLs/Logistics",
+    "tags": [
+      "solo",
+      "mental",
+      "routine"
+    ],
+    "when": "daily@dawn",
+    "where": [
+      "Clearing",
+      "Forest"
+    ],
+    "duration": [
+      10,
+      15
+    ],
+    "needs": [
+      "Backpack",
+      "Survivor"
+    ],
+    "states_addressed": [
+      "confusion"
+    ],
+    "steps": [
+      "open backpack and lay out contents",
+      "inspect food, water, and tools for damage",
+      "estimate rations for coming days",
+      "organize items for quick access",
+      "record findings mentally or note on object"
+    ],
+    "importance": 0.8,
+    "habit": 0.5
+  },
+  "Gather Firewood/Fallen Branches": {
+    "name": "Gather Firewood/Fallen Branches",
+    "category": "Instrumental ADLs/Logistics",
+    "tags": [
+      "physical",
+      "outdoors",
+      "solo",
+      "survival"
+    ],
+    "when": "opportunistic",
+    "where": [
+      "Forest",
+      "Clearing",
+      "Thicket"
+    ],
+    "duration": [
+      15,
+      25
+    ],
+    "needs": [
+      "Fallenbranch",
+      "Survivor"
+    ],
+    "states_addressed": [
+      "hope"
+    ],
+    "steps": [
+      "search area for dry fallen branches",
+      "gather enough for building, signaling, or warmth",
+      "pile collected wood near camp area",
+      "select best pieces for tools or shelter",
+      "check area for signs of wildlife"
+    ],
+    "importance": 0.7,
+    "habit": 0.3
+  },
+  "Scout Perimeter": {
+    "name": "Scout Perimeter",
+    "category": "Mobility & Transport",
+    "tags": [
+      "outdoors",
+      "physical",
+      "solo",
+      "survival"
+    ],
+    "when": "daily@morning",
+    "where": [
+      "Forest",
+      "Meadow",
+      "Clearing"
+    ],
+    "duration": [
+      20,
+      30
+    ],
+    "needs": [
+      "Explorer",
+      "Survivor"
+    ],
+    "states_addressed": [
+      "anxiety",
+      "curiosity"
+    ],
+    "steps": [
+      "select an outer boundary to patrol",
+      "move quietly and observe for threats or paths",
+      "look for animal tracks or recent disturbances",
+      "note any new resources or hazards",
+      "return to starting point and adjust plans"
+    ],
+    "importance": 0.7,
+    "habit": 0.3
+  },
+  "Travel To High Ground": {
+    "name": "Travel To High Ground",
+    "category": "Mobility & Transport",
+    "tags": [
+      "physical",
+      "outdoors",
+      "solo"
+    ],
+    "when": "opportunistic",
+    "where": [
+      "Mountain",
+      "Forest"
+    ],
+    "duration": [
+      25,
+      45
+    ],
+    "needs": [
+      "Explorer"
+    ],
+    "states_addressed": [
+      "hope",
+      "curiosity"
+    ],
+    "steps": [
+      "identify a visible hill or mountain in the distance",
+      "plot the most direct and safe path",
+      "ascend while conserving energy",
+      "pause to scan wider surroundings",
+      "mark trail for return"
+    ],
+    "importance": 0.8,
+    "habit": 0.1
+  },
+  "Navigate To Water Source": {
+    "name": "Navigate To Water Source",
+    "category": "Mobility & Transport",
+    "tags": [
+      "outdoors",
+      "survival",
+      "physical",
+      "solo"
+    ],
+    "when": "opportunistic",
+    "where": [
+      "Forest",
+      "Spring",
+      "Water"
+    ],
+    "duration": [
+      15,
+      30
+    ],
+    "needs": [
+      "Explorer",
+      "water"
+    ],
+    "states_addressed": [
+      "thirst",
+      "anxiety"
+    ],
+    "steps": [
+      "listen for sounds of running water",
+      "follow wet ground or animal paths",
+      "move cautiously to avoid hazards",
+      "confirm water is present and accessible",
+      "note nearby resources or threats"
+    ],
+    "importance": 0.9,
+    "habit": 0.4
+  },
+  "Forage For Edible Plants": {
+    "name": "Forage For Edible Plants",
+    "category": "Role/Production",
+    "tags": [
+      "physical",
+      "outdoors",
+      "solo",
+      "survival"
+    ],
+    "when": "seasonal@spring",
+    "where": [
+      "Meadow",
+      "Forest",
+      "Thicket"
+    ],
+    "duration": [
+      20,
+      40
+    ],
+    "needs": [
+      "Forager",
+      "Berries",
+      "Mushrooms",
+      "Appletree"
+    ],
+    "states_addressed": [
+      "hunger",
+      "hope"
+    ],
+    "steps": [
+      "scan local vegetation for recognizable edibles",
+      "collect berries, nuts, or mushrooms with care",
+      "separate known safe from unknown species",
+      "bring finds to base area",
+      "prepare for consumption or storage"
+    ],
+    "importance": 0.8,
+    "habit": 0.3
+  },
+  "Investigate Strange Sounds": {
+    "name": "Investigate Strange Sounds",
+    "category": "Role/Production",
+    "tags": [
+      "mental",
+      "curiosity",
+      "cognitive",
+      "outdoors"
+    ],
+    "when": "opportunistic",
+    "where": [
+      "Forest",
+      "Thicket",
+      "Meadow"
+    ],
+    "duration": [
+      5,
+      20
+    ],
+    "needs": [
+      "Investigator"
+    ],
+    "states_addressed": [
+      "curiosity",
+      "anxiety"
+    ],
+    "steps": [
+      "pause and listen for direction of sound origin",
+      "move cautiously toward source",
+      "evaluate risks from a safe distance",
+      "record type or pattern of sound mentally",
+      "retreat if any threat detected"
+    ],
+    "importance": 0.5,
+    "habit": 0.1
+  },
+  "Construct Temporary Shelter": {
+    "name": "Construct Temporary Shelter",
+    "category": "Role/Production",
+    "tags": [
+      "physical",
+      "outdoors",
+      "solo",
+      "survival"
+    ],
+    "when": "daily@dusk",
+    "where": [
+      "Clearing",
+      "Forest",
+      "Cave"
+    ],
+    "duration": [
+      20,
+      60
+    ],
+    "needs": [
+      "Fallenbranch",
+      "Survivor",
+      "Backpack"
+    ],
+    "states_addressed": [
+      "exposure",
+      "fatigue",
+      "hope"
+    ],
+    "steps": [
+      "scan area for natural coverage or caves",
+      "collect branches and large leaves",
+      "arrange materials to block wind and rain",
+      "position shelter close to resources",
+      "test stability before use"
+    ],
+    "importance": 0.9,
+    "habit": 0.5
+  },
+  "Observe Wildlife Behavior": {
+    "name": "Observe Wildlife Behavior",
+    "category": "Role/Production",
+    "tags": [
+      "outdoors",
+      "solo",
+      "learning",
+      "mental"
+    ],
+    "when": "opportunistic",
+    "where": [
+      "Forest",
+      "Meadow",
+      "Water"
+    ],
+    "duration": [
+      10,
+      25
+    ],
+    "needs": [
+      "Investigator",
+      "Explorer"
+    ],
+    "states_addressed": [
+      "curiosity"
+    ],
+    "steps": [
+      "find a quiet, concealed spot",
+      "watch for birds, mammals, or insects",
+      "note behavior and habitat preferences",
+      "identify potential threats or resources",
+      "reflect on possible survival strategies"
+    ],
+    "importance": 0.4,
+    "habit": 0.2
+  },
+  "Practice Edible Plant Identification": {
+    "name": "Practice Edible Plant Identification",
+    "category": "Learning & Practice",
+    "tags": [
+      "mental",
+      "outdoors",
+      "solo",
+      "routine"
+    ],
+    "when": "seasonal@spring",
+    "where": [
+      "Meadow",
+      "Forest"
+    ],
+    "duration": [
+      10,
+      30
+    ],
+    "needs": [
+      "Forager"
+    ],
+    "states_addressed": [
+      "curiosity",
+      "hope"
+    ],
+    "steps": [
+      "observe local plants visually and tactilely",
+      "compare features with mental references",
+      "test small samples with caution",
+      "avoid any with ambiguous appearance",
+      "note which are edible for later use"
+    ],
+    "importance": 0.6,
+    "habit": 0.2
+  },
+  "Self-Reflection and Mental Resilience": {
+    "name": "Self-Reflection and Mental Resilience",
+    "category": "Cognitive/Inner",
+    "tags": [
+      "mental",
+      "solo",
+      "routine"
+    ],
+    "when": "daily@night",
+    "where": [
+      "Clearing",
+      "Cave"
+    ],
+    "duration": [
+      10,
+      20
+    ],
+    "needs": [
+      "Self"
+    ],
+    "states_addressed": [
+      "anxiety",
+      "confusion",
+      "hope"
+    ],
+    "steps": [
+      "review events of the day internally",
+      "acknowledge emotions, good and bad",
+      "remind self of past successes",
+      "set an intention for tomorrow",
+      "accept current uncertainty as temporary"
+    ],
+    "importance": 0.7,
+    "habit": 0.5
+  },
+  "Journaling on Found Objects": {
+    "name": "Journaling on Found Objects",
+    "category": "Cognitive/Inner",
+    "tags": [
+      "mental",
+      "solo",
+      "routine"
+    ],
+    "when": "daily@evening",
+    "where": [
+      "Clearing",
+      "Cave",
+      "Meadow"
+    ],
+    "duration": [
+      5,
+      15
+    ],
+    "needs": [
+      "Investigator",
+      "Backpack"
+    ],
+    "states_addressed": [
+      "confusion",
+      "curiosity"
+    ],
+    "steps": [
+      "find a flat surface such as bark or stone",
+      "use any sharp edge to etch notes or keep tally",
+      "record notable events or locations",
+      "note changes in mood or state",
+      "review previous entries to track progress"
+    ],
+    "importance": 0.5,
+    "habit": 0.2
+  },
+  "Cloud Watching": {
+    "name": "Cloud Watching",
+    "category": "Recreation & Leisure",
+    "tags": [
+      "mental",
+      "outdoors",
+      "solo"
+    ],
+    "when": "daily@afternoon",
+    "where": [
+      "Clearing",
+      "Meadow"
+    ],
+    "duration": [
+      10,
+      20
+    ],
+    "needs": [
+      "CompanionSeeker"
+    ],
+    "states_addressed": [
+      "hope",
+      "loneliness"
+    ],
+    "steps": [
+      "lie back on grass or soft ground",
+      "gaze up at clouds and sky patterns",
+      "identify shapes or stories in clouds",
+      "let thoughts wander freely",
+      "enjoy restful break"
+    ],
+    "importance": 0.3,
+    "habit": 0.1
+  },
+  "Whittle Fallen Branches": {
+    "name": "Whittle Fallen Branches",
+    "category": "Recreation & Leisure",
+    "tags": [
+      "solo",
+      "outdoors",
+      "routine",
+      "physical"
+    ],
+    "when": "daily@evening",
+    "where": [
+      "Clearing",
+      "Forest"
+    ],
+    "duration": [
+      10,
+      30
+    ],
+    "needs": [
+      "Fallenbranch",
+      "Backpack"
+    ],
+    "states_addressed": [
+      "curiosity",
+      "anxiety"
+    ],
+    "steps": [
+      "choose an appropriately sized dry branch",
+      "use available sharp tool or edge",
+      "shape branch into tool, art, or symbol",
+      "focus on fine detail to distract mind",
+      "store completed item for use or comfort"
+    ],
+    "importance": 0.4,
+    "habit": 0.2
+  },
+  "Create Nature-Based Music": {
+    "name": "Create Nature-Based Music",
+    "category": "Recreation & Leisure",
+    "tags": [
+      "mental",
+      "outdoors",
+      "solo"
+    ],
+    "when": "opportunistic",
+    "where": [
+      "Meadow",
+      "Clearing",
+      "Forest"
+    ],
+    "duration": [
+      10,
+      20
+    ],
+    "needs": [
+      "Fallenbranch",
+      "CompanionSeeker"
+    ],
+    "states_addressed": [
+      "loneliness",
+      "hope"
+    ],
+    "steps": [
+      "gather small sticks or stones",
+      "tap or rub objects to produce rhythmic sounds",
+      "try to mimic natural sounds",
+      "compose a simple tune for morale",
+      "repeat as needed for comfort"
+    ],
+    "importance": 0.2,
+    "habit": 0.1
+  },
+  "Respond To Sudden Threat": {
+    "name": "Respond To Sudden Threat",
+    "category": "Safety/Emergency",
+    "tags": [
+      "physical",
+      "solo",
+      "outdoors",
+      "survival"
+    ],
+    "when": "opportunistic",
+    "where": [
+      "Forest",
+      "Thicket",
+      "Cave",
+      "Mountain"
+    ],
+    "duration": [
+      1,
+      10
+    ],
+    "needs": [
+      "Survivor"
+    ],
+    "states_addressed": [
+      "anxiety",
+      "injury"
+    ],
+    "steps": [
+      "listen and look for threat source",
+      "remove self from immediate danger zone",
+      "seek refuge in dense vegetation or cave",
+      "use branch or tool to deter if approached",
+      "remain quiet and monitor situation"
+    ],
+    "importance": 1.0,
+    "habit": 0.1
+  },
+  "First Aid for Minor Injury": {
+    "name": "First Aid for Minor Injury",
+    "category": "Safety/Emergency",
+    "tags": [
+      "physical",
+      "solo",
+      "survival"
+    ],
+    "when": "opportunistic",
+    "where": [
+      "Forest",
+      "Clearing",
+      "Meadow"
+    ],
+    "duration": [
+      5,
+      20
+    ],
+    "needs": [
+      "Backpack",
+      "Survivor"
+    ],
+    "states_addressed": [
+      "injury",
+      "anxiety"
+    ],
+    "steps": [
+      "inspect wound or injury site",
+      "clean area using water from backpack or spring",
+      "apply pressure to stop bleeding if needed",
+      "bandage with clean cloth or leaf if available",
+      "monitor for signs of infection"
+    ],
+    "importance": 1.0,
+    "habit": 0.2
+  },
+  "Check For Signs of Unknown Person": {
+    "name": "Check For Signs of Unknown Person",
+    "category": "Safety/Emergency",
+    "tags": [
+      "mental",
+      "outdoors",
+      "solo",
+      "survival"
+    ],
+    "when": "opportunistic",
+    "where": [
+      "Forest",
+      "Clearing",
+      "Cave"
+    ],
+    "duration": [
+      10,
+      20
+    ],
+    "needs": [
+      "Investigator"
+    ],
+    "states_addressed": [
+      "anxiety",
+      "curiosity"
+    ],
+    "steps": [
+      "scan area for recent footprints or disturbances",
+      "listen for non-natural sounds",
+      "identify any objects not brought by self",
+      "avoid leaving own identifiable trace",
+      "avoid direct encounters if uncertain"
+    ],
+    "importance": 0.9,
+    "habit": 0.1
+  },
+  "Daily Hygiene Routine": {
+    "name": "Daily Hygiene Routine",
+    "category": "Health Management (self-care)",
+    "tags": [
+      "physical",
+      "solo",
+      "routine"
+    ],
+    "when": "daily@morning",
+    "where": [
+      "Spring",
+      "Water",
+      "Clearing"
+    ],
+    "duration": [
+      10,
+      20
+    ],
+    "needs": [
+      "Water",
+      "Backpack"
+    ],
+    "states_addressed": [
+      "injury",
+      "fatigue"
+    ],
+    "steps": [
+      "retrieve water from a clean source",
+      "wash hands, face, and exposed skin",
+      "clean teeth or mouth with available tools",
+      "inspect for insect bites or scratches",
+      "dry off before returning to camp"
+    ],
+    "importance": 0.8,
+    "habit": 0.7
+  },
+  "Stretch And Assess Fitness": {
+    "name": "Stretch And Assess Fitness",
+    "category": "Health Management (self-care)",
+    "tags": [
+      "physical",
+      "solo",
+      "routine"
+    ],
+    "when": "daily@dawn",
+    "where": [
+      "Clearing",
+      "Meadow",
+      "Forest"
+    ],
+    "duration": [
+      5,
+      15
+    ],
+    "needs": [
+      "Self",
+      "Survivor"
+    ],
+    "states_addressed": [
+      "fatigue",
+      "injury"
+    ],
+    "steps": [
+      "stand on stable surface",
+      "gently stretch arms, legs, and back",
+      "test range of motion of joints",
+      "note discomfort or weakness",
+      "adapt daily plan to current condition"
+    ],
+    "importance": 0.7,
+    "habit": 0.6
+  },
+  "Monitor For Symptoms Of Illness": {
+    "name": "Monitor For Symptoms Of Illness",
+    "category": "Health Management (self-care)",
+    "tags": [
+      "solo",
+      "routine",
+      "mental"
+    ],
+    "when": "daily@morning",
+    "where": [
+      "Clearing",
+      "Forest"
+    ],
+    "duration": [
+      5,
+      10
+    ],
+    "needs": [
+      "Self"
+    ],
+    "states_addressed": [
+      "injury",
+      "anxiety"
+    ],
+    "steps": [
+      "take stock of energy and appetite",
+      "check for fever, rash, or aches",
+      "review any new exposures or risky foods",
+      "rest if warning signs appear",
+      "adjust plans for recuperation"
+    ],
+    "importance": 0.8,
+    "habit": 0.6
+  },
+  "Reinforce Shelter": {
+    "name": "Reinforce Shelter",
+    "category": "Maintenance & Repair",
+    "tags": [
+      "physical",
+      "solo",
+      "outdoors",
+      "routine"
+    ],
+    "when": "daily@afternoon",
+    "where": [
+      "Clearing",
+      "Forest",
+      "Cave"
+    ],
+    "duration": [
+      15,
+      40
+    ],
+    "needs": [
+      "Fallenbranch",
+      "Backpack"
+    ],
+    "states_addressed": [
+      "exposure",
+      "hope"
+    ],
+    "steps": [
+      "inspect current shelter for weak points",
+      "add more branches or natural materials",
+      "secure vulnerable gaps against rain or wind",
+      "test shelter stability and make adjustments",
+      "clear entrance area of hazards"
+    ],
+    "importance": 0.8,
+    "habit": 0.4
+  },
+  "Repair Or Improvise Tools": {
+    "name": "Repair Or Improvise Tools",
+    "category": "Maintenance & Repair",
+    "tags": [
+      "physical",
+      "solo",
+      "outdoors"
+    ],
+    "when": "opportunistic",
+    "where": [
+      "Clearing",
+      "Forest"
+    ],
+    "duration": [
+      10,
+      30
+    ],
+    "needs": [
+      "Fallenbranch",
+      "Backpack"
+    ],
+    "states_addressed": [
+      "hope",
+      "curiosity"
+    ],
+    "steps": [
+      "evaluate current tools for cracks or wear",
+      "identify natural materials for repairs",
+      "reinforce weak points with cord or fabric",
+      "improvise missing tools as needed",
+      "test tool function before use"
+    ],
+    "importance": 0.7,
+    "habit": 0.3
+  },
+  "Inspect Camp For Hazards": {
+    "name": "Inspect Camp For Hazards",
+    "category": "Maintenance & Repair",
+    "tags": [
+      "physical",
+      "mental",
+      "solo",
+      "routine"
+    ],
+    "when": "daily@dawn",
+    "where": [
+      "Clearing",
+      "Forest",
+      "Cave"
+    ],
+    "duration": [
+      10,
+      15
+    ],
+    "needs": [
+      "Survivor"
+    ],
+    "states_addressed": [
+      "anxiety"
+    ],
+    "steps": [
+      "walk perimeter of camp area",
+      "check for loose branches, animal tracks, or sharp objects",
+      "remove tripping hazards",
+      "relocate camp items for greater safety",
+      "reaffirm boundaries to unknown person"
+    ],
+    "importance": 0.7,
+    "habit": 0.5
+  }
+}

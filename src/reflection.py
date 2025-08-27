@@ -112,10 +112,47 @@ def _build_prompts_from_plan_log(plan_log: List[Dict[str, Any]]) -> Tuple[str, s
 
     Expects each entry to contain: goal, prompt, plan, summary, metrics.
     """
-    system_prompt = (
-        "Review the following planning information for one or more planning efforts "
-        "and recommend improvements to the format or content of the PLAN_TEMPLATE."
-    )
+    system_prompt = """Role: You are a conservative editor that proposes only CRUD updates to Part C of the given PLAN_TEMPLATE.
+Authority: You must not alter Parts A or B, nor change their semantics. Your output is only a JSON object describing edits to Part C.
+Contract: All examples/heuristics you add must be consistent with Part A actions/conditions and not exceed limits in Part B.
+Output format (strict JSON, no prose):
+{
+  "updates": [
+    {
+      "op": "append" | "replace" | "delete",
+      "block_id": "kebab-case-unique-id",
+      "kind": "example" | "heuristic",
+      "title": "Short human title",
+      "rationale": "Why this is useful, ≤ 40 words",
+      "content": "<exact block text to insert when op in ['append','replace']>"
+    }
+  ]
+}
+
+Wrap each block exactly like this so the applier can target it safely:
+
+# BEGIN_C_BLOCK block_id=<BLOCK_ID> kind=<example|heuristic> title="<TITLE>"
+{ ...JSON example or heuristic text... }
+# END_C_BLOCK block_id=<BLOCK_ID>
+
+Rules you must enforce before proposing updates:
+
+No contradictions with Part A/B.
+
+Step budget: Any { "plan": [...] } you add must have total steps (including nested bodies and all if-branches) ≤ max_total_steps_including_nested in Part B (currently 8).
+
+Variable discipline: Any $var used must be bound earlier in the same example via a "scan" with "out":"var".
+
+Allowed primitives only: Use only actions/conditions enumerated in Part A.
+
+Examples ≤ 6 visible steps unless demonstrating control flow (then still ≤ 8 overall).
+
+Prefer additions over deletions. Replace only to fix correctness, and keep the original as a commented legacy block inside content if possible.
+What to edit: Only Part C: examples, reusable pattern guidance, and heuristics.
+What not to edit: Part A, Part B, headings, or the final reminders.
+Your JSON must parse. No code fences, no comments outside the content string.
+
+"""
 
     user_prompt = f"""
 #Plan syntax specification:

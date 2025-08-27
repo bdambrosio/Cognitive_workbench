@@ -449,7 +449,7 @@ def _parse_action_line(line, line_number):
                     # think only needs value, not target
                     value = args[0] if len(args) > 0 else ''
                     target = ''
-                elif action in ['move', 'take', 'inspect', 'use']:
+                elif action in ['move', 'take', 'place', 'inspect', 'use']:
                     # These actions only need target, not value
                     target = args[0] if len(args) > 0 else ''
                     value = ''
@@ -501,8 +501,8 @@ def verify_plan(plan_json: Any) -> bool:
 # helpers
 # ---------------------------------------------------------------------------
 
-_ALLOWED_TYPES = {"action", "say", "move", "think", "take", "inspect", "use", "scan", "while", "if", "near", "look"}
-_ALLOWED_CONDITION_TYPES = {"near", "can_see", "has_item", "notnear", "cant_see", "hasnt_item", "at_location", "notat_location", "believes", "notbelieves"}
+_ALLOWED_TYPES = {"action", "say", "move", "think", "take", "place", "inspect", "use", "scan", "while", "if", "near", "look"}
+_ALLOWED_CONDITION_TYPES = {"near", "can_see", "has_item", "notnear", "cant_see", "hasnt_item", "at_location", "notat_location", "believes", "notbelieves", "bound", "notbound"}
 
 REQ_KEYS = {
     "say": {"type", "target", "value"},
@@ -510,6 +510,7 @@ REQ_KEYS = {
     "think": {"type", "value"},
     "look": {"type", "target"},
     "take": {"type", "target"},
+    "place": {"type", "target"},
     "inspect": {"type", "target"},
     "use": {"type", "target"},
     "scan": {"type", "target", "out"},
@@ -524,6 +525,7 @@ OPTIONAL_KEYS = {
     "think": {"reason", "target"},
     "look": {"reason", "value"},
     "take": {"reason", "value"},
+    "place": {"reason", "value"},
     "inspect": {"reason", "value"},
     "use": {"reason", "value"},
     "scan": set(),  # scan has no optional keys
@@ -544,6 +546,8 @@ REQ_CONDITION_KEYS = {
     "hasnt_item": {"target"},
     "notat_location": {"target"},
     "notbelieves": {"target"},
+    "bound": {"target"},
+    "notbound": {"target"}
 }
 
 def _load(plan_json: Any) -> Dict[str, Any]:
@@ -705,6 +709,7 @@ def _evaluate_condition(character: ZenohExecutiveNode, condition: dict) -> bool:
         
         condition_type = condition['type']
         normalized_type, negated = normalize_condition_type(condition_type)
+        raw_target = condition['target']
         target = deref_plan_target(character.plan_bindings, condition['target'])
         character_name = character.character_name
         result = {'value': False, 'binding': None}
@@ -715,6 +720,21 @@ def _evaluate_condition(character: ZenohExecutiveNode, condition: dict) -> bool:
                 return False
             # For non-scan semantics: always require exact id equality
             return name == target_str
+        
+        # NEW: binding test conditions
+        if normalized_type == 'bound':
+            try:
+                # Accept "$var" or plain var name; treat None/empty as unbound
+                var_name = raw_target[1:] if isinstance(raw_target, str) and raw_target.startswith('$') else raw_target
+                val = character.plan_bindings.get(var_name, None)
+                is_bound = not (val is None or val == '' or val == [] or val == {})
+                if not negated:  # 'bound'
+                    return {'value': is_bound, 'binding': val if is_bound else None}
+                else:            # 'notbound'
+                    return {'value': (not is_bound), 'binding': None}
+            except Exception:
+                # On any error, treat as unbound
+                return {'value': False if not negated else True, 'binding': None}
         
         def _local_find_visible(tgt: str):
             try:

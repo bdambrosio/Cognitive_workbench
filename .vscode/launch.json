@@ -17,7 +17,7 @@
             "preLaunchTask": "setup-zenoh-environment"
         },
         {
-            "name": "Debug Activity (laTerre.yaml)",
+            "name": "Generate Activities (laTerre.yaml)",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/src/activity.py",
@@ -32,7 +32,7 @@
             "preLaunchTask": "setup-zenoh-environment"
         },
         {
-            "name": "Debug Activity (Joe.yaml)",
+            "name": "Generate Activities (Jim.yaml)",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/src/activity.py",
@@ -41,13 +41,13 @@
             "env": {
                 "PYTHONPATH": "${workspaceFolder}/src"
             },
-            "args": ["../scenarios/joe.yaml"],
+            "args": ["../scenarios/jim.yaml"],
             "justMyCode": false,
             "stopOnEntry": false,
             "preLaunchTask": "setup-zenoh-environment"
         },
         {
-            "name": "Debug Activity (lost.yaml)",
+            "name": "Generate Activities (lost.yaml)",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/src/activity.py",
@@ -62,7 +62,7 @@
             "preLaunchTask": "setup-zenoh-environment"
         },
         {
-            "name": "Debug Activity (ABetterLife.yaml)",
+            "name": "Generate Activities (ABetterLife.yaml)",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/src/activity.py",
@@ -76,7 +76,7 @@
             "stopOnEntry": false,
             "preLaunchTask": "setup-zenoh-environment"
         },{
-            "name": "Debug Launcher (Joe - single character)",
+            "name": "Jim - single character",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/src/launcher.py",
@@ -86,7 +86,7 @@
                 "PYTHONPATH": "${workspaceFolder}/src",
                 "CWB_DEBUG": "1"
             },
-            "args": ["joe.yaml", "--ui", "--map-file", "forest.py"],
+            "args": ["jim.yaml", "--ui", "--map-file", "forest.py"],
             "justMyCode": false,
             "stopOnEntry": false,
             "preLaunchTask": "setup-zenoh-environment"
