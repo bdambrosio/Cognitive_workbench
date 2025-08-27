@@ -241,7 +241,7 @@
             "env": {
                 "PYTHONPATH": "${workspaceFolder}/src"
             },
-            "args": [],
+            "args": ["--v2", "--microbatch", "5", "--seed", "42", "--s1_out", "data/reflection_stage1.json"],
             "justMyCode": false,
             "stopOnEntry": false,
             "preLaunchTask": "setup-zenoh-environment"
