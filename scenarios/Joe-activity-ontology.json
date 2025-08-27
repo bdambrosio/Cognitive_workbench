@@ -7,7 +7,9 @@
     "Mountain",
     "Spring",
     "Cave",
-    "Thicket"
+    "Thicket",
+    "Hut1",
+    "Appletree"
   ],
   "tools": [
     "Berries",
@@ -16,92 +18,101 @@
     "Fallenbranch",
     "Spring",
     "Backpack",
-    "Food",
-    "Water bottle",
-    "Pocket knife",
-    "Map (if present)"
+    "Waterbottle",
+    "Food"
   ],
   "roles": [
     "Explorer",
-    "Forager",
-    "Problem Solver",
-    "Survivor",
+    "Companion",
     "Investigator",
-    "Seeker",
-    "Companion (if others are present)"
+    "Survivor",
+    "Gatherer",
+    "Forager"
   ],
   "norms_rules": [
-    "Prioritize safety and survival",
-    "Respect the natural environment",
-    "Avoid unnecessary risks",
-    "Be curious and observant",
-    "Act independently but open to teamwork",
-    "Avoid direct confrontation unless necessary",
-    "Do not consume unknown flora unless identified as safe"
+    "Prioritize safety and avoid unnecessary risk.",
+    "Seek shelter and stay hydrated.",
+    "Respect unknown individuals and keep distance until trust is established.",
+    "Try to solve the mystery of the current situation.",
+    "Share information when appropriate.",
+    "Be resourceful using available items.",
+    "Follow your curiosity but remember the need for survival."
   ],
   "hazards": [
-    "Poisonous Berries",
-    "Poisonous Mushrooms",
-    "Thick Underbrush (Thicket)",
-    "Steep Areas (Mountain)",
-    "Wild Animals (implied hazard)",
+    "Accident",
+    "Illness",
+    "Mountain",
+    "Cave",
+    "UnknownAnimals",
+    "Hermit",
+    "PoisonousPlants",
     "Dehydration",
-    "Exposure",
-    "Getting lost",
-    "Slippery Rocks near Water",
-    "Entrapment in Cave"
+    "GettingLost"
   ],
   "social_graph": [
-    {
-      "name": "Joe",
-      "relationship": "self"
-    }
+    "Samantha",
+    "Hermit",
+    "User"
   ],
   "time_windows": "morning",
   "affordances": {
     "Forest": [
-      "exploring",
-      "foraging",
-      "seeking shelter",
-      "identifying plants",
-      "navigating",
-      "climbing"
+      "explore",
+      "forage",
+      "gather_fuel",
+      "observe_flora_fauna",
+      "hide"
     ],
     "Clearing": [
-      "resting",
-      "surveying area",
-      "setting up temporary camp",
-      "eating"
+      "rest",
+      "meet",
+      "survey_surroundings",
+      "set_up_camp"
     ],
     "Meadow": [
-      "resting",
-      "spotting landmarks",
-      "gathering edible plants"
+      "forage",
+      "relax",
+      "observe",
+      "engage_in_conversation"
     ],
     "Water": [
-      "drinking",
-      "washing",
-      "refilling bottles",
-      "following downstream"
+      "drink",
+      "refill_water",
+      "wash",
+      "observe_wildlife"
     ],
     "Mountain": [
-      "climbing for vantage",
-      "navigating terrain",
-      "avoiding hazards"
+      "survey_area",
+      "climb",
+      "look_for_landmarks",
+      "risk_of_injury"
     ],
     "Spring": [
-      "collecting water",
-      "resting"
+      "collect_water",
+      "refresh",
+      "wash",
+      "possible_meeting_point"
     ],
     "Cave": [
-      "sheltering",
-      "exploring",
-      "hiding"
+      "take_shelter",
+      "explore",
+      "hide",
+      "risk_of_hazards"
     ],
     "Thicket": [
-      "hiding",
-      "foraging carefully",
-      "avoiding injury"
+      "hide",
+      "forage",
+      "seek_shelter"
+    ],
+    "Hut1": [
+      "seek_shelter",
+      "meet_Hermit",
+      "investigate_clues"
+    ],
+    "Appletree": [
+      "forage",
+      "eat_apples",
+      "rest_in_shade"
     ]
   },
   "states": [
@@ -110,10 +121,9 @@
     "fatigue",
     "injury",
     "curiosity",
-    "anxiety",
     "loneliness",
-    "hope",
-    "alertness",
-    "confusion"
+    "anxiety",
+    "confusion",
+    "hopefulness"
   ]
 }

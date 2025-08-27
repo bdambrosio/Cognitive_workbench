@@ -1,38 +1,78 @@
-2025-08-26 18:19:59 - character_launcher - INFO - 🔧 Debug mode enabled for Launcher (console INFO)
-2025-08-26 18:20:00 - character_launcher - INFO - ✅ Launcher subscribed to cognitive/launcher/shutdown and ready to publish ready signal
-2025-08-26 18:20:00 - character_launcher - INFO - Added character: Jim
-2025-08-26 18:20:11 - character_launcher - INFO - Launching 1 characters...
-2025-08-26 18:20:11 - character_launcher - INFO - Launching shared services...
-2025-08-26 18:20:11 - character_launcher - INFO - ✅ LLM Service Node launched with server: vllm, model: llama3.1-8b-instruct
-2025-08-26 18:20:11 - character_launcher - INFO - ✅ FastAPI Action Display Node launched on port 3000
-2025-08-26 18:20:11 - character_launcher - INFO -    - Web UI available at: http://localhost:3000
-2025-08-26 18:20:13 - character_launcher - INFO - Debug mode enabled via CWB_DEBUG - map turn timeout will be disabled
-2025-08-26 18:20:13 - character_launcher - INFO - ✅ Map Node launched with map: forest.py
-2025-08-26 18:20:13 - character_launcher - INFO - ⏳ Waiting for Map Node to initialize...
-2025-08-26 18:20:20 - character_launcher - INFO - Launching character: Jim
-2025-08-26 18:20:20 - character_launcher - INFO - ✅ Jim memory_node launched
-2025-08-26 18:20:21 - character_launcher - INFO - ✅ Jim situation_node launched
-2025-08-26 18:20:21 - character_launcher - INFO - ✅ Jim sense_node launched
-2025-08-26 18:20:22 - character_launcher - INFO - ✅ Jim executive_node launched
-2025-08-26 18:20:23 - character_launcher - INFO - ✅ All characters launched
-2025-08-26 18:20:23 - character_launcher - INFO - 🚀 Published ready signal: 1 characters active
-2025-08-26 18:20:23 - character_launcher - INFO - Monitoring processes...
-2025-08-26 18:38:20 - character_launcher - INFO - Received signal 2, initiating shutdown...
-2025-08-26 18:38:23 - character_launcher - INFO - 🛑 Initiating graceful shutdown...
-2025-08-26 18:38:23 - character_launcher - INFO - 📨 Sending SIGTERM to 7 processes...
-2025-08-26 18:38:23 - character_launcher - INFO -   ✉️  SIGTERM sent to Jim process 336861
-2025-08-26 18:38:23 - character_launcher - INFO -   ✉️  SIGTERM sent to Jim process 336868
-2025-08-26 18:38:23 - character_launcher - INFO -   ✉️  SIGTERM sent to Jim process 336899
-2025-08-26 18:38:23 - character_launcher - INFO -   ✉️  SIGTERM sent to Jim process 336908
-2025-08-26 18:38:23 - character_launcher - INFO -   ✉️  SIGTERM sent to shared process 336448
-2025-08-26 18:38:23 - character_launcher - INFO -   ✉️  SIGTERM sent to shared process 336449
-2025-08-26 18:38:23 - character_launcher - INFO -   ✉️  SIGTERM sent to shared process 336488
-2025-08-26 18:38:23 - character_launcher - INFO - ⏳ Waiting up to 15s for graceful shutdown...
-2025-08-26 18:38:28 - character_launcher - WARNING -   ⏰ 3 processes still running after 5s...
-2025-08-26 18:38:33 - character_launcher - WARNING -   ⏰ 3 processes still running after 10s...
-2025-08-26 18:38:38 - character_launcher - WARNING -   ⏰ 3 processes still running after 15s...
-2025-08-26 18:38:38 - character_launcher - WARNING - ⚠️  Force killing 3 unresponsive processes...
-2025-08-26 18:38:38 - character_launcher - WARNING -   💀 Force killed Jim process 336861
-2025-08-26 18:38:38 - character_launcher - WARNING -   💀 Force killed Jim process 336908
-2025-08-26 18:38:38 - character_launcher - WARNING -   💀 Force killed shared process 336488
-2025-08-26 18:38:38 - character_launcher - INFO - ✅ Shutdown complete
+2025-08-27 10:49:02 - character_launcher - INFO - 🔧 Debug mode enabled for Launcher (console INFO)
+2025-08-27 10:49:02 - character_launcher - INFO - ✅ Launcher subscribed to cognitive/launcher/shutdown and ready to publish ready signal
+2025-08-27 10:49:02 - character_launcher - INFO - Added character: Samantha
+2025-08-27 10:49:02 - character_launcher - INFO - Added character: Joe
+2025-08-27 10:49:02 - character_launcher - INFO - Added character: Hermit
+2025-08-27 10:49:02 - character_launcher - INFO - Added character: User
+2025-08-27 10:49:48 - character_launcher - INFO - Launching 4 characters...
+2025-08-27 10:49:48 - character_launcher - INFO - Launching shared services...
+2025-08-27 10:49:48 - character_launcher - INFO - ✅ LLM Service Node launched with server: vllm, model: llama3.1-8b-instruct
+2025-08-27 10:49:48 - character_launcher - INFO - ✅ FastAPI Action Display Node launched on port 3000
+2025-08-27 10:49:48 - character_launcher - INFO -    - Web UI available at: http://localhost:3000
+2025-08-27 10:49:50 - character_launcher - INFO - Debug mode enabled via CWB_DEBUG - map turn timeout will be disabled
+2025-08-27 10:49:50 - character_launcher - INFO - ✅ Map Node launched with map: forest.py
+2025-08-27 10:49:50 - character_launcher - INFO - ⏳ Waiting for Map Node to initialize...
+2025-08-27 10:49:57 - character_launcher - INFO - Launching character: Samantha
+2025-08-27 10:49:57 - character_launcher - INFO - ✅ Samantha memory_node launched
+2025-08-27 10:49:58 - character_launcher - INFO - ✅ Samantha situation_node launched
+2025-08-27 10:49:58 - character_launcher - INFO - ✅ Samantha sense_node launched
+2025-08-27 10:49:59 - character_launcher - INFO - ✅ Samantha executive_node launched
+2025-08-27 10:50:00 - character_launcher - INFO - Launching character: Joe
+2025-08-27 10:50:00 - character_launcher - INFO - ✅ Joe memory_node launched
+2025-08-27 10:50:00 - character_launcher - INFO - ✅ Joe situation_node launched
+2025-08-27 10:50:01 - character_launcher - INFO - ✅ Joe sense_node launched
+2025-08-27 10:50:01 - character_launcher - INFO - ✅ Joe executive_node launched
+2025-08-27 10:50:02 - character_launcher - INFO - Launching character: Hermit
+2025-08-27 10:50:02 - character_launcher - INFO - ✅ Hermit memory_node launched
+2025-08-27 10:50:03 - character_launcher - INFO - ✅ Hermit situation_node launched
+2025-08-27 10:50:03 - character_launcher - INFO - ✅ Hermit sense_node launched
+2025-08-27 10:50:04 - character_launcher - INFO - ✅ Hermit executive_node launched
+2025-08-27 10:50:05 - character_launcher - INFO - Launching character: User
+2025-08-27 10:50:05 - character_launcher - INFO - ✅ User memory_node launched
+2025-08-27 10:50:05 - character_launcher - INFO - ✅ User situation_node launched
+2025-08-27 10:50:06 - character_launcher - INFO - ✅ User sense_node launched
+2025-08-27 10:50:06 - character_launcher - INFO - ✅ User executive_node launched
+2025-08-27 10:50:07 - character_launcher - INFO - ✅ All characters launched
+2025-08-27 10:50:07 - character_launcher - INFO - 🚀 Published ready signal: 4 characters active
+2025-08-27 10:50:07 - character_launcher - INFO - Monitoring processes...
+2025-08-27 11:11:07 - character_launcher - INFO - Received signal 2, initiating shutdown...
+2025-08-27 11:11:07 - character_launcher - INFO - 🛑 Initiating graceful shutdown...
+2025-08-27 11:11:07 - character_launcher - INFO - 📨 Sending SIGTERM to 19 processes...
+2025-08-27 11:11:07 - character_launcher - INFO -   ✉️  SIGTERM sent to Samantha process 80830
+2025-08-27 11:11:07 - character_launcher - INFO -   ✉️  SIGTERM sent to Samantha process 80837
+2025-08-27 11:11:07 - character_launcher - INFO -   ✉️  SIGTERM sent to Samantha process 80851
+2025-08-27 11:11:07 - character_launcher - INFO -   ✉️  SIGTERM sent to Samantha process 80858
+2025-08-27 11:11:07 - character_launcher - INFO -   ✉️  SIGTERM sent to Joe process 80904
+2025-08-27 11:11:07 - character_launcher - INFO -   ✉️  SIGTERM sent to Joe process 80959
+2025-08-27 11:11:07 - character_launcher - INFO -   ✉️  SIGTERM sent to Joe process 80985
+2025-08-27 11:11:07 - character_launcher - INFO -   ✉️  SIGTERM sent to Joe process 80994
+2025-08-27 11:11:07 - character_launcher - INFO -   ✉️  SIGTERM sent to Hermit process 81018
+2025-08-27 11:11:07 - character_launcher - INFO -   ✉️  SIGTERM sent to Hermit process 81034
+2025-08-27 11:11:07 - character_launcher - INFO -   ✉️  SIGTERM sent to Hermit process 81061
+2025-08-27 11:11:07 - character_launcher - INFO -   ✉️  SIGTERM sent to Hermit process 81064
+2025-08-27 11:11:07 - character_launcher - INFO -   ✉️  SIGTERM sent to User process 81171
+2025-08-27 11:11:07 - character_launcher - INFO -   ✉️  SIGTERM sent to User process 81232
+2025-08-27 11:11:07 - character_launcher - INFO -   ✉️  SIGTERM sent to User process 81241
+2025-08-27 11:11:07 - character_launcher - INFO -   ✉️  SIGTERM sent to User process 81244
+2025-08-27 11:11:07 - character_launcher - INFO -   ✉️  SIGTERM sent to shared process 80519
+2025-08-27 11:11:07 - character_launcher - INFO -   ✉️  SIGTERM sent to shared process 80520
+2025-08-27 11:11:07 - character_launcher - INFO -   ✉️  SIGTERM sent to shared process 80562
+2025-08-27 11:11:07 - character_launcher - INFO - ⏳ Waiting up to 15s for graceful shutdown...
+2025-08-27 11:11:12 - character_launcher - WARNING -   ⏰ 13 processes still running after 5s...
+2025-08-27 11:11:17 - character_launcher - WARNING -   ⏰ 13 processes still running after 10s...
+2025-08-27 11:11:22 - character_launcher - WARNING -   ⏰ 13 processes still running after 15s...
+2025-08-27 11:11:22 - character_launcher - WARNING - ⚠️  Force killing 13 unresponsive processes...
+2025-08-27 11:11:22 - character_launcher - WARNING -   💀 Force killed Samantha process 80830
+2025-08-27 11:11:22 - character_launcher - WARNING -   💀 Force killed Samantha process 80851
+2025-08-27 11:11:22 - character_launcher - WARNING -   💀 Force killed Samantha process 80858
+2025-08-27 11:11:22 - character_launcher - WARNING -   💀 Force killed Joe process 80904
+2025-08-27 11:11:22 - character_launcher - WARNING -   💀 Force killed Joe process 80985
+2025-08-27 11:11:22 - character_launcher - WARNING -   💀 Force killed Joe process 80994
+2025-08-27 11:11:22 - character_launcher - WARNING -   💀 Force killed Hermit process 81018
+2025-08-27 11:11:22 - character_launcher - WARNING -   💀 Force killed Hermit process 81061
+2025-08-27 11:11:22 - character_launcher - WARNING -   💀 Force killed Hermit process 81064
+2025-08-27 11:11:22 - character_launcher - WARNING -   💀 Force killed User process 81171
+2025-08-27 11:11:22 - character_launcher - WARNING -   💀 Force killed User process 81241
+2025-08-27 11:11:22 - character_launcher - WARNING -   💀 Force killed User process 81244
+2025-08-27 11:11:22 - character_launcher - WARNING -   💀 Force killed shared process 80562
+2025-08-27 11:11:22 - character_launcher - INFO - ✅ Shutdown complete

@@ -5,120 +5,106 @@
     "Meadow",
     "Mountain",
     "Water",
-    "Thicket",
     "Spring",
     "Cave",
-    "Appletree",
-    "Hut"
+    "Thicket"
   ],
   "tools": [
+    "Berries",
+    "Mushrooms",
+    "Appletree",
+    "Fallenbranch",
+    "Spring",
     "backpack",
     "food",
-    "water",
-    "hiking pants",
-    "pendleton shirt",
-    "Fallenbranch",
-    "Berries",
-    "Mushrooms"
+    "water"
   ],
   "roles": [
-    "explorer",
-    "survivor",
-    "friend/companion",
-    "philosopher",
-    "adventurer",
-    "watcher",
-    "forager",
-    "outsider"
+    "Explorer",
+    "Forager",
+    "Companion",
+    "Philosopher",
+    "Survivor",
+    "Defender",
+    "Stranger"
   ],
   "norms_rules": [
-    "be wary of strangers",
-    "respect the wild environment",
-    "do not harm living things unnecessarily",
-    "share knowledge with trusted others",
-    "do not trust blindly",
-    "explore with curiosity",
-    "seek safety for self and companions",
-    "navigate using intuition and reasoning"
+    "Be wary of strangers",
+    "Respect nature",
+    "Trust must be earned",
+    "Safety first",
+    "Explore with caution",
+    "Avoid unnecessary risk",
+    "Seek understanding"
   ],
   "hazards": [
-    "unfamiliar terrain (e.g., Mountain, Thicket)",
-    "dangerous mushrooms or berries",
-    "getting lost in the Forest",
-    "exposure to elements (heat, cold, rain)",
-    "wild animals (unseen)",
-    "trusting the wrong person",
-    "emotional distress or fear",
-    "encounter with Hermit (potential threat/unknown intentions)"
+    "Mountain",
+    "Water",
+    "Cave",
+    "Thicket",
+    "Hermit"
   ],
   "social_graph": [
-    {
-      "name": "Joe",
-      "relationship": "Potential companion, also lost, trust uncertain, possible friend or rival"
-    },
-    {
-      "name": "Hermit",
-      "relationship": "Unknown, source of answers or danger, trust is a challenge"
-    },
-    {
-      "name": "User",
-      "relationship": "Mysterious, protective, potential guide/confidant, knowledge not fully shared"
-    }
+    "Joe",
+    "Hermit",
+    "User"
   ],
   "time_windows": "morning",
   "affordances": {
     "Forest": [
-      "explore surroundings",
-      "forage for food (berries, mushrooms)",
-      "philosophical reflection",
-      "seek safety",
-      "hide from unknown threats",
-      "navigate quietly"
+      "observe_nature",
+      "hike",
+      "forage",
+      "reflect",
+      "hide"
     ],
     "Clearing": [
-      "rest and eat",
-      "observe the sky/sunrise",
-      "initiate conversation with others",
-      "set up temporary camp",
-      "reflect or journal"
+      "rest",
+      "socialize",
+      "plan",
+      "eat"
     ],
     "Meadow": [
-      "gather wildflowers",
-      "move quickly across open space",
-      "look for food or water sources"
+      "wander",
+      "pick_flowers",
+      "daydream",
+      "watch_wildlife"
     ],
     "Mountain": [
-      "observe surroundings from higher ground",
-      "plan route",
-      "test physical fitness/climb"
+      "climb",
+      "scout",
+      "risk_fall"
     ],
     "Water": [
-      "refill water supplies",
+      "drink",
       "wash",
-      "follow water course for navigation"
-    ],
-    "Thicket": [
-      "seek cover/hide",
-      "risk getting scratched or lost"
+      "risk_drowning"
     ],
     "Spring": [
-      "collect clean water",
-      "rest/refill",
-      "reflect quietly"
+      "collect_water",
+      "rest"
     ],
     "Cave": [
-      "seek physical shelter",
-      "investigate for resources",
-      "risk from darkness or animals"
+      "explore",
+      "hide",
+      "risk_injury"
     ],
-    "Appletree": [
-      "gather fruit for food",
-      "climb to observe area"
-    ],
-    "Hut": [
-      "seek information or advice (Hermit)",
-      "request help or shelter",
-      "risk conflict or rejection"
+    "Thicket": [
+      "forage_berries",
+      "get_scratched",
+      "shelter"
     ]
-  }
+  },
+  "states": [
+    "hunger",
+    "thirst",
+    "fatigue",
+    "injury",
+    "curiosity",
+    "fear",
+    "longing",
+    "loneliness",
+    "hope",
+    "confusion"
+  ]
 }

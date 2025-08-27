@@ -1867,7 +1867,7 @@ end your response with </end>
                 f.write(json.dumps(entry, default=datetime_handler) + '\n')
         except Exception as e:
             logger.error(f'Error writing plan log to file: {e}')
-        self.review_planning()
+        #self.review_planning()
         self.action_history = []
     
     def review_planning(self):
