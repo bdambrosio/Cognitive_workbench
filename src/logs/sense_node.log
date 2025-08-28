@@ -1,34 +1,11 @@
-2025-08-27 10:50:11 - sense_node - INFO - 🔧 Debug mode enabled for User
-2025-08-27 10:50:11 - sense_node - INFO - 👁️ Sense Node initialized for character: User
-2025-08-27 10:50:11 - sense_node - INFO - Console Text Sensor ready - will auto-disable if external input detected
-2025-08-27 10:50:11 - sense_node - INFO - Sense Node running - press Ctrl+C to sto2020252025-08-27 11:11:07 - sense_node - INFO - Received signal 2, initiating shutdown...
-2025-08-27 11:11:07 - sense_node - INFO - Sense Node shutdown initiated...
-2025-08-27 11:11:07 - sense_node - INFO - Sense Node shutdown complete
-2025-08-27 11:11:07 - sense_node - INFO - Received signal 15, initiating shutdown...
-: [19, 19], 'distance': 2, 'timestamp': '2025-08-27T10:51:52.860238'}
-2025-08-27 11:11:07 - sense_node - INFO - Received signal 2, initiating shutdown...
-2025-08-27 11:11:07 - sense_node - INFO - Sense Node shutdown initiated...
-2025-08-27 11:11:07 - sense_node - INFO - Sense Node shutdown complete
-2025-08-27 11:11:07 - sense_node - INFO - Received signal 15, initiating shutdown...
-03 - sense_node - INFO - 📨 Received external text input from Samantha: "I think we should try to find a way out, but I'm not sure which direction to go, I mean, everything looks the same to me, all these trees a2025-08-27 10:51:07 - sense_node - INFO - 📨 Received external text input from Joe: "I think I see some stuff over that way, like, some fallen branc2025-08-27 10:51:51 - sense_node - INFO - 👁️ Visual event received: agent_detected - {'agent_name': 'Samantha', 'position': [21, 21], 'distance': 2, 'timestamp': '2025-08-27T10:51:51.876237'}
-2025-08-27 10:51:55 - sense_node - INFO - 📨 Received external text input from Samantha: "I'm following you to the appletree, Joe, stay close"
-2025-08-27 10:51:55 - sense_node - INFO - 📤 Published sense data: 3
-2025-08-22025-08-27 10:52:29 - sense_node - INFO - 📨 Received external text input from Joe: "I'm glad we're together too, it's definitely more fun to explore with someone, and like, safer, you know, in case something happens, we can, uh, watch each other's backs, I guess, so, yeah, le2025-08-27 10:53:42 - sense_node - INFO - 📨 Received external text input from Samantha: "I think I see a trail, let's follow it together, Joe"
-2025-08-27 10:53:42 - sense_node - INFO - 📤 Publi2025-08-27 10:54:442025-08-27 10:56:53 - sense_node - INFO - 📨 Received external text input from Samantha: "I'm glad we're following the trail together too, Joe, it's definitely more fun with someone, and like you said, safer, I was just thinking that, what do you think is at the end of this trail, do you think it might lead us out of the forest?"
-2025-08-27 10:56:53 - sense_node - INFO - 📤 Published sense data: 6
-2025-08-27 10:58:54 - sense_node - INFO - 📨 Received external text input from Samantha: "I think we should keep following the trail and see where it takes us, maybe we'll stumble upon something that'll give us a clue about where we are and how to get out, I'm getting a bit hungry though, do you see any food around here?"
-2025-08-27 10:58:54 - sense_node - INFO - 📤 Published sense data: 7
-2025-08-27 10:59:18 - sense_node - INFO - 📨 Received external text input from Samantha: "I think we should be careful about what we eat, I mean, some berries and mushrooms can be poisonous, but I did eat some berries earlier and they were fine, and I also ate an appletree, it was ripe and edible, so maybe we can try to find some more of those, or see if there are any other appletrees around, what do you think?"
-2025-08-27 10:59:18 - sense_node - INFO - 📤 Published sense data: 8
-2025-08-27 10:59:34 - sense_node - INFO - 📨 Received external text input from Samantha: "I think we should keep following the trail and see where it takes us, maybe we'll stumble upon something that'll give us a clue about where we are and how to get out, I'm getting a bit hungry too, and I was just thinking, I saw some berries and mushrooms around us, and I think I saw an appletree not too far from here, we could try to find some of those and see if they're edible, do you think any of those things would be safe to eat?"
-2025-08-27 10:59:34 - sense_node - INFO - 📤 Published sense data: 9
-2025-08-27 11:11:07 - sense_node - INFO - Received signal 2, initiating shutdown...
-2025-08-27 11:11:07 - sense_node - INFO - Sense Node shutdown initiated...
-2025-08-27 11:11:07 - sense_node - INFO - Sense Node shutdown complete
-2025-08-27 11:11:07 - sense_node - INFO - Received signal 15, initiating shutdown...
-text input from Joe: "I think we should be careful about what we eat, I mean, some berries and mushrooms can be poisonous, but I did eat some of the apples from that appletree we found, and they were fine, so maybe we can try to find some more of those, or see if there are any other appletrees around, I'm getting a bit hungry too, and I don't know how long we'll be walking for, do you think we should try to find some of those berries and mushrooms you saw, and see if they're edible?"
-2025-08-27 10:59:43 - sense_node - INFO - 📤 Published sense data: 11
-2025-08-27 11:11:07 - sense_node - INFO - Received signal 2, initiating shutdown...
-2025-08-27 11:11:07 - sense_node - INFO - Sense Node shutdown initiated...
-2025-08-27 11:11:07 - sense_node - INFO - Sense Node shutdown complete
-2025-08-27 11:11:07 - sense_node - INFO - Received signal 15, initiating shutdown...
+2025-08-27 19:17:34 - sense_node - INFO - 🔧 Debug mode enabled for User
+2025-08-27 19:17:34 - sense_node - INFO - 👁️ Sense Node initialized for character: User
+2025-08-27 19:17:34 - sense_node - INFO - Console Text Sensor ready - will auto-disable if external input detected
+2025-08-27 19:17:34 - sense_node - INFO - Sense Node running - press Ctrl+C to sto2025-08-272025-08-27 19:19:12 - sense_node - INFO - 🔄 External input detected - console input disabled to prevent conflicts
+2025-08-27 19:19:12 - sense_node - INFO - 📨 Received external text 202025-08-27 19:19:43 - sense_node - INFO - 🔄 External input detected - console input disabled to prevent conflic2025-08-27 19:22:27 - sense_node - INFO - 📨 Received external text input from Joe: "I haven't seen it, but I was thinking of heading north, want to come with me?"
+2025-08-27 19:22:27 - sense_node - INFO - 📤 Published 2025-08-27 19:2025-08-27 19:23:43 - sense_node - INFO - 📨 Received external text input from Joe: "I was thinking, well, I've been looking around, and I haven't seen any signs of Hut1 around here, so I figured heading north might give us a better chance of finding it, plus I saw some berries and a fallen branch that way, which could be u2025-08-27 19:24:12 - sense_node - INFO - 📨 Received external text input from Samantha: "Let's he2025-08-27 19:24:13 - sense_node - INFO - 👁️ Visual event received: agent_detected - {'agent_name': 'Joe', 'position': [20, 22025-08-27 19:24:32 - sense_node - INFO - 📨 Received external text input from Samantha: "I think that's a good point, the berries and fallen branch could be really useful, and like you said, we haven't seen any signs of Hut1 around here, so heading north does seem like a good idea, but I'm still a bit hesitant, 2025-08-27 19:24:43 - sense_node - INFO - 📨 Received external text input from Joe: "I think we can mini2025-08-27 19:25:17 - sense_node - INFO - 📨 Received external text input from Samantha: "I see some berries north of us, let's go get them to eat, Joe"
+2025-08-27 19:25:17 - sense_node - INFO - 📤 Published sense data: 4
+2025-08-27 19:27:55 - sense_node - INFO - 📨 Received external text input from Samantha: "I did say we should get the berries, yeah, let's go gather them, I'm getting a bit hungry and it's always good to have some food, but we should also keep an eye out for Hut1, we don't want to get too distracted and forget what we're really looking for"
+2025-08-27 19:27:55 - sense_node - INFO - 📤 Published sense data: 5
+2025-08-27 19:28:33 - sense_node - INFO - 📨 Received external text input from Samantha: "I don't see any sign of Hut1 here yet, should we keep searching further north or try another direction, maybe check out that thicket to the south?"
+2025-08-27 19:28:33 - sense_node - INFO - 📤 Published sense data: 6

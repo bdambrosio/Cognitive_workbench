@@ -4784,3 +4784,384 @@ SystemExit: 0
 2025-08-27 10:59:01,125 - __main__ - INFO - 🔄 Turn control update from map node: mode=step
 2025-08-27 10:59:01,126 - __main__ - INFO - 📤 Sending turn mode update: mode=step
 2025-08-27 10:59:10,656 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T09:05:00+00:00
+2025-08-27 13:39:14,657 - __main__ - INFO - 🔧 Debug mode enabled for FastAPI Action Display
+2025-08-27 13:39:15,829 - __main__ - INFO - 📤 No simulation time available for new WebSocket connection
+2025-08-27 13:39:19,135 - __main__ - INFO - 🔄 Turn control update from map node: mode=step
+2025-08-27 13:39:19,135 - __main__ - INFO - 📤 Sending turn mode update: mode=step
+2025-08-27 13:39:31,518 - __main__ - INFO - 🚀 System ready signal received: 4 characters active
+2025-08-27 13:39:31,519 - __main__ - INFO - 📤 No simulation time available to send to WebSocket clients
+2025-08-27 13:39:42,650 - __main__ - INFO - 🔄 Turn control update from map node: mode=step
+2025-08-27 13:39:42,651 - __main__ - INFO - 📤 Sending turn mode update: mode=step
+2025-08-27 13:40:13,723 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T06:32:00+00:00
+2025-08-27 13:40:42,050 - __main__ - INFO - 🏃 Run command received in FastAPI
+2025-08-27 13:40:42,051 - __main__ - INFO - 🏃 Run command published to map node
+2025-08-27 13:40:42,052 - __main__ - INFO - 🔄 Turn control update from map node: mode=run
+2025-08-27 13:40:42,052 - __main__ - INFO - 📤 Sending turn mode update: mode=run
+2025-08-27 13:40:43,875 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T06:36:00+00:00
+2025-08-27 13:40:49,239 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T06:46:00+00:00
+2025-08-27 13:41:17,993 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T06:48:00+00:00
+2025-08-27 13:41:22,464 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T06:50:00+00:00
+2025-08-27 13:41:33,867 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T06:53:00+00:00
+2025-08-27 13:41:46,667 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T06:56:00+00:00
+2025-08-27 13:41:48,927 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T07:00:00+00:00
+2025-08-27 13:41:49,938 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T07:02:00+00:00
+2025-08-27 13:41:50,981 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T07:07:00+00:00
+2025-08-27 13:41:52,058 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T07:12:00+00:00
+2025-08-27 13:41:53,081 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T07:14:00+00:00
+2025-08-27 13:41:54,104 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T07:17:00+00:00
+2025-08-27 13:41:55,098 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T07:22:00+00:00
+2025-08-27 13:42:03,208 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T07:27:00+00:00
+2025-08-27 13:42:22,705 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T07:32:00+00:00
+2025-08-27 13:42:32,021 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T07:34:00+00:00
+2025-08-27 13:42:43,368 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T07:38:00+00:00
+2025-08-27 13:42:46,267 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T07:41:00+00:00
+2025-08-27 13:42:48,104 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T07:43:00+00:00
+2025-08-27 13:42:57,616 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T07:47:00+00:00
+2025-08-27 13:43:15,948 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T07:50:00+00:00
+2025-08-27 13:43:16,989 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T07:52:00+00:00
+2025-08-27 13:43:18,015 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T07:55:00+00:00
+2025-08-27 13:43:19,025 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T07:58:00+00:00
+2025-08-27 13:43:20,053 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T08:00:00+00:00
+2025-08-27 13:43:21,049 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T08:04:00+00:00
+2025-08-27 13:43:22,043 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T08:08:00+00:00
+2025-08-27 13:43:24,668 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T08:10:00+00:00
+2025-08-27 13:43:38,307 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T08:13:00+00:00
+2025-08-27 13:44:16,799 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T08:17:00+00:00
+2025-08-27 13:44:19,358 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T08:19:00+00:00
+2025-08-27 13:44:22,579 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T08:21:00+00:00
+2025-08-27 13:44:25,033 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T08:24:00+00:00
+2025-08-27 13:44:35,609 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T08:29:00+00:00
+2025-08-27 13:44:54,820 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T08:31:00+00:00
+2025-08-27 13:45:07,383 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T08:36:00+00:00
+2025-08-27 13:45:37,986 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T08:38:00+00:00
+2025-08-27 13:45:40,349 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T08:40:00+00:00
+2025-08-27 13:45:43,803 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T08:42:00+00:00
+2025-08-27 13:45:46,275 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T08:44:00+00:00
+2025-08-27 13:46:11,535 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T08:49:00+00:00
+2025-08-27 13:46:54,895 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T08:54:00+00:00
+2025-08-27 13:46:57,792 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T08:57:00+00:00
+2025-08-27 13:47:00,183 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T09:00:00+00:00
+2025-08-27 13:47:03,354 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T09:05:00+00:00
+2025-08-27 13:47:04,404 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T09:07:00+00:00
+2025-08-27 13:47:07,889 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T09:09:00+00:00
+2025-08-27 13:47:17,118 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T09:11:00+00:00
+2025-08-27 13:47:57,046 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T09:16:00+00:00
+2025-08-27 13:48:10,408 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T09:21:00+00:00
+2025-08-27 13:48:41,262 - __main__ - INFO - 🛑 Stop command received in FastAPI
+2025-08-27 13:48:41,263 - __main__ - INFO - 🛑 Stop command published to map node
+2025-08-27 13:48:41,266 - __main__ - INFO - 🔄 Turn control update from map node: mode=step
+2025-08-27 13:48:41,266 - __main__ - INFO - 📤 Sending turn mode update: mode=step
+2025-08-27 13:48:50,599 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T09:23:00+00:00
+2025-08-27 14:36:14,757 - __main__ - INFO - 🔧 Debug mode enabled for FastAPI Action Display
+2025-08-27 14:36:15,937 - __main__ - INFO - 📤 No simulation time available for new WebSocket connection
+2025-08-27 14:36:18,188 - __main__ - INFO - 🔄 Turn control update from map node: mode=step
+2025-08-27 14:36:18,188 - __main__ - INFO - 📤 Sending turn mode update: mode=step
+2025-08-27 14:36:30,668 - __main__ - INFO - 🚀 System ready signal received: 4 characters active
+2025-08-27 14:36:30,669 - __main__ - INFO - 📤 No simulation time available to send to WebSocket clients
+2025-08-27 14:37:20,094 - __main__ - INFO - 🏃 Run command received in FastAPI
+2025-08-27 14:37:20,095 - __main__ - INFO - 🏃 Run command published to map node
+2025-08-27 14:37:20,096 - __main__ - INFO - 🔄 Turn control update from map node: mode=run
+2025-08-27 14:37:20,097 - __main__ - INFO - 📤 Sending turn mode update: mode=run
+2025-08-27 14:38:05,951 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T06:33:00+00:00
+2025-08-27 14:38:08,798 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T06:35:00+00:00
+2025-08-27 14:38:15,181 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T06:45:00+00:00
+2025-08-27 14:38:42,548 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T06:48:00+00:00
+2025-08-27 14:38:44,794 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T06:52:00+00:00
+2025-08-27 14:40:03,489 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T06:55:00+00:00
+2025-08-27 14:40:21,515 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T06:59:00+00:00
+2025-08-27 14:40:31,202 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T07:04:00+00:00
+2025-08-27 14:40:55,247 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T07:06:00+00:00
+2025-08-27 14:40:58,621 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T07:08:00+00:00
+2025-08-27 14:41:00,969 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T07:11:00+00:00
+2025-08-27 14:41:10,671 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T07:21:00+00:00
+2025-08-27 14:41:42,035 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T07:25:00+00:00
+2025-08-27 14:41:45,757 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T07:29:00+00:00
+2025-08-27 14:41:51,725 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T07:31:00+00:00
+2025-08-27 14:41:55,338 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T07:35:00+00:00
+2025-08-27 14:42:01,334 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T07:38:00+00:00
+2025-08-27 14:42:14,517 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T07:43:00+00:00
+2025-08-27 14:42:29,104 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T07:46:00+00:00
+2025-08-27 14:42:52,638 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T07:48:00+00:00
+2025-08-27 14:43:13,151 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T07:50:00+00:00
+2025-08-27 14:43:14,200 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T07:52:00+00:00
+2025-08-27 14:43:16,699 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T07:55:00+00:00
+2025-08-27 14:43:18,378 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T07:58:00+00:00
+2025-08-27 14:43:19,420 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T08:01:00+00:00
+2025-08-27 14:43:24,644 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T08:04:00+00:00
+2025-08-27 14:43:42,821 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T08:08:00+00:00
+2025-08-27 14:43:52,783 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T08:11:00+00:00
+2025-08-27 14:44:43,755 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T08:13:00+00:00
+2025-08-27 14:44:47,378 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T08:16:00+00:00
+2025-08-27 14:44:48,397 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T08:19:00+00:00
+2025-08-27 14:45:00,462 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T08:24:00+00:00
+2025-08-27 14:45:31,709 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T08:27:00+00:00
+2025-08-27 14:45:33,768 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T08:30:00+00:00
+2025-08-27 14:45:55,884 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T08:32:00+00:00
+2025-08-27 14:46:09,036 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T08:35:00+00:00
+2025-08-27 14:46:11,461 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T08:39:00+00:00
+2025-08-27 14:46:18,243 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T08:42:00+00:00
+2025-08-27 14:46:48,612 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T08:46:00+00:00
+2025-08-27 14:47:19,945 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T08:48:00+00:00
+2025-08-27 14:47:22,789 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T08:50:00+00:00
+2025-08-27 14:47:34,604 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T08:53:00+00:00
+2025-08-27 14:48:07,752 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T08:57:00+00:00
+2025-08-27 14:48:11,433 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T09:00:00+00:00
+2025-08-27 14:48:19,364 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T09:04:00+00:00
+2025-08-27 14:48:23,229 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T09:07:00+00:00
+2025-08-27 14:48:29,528 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T09:11:00+00:00
+2025-08-27 14:48:45,511 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T09:16:00+00:00
+2025-08-27 14:49:01,832 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T09:19:00+00:00
+2025-08-27 14:49:02,893 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T09:21:00+00:00
+2025-08-27 14:49:04,040 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T09:23:00+00:00
+2025-08-27 14:49:05,050 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T09:26:00+00:00
+2025-08-27 14:49:07,349 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T09:28:00+00:00
+2025-08-27 14:49:12,956 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T09:32:00+00:00
+2025-08-27 14:49:37,989 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T09:35:00+00:00
+2025-08-27 14:49:41,087 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T09:37:00+00:00
+2025-08-27 14:49:43,569 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T09:40:00+00:00
+2025-08-27 14:49:50,059 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T09:42:00+00:00
+2025-08-27 14:50:18,787 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T09:45:00+00:00
+2025-08-27 14:50:30,138 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T09:47:00+00:00
+2025-08-27 14:50:49,659 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T09:49:00+00:00
+2025-08-27 14:50:50,716 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T09:51:00+00:00
+2025-08-27 14:50:51,804 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T09:56:00+00:00
+2025-08-27 14:50:52,798 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T09:58:00+00:00
+2025-08-27 14:50:53,826 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T10:01:00+00:00
+2025-08-27 14:50:54,829 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T10:03:00+00:00
+2025-08-27 14:50:55,813 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T10:07:00+00:00
+2025-08-27 14:50:57,588 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T10:09:00+00:00
+2025-08-27 14:50:58,600 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T10:14:00+00:00
+2025-08-27 14:51:04,053 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T10:19:00+00:00
+2025-08-27 14:51:37,740 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T10:21:00+00:00
+2025-08-27 14:51:44,590 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T10:26:00+00:00
+2025-08-27 14:52:19,441 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T10:31:00+00:00
+2025-08-27 14:52:20,493 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T10:34:00+00:00
+2025-08-27 14:52:23,092 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T10:37:00+00:00
+2025-08-27 14:52:24,106 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T10:39:00+00:00
+2025-08-27 14:52:32,342 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T10:41:00+00:00
+2025-08-27 14:52:55,426 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T10:44:00+00:00
+2025-08-27 14:52:56,432 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T10:54:00+00:00
+2025-08-27 14:53:38,424 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T11:04:00+00:00
+2025-08-27 14:54:19,113 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T11:14:00+00:00
+2025-08-27 14:55:16,403 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T11:24:00+00:00
+2025-08-27 14:55:55,547 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T11:34:00+00:00
+2025-08-27 14:56:33,434 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T11:44:00+00:00
+2025-08-27 14:56:52,343 - __main__ - INFO - 🛑 Stop command received in FastAPI
+2025-08-27 14:56:52,344 - __main__ - INFO - 🛑 Stop command published to map node
+2025-08-27 14:56:52,347 - __main__ - INFO - 🔄 Turn control update from map node: mode=step
+2025-08-27 14:56:52,347 - __main__ - INFO - 📤 Sending turn mode update: mode=step
+2025-08-27 14:57:21,396 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T11:54:00+00:00
+2025-08-27 17:19:19,445 - __main__ - INFO - 🔧 Debug mode enabled for FastAPI Action Display
+2025-08-27 17:19:20,638 - __main__ - WARNING - Failed to query map_node for initial time: 'builtins.Reply' object has no attribute 'payload'
+2025-08-27 17:19:20,643 - __main__ - INFO - 📤 No simulation time available for new WebSocket connection
+2025-08-27 17:19:35,618 - __main__ - INFO - 🚀 System ready signal received: 4 characters active
+2025-08-27 17:19:35,619 - __main__ - INFO - 📤 No simulation time available to send to WebSocket clients
+2025-08-27 17:20:45,313 - __main__ - INFO - 🔧 Debug mode enabled for FastAPI Action Display
+2025-08-27 17:20:46,526 - __main__ - INFO - 📤 No simulation time available for new WebSocket connection
+2025-08-27 17:20:49,642 - __main__ - INFO - 🔄 Turn control update from map node: mode=step
+2025-08-27 17:20:49,643 - __main__ - INFO - 📤 Sending turn mode update: mode=step
+2025-08-27 17:21:02,260 - __main__ - INFO - 🚀 System ready signal received: 4 characters active
+2025-08-27 17:21:02,262 - __main__ - INFO - 📤 No simulation time available to send to WebSocket clients
+2025-08-27 17:21:09,667 - __main__ - INFO - 🔄 Turn control update from map node: mode=step
+2025-08-27 17:21:09,667 - __main__ - INFO - 📤 Sending turn mode update: mode=step
+2025-08-27 17:21:43,002 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T06:32:00+00:00
+2025-08-27 17:26:02,649 - __main__ - INFO - 🏃 Run command received in FastAPI
+2025-08-27 17:26:02,650 - __main__ - INFO - 🏃 Run command published to map node
+2025-08-27 17:26:02,651 - __main__ - INFO - 🔄 Turn control update from map node: mode=run
+2025-08-27 17:26:02,652 - __main__ - INFO - 📤 Sending turn mode update: mode=run
+2025-08-27 17:26:16,156 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T06:34:00+00:00
+2025-08-27 17:26:22,419 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T06:39:00+00:00
+2025-08-27 17:26:43,851 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T06:42:00+00:00
+2025-08-27 17:26:45,863 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T06:44:00+00:00
+2025-08-27 17:26:52,447 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T06:49:00+00:00
+2025-08-27 17:27:13,727 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T06:51:00+00:00
+2025-08-27 17:27:38,168 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T06:54:00+00:00
+2025-08-27 17:27:44,273 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T06:57:00+00:00
+2025-08-27 17:28:08,681 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T07:00:00+00:00
+2025-08-27 17:28:10,861 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T07:02:00+00:00
+2025-08-27 17:28:17,031 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T07:07:00+00:00
+2025-08-27 17:28:38,331 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T07:09:00+00:00
+2025-08-27 17:28:40,093 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T07:11:00+00:00
+2025-08-27 17:28:46,820 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T07:21:00+00:00
+2025-08-27 17:29:18,031 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T07:23:00+00:00
+2025-08-27 17:29:20,321 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T07:25:00+00:00
+2025-08-27 17:29:25,418 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T07:28:00+00:00
+2025-08-27 17:29:48,148 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T07:31:00+00:00
+2025-08-27 17:29:52,988 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T07:34:00+00:00
+2025-08-27 17:30:24,074 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T07:39:00+00:00
+2025-08-27 17:30:53,089 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T07:43:00+00:00
+2025-08-27 17:30:55,311 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T07:47:00+00:00
+2025-08-27 17:30:59,538 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T07:49:00+00:00
+2025-08-27 17:31:24,758 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T07:53:00+00:00
+2025-08-27 17:31:26,967 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T07:57:00+00:00
+2025-08-27 17:31:31,333 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T08:01:00+00:00
+2025-08-27 17:31:54,200 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T08:03:00+00:00
+2025-08-27 17:31:55,220 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T08:06:00+00:00
+2025-08-27 17:31:56,213 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T08:08:00+00:00
+2025-08-27 17:32:01,236 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T08:12:00+00:00
+2025-08-27 17:32:23,613 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T08:14:00+00:00
+2025-08-27 17:32:24,652 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T08:17:00+00:00
+2025-08-27 17:32:26,507 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T08:21:00+00:00
+2025-08-27 17:32:32,283 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T08:31:00+00:00
+2025-08-27 17:33:08,442 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T08:34:00+00:00
+2025-08-27 17:33:09,450 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T08:38:00+00:00
+2025-08-27 17:33:10,475 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T08:40:00+00:00
+2025-08-27 17:33:14,426 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T08:43:00+00:00
+2025-08-27 17:33:37,366 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T08:47:00+00:00
+2025-08-27 17:33:38,392 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T08:50:00+00:00
+2025-08-27 17:33:40,003 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T08:53:00+00:00
+2025-08-27 17:33:43,539 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T08:56:00+00:00
+2025-08-27 17:34:06,726 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T08:59:00+00:00
+2025-08-27 17:34:07,736 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T09:02:00+00:00
+2025-08-27 17:34:08,747 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T09:04:00+00:00
+2025-08-27 17:34:12,866 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T09:08:00+00:00
+2025-08-27 17:34:34,874 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T09:12:00+00:00
+2025-08-27 17:34:35,932 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T09:15:00+00:00
+2025-08-27 17:34:36,927 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T09:19:00+00:00
+2025-08-27 17:34:43,290 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T09:29:00+00:00
+2025-08-27 17:35:14,250 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T09:31:00+00:00
+2025-08-27 17:35:15,299 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T09:34:00+00:00
+2025-08-27 17:35:16,266 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T09:36:00+00:00
+2025-08-27 17:35:21,802 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T09:38:00+00:00
+2025-08-27 17:35:45,042 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T09:41:00+00:00
+2025-08-27 17:36:08,330 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T09:43:00+00:00
+2025-08-27 17:36:09,341 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T09:46:00+00:00
+2025-08-27 17:36:26,059 - __main__ - INFO - 🛑 Stop command received in FastAPI
+2025-08-27 17:36:26,059 - __main__ - INFO - 🛑 Stop command published to map node
+2025-08-27 17:36:26,061 - __main__ - INFO - 🔄 Turn control update from map node: mode=step
+2025-08-27 17:36:26,061 - __main__ - INFO - 📤 Sending turn mode update: mode=step
+2025-08-27 17:36:34,474 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T09:51:00+00:00
+2025-08-27 18:44:41,652 - __main__ - INFO - 🔧 Debug mode enabled for FastAPI Action Display
+2025-08-27 18:44:42,848 - __main__ - INFO - 📤 No simulation time available for new WebSocket connection
+2025-08-27 18:44:44,873 - __main__ - INFO - 🔄 Turn control update from map node: mode=step
+2025-08-27 18:44:44,873 - __main__ - INFO - 📤 Sending turn mode update: mode=step
+2025-08-27 18:44:57,280 - __main__ - INFO - 🚀 System ready signal received: 4 characters active
+2025-08-27 18:44:57,282 - __main__ - INFO - 📤 No simulation time available to send to WebSocket clients
+2025-08-27 18:45:10,353 - __main__ - INFO - 🔄 Turn control update from map node: mode=step
+2025-08-27 18:45:10,354 - __main__ - INFO - 📤 Sending turn mode update: mode=step
+2025-08-27 18:47:10,844 - __main__ - INFO - 🔧 Debug mode enabled for FastAPI Action Display
+2025-08-27 18:47:12,085 - __main__ - INFO - 📤 No simulation time available for new WebSocket connection
+2025-08-27 18:47:14,090 - __main__ - INFO - 🔄 Turn control update from map node: mode=step
+2025-08-27 18:47:14,090 - __main__ - INFO - 📤 Sending turn mode update: mode=step
+2025-08-27 18:47:26,664 - __main__ - INFO - 🚀 System ready signal received: 4 characters active
+2025-08-27 18:47:26,665 - __main__ - INFO - 📤 No simulation time available to send to WebSocket clients
+2025-08-27 18:47:40,140 - __main__ - INFO - 🔄 Turn control update from map node: mode=step
+2025-08-27 18:47:40,140 - __main__ - INFO - 📤 Sending turn mode update: mode=step
+2025-08-27 18:48:12,445 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T06:32:00+00:00
+2025-08-27 18:48:16,942 - __main__ - INFO - 🏃 Run command received in FastAPI
+2025-08-27 18:48:16,943 - __main__ - INFO - 🏃 Run command published to map node
+2025-08-27 18:48:16,944 - __main__ - INFO - 🔄 Turn control update from map node: mode=run
+2025-08-27 18:48:16,945 - __main__ - INFO - 📤 Sending turn mode update: mode=run
+2025-08-27 18:48:18,910 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T06:35:00+00:00
+2025-08-27 18:48:25,691 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T06:38:00+00:00
+2025-08-27 18:48:49,845 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T06:42:00+00:00
+2025-08-27 18:48:52,034 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T06:45:00+00:00
+2025-08-27 18:48:59,094 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T06:47:00+00:00
+2025-08-27 18:49:22,584 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T06:49:00+00:00
+2025-08-27 18:49:53,229 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T06:51:00+00:00
+2025-08-27 18:49:58,082 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T06:54:00+00:00
+2025-08-27 18:50:23,783 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T06:58:00+00:00
+2025-08-27 18:50:25,999 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T07:01:00+00:00
+2025-08-27 18:50:33,140 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T07:11:00+00:00
+2025-08-27 18:51:10,939 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T07:14:00+00:00
+2025-08-27 18:51:13,252 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T07:16:00+00:00
+2025-08-27 18:51:18,429 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T07:21:00+00:00
+2025-08-27 18:51:41,484 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T07:23:00+00:00
+2025-08-27 18:51:47,652 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T07:25:00+00:00
+2025-08-27 18:52:17,175 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T07:30:00+00:00
+2025-08-27 18:52:46,159 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T07:32:00+00:00
+2025-08-27 18:52:48,718 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T07:34:00+00:00
+2025-08-27 18:52:55,362 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T07:39:00+00:00
+2025-08-27 18:53:13,378 - __main__ - INFO - 🛑 Stop command received in FastAPI
+2025-08-27 18:53:13,378 - __main__ - INFO - 🛑 Stop command published to map node
+2025-08-27 18:53:13,381 - __main__ - INFO - 🔄 Turn control update from map node: mode=step
+2025-08-27 18:53:13,381 - __main__ - INFO - 📤 Sending turn mode update: mode=step
+2025-08-27 18:53:16,245 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T07:44:00+00:00
+2025-08-27 19:05:30,002 - __main__ - INFO - 🔧 Debug mode enabled for FastAPI Action Display
+2025-08-27 19:05:31,241 - __main__ - INFO - 📤 No simulation time available for new WebSocket connection
+2025-08-27 19:05:33,400 - __main__ - INFO - 🔄 Turn control update from map node: mode=step
+2025-08-27 19:05:33,400 - __main__ - INFO - 📤 Sending turn mode update: mode=step
+2025-08-27 19:05:45,801 - __main__ - INFO - 🚀 System ready signal received: 4 characters active
+2025-08-27 19:05:45,803 - __main__ - INFO - 📤 No simulation time available to send to WebSocket clients
+2025-08-27 19:05:54,391 - __main__ - INFO - 🔄 Turn control update from map node: mode=step
+2025-08-27 19:05:54,392 - __main__ - INFO - 📤 Sending turn mode update: mode=step
+2025-08-27 19:06:30,651 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T06:40:00+00:00
+2025-08-27 19:17:14,158 - __main__ - INFO - 🔧 Debug mode enabled for FastAPI Action Display
+2025-08-27 19:17:15,323 - __main__ - INFO - 📤 No simulation time available for new WebSocket connection
+2025-08-27 19:17:18,333 - __main__ - INFO - 🔄 Turn control update from map node: mode=step
+2025-08-27 19:17:18,333 - __main__ - INFO - 📤 Sending turn mode update: mode=step
+2025-08-27 19:17:30,908 - __main__ - INFO - 🚀 System ready signal received: 4 characters active
+2025-08-27 19:17:30,909 - __main__ - INFO - 📤 No simulation time available to send to WebSocket clients
+2025-08-27 19:17:41,466 - __main__ - INFO - 🔄 Turn control update from map node: mode=step
+2025-08-27 19:17:41,467 - __main__ - INFO - 📤 Sending turn mode update: mode=step
+2025-08-27 19:18:45,775 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T06:35:00+00:00
+2025-08-27 19:19:08,726 - __main__ - INFO - 🔄 Turn control update from map node: mode=step
+2025-08-27 19:19:08,727 - __main__ - INFO - 📤 Sending turn mode update: mode=step
+2025-08-27 19:19:09,787 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T06:37:00+00:00
+2025-08-27 19:19:10,566 - __main__ - INFO - 🏃 Run command received in FastAPI
+2025-08-27 19:19:10,566 - __main__ - INFO - 🏃 Run command published to map node
+2025-08-27 19:19:10,567 - __main__ - INFO - 🔄 Turn control update from map node: mode=run
+2025-08-27 19:19:10,568 - __main__ - INFO - 📤 Sending turn mode update: mode=run
+2025-08-27 19:19:12,433 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T06:40:00+00:00
+2025-08-27 19:19:19,133 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T06:44:00+00:00
+2025-08-27 19:19:43,300 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T06:48:00+00:00
+2025-08-27 19:19:44,306 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T06:50:00+00:00
+2025-08-27 19:19:48,045 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T06:52:00+00:00
+2025-08-27 19:19:53,741 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T06:54:00+00:00
+2025-08-27 19:20:24,014 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T06:58:00+00:00
+2025-08-27 19:20:25,026 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T07:00:00+00:00
+2025-08-27 19:20:28,791 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T07:02:00+00:00
+2025-08-27 19:20:34,716 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T07:05:00+00:00
+2025-08-27 19:20:56,759 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T07:07:00+00:00
+2025-08-27 19:20:57,768 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T07:10:00+00:00
+2025-08-27 19:21:01,308 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T07:12:00+00:00
+2025-08-27 19:21:08,209 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T07:22:00+00:00
+2025-08-27 19:21:37,451 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T07:24:00+00:00
+2025-08-27 19:21:38,461 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T07:26:00+00:00
+2025-08-27 19:21:42,279 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T07:29:00+00:00
+2025-08-27 19:21:48,336 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T07:34:00+00:00
+2025-08-27 19:22:19,639 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T07:36:00+00:00
+2025-08-27 19:22:28,430 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T07:41:00+00:00
+2025-08-27 19:22:50,190 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T07:44:00+00:00
+2025-08-27 19:22:52,585 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T07:47:00+00:00
+2025-08-27 19:23:01,010 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T07:49:00+00:00
+2025-08-27 19:23:31,685 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T07:51:00+00:00
+2025-08-27 19:23:43,370 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T07:56:00+00:00
+2025-08-27 19:24:12,355 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T07:59:00+00:00
+2025-08-27 19:24:13,392 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T08:01:00+00:00
+2025-08-27 19:24:14,380 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T08:04:00+00:00
+2025-08-27 19:24:18,429 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T08:06:00+00:00
+2025-08-27 19:24:30,446 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T08:10:00+00:00
+2025-08-27 19:24:59,663 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T08:12:00+00:00
+2025-08-27 19:25:00,686 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T08:15:00+00:00
+2025-08-27 19:25:03,081 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T08:20:00+00:00
+2025-08-27 19:25:17,355 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T08:25:00+00:00
+2025-08-27 19:25:37,729 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T08:28:00+00:00
+2025-08-27 19:25:38,738 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T08:32:00+00:00
+2025-08-27 19:25:39,770 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T08:35:00+00:00
+2025-08-27 19:25:42,132 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T08:38:00+00:00
+2025-08-27 19:25:48,461 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T08:41:00+00:00
+2025-08-27 19:26:20,431 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T08:44:00+00:00
+2025-08-27 19:26:21,458 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T08:46:00+00:00
+2025-08-27 19:26:30,285 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T08:50:00+00:00
+2025-08-27 19:27:04,039 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T08:54:00+00:00
+2025-08-27 19:27:05,110 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T08:57:00+00:00
+2025-08-27 19:27:06,189 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T09:00:00+00:00
+2025-08-27 19:27:07,201 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T09:04:00+00:00
+2025-08-27 19:27:09,605 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T09:06:00+00:00
+2025-08-27 19:27:10,607 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T09:09:00+00:00
+2025-08-27 19:27:12,697 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T09:12:00+00:00
+2025-08-27 19:27:18,096 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T09:15:00+00:00
+2025-08-27 19:27:48,160 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T09:17:00+00:00
+2025-08-27 19:27:56,022 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T09:19:00+00:00
+2025-08-27 19:28:24,899 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T09:23:00+00:00
+2025-08-27 19:28:25,901 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T09:26:00+00:00
+2025-08-27 19:28:26,913 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T09:31:00+00:00
+2025-08-27 19:28:29,458 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T09:35:00+00:00
+2025-08-27 19:28:36,047 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T09:38:00+00:00
+2025-08-27 19:29:09,671 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T09:40:00+00:00
+2025-08-27 19:29:10,681 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T09:43:00+00:00
+2025-08-27 19:29:11,713 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T09:45:00+00:00
+2025-08-27 19:29:12,712 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T09:48:00+00:00
+2025-08-27 19:29:40,207 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T09:52:00+00:00
+2025-08-27 19:30:05,983 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T09:56:00+00:00

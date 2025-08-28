@@ -6,6 +6,7 @@ import random
 import uuid
 import re
 import math
+import time
 from typing import List, Dict, Any, Tuple
 
 from templates import PLAN_TEMPLATE
@@ -297,6 +298,37 @@ def _format_plan_text_block(plan_id: str, item: Dict[str, Any], idx: int) -> str
     prompt = item.get('prompt', '') or ''
     plan_obj = item.get('plan', {}) or {}
     summary = item.get('summary', '') or ''
+    # Build a compact structured appendix with only new fields when present
+    appendix_actions = []
+    try:
+        for ar in item.get('actions', []) or []:
+            try:
+                step_id = ar.get('step_id')
+                action_type = (ar.get('action') or {}).get('type')
+                bindings_after = ar.get('bindings_after')
+                binding_evidence = ar.get('binding_evidence')
+                feature_snapshot = ar.get('feature_snapshot')
+                if bindings_after or binding_evidence or feature_snapshot:
+                    appendix_actions.append({
+                        'step_id': step_id,
+                        'type': action_type,
+                        **({'bindings_after': bindings_after} if bindings_after else {}),
+                        **({'binding_evidence': binding_evidence} if binding_evidence else {}),
+                        **({'feature_snapshot': feature_snapshot} if feature_snapshot else {}),
+                    })
+            except Exception:
+                continue
+    except Exception:
+        appendix_actions = []
+
+    structured_appendix = ""
+    if appendix_actions:
+        structured_appendix = (
+            "\n#Structured appendix (selected fields)\n"
+            + json.dumps({"actions": appendix_actions}, ensure_ascii=False, indent=2)
+            + "\n"
+        )
+
     return (
         f"# Plan ID: {plan_id}\n\n"
         f"# Goal the plan was created for:\n{goal}\n\n"
@@ -304,6 +336,7 @@ def _format_plan_text_block(plan_id: str, item: Dict[str, Any], idx: int) -> str
         f"#Resulting Plan:\n{json.dumps(plan_obj, indent=2)}\n\n"
         f"#Plan metrics (Phase 1):\n{metrics_summary}\n\n"
         f"#Plan post-mortem summary:\n{summary}\n"
+        f"{structured_appendix}"
     )
 
 
@@ -324,7 +357,7 @@ def _sample_microbatch(plan_log: List[Dict[str, Any]], k: int = 5, seed: Any = N
     return micro, chosen
 
 
-def _build_s1_prompts_textual(microbatch: List[Tuple[str, Dict[str, Any]]]) -> Tuple[str, str]:
+def _build_s1_prompts_textual(microbatch: List[Tuple[str, Dict[str, Any]]], batch_id: str) -> Tuple[str, str]:
     """Construct S1 prompts using PLAN_TEMPLATE and a textual MICRO_BATCH."""
     system_prompt = (
         "You are a precise auditor. Extract concrete problems from the given plans and metrics. "
@@ -340,11 +373,19 @@ def _build_s1_prompts_textual(microbatch: List[Tuple[str, Dict[str, Any]]]) -> T
         "  each delimited by '----- MICRO_BATCH ENTRY (plan_id=...) -----' and '----- END MICRO_BATCH ENTRY (plan_id=...) -----'\n"
     )
     parts.append(
+        f"Batch metadata:\n- BATCH_ID: {batch_id}\n- PID FORMAT: '<BATCH_ID>:<plan_id>:p<k>' (use 1-based k per plan)\n"
+    )
+    parts.append(
         "Tasks:\n"
         "1) For each plan, enumerate specific problems found (zero or more).\n"
         "2) For every problem, include: textual issue, evidence (a minimal quote or JSON pointer), impacted priority, severity (1–5), and plan_id.\n"
         "3) Do NOT cluster; emit a flat list.\n"
         "4) If a plan has no valid problems under the rules below, emit no entries for that plan (do not invent issues).\n"
+    )
+    parts.append(
+        "Evidence guidance:\n"
+        "- Prefer evidence_ptr into plan_json or into the Structured appendix (bindings_after, binding_evidence.distance, feature_snapshot.distance_to_target).\n"
+        "- If an evidence_ptr is available, include it (required). Use evidence_quote only if a pointer is not possible.\n"
     )
     parts.append(
         "Classification guidance:\n"
@@ -371,6 +412,7 @@ def _build_s1_prompts_textual(microbatch: List[Tuple[str, Dict[str, Any]]]) -> T
         "- If hunger delta is strongly negative (improvement), do not flag a 'goal' violation unless the plan contradicts the goal text.\n"
         "- Do not use runtime step counts or loop iterations to claim a Part B step-budget validity violation; that budget applies to static plan structure. Treat runtime excess as efficiency.\n"
         "- Use failure_rate, time_norm, and steps_norm to avoid extremes unless warranted.\n"
+        "- Use new structured signals when present: bindings_after to confirm variable resolution; binding_evidence.distance for nearest/efficiency judgments; feature_snapshot.distance_to_target to calibrate severity and avoid mislabeling goal vs efficiency.\n"
     )
     parts.append(
         "Batch calibration:\n"
@@ -387,10 +429,11 @@ def _build_s1_prompts_textual(microbatch: List[Tuple[str, Dict[str, Any]]]) -> T
         "{\n"
         "  \"problems\":[\n"
         "    {\n"
-        "      \"pid\":\"p1\",\n"
+        "      \"pid\":\"<BATCH_ID>:<plan_id>:p1\",\n"
         "      \"plan_id\":\"{{plan_id}}\",\n"
         "      \"issue\":\"short text\",\n"
-        "      \"evidence\":\"minimal quote or JSON pointer\",\n"
+        "      \"evidence_ptr\":\"/plan/0/type\",\n"
+        "      \"evidence_quote\":\"optional minimal quote\",\n"
         "      \"impact\":\"validity|goal|efficiency|realism|strategy\",\n"
         "      \"severity\": 1\n"
         "    }\n"
@@ -401,6 +444,7 @@ def _build_s1_prompts_textual(microbatch: List[Tuple[str, Dict[str, Any]]]) -> T
     parts.append("PLAN_TEMPLATE:\n")
     parts.append(str(PLAN_TEMPLATE))
     parts.append("\nMICRO_BATCH:\n")
+    parts.append("(Some plans may include a 'Structured appendix (selected fields)' section for precise evidence_ptrs.)\n")
 
     # Add each entry with a clear separator and embedded plan_id
     for idx, (plan_id, entry) in enumerate(microbatch):
@@ -472,6 +516,9 @@ def _build_s2_prompts(problems_list: List[Dict[str, Any]]) -> Tuple[str, str]:
     )
     user_parts.append(
         "Output (strict JSON):\n{\n  \"classes\":[\n    {\n      \"class_id\":\"pc-{{kebab}}\",\n      \"name\":\"short human name\",\n      \"problems\":[\"p1\",\"p7\"],\n      \"priorities\":[\"validity\",\"efficiency\"],\n      \"urgency\":5\n    }\n  ],\n  \"priority_order\":[\"validity\",\"goal\",\"efficiency\",\"realism\",\"strategy\"]\n}\n"
+    )
+    user_parts.append(
+        "Also include: problem_to_classes (map pid -> [class_id]), and priority_rank (map priority -> numeric rank, higher is more important; e.g., validity:5, goal:4, efficiency:3, realism:2, strategy:1).\n"
     )
     user_parts.append("INPUT:\n")
     user_parts.append("PART_A:\n")
@@ -574,6 +621,91 @@ def stage3_coverage(classes: Dict[str, Any], max_updates: int = 8, output_path: 
     return result
 
 
+def _build_s5_prompts(classes_obj: Dict[str, Any], coverage_obj: Dict[str, Any], updates_s4: Dict[str, Any], max_steps: int) -> Tuple[str, str]:
+    """Construct Stage 5 prompts using PART_A, PART_B, CLASSES, COVERAGE, and S4 UPDATES."""
+    part_a, part_b = _extract_part_a_b_from_template(str(PLAN_TEMPLATE))
+    system_prompt = (
+        "You are a strict validator. Check the S4 updates against constraints. "
+        "If any check fails, output a corrected updates JSON that passes all checks. Otherwise, echo the original updates JSON unchanged.\n"
+        "Checks:\n"
+        "1) JSON parses; only CRUD ops; A/B untouched.\n"
+        "2) Each update has block_id starting with some class_id from CLASSES.\n"
+        "3) Content is wrapped with BEGIN/END_C_BLOCK and consistent block_id/kind/title.\n"
+        "4) Examples obey MAX_STEPS and variable discipline; only allowed actions/conditions; no sequential \"say\".\n"
+        "5) Coverage: every class_id in CLASSES appears in at least one update; each global priority appears at least once (infer from update titles/rationales).\n"
+        "6) No contradictions with PART_A/PART_B.\n\n"
+        "Action:\n- If all checks pass: output the updates JSON as-is.\n- Else: minimally repair to pass all checks; prefer turning overly long examples into heuristics, or trimming steps.\n\n"
+        "Output: (strict JSON, same schema as S4)"
+    )
+    user_parts: List[str] = []
+    user_parts.append("INPUTS:\n")
+    user_parts.append("PART_A:\n")
+    user_parts.append(part_a)
+    user_parts.append("\nPART_B:\n")
+    user_parts.append(part_b)
+    user_parts.append("\nCLASSES:\n")
+    user_parts.append(json.dumps(classes_obj, ensure_ascii=False, indent=2))
+    user_parts.append("\nCOVERAGE:\n")
+    user_parts.append(json.dumps(coverage_obj, ensure_ascii=False, indent=2))
+    user_parts.append("\nUPDATES_S4:\n")
+    user_parts.append(json.dumps(updates_s4, ensure_ascii=False, indent=2))
+    user_parts.append("\nMAX_STEPS:\n")
+    user_parts.append(str(max_steps))
+    user_prompt = "\n".join(user_parts)
+    return system_prompt, user_prompt
+
+
+def stage5_validate_and_repair(
+    classes: Dict[str, Any],
+    coverage: Dict[str, Any],
+    updates_s4: Dict[str, Any],
+    output_path: str = None,
+) -> Dict[str, Any]:
+    """Validate S4 output against constraints and minimally repair if needed. Writes once if output_path provided."""
+    # Determine MAX_STEPS from PART_B if available; fallback to 8
+    part_a, part_b = _extract_part_a_b_from_template(str(PLAN_TEMPLATE))
+    max_steps = 8
+    try:
+        pb = json.loads(part_b)
+        if isinstance(pb, dict) and isinstance(pb.get('max_steps'), int):
+            max_steps = int(pb['max_steps'])
+    except Exception:
+        pass
+
+    system_prompt, user_prompt = _build_s5_prompts(classes, coverage, updates_s4, max_steps)
+    llm = LLM(server_name="openai", model_name="gpt-4.1")
+    response = llm.ask(
+        {},
+        [SystemMessage(content=system_prompt), UserMessage(content=user_prompt)],
+        max_tokens=1500,
+        is_json=True
+    )
+    if isinstance(response, str):
+        try:
+            result = json.loads(response)
+        except Exception:
+            result = updates_s4 or {"updates": []}
+    elif isinstance(response, dict):
+        result = response
+    else:
+        text = getattr(response, 'text', None)
+        try:
+            result = json.loads(text) if text else (updates_s4 or {"updates": []})
+        except Exception:
+            result = updates_s4 or {"updates": []}
+
+    if output_path:
+        try:
+            dirpath = os.path.dirname(output_path)
+            if dirpath:
+                os.makedirs(dirpath, exist_ok=True)
+            with open(output_path, 'w', encoding='utf-8') as f:
+                json.dump(result, f, ensure_ascii=False, indent=2)
+        except Exception:
+            pass
+    return result
+
+
 def stage1_diagnose(
     plan_log: List[Dict[str, Any]],
     server_name: str = "openai",
@@ -599,6 +731,8 @@ def stage1_diagnose(
     aggregated: List[Dict[str, Any]] = []
     last_result: Dict[str, Any] = {"problems": []}
     llm = LLM(server_name=server_name, model_name=model_name)
+    # Create a run-level batch identifier to construct globally unique pids
+    batch_id = f"s1-{int(time.time())}-{uuid.uuid4().hex[:6]}"
 
     for it in range(total_iterations):
         microbatch, chosen = _sample_microbatch(
@@ -607,7 +741,7 @@ def stage1_diagnose(
         if not microbatch:
             break
         used_indices.update(chosen)
-        system_prompt, user_prompt = _build_s1_prompts_textual(microbatch)
+        system_prompt, user_prompt = _build_s1_prompts_textual(microbatch, batch_id)
         response = llm.ask(
             {},
             [SystemMessage(content=system_prompt), UserMessage(content=user_prompt)],
@@ -729,6 +863,11 @@ def _build_s4_prompts(classes_obj: Dict[str, Any], coverage_obj: Dict[str, Any],
     user_parts.append(
         "Output schema (strict):\n{\n  \"updates\":[\n    {\n      \"op\":\"append\"|\"replace\"|\"delete\",\n      \"block_id\":\"kebab-case-unique-id\",\n      \"kind\":\"example\"|\"heuristic\",\n      \"title\":\"Short human title\",\n      \"rationale\":\"≤ 40 words\",\n      \"content\":\"<BEGIN/END_C_BLOCK wrapped content as above>\"\n    }\n  ]\n}\n"
     )
+    user_parts.append(
+        "Additional requirements:\n"
+        "- block_id must start with the target class_id and include a deterministic suffix (e.g., short hash of title) to avoid duplicates on re-runs.\n"
+        "- Include source_pids: [\"<BATCH_ID>:<plan_id>:p1\", ...] to trace updates back to problems addressed.\n"
+    )
     user_parts.append("INPUTS:\n")
     user_parts.append("PART_A:\n")
     user_parts.append(part_a)
@@ -814,6 +953,7 @@ def run_reflection_pipeline_v2(
     s3_output_path: str = "data/reflection_stage3.json",
     s3_max_updates: int = 8,
     s4_output_path: str = "data/reflection_stage4.json",
+    s5_output_path: str = "data/reflection_stage5.json",
 ) -> Dict[str, Any]:
     """Orchestrate the new multi-stage pipeline; S1 implemented, S2–S5 are stubs."""
     s1 = stage1_diagnose(
@@ -830,7 +970,7 @@ def run_reflection_pipeline_v2(
     s2 = stage2_cluster(aggregated_problems, output_path=s2_output_path)
     s3 = stage3_coverage(s2, max_updates=s3_max_updates, output_path=s3_output_path)
     s4 = stage4_draft_updates(s2, s3, output_path=s4_output_path)
-    s5 = stage5_validate_and_repair(s4, s2, _S1_PRIORITIES)
+    s5 = stage5_validate_and_repair(s2, s3, s4, output_path=s5_output_path)
     return {"s1": s1, "s2": s2, "s3": s3, "s4": s4, "s5": s5}
 
 def main():
@@ -849,13 +989,18 @@ def main():
     parser.add_argument('--s3_out', default='data/reflection_stage3.json', help='Output path for Stage 3 results (v2)')
     parser.add_argument('--s3_max', type=int, default=8, help='Max total updates to target in Stage 3 coverage planning (v2)')
     parser.add_argument('--s4_out', default='data/reflection_stage4.json', help='Output path for Stage 4 results (v2)')
+    parser.add_argument('--s5_out', default='data/reflection_stage5.json', help='Output path for Stage 5 results (v2)')
+    # Replan harness (offline) flags
+    parser.add_argument('--replan', action='store_true', help='Replan a single entry from plan log using pure planner (testing)')
+    parser.add_argument('--replan_mode', choices=['first','random','index'], default='first', help='Selection mode for replan entry')
+    parser.add_argument('--replan_index', type=int, default=0, help='Index for replan when mode=index')
 
     args = parser.parse_args()
 
     plan_log = _load_plan_log_from_jsonl(args.plans, max_entries=args.max_entries)
 
     # Run new v2 pipeline if requested
-    if args.v2:
+    if args.v2 and not args.replan:
         # Clear Stage 1 output file at the start to prepare for multiple runs/appends
         if args.s1_out:
             try:
@@ -878,10 +1023,34 @@ def main():
             s3_output_path=args.s3_out,
             s3_max_updates=args.s3_max,
             s4_output_path=args.s4_out,
+            s5_output_path=args.s5_out,
         )
         if result:
             # Print Stage 1 output JSON for convenience
             print(json.dumps(result.get('s1', {}), ensure_ascii=False, indent=2))
+        return
+
+    # Replan harness (offline)
+    if args.replan:
+        entries = _load_plan_log_from_jsonl(args.plans, max_entries=args.max_entries)
+        if not entries:
+            print(json.dumps({"plan": []}))
+            return
+        import random as _rnd
+        if args.replan_mode == 'first':
+            entry = entries[0]
+        elif args.replan_mode == 'random':
+            entry = _rnd.choice(entries)
+        else:
+            idx = max(0, min(len(entries)-1, int(args.replan_index)))
+            entry = entries[idx]
+        from plan import generate_plan_with_context
+        goal_text = entry.get('goal','')
+        prompt_text = entry.get('prompt','')
+        percepts = entry.get('percepts_at_plan')
+        print(f"Replanning entry {args.replan_index} of {len(entries)}: {entry.get('plan_id','')}\n{json.dumps(entry.get('plan',''), indent=2)}")
+        plan_obj = generate_plan_with_context(goal_text, prompt_text, percepts, server_name=args.server, model_name=args.model)
+        print(json.dumps(plan_obj, ensure_ascii=False, indent=2))
         return
 
     # Default: legacy v1 review flow

@@ -245,6 +245,21 @@
             "justMyCode": false,
             "stopOnEntry": false,
             "preLaunchTask": "setup-zenoh-environment"
+        },
+        {
+            "name": "Reflection Replan",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/reflection.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/src",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src"
+            },
+            "args": ["--replan", "--replan_mode", "random", "--plans", "data/plans.jsonl", "--server", "vllm", "--model", "llama3.1-8b-instruct"],
+            "justMyCode": false,
+            "stopOnEntry": false,
+            "preLaunchTask": "setup-zenoh-environment"
         }
 
 

@@ -6,8 +6,10 @@
     "Mountain",
     "Water",
     "Spring",
+    "Appletree",
+    "Thicket",
     "Cave",
-    "Thicket"
+    "Hut"
   ],
   "tools": [
     "Berries",
@@ -15,34 +17,36 @@
     "Appletree",
     "Fallenbranch",
     "Spring",
-    "backpack",
-    "food",
-    "water"
+    "Backpack",
+    "Waterbottle",
+    "Foodpacket"
   ],
   "roles": [
-    "Explorer",
-    "Forager",
+    "Hiker",
+    "Seeker",
     "Companion",
+    "Wanderer",
+    "Forager",
     "Philosopher",
-    "Survivor",
-    "Defender",
-    "Stranger"
+    "Romantic"
   ],
   "norms_rules": [
-    "Be wary of strangers",
-    "Respect nature",
-    "Trust must be earned",
-    "Safety first",
-    "Explore with caution",
-    "Avoid unnecessary risk",
-    "Seek understanding"
+    "Stay_alert_for_dangers",
+    "Respect_nature",
+    "Conserve_supplies",
+    "Avoid_strangers",
+    "Be_friendly_when_safe",
+    "Explore_with_caution",
+    "Look_for_clues_about_the_setting"
   ],
   "hazards": [
     "Mountain",
-    "Water",
-    "Cave",
     "Thicket",
-    "Hermit"
+    "Cave",
+    "Hermit",
+    "Fatigue",
+    "Injury",
+    "Getting_lost"
   ],
   "social_graph": [
     "Joe",
@@ -52,59 +56,65 @@
   "time_windows": "morning",
   "affordances": {
     "Forest": [
-      "observe_nature",
-      "hike",
+      "explore",
       "forage",
-      "reflect",
-      "hide"
+      "hide",
+      "rest",
+      "philosophize"
     ],
     "Clearing": [
+      "meet",
+      "observe",
+      "talk",
       "rest",
-      "socialize",
-      "plan",
-      "eat"
+      "inspect_surroundings"
     ],
     "Meadow": [
-      "wander",
-      "pick_flowers",
-      "daydream",
-      "watch_wildlife"
+      "gather_food",
+      "bask_in_sun",
+      "meditate",
+      "daydream"
     ],
     "Mountain": [
       "climb",
-      "scout",
-      "risk_fall"
+      "observe_landscape",
+      "risk_falling"
     ],
     "Water": [
       "drink",
       "wash",
-      "risk_drowning"
+      "listen_to_flow"
     ],
     "Spring": [
-      "collect_water",
+      "refill_water",
       "rest"
     ],
-    "Cave": [
-      "explore",
-      "hide",
-      "risk_injury"
+    "Appletree": [
+      "gather_apples",
+      "eat"
     ],
     "Thicket": [
       "forage_berries",
-      "get_scratched",
-      "shelter"
+      "risk_scratches"
+    ],
+    "Cave": [
+      "seek_shelter",
+      "explore_darkness"
+    ],
+    "Hut": [
+      "seek_safety",
+      "encounter_hermit"
     ]
   },
   "states": [
     "hunger",
-    "thirst",
     "fatigue",
     "injury",
+    "thirst",
+    "confusion",
     "curiosity",
     "fear",
-    "longing",
-    "loneliness",
-    "hope",
-    "confusion"
+    "excitement",
+    "loneliness"
   ]
 }
