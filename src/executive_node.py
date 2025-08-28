@@ -28,6 +28,8 @@ import plan as plan_module
 from dataclasses import dataclass, asdict
 import os
 from templates import PLAN_TEMPLATE
+from plan import generate_plan_with_context
+from utils.format_utils import format_views_compact
 from utils.state_utils import tick_state, apply_restore, initialize_character_states
 from utils.format_utils import format_views_compact
 from utils.condition_utils import deref_plan_target
@@ -91,6 +93,10 @@ class ActionRecord:
     hunger_after: Optional[float] = None
     proposed_minutes: Optional[int] = None
     simulation_time: Optional[str] = None
+    # Optional traceability/telemetry extensions
+    bindings_after: Optional[Dict[str, Any]] = None
+    binding_evidence: Optional[Dict[str, Any]] = None
+    feature_snapshot: Optional[Dict[str, Any]] = None
 
 class ZenohExecutiveNode:
     """
@@ -194,6 +200,8 @@ class ZenohExecutiveNode:
         self.current_plan = None
         self.plan_state = None
         self.plan_bindings_cache = {}
+        # Snapshot of percepts at plan start (normalized, optional)
+        self.percepts_at_plan: Optional[List[Dict[str, Any]]] = None
         self.plan_bindings = {}  # Store scan action results: {var_name: scan_result}
         self.plan_summary_completed = False  # Track if current plan has been summarized
         self.plan_summary = None
@@ -871,67 +879,68 @@ end your response with </end>
                 directive = f"""\nrespond only with the JSON plan, no other text.\nend your response with </end>"""
 
             self.current_plan_prompt = system_prompt + user_prompt + goal_prompt
-            # Make LLM call
-            #self.current_plan_prompt= self.llm_client.substitute_bindings(self.current_plan_prompt_template, self.current_plan_prompt_bindings)
-            if self.llm_client and not self.shutdown_requested:
-                response = self.llm_client.generate(
-                    messages=[system_prompt, user_prompt, goal_prompt, PLAN_TEMPLATE, directive],
-                    max_tokens=1500,
-                    temperature=0.7,
-                    stops=['</end>'],
-                    is_json=True
+            # Capture percepts at plan start (before LLM call)
+            try:
+                self.percepts_at_plan = self._capture_percepts_at_plan()
+            except Exception:
+                self.percepts_at_plan = []
+            # Make LLM call via pure planner (avoid duplicate percepts: user_prompt already includes compact views)
+            if not self.shutdown_requested:
+                plan_candidate = generate_plan_with_context(
+                    goal_text=goal.to_string(),
+                    prompt_text=user_prompt,
+                    percepts_at_plan=None,  # avoid double-including percepts
+                    server_name=os.getenv('CWB_LLM_SERVER', 'openai'),
+                    model_name=os.getenv('CWB_LLM_MODEL', 'gpt-4.1')
                 )
+            else:
+                plan_candidate = None
 
-                if response.success:
-                    logger.debug(f'🤖 {self.character_name} New Action: {response.text}')
-                    plan_candidate = None
-                    valid = False
-                    try:
-                        plan_candidate = response.text #json.loads(response.text.strip())
-                        valid = plan_module.verify_plan(plan_candidate)
-                        if not valid:
-                            logger.error(f'Invalid plan JSON in LLM response: {response.text}')
-                            plan_candidate = None
-                        else:
-                            logger.info(f'📋 {self.character_name} generated new plan: {json.dumps(plan_candidate, indent=2)}')
-                    except Exception as e:
-                        logger.error(f'Invalid plan JSON in LLM response: {e}')
+            if plan_candidate and isinstance(plan_candidate, dict):
+                logger.debug(f'🤖 {self.character_name} New Plan candidate: {json.dumps(plan_candidate)}')
+                valid = False
+                try:
+                    valid = plan_module.verify_plan(plan_candidate)
+                    if not valid:
+                        logger.error(f'Invalid plan JSON from planner')
                         plan_candidate = None
-                    if not plan_candidate or not plan_candidate.get('plan') or len(plan_candidate['plan']) == 0:
-                        logger.error(f'No action, target, or value found in LLM response: {response.text}')
-                        single_action = {'type': 'sleep', 'target': 'self', 'value': '', 'reason': ''}
                     else:
-                        self.current_plan = plan_candidate
-                        self.plan_bindings = {}  # Clear scan variables for new plan
-                        logger.info(f'🔄 {self.character_name} cleared plan_bindings for new plan')
-                        logger.info(f'📋 {self.character_name} assigned LLM-generated plan with {len(plan_candidate["plan"])} steps')
-                        self.plan_bindings_cache = {}
-                        self.plan_summary_completed = False  # Reset for new plan
-                        # Initialize plan identifiers and control-flow events
-                        self.plan_counter += 1
-                        self.current_plan_id = f"p_{self.plan_counter}"
-                        self.control_flow_events = []
-                        self.step_counter = 0
-                        # Capture simulation time at plan start
-                        try:
-                            for time_reply in self.session.get("cognitive/map/simulation_time", timeout=2.0 if not self.debug else 600.0):
-                                if time_reply.ok:
-                                    time_data = json.loads(time_reply.ok.payload.to_bytes().decode('utf-8'))
-                                    if time_data.get('success'):
-                                        self.current_plan_start_sim_iso = time_data.get('time_info', {}).get('datetime')
-                                        break
-                        except Exception:
-                            self.current_plan_start_sim_iso = None
-                        self._publish_current_plan()
-                        self.plan_state = {'step_stack': plan_module.Stack()}
-                        return self.current_plan
-                else:
-                    logger.error(f'LLM call failed: {response.error}')
+                        logger.info(f'📋 {self.character_name} generated new plan: {json.dumps(plan_candidate, indent=2)}')
+                except Exception as e:
+                    logger.error(f'Invalid plan structure from planner: {e}')
+                    plan_candidate = None
+                if not plan_candidate or not plan_candidate.get('plan') or len(plan_candidate['plan']) == 0:
+                    logger.error('No action, target, or value found in planner output')
                     single_action = {'type': 'sleep', 'target': 'self', 'value': '', 'reason': ''}
-            else:   
-                logger.error('LLM client not available')
+                else:
+                    self.current_plan = plan_candidate
+                    self.plan_bindings = {}  # Clear scan variables for new plan
+                    logger.info(f'🔄 {self.character_name} cleared plan_bindings for new plan')
+                    logger.info(f'📋 {self.character_name} assigned LLM-generated plan with {len(plan_candidate["plan"])} steps')
+                    self.plan_bindings_cache = {}
+                    self.plan_summary_completed = False  # Reset for new plan
+                    # Initialize plan identifiers and control-flow events
+                    self.plan_counter += 1
+                    self.current_plan_id = f"p_{self.plan_counter}"
+                    self.control_flow_events = []
+                    self.step_counter = 0
+                    # Capture simulation time at plan start
+                    try:
+                        for time_reply in self.session.get("cognitive/map/simulation_time", timeout=2.0 if not self.debug else 600.0):
+                            if time_reply.ok:
+                                time_data = json.loads(time_reply.ok.payload.to_bytes().decode('utf-8'))
+                                if time_data.get('success'):
+                                    self.current_plan_start_sim_iso = time_data.get('time_info', {}).get('datetime')
+                                    break
+                    except Exception:
+                        self.current_plan_start_sim_iso = None
+                    self._publish_current_plan()
+                    self.plan_state = {'step_stack': plan_module.Stack()}
+                    return self.current_plan
+            else:
+                logger.error('Planner call failed or returned no plan')
                 single_action = {'type': 'sleep', 'target': 'self', 'value': '', 'reason': ''}
-        
+
         # Create single-action plan
         if single_action:
             self.current_plan = {'plan': [{'type': single_action['type'], 'target': single_action['target'], 'value': single_action['value'], 'reason': single_action.get('reason', '')}]}   
@@ -944,6 +953,11 @@ end your response with </end>
         self.current_plan_id = f"p_{self.plan_counter}"
         self.control_flow_events = []
         self.step_counter = 0
+        # Capture percepts at plan start
+        try:
+            self.percepts_at_plan = self._capture_percepts_at_plan()
+        except Exception:
+            self.percepts_at_plan = None
         # Capture simulation time at plan start (single-action plans)
         try:
             for time_reply in self.session.get("cognitive/map/simulation_time", timeout=2.0 if not self.debug else 600.0):
@@ -1644,6 +1658,32 @@ end your response with </end>
         elif action['type'].lower() == "scan":
             scan_result = self._execute_scan_action(action)
             action_record.result = scan_result
+            # Record bindings_after and simple binding evidence
+            try:
+                var_name = action.get('out', '')
+                if var_name and scan_result:
+                    action_record.bindings_after = {var_name: scan_result}
+                    # If distance is available in situation, include minimal evidence
+                    try:
+                        # Re-evaluate nearest distance from last_situation_data
+                        target_lower = scan_result.lower()
+                        best_dist = None
+                        for view in (self.last_situation_data or {}).get('views', []):
+                            for key in ('characters','resources'):
+                                for ent in view.get(key, []) or []:
+                                    name = ent.get('name','')
+                                    if name and name.lower() == target_lower:
+                                        d = ent.get('distance')
+                                        if d is not None:
+                                            dd = float(d)
+                                            if best_dist is None or dd < best_dist:
+                                                best_dist = dd
+                        if best_dist is not None:
+                            action_record.binding_evidence = {"criterion":"nearest","distance": best_dist}
+                    except Exception:
+                        pass
+            except Exception:
+                pass
             # Telemetry snapshot after action
             try:
                 action_record.hunger_after = float(self.self_state.get('hunger', {}).get('value', 0.0))
@@ -1682,6 +1722,36 @@ end your response with </end>
         action_record.ended_at = datetime.now()
         try:
             action_record.duration_ms = int((action_record.ended_at - action_record.started_at).total_seconds() * 1000)
+        except Exception:
+            pass
+
+        # Attach a minimal feature snapshot when available (low-risk fields only)
+        try:
+            snap: Dict[str, Any] = {}
+            # If resolved_target/near/visibility can be inferred cheaply, include them
+            if action.get('type','').lower() in ['move','take','use','inspect']:
+                # Best-effort distance from last_situation_data
+                rt = None
+                try:
+                    rt = (action_record.resolved_target or '').lower()
+                except Exception:
+                    rt = ''
+                if rt:
+                    best_dist = None
+                    for view in (self.last_situation_data or {}).get('views', []):
+                        for key in ('characters','resources'):
+                            for ent in view.get(key, []) or []:
+                                name = ent.get('name','')
+                                if name and name.lower() == rt:
+                                    d = ent.get('distance')
+                                    if d is not None:
+                                        dd = float(d)
+                                        if best_dist is None or dd < best_dist:
+                                            best_dist = dd
+                    if best_dist is not None:
+                        snap['distance_to_target'] = best_dist
+            if snap:
+                action_record.feature_snapshot = snap
         except Exception:
             pass
 
@@ -1740,36 +1810,67 @@ end your response with </end>
         goal_text = self.current_goal.to_string() if self.current_goal else "No specific goal"
         plan_text = json.dumps(self.current_plan, indent=2) if self.current_plan else "No plan available"
         
-        # TODO: Complete the LLM prompt and call
-        # This is a stub - the actual LLM integration will be implemented in the next phase
+        # Build compact structured telemetry for selected fields (bindings/evidence/features)
+        try:
+            telemetry_actions = []
+            for ar in self.action_history:
+                sel = {
+                    'step_id': ar.step_id,
+                    'type': (ar.action or {}).get('type', '')
+                }
+                if getattr(ar, 'bindings_after', None):
+                    sel['bindings_after'] = ar.bindings_after
+                if getattr(ar, 'binding_evidence', None):
+                    sel['binding_evidence'] = ar.binding_evidence
+                if getattr(ar, 'feature_snapshot', None):
+                    sel['feature_snapshot'] = ar.feature_snapshot
+                if len(sel.keys()) > 2:
+                    telemetry_actions.append(sel)
+        except Exception:
+            telemetry_actions = []
+
+        percepts_json = json.dumps(self.percepts_at_plan, indent=2) if self.percepts_at_plan else "[]"
+        telemetry_json = json.dumps({"actions": telemetry_actions}, indent=2)
+
         summary_prompt = f"""
         Goal: {goal_text}
         
-        Plan: {plan_text}
+        Plan (JSON):
+        {plan_text}
         
-        Actions Taken:
+        Actions Taken (text):
         {actions_summary}
         
+        Percepts at plan start (JSON):
+        {percepts_json}
+        
+        Structured telemetry (selected fields; JSON):
+        {telemetry_json}
+        
         Please provide a concise paragraph summarizing this plan execution, including the goal, actions taken, and observed results.
-        Conclude with a hash-formatted numerical assessment of the plan's success or failure in meeting the goal.
-        this should be a number between 0 and 100, where 0 is the worst and 100 is the best, formatted as follows:
-
-        #score nn
+        Conclude with a hash-formatted assessment of the plan's success or failure in meeting the goal, in the following format:
+        
+        #why concise (8-10 words) explanation how this plan intends to achieve the goal
+        #outcome concise (16-24 words) explanation of the outcome - did it achieve the goal? If not, where did it fail and why?
+        #score nn (0-100)
         ##
-
+        
         Do not include any other introductory, explanatory, discursive, or formatting text in your response.
         End your text with: </end>
         """
-        response = self.llm_client.generate([summary_prompt], max_tokens=200, stops=['</end>'])
-        self.plan_summary = response.text
-        goal_score = hash_utils.find('score', self.plan_summary)
-        if goal_score:
+        response = self.llm_client.generate([summary_prompt], max_tokens=1000, stops=['</end>'])
+        why_text = hash_utils.find('why', self.plan_summary)
+        outcome_text = hash_utils.find('outcome', self.plan_summary)
+        score_text = hash_utils.find('score', self.plan_summary)
+
+        if score_text:
             try:
-                goal_score = int(goal_score)
+                plan_score = int(score_text)
             except Exception:
-                goal_score = 0
-        else:
-            goal_score = 0
+                plan_score = 0
+        metrics = {"rationale": why_text, "outcome": outcome_text, "score": score_text}
+        self.plan_summary = f'{response.text}\n{json.dumps(metrics, indent=2)}'
+
         logger.info(f'📝 Plan post-mortem prepared for {self.character_name}\n{self.plan_summary}\n')
         
         # Mark as completed to prevent redundant calls
@@ -1845,7 +1946,7 @@ end your response with </end>
 
         # Add goal satisfaction score to metrics for reflection scoring
         if 'goal_satisfaction' not in metrics:
-            metrics['goal_satisfaction'] = goal_score / 100.0 if goal_score is not None else 0.0
+            metrics['goal_satisfaction'] = plan_score / 100.0 if plan_score is not None else 0.0
 
         entry = {
             'goal': self.current_goal.to_string() if self.current_goal else '',
@@ -1853,6 +1954,7 @@ end your response with </end>
             'plan': self.current_plan,
             'summary': self.plan_summary,
             'actions': [asdict(ar) for ar in self.action_history],
+            'percepts_at_plan': self.percepts_at_plan,
             'metrics': metrics
         }
         self.plan_log.append(entry)
@@ -2229,7 +2331,15 @@ End your text with: </end>"""
         }
 
         if self.action_history:
-            self.action_history[-1].result = text_to_send
+            try:
+                last_type = (self.action_history[-1].action.get('type', '') or '').lower()
+            except Exception:
+                last_type = ''
+            if last_type == 'say':
+                self.action_history[-1].result = text_to_send
+            else:
+                # Non-say last action: suppress recording dialog text into action result
+                pass
         # Publish action (this will be picked up by memory_node and action_display_node)
         self.action_publisher.put(json.dumps(action_data))
         logger.info(f'📤 Published action: {action_data["action_id"]}')
@@ -2600,6 +2710,43 @@ End your text with: </end>"""
         except Exception as e:
             logger.error(f'Error finding direction for target "{target}": {e}')
             return None
+
+    def _capture_percepts_at_plan(self) -> List[Dict[str, Any]]:
+        """Capture a compact, normalized snapshot of percepts at plan start.
+
+        Limits size and fields to keep logs small. Returns [] on failure.
+        """
+        snapshot: List[Dict[str, Any]] = []
+        try:
+            situation = None
+            for reply in self.session.get(f"cognitive/{self.character_name}/situation/current_situation", timeout=3.0 if not self.debug else 600.0):
+                if reply.ok:
+                    situation_data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
+                    if situation_data.get('success'):
+                        situation = situation_data.get('situation', {})
+                        break
+            views = situation.get('views', []) if isinstance(situation, dict) else []
+            # Cap number of views
+            for view in views[:9]:
+                entry: Dict[str, Any] = {
+                    'direction': view.get('direction'),
+                    'terrain': view.get('terrain'),
+                    'visibility': view.get('visibility'),
+                }
+                resources_out = []
+                for res in (view.get('resources') or [])[:5]:
+                    resources_out.append({'name': res.get('name'), 'distance': res.get('distance')})
+                chars_out = []
+                for ch in (view.get('characters') or [])[:5]:
+                    chars_out.append({'name': ch.get('name'), 'distance': ch.get('distance')})
+                if resources_out:
+                    entry['resources'] = resources_out
+                if chars_out:
+                    entry['characters'] = chars_out
+                snapshot.append(entry)
+        except Exception:
+            return []
+        return snapshot
 
     def move(self, move_direction: str):
         """Move the character in the specified direction."""

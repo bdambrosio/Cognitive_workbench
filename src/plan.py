@@ -11,6 +11,10 @@ import numpy as np
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from utils import hash_utils
 
+from typing import Any, Dict, List
+from utils.llm_api import LLM
+from Messages import SystemMessage, UserMessage
+from templates import PLAN_TEMPLATE
 # Type checking imports
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
@@ -268,8 +272,6 @@ def validate_and_create_goal(character_name, goal_hash):
             print(f"Warning: Invalid goal generation response for {goal_hash}") 
             return None
 
-import json
-from typing import Any, Dict, List
 
 # ---------------------------------------------------------------------------
 # public API
@@ -635,6 +637,87 @@ def _validate_condition(condition: Any) -> bool:
     if not REQ_CONDITION_KEYS[condition.get("type", None)].issubset(keys):
         return False
     return True
+
+# ---------------------------------------------------------------------------
+# Pure planner entry (for offline replanning/testing)
+# ---------------------------------------------------------------------------
+
+def generate_plan_with_context(
+    goal_text: str,
+    prompt_text: str,
+    percepts_at_plan: Any = None,
+    server_name: str = "openai",
+    model_name: str = "gpt-4.1",
+) -> Dict[str, Any]:
+    """Generate a plan using explicit context only (no node state).
+
+    Inputs should come from a plan_log entry to ensure parity during verification.
+    Returns a verified plan dict; returns {"plan": []} on failure.
+    """
+    try:
+        system_prompt = (
+            "Respond only with a JSON plan according to the provided PLAN_TEMPLATE. "
+            "No prose; end with </end>."
+        )
+        parts = []
+        parts.append("#Your current goal is:\n" + (goal_text or ""))
+        parts.append("\n#Planning prompt (dynamic):\n" + (prompt_text or ""))
+        if percepts_at_plan is not None:
+            try:
+                parts.append("\n#Percepts at plan start (JSON):\n" + json.dumps(percepts_at_plan, ensure_ascii=False, indent=2))
+            except Exception:
+                pass
+        parts.append("\n#Plan syntax specification:\n" + str(PLAN_TEMPLATE))
+        parts.append("\nRespond only with JSON, no other text. End with </end>\n")
+        user_prompt = "\n".join(parts)
+
+        llm = LLM(server_name=server_name, model_name=model_name)
+        response = llm.ask(
+            {},
+            [SystemMessage(content=system_prompt), UserMessage(content=user_prompt)],
+            max_tokens=1500,
+            stops=['</end>'],
+            is_json=True,
+        )
+        if isinstance(response, dict):
+            plan_candidate = response
+        else:
+            text = response if isinstance(response, str) else getattr(response, 'text', None)
+            plan_candidate = json.loads(text) if text else {"plan": []}
+
+        # Verify; attempt one minimal repair if invalid
+        if not verify_plan(plan_candidate):
+            try:
+                broken_json = json.dumps(plan_candidate, ensure_ascii=False, indent=2)
+            except Exception:
+                broken_json = str(plan_candidate)
+            repair_system = (
+                "You are a strict plan repairer. Given the PLAN_TEMPLATE and a broken plan JSON, "
+                "emit a corrected plan that is valid per the template. Output only JSON. End with </end>."
+            )
+            repair_user_parts = []
+            repair_user_parts.append("PLAN_TEMPLATE:\n" + str(PLAN_TEMPLATE))
+            repair_user_parts.append("\nBroken plan (JSON):\n" + broken_json)
+            repair_user_parts.append("\nNote: The plan failed validation against PLAN_TEMPLATE. Repair to a valid JSON plan.")
+            repair_user = "\n".join(repair_user_parts)
+            repair_resp = llm.ask(
+                {},
+                [SystemMessage(content=repair_system), UserMessage(content=repair_user)],
+                max_tokens=1200,
+                stops=['</end>'],
+                is_json=True,
+            )
+            if isinstance(repair_resp, dict):
+                repaired = repair_resp
+            else:
+                rtext = repair_resp if isinstance(repair_resp, str) else getattr(repair_resp, 'text', None)
+                repaired = json.loads(rtext) if rtext else {"plan": []}
+            if verify_plan(repaired):
+                return repaired
+            return {"plan": []}
+        return plan_candidate
+    except Exception:
+        return {"plan": []}
 
 def _validate_variable_references(plan_steps: List[Any]) -> bool:
     """
