@@ -1,52 +1,44 @@
 {
   "places": [
-    "Forest",
-    "Clearing",
-    "Meadow",
-    "Mountain",
-    "Water",
-    "Spring",
-    "Appletree",
+    "MixedForest",
+    "OpenMeadow",
+    "StreamBank",
+    "Hilltop",
     "Thicket",
-    "Cave",
-    "Hut"
+    "BerryPatch"
   ],
   "tools": [
-    "Berries",
-    "Mushrooms",
-    "Appletree",
-    "Fallenbranch",
-    "Spring",
     "Backpack",
-    "Waterbottle",
-    "Foodpacket"
+    "WaterBottle",
+    "GranolaBar",
+    "MapNotebook",
+    "SturdyShoes",
+    "Berries",
+    "WalkingStick"
   ],
   "roles": [
+    "Explorer",
     "Hiker",
-    "Seeker",
-    "Companion",
-    "Wanderer",
-    "Forager",
+    "Watcher",
     "Philosopher",
-    "Romantic"
+    "Adventurer"
   ],
   "norms_rules": [
-    "Stay_alert_for_dangers",
-    "Respect_nature",
-    "Conserve_supplies",
-    "Avoid_strangers",
-    "Be_friendly_when_safe",
-    "Explore_with_caution",
-    "Look_for_clues_about_the_setting"
+    "BeCautiousOfStrangers",
+    "CareForNature",
+    "ReflectOnOwnThoughts",
+    "StayAlertForHazards",
+    "ShareResourcesIfNecessary",
+    "MoveQuietlyToAvoidDrawingAttention"
   ],
   "hazards": [
-    "Mountain",
-    "Thicket",
-    "Cave",
+    "WildAnimal",
+    "PoisonousPlant",
+    "SuddenStorm",
+    "SteepRavine",
     "Hermit",
-    "Fatigue",
-    "Injury",
-    "Getting_lost"
+    "InjuryByFalling",
+    "Ticks"
   ],
   "social_graph": [
     "Joe",
@@ -55,55 +47,40 @@
   ],
   "time_windows": "morning",
   "affordances": {
-    "Forest": [
-      "explore",
-      "forage",
-      "hide",
-      "rest",
-      "philosophize"
+    "MixedForest": [
+      "Forage",
+      "SeekShade",
+      "Contemplate",
+      "HideFromOthers",
+      "ScoutForPaths"
     ],
-    "Clearing": [
-      "meet",
-      "observe",
-      "talk",
-      "rest",
-      "inspect_surroundings"
+    "OpenMeadow": [
+      "Rest",
+      "ObserveSurroundings",
+      "Sunbathe",
+      "ScanForOtherPeople"
     ],
-    "Meadow": [
-      "gather_food",
-      "bask_in_sun",
-      "meditate",
-      "daydream"
+    "StreamBank": [
+      "DrinkWater",
+      "RefillWaterBottle",
+      "WashFace",
+      "CatchSmallFish"
     ],
-    "Mountain": [
-      "climb",
-      "observe_landscape",
-      "risk_falling"
-    ],
-    "Water": [
-      "drink",
-      "wash",
-      "listen_to_flow"
-    ],
-    "Spring": [
-      "refill_water",
-      "rest"
-    ],
-    "Appletree": [
-      "gather_apples",
-      "eat"
+    "Hilltop": [
+      "SurveyTheArea",
+      "OrientWithSun",
+      "Reflect",
+      "SignalForHelp"
     ],
     "Thicket": [
-      "forage_berries",
-      "risk_scratches"
+      "TakeCover",
+      "SearchForBerries",
+      "MakeShelter"
     ],
-    "Cave": [
-      "seek_shelter",
-      "explore_darkness"
-    ],
-    "Hut": [
-      "seek_safety",
-      "encounter_hermit"
+    "BerryPatch": [
+      "GatherBerries",
+      "Eat",
+      "ShareWithCompanion"
     ]
   },
   "states": [
@@ -111,10 +88,10 @@
     "fatigue",
     "injury",
     "thirst",
-    "confusion",
     "curiosity",
-    "fear",
-    "excitement",
-    "loneliness"
+    "anxiety",
+    "loneliness",
+    "optimism",
+    "wary"
   ]
 }

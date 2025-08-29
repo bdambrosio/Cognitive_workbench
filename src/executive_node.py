@@ -220,6 +220,16 @@ class ZenohExecutiveNode:
         # Local cache of inventory item ids (exact strings)
         self.inventory_cache: List[str] = []
         self.last_state_update_time: Optional[datetime] = None
+        # Ontology
+        self.ontology = json.load(open(f'../scenarios/{self.character_name}-activity-ontology.json'))   
+        self.middle_ontology = json.load(open(f'../scenarios/{self.character_name}-middle-ontology.json'))
+        self.map_types = {}
+        for reply in self.session.get("cognitive/map/types", timeout=2.0 if not self.debug else 600.0):
+            if reply.ok:
+                data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
+                if data.get('success'):
+                    self.map_types = data
+                    break
 
         # Publish initial state snapshot so UI has data before first time advance
         try:
@@ -267,14 +277,6 @@ class ZenohExecutiveNode:
         self.shutdown_requested = False
         self._shutting_down = False
 
-        # Get map types
-        self.map_types = {}
-        for reply in self.session.get("cognitive/map/types", timeout=2.0 if not self.debug else 600.0):
-            if reply.ok:
-                data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
-                if data.get('success'):
-                    self.map_types = data
-                    break
         self.inspections = {} # cache of inspections
         self.uses = {} # cache of uses
         self.activities = {} # dictionary of all available activities for initializing activity manager
@@ -887,6 +889,7 @@ end your response with </end>
             # Make LLM call via pure planner (avoid duplicate percepts: user_prompt already includes compact views)
             if not self.shutdown_requested:
                 plan_candidate = generate_plan_with_context(
+                    character=self,
                     goal_text=goal.to_string(),
                     prompt_text=user_prompt,
                     percepts_at_plan=None,  # avoid double-including percepts
@@ -1134,7 +1137,17 @@ end your response with </end>
                     val = float(data.get('value', 0.0))
                     if val >= 95.0:
                         logger.error(f'🚫 {self.character_name} aborting plan due to state threshold: {key}={val:.1f}')
-                        # Terminate current plan as failure
+                        # Finalize current plan and publish plan log
+                        try:
+                            self._plan_completed()
+                        except Exception:
+                            pass
+                        # Publish stop to map turn controller and UI reflects via turn_status
+                        try:
+                            self.session.put("cognitive/map/turn/stop", json.dumps({"character": self.character_name, "reason": "state_threshold", "metric": key, "value": val}).encode())
+                        except Exception:
+                            pass
+                        # Clear plan/activity state
                         self.current_plan = None
                         self._publish_current_plan()
                         # Terminate current activity if present
@@ -1181,7 +1194,7 @@ end your response with </end>
             return None
 
         def _cond_outcome(cond):
-            result = plan_module._evaluate_condition(self, cond)
+            result = plan_module._evaluate_condition(self, cond, self.observations)
             return result['value'], result['binding'] if result['binding'] else None
 
         current = step_stack.peek()
@@ -1293,6 +1306,34 @@ end your response with </end>
                 current['idx'] = idx + 1
             return self._execute_next_step(step_stack)
 
+        elif stype == 'wait':
+            # Evaluate wait condition; if true, advance; else publish turn complete and re-evaluate next turn.
+            cond = step.get('condition')
+            outcome, resolved = _cond_outcome(cond if isinstance(cond, dict) else {'type': str(cond), 'target': ''})
+            wait_state = current.setdefault('wait_state', {'turns': 0})
+            if outcome:
+                logger.info(f"⏳ wait condition satisfied; advancing")
+                current['idx'] = idx + 1
+                return self._execute_next_step(step_stack)
+            else:
+                wait_state['turns'] += 1
+                logger.info(f"⏳ wait turn {wait_state['turns']}/15; publishing turn complete")
+                # Publish turn completion and do not advance index
+                try:
+                    turn_data = {
+                        'character': self.character_name,
+                        'timestamp': datetime.now().isoformat(),
+                        'type': 'turn_complete'
+                    }
+                    self.turn_complete_publisher.put(json.dumps(turn_data))
+                except Exception:
+                    pass
+                # Hard cap to avoid indefinite wait
+                if wait_state['turns'] >= 15:
+                    logger.warning("⏳ wait exceeded 15 turns; advancing with warning")
+                    current['idx'] = idx + 1
+                return None
+
         else:
             # Unknown or non-executable type: skip
             logger.error(f'Unknown or non-executable step type: {stype}')
@@ -1374,7 +1415,7 @@ end your response with </end>
                     cond_action = action.copy()
                     cond_action['type'] = 'can_see'
                     cond_action['target'] = move_target.capitalize()
-                    binding = plan_module._evaluate_condition(self, cond_action)
+                    binding = plan_module._evaluate_condition(self, cond_action, self.observations)
                     outcome = binding['value']
                     resolved = binding['binding']
                     if outcome:
@@ -1442,7 +1483,7 @@ end your response with </end>
             cond_action['target'] = deref_plan_target(self.plan_bindings, cond_action.get('target', ''))
             cond_action['type'] = 'near'
             cond_action['target'] = cond_action['target'].strip().capitalize()
-            binding = plan_module._evaluate_condition(self, cond_action)
+            binding = plan_module._evaluate_condition(self, cond_action, self.observations)
             outcome = binding['value']
             resolved = binding['binding']   
             # Telemetry: store resolved target
@@ -1484,7 +1525,7 @@ end your response with </end>
                 pass
             cond_action['type'] = 'has_item'
             cond_action['target'] = cond_action['target'].strip().capitalize()
-            binding = plan_module._evaluate_condition(self, cond_action)
+            binding = plan_module._evaluate_condition(self, cond_action, self.observations)
             outcome = binding['value']
             resolved = binding['binding']
             # Telemetry: store resolved target
@@ -1525,7 +1566,7 @@ end your response with </end>
             cond_action['target'] = deref_plan_target(self.plan_bindings, cond_action.get('target', ''))
             cond_action['type'] = 'near'
             cond_action['target'] = cond_action['target'].strip().capitalize()
-            binding = plan_module._evaluate_condition(self, cond_action)
+            binding = plan_module._evaluate_condition(self, cond_action, self.observations)
             outcome = binding['value']
             resolved = binding['binding']
             # Telemetry: store resolved target
@@ -1539,7 +1580,7 @@ end your response with </end>
                 has_digits = any(ch.isdigit() for ch in tgt) if isinstance(tgt, str) else False
                 if not has_digits:
                     cond_action['type'] = 'has_item'
-                    binding = plan_module._evaluate_condition(self, cond_action)
+                    binding = plan_module._evaluate_condition(self, cond_action, self.observations)
                     outcome = binding['value']
                     resolved = binding['binding']
 
@@ -1594,7 +1635,7 @@ end your response with </end>
                 pass
             cond_action['type'] = 'near'
             cond_action['target'] = cond_action['target'].strip().capitalize()
-            binding = plan_module._evaluate_condition(self, cond_action)
+            binding = plan_module._evaluate_condition(self, cond_action, self.observations)
             outcome = binding['value']
             resolved = binding['binding']
             # Telemetry: store resolved target
@@ -1604,7 +1645,7 @@ end your response with </end>
                 pass
             if not outcome:
                 cond_action['type'] = 'has_item'
-                binding = plan_module._evaluate_condition(self, cond_action)
+                binding = plan_module._evaluate_condition(self, cond_action, self.observations)
                 outcome = binding['value']
                 resolved = binding['binding']
 

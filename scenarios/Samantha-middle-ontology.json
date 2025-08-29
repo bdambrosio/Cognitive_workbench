@@ -1,0 +1,2001 @@
+{
+  "version": "0.4",
+  "setting_notes": "Ontology covers a forest-edge adventure with drives for mystery, safety, and belonging. Verbs and nouns abstract over plan-primitive steps, integrating social, survival, and exploration. All terms ultimately ground in provided places, tools, hazards, resource types, states, and character roles.",
+  "constraints": {
+    "verb_nodes_max": 40,
+    "noun_nodes_max": 60,
+    "edge_kinds": [
+      "refines",
+      "composes",
+      "precondition_of",
+      "enables",
+      "equivalent_to",
+      "alias_of",
+      "incompatible_with",
+      "member_of",
+      "subset_of"
+    ],
+    "acyclic": true,
+    "max_depth": 3
+  },
+  "manifest": {
+    "verbs": [
+      {
+        "id": "Approach",
+        "gloss": "move toward a target"
+      },
+      {
+        "id": "Survey",
+        "gloss": "scan surroundings for info"
+      },
+      {
+        "id": "Acquire",
+        "gloss": "gain control of an item"
+      },
+      {
+        "id": "Consume",
+        "gloss": "ingest food/water"
+      },
+      {
+        "id": "Share",
+        "gloss": "offering resource to another"
+      },
+      {
+        "id": "Negotiate",
+        "gloss": "socially exchange offers"
+      },
+      {
+        "id": "Greet",
+        "gloss": "initiate friendly social opening"
+      },
+      {
+        "id": "Warn",
+        "gloss": "alert others to threat"
+      },
+      {
+        "id": "Reflect",
+        "gloss": "think about situation/feelings"
+      },
+      {
+        "id": "Inspect",
+        "gloss": "closely examine an entity"
+      },
+      {
+        "id": "Use",
+        "gloss": "apply object for effect"
+      },
+      {
+        "id": "Rest",
+        "gloss": "pause to recover energy"
+      },
+      {
+        "id": "Evade",
+        "gloss": "take action to avoid hazard"
+      },
+      {
+        "id": "Signal",
+        "gloss": "communicate intent/direction nonverbally"
+      },
+      {
+        "id": "Observe",
+        "gloss": "attend to phenomena/person"
+      },
+      {
+        "id": "Record",
+        "gloss": "document findings/ideas"
+      },
+      {
+        "id": "Hide",
+        "gloss": "deliberately obscure self"
+      },
+      {
+        "id": "Aid",
+        "gloss": "assist another entity"
+      },
+      {
+        "id": "Orient",
+        "gloss": "determine or confirm location"
+      },
+      {
+        "id": "Build",
+        "gloss": "assemble or construct utility"
+      },
+      {
+        "id": "Settle",
+        "gloss": "establish safe/persistent spot"
+      },
+      {
+        "id": "EvaluateRisk",
+        "gloss": "think through hazards or dangers"
+      },
+      {
+        "id": "Recall",
+        "gloss": "retrieving knowledge/memory"
+      }
+    ],
+    "nouns": [
+      {
+        "id": "Portable",
+        "gloss": "items that can be carried"
+      },
+      {
+        "id": "Edible",
+        "gloss": "safe to eat or drink"
+      },
+      {
+        "id": "Tool",
+        "gloss": "artifact used for actions"
+      },
+      {
+        "id": "Resource",
+        "gloss": "acquirable natural or crafted things"
+      },
+      {
+        "id": "Hazard",
+        "gloss": "potentially dangerous states/entities"
+      },
+      {
+        "id": "Location",
+        "gloss": "distinct places in the landscape"
+      },
+      {
+        "id": "Person",
+        "gloss": "any character"
+      },
+      {
+        "id": "Role",
+        "gloss": "functional persona adopted"
+      },
+      {
+        "id": "State",
+        "gloss": "internal or external condition"
+      },
+      {
+        "id": "Terrain",
+        "gloss": "broad area types"
+      },
+      {
+        "id": "WaterSource",
+        "gloss": "source of drinkable water"
+      },
+      {
+        "id": "Shelter",
+        "gloss": "provides cover or rest"
+      },
+      {
+        "id": "SignalDevice",
+        "gloss": "item to communicate location"
+      },
+      {
+        "id": "Clue",
+        "gloss": "hint about mystery"
+      },
+      {
+        "id": "Berry",
+        "gloss": "edible resource, category"
+      },
+      {
+        "id": "Notebook",
+        "gloss": "item to record data"
+      },
+      {
+        "id": "Emotion",
+        "gloss": "affective state"
+      },
+      {
+        "id": "Companion",
+        "gloss": "allied person"
+      },
+      {
+        "id": "Enemy",
+        "gloss": "potential or active adversary"
+      },
+      {
+        "id": "Apparel",
+        "gloss": "worn clothing/equipment"
+      },
+      {
+        "id": "Path",
+        "gloss": "route connecting places"
+      },
+      {
+        "id": "Fish",
+        "gloss": "edible water-dweller"
+      },
+      {
+        "id": "Plant",
+        "gloss": "flora, possibly edible/threat"
+      },
+      {
+        "id": "Branch",
+        "gloss": "type of tool/resource"
+      },
+      {
+        "id": "Threat",
+        "gloss": "encompasses hazards and foes"
+      },
+      {
+        "id": "Map",
+        "gloss": "representation of place/terrain"
+      },
+      {
+        "id": "Object",
+        "gloss": "generic physical item"
+      },
+      {
+        "id": "BerryPatch",
+        "gloss": "location: lots of berries"
+      },
+      {
+        "id": "Spring",
+        "gloss": "location: freshwater source"
+      },
+      {
+        "id": "Meadow",
+        "gloss": "open area, terrain"
+      },
+      {
+        "id": "Forest",
+        "gloss": "dense trees, terrain"
+      },
+      {
+        "id": "Thicket",
+        "gloss": "dense brush, shelter/hiding"
+      },
+      {
+        "id": "Cave",
+        "gloss": "rock shelter"
+      }
+    ]
+  },
+  "verbs": {
+    "nodes": [
+      {
+        "id": "Approach",
+        "aliases": [
+          "move_toward",
+          "advance",
+          "go_near"
+        ],
+        "args": [
+          "$agent",
+          "$target",
+          "$location?"
+        ],
+        "role_constraints": {
+          "$target": {
+            "noun_types_any_of": [
+              "Person",
+              "Hazard",
+              "Resource",
+              "Location"
+            ]
+          }
+        },
+        "decomposition_patterns": [
+          {
+            "sequence": [
+              "Orient",
+              "Survey"
+            ]
+          }
+        ],
+        "hint_anchor": "move"
+      },
+      {
+        "id": "Survey",
+        "aliases": [
+          "scan",
+          "look_for",
+          "search"
+        ],
+        "args": [
+          "$agent",
+          "$area",
+          "$entity?"
+        ],
+        "role_constraints": {
+          "$entity": {
+            "noun_types_any_of": [
+              "Resource",
+              "Hazard",
+              "Person",
+              "Clue"
+            ]
+          }
+        },
+        "decomposition_patterns": [
+          {
+            "sequence": [
+              "Observe"
+            ]
+          }
+        ],
+        "hint_anchor": "scan"
+      },
+      {
+        "id": "Acquire",
+        "aliases": [
+          "take",
+          "collect",
+          "pick_up",
+          "obtain"
+        ],
+        "args": [
+          "$agent",
+          "$entity",
+          "$location?"
+        ],
+        "role_constraints": {
+          "$entity": {
+            "noun_types_any_of": [
+              "Portable",
+              "Resource",
+              "Tool",
+              "Edible",
+              "Berry",
+              "Fish",
+              "Branch"
+            ]
+          }
+        },
+        "decomposition_patterns": [
+          {
+            "sequence": [
+              "Approach",
+              "Inspect",
+              "Collect"
+            ]
+          }
+        ],
+        "hint_anchor": "take"
+      },
+      {
+        "id": "Consume",
+        "aliases": [
+          "eat",
+          "drink"
+        ],
+        "args": [
+          "$agent",
+          "$entity"
+        ],
+        "role_constraints": {
+          "$entity": {
+            "noun_types_any_of": [
+              "Edible",
+              "Berry",
+              "Fish"
+            ]
+          }
+        },
+        "decomposition_patterns": [
+          {
+            "sequence": [
+              "Acquire",
+              "Use"
+            ]
+          }
+        ],
+        "hint_anchor": "use"
+      },
+      {
+        "id": "Share",
+        "aliases": [
+          "offer",
+          "give"
+        ],
+        "args": [
+          "$agent",
+          "$entity",
+          "$person"
+        ],
+        "role_constraints": {
+          "$entity": {
+            "noun_types_any_of": [
+              "Edible",
+              "Tool",
+              "Resource"
+            ]
+          },
+          "$person": {
+            "noun_types_any_of": [
+              "Person"
+            ]
+          }
+        },
+        "decomposition_patterns": [
+          {
+            "sequence": [
+              "Approach",
+              "Greet",
+              "Offer"
+            ]
+          }
+        ],
+        "hint_anchor": "place"
+      },
+      {
+        "id": "Negotiate",
+        "aliases": [
+          "bargain",
+          "exchange"
+        ],
+        "args": [
+          "$agent",
+          "$person",
+          "$entity?"
+        ],
+        "role_constraints": {
+          "$person": {
+            "noun_types_any_of": [
+              "Person"
+            ]
+          }
+        },
+        "decomposition_patterns": [
+          {
+            "sequence": [
+              "Greet",
+              "Offer",
+              "Receive"
+            ]
+          }
+        ],
+        "hint_anchor": "say"
+      },
+      {
+        "id": "Greet",
+        "aliases": [
+          "initiate_contact",
+          "hello"
+        ],
+        "args": [
+          "$agent",
+          "$person"
+        ],
+        "role_constraints": {
+          "$person": {
+            "noun_types_any_of": [
+              "Person"
+            ]
+          }
+        },
+        "decomposition_patterns": [],
+        "hint_anchor": "say"
+      },
+      {
+        "id": "Warn",
+        "aliases": [
+          "alert",
+          "signal_danger"
+        ],
+        "args": [
+          "$agent",
+          "$person",
+          "$hazard"
+        ],
+        "role_constraints": {
+          "$person": {
+            "noun_types_any_of": [
+              "Person"
+            ]
+          },
+          "$hazard": {
+            "noun_types_any_of": [
+              "Hazard",
+              "Threat"
+            ]
+          }
+        },
+        "decomposition_patterns": [],
+        "hint_anchor": "say"
+      },
+      {
+        "id": "Reflect",
+        "aliases": [
+          "contemplate",
+          "consider",
+          "re-examine"
+        ],
+        "args": [
+          "$agent",
+          "$topic?"
+        ],
+        "role_constraints": {
+          "$topic": {
+            "noun_types_any_of": [
+              "Emotion",
+              "Clue",
+              "Event",
+              "State"
+            ]
+          }
+        },
+        "decomposition_patterns": [
+          {
+            "sequence": [
+              "Recall"
+            ]
+          }
+        ],
+        "hint_anchor": "think"
+      },
+      {
+        "id": "Inspect",
+        "aliases": [
+          "examine",
+          "analyze",
+          "probe"
+        ],
+        "args": [
+          "$agent",
+          "$entity"
+        ],
+        "role_constraints": {
+          "$entity": {
+            "noun_types_any_of": [
+              "Resource",
+              "Tool",
+              "Person",
+              "Hazard",
+              "Clue"
+            ]
+          }
+        },
+        "decomposition_patterns": [],
+        "hint_anchor": "inspect"
+      },
+      {
+        "id": "Use",
+        "aliases": [
+          "employ",
+          "apply"
+        ],
+        "args": [
+          "$agent",
+          "$entity"
+        ],
+        "role_constraints": {
+          "$entity": {
+            "noun_types_any_of": [
+              "Tool",
+              "Resource",
+              "Edible",
+              "Apparel",
+              "SignalDevice",
+              "Notebook"
+            ]
+          }
+        },
+        "decomposition_patterns": [],
+        "hint_anchor": "use"
+      },
+      {
+        "id": "Rest",
+        "aliases": [
+          "recover",
+          "wait"
+        ],
+        "args": [
+          "$agent",
+          "$location?"
+        ],
+        "role_constraints": {
+          "$location": {
+            "noun_types_any_of": [
+              "Shelter",
+              "Meadow",
+              "Forest",
+              "Cave",
+              "Thicket"
+            ]
+          }
+        },
+        "decomposition_patterns": [],
+        "hint_anchor": "wait"
+      },
+      {
+        "id": "Evade",
+        "aliases": [
+          "flee",
+          "avoid"
+        ],
+        "args": [
+          "$agent",
+          "$entity"
+        ],
+        "role_constraints": {
+          "$entity": {
+            "noun_types_any_of": [
+              "Hazard",
+              "Enemy",
+              "Threat"
+            ]
+          }
+        },
+        "decomposition_patterns": [
+          {
+            "sequence": [
+              "Survey",
+              "Approach",
+              "Hide"
+            ]
+          }
+        ],
+        "hint_anchor": "move"
+      },
+      {
+        "id": "Signal",
+        "aliases": [
+          "call",
+          "produce_attention"
+        ],
+        "args": [
+          "$agent",
+          "$method?",
+          "$target?"
+        ],
+        "role_constraints": {
+          "$method": {
+            "noun_types_any_of": [
+              "SignalDevice",
+              "Voice"
+            ]
+          },
+          "$target": {
+            "noun_types_any_of": [
+              "Person"
+            ]
+          }
+        },
+        "decomposition_patterns": [],
+        "hint_anchor": "say"
+      },
+      {
+        "id": "Observe",
+        "aliases": [
+          "watch",
+          "see",
+          "study"
+        ],
+        "args": [
+          "$agent",
+          "$entity"
+        ],
+        "role_constraints": {
+          "$entity": {
+            "noun_types_any_of": [
+              "Person",
+              "Hazard",
+              "Clue",
+              "Resource",
+              "Event"
+            ]
+          }
+        },
+        "decomposition_patterns": [],
+        "hint_anchor": "scan"
+      },
+      {
+        "id": "Record",
+        "aliases": [
+          "document",
+          "write_down"
+        ],
+        "args": [
+          "$agent",
+          "$topic"
+        ],
+        "role_constraints": {
+          "$topic": {
+            "noun_types_any_of": [
+              "Clue",
+              "Event",
+              "Observation",
+              "Emotion"
+            ]
+          }
+        },
+        "decomposition_patterns": [],
+        "hint_anchor": "use"
+      },
+      {
+        "id": "Hide",
+        "aliases": [
+          "conceal",
+          "cover"
+        ],
+        "args": [
+          "$agent",
+          "$place?"
+        ],
+        "role_constraints": {
+          "$place": {
+            "noun_types_any_of": [
+              "Thicket",
+              "Forest",
+              "Cave",
+              "Shelter"
+            ]
+          }
+        },
+        "decomposition_patterns": [],
+        "hint_anchor": "move"
+      },
+      {
+        "id": "Aid",
+        "aliases": [
+          "help",
+          "support"
+        ],
+        "args": [
+          "$agent",
+          "$person",
+          "$problem?"
+        ],
+        "role_constraints": {
+          "$person": {
+            "noun_types_any_of": [
+              "Person"
+            ]
+          },
+          "$problem": {
+            "noun_types_any_of": [
+              "Hazard",
+              "State"
+            ]
+          }
+        },
+        "decomposition_patterns": [
+          {
+            "sequence": [
+              "Approach",
+              "Inspect",
+              "Offer"
+            ]
+          }
+        ],
+        "hint_anchor": "use"
+      },
+      {
+        "id": "Orient",
+        "aliases": [
+          "determine_location",
+          "find_direction"
+        ],
+        "args": [
+          "$agent",
+          "$reference?"
+        ],
+        "role_constraints": {
+          "$reference": {
+            "noun_types_any_of": [
+              "Map",
+              "Sun",
+              "Terrain"
+            ]
+          }
+        },
+        "decomposition_patterns": [],
+        "hint_anchor": "inspect"
+      },
+      {
+        "id": "Build",
+        "aliases": [
+          "construct",
+          "assemble"
+        ],
+        "args": [
+          "$agent",
+          "$object"
+        ],
+        "role_constraints": {
+          "$object": {
+            "noun_types_any_of": [
+              "Shelter",
+              "Tool"
+            ]
+          }
+        },
+        "decomposition_patterns": [
+          {
+            "sequence": [
+              "Acquire",
+              "Use"
+            ]
+          }
+        ],
+        "hint_anchor": "place"
+      },
+      {
+        "id": "Settle",
+        "aliases": [
+          "camp",
+          "make_base"
+        ],
+        "args": [
+          "$agent",
+          "$location"
+        ],
+        "role_constraints": {
+          "$location": {
+            "noun_types_any_of": [
+              "Shelter",
+              "Meadow",
+              "Cave",
+              "Thicket"
+            ]
+          }
+        },
+        "decomposition_patterns": [
+          {
+            "sequence": [
+              "Survey",
+              "Rest"
+            ]
+          }
+        ],
+        "hint_anchor": "wait"
+      },
+      {
+        "id": "EvaluateRisk",
+        "aliases": [
+          "calculate_danger",
+          "assess_safety"
+        ],
+        "args": [
+          "$agent",
+          "$situation?"
+        ],
+        "role_constraints": {
+          "$situation": {
+            "noun_types_any_of": [
+              "Hazard",
+              "Threat",
+              "Event",
+              "Plan"
+            ]
+          }
+        },
+        "decomposition_patterns": [
+          {
+            "sequence": [
+              "Observe",
+              "Reflect"
+            ]
+          }
+        ],
+        "hint_anchor": "think"
+      },
+      {
+        "id": "Recall",
+        "aliases": [
+          "remember",
+          "retrieve_memory"
+        ],
+        "args": [
+          "$agent",
+          "$topic"
+        ],
+        "role_constraints": {
+          "$topic": {
+            "noun_types_any_of": [
+              "Event",
+              "Clue",
+              "Person",
+              "Map"
+            ]
+          }
+        },
+        "decomposition_patterns": [],
+        "hint_anchor": "think"
+      }
+    ],
+    "edges": [
+      {
+        "source": "Acquire",
+        "target": "Approach",
+        "kind": "composes"
+      },
+      {
+        "source": "Acquire",
+        "target": "Inspect",
+        "kind": "composes"
+      },
+      {
+        "source": "Acquire",
+        "target": "Collect",
+        "kind": "composes"
+      },
+      {
+        "source": "Survey",
+        "target": "Observe",
+        "kind": "refines"
+      },
+      {
+        "source": "Consume",
+        "target": "Acquire",
+        "kind": "precondition_of"
+      },
+      {
+        "source": "Consume",
+        "target": "Use",
+        "kind": "composes"
+      },
+      {
+        "source": "Share",
+        "target": "Approach",
+        "kind": "precondition_of"
+      },
+      {
+        "source": "Share",
+        "target": "Greet",
+        "kind": "precondition_of"
+      },
+      {
+        "source": "Share",
+        "target": "Offer",
+        "kind": "composes"
+      },
+      {
+        "source": "Negotiate",
+        "target": "Greet",
+        "kind": "precondition_of"
+      },
+      {
+        "source": "Negotiate",
+        "target": "Offer",
+        "kind": "composes"
+      },
+      {
+        "source": "Negotiate",
+        "target": "Receive",
+        "kind": "composes"
+      },
+      {
+        "source": "Evade",
+        "target": "Survey",
+        "kind": "precondition_of"
+      },
+      {
+        "source": "Evade",
+        "target": "Approach",
+        "kind": "precondition_of"
+      },
+      {
+        "source": "Evade",
+        "target": "Hide",
+        "kind": "composes"
+      },
+      {
+        "source": "Aid",
+        "target": "Approach",
+        "kind": "precondition_of"
+      },
+      {
+        "source": "Aid",
+        "target": "Inspect",
+        "kind": "precondition_of"
+      },
+      {
+        "source": "Aid",
+        "target": "Offer",
+        "kind": "composes"
+      },
+      {
+        "source": "Reflect",
+        "target": "Recall",
+        "kind": "refines",
+        "note": "self-reflection references memory"
+      },
+      {
+        "source": "Build",
+        "target": "Acquire",
+        "kind": "precondition_of"
+      },
+      {
+        "source": "Build",
+        "target": "Use",
+        "kind": "composes"
+      },
+      {
+        "source": "Settle",
+        "target": "Survey",
+        "kind": "precondition_of"
+      },
+      {
+        "source": "Settle",
+        "target": "Rest",
+        "kind": "composes"
+      },
+      {
+        "source": "EvaluateRisk",
+        "target": "Observe",
+        "kind": "precondition_of"
+      },
+      {
+        "source": "EvaluateRisk",
+        "target": "Reflect",
+        "kind": "composes"
+      }
+    ]
+  },
+  "nouns": {
+    "nodes": [
+      {
+        "id": "Resource",
+        "aliases": [
+          "item",
+          "supply"
+        ],
+        "decomposition_patterns": [
+          {
+            "subset_of": [
+              "Portable",
+              "Tool",
+              "Edible",
+              "Branch"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "Portable",
+        "aliases": [
+          "carryable",
+          "movable"
+        ],
+        "decomposition_patterns": [
+          {
+            "subset_of": [
+              "Tool",
+              "Edible",
+              "Notebook",
+              "SignalDevice",
+              "Branch"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "Tool",
+        "aliases": [],
+        "decomposition_patterns": [
+          {
+            "subset_of": [
+              "WalkingStick",
+              "MapNotebook",
+              "Notebook",
+              "Branch"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "WalkingStick",
+        "aliases": [
+          "stick"
+        ],
+        "decomposition_patterns": []
+      },
+      {
+        "id": "MapNotebook",
+        "aliases": [
+          "map",
+          "notebook"
+        ],
+        "decomposition_patterns": []
+      },
+      {
+        "id": "Edible",
+        "aliases": [
+          "food",
+          "drink"
+        ],
+        "decomposition_patterns": [
+          {
+            "subset_of": [
+              "Berry",
+              "Fish",
+              "WaterBottle",
+              "GranolaBar",
+              "Berries"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "Berry",
+        "aliases": [],
+        "decomposition_patterns": [
+          {
+            "subset_of": [
+              "Berries"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "Fish",
+        "aliases": [],
+        "decomposition_patterns": []
+      },
+      {
+        "id": "WaterBottle",
+        "aliases": [],
+        "decomposition_patterns": []
+      },
+      {
+        "id": "GranolaBar",
+        "aliases": [],
+        "decomposition_patterns": []
+      },
+      {
+        "id": "Berries",
+        "aliases": [],
+        "decomposition_patterns": []
+      },
+      {
+        "id": "Branch",
+        "aliases": [
+          "fallen_branch"
+        ],
+        "decomposition_patterns": []
+      },
+      {
+        "id": "Hazard",
+        "aliases": [
+          "danger",
+          "threat"
+        ],
+        "decomposition_patterns": [
+          {
+            "subset_of": [
+              "WildAnimal",
+              "PoisonousPlant",
+              "SuddenStorm",
+              "SteepRavine",
+              "InjuryByFalling",
+              "Ticks",
+              "Hermit"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "Threat",
+        "aliases": [],
+        "decomposition_patterns": [
+          {
+            "subset_of": [
+              "Hazard",
+              "Enemy"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "WildAnimal",
+        "aliases": [],
+        "decomposition_patterns": []
+      },
+      {
+        "id": "PoisonousPlant",
+        "aliases": [],
+        "decomposition_patterns": []
+      },
+      {
+        "id": "SuddenStorm",
+        "aliases": [],
+        "decomposition_patterns": []
+      },
+      {
+        "id": "SteepRavine",
+        "aliases": [],
+        "decomposition_patterns": []
+      },
+      {
+        "id": "InjuryByFalling",
+        "aliases": [],
+        "decomposition_patterns": []
+      },
+      {
+        "id": "Ticks",
+        "aliases": [],
+        "decomposition_patterns": []
+      },
+      {
+        "id": "Hermit",
+        "aliases": [],
+        "decomposition_patterns": []
+      },
+      {
+        "id": "Location",
+        "aliases": [
+          "place",
+          "site"
+        ],
+        "decomposition_patterns": [
+          {
+            "subset_of": [
+              "Meadow",
+              "Forest",
+              "StreamBank",
+              "Thicket",
+              "Hilltop",
+              "BerryPatch",
+              "Spring",
+              "Cave",
+              "Hut"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "Meadow",
+        "aliases": [
+          "OpenMeadow"
+        ],
+        "decomposition_patterns": []
+      },
+      {
+        "id": "Forest",
+        "aliases": [
+          "MixedForest"
+        ],
+        "decomposition_patterns": []
+      },
+      {
+        "id": "StreamBank",
+        "aliases": [],
+        "decomposition_patterns": []
+      },
+      {
+        "id": "Thicket",
+        "aliases": [],
+        "decomposition_patterns": []
+      },
+      {
+        "id": "Hilltop",
+        "aliases": [],
+        "decomposition_patterns": []
+      },
+      {
+        "id": "BerryPatch",
+        "aliases": [],
+        "decomposition_patterns": []
+      },
+      {
+        "id": "Spring",
+        "aliases": [],
+        "decomposition_patterns": []
+      },
+      {
+        "id": "Cave",
+        "aliases": [],
+        "decomposition_patterns": []
+      },
+      {
+        "id": "Hut",
+        "aliases": [],
+        "decomposition_patterns": []
+      },
+      {
+        "id": "Shelter",
+        "aliases": [],
+        "decomposition_patterns": [
+          {
+            "subset_of": [
+              "Thicket",
+              "Cave",
+              "Hut"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "Person",
+        "aliases": [
+          "character",
+          "agent"
+        ],
+        "decomposition_patterns": [
+          {
+            "subset_of": [
+              "Joe",
+              "Hermit",
+              "User",
+              "Companion"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "Joe",
+        "aliases": [],
+        "decomposition_patterns": []
+      },
+      {
+        "id": "User",
+        "aliases": [],
+        "decomposition_patterns": []
+      },
+      {
+        "id": "Companion",
+        "aliases": [],
+        "decomposition_patterns": []
+      },
+      {
+        "id": "Enemy",
+        "aliases": [],
+        "decomposition_patterns": [
+          {
+            "subset_of": [
+              "Hermit"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "Role",
+        "aliases": [
+          "persona"
+        ],
+        "decomposition_patterns": [
+          {
+            "subset_of": [
+              "Explorer",
+              "Hiker",
+              "Watcher",
+              "Philosopher",
+              "Adventurer"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "Explorer",
+        "aliases": [],
+        "decomposition_patterns": []
+      },
+      {
+        "id": "Hiker",
+        "aliases": [],
+        "decomposition_patterns": []
+      },
+      {
+        "id": "Watcher",
+        "aliases": [],
+        "decomposition_patterns": []
+      },
+      {
+        "id": "Philosopher",
+        "aliases": [],
+        "decomposition_patterns": []
+      },
+      {
+        "id": "Adventurer",
+        "aliases": [],
+        "decomposition_patterns": []
+      },
+      {
+        "id": "State",
+        "aliases": [
+          "condition"
+        ],
+        "decomposition_patterns": [
+          {
+            "subset_of": [
+              "hunger",
+              "fatigue",
+              "injury",
+              "thirst",
+              "curiosity",
+              "anxiety",
+              "loneliness",
+              "optimism",
+              "wary"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "hunger",
+        "aliases": [],
+        "decomposition_patterns": []
+      },
+      {
+        "id": "fatigue",
+        "aliases": [],
+        "decomposition_patterns": []
+      },
+      {
+        "id": "injury",
+        "aliases": [],
+        "decomposition_patterns": []
+      },
+      {
+        "id": "thirst",
+        "aliases": [],
+        "decomposition_patterns": []
+      },
+      {
+        "id": "curiosity",
+        "aliases": [],
+        "decomposition_patterns": []
+      },
+      {
+        "id": "anxiety",
+        "aliases": [],
+        "decomposition_patterns": []
+      },
+      {
+        "id": "loneliness",
+        "aliases": [],
+        "decomposition_patterns": []
+      },
+      {
+        "id": "optimism",
+        "aliases": [],
+        "decomposition_patterns": []
+      },
+      {
+        "id": "wary",
+        "aliases": [],
+        "decomposition_patterns": []
+      },
+      {
+        "id": "Emotion",
+        "aliases": [],
+        "decomposition_patterns": [
+          {
+            "subset_of": [
+              "anxiety",
+              "loneliness",
+              "optimism",
+              "wary"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "Map",
+        "aliases": [
+          "mapnotebook"
+        ],
+        "decomposition_patterns": []
+      },
+      {
+        "id": "Notebook",
+        "aliases": [],
+        "decomposition_patterns": []
+      },
+      {
+        "id": "SignalDevice",
+        "aliases": [],
+        "decomposition_patterns": [
+          {
+            "subset_of": [
+              "MapNotebook"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "Apparel",
+        "aliases": [
+          "sturdyshoes"
+        ],
+        "decomposition_patterns": []
+      },
+      {
+        "id": "Path",
+        "aliases": [],
+        "decomposition_patterns": []
+      },
+      {
+        "id": "Object",
+        "aliases": [],
+        "decomposition_patterns": [
+          {
+            "subset_of": [
+              "Tool",
+              "Resource",
+              "Edible"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "Clue",
+        "aliases": [],
+        "decomposition_patterns": []
+      },
+      {
+        "id": "Plant",
+        "aliases": [],
+        "decomposition_patterns": [
+          {
+            "subset_of": [
+              "PoisonousPlant",
+              "Berries"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "WaterSource",
+        "aliases": [],
+        "decomposition_patterns": [
+          {
+            "subset_of": [
+              "StreamBank",
+              "Spring"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "Terrain",
+        "aliases": [],
+        "decomposition_patterns": [
+          {
+            "subset_of": [
+              "Meadow",
+              "Forest",
+              "Cave",
+              "Thicket",
+              "Hilltop",
+              "StreamBank"
+            ]
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "source": "Resource",
+        "target": "Portable",
+        "kind": "subset_of"
+      },
+      {
+        "source": "Portable",
+        "target": "Tool",
+        "kind": "subset_of"
+      },
+      {
+        "source": "Edible",
+        "target": "Berry",
+        "kind": "subset_of"
+      },
+      {
+        "source": "Berry",
+        "target": "Berries",
+        "kind": "subset_of"
+      },
+      {
+        "source": "Hazard",
+        "target": "WildAnimal",
+        "kind": "subset_of"
+      },
+      {
+        "source": "Hazard",
+        "target": "PoisonousPlant",
+        "kind": "subset_of"
+      },
+      {
+        "source": "Hazard",
+        "target": "SuddenStorm",
+        "kind": "subset_of"
+      },
+      {
+        "source": "Hazard",
+        "target": "SteepRavine",
+        "kind": "subset_of"
+      },
+      {
+        "source": "Hazard",
+        "target": "InjuryByFalling",
+        "kind": "subset_of"
+      },
+      {
+        "source": "Hazard",
+        "target": "Ticks",
+        "kind": "subset_of"
+      },
+      {
+        "source": "Hazard",
+        "target": "Hermit",
+        "kind": "subset_of"
+      },
+      {
+        "source": "Threat",
+        "target": "Hazard",
+        "kind": "subset_of"
+      },
+      {
+        "source": "Threat",
+        "target": "Enemy",
+        "kind": "subset_of"
+      },
+      {
+        "source": "Enemy",
+        "target": "Hermit",
+        "kind": "subset_of"
+      },
+      {
+        "source": "Location",
+        "target": "Meadow",
+        "kind": "subset_of"
+      },
+      {
+        "source": "Location",
+        "target": "Forest",
+        "kind": "subset_of"
+      },
+      {
+        "source": "Location",
+        "target": "StreamBank",
+        "kind": "subset_of"
+      },
+      {
+        "source": "Location",
+        "target": "Thicket",
+        "kind": "subset_of"
+      },
+      {
+        "source": "Location",
+        "target": "Hilltop",
+        "kind": "subset_of"
+      },
+      {
+        "source": "Location",
+        "target": "BerryPatch",
+        "kind": "subset_of"
+      },
+      {
+        "source": "Location",
+        "target": "Spring",
+        "kind": "subset_of"
+      },
+      {
+        "source": "Location",
+        "target": "Cave",
+        "kind": "subset_of"
+      },
+      {
+        "source": "Location",
+        "target": "Hut",
+        "kind": "subset_of"
+      },
+      {
+        "source": "Shelter",
+        "target": "Thicket",
+        "kind": "subset_of"
+      },
+      {
+        "source": "Shelter",
+        "target": "Cave",
+        "kind": "subset_of"
+      },
+      {
+        "source": "Shelter",
+        "target": "Hut",
+        "kind": "subset_of"
+      },
+      {
+        "source": "Person",
+        "target": "Joe",
+        "kind": "subset_of"
+      },
+      {
+        "source": "Person",
+        "target": "User",
+        "kind": "subset_of"
+      },
+      {
+        "source": "Person",
+        "target": "Companion",
+        "kind": "subset_of"
+      },
+      {
+        "source": "Role",
+        "target": "Explorer",
+        "kind": "subset_of"
+      },
+      {
+        "source": "Role",
+        "target": "Hiker",
+        "kind": "subset_of"
+      },
+      {
+        "source": "Role",
+        "target": "Watcher",
+        "kind": "subset_of"
+      },
+      {
+        "source": "Role",
+        "target": "Philosopher",
+        "kind": "subset_of"
+      },
+      {
+        "source": "Role",
+        "target": "Adventurer",
+        "kind": "subset_of"
+      },
+      {
+        "source": "State",
+        "target": "hunger",
+        "kind": "subset_of"
+      },
+      {
+        "source": "State",
+        "target": "fatigue",
+        "kind": "subset_of"
+      },
+      {
+        "source": "State",
+        "target": "injury",
+        "kind": "subset_of"
+      },
+      {
+        "source": "State",
+        "target": "thirst",
+        "kind": "subset_of"
+      },
+      {
+        "source": "State",
+        "target": "curiosity",
+        "kind": "subset_of"
+      },
+      {
+        "source": "State",
+        "target": "anxiety",
+        "kind": "subset_of"
+      },
+      {
+        "source": "State",
+        "target": "loneliness",
+        "kind": "subset_of"
+      },
+      {
+        "source": "State",
+        "target": "optimism",
+        "kind": "subset_of"
+      },
+      {
+        "source": "State",
+        "target": "wary",
+        "kind": "subset_of"
+      },
+      {
+        "source": "Emotion",
+        "target": "anxiety",
+        "kind": "subset_of"
+      },
+      {
+        "source": "Emotion",
+        "target": "loneliness",
+        "kind": "subset_of"
+      },
+      {
+        "source": "Emotion",
+        "target": "optimism",
+        "kind": "subset_of"
+      },
+      {
+        "source": "Emotion",
+        "target": "wary",
+        "kind": "subset_of"
+      },
+      {
+        "source": "WaterSource",
+        "target": "StreamBank",
+        "kind": "subset_of"
+      },
+      {
+        "source": "WaterSource",
+        "target": "Spring",
+        "kind": "subset_of"
+      },
+      {
+        "source": "Terrain",
+        "target": "Meadow",
+        "kind": "subset_of"
+      },
+      {
+        "source": "Terrain",
+        "target": "Forest",
+        "kind": "subset_of"
+      },
+      {
+        "source": "Terrain",
+        "target": "Cave",
+        "kind": "subset_of"
+      },
+      {
+        "source": "Terrain",
+        "target": "Thicket",
+        "kind": "subset_of"
+      },
+      {
+        "source": "Terrain",
+        "target": "Hilltop",
+        "kind": "subset_of"
+      },
+      {
+        "source": "Terrain",
+        "target": "StreamBank",
+        "kind": "subset_of"
+      }
+    ]
+  },
+  "cross_links": [
+    {
+      "verb": "Acquire",
+      "noun": "Resource"
+    },
+    {
+      "verb": "Acquire",
+      "noun": "Tool"
+    },
+    {
+      "verb": "Consume",
+      "noun": "Edible"
+    },
+    {
+      "verb": "Evade",
+      "noun": "Hazard"
+    },
+    {
+      "verb": "Share",
+      "noun": "Edible"
+    },
+    {
+      "verb": "Share",
+      "noun": "Tool"
+    },
+    {
+      "verb": "Negotiate",
+      "noun": "Person"
+    },
+    {
+      "verb": "Greet",
+      "noun": "Person"
+    },
+    {
+      "verb": "Warn",
+      "noun": "Hazard"
+    },
+    {
+      "verb": "Warn",
+      "noun": "Threat"
+    },
+    {
+      "verb": "Reflect",
+      "noun": "Emotion"
+    },
+    {
+      "verb": "Aide",
+      "noun": "Person"
+    },
+    {
+      "verb": "Orient",
+      "noun": "Map"
+    },
+    {
+      "verb": "Inspect",
+      "noun": "Resource"
+    },
+    {
+      "verb": "Inspect",
+      "noun": "Person"
+    },
+    {
+      "verb": "Inspect",
+      "noun": "Hazard"
+    },
+    {
+      "verb": "Build",
+      "noun": "Shelter"
+    },
+    {
+      "verb": "Build",
+      "noun": "Tool"
+    },
+    {
+      "verb": "Settle",
+      "noun": "Shelter"
+    },
+    {
+      "verb": "Settle",
+      "noun": "Location"
+    },
+    {
+      "verb": "Rest",
+      "noun": "Shelter"
+    },
+    {
+      "verb": "Rest",
+      "noun": "Meadow"
+    },
+    {
+      "verb": "Rest",
+      "noun": "Cave"
+    },
+    {
+      "verb": "Survey",
+      "noun": "Location"
+    },
+    {
+      "verb": "Survey",
+      "noun": "Clue"
+    },
+    {
+      "verb": "Observe",
+      "noun": "Person"
+    },
+    {
+      "verb": "Observe",
+      "noun": "Hazard"
+    },
+    {
+      "verb": "Observe",
+      "noun": "Resource"
+    },
+    {
+      "verb": "Record",
+      "noun": "Clue"
+    },
+    {
+      "verb": "Record",
+      "noun": "Observation"
+    }
+  ],
+  "coverage": {
+    "drives_supported": {
+      "mystery": [
+        "Survey\u2192Observe\u2192Clue",
+        "Inspect\u2192Clue",
+        "Recall\u2192Clue",
+        "Record\u2192Clue"
+      ],
+      "safety": [
+        "Evade\u2192Hazard",
+        "Rest\u2192Shelter",
+        "Build\u2192Shelter",
+        "Acquire\u2192Tool",
+        "EvaluateRisk\u2192Hazard"
+      ],
+      "belonging": [
+        "Greet\u2192Person",
+        "Share\u2192Edible",
+        "Aid\u2192Person",
+        "Negotiate\u2192Person"
+      ]
+    },
+    "ontology_terms_covered": "All supplied places, tools, roles, hazards, resource types, and states appear in noun taxonomy.",
+    "primitive_family_anchors": "All verbs map to primitives: move, take, place, use, inspect, scan, say, think, wait."
+  },
+  "invariants": [
+    "No cycles in either graph (verbs or nouns).",
+    "Every decomposition_patterns.sequence references existing nodes in the same graph.",
+    "No execution details or primitives appear; this is not a plan.",
+    "Selectional constraints refer only to noun node ids from manifest.",
+    "Aliases collapse near-synonyms to reduce proliferation.",
+    "Prefer general terms; introduce scenario-specific leaves only when required by drives or activities.",
+    "Decomposition depth \u2264 3.",
+    "**Every verb node must include a `hint_anchor` with one of {move,take,place,inspect,use,scan,say,think}, unless justified by a drive.**",
+    "**Every noun node must eventually subset into either a `map_types` resource/terrain or a role/state from ontology.json.**",
+    "**Each drive has at least one verb+noun path that fulfills it.**",
+    "**Exclude verbs not supported by any activity step, ontology term, or drive.**"
+  ],
+  "qa_checks": [
+    "Topological order exists for both graphs.",
+    "\u2265 80% of activity steps can be paraphrased as paths in verbs+nouns.",
+    "Every verb argument type must be in noun manifest.",
+    "No noun orphaned from all verbs unless marked 'latent'.",
+    "Domain quotas: \u22645 verbs per domain (perception, locomotion, manipulation, social, cognitive)."
+  ]
+}

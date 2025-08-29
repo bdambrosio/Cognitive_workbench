@@ -2,61 +2,76 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Debug LLM Client",
+            "name": "Rewrite Goal (Jim, load all)",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/src/llm_client.py",
+            "program": "${workspaceFolder}/src/middle_ontology.py",
             "console": "integratedTerminal",
             "cwd": "${workspaceFolder}/src",
             "env": {
                 "PYTHONPATH": "${workspaceFolder}/src"
             },
-            "args": [],
+            "args": ["--scenario", "../scenarios/jim.yaml", "--target_character", "jim", "--ontology", "load", "--middle", "load", "--activities", "load"],
             "justMyCode": false,
             "stopOnEntry": false,
             "preLaunchTask": "setup-zenoh-environment"
         },
         {
-            "name": "Generate Activities (laTerre.yaml)",
+            "name": "Scenario Analysis (laTerre, create all)",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/src/activity.py",
+            "program": "${workspaceFolder}/src/scenario_analysis.py",
             "console": "integratedTerminal",
             "cwd": "${workspaceFolder}/src",
             "env": {
                 "PYTHONPATH": "${workspaceFolder}/src"
             },
-            "args": ["../scenarios/laTerre.yaml"],
+            "args": ["--scenario", "../scenarios/laTerre.yaml", "--character", "all", "--ontology", "create", "--middle", "create", "--activities", "create"],
             "justMyCode": false,
             "stopOnEntry": false,
             "preLaunchTask": "setup-zenoh-environment"
         },
         {
-            "name": "Generate Activities (Jim.yaml)",
+            "name": "Scenario Analysis (Jim, create all)",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/src/activity.py",
+            "program": "${workspaceFolder}/src/scenario_analysis.py",
             "console": "integratedTerminal",
             "cwd": "${workspaceFolder}/src",
             "env": {
                 "PYTHONPATH": "${workspaceFolder}/src"
             },
-            "args": ["../scenarios/jim.yaml"],
+            "args": ["--scenario", "../scenarios/jim.yaml", "--character", "all", "--ontology", "load", "--middle", "load", "--activities", "create"],
             "justMyCode": false,
             "stopOnEntry": false,
             "preLaunchTask": "setup-zenoh-environment"
         },
         {
-            "name": "Generate Activities (lost.yaml)",
+            "name": "Scenario Analysis (lost, create all)",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/src/activity.py",
+            "program": "${workspaceFolder}/src/scenario_analysis.py",
             "console": "integratedTerminal",
             "cwd": "${workspaceFolder}/src",
             "env": {
                 "PYTHONPATH": "${workspaceFolder}/src"
             },
-            "args": ["../scenarios/lost.yaml"],
+            "args": ["--scenario", "../scenarios/lost.yaml", "--character", "all", "--ontology", "create", "--middle", "create", "--activities", "create"],
+            "justMyCode": false,
+            "stopOnEntry": false,
+            "preLaunchTask": "setup-zenoh-environment"
+        },
+        {
+            "name": "Generate Middle Ontology",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/middle_ontology.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/src",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src"
+            },
+            "args": ["../scenarios/jim.yaml", "../scenarios/Jim-activity-ontology.json", "Jim"],
             "justMyCode": false,
             "stopOnEntry": false,
             "preLaunchTask": "setup-zenoh-environment"

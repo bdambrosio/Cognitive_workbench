@@ -89,6 +89,125 @@ end your response with </end>
 """
 llm_client = None
 
+MIDDLE_ONTOLOGY_TEMPLATE = prompt ="""You are constructing TWO DIRECTED ACYCLIC GRAPHS (DAGs) that form a middle-layer ontology:
+(1) a VERB graph (action frames/operators), and
+(2) a NOUN graph (entity/resource/type categories).
+These bridge from activity steps (in activities.json) to lower-level concepts WITHOUT producing executable plans.
+
+INPUTS
+-------
+# ONTOLOGY (JSON)
+{{$ontology}}
+
+# CHARACTER DRIVES
+{{$character_drives}}
+
+# MAP TYPES
+{{$map_types}}
+
+# PLAN TEMPLATE
+{{$plan_template}}
+
+GOAL
+----
+Return a compact, reusable, scenario-aware pair of DAGs that are bounded above by the ontology.json and character drives, and from below by map types and PLAN_TEMPLATE.
+- Support multi-level decomposition via "decomposition_patterns" that point to NEXT-LOWER-LEVEL TERMS (not primitives).
+- Remain acyclic so that iterative refinement or compilation can topologically traverse them later.
+- Provide selectional constraints linking verbs to compatible noun classes (typing only).
+- Are modest in size: ≈ 20–40 verb nodes and ≈ 30–60 noun nodes.
+- Are bounded in both width (breadth of categories) and height (depth of decomposition ≤ 3).
+- **Every verb node must include a `hint_anchor` field naming its central primitive family (`move`, `take`, `place`, `inspect`, `use`, `scan`, `say`, `think`). Verbs with no plausible anchor are excluded unless justified by a character drive.**
+- **Every noun node must eventually subset into either a `map_types` resource/terrain or a role/state from ontology.json. No free-floating nouns.**
+- **For each character drive, ensure at least one verb+noun path exists that plausibly fulfills it (e.g., hunger → Acquire+Edible).**
+- **Exclude verbs not supported by any activity step, ontology term, or drive.**
+
+OUTPUT (STRICT JSON ONLY; NO MARKDOWN)
+--------------------------------------
+{
+  "version": "0.4",
+  "setting_notes": "≤ 60 words about setting cues, drives, and ontology inputs shaping coverage",
+  "constraints": {
+    "verb_nodes_max": 40,
+    "noun_nodes_max": 60,
+    "edge_kinds": ["refines","composes","precondition_of","enables","equivalent_to","alias_of","incompatible_with","member_of","subset_of"],
+    "acyclic": true,
+    "max_depth": 3
+  },
+
+  "manifest": {
+    "verbs": [
+      {"id": "Acquire", "gloss": "obtain control of an entity"},
+      {"id": "Consume", "gloss": "ingest food or drink"},
+      {"id": "Negotiate", "gloss": "exchange offers socially"},
+      ...
+    ],
+    "nouns": [
+      {"id": "Edible", "gloss": "any item that can be eaten"},
+      {"id": "Tool", "gloss": "artifact usable for work"},
+      {"id": "Authority", "gloss": "person with higher status"},
+      ...
+    ]
+  },
+
+  "verbs": {
+    "nodes": [
+      {
+        "id": "Acquire",
+        "aliases": ["get","pick_up","take_possession"],
+        "args": ["$agent","$entity","$source?","$location?"],
+        "role_constraints": {"$entity": {"noun_types_any_of": ["Portable","Edible","Tool"]}},
+        "decomposition_patterns": [{"sequence":["Locate","Approach","Collect"]}],
+        "hint_anchor": "take"
+      }
+      /* … 20–40 verb nodes total … */
+    ],
+    "edges": [ ... ]
+  },
+
+  "nouns": {
+    "nodes": [ ... ],
+    "edges": [ ... ]
+  },
+
+  "cross_links": [ ... ],
+
+  "coverage": { ... },
+
+  "invariants": [
+    "No cycles in either graph (verbs or nouns).",
+    "Every decomposition_patterns.sequence references existing nodes in the same graph.",
+    "No execution details or primitives appear; this is not a plan.",
+    "Selectional constraints refer only to noun node ids from manifest.",
+    "Aliases collapse near-synonyms to reduce proliferation.",
+    "Prefer general terms; introduce scenario-specific leaves only when required by drives or activities.",
+    "Decomposition depth ≤ 3.",
+    "**Every verb node must include a `hint_anchor` with one of {move,take,place,inspect,use,scan,say,think}, unless justified by a drive.**",
+    "**Every noun node must eventually subset into either a `map_types` resource/terrain or a role/state from ontology.json.**",
+    "**Each drive has at least one verb+noun path that fulfills it.**",
+    "**Exclude verbs not supported by any activity step, ontology term, or drive.**"
+  ],
+
+  "qa_checks": [
+    "Topological order exists for both graphs.",
+    "≥ 80% of activity steps can be paraphrased as paths in verbs+nouns.",
+    "Every verb argument type must be in noun manifest.",
+    "No noun orphaned from all verbs unless marked 'latent'.",
+    "Domain quotas: ≤5 verbs per domain (perception, locomotion, manipulation, social, cognitive)."
+  ]
+}
+
+GUIDANCE
+--------
+1) STEP 1: Propose a manifest of verb and noun IDs + glosses. Use only these IDs thereafter.
+2) STEP 2: Build verbs by mining activity steps; keep them general. Collapse near-synonyms into aliases. Use drives to filter: if no active drive supports a candidate verb, exclude it.
+3) STEP 3: Build nouns from ontology affordances, map resource types, and activity objects. Ground all in manifest.
+4) Use decomposition_patterns ONLY to point to lower-level nodes (verbs→verbs, nouns→nouns). No primitives.
+5) Keep DAGs shallow (≤3 layers). Prefer “refines/subset_of” for taxonomy; “composes/precondition_of” for procedural relation.
+6) Ensure each drive is supported by at least one verb path (e.g., hunger→Acquire+Consume, safety→DetectThreat+RespondToThreat, social→Greet+Negotiate).
+7) Output STRICTLY in JSON format above.
+
+"""
+
 ACTIVITIES_TEMPLATE = """You are generating a comprehensive activity list for a character. 
 CHARACTER: 
 {{$character}}
@@ -127,11 +246,22 @@ Each Activity should conform to this schema:
   "habit": 0.0
 }
 
-The following ontology must be used to fill in the details of activities:
-ONTOLOGY: 
+The following ontologies must be used to fill in the details of activities:
+- ONTOLOGY: 
 {{$ontology}}
 ##
+- MIDDLE ONTOLOGY:
+{{$middle_ontology}}
+##
 
+- BASE TYPES:
+{{$map_types}}
+
+- BASE ACTIONS:
+{{$plan_template}}
+##
+
+Use 'higher-level' nouns and verbs from the middle ontology to fill in the details of activities when possible.
 Include self-care actions that remediate physiological needs (e.g. eating reduces hunger, rest reduces fatigue, injury or sickness). Make sure to specify which states each activity addresses in the "states_addressed" field.
 
 #Characters you can interact with (if any):
@@ -153,6 +283,40 @@ Generate steps that can serve as achievable planning goals. Each step should:
 - Consider the character's current state when designing activities - hungry characters should have access to hunger-reducing activities
 
 Do not include any other text, introductory, explanatory, markdown, etc.
+End with </end>.
+"""
+
+REWRITE_TEMPLATE = """You are rewriting a single activity step using the middle-layer ontology.
+
+INPUTS
+------
+#Activity name:
+{{$activity_name}}
+
+#All steps (for context on pre/post conditions):
+{{$activity_steps}}
+
+#Step to rewrite:
+{{$step_to_rewrite}}
+
+#Ontology (verbs + nouns, including decomposition patterns):
+{{$middle_ontology}}
+
+TASK
+----
+Rewrite the given step by replacing verbs and nouns with their next-level decompositions from the ontology.
+- Only expand downward (more specific). Do not generalize or invent.
+- Reuse terms that are already leaves.
+- Produce exactly one rewritten step string.
+- Indicate whether ALL verbs and nouns in the rewritten step are leaves.
+
+OUTPUT (strict JSON only)
+-------------------------
+{
+  "rewritten_step": "<string>",
+  "all_leaves": true | false
+}
+
 End with </end>.
 """
 
@@ -188,7 +352,7 @@ Output: only valid JSON – no prose, no code fences.
 
 Meta-spec (strictly observe these rules in your output):
 {
-  "actions": ["move","say","think","take","place","inspect","use","scan","while","if"],
+  "actions": ["move","say","think","take","place", "wait", "inspect","use","scan","while","if"],
   "conditions": [
     "near","notnear","can_see","cant_see","has_item","hasnt_item","at_location","notat_location","believes","notbelieves"
   ],
@@ -198,6 +362,7 @@ Meta-spec (strictly observe these rules in your output):
     "think": ["type","value"],
     "take": ["type","target"],
     "place": ["type","target"],
+    "wait": ["type","condition"],
     "inspect": ["type","target","reason"],
     "use": ["type","target","reason"],
     "scan": ["type","target","out"],
@@ -215,11 +380,12 @@ Meta-spec (strictly observe these rules in your output):
     { "type": "move", "target": "…"},
     { "type": "say", "target": "…", "value": "…" },
     { "type": "scan", "target": "resource_type", "out": "variable_name to assign the scan result to" },
-    { "type": "wait", "condition": "condition_name", "target": "condition_target" },
+    { "type": "wait", "condition": "..." },
     { "type": "think", "value": "…" },
     { "type": "take", "target": "…"},
     { "type": "inspect", "target": "…", "reason": "…"},
     { "type": "use", "target": "…", "reason": "…"},
+    { "type": "place", "target": "…"},
     { "type": "while", "condition": "…" , "body": [ /* steps */ ]},
     { "type": "if", "condition": "…", "then": [ /* steps */ ], "else": [ /* steps */ ] }
   ]
@@ -262,16 +428,16 @@ Only dicts of the types below are allowed for the condition of while and if. Con
  - "can_see": {"type": "can_see", "target": <character_name> or "$variable_name"} is for checking if the character can see a character.
  - "has_item": {"type": "has_item", "target": <resource_name> or "$variable_name"} is for checking if the character has a resource in their inventory.
  - "at_location": {"type": "at_location", "target": <location_name>} is for checking if the character is at a location.
- - "believes": {"type": "believes", "target": <character_name>} is for checking if the character believes something about another character.
+ - "believes": {"type": "believes", "target": <statement>} is for checking if the character believes a statement.
  - "notnear": {"type": "notnear", "target": <resource name> or <character_name> or "$variable_name"} is for checking if the character is not near a resource or character.
  - "cant_see": {"type": "cant_see", "target": <character_name> or "$variable_name"} is for checking if the character cannot see a character.
  - "hasnt_item": {"type": "hasnt_item", "target": <resource_name> or "$variable_name"} is for checking if the character does not have a resource in their inventory.
  - "notat_location": {"type": "notat_location", "target": <location_name> or "$variable_name"} is for checking if the character is not at a location.
- - "notbelieves": {"type": "notbelieves", "target": <character_name>} is for checking if the character does not believe something about another character.
+ - "notbelieves": {"type": "notbelieves", "target": <statement>} is for checking if the character does not believe a statement.
  - "bound": {"type": "bound", "target": "$variable_name"} is true when the variable has a binding (not None/empty) in the current plan.
  - "notbound": {"type": "notbound", "target": "$variable_name"} is true when the variable has no binding in the current plan.
 
-outside a while or if condition, "type" can take the values "say", "move", "think", "take", "place", "inspect", "use", or "scan":
+outside a while, if, or wait condition, "type" can take the values "say", "move", "think", "take", "place", "inspect", "use", or "scan":
  - "move": { "type": "move", "target": "cardinal_direction" or 'resource or character name'} 
      Move one step in one of the 8 cardinal directions or in the direction of a resource or character.
     You can only move in the direction of a resource, character, or terrain type if you can see it.
@@ -280,7 +446,7 @@ outside a while or if condition, "type" can take the values "say", "move", "thin
      For a 'say' act, speak only for yourself, and do not include any other introductory, explanatory, discursive, or formatting text in your response.
  - "scan": { "type": "scan", "target": "resource_type", "out": "variable_name to assign the scan result to" }
      Scan a resource type to find the nearest matching instance in your current situation.
- - "wait": { "type": "wait", "condition": "condition_name", "target": "condition_target" }
+ - "wait": { "type": "wait", "condition": "..." }
      Wait for a condition to be true. The condition must be one of the Condition actions listed earlier.
  - "think": { "type": "think", "value": "text to think about" } 
      Think about a topic or question, attempting to derive new information, conclusions, or decisions from who you are and what you already explicitly know
