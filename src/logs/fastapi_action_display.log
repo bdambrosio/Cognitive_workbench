@@ -5165,3 +5165,185 @@ SystemExit: 0
 2025-08-27 19:29:12,712 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T09:48:00+00:00
 2025-08-27 19:29:40,207 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T09:52:00+00:00
 2025-08-27 19:30:05,983 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T09:56:00+00:00
+2025-08-27 19:30:34,005 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T10:00:00+00:00
+2025-08-27 19:31:01,103 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T10:10:00+00:00
+2025-08-27 19:31:44,495 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T10:14:00+00:00
+2025-08-27 19:32:13,963 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T10:18:00+00:00
+2025-08-27 19:32:40,720 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T10:23:00+00:00
+2025-08-27 19:33:07,707 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T10:28:00+00:00
+2025-08-27 19:33:34,249 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T10:32:00+00:00
+2025-08-27 19:34:02,215 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T10:34:00+00:00
+2025-08-27 19:34:28,160 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T10:38:00+00:00
+2025-08-27 19:34:55,995 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T10:48:00+00:00
+2025-08-27 19:35:28,810 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T10:58:00+00:00
+2025-08-27 19:36:12,357 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T11:08:00+00:00
+2025-08-27 19:36:56,010 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T11:18:00+00:00
+2025-08-27 19:37:37,171 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T11:28:00+00:00
+2025-08-27 19:37:55,541 - __main__ - INFO - 🛑 Stop command received in FastAPI
+2025-08-27 19:37:55,541 - __main__ - INFO - 🛑 Stop command published to map node
+2025-08-27 19:37:55,545 - __main__ - INFO - 🔄 Turn control update from map node: mode=step
+2025-08-27 19:37:55,546 - __main__ - INFO - 📤 Sending turn mode update: mode=step
+2025-08-27 19:38:11,693 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T11:38:00+00:00
+2025-08-28 08:45:39,832 - __main__ - INFO - 🔧 Debug mode enabled for FastAPI Action Display
+2025-08-28 08:45:46,466 - __main__ - INFO - 📤 No simulation time available for new WebSocket connection
+2025-08-28 08:45:46,486 - __main__ - INFO - 📤 No simulation time available for new WebSocket connection
+2025-08-28 08:45:46,750 - __main__ - INFO - 🔄 Turn control update from map node: mode=step
+2025-08-28 08:45:46,751 - __main__ - INFO - 📤 Sending turn mode update: mode=step
+2025-08-28 08:45:54,822 - __main__ - INFO - 🚀 System ready signal received: 4 characters active
+2025-08-28 08:45:54,823 - __main__ - INFO - 📤 No simulation time available to send to WebSocket clients
+2025-08-28 08:48:57,665 - __main__ - INFO - 🔄 Turn control update from map node: mode=step
+2025-08-28 08:48:57,666 - __main__ - INFO - 📤 Sending turn mode update: mode=step
+2025-08-28 08:49:25,831 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T06:35:00+00:00
+2025-08-28 09:14:44,112 - __main__ - INFO - 🔄 Turn control update from map node: mode=step
+2025-08-28 09:14:44,114 - __main__ - INFO - 📤 Sending turn mode update: mode=step
+2025-08-28 09:14:45,069 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T06:38:00+00:00
+2025-08-28 09:14:48,493 - __main__ - INFO - 🏃 Run command received in FastAPI
+2025-08-28 09:14:48,494 - __main__ - INFO - 🏃 Run command published to map node
+2025-08-28 09:14:48,496 - __main__ - INFO - 🔄 Turn control update from map node: mode=run
+2025-08-28 09:14:48,496 - __main__ - INFO - 📤 Sending turn mode update: mode=run
+2025-08-28 09:14:49,414 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T06:40:00+00:00
+2025-08-28 09:14:50,394 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T06:42:00+00:00
+2025-08-28 09:14:51,405 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T06:44:00+00:00
+2025-08-28 09:14:52,417 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T06:46:00+00:00
+2025-08-28 09:16:52,368 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T06:49:00+00:00
+2025-08-28 09:17:17,400 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T06:52:00+00:00
+2025-08-28 09:17:23,021 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T06:56:00+00:00
+2025-08-28 09:17:45,555 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T06:59:00+00:00
+2025-08-28 09:18:07,775 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T07:02:00+00:00
+2025-08-28 09:18:10,614 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T07:04:00+00:00
+2025-08-28 09:18:18,105 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T07:06:00+00:00
+2025-08-28 09:18:39,751 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T07:08:00+00:00
+2025-08-28 09:18:46,275 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T07:10:00+00:00
+2025-08-28 09:19:06,871 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T07:13:00+00:00
+2025-08-28 09:19:08,448 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T07:15:00+00:00
+2025-08-28 09:19:10,154 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T07:17:00+00:00
+2025-08-28 09:19:17,538 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T07:20:00+00:00
+2025-08-28 09:19:41,066 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T07:22:00+00:00
+2025-08-28 09:19:44,988 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T07:24:00+00:00
+2025-08-28 09:19:50,585 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T07:27:00+00:00
+2025-08-28 09:20:28,462 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T07:29:00+00:00
+2025-08-28 09:20:33,188 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T07:34:00+00:00
+2025-08-28 09:20:51,906 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T07:38:00+00:00
+2025-08-28 09:20:53,848 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T07:40:00+00:00
+2025-08-28 09:21:00,054 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T07:43:00+00:00
+2025-08-28 09:21:17,411 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T07:46:00+00:00
+2025-08-28 09:21:44,130 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T07:50:00+00:00
+2025-08-28 09:21:45,549 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T07:53:00+00:00
+2025-08-28 09:21:52,533 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T07:58:00+00:00
+2025-08-28 09:22:12,695 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T08:02:00+00:00
+2025-08-28 09:22:14,688 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T08:04:00+00:00
+2025-08-28 09:22:20,233 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T08:07:00+00:00
+2025-08-28 09:22:40,171 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T08:09:00+00:00
+2025-08-28 09:22:41,629 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T08:11:00+00:00
+2025-08-28 09:22:45,929 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T08:15:00+00:00
+2025-08-28 09:23:14,393 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T08:17:00+00:00
+2025-08-28 09:23:18,145 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T08:20:00+00:00
+2025-08-28 09:23:20,308 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T08:24:00+00:00
+2025-08-28 09:23:22,946 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T08:28:00+00:00
+2025-08-28 09:23:25,043 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T08:30:00+00:00
+2025-08-28 09:23:30,878 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T08:34:00+00:00
+2025-08-28 09:23:58,166 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T08:39:00+00:00
+2025-08-28 09:24:20,306 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T08:43:00+00:00
+2025-08-28 09:24:24,111 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T08:47:00+00:00
+2025-08-28 09:24:25,135 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T08:49:00+00:00
+2025-08-28 09:24:26,139 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T08:53:00+00:00
+2025-08-28 09:24:27,525 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T08:56:00+00:00
+2025-08-28 09:24:33,402 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T08:58:00+00:00
+2025-08-28 09:24:53,938 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T09:01:00+00:00
+2025-08-28 09:24:54,951 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T09:03:00+00:00
+2025-08-28 09:24:55,964 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T09:05:00+00:00
+2025-08-28 09:25:00,907 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T09:10:00+00:00
+2025-08-28 09:25:30,552 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T09:12:00+00:00
+2025-08-28 09:25:31,574 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T09:15:00+00:00
+2025-08-28 09:25:32,566 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T09:19:00+00:00
+2025-08-28 09:25:36,930 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T09:23:00+00:00
+2025-08-28 09:25:42,406 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T09:26:00+00:00
+2025-08-28 09:26:09,729 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T09:28:00+00:00
+2025-08-28 09:26:10,741 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T09:30:00+00:00
+2025-08-28 09:26:11,753 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T09:32:00+00:00
+2025-08-28 09:26:12,765 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T09:34:00+00:00
+2025-08-28 09:26:20,386 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T09:36:00+00:00
+2025-08-28 09:26:56,938 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T09:38:00+00:00
+2025-08-28 09:26:58,047 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T09:40:00+00:00
+2025-08-28 09:27:06,201 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T09:45:00+00:00
+2025-08-28 09:27:25,287 - __main__ - INFO - 🔄 Turn control update from map node: mode=step
+2025-08-28 09:27:25,287 - __main__ - INFO - 📤 Sending turn mode update: mode=step
+2025-08-28 09:27:25,288 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T09:47:00+00:00
+2025-08-28 14:30:30,089 - __main__ - INFO - 🔧 Debug mode enabled for FastAPI Action Display
+2025-08-28 14:30:31,327 - __main__ - WARNING - Failed to query map_node for initial time: 'builtins.Reply' object has no attribute 'payload'
+2025-08-28 14:30:31,335 - __main__ - INFO - 📤 No simulation time available for new WebSocket connection
+2025-08-28 14:30:38,432 - __main__ - INFO - 🚀 System ready signal received: 1 characters active
+2025-08-28 14:30:38,435 - __main__ - INFO - 📤 No simulation time available to send to WebSocket clients
+2025-08-28 14:31:01,035 - __main__ - INFO - 🔧 Debug mode enabled for FastAPI Action Display
+2025-08-28 14:31:02,232 - __main__ - INFO - 📤 No simulation time available for new WebSocket connection
+2025-08-28 14:31:04,461 - __main__ - INFO - 🔄 Turn control update from map node: mode=step
+2025-08-28 14:31:04,462 - __main__ - INFO - 📤 Sending turn mode update: mode=step
+2025-08-28 14:31:09,387 - __main__ - INFO - 🚀 System ready signal received: 1 characters active
+2025-08-28 14:31:09,389 - __main__ - INFO - 📤 No simulation time available to send to WebSocket clients
+2025-08-28 14:32:09,204 - __main__ - INFO - 🔄 Turn control update from map node: mode=step
+2025-08-28 14:32:09,205 - __main__ - INFO - 📤 Sending turn mode update: mode=step
+2025-08-28 16:08:58,374 - __main__ - INFO - 🔧 Debug mode enabled for FastAPI Action Display
+2025-08-28 16:08:59,629 - __main__ - INFO - 📤 No simulation time available for new WebSocket connection
+2025-08-28 16:09:01,639 - __main__ - INFO - 🔄 Turn control update from map node: mode=step
+2025-08-28 16:09:01,639 - __main__ - INFO - 📤 Sending turn mode update: mode=step
+2025-08-28 16:09:06,512 - __main__ - INFO - 🚀 System ready signal received: 1 characters active
+2025-08-28 16:09:06,513 - __main__ - INFO - 📤 No simulation time available to send to WebSocket clients
+2025-08-28 16:12:41,378 - __main__ - INFO - 🔄 Turn control update from map node: mode=step
+2025-08-28 16:12:41,378 - __main__ - INFO - 📤 Sending turn mode update: mode=step
+2025-08-28 16:13:08,585 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T06:40:00+00:00
+2025-08-28 16:56:30,952 - __main__ - INFO - 🔧 Debug mode enabled for FastAPI Action Display
+2025-08-28 16:56:32,184 - __main__ - INFO - 📤 No simulation time available for new WebSocket connection
+2025-08-28 16:56:34,324 - __main__ - INFO - 🔄 Turn control update from map node: mode=step
+2025-08-28 16:56:34,325 - __main__ - INFO - 📤 Sending turn mode update: mode=step
+2025-08-28 16:56:39,170 - __main__ - INFO - 🚀 System ready signal received: 1 characters active
+2025-08-28 16:56:39,172 - __main__ - INFO - 📤 No simulation time available to send to WebSocket clients
+2025-08-28 16:57:30,048 - __main__ - INFO - 🔄 Turn control update from map node: mode=step
+2025-08-28 16:57:30,049 - __main__ - INFO - 📤 Sending turn mode update: mode=step
+2025-08-28 16:57:42,057 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T06:33:00+00:00
+2025-08-28 16:57:55,752 - __main__ - INFO - 🔄 Turn control update from map node: mode=step
+2025-08-28 16:57:55,752 - __main__ - INFO - 📤 Sending turn mode update: mode=step
+2025-08-28 16:57:56,268 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T06:43:00+00:00
+2025-08-28 16:57:56,270 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T06:53:00+00:00
+2025-08-28 16:58:08,517 - __main__ - INFO - 🔄 Turn control update from map node: mode=step
+2025-08-28 16:58:08,517 - __main__ - INFO - 📤 Sending turn mode update: mode=step
+2025-08-28 16:58:09,382 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T07:03:00+00:00
+2025-08-28 16:58:09,384 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T07:13:00+00:00
+2025-08-28 16:59:02,178 - __main__ - INFO - 🔄 Turn control update from map node: mode=step
+2025-08-28 16:59:02,179 - __main__ - INFO - 📤 Sending turn mode update: mode=step
+2025-08-28 18:07:59,093 - __main__ - INFO - 🔧 Debug mode enabled for FastAPI Action Display
+2025-08-28 18:08:00,289 - __main__ - INFO - 📤 No simulation time available for new WebSocket connection
+2025-08-28 18:08:03,717 - __main__ - INFO - 🔄 Turn control update from map node: mode=step
+2025-08-28 18:08:03,718 - __main__ - INFO - 📤 Sending turn mode update: mode=step
+2025-08-28 18:08:08,278 - __main__ - INFO - 🚀 System ready signal received: 1 characters active
+2025-08-28 18:08:08,279 - __main__ - INFO - 📤 No simulation time available to send to WebSocket clients
+2025-08-28 18:08:15,288 - __main__ - INFO - 🔄 Turn control update from map node: mode=step
+2025-08-28 18:08:15,289 - __main__ - INFO - 📤 Sending turn mode update: mode=step
+2025-08-28 18:08:26,720 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T06:35:00+00:00
+2025-08-28 18:08:31,711 - __main__ - INFO - 🔄 Turn control update from map node: mode=step
+2025-08-28 18:08:31,711 - __main__ - INFO - 📤 Sending turn mode update: mode=step
+2025-08-28 18:55:40,518 - __main__ - INFO - 🔧 Debug mode enabled for FastAPI Action Display
+2025-08-28 18:55:41,722 - __main__ - INFO - 📤 No simulation time available for new WebSocket connection
+2025-08-28 18:55:44,812 - __main__ - INFO - 🔄 Turn control update from map node: mode=step
+2025-08-28 18:55:44,812 - __main__ - INFO - 📤 Sending turn mode update: mode=step
+2025-08-28 18:55:49,667 - __main__ - INFO - 🚀 System ready signal received: 1 characters active
+2025-08-28 18:55:49,668 - __main__ - INFO - 📤 No simulation time available to send to WebSocket clients
+2025-08-28 18:56:00,562 - __main__ - INFO - 🔄 Turn control update from map node: mode=step
+2025-08-28 18:56:00,562 - __main__ - INFO - 📤 Sending turn mode update: mode=step
+2025-08-28 18:58:35,615 - __main__ - INFO - 🔧 Debug mode enabled for FastAPI Action Display
+2025-08-28 18:58:36,812 - __main__ - INFO - 📤 No simulation time available for new WebSocket connection
+2025-08-28 18:58:38,994 - __main__ - INFO - 🔄 Turn control update from map node: mode=step
+2025-08-28 18:58:38,994 - __main__ - INFO - 📤 Sending turn mode update: mode=step
+2025-08-28 18:58:43,657 - __main__ - INFO - 🚀 System ready signal received: 1 characters active
+2025-08-28 18:58:43,659 - __main__ - INFO - 📤 No simulation time available to send to WebSocket clients
+2025-08-28 18:59:00,281 - __main__ - INFO - 🔄 Turn control update from map node: mode=step
+2025-08-28 18:59:00,281 - __main__ - INFO - 📤 Sending turn mode update: mode=step
+2025-08-28 19:00:48,331 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T06:35:00+00:00
+2025-08-28 19:00:55,554 - __main__ - INFO - 🔄 Turn control update from map node: mode=step
+2025-08-28 19:00:55,554 - __main__ - INFO - 📤 Sending turn mode update: mode=step
+2025-08-28 19:00:55,940 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T06:37:00+00:00
+2025-08-28 19:01:00,179 - __main__ - INFO - 🔄 Turn control update from map node: mode=step
+2025-08-28 19:01:00,180 - __main__ - INFO - 📤 Sending turn mode update: mode=step
+2025-08-28 19:02:28,762 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T06:41:00+00:00
+2025-08-28 19:02:39,926 - __main__ - INFO - 🔄 Turn control update from map node: mode=step
+2025-08-28 19:02:39,926 - __main__ - INFO - 📤 Sending turn mode update: mode=step
+2025-08-28 19:02:44,957 - __main__ - INFO - ⏰ Time advanced: 2023-06-15T06:51:00+00:00

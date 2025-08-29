@@ -1,0 +1,195 @@
+{
+    "version": "0.1",
+    "setting_notes": "Survival in a natural terrain: dense forest, meadow, caves, water sources, unknown social contacts, portable tools, physiological and cognitive needs. Actions blend foraging, self-care, vigilance, and core social primitives for solo/encounter scenarios.",
+    "constraints": {
+      "n_nodes_max": 40,
+      "allowed_primitives": ["move", "say", "think", "take", "place", "inspect", "use", "scan", "while", "if"],
+      "n_edges_max": 160
+    },
+    "types": {
+      "node_kinds": [
+        "operator",
+        "affordance",
+        "role",
+        "resource_class",
+        "social_act",
+        "motion",
+        "perception",
+        "manipulation",
+        "cognitive"
+      ],
+      "edge_kinds": [
+        "refines",
+        "composes",
+        "enables",
+        "precondition_of",
+        "equivalent_to",
+        "alias_of",
+        "incompatible_with"
+      ]
+    },
+    "nodes": [
+      {
+        "id": "NavigateTo",
+        "kind": "motion",
+        "aliases": ["go_to", "travel_to", "approach"],
+        "args": ["$agent", "$location_or_entity"],
+        "bindings": {
+          "requires": ["known($location_or_entity) OR discoverable_by(scan{filter:move_target})"],
+          "yields": ["at($agent,$location_or_entity) OR near($agent,$location_or_entity)"]
+        },
+        "primitive_patterns": [
+          {
+            "seq": ["scan?", "while", "move"],
+            "notes": "while not near($location_or_entity), move toward; scan optional"
+          }
+        ],
+        "affordance_hints": ["navigable"],
+        "applicability": ["survival", "urban", "exploration"]
+      },
+      {
+        "id": "ScanFor",
+        "kind": "perception",
+        "aliases": ["search_for", "look_for", "survey"],
+        "args": ["$agent", "$resource_type"],
+        "bindings": {
+          "requires": ["known($resource_type)"],
+          "yields": ["bound($variable) := nearest($resource_type)"]
+        },
+        "primitive_patterns": [
+          {
+            "seq": ["scan"],
+            "notes": "scan returns nearest $resource_type binding"
+          }
+        ],
+        "affordance_hints": ["visible", "detectable"],
+        "applicability": ["survival", "urban", "workplace"]
+      },
+      {
+        "id": "Acquire",
+        "kind": "operator",
+        "aliases": ["get", "pick_up", "take_possession"],
+        "args": ["$agent", "$entity"],
+        "bindings": {
+          "requires": ["near($entity) OR discoverable_by(scan{filter:takeable})"],
+          "yields": ["has($agent,$entity)"]
+        },
+        "primitive_patterns": [
+          {
+            "seq": ["scan?", "while", "move", "take"],
+            "notes": "scan/move if not near"
+          }
+        ],
+        "affordance_hints": ["takeable", "portable"],
+        "applicability": ["survival", "urban", "workplace", "domestic"]
+      },
+      {
+        "id": "Consume",
+        "kind": "operator",
+        "aliases": ["eat", "drink", "ingest"],
+        "args": ["$agent", "$consumable"],
+        "bindings": {
+          "requires": ["has($agent,$consumable) OR (near($consumable) AND takeable($consumable))"],
+          "yields": ["deplete($consumable)", "change_state($agent:hunger/thirst)"]
+        },
+        "primitive_patterns": [
+          {
+            "seq": ["while?", "move?", "take?", "use"],
+            "notes": "may include acquire step if not possessed"
+          }
+        ],
+        "affordance_hints": ["edible", "drinkable"],
+        "applicability": ["survival", "domestic"]
+      },
+      {
+        "id": "Inspect",
+        "kind": "perception",
+        "aliases": ["examine", "check", "verify"],
+        "args": ["$agent", "$entity", "$aspect"],
+        "bindings": {
+          "requires": ["near($entity)"],
+          "yields": ["knows($agent,$aspect)"]
+        },
+        "primitive_patterns": [
+          {
+            "seq": ["while?", "move?", "inspect"],
+            "notes": "approach if needed"
+          }
+        ],
+        "affordance_hints": ["inspectable"],
+        "applicability": ["survival", "urban", "maintenance"]
+      },
+      {
+        "id": "Use",
+        "kind": "operator",
+        "aliases": ["employ", "apply", "activate"],
+        "args": ["$agent", "$tool_or_resource", "$purpose"],
+        "bindings": {
+          "requires": ["has($agent,$tool_or_resource) OR near($tool_or_resource)"],
+          "yields": ["effect($purpose)"]
+        },
+        "primitive_patterns": [
+          {
+            "seq": ["while?", "move?", "take?", "use"],
+            "notes": "optionally acquire if needed"
+          }
+        ],
+        "affordance_hints": ["usable", "tool"],
+        "applicability": ["survival", "repair", "urban", "workplace"]
+      },
+      {
+        "id": "Place",
+        "kind": "manipulation",
+        "aliases": ["put_down", "deposit"],
+        "args": ["$agent", "$entity", "$surface?"],
+        "bindings": {
+          "requires": ["has($agent,$entity)", "at($agent,$surface)?"],
+          "yields": ["at($entity,$surface OR $agent_location)"]
+        },
+        "primitive_patterns": [
+          {
+            "seq": ["while?", "move?", "place"],
+            "notes": "optionally move to surface"
+          }
+        ],
+        "affordance_hints": ["placeable", "container", "surface"],
+        "applicability": ["survival", "domestic", "urban"]
+      },
+      {
+        "id": "Prepare",
+        "kind": "manipulation",
+        "aliases": ["ready", "assemble", "set_up"],
+        "args": ["$agent", "$items", "$purpose"],
+        "bindings": {
+          "requires": ["has($agent,$items) OR near($items)"],
+          "yields": ["usable($items,$purpose)"]
+        },
+        "primitive_patterns": [
+          {
+            "seq": ["use"],
+            "notes": "represents any preparation or assembly"
+          }
+        ],
+        "affordance_hints": ["preparable"],
+        "applicability": ["survival", "urban", "workplace"]
+      },
+      {
+        "id": "Store",
+        "kind": "operator",
+        "aliases": ["stow", "pack"],
+        "args": ["$agent", "$item", "$container"],
+        "bindings": {
+          "requires": ["has($agent,$item)", "has($agent,$container)"],
+          "yields": ["in($item,$container)"]
+        },
+        "primitive_patterns": [
+          {
+            "seq": ["while?", "move?", "place"],
+            "notes": "put item in container"
+          }
+        ],
+        "affordance_hints": ["storable", "container"],
+        "applicability": ["survival", "urban", "travel", "domestic"]
+      }
+    ]
+  }

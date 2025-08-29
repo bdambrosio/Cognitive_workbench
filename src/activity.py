@@ -18,6 +18,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from Messages import SystemMessage
 from utils import hash_utils
 from utils.state_utils import calculate_state_activity_alignment, get_known_states
+from templates import ONTOLOGY_TEMPLATE, MIDDLE_ONTOLOGY_TEMPLATE, ACTIVITIES_TEMPLATE, PLAN_TEMPLATE
 
 # Type checking imports
 from typing import TYPE_CHECKING
@@ -129,7 +130,7 @@ def create_ontology(context, character_name, character, character_drives, other_
         print(f'❌ Failed to get ontology: {response}')
         return None
 
-def create_activities(context, character_name, character, character_drives, other_characters, ontology):
+def create_activities(context, character_name, character, character_drives, other_characters, ontology, middle_ontology):
 
     other_characters_str = ''
     for other_character_name, other_character_desc in other_characters.items():
@@ -157,6 +158,8 @@ def create_activities(context, character_name, character, character_drives, othe
                                    "states": get_known_states(),
                                    "other_characters": other_characters_str, 
                                    "ontology": json.dumps(ontology, indent=2),
+                                   "middle_ontology": json.dumps(middle_ontology, indent=2),
+                                   "plan_template": PLAN_TEMPLATE,
                                    "map_types": map_types_str,
                                    "setting": context},
                     [SystemMessage(content=ACTIVITIES_TEMPLATE)],
@@ -635,20 +638,40 @@ End with </end>.
         """Final scoring and ranking"""
         for activity in candidates:
             # Weighted combination of scores
-            activity['final_score'] = (
-                activity['importance'] * 0.30 +           # Base importance
-                activity['habit'] * 0.15 +                # Habit strength  
-                activity['alignment_score']['drive'] * 0.30 +          # Drive alignment
-                activity['alignment_score']['consistency'] * 0.20 +          # Situational fit
-                calculate_state_activity_alignment(activity, situation.get('character_state')) * 0.05 +  # State alignment
-                0.05 if 'social' in activity['tags'] else 0.00     # Social stuff is important!
-            )
+            importance_w = activity['importance'] * 0.30
+            habit_w = activity['habit'] * 0.15
+            drive_w = activity['alignment_score']['drive'] * 0.30
+            consistency_w = activity['alignment_score']['consistency'] * 0.20
+            state_align_raw = calculate_state_activity_alignment(activity, situation.get('character_state'))
+            state_w = state_align_raw * 0.05
+            social_w = 0.05 if 'social' in activity.get('tags', []) else 0.00
+            activity['final_score'] = importance_w + habit_w + drive_w + consistency_w + state_w + social_w
+            # Attach components for debugging
+            activity['score_components'] = {
+                'importance_w': round(importance_w, 3),
+                'habit_w': round(habit_w, 3),
+                'drive_w': round(drive_w, 3),
+                'consistency_w': round(consistency_w, 3),
+                'state_align_raw': round(state_align_raw, 3) if isinstance(state_align_raw, (int, float)) else state_align_raw,
+                'state_w': round(state_w, 3),
+                'social_w': round(social_w, 3),
+            }
         
         # Sort by final score
         ranked = sorted(candidates, key=lambda a: a['final_score'], reverse=True)
-        
-        # Return top choice, or None if no good candidates
-        return ranked[0] if ranked and ranked[0]['final_score'] > 0.3 else None
+        if not ranked:
+            return None
+        best = ranked[0]
+        # Log the components for the best candidate for transparency
+        try:
+            logger.info(
+                f"Best activity: {best.get('name')} | final_score={best.get('final_score'):.3f} | "
+                f"components={best.get('score_components')}"
+            )
+        except Exception:
+            pass
+        # Never reject the best activity; return it even if the score is low
+        return best
     
     def _summarize_resources(self, situation):
         """Helper to summarize visible resources for LLM"""
@@ -1009,131 +1032,3 @@ def run_activity_selection(character, situation, time_info, activities):
         print("No suitable activity found - falling back to default behavior")
         return manager.get_default_activity(character, situation)
 
-def main():
-    global map_types
-    parser = argparse.ArgumentParser(description='Generate activities for characters in a scenario')
-    parser.add_argument('scenario', help='Path to scenario YAML file')
-    args = parser.parse_args()
-    
-    # Load scenario file
-    scenario = load_scenario(args.scenario)
-    if not scenario:
-        return
-    
-    # Get setting from scenario (default to empty string if not present)
-    setting = scenario.get('setting', '')
-    if not setting:
-        print("⚠️  No 'setting' parameter found in scenario file")
-        setting = "modern era, western, moderate climate"
-    
-    # Get characters from scenario
-    characters = scenario.get('characters', {})
-    if not characters:
-        print("❌ No characters found in scenario file")
-        return
-    
-    print(f"📖 Processing scenario: {args.scenario}")
-    print(f"🌍 Setting: {setting}")
-    print(f"👥 Characters: {', '.join(characters.keys())}")
-    
-    # Initialize LLM client
-    global llm_client
-    config = zenoh.Config()
-    session = zenoh.open(config)
-    llm_client = ZenohLLMClient(service_timeout=240.0)
-    
-        # Launch map node (required for situation awareness)
-    try:
-        map_args = [sys.executable, 'map_node.py']
-        map_file = scenario.get('map', None)
-        if map_file:
-            # Decision on reuse/new world is handled early in main()
-            world_name = map_file.replace('.py', '')
-            map_args.extend(['-m', map_file])
-        # Propagate optional debug flag to disable map turn timeouts
-        env = os.environ.copy()
-        if env.get('CWB_DEBUG', ''):
-            logger.info('Debug mode enabled via CWB_DEBUG - map turn timeout will be disabled')
-        map_process = subprocess.Popen(map_args, env=env)
-        shared_processes.append(map_process)
-        logger.info(f'✅ Map Node launched' + (f' with map: {map_file}' if map_file else ''))
-            
-        # Wait for map node to be ready (check for initialization message)
-        logger.info('⏳ Waiting for Map Node to initialize...')
-        time.sleep(5)  # Give map node time to start up
-    except Exception as e:
-        logger.error(f'❌ Failed to launch Map Node: {e}')
-
-    while not map_types:
-        for reply in session.get("cognitive/map/types", timeout=25.0):
-            if reply.ok:
-                data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
-                if data.get('success'):
-                    map_types = data
-                    break
-    if not map_types:
-        logger.error(f"❌ Failed to get map types")
-        return
-    
-    # Get scenario directory for output files
-    scenario_dir = os.path.dirname(args.scenario)
-    
-    # Process each character
-    for character_name, character_data in characters.items():
-        print(f"\n🎭 Processing character: {character_name}")
-        
-        # Skip manual characters
-        if character_data.get('manual', False):
-            print(f"⏭️  Skipping manual character: {character_name}")
-            continue
-        
-        # Get character description
-        character_desc = character_data.get('character', '') + '\n' + character_data.get('status', '')
-        character_drives = character_data.get('drives', [])
-        if not character_desc:
-            print(f"⚠️  No character description for {character_name}, skipping")
-            continue
-        
-        # Get ontology
-        print(f"🔍 Getting ontology for {character_name}...")
-        ontology = create_ontology(setting, character_name, character_desc, character_drives, characters)
-        if not ontology:
-            print(f"❌ Failed to get ontology for {character_name}, skipping")
-            continue
-        # Save ontology to file
-        save_ontology(character_name, ontology, scenario_dir)   
-        
-        
-        # Get activities
-        print(f"🎯 Getting activities for {character_name}...")
-        activities = create_activities(setting, character_name, character_desc, character_drives, characters, ontology)
-        if not activities:
-            print(f"❌ Failed to get activities for {character_name}, skipping")
-            continue
-        
-        # Save activities to file
-        save_activities(character_name, activities, scenario_dir)
-    
-    print(f"\n✅ Finished processing scenario: {args.scenario}")
-
-if __name__ == "__main__":
-    shared_processes = []
-    try:
-        llm_cmd = [sys.executable, 'llm_service_node.py', '--server-name', 'vllm', '--model-name', 'anthropic/claude-sonnet-4']
-        #if model_name:
-        #    llm_cmd.extend(['--model-name', model_name])
-            
-        llm_process = subprocess.Popen(llm_cmd)
-        shared_processes.append(llm_process)
-        time.sleep(5)
-        print(f'✅ LLM Service Node launched with server: vllm')
-    except Exception as e:
-        logger.error(f'❌ Failed to launch LLM Service Node: {e}')
-
-    # Run main function
-    main()
-    
-    print('finished ontology generation')
-    for process in shared_processes:
-        process.terminate()
-    print('terminated shared processes')

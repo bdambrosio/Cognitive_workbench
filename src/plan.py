@@ -397,7 +397,7 @@ def parse_plan_text(plan_text):
                         # Add to main plan
                         plan_steps.append(parsed_step)
         
-        # Check for unmatched blocks
+        # Check for unmatched blcks
         if current_block == 'while':
             raise ValueError("Unmatched 'while(...)' block without 'endwhile:'")
         elif current_block in ['if', 'else']:
@@ -503,7 +503,7 @@ def verify_plan(plan_json: Any) -> bool:
 # helpers
 # ---------------------------------------------------------------------------
 
-_ALLOWED_TYPES = {"action", "say", "move", "think", "take", "place", "inspect", "use", "scan", "while", "if", "near", "look"}
+_ALLOWED_TYPES = {"action", "say", "move", "think", "take", "place", "inspect", "use", "scan", "while", "if", "near", "look", "wait"}
 _ALLOWED_CONDITION_TYPES = {"near", "can_see", "has_item", "notnear", "cant_see", "hasnt_item", "at_location", "notat_location", "believes", "notbelieves", "bound", "notbound"}
 
 REQ_KEYS = {
@@ -517,6 +517,7 @@ REQ_KEYS = {
     "use": {"type", "target"},
     "scan": {"type", "target", "out"},
     "while": {"type", "body", "condition"},
+    "wait": {"type", "condition"},
     "if": {"type", "condition", "then"},          # "else" is optional
     "near": {"type", "target"},
 }
@@ -532,6 +533,7 @@ OPTIONAL_KEYS = {
     "use": {"reason", "value"},
     "scan": set(),  # scan has no optional keys
     "while": {"reason", "value"},
+    "wait": {"reason", "target", "value"},
     "if": {"else"},
     "near": {"reason", "value"},
     "look": {"reason", "value"},
@@ -623,6 +625,14 @@ def _validate_step(step: Any) -> bool:
             return False
         return _validate_steps(step["then"]) and _validate_steps(step.get("else", []))
 
+    if step_type == "wait":
+        # condition can be a dict (preferred) or a simple string (legacy); validate dict via _validate_condition
+        cond = step.get("condition")
+        if isinstance(cond, dict):
+            return _validate_condition(cond)
+        # Accept string condition for backward compatibility
+        return isinstance(cond, str) and len(cond) > 0
+
     if isinstance(step, list):
         return all(_validate_steps(element) for element in step)
 
@@ -643,6 +653,7 @@ def _validate_condition(condition: Any) -> bool:
 # ---------------------------------------------------------------------------
 
 def generate_plan_with_context(
+    character: ZenohExecutiveNode,
     goal_text: str,
     prompt_text: str,
     percepts_at_plan: Any = None,
@@ -654,7 +665,18 @@ def generate_plan_with_context(
     Inputs should come from a plan_log entry to ensure parity during verification.
     Returns a verified plan dict; returns {"plan": []} on failure.
     """
+    llm = LLM(server_name=server_name, model_name=model_name)
     try:
+        from middle_ontology import rewrite_goal
+        finished_rewriting = False
+        while not finished_rewriting:
+            rewritten_goal = rewrite_goal(llm, character.character_name, 
+                         character.ontology, 
+                         character.middle_ontology, 
+                         character.map_types, 
+                         goal_text)
+            goal_text = rewritten_goal['rewritten_step']
+            finished_rewriting = rewritten_goal['all_leaves']
         system_prompt = (
             "Respond only with a JSON plan according to the provided PLAN_TEMPLATE. "
             "No prose; end with </end>."
@@ -716,7 +738,8 @@ def generate_plan_with_context(
                 return repaired
             return {"plan": []}
         return plan_candidate
-    except Exception:
+    except Exception as e:
+        logger.error(f'Error generating plan with context: {e}')
         return {"plan": []}
 
 def _validate_variable_references(plan_steps: List[Any]) -> bool:
@@ -779,7 +802,7 @@ def is_near(character, target: str, negated: bool) -> bool:
         logger.error(f'Error checking proximity for {target}: {e}')
     return {'value': False, 'binding': None}
 
-def _evaluate_condition(character: ZenohExecutiveNode, condition: dict) -> bool:
+def _evaluate_condition(character: ZenohExecutiveNode, condition: dict, observations: dict) -> bool:
         """Evaluate a condition action dict using distributed node queries."""
         # The key to conditions is access to the character's beliefs and knowledge base.
         # Since this is distributed among nodes, we will used targeted queires by predicate.
@@ -897,7 +920,7 @@ def _evaluate_condition(character: ZenohExecutiveNode, condition: dict) -> bool:
         try:
             # Reject type-level targets (no digits) for non-scan contexts
             try:
-                if isinstance(target, str) and not any(ch.isdigit() for ch in target):
+                if (not normalized_type == 'believes') and isinstance(target, str) and not any(ch.isdigit() for ch in target):
                     # Only scan accepts resource types; conditions/actions require instance ids
                     return {'value': False, 'binding': None}
             except Exception:
@@ -965,10 +988,18 @@ def _evaluate_condition(character: ZenohExecutiveNode, condition: dict) -> bool:
                             return result
                 return {'value': True, 'binding': None} if negated else {'value': False, 'binding': None}
                     
-            elif normalized_type == 'believes':
-                # Stub implementation - user will implement this
-                logger.warning(f'Belief condition {condition_type}({target}) not implemented - returning False')
-                return {'value': False, 'binding': None}
+            elif normalized_type in ('believes', 'notbelieves'):
+                try:
+                    from Messages import SystemMessage, UserMessage
+                    sys_prompt = f"Question: Does the character believe: {target}? That is, is that statement in or directly derivable from the users facts below?Answer Yes or No only."
+                    user_prompt = f'User facts: {observations}\n\nDo not include any other text in your response, just Yes or No.'
+                    resp = character.llm_client.generate([sys_prompt, user_prompt], max_tokens=10, stops=['</end>'])
+                    text = resp if isinstance(resp, str) else getattr(resp, 'text', str(resp))
+                    val = str(text).strip().lower().startswith('y')
+                    return {'value': (not val) if negated else val, 'binding': None}
+                except Exception as e:
+                    logger.warning(f"believes check failed ({target}): {e}")
+                    return {'value': False, 'binding': None}
             else:
                 logger.error(f'Unknown condition type: {condition_type} (normalized: {normalized_type})')
                 return {'value': False, 'binding': None}
