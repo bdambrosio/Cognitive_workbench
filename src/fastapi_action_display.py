@@ -1536,10 +1536,15 @@ class FastAPIActionDisplayNode:
             }
         }
         
+        // Cache of latest simulation time (ISO string)
+        let latestSimTimeISO = null;
+
         function handleTimeUpdate(timeData) {
             const timeInfo = timeData.time_info;
             if (timeInfo && timeInfo.datetime) {
                 const dateTime = new Date(timeInfo.datetime);
+                // Cache latest simulation time for action log timestamps
+                latestSimTimeISO = timeInfo.datetime;
                 const displayTime = dateTime.toLocaleString('en-US', {
                     weekday: 'short',
                     year: 'numeric',
@@ -1765,7 +1770,8 @@ class FastAPIActionDisplayNode:
             const entry = document.createElement('div');
             entry.className = 'action-entry';
             
-            const timestamp = new Date().toLocaleTimeString();
+            // Prefer simulation time (latest from time_update); fallback to local clock
+            const timestamp = latestSimTimeISO ? new Date(latestSimTimeISO).toLocaleTimeString() : new Date().toLocaleTimeString();
             let html = `<span class="timestamp">[${timestamp}]</span> `;
             html += `<span class="character-name">[${actionData.character.toUpperCase()}]</span> `;
             const typeLower = (actionData.action_type || '').toLowerCase();

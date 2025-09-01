@@ -14,7 +14,7 @@ class RuralTerrain(Enum):
     Field = 5
 
 class RuralInfrastructure(Enum):
-    Road = auto()
+    Path = auto()
 
 class RuralResources(Enum):
     Well = auto()
@@ -45,7 +45,7 @@ terrain_rules = {
 
 infrastructure_rules = {
     'road_density': 0.1,
-    'path_type': 'Road',
+    'path_type': 'Path',
     'slope_factor': 2.0,
     'terrain_costs': {
         'Water': float('inf'),

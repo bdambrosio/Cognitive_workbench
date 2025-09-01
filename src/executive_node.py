@@ -20,16 +20,16 @@ import argparse
 from datetime import datetime
 from typing import Dict, List, Any, Union, Optional
 from Messages import SystemMessage, UserMessage
-from activity import ActivityManager
+from activity import ActivityManager, derive_drive_lexicon
 import utils.hash_utils as hash_utils
 from utils.llm_api import LLM
 from utils.zenoh_utils import datetime_handler
 import plan as plan_module
 from dataclasses import dataclass, asdict
 import os
-from templates import PLAN_TEMPLATE
+from templates import GOAL_TEMPLATE, PLAN_TEMPLATE, PHYSIOLOGICAL_NEEDS
 from plan import generate_plan_with_context
-from utils.format_utils import format_views_compact
+from utils.format_utils import format_map_types, format_views_compact
 from utils.state_utils import tick_state, apply_restore, initialize_character_states
 from utils.format_utils import format_views_compact
 from utils.condition_utils import deref_plan_target
@@ -111,6 +111,9 @@ class ZenohExecutiveNode:
         # Store character info (canonicalized)
         self.character_name = character_name.capitalize()
         self.character_config = character_config or {}
+        self.drives = self.character_config.get('drives', [])
+        self.drives_str = '\n'.join(self.drives)   
+        self.drive_lex = derive_drive_lexicon(self.drives_str)
         
         # Debug mode flag - must be set early as it's used throughout initialization
         self.debug = str(os.getenv('CWB_DEBUG', '')).lower() in ('1', 'true', 'yes', 'on')
@@ -220,9 +223,19 @@ class ZenohExecutiveNode:
         # Local cache of inventory item ids (exact strings)
         self.inventory_cache: List[str] = []
         self.last_state_update_time: Optional[datetime] = None
-        # Ontology
-        self.ontology = json.load(open(f'../scenarios/{self.character_name}-activity-ontology.json'))   
-        self.middle_ontology = json.load(open(f'../scenarios/{self.character_name}-middle-ontology.json'))
+        # Ontology (guard for manual characters / missing files)
+        try:
+            self.ontology = json.load(open(f'../scenarios/{self.character_name}-activity-ontology.json'))
+        except Exception as e:
+            self.ontology = {}
+            if not self.manual:
+                logger.warning(f"No activity ontology for {self.character_name}: {e}")
+        try:
+            self.middle_ontology = json.load(open(f'../scenarios/{self.character_name}-middle-ontology.json'))
+        except Exception as e:
+            self.middle_ontology = {}
+            if not self.manual:
+                logger.warning(f"No middle ontology for {self.character_name}: {e}")
         self.map_types = {}
         for reply in self.session.get("cognitive/map/types", timeout=2.0 if not self.debug else 600.0):
             if reply.ok:
@@ -700,31 +713,13 @@ class ZenohExecutiveNode:
                             self.map_types = data
                             break
             if self.map_types:
-                system_prompt += f'\n#Available map types:'
-                if self.map_types.get('terrain_types'):
-                    system_prompt += f"\n\tTerrain: {', '.join(self.map_types['terrain_types'])}"
-                if self.map_types.get('infrastructure_types'):
-                    system_prompt += f"\n\tInfrastructure: {', '.join(self.map_types['infrastructure_types'])}"
-                if self.map_types.get('property_types'):
-                    system_prompt += f"\n\tProperties: {', '.join(self.map_types['property_types'])}"
-                if self.map_types.get('resource_types'):
-                    system_prompt += f"\n\tResources: {', '.join(self.map_types['resource_types'])}"
-                system_prompt += '\n'
-
-                
+                system_prompt += format_map_types(self.map_types)
             # Build user prompt with context
             user_prompt += self.format_situation()
             # Include current self state (e.g., hunger)
             try:
                 if hasattr(self, 'self_state') and isinstance(self.self_state, dict) and self.self_state:
-                    user_prompt += f"\n#Your current state:"
-                    for key, data in self.self_state.items():
-                        try:
-                            val = float(data.get('value', 0.0))
-                            user_prompt += f"\n\t{key.capitalize()}: {val:.1f}/100"
-                        except Exception:
-                            pass
-                    user_prompt += '\n'
+                    user_prompt += self.format_current_physiological_state()
             except Exception:
                 pass
             entity_context = None
@@ -768,6 +763,11 @@ class ZenohExecutiveNode:
             self.observations = {'static': system_prompt, 'dynamic': user_prompt}
             return self.observations
 
+    def format_current_physiological_state(self):
+        """Format the current physiological state for the LLM."""
+        def_str = 'DEFINITIONS:\n'+'+\n'.join(str(need) for need in PHYSIOLOGICAL_NEEDS)
+        return def_str+'\n'+'CURRENT_STATE:\n'+'\n'.join([f'{key.capitalize()}: {item["value"]:.1f}' for key, item in self.self_state.items()])
+
     def _orient(self, observations: Dict[str, Any], new_goal: plan_module.Goal = None):
         """Orient: Assess current state and drives"""
         """{'static': system_prompt, 'dynamic': user_prompt}"""
@@ -785,42 +785,27 @@ class ZenohExecutiveNode:
 
         # Create a new goal based on current situation
         self.map_update_request_publisher.put(json.dumps({'type': 'goal_look'}))
-        system_prompt = observations['static']
-        user_prompt = observations['dynamic']
-        directive = """What would you like to do next? 
-Consider:
-1. What is the central issue / opportunity / obligation demanding the character's attention?
-2. Given the following available information about the character, the situation, and the surroundings, how can the character best satify their drives?
-3. Identify any other actors involved in the goal, and their relationships to the character.
-4. Each goal should be a candiate for the center of activity for the near future.
-5. Goals must be distinct from one another.
-6. Goals must be consistent with the character's drives and emotional stance.
-7. Goals must be consistent with the available map types.
+        system_prompt = """Task: generate a goal statement for your next objective."""
+        user_prompt = observations['static']
+        user_prompt += '\n\n' + observations['dynamic']
 
-Nothing in this or other instructions limits your use of deception or surprise.
-                  
-Respond using the following hash-formatted text, where each tag is preceded by a # and followed by a single space, followed by its content.
-Each goal should begin with a #goal tag, and should end with ## on a separate line as shown below:
-be careful to insert line breaks only where shown, separating a value from the next tag:
+        character_drives_str = '\n'.join(self.drives)   
 
-#goal terse (5-8) words) name for this goal
-#description concise (8-14) words) further details of this goal
-#otherCharacterName name of the other actor involved in this goal, or None if no other actor is involved
-#termination terse (5-6 words) statement of condition that would mark achievement or partial achievement of this goal. This should be a specific observable condition that can be checked for.
-##
-
-Respond ONLY with the above hash-formatted text.
-end your response with </end>
-"""
         # Make LLM call
         if self.llm_client and not self.shutdown_requested:
             # Use shorter timeout during shutdown
             timeout = 5.0 if self.shutdown_requested else None
             response = self.llm_client.generate(
-                messages=[system_prompt, user_prompt, directive],
+                messages=[system_prompt, user_prompt, GOAL_TEMPLATE],
+                bindings={
+                    "physiological_needs": self.format_current_physiological_state(),
+                    "character_drives": character_drives_str,
+                    "middle_ontology": json.dumps((self.middle_ontology or {}).get('manifest', {}), indent=2),
+                },
                 max_tokens=400,
                 temperature=0.5,
                 stops=['</end>'],
+                
                 timeout=timeout
             )
 
@@ -856,7 +841,7 @@ end your response with </end>
         return self.current_goal
 
 
-    def _plan(self, goal):
+    def _plan(self, goal: plan_module.Goal):
         """Plan: Return existing plan or create single-action plan from goal."""
         # If we already have a plan, return it
         if self.current_plan is not None:
@@ -890,7 +875,8 @@ end your response with </end>
             if not self.shutdown_requested:
                 plan_candidate = generate_plan_with_context(
                     character=self,
-                    goal_text=goal.to_string(),
+                    current_activity=self.current_activity,
+                    goal_text=goal.name+(': '+goal.description if goal.description != goal.name else ''),
                     prompt_text=user_prompt,
                     percepts_at_plan=None,  # avoid double-including percepts
                     server_name=os.getenv('CWB_LLM_SERVER', 'openai'),
@@ -1273,7 +1259,7 @@ end your response with </end>
                     'condition': cond,
                     'return_to': idx + 1,
                     'iteration_count': 0,
-                    'max_iterations': 5
+                    'max_iterations': 15
                 }
                 step_stack.push(while_frame)
                 return self._execute_next_step(step_stack)
@@ -1345,7 +1331,21 @@ end your response with </end>
         """Act: Execute the chosen action. Returns True if action succeeded, False if it failed."""
 
         # Publish time advancement proposal for testing TBD - condition on type
-        proposed_minutes = random.randint(2, 5)
+        ACTION_TIME_COSTS = {
+                            "move": 1,
+                            "scan": .5,
+                            "inspect": 0.75,
+                            "think": 0.75,
+                            "take": 5,
+                            "use": 5,
+                            "say": 1,
+                            "wait": 5,  # use explicit duration
+                            }
+
+        if action['type'] in ACTION_TIME_COSTS:
+            proposed_minutes = ACTION_TIME_COSTS[action['type']]
+        else:
+            proposed_minutes = random.randint(2, 5)
         self.publish_time_proposal(proposed_minutes)
 
         action = self.current_action if self.current_action else action
@@ -1491,6 +1491,28 @@ end your response with </end>
                 action_record.resolved_target = resolved if resolved else ''
             except Exception:
                 pass
+            # Disallow infrastructure for take
+            try:
+                if isinstance(resolved, str) and resolved.startswith('Path'):
+                    action_data = {
+                        'type': 'take',
+                        'action_id': self.action_counter,
+                        'timestamp': datetime.now().isoformat(),
+                        'target': '',
+                        'requested_target': action.get('target', ''),
+                        'resolved_target': resolved,
+                        'status': 'failed',
+                        'error': 'illegal for infrastructure'
+                    }
+                    self.action_publisher.put(json.dumps(action_data))
+                    action_record.outcome_status = 'failure'
+                    action_record.failure_code = 'illegal:infrastructure'
+                    if self.action_history:
+                        self.action_history[-1].result = 'failed - illegal on infrastructure'
+                    self.action_counter += 1
+                    return False
+            except Exception:
+                pass
             if not outcome:
                 action_data = {
                     'type': 'take',
@@ -1507,9 +1529,18 @@ end your response with </end>
                 # Telemetry failure tagging
                 action_record.outcome_status = 'failure'
                 action_record.failure_code = 'precondition:near'
+                # Record a concise failure result for summaries
+                if self.action_history:
+                    self.action_history[-1].result = 'failed - target not nearby/visible'
                 self.action_counter += 1
                 return False
-            self.take(resolved)
+            ok = self.take(resolved)
+            # Set final outcome string for summaries
+            try:
+                if self.action_history:
+                    self.action_history[-1].result = f'took {resolved}' if ok else 'take failed'
+            except Exception:
+                pass
             self.action_counter += 1
         elif action['type'].lower() == "place":
             # Precondition: must have item in inventory (has_item)
@@ -1521,6 +1552,29 @@ end your response with </end>
                     vn = rt[1:]
                     if vn in self.plan_bindings:
                         cond_action['target'] = self.plan_bindings[vn]
+            except Exception:
+                pass
+            # Disallow infrastructure for place
+            try:
+                tname = cond_action.get('target', '')
+                if isinstance(tname, str) and tname.strip().capitalize().startswith('Path'):
+                    action_data = {
+                        'type': 'place',
+                        'action_id': self.action_counter,
+                        'timestamp': datetime.now().isoformat(),
+                        'target': '',
+                        'requested_target': action.get('target', ''),
+                        'resolved_target': '',
+                        'status': 'failed',
+                        'error': 'illegal for infrastructure'
+                    }
+                    self.action_publisher.put(json.dumps(action_data))
+                    action_record.outcome_status = 'failure'
+                    action_record.failure_code = 'illegal:infrastructure'
+                    if self.action_history:
+                        self.action_history[-1].result = 'failed - illegal on infrastructure'
+                    self.action_counter += 1
+                    return False
             except Exception:
                 pass
             cond_action['type'] = 'has_item'
@@ -1548,6 +1602,9 @@ end your response with </end>
                 # Telemetry failure tagging
                 action_record.outcome_status = 'failure'
                 action_record.failure_code = 'precondition:has_item'
+                # Record a concise failure result for summaries
+                if self.action_history:
+                    self.action_history[-1].result = 'failed - item not in inventory'
                 self.action_counter += 1
                 return False
             # Perform place on map
@@ -1599,6 +1656,9 @@ end your response with </end>
                 # Telemetry failure tagging
                 action_record.outcome_status = 'failure'
                 action_record.failure_code = 'precondition:near'
+                # Record a concise failure result for summaries
+                if self.action_history:
+                    self.action_history[-1].result = 'failed - target not nearby/visible'
             else:
                 # Perform inspect which may populate last_action_result
                 self.inspect(action, resolved)
@@ -1663,8 +1723,35 @@ end your response with </end>
                 # Telemetry failure tagging (choose specific reason if known)
                 action_record.outcome_status = 'failure'
                 action_record.failure_code = 'precondition:near' if binding and not binding.get('value') else 'precondition:has_item'
+                # Record a concise failure result for summaries
+                if self.action_history:
+                    self.action_history[-1].result = (
+                        'failed - target not nearby/visible'
+                        if (binding and not binding.get('value')) else 'failed - item not in inventory'
+                    )
                 return False
             else:
+                # Infrastructure: invoke map use_path to traverse
+                if isinstance(resolved, str) and resolved.startswith('Path'):
+                    try:
+                        payload = json.dumps({'path_id': resolved}).encode('utf-8')
+                    except Exception:
+                        payload = None
+                    for reply in self.session.get(f"cognitive/map/agent/{self.character_name}/use_path", payload=payload, timeout=5.0 if not self.debug else 600.0):
+                        if reply.ok:
+                            data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
+                            ok = data.get('success', False)
+                            if ok:
+                                self.action_history[-1].result = f'traversed {resolved}'
+                                action_data['status'] = 'success'
+                            else:
+                                self.action_history[-1].result = 'use path failed'
+                                action_data['status'] = 'failed'
+                            break
+                    self.action_publisher.put(json.dumps(action_data))
+                    self.action_counter += 1
+                    return True
+                # Resource/other use path
                 self.use(action, resolved, action_data)
                 action_data['result'] = self.action_history[-1].result
                 # Apply simple hunger restore if using an edible resource (Phase 1 heuristic)
@@ -1900,17 +1987,18 @@ end your response with </end>
         End your text with: </end>
         """
         response = self.llm_client.generate([summary_prompt], max_tokens=1000, stops=['</end>'])
-        why_text = hash_utils.find('why', self.plan_summary)
-        outcome_text = hash_utils.find('outcome', self.plan_summary)
-        score_text = hash_utils.find('score', self.plan_summary)
-
+        summary_text = response.text if hasattr(response, 'text') else str(response)
+        why_text = hash_utils.find('why', summary_text)
+        outcome_text = hash_utils.find('outcome', summary_text)
+        score_text = hash_utils.find('score', summary_text)
+        plan_score = None
         if score_text:
             try:
                 plan_score = int(score_text)
             except Exception:
                 plan_score = 0
         metrics = {"rationale": why_text, "outcome": outcome_text, "score": score_text}
-        self.plan_summary = f'{response.text}\n{json.dumps(metrics, indent=2)}'
+        self.plan_summary = f'{summary_text}\n{json.dumps(metrics, indent=2)}'
 
         logger.info(f'📝 Plan post-mortem prepared for {self.character_name}\n{self.plan_summary}\n')
         
@@ -2386,260 +2474,57 @@ End your text with: </end>"""
         logger.info(f'📤 Published action: {action_data["action_id"]}')
         self.action_counter += 1
         return text_to_send
-
-    
-    def _resolve_target(self, action: Dict[str, Any]) -> Union[str, bool]:
-        """
-        Resolve abstract target name to specific instance reference using plan bindings cache.
-        This ONLY handles abstract -> specific resolution (e.g., "Berry" -> "Berry23").
-        Note this is merely attempting to resolve the target to a specific map instance. It is NOT evaluating the target wrt the action.
-        Nonetheless, for 'near', for example, we should attempt to resolve to the closest instance, right?
-        too hard.
-        next - only instances in view? Let's say no. That means this must be a map_node query.
-        
-        Args:
-            action: Action dictionary containing 'type' and 'target', or condition dictionary
-            
-        Returns:
-            Resolved target name (str) or False if resolution fails
-        """
-        action_type = action.get('type', 'unknown')
-        raw_target = action.get('target', None)
-        
-        if not raw_target:
-            return None
-            
-        # Check if target is a variable reference ($variable_name)
-        raw_target = deref_plan_target(self.plan_bindings, raw_target)
-        if raw_target is False:
-            logger.error(f'❌ {self.character_name} variable dereferencing failed')
-            return False
-            
-        # Check plan bindings cache first
-        cache_key = raw_target
-        # TODO: Re-enable cache
-        # disabling cache untill we implement invalidation (e.g. on move or visibility change)
-        #if cache_key in self.plan_bindings_cache:
-            #cached_result = self.plan_bindings_cache[cache_key]
-            #logger.debug(f'🎯 Cache hit: {raw_target} -> {cached_result}')
-            #action_copy = action.copy()
-            #action_copy['target'] = cached_result
-            #return action_copy
-        
-        logger.debug(f'🔍 Resolving target "{raw_target}" for action type "{action_type}"')
-        resolved_target = False
-        
-        try:
-            # Context-aware resolution based on action type
-            action_type = action['type'].lower()
-            # Use proper negation detection from condition_utils
-            from utils.condition_utils import is_negated_condition
-            negated = is_negated_condition(action_type)
-
-            if action_type == "move":
-                move_target = action['target'].strip()
-                move_direction = move_target.lower()
-                # Step 1: Test for compass points first (case insensitive)
-                cardinal_directions = ['north', 'northeast', 'southeast', 'south', 'southwest', 'northwest', 'east', 'west']
-                if move_direction in cardinal_directions:
-                    return move_direction
-                else:
-                    resolved_target = self._resolve_visible_instance(negated, raw_target)
-                    if not resolved_target:
-                        return None
-                    move_direction = self._find_target_direction(resolved_target)
-                    return move_direction
-            if action_type in ['take', 'inspect', 'use']:
-                # Resource actions/conditions - resolve to specific resource instance
-                resolved_target = self._resolve_near_resource_instance(negated, raw_target)
-                return resolved_target
-                
-            if action_type in ['has_item', 'hasnt_item']:
-                # Resource actions/conditions - resolve to specific resource instance
-                resolved_target = self._resolve_inventory_instance(negated, raw_target)
-                if resolved_target and not negated:
-                    return resolved_target
-                elif not resolved_target and negated:
-                    return True
-                return False
-                
-            elif action_type in ['say', 'can_see', 'cant_see']:
-                # Character actions/conditions - resolve to specific character name
-                resolved_target = self._resolve_visible_instance(negated, raw_target)
-                if resolved_target and not negated:
-                    return resolved_target
-                elif not resolved_target and negated:
-                    return True
-                return False
-                
-            elif action_type in ['near', 'notnear']:
-                # Proximity conditions - could be character or resource
-                resolved_target = self._resolve_near_instance(negated,raw_target)
-                if resolved_target and not negated:
-                    return resolved_target
-                elif not resolved_target and negated:
-                    return True
-                return False
-            
-            elif action_type in ['at_location', 'notat_location']:
-                # Location conditions - pass through for now
-                resolved_target = self._resolve_at_instance(negated,raw_target)
-                if resolved_target and not negated:
-                    return resolved_target
-                elif not resolved_target and negated:
-                    return True
-                return False
-            else:
-                logger.error(f'❓ Unknown action type for resolution: {action_type}')
-                resolved_target = raw_target  # Pass through unchanged
-                return resolved_target
-        except Exception as e:
-            logger.error(f'❌ Error resolving target "{raw_target}" for {action_type}: {e}')
-            resolved_target = False
-        
-        # Cache the result (even if False or pass-through)
-        if resolved_target:
-            self.plan_bindings_cache[cache_key] = resolved_target
-        
-        if resolved_target and resolved_target != raw_target:
-            logger.info(f'✅ Resolved "{raw_target}" -> "{resolved_target}" ({action_type})')
-        elif resolved_target == raw_target:
-            logger.debug(f'✅ Validated "{raw_target}" ({action_type})')
-        else:
-            logger.error(f'❌ Failed to resolve "{raw_target}" ({action_type})')
-            
-        # Ensure we return the resolved target, not the action dict
-        return resolved_target
-
-    def _resolve_visible_instance(self, negated: bool, raw_target: str) -> Union[str, bool]:
-        """Resolve abstract visible instance to specific visible instance."""
-        try:
-            # visible means in current situation, so can be resolved locally
-            target = raw_target.capitalize()
-            if self.last_situation_data and target in self.last_situation_data.get('characters', []):
-                return target
-            for view in self.last_situation_data.get('views', []):
-                if 'characters' in view:
-                    for character in view['characters']:
-                        if character.get('name', '') == target or target == 'person':
-                            return character.get('name', '')
-                if 'resources' in view: 
-                    for resource in view['resources']:
-                        if ((not any(ch.isdigit() for ch in target) and resource['name'].startswith(target)) 
-                            or resource['name'] == target):
-                            return resource.get('name', '')
-                if 'terrain' in view:
-                    if view['terrain'] == target:
-                        return target
-            return False
-        except Exception as e:
-            logger.error(f'Error resolving visible instance {raw_target}: {e}')
-            return False
-        
-    def _resolve_near_instance(self, negated: bool, raw_target: str) -> Union[str, bool]:
-        """Resolve abstract visible instance to specific visible instance."""
-        try:
-            # visible means in current situation, so can be resolved locally
-            target = raw_target.capitalize()
-            # check inventory first!
-            resolved_target = self._resolve_inventory_instance(negated, raw_target)
-            if resolved_target:
-                return resolved_target
-            
-            for view in self.last_situation_data.get('views', []):
-                if 'characters' in view:
-                    for character in view['characters']:
-                        if character.get('distance', 20) <= 2 and (character.get('name', '') == target or target == 'person'):
-                            return character.get('name', '')
-                if 'resources' in view:
-                    for resource in view['resources']:  
-                        if resource.get('distance', 20) <= 2 and ((not any(ch.isdigit() for ch in target) and resource['name'].startswith(target)) 
-                            or resource['name'] == target):
-                            return resource.get('name', '')
-                if 'terrain' in view:
-                    if view['terrain'] == target:
-                        return target
-            
-            return False
-        except Exception as e:
-            logger.error(f'Error resolving visible instance {raw_target}: {e}')
-            return False
-
-    def _resolve_near_resource_instance(self, negated: bool, raw_target: str) -> Union[str, bool]:
-        """Resolve abstract visible instance to specific visible instance."""
-        try:
-            # visible means in current situation, so can be resolved locally
-            target = raw_target.capitalize()
-            for view in self.last_situation_data.get('views', []):
-                if 'resources' in view:
-                    for resource in view['resources']:  
-                        if resource.get('distance', 20) <= 2 \
-                            and ((not any(ch.isdigit() for ch in target) and resource['name'].startswith(target)) or resource['name'] == target):                            
-                            return resource.get('name', '')
-            return False
-        except Exception as e:
-            logger.error(f'Error resolving visible instance {raw_target}: {e}')
-            return False
-
-    def _resolve_at_instance(self, negated: bool, raw_target: str) -> Union[str, bool]:
-        """Resolve abstract visible instance to specific visible instance."""
-        try:
-            # visible means in current situation, so can be resolved locally
-            target = raw_target.capitalize()
-            for view in self.last_situation_data.get('views', []):
-                if 'characters' in view:
-                    for character in view['characters']:
-                        if character.get('distance', 20) <= 1 and (character.get('name', '') == target or target == 'person'):
-                            return character.get('name', '')
-                if 'resources' in view:
-                    for resource in view['resources']:  
-                        if resource.get('distance', 20) <= 2 and ((not any(ch.isdigit() for ch in target) and resource['name'].startswith(target)) 
-                            or resource['name'] == target):                            
-                            return resource.get('name', '')
-                if 'terrain' in view:
-                    if view['terrain'] == target:
-                        return target
-            return False
-        except Exception as e:
-            logger.error(f'Error resolving visible instance {raw_target}: {e}')
-            return False
-
-    
-    def _resolve_inventory_instance(self, negated: bool, raw_target: str) -> Union[str, bool]:
-        """Resolve abstract resource name to specific resource instance."""
-        try:
-            # First try exact match validation
-            for reply in self.session.get(f"cognitive/{self.character_name}/memory/inventory?item={raw_target}", timeout=2.0 if not self.debug else 600.0):
-                if reply.ok:
-                    data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
-                    if data.get('success'):
-                        logger.debug(f'✅ Exact resource instance: {raw_target}')
-                        return raw_target
-                break
-            
-            # First try exact match validation
-            for reply in self.session.get(f"cognitive/map/bind/resource/{raw_target}", timeout=2.0 if not self.debug else 600.0):
-                if reply.ok:
-                    data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
-                    if data.get('success'):
-                        resolved_target = data.get('resolved_target', raw_target)
-                        logger.debug(f'✅ Exact resource instance: {raw_target} -> {resolved_target}')
-                        return resolved_target
-                break
-            
-            return False
-            
-        except Exception as e:
-            logger.error(f'Error resolving resource instance {raw_target}: {e}')
-            return False
             
     def _execute_scan_action(self, action: Dict[str, Any]) -> str:
         """Execute scan action and return the found target name."""
         target = action.get('target', '')
         var_name = action.get('out', '')
         
-        # Search in last_situation_data for matching character or resource
-        found_target = self._find_target_in_situation(target)
+        # Resolve noun target to one or more concrete map_types (if indices exist)
+        candidates = []
+        try:
+            scan_idx = ((self.middle_ontology or {}).get('indices', {})
+                        .get('noun', {}) if isinstance(self.middle_ontology, dict) else {})
+            noun_to_map = scan_idx.get('noun_to_map_types', {}) if isinstance(scan_idx, dict) else {}
+            mapped = noun_to_map.get(target)
+            if isinstance(mapped, list) and mapped:
+                candidates = [c for c in mapped if isinstance(c, str) and c]
+        except Exception:
+            pass
+        if not candidates:
+            candidates = [target]
+
+        # If multiple candidate types, choose globally nearest match across them
+        found_target = ''
+        best_dist = float('inf')
+        for cand in candidates:
+            name = self._find_target_in_situation(cand)
+            if not name:
+                continue
+            # compute distance for this name (nearest over all views)
+            try:
+                target_lower = name.lower()
+                nearest = None
+                for view in (self.last_situation_data or {}).get('views', []):
+                    for key in ('characters','resources'):
+                        for ent in view.get(key, []) or []:
+                            nm = ent.get('name','')
+                            if nm and nm.lower() == target_lower:
+                                d = ent.get('distance')
+                                if d is not None:
+                                    dd = float(d)
+                                    if nearest is None or dd < nearest:
+                                        nearest = dd
+                # Terrain has no distance; de-prioritize vs finite distances
+                if nearest is None and name:
+                    nearest = 1e8
+                if nearest is not None and nearest < best_dist:
+                    best_dist = nearest
+                    found_target = name
+            except Exception:
+                # If distance calc fails, accept first found
+                if not found_target:
+                    found_target = name
         
         # Store result in plan_bindings if var_name provided
         if var_name and found_target:
@@ -2686,6 +2571,17 @@ End your text with: </end>"""
                         if dist < best_dist or (dist == best_dist and resource_name < best_name):
                             best_name = resource_name
                             best_dist = dist
+            # Paths (infrastructure)
+            if 'paths' in view:
+                for path in view['paths']:
+                    path_name = path.get('name', '')
+                    if (path_name and (
+                        path_name.lower() == target_lower or
+                        path_name.lower().startswith(target_lower))):
+                        dist = float(path.get('distance', 1e9))
+                        if dist < best_dist or (dist == best_dist and path_name < best_name):
+                            best_name = path_name
+                            best_dist = dist
             # Terrain exact match (no distance available; treat as mid priority)
             if 'terrain' in view:
                 terrain = view['terrain']
@@ -2730,6 +2626,13 @@ End your text with: </end>"""
                             for resource in view['resources']:
                                 if resource.get('name') == target_name:
                                     logger.info(f'🎯 Found target "{target}" as resource in direction: {direction}')
+                                    return direction
+                        
+                        # Check paths (infrastructure) in this direction
+                        if 'paths' in view:
+                            for path in view['paths']:
+                                if path.get('name') == target_name:
+                                    logger.info(f'🎯 Found target "{target}" as path in direction: {direction}')
                                     return direction
                         
                         # Check characters in this direction

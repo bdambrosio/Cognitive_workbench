@@ -21,7 +21,6 @@ characters:
     status: |
       You have no idea where you are or how you got here or who that other person is. You have a backpack with food, water, and a few other items.
     drives:
-      - "solve the mystery of how I ended up here. Find a way out of the forest."
-      - "safety from threats including accident, illness, or physical threats from unknown or adversarial actors or adverse events."
+      - "Find a way out of the forest."
+      - "Live and survive safely while finding a way out of the forest or waiting for rescue."
       - "companionship, community, family, acceptance, trust, intimacy."
-      - "immediate physiological needs: survival, shelter, water, food, rest."

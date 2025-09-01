@@ -97,8 +97,15 @@ def validate_condition_structure(condition: Dict[str, Any]) -> bool:
         logger.error(f'Condition missing type: {condition}')
         return False
         
-    if 'target' not in condition:
-        logger.error(f'Condition missing target: {condition}')
-        return False
+    # For most conditions, 'target' is required; for believes/notbelieves we now accept 'value' instead
+    ctype = str(condition.get('type', '')).lower()
+    if ctype in ('believes', 'notbelieves'):
+        if 'value' not in condition:
+            logger.error(f"Condition 'believes/notbelieves' missing value: {condition}")
+            return False
+    else:
+        if 'target' not in condition:
+            logger.error(f'Condition missing target: {condition}')
+            return False
         
     return True

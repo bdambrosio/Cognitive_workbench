@@ -262,6 +262,12 @@ Do not include any other text, reasoning, introductory, expository, or markdown.
             self.handle_agent_move
         )
         
+        # Agent use_path queryable
+        self.agent_use_path_queryable = self.session.declare_queryable(
+            "cognitive/map/agent/*/use_path",
+            self.handle_agent_use_path
+        )
+        
         # Map types queryable
         self.map_types_queryable = self.session.declare_queryable(
             "cognitive/map/types",
@@ -1000,6 +1006,7 @@ Do not include any other text, reasoning, introductory, expository, or markdown.
                     'look_result': view_text,
                     'location': [agent.x, agent.y],
                     'characters': list(set(characters)),
+                    'paths': list(set(paths)),
                 }
             
             query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
@@ -1060,6 +1067,50 @@ Do not include any other text, reasoning, introductory, expository, or markdown.
             
         except Exception as e:
             logger.error(f"Error handling agent move: {e}")
+            error_response = {
+                'success': False,
+                'error': str(e)
+            }
+            query.reply(query.key_expr, json.dumps(error_response).encode('utf-8'))
+
+    def handle_agent_use_path(self, query):
+        """Handle agent use_path command"""
+        try:
+            # Extract character name from query key
+            key_parts = str(query.key_expr).split('/')
+            character_name = key_parts[-3] if len(key_parts) > 2 else None
+            if not character_name:
+                raise ValueError("No character name provided")
+
+            canonical_character_name = character_name.capitalize()
+            if canonical_character_name not in self.agent_registry:
+                response = {
+                    'success': False,
+                    'error': f"Agent for character '{character_name}' not found"
+                }
+            else:
+                agent = self.agent_registry[canonical_character_name]
+                # Parse path_id from payload
+                path_id = None
+                if query.payload:
+                    payload = query.payload.to_bytes().decode('utf-8')
+                    try:
+                        data = json.loads(payload)
+                        path_id = data.get('path_id')
+                    except Exception:
+                        path_id = None
+                if not path_id:
+                    response = {'success': False, 'error': 'Missing path_id'}
+                else:
+                    ok = agent.use_path(path_id)
+                    response = {
+                        'success': bool(ok),
+                        'location': [agent.x, agent.y]
+                    }
+
+            query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
+        except Exception as e:
+            logger.error(f"Error handling agent use_path: {e}")
             error_response = {
                 'success': False,
                 'error': str(e)

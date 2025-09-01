@@ -1420,6 +1420,9 @@ class WorldMap:
         
         return '\n'.join(lines)
 
+import random
+
+
 class Agent:
     def __init__(self, x, y, world, name):
         self.x = x
@@ -1427,6 +1430,8 @@ class Agent:
         self.world = world
         self.name = name
         self.world.register_agent(self)
+        # Track last path traversal direction as (dx, dy)
+        self._last_path_dir = None
 
 
     def look(self):
@@ -1567,6 +1572,90 @@ class Agent:
         # Use existing move method
         return self.move(direction)
 
+    def use_path(self, path_id: str) -> bool:
+        """Traverse a path: if near but not on, move to a patch across the path patch that also has path.
+        If already on the path patch, continue in the last path direction if possible.
+        Falls back to stepping onto the path patch if no across candidate exists.
+        """
+        # Resolve PathXY to coordinates by matching against patches
+        target_xy = None
+        for x in range(self.world.width):
+            for y in range(self.world.height):
+                p = self.world.patches[x][y]
+                if p.has_path and f"Path{p.x}{p.y}" == path_id:
+                    target_xy = (p.x, p.y)
+                    break
+            if target_xy:
+                break
+        if target_xy is None:
+            return False
+
+        tx, ty = target_xy
+        ax, ay = self.x, self.y
+
+        # If already on the path patch: try continuing in stored direction
+        if (ax, ay) == (tx, ty):
+            dx, dy = self._last_path_dir if self._last_path_dir else (0, 0)
+            nx, ny = ax + dx, ay + dy
+            if 0 <= nx < self.world.width and 0 <= ny < self.world.height and self.world.patches[nx][ny].has_path:
+                self.x, self.y = nx, ny
+                return True
+            # Fallback: try any neighbor with path, prefer forward-ish
+            candidates = []
+            for ox in (-1, 0, 1):
+                for oy in (-1, 0, 1):
+                    if ox == 0 and oy == 0:
+                        continue
+                    nx, ny = ax + ox, ay + oy
+                    if 0 <= nx < self.world.width and 0 <= ny < self.world.height and self.world.patches[nx][ny].has_path:
+                        # Score by alignment with previous direction (dot product)
+                        score = ox * (dx or 0) + oy * (dy or 0)
+                        candidates.append(((nx, ny), score))
+            if candidates:
+                # Pick best alignment; if tie, random among best
+                max_score = max(s for _, s in candidates)
+                best = [pos for pos, s in candidates if s == max_score]
+                nx, ny = random.choice(best)
+                self._last_path_dir = (nx - ax, ny - ay)
+                self.x, self.y = nx, ny
+                return True
+            return False
+
+        # Not on path: compute across-path candidates relative to agent->path vector
+        vx = tx - ax
+        vy = ty - ay
+        sx = 1 if vx > 0 else (-1 if vx < 0 else 0)
+        sy = 1 if vy > 0 else (-1 if vy < 0 else 0)
+
+        cand_coords = []
+        if sx != 0 and sy != 0:
+            cand_coords = [(tx + sx, ty + sy)]
+        elif sx == 0 and sy != 0:
+            cand_coords = [(tx + 1, ty + sy), (tx - 1, ty + sy)]
+        elif sy == 0 and sx != 0:
+            cand_coords = [(tx + sx, ty + 1), (tx + sx, ty - 1)]
+
+        # Filter to in-bounds path patches
+        cand_coords = [c for c in cand_coords if 0 <= c[0] < self.world.width and 0 <= c[1] < self.world.height and self.world.patches[c[0]][c[1]].has_path]
+
+        chosen = None
+        if cand_coords:
+            # Choose nearest to ideal across point (tx+sx, ty+sy) by Euclidean; tie -> random
+            ideal = (tx + (sx or 0), ty + (sy or 0))
+            def ed2(c):
+                return (c[0] - ideal[0]) ** 2 + (c[1] - ideal[1]) ** 2
+            bestd = min(ed2(c) for c in cand_coords)
+            bests = [c for c in cand_coords if ed2(c) == bestd]
+            chosen = random.choice(bests)
+        else:
+            # No across candidate: step onto the path patch itself
+            chosen = (tx, ty)
+
+        nx, ny = chosen
+        self._last_path_dir = (nx - tx, ny - ty) if (nx, ny) != (tx, ty) else (sx, sy)
+        self.x, self.y = nx, ny
+        return True
+
 def manhattan_distance(x1, y1, x2, y2):
     return abs(x2 - x1) + abs(y2 - y1)
 
@@ -1594,7 +1683,8 @@ def get_detailed_visibility_description(world: WorldMap, camera_x: int, camera_y
         direction_element = ET.SubElement(root, direction.name)
 
         if direction == Direction.Current:
-            direction_patches = [world.patches[camera_x][camera_y]]
+            # Include current patch and immediate neighborhood (Manhattan distance <= 1)
+            direction_patches = [p for p in visible_patches if manhattan_distance(camera_x, camera_y, p.x, p.y) <= 1]
         else:
             direction_patches = [p for p in visible_patches if (abs(p.x - camera_x) <= 16 and abs(p.y - camera_y) <= 16) and get_direction_name(p.x - camera_x, p.y - camera_y) == direction]
 
@@ -1606,14 +1696,12 @@ def get_detailed_visibility_description(world: WorldMap, camera_x: int, camera_y
         adjacent_patch = min(direction_patches, key=lambda p: manhattan_distance(camera_x, camera_y, p.x, p.y))
         elevation_change = adjacent_patch.elevation - world.patches[camera_x][camera_y].elevation
 
-        if direction != Direction.Current:
-            ET.SubElement(direction_element, "visibility").text = str(max_distance)
+        ET.SubElement(direction_element, "visibility").text = str(max_distance)
 
         ET.SubElement(direction_element, "terrain").text = adjacent_patch.terrain_type.name
 
-        if direction != Direction.Current:
-            slope_element = ET.SubElement(direction_element, "slope")
-            slope_element.text = get_slope_description(elevation_change)
+        slope_element = ET.SubElement(direction_element, "slope")
+        slope_element.text = get_slope_description(elevation_change)
 
         resources_element = ET.SubElement(direction_element, "resources")
         for patch in direction_patches:
@@ -1627,19 +1715,23 @@ def get_detailed_visibility_description(world: WorldMap, camera_x: int, camera_y
         water_patches = [p for p in direction_patches if p.has_water]
         if water_patches:
             water_element = ET.SubElement(direction_element, "water")
-            if direction == Direction.Current:
-                flow_direction = get_water_flow_direction(world, camera_x, camera_y)
-                water_element.set("flow", flow_direction)
-            else:
-                water_distances = [manhattan_distance(camera_x, camera_y, p.x, p.y) for p in water_patches]
-                water_element.set("distances", ",".join(map(str, sorted(water_distances))))
+            water_distances = [manhattan_distance(camera_x, camera_y, p.x, p.y) for p in water_patches]
+            water_element.set("distances", ",".join(map(str, sorted(water_distances))))
 
         path_patches = [p for p in direction_patches if p.has_path]
         path_name = world._infrastructure_rules.get('path_type', 'road')
         if path_patches:
+            # Back-compat: aggregated distances under path_name element
             path_element = ET.SubElement(direction_element, path_name)
             path_distances = [manhattan_distance(camera_x, camera_y, p.x, p.y) for p in path_patches]
             path_element.set("distances", ",".join(map(str, sorted(path_distances))))
+            # New: per-path entities similar to resources
+            paths_element = ET.SubElement(direction_element, "paths")
+            for p in path_patches:
+                pe = ET.SubElement(paths_element, "path")
+                pe.set("id", f"Path{p.x}{p.y}")
+                pe.set("distance", str(manhattan_distance(camera_x, camera_y, p.x, p.y)))
+                pe.text = ""
 
         visible_agents = [agent for agent in world.agents if
                             world.patches[agent.x][agent.y] in direction_patches and agent != observer]
@@ -1729,13 +1821,19 @@ def extract_direction_info(world, xml_string, direction_name):
         except:
             pass
 
-    # Extract path information if available
+    # Extract path information if available (aggregated distances and per-path list)
     path_name = world._infrastructure_rules.get('path_type', 'road')
     path_elem = direction_elem.find(path_name)
     if path_elem is not None:
         info[path_name] = {
             'distances': path_elem.get('distances')
         } 
+    paths_elem = direction_elem.find('paths')
+    if paths_elem is not None:
+        info['paths'] = [
+            {'id': path.get('id'), 'distance': int(path.get('distance'))}
+            for path in paths_elem.findall('path')
+        ]
 
     # Extract agent information if available
     agents_elem = direction_elem.find('characters')
@@ -1782,8 +1880,20 @@ def hash_direction_info(direction_info, distance_threshold=10, world=None):
                     percept += f"{resource['id']} distance {resource['distance']}, "
                     resources.append(resource['id'])
             percept = percept[:-2] + '; '
-        path_name = world._infrastructure_rules.get('path_type', 'road')
-        if path_name in direction_info[dir] and len(direction_info[dir][path_name]) > 0:
+        path_name = world._infrastructure_rules.get('path_type', 'road').lower()
+        # New per-path entities
+        if 'paths' in direction_info[dir] and len(direction_info[dir]['paths']) > 0:
+            path_label_added = False
+            for path in direction_info[dir]['paths']:
+                if path['distance'] <= distance_threshold:
+                    if not path_label_added:
+                        percept += f"{path_name}s: "
+                        path_label_added = True
+                    percept += f"{path['id']} distance {path['distance']}, "
+                    paths.append(path['id'])
+            percept = percept[:-2] if path_label_added else percept
+        # Preserve legacy aggregated distances for compatibility
+        elif path_name in direction_info[dir] and len(direction_info[dir][path_name]) > 0:
             path_distances = direction_info[dir][path_name]['distances']
             percept += f"{path_name}: distances {path_distances}"
             paths.append(path_name)
@@ -1799,6 +1909,6 @@ def hash_direction_info(direction_info, distance_threshold=10, world=None):
                         characters.append(character['name'])
             percept = percept[:-2]
         percept += "\n"
-    percept_summary += f"You see {', '.join(list(set(characters)))} and {', '.join(list(set(resources)))} resources{f' and {path_name}(s)' if len(paths) > 0 else ''}"
+    percept_summary += f"You see {', '.join(list(set(characters)))} and {', '.join(list(set(resources)))} resources{f' and paths' if len(paths) > 0 else ''}"
     return percept, resources, characters, paths, percept_summary
                 

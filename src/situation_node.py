@@ -116,13 +116,7 @@ class ZenohSituationNode:
             f"cognitive/{character_name}/situation/request_update",
             self.map_update_callback
         )
-        
-        # Subscriber for map update requests (character-specific)
-        self.map_update_request_subscriber = self.session.declare_subscriber(
-            f"cognitive/{character_name}/situation/request_update",
-            self.map_update_callback
-        )
-        
+                
         # Publisher for situation updates (character-specific)
         self.situation_publisher = self.session.declare_publisher(f"cognitive/{character_name}/situation/update")
         
@@ -279,8 +273,11 @@ class ZenohSituationNode:
                         self.situation['views'] = [self.parse_view_string(view_string) for view_string in view_strings]
                         self.situation['adjacent_to']['resources'] = []
                         self.situation['adjacent_to']['characters'] = []
+                        self.situation['adjacent_to']['paths'] = []
                         self.situation['resources'] = []
+                        self.situation['paths'] = []
                         self.situation['characters'] = map_look_data['characters']
+                        self.situation['paths'] = map_look_data['paths']
 
                         # Check if resources and characters are in the response
                         for view in self.situation['views']:
@@ -290,6 +287,13 @@ class ZenohSituationNode:
                                         self.situation['adjacent_to']['resources'].append(resource['name'])
                                     if resource['name'] not in self.situation['resources']:
                                         self.situation['resources'].append(resource['name'])
+                        
+                            for path in view['paths']:
+                                if isinstance(path, dict) and 'distance' in path:
+                                    if path['distance'] <= 1:
+                                        self.situation['adjacent_to']['paths'].append(path['name'])
+                                    if path['name'] not in self.situation['paths']:
+                                        self.situation['paths'].append(path['name'])
                         
                             for character in view['characters']:
                                 if isinstance(character, dict) and 'distance' in character:
@@ -397,6 +401,16 @@ class ZenohSituationNode:
                                 else:
                                     response = {'success': True, 'value': False, 'binding': resource['name']}
                                 break
+                    # Check paths in this direction
+                    if not response:
+                        for path in view.get('paths', []):
+                            if path.get('name', '').capitalize() == target_canonical:
+                                if ((not negated and path.get('distance', float('inf')) <= self.near_threshold)
+                                    or (negated and path.get('distance', float('inf')) > self.near_threshold)):
+                                    response = {'success': True, 'value': True, 'binding': path['name']}
+                                else:
+                                    response = {'success': True, 'value': False, 'binding': path['name']}
+                                break
                     # Check characters if not found in resources
                     if not response:
                         for character in view.get('characters', []):
@@ -457,6 +471,7 @@ class ZenohSituationNode:
                     if resource.capitalize() == target_canonical:
                         response = {'success': True, 'value': not negated, 'binding': resource}
                         break
+                # Paths currently only appear per-view; no top-level list to scan here
                 for character in self.situation.get('characters', []):
                     # situation characters are strings, not dicts
                         if character == target_canonical:
@@ -516,6 +531,16 @@ class ZenohSituationNode:
                                     response = {'success': True, 'value': True, 'binding': resource['name']}
                                 else:
                                     response = {'success': True, 'value': False, 'binding': resource['name']}
+                                break
+                    # Check paths in this direction
+                    if not response:
+                        for path in view.get('paths', []):
+                            if path.get('name', '').capitalize() == target_canonical:
+                                if ((not negated and path.get('distance', float('inf')) <= self.location_threshold)
+                                     or (negated and path.get('distance', float('inf')) > self.location_threshold)):
+                                    response = {'success': True, 'value': True, 'binding': path['name']}
+                                else:
+                                    response = {'success': True, 'value': False, 'binding': path['name']}
                                 break
                 
                     # Check characters if not found in resources
@@ -616,7 +641,8 @@ class ZenohSituationNode:
             'terrain': '',
             'slope': '',
             'resources': [],
-            'characters': []
+            'characters': [],
+            'paths': []
         }
         
         # Split direction from the rest
@@ -645,7 +671,7 @@ class ZenohSituationNode:
             elif part.startswith('slope'):
                 result['slope'] = part.split()[1]
         
-        # Parse optional sections (resources, characters)
+        # Parse optional sections (resources, characters, paths)
         for section in sections[1:]:
             section = section.strip()
             if not section:
@@ -674,6 +700,18 @@ class ZenohSituationNode:
                             character_name = ' '.join(item_parts[:-2])
                             distance = int(item_parts[-1])
                             result['characters'].append({'name': character_name, 'distance': distance})
+            
+            elif section.startswith('roads:') or section.startswith('paths:'):
+                # Parse infrastructure: "roads: PathXY distance X, PathUV distance Y"
+                infra_part = section.split(':', 1)[1].strip()
+                if infra_part:
+                    infra_items = [item.strip() for item in infra_part.split(',')]
+                    for item in infra_items:
+                        item_parts = item.split()
+                        if len(item_parts) >= 3 and item_parts[-2] == 'distance':
+                            path_name = ' '.join(item_parts[:-2])
+                            distance = int(item_parts[-1])
+                            result['paths'].append({'name': path_name, 'distance': distance})
         
         return result
 

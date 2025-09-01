@@ -18,6 +18,7 @@ from activity import (
 from middle_ontology import (
     create_middle_ontology,
     save_middle_ontology,
+    validate_ontology,
 )
 from llm_client import ZenohLLMClient
 from utils.llm_api import LLM
@@ -153,7 +154,7 @@ def main():
             if not map_types:
                 logger.error("map/types unavailable; cannot create ontology")
                 raise RuntimeError("missing map types")
-            ontology = create_ontology(setting, name, character_desc, character_drives, characters)
+            ontology = create_ontology(setting, map_types, name, character_desc, character_drives, characters)
             if not ontology:
                 raise RuntimeError("create_ontology failed")
             save_ontology(name, ontology, scenario_dir)
@@ -169,8 +170,43 @@ def main():
                 logger.error("map/types unavailable; cannot create middle ontology")
                 raise RuntimeError("missing map types")
             middle = create_middle_ontology(ontology, middle_llm, map_types, character_drives)
-            if not isinstance(middle, dict):
-                raise RuntimeError("create_middle_ontology failed")
+        if not isinstance(middle, dict):
+            raise RuntimeError("create_middle_ontology failed")
+        problems, report = validate_ontology(middle)
+        if problems:
+            logger.error(f"Middle ontology validation problems: {problems}")
+            from middle_ontology import repair_ontology
+            middle, repairs = repair_ontology(middle, report, mode='nodes')
+            logger.info(f"Applied ontology repairs: {repairs}")
+            problems2, _ = validate_ontology(middle)
+            if problems2:
+                logger.error(f"Middle ontology validation problems after repair: {problems2}")
+            # Build and attach indices
+            try:
+                from middle_ontology import build_noun_indices, build_verb_indices
+                noun_indices = build_noun_indices(middle, map_types)
+                if isinstance(noun_indices, dict):
+                    middle.setdefault('indices', {})['noun'] = noun_indices
+                    # Log indices, one line per noun or map_type
+                    noun_map = noun_indices.get('noun_to_map_types', {}) or {}
+                    for nid, mts in noun_map.items():
+                        logger.info(f"noun-index noun {nid} -> {', '.join(mts)}")
+                    mt_map = noun_indices.get('map_type_to_nouns', {}) or {}
+                    for mt, nouns in mt_map.items():
+                        logger.info(f"noun-index map_type {mt} <- {', '.join(nouns)}")
+
+                verb_indices = build_verb_indices(middle, logger)
+                if isinstance(verb_indices, dict):
+                    middle.setdefault('indices', {})['verb'] = verb_indices
+                    # Log indices, one line per verb or anchor
+                    vt = verb_indices.get('verb_to_anchors', {}) or {}
+                    for vid, anchors in vt.items():
+                        logger.info(f"verb-index verb {vid} -> {', '.join(anchors)}")
+                    at = verb_indices.get('anchor_to_verbs', {}) or {}
+                    for anchor, vids in at.items():
+                        logger.info(f"verb-index anchor {anchor} <- {', '.join(vids)}")
+            except Exception as _e:
+                logger.warning(f"Failed to attach indices: {_e}")
             save_middle_ontology(name, middle, scenario_dir)
 
         # Activities
@@ -183,7 +219,7 @@ def main():
             if not map_types:
                 logger.error("map/types unavailable; cannot create activities")
                 raise RuntimeError("missing map types")
-            activities = create_activities(setting, name, character_desc, character_drives, characters, ontology, middle)
+            activities = create_activities(setting, map_types, name, character_desc, character_drives, characters, ontology, middle)
             if not activities:
                 raise RuntimeError("create_activities failed")
             save_activities(name, activities, scenario_dir)
