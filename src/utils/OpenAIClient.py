@@ -38,7 +38,7 @@ class OpenAIClient:
         else:
             self.client = OpenAI(
                 api_key=openai_api_key,
-                timeout=45.0,  # 60 second timeout
+                timeout=180.0,  # 60 second timeout
                 max_retries=2   # Retry up to 3 times
             )
 
@@ -65,14 +65,14 @@ class OpenAIClient:
                 print(f"VLLM {model} request error: {e}")
                 return {"status":'error', "message":str(e)} 
         else:
-            max_retries = 3
+            max_retries = 2
             for attempt in range(max_retries):
                 try:
                     response = self.client.chat.completions.create(
                             model=self.model_name, 
                             messages=prompt,
                             max_completion_tokens=max_tokens, 
-                            timeout=120.0
+                            timeout=360.0
                         )
                     item = response.choices[0].message
                     return item.content

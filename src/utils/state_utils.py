@@ -31,7 +31,7 @@ def clamp(value: float, lo: float = 0.0, hi: float = 100.0) -> float:
     return value
 
 
-def tick_state(state: Dict[str, Dict[str, Any]], dt_minutes: float, *, hunger_decay_per_min: float = 0.5, fatigue_decay_per_min: float = 0.3) -> None:
+def tick_state(state: Dict[str, Dict[str, Any]], dt_minutes: float, *, hunger_decay_per_min: float = 0.2, fatigue_decay_per_min: float = 0.2) -> None:
     """
     Advance state values forward in time by dt_minutes.
 

@@ -1,124 +1,349 @@
 {
   "places": [
-    "Forest",
-    "Clearing",
-    "Meadow",
-    "Mountain",
-    "Water",
-    "Cave",
-    "Thicket",
-    "Spring"
+    "MixedForestEdge",
+    "SunlitClearing",
+    "OpenMeadow",
+    "ShadyThicket",
+    "AppletreeStand",
+    "BerryPatch",
+    "RockySpring",
+    "FallenBranchPile",
+    "HiddenCave",
+    "OldPath",
+    "HutSite"
   ],
   "tools": [
-    "Berries",
-    "Mushrooms",
-    "Appletree",
-    "Fallenbranch",
-    "Spring",
     "Backpack",
-    "Food",
-    "Water"
+    "WaterBottle",
+    "FoodRations",
+    "MultiTool",
+    "Notebook",
+    "Pencil",
+    "Jacket"
   ],
   "roles": [
-    "Explorer",
+    "Searcher",
+    "Observer",
+    "RestingPerson",
+    "SignalMaker",
     "Forager",
-    "Survivor",
-    "Investigator",
-    "CompanionSeeker"
+    "Stranger"
   ],
   "norms_rules": [
-    "AvoidUnnecessaryRisks",
-    "ObserveAndRecord",
-    "UseResourcesResponsibly",
-    "TrustCautiously",
-    "RespectNature",
-    "MaintainCuriosity"
+    "RespectNaturalEnvironment",
+    "ShareResourcesIfPossible",
+    "ProtectYourSafety",
+    "AttemptPeacefulContactWithOthers"
   ],
   "hazards": [
-    "Cave",
-    "Mountain",
-    "UnknownOtherPerson",
-    "Thicket",
-    "UnidentifiedMushrooms",
-    "AccidentalInjury",
     "Dehydration",
-    "Exposure"
+    "Hunger",
+    "PhysicalFatigue",
+    "MinorInjury",
+    "SunExposure",
+    "UnevenGround"
   ],
   "social_graph": [
-    "UnknownOtherPerson",
-    "Self"
+    "UnknownStranger"
   ],
-  "time_windows": "morning",
+  "time_windows": [
+    "dawn",
+    "morning",
+    "afternoon",
+    "dusk",
+    "evening",
+    "day",
+    "night"
+  ],
+  "activities": [
+    {
+      "id": "SurveyArea",
+      "drive": "SolveMystery",
+      "verbs": [
+        "Survey",
+        "Orient",
+        "ScanFor"
+      ],
+      "nouns": [
+        "Landmark",
+        "ForestEdge",
+        "Clue"
+      ]
+    },
+    {
+      "id": "ScanForPaths",
+      "drive": "SolveMystery",
+      "verbs": [
+        "ScanFor",
+        "Identify",
+        "Inspect"
+      ],
+      "nouns": [
+        "Path",
+        "Trail",
+        "WayOut"
+      ]
+    },
+    {
+      "id": "OrientToForestEdge",
+      "drive": "SolveMystery",
+      "verbs": [
+        "Orient",
+        "Navigate",
+        "DetermineDirection"
+      ],
+      "nouns": [
+        "ForestEdge",
+        "SunPosition",
+        "Landmark"
+      ]
+    },
+    {
+      "id": "AvoidHazard",
+      "drive": "Safety",
+      "verbs": [
+        "Avoid",
+        "MoveAway",
+        "Recognize"
+      ],
+      "nouns": [
+        "Hazard",
+        "UnevenGround",
+        "SunExposure"
+      ]
+    },
+    {
+      "id": "MarkTrail",
+      "drive": "Safety",
+      "verbs": [
+        "Mark",
+        "Place",
+        "Record"
+      ],
+      "nouns": [
+        "Trail",
+        "FallenBranch",
+        "Rock"
+      ]
+    },
+    {
+      "id": "HideSelf",
+      "drive": "Safety",
+      "verbs": [
+        "Hide",
+        "Conceal",
+        "StayQuiet"
+      ],
+      "nouns": [
+        "Thicket",
+        "Shadow",
+        "Underbrush"
+      ]
+    },
+    {
+      "id": "RestRecover",
+      "drive": "Physiological",
+      "verbs": [
+        "Rest",
+        "Recover",
+        "Wait"
+      ],
+      "nouns": [
+        "Clearing",
+        "Meadow",
+        "Shade"
+      ]
+    },
+    {
+      "id": "CollectWater",
+      "drive": "Physiological",
+      "verbs": [
+        "Collect",
+        "Fill",
+        "Use"
+      ],
+      "nouns": [
+        "Water",
+        "Spring",
+        "WaterBottle"
+      ]
+    },
+    {
+      "id": "ForageBerries",
+      "drive": "Physiological",
+      "verbs": [
+        "Forage",
+        "Collect",
+        "Eat"
+      ],
+      "nouns": [
+        "Berries",
+        "EdiblePlant",
+        "Appletree"
+      ]
+    },
+    {
+      "id": "GreetStranger",
+      "drive": "Companionship",
+      "verbs": [
+        "Greet",
+        "Say",
+        "Observe"
+      ],
+      "nouns": [
+        "Stranger",
+        "OtherPerson",
+        "Greeting"
+      ]
+    },
+    {
+      "id": "TestTrust",
+      "drive": "Companionship",
+      "verbs": [
+        "Test",
+        "Share",
+        "Assess"
+      ],
+      "nouns": [
+        "Resource",
+        "Intent",
+        "Reaction"
+      ]
+    },
+    {
+      "id": "NegotiateAssistance",
+      "drive": "Companionship",
+      "verbs": [
+        "Negotiate",
+        "Request",
+        "Offer"
+      ],
+      "nouns": [
+        "Assistance",
+        "Help",
+        "Cooperation"
+      ]
+    },
+    {
+      "id": "SignalHelp",
+      "drive": "Safety",
+      "verbs": [
+        "Signal",
+        "Wave",
+        "Use"
+      ],
+      "nouns": [
+        "Clothing",
+        "Stick",
+        "Clearing"
+      ]
+    },
+    {
+      "id": "InventoryBackpack",
+      "drive": "Safety",
+      "verbs": [
+        "Inventory",
+        "Count",
+        "Inspect"
+      ],
+      "nouns": [
+        "Backpack",
+        "Supplies",
+        "Tool"
+      ]
+    },
+    {
+      "id": "SearchForEdibles",
+      "drive": "Physiological",
+      "verbs": [
+        "Search",
+        "Inspect",
+        "Harvest"
+      ],
+      "nouns": [
+        "Mushrooms",
+        "Berries",
+        "EdiblePlant"
+      ]
+    }
+  ],
   "affordances": {
-    "Forest": [
-      "forage",
-      "observeWildlife",
-      "hide",
-      "navigate",
-      "collectWood",
-      "rest"
+    "MixedForestEdge": [
+      "SurveyArea",
+      "ScanForPaths",
+      "SearchForEdibles",
+      "ForageBerries"
     ],
-    "Clearing": [
-      "rest",
-      "observeSky",
-      "signalForHelp",
-      "camp"
+    "SunlitClearing": [
+      "RestRecover",
+      "SignalHelp",
+      "InventoryBackpack"
     ],
-    "Meadow": [
-      "gatherBerries",
-      "explore",
-      "sunbathe"
+    "OpenMeadow": [
+      "RestRecover",
+      "SurveyArea",
+      "SignalHelp"
     ],
-    "Mountain": [
-      "scoutSurroundings",
-      "climb",
-      "findShelter"
+    "ShadyThicket": [
+      "HideSelf",
+      "SearchForEdibles"
     ],
-    "Water": [
-      "refillWater",
-      "wash",
-      "observeAquaticLife"
+    "AppletreeStand": [
+      "ForageBerries",
+      "SearchForEdibles",
+      "RestRecover"
     ],
-    "Cave": [
-      "seekShelter",
-      "investigate",
-      "hide"
+    "BerryPatch": [
+      "ForageBerries",
+      "SearchForEdibles"
     ],
-    "Thicket": [
-      "forage",
-      "hide",
-      "riskInjury"
+    "RockySpring": [
+      "CollectWater",
+      "RestRecover"
     ],
-    "Spring": [
-      "collectWater",
-      "rest"
+    "FallenBranchPile": [
+      "MarkTrail"
     ],
-    "Appletree": [
-      "harvestApples",
-      "observeInsects"
+    "HiddenCave": [
+      "HideSelf",
+      "RestRecover"
     ],
-    "Berries": [
-      "gather",
-      "eat"
+    "OldPath": [
+      "ScanForPaths",
+      "MoveAway",
+      "MarkTrail"
     ],
-    "Mushrooms": [
-      "gather",
-      "analyzeEdibility"
+    "HutSite": [
+      "SurveyArea",
+      "SignalHelp"
+    ]
+  },
+  "drive_coverage": {
+    "Find a way out of the forest.": [
+      "SurveyArea",
+      "ScanForPaths",
+      "OrientToForestEdge"
     ],
-    "Fallenbranch": [
-      "collect",
-      "useForTool"
+    "Live and survive safely while finding a way out of the forest or waiting for rescue.": [
+      "RestRecover",
+      "CollectWater",
+      "ForageBerries",
+      "AvoidHazard",
+      "MarkTrail",
+      "InventoryBackpack",
+      "SignalHelp",
+      "SearchForEdibles"
+    ],
+    "companionship, community, family, acceptance, trust, intimacy.": [
+      "GreetStranger",
+      "TestTrust",
+      "NegotiateAssistance"
     ]
   },
   "states": [
     "hunger",
-    "fatigue",
-    "injury",
     "thirst",
-    "confusion",
-    "loneliness",
-    "anxiety",
-    "curiosity",
-    "hope"
+    "fatigue",
+    "injury"
   ]
 }

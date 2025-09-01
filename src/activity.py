@@ -18,7 +18,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from Messages import SystemMessage
 from utils import hash_utils
 from utils.state_utils import calculate_state_activity_alignment, get_known_states
-from templates import ONTOLOGY_TEMPLATE, MIDDLE_ONTOLOGY_TEMPLATE, ACTIVITIES_TEMPLATE, PLAN_TEMPLATE
+from templates import ONTOLOGY_TEMPLATE, MIDDLE_ONTOLOGY_TEMPLATE, ACTIVITIES_TEMPLATE, PLAN_TEMPLATE, PLAN_VERBS
 
 # Type checking imports
 from typing import TYPE_CHECKING
@@ -78,30 +78,50 @@ DEFAULT_ACTIVITY = {
     "habit": 0.0
 }
 
-from templates import ONTOLOGY_TEMPLATE, ACTIVITIES_TEMPLATE
+
+from templates import PHYSIOLOGICAL_NEEDS, ONTOLOGY_TEMPLATE, ACTIVITIES_TEMPLATE
 llm_client = None
-from utils.format_utils import format_views_compact
+from utils.format_utils import format_map_types, format_views_compact
 
 
-def create_ontology(context, character_name, character, character_drives, other_characters):
+def derive_drive_lexicon(character_drives_str: str) -> dict:
+    """Minimal helper to derive a compact drive lexicon used to bias ontology.
+    Falls back to a small default if LLM call fails."""
+    global llm_client
+    default = {"nouns": ["Edible", "Potable", "Shelter"], "verbs": ["scan", "move", "take", "use", "rest"]}
+    try:
+        if not llm_client:
+            return default
+        sys_prompt = (
+            "Extract a minimal lexicon of nouns and verbs from the character drives. Collapse near-synonyms."
+            "Output strict JSON with keys 'nouns' and 'verbs'."
+        )
+        user_content = (
+            f"DRIVES:\n{character_drives_str}\n"
+        )
+        resp = llm_client.ask(
+            {},
+            [SystemMessage(content=sys_prompt), SystemMessage(content=user_content)],
+            max_tokens=300,
+            temp=0.2,
+            is_json=True,
+            log=False,
+        )
+        if isinstance(resp, dict) and resp.get("nouns") and resp.get("verbs"):
+            return resp
+        return default
+    except Exception:
+        return default
+    
+
+
+def create_ontology(context, map_types,character_name, character, character_drives, other_characters):
     global llm_client
     """Get the ontology for a given setting and character from Zenoh."""
     # Initialize Zenoh session
 
-    if llm_client:
-        map_types_str = ''    
-        if map_types:
-            map_types_str = f'\n#Available map types:'
-            if map_types.get('terrain_types'):
-                map_types_str += f"\n\tTerrains: {', '.join(map_types['terrain_types'])}"
-            if map_types.get('pathway_types'):
-                map_types_str += f"\n\tPathways {', '.join(map_types['infrastructure_types'])}"
-            if map_types.get('property_types'):
-                map_types_str += f"\n\tProperties: {', '.join(map_types['property_types'])}"
-            if map_types.get('resource_types'):
-                map_types_str += f"\n\tResources: {', '.join(map_types['resource_types'])}"
-            map_types_str += '\n'
-
+    if llm_client:  
+        map_types_str = format_map_types(map_types)
         other_characters_str = ''
         for other_character_name, other_character_desc in other_characters.items():
             if other_character_name != character_name:
@@ -109,14 +129,22 @@ def create_ontology(context, character_name, character, character_drives, other_
         
         character_drives_str = '\n'.join(character_drives)   
 
+        # Static, scenario-invariant physiological needs block
+
+        # Derive a small drive lexicon from drives
+        drive_lex = derive_drive_lexicon(character_drives_str)
+
         response = llm_client.ask({"setting": context, 
                                    "character": character, 
                                    "character_drives": character_drives_str, 
-                                    "states": get_known_states(),
+                                   "states": get_known_states(),
                                    "other_characters": other_characters_str, 
-                                   "map_types": map_types_str},
+                                   "primitive_nouns": map_types_str,
+                                   "primitive_verbs": PLAN_VERBS,
+                                   "physiological_needs": json.dumps(PHYSIOLOGICAL_NEEDS, indent=2),
+                                   "drive_lexicon": json.dumps(drive_lex, indent=2)},
                     [SystemMessage(content=ONTOLOGY_TEMPLATE)],
-                    max_tokens=1500,
+                    max_tokens=10000,
                     temp=0.7,
                     stops=['</end>'],
                     is_json=True,
@@ -124,13 +152,14 @@ def create_ontology(context, character_name, character, character_drives, other_
                 )
 
     if type(response) == dict:
+        response['time_windows'] = ['dawn', 'morning', 'afternoon', 'dusk', 'evening', 'day', 'night']
         print(f'🤖  Activity taxonomy: \n{response}')
         return response
     else:
         print(f'❌ Failed to get ontology: {response}')
         return None
 
-def create_activities(context, character_name, character, character_drives, other_characters, ontology, middle_ontology):
+def create_activities(context, map_types, character_name, character, character_drives, other_characters, ontology, middle_ontology):
 
     other_characters_str = ''
     for other_character_name, other_character_desc in other_characters.items():
@@ -140,18 +169,7 @@ def create_activities(context, character_name, character, character_drives, othe
     character_drives_str = '\n'.join(character_drives)
 
     if llm_client:
-        map_types_str = ''    
-        if map_types:
-            map_types_str = f'\n#Available map types:'
-            if map_types.get('terrain_types'):
-                map_types_str += f"\n\tTerrains: {', '.join(map_types['terrain_types'])}"
-            if map_types.get('pathway_types'):
-                map_types_str += f"\n\tPathways {', '.join(map_types['infrastructure_types'])}"
-            if map_types.get('property_types'):
-                map_types_str += f"\n\tProperties: {', '.join(map_types['property_types'])}"
-            if map_types.get('resource_types'):
-                map_types_str += f"\n\tResources: {', '.join(map_types['resource_types'])}"
-            map_types_str += '\n'
+        map_types_str = format_map_types(map_types)    
 
         response = llm_client.ask({"character": character, 
                                    "character_drives": character_drives_str, 
@@ -160,7 +178,8 @@ def create_activities(context, character_name, character, character_drives, othe
                                    "ontology": json.dumps(ontology, indent=2),
                                    "middle_ontology": json.dumps(middle_ontology, indent=2),
                                    "plan_template": PLAN_TEMPLATE,
-                                   "map_types": map_types_str,
+                                   "primitive_nouns": map_types_str,
+                                   "primitive_verbs": PLAN_VERBS,
                                    "setting": context},
                     [SystemMessage(content=ACTIVITIES_TEMPLATE)],
                     max_tokens=6000,
@@ -172,6 +191,12 @@ def create_activities(context, character_name, character, character_drives, othe
 
     if type(response) == dict:
         print(f'🤖  Activities: \n{response}')
+        try:
+            activity_names = list(response.keys())
+            logger.info(f"Activities created: {len(activity_names)}")
+            logger.info(f"Activity names: {', '.join(activity_names)}")
+        except Exception as e:
+            logger.warning(f"Failed to summarize activities: {e}")
         return response
     else:
         print(f'❌ Failed to get activities: {response}')
@@ -282,6 +307,25 @@ class ActivityManager:
             if last_data.get('views'):
                 situation['views'] = last_data['views']
                 situation['views_compact'] = format_views_compact(last_data['views'])
+                # Minimal paths integration (infrastructure)
+                try:
+                    situation['paths'] = []
+                    situation['adjacent_paths'] = []
+                    for view in last_data['views']:
+                        for path in view.get('paths', []) or []:
+                            name = path.get('name') if isinstance(path, dict) else None
+                            if isinstance(name, str) and name and name not in situation['paths']:
+                                situation['paths'].append(name)
+                            try:
+                                dist = path.get('distance', 9999) if isinstance(path, dict) else 9999
+                                if isinstance(dist, (int, float)) and dist <= 1 and name and name not in situation['adjacent_paths']:
+                                    situation['adjacent_paths'].append(name)
+                            except Exception:
+                                pass
+                except Exception:
+                    # Keep KISS: if anything goes wrong, omit paths
+                    situation['paths'] = []
+                    situation['adjacent_paths'] = []
             else:
                 situation['views'] = {}
                 situation['views_compact'] = ''
@@ -444,18 +488,22 @@ class ActivityManager:
             
             # Temporal compatibility
             if not self._time_compatible(activity_copy, time_info):
+                logger.info(f"Activity {activity_copy['name']} not time-compatible")
                 continue
                 
             # Location compatibility
             if not self._location_compatible(activity_copy, situation):
+                logger.info(f"Activity {activity_copy['name']} not location-compatible")
                 continue
                 
             # Basic resource availability
             if not self._resources_available(activity_copy, situation):
+                logger.info(f"Activity {activity_copy['name']} not resources-available")
                 continue
                 
             # Cooldown check (if recently completed)
             if self._in_cooldown(activity_copy, time_info):
+                logger.info(f"Activity {activity_copy['name']} in cooldown")
                 continue
                 
             candidates.append(activity_copy)
@@ -468,40 +516,128 @@ class ActivityManager:
         when = activity.get('when', None)
         if not when:
             when = 'opportunistic'
-        current_period = current_time['period']  # morning, midday, evening, night
+        current_period = current_time['period']  
         current_season = current_time['season']  # winter, spring, summer, autumn
         
         if when == 'opportunistic':
             return True
         elif when.startswith('daily@'):
             target_time = when.split('@')[1]
+            if target_time == 'day':
+                return current_period in ('dawn, morning, afternoon, dusk')
             return current_period == target_time
         elif when.startswith('seasonal@'):
             target_season = when.split('@')[1] 
+            if target_season == 'year-round':
+                return True
             return current_season == target_season
         
         return False
     
     def _location_compatible(self, activity, situation):
         """Check if current location supports activity"""
-        current_terrain = situation.get('current_location', {}).get('terrain', 'unknown')
+        current_terrain = situation.get('current_location', {}).get('terrain', '')
         views = situation.get('views', {})
-        resources = []
-        for view in views:
-            if view['direction'] == 'Current':
-                resources = view.get('resources', [])
-                break
-        at_resource_locations = []
-        for resource in resources:
-            at_resource_locations.append(resource.get('name'))
-        valid_locations = activity.get('where', [])
-        compatible = current_terrain in valid_locations
-        if not compatible:
-            for resource in at_resource_locations:
-                if resource in valid_locations:
-                    compatible = True
+        valid_locations = activity.get('where', []) or []
+        if not isinstance(valid_locations, list):
+            return False
+
+        # Build candidate primitive types at Current
+        candidate_primitives = set()
+        try:
+            terrain = (current_terrain or '').strip()
+            if terrain:
+                candidate_primitives.add(terrain.lower())
+        except Exception:
+            pass
+
+        # Find the Current view
+        current_view = None
+        try:
+            for view in views:
+                if isinstance(view, dict) and view.get('direction') == 'Current':
+                    current_view = view
                     break
-        return compatible
+        except Exception:
+            current_view = None
+
+        # Resources: canonicalize instance names to base type by stripping trailing digits
+        if current_view:
+            try:
+                for res in current_view.get('resources', []) or []:
+                    nm = res.get('name') if isinstance(res, dict) else None
+                    if isinstance(nm, str) and nm:
+                        base = nm.rstrip('0123456789') or nm
+                        candidate_primitives.add(base.lower())
+            except Exception:
+                pass
+            # Paths/infrastructure: include a single generic 'path' if any present
+            try:
+                if current_view.get('paths'):
+                    candidate_primitives.add('path')
+            except Exception:
+                pass
+
+        # Map primitives -> nouns via indices if available (executive_node caches middle_ontology)
+        candidate_nouns = set()
+        try:
+            middle_ontology = getattr(self.executive_node, 'middle_ontology', {})
+            scan_idx = (middle_ontology.get('indices', {}) or {}).get('noun', {}) if isinstance(middle_ontology, dict) else {}
+            mt_to_nouns = scan_idx.get('map_type_to_nouns', {}) if isinstance(scan_idx, dict) else {}
+            noun_to_map = scan_idx.get('noun_to_map_types', {}) if isinstance(scan_idx, dict) else {}
+            # reverse match: any primitive that appears as a map_type key maps to nouns
+            for prim in list(candidate_primitives):
+                # Case-insensitive keys: check both exact and capitalized
+                candidates_keys = [prim, prim.capitalize()]
+                for key in candidates_keys:
+                    nouns = mt_to_nouns.get(key)
+                    if isinstance(nouns, list):
+                        for nid in nouns:
+                            if isinstance(nid, str) and nid:
+                                candidate_nouns.add(nid.lower())
+        except Exception:
+            scan_idx = {}
+            noun_to_map = {}
+
+        # Prepare valid_locations lowercase set
+        want = {str(x).lower() for x in valid_locations if isinstance(x, (str,))}
+
+        # Early guard: if any where-term is neither a known noun id nor a map_type,
+        # allow and warn ONLY if it does not contain any known map_type substring
+        try:
+            noun_ids_lc = {str(k).lower() for k in (noun_to_map.keys() if isinstance(noun_to_map, dict) else [])}
+            mt_sets = []
+            if isinstance(self.map_types, dict):
+                for key in ('resource_types', 'terrain_types', 'infrastructure_types'):
+                    vals = self.map_types.get(key, [])
+                    if isinstance(vals, list):
+                        mt_sets.extend([str(v).lower() for v in vals if isinstance(v, str)])
+            map_types_lc = set(mt_sets)
+            unknown = [w for w in want if (w not in noun_ids_lc and w not in map_types_lc)]
+            if unknown:
+                for u in unknown:
+                    contains_any_mt = any((mt and mt in u) for mt in map_types_lc)
+                    if not contains_any_mt:
+                        logger.warning(f"_location_compatible: unknown where term '{u}' has no known map_type substring; treating as compatible")
+                        return True
+        except Exception:
+            pass
+
+        # Direct primitive match or noun match is acceptable
+        if candidate_primitives & want:
+            return True
+        if candidate_nouns & want:
+            return True
+        # Substring compatibility: any available primitive present as substring of a where noun
+        try:
+            for w in want:
+                for prim in candidate_primitives:
+                    if prim and prim in w:
+                        return True
+        except Exception:
+            pass
+
+        return False
     
     def _resources_available(self, activity, situation):
         """Check if needed resources are available"""
@@ -515,9 +651,6 @@ class ActivityManager:
                 continue
             if need not in resource_types:
                 continue
-            if not self.executive_node._resolve_visible_instance(False, need) \
-                and not self.executive_node._resolve_inventory_instance(False, need):
-                return False
         return True
     
     def _in_cooldown(self, activity, current_time):

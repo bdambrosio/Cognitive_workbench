@@ -1,25 +1,105 @@
-2025-08-28 18:58:43 - situation_node - INFO - 🔧 Debug mode enabled for Jim
-2025-08-28 18:58:43 - situation_node - INFO - 📂 No existing situation file for Jim, starting fresh
-2025-08-28 18:58:43 - situation_node - INFO - 🧭 Situation Node initialized for character: Jim
-2025-08-28 18:58:43 - situation_node - INFO -    - Subscribing to: cognitive/Jim/sense_data
-2025-08-28 18:58:43 - situation_node - INFO -    - Subscribing to: cognitive/Jim/action
-2025-08-28 18:58:43 - situation_node - INFO -    - Subscribing to: cognitive/Jim/situation/request_update
-2025-08-28 18:58:43 - situation_node - INFO -    - Publishing to: cognitive/Jim/situation/update
-2025-08-28 18:58:43 - situation_node - INFO -    - Queryable at: cognitive/Jim/situation/current_situation
-2025-08-28 18:58:43 - situation_node - INFO -    - Proximity queryable at: cognitive/Jim/situation/proximity
-2025-08-28 18:58:43 - situation_node - INFO -    - Visibility queryable at: cognitive/Jim/situation/visibility
-2025-08-28 18:58:43 - situation_node - INFO -    - Location queryable at: cognitive/Jim/situation/location
-2025-08-28 18:58:43 - situation_node - INFO -    - Storage available at: data/situation/Jim_situation.json
-2025-08-28 18:58:43 - situation_node - INFO - Situation Node running - press Ctrl+C to stop
-2025-08-28 18:58:48 - situation_node - INFO - 📥 Received action: announcement
-2025-08-28 18:58:48 - situation_node - INFO - Updating map data for Jim
-2025-08-28 18:58:48 - situation_node - INFO - Updating map data for Jim
-2025-08-28 18:58:48 - situation_node - INFO - Updating map data for Jim
-2025-08-28 18:58:48 - situation_node - INFO - 🗺️ Updated map look data for Jim
-2025-08-28 18:58:48 - situation_node - INFO - Map look data updated for Jim
-2025-08-28 18:58:48 - situation_node - INFO - 🗺️ Updated map look data for Jim
-2025-08-28 18:58:48 - situation_node - INFO - Map look data updated for Jim
-2025-08-28 18:59:06 - situation_node - INFO - 🧭 Situation query: returned current situation
-2025-08-28 19:00:48 - situation_node - INFO - 📥 Received action: think
-2025-08-28 19:00:55 - situation_node - INFO - 📥 Received action: scan
-2025-08-28 19:02:28 - situation_node - INFO - 📥 Received action: think
+2025-09-01 09:40:06 - situation_node - INFO - 🔧 Debug mode enabled for Jim
+2025-09-01 09:40:06 - situation_node - INFO - 📂 No existing situation file for Jim, starting fresh
+2025-09-01 09:40:06 - situation_node - INFO - 🧭 Situation Node initialized for character: Jim
+2025-09-01 09:40:06 - situation_node - INFO -    - Subscribing to: cognitive/Jim/sense_data
+2025-09-01 09:40:06 - situation_node - INFO -    - Subscribing to: cognitive/Jim/action
+2025-09-01 09:40:06 - situation_node - INFO -    - Subscribing to: cognitive/Jim/situation/request_update
+2025-09-01 09:40:06 - situation_node - INFO -    - Publishing to: cognitive/Jim/situation/update
+2025-09-01 09:40:06 - situation_node - INFO -    - Queryable at: cognitive/Jim/situation/current_situation
+2025-09-01 09:40:06 - situation_node - INFO -    - Proximity queryable at: cognitive/Jim/situation/proximity
+2025-09-01 09:40:06 - situation_node - INFO -    - Visibility queryable at: cognitive/Jim/situation/visibility
+2025-09-01 09:40:06 - situation_node - INFO -    - Location queryable at: cognitive/Jim/situation/location
+2025-09-01 09:40:06 - situation_node - INFO -    - Storage available at: data/situation/Jim_situation.json
+2025-09-01 09:40:06 - situation_node - INFO - Situation Node running - press Ctrl+C to stop
+2025-09-01 09:40:11 - situation_node - INFO - 📥 Received action: announcement
+2025-09-01 09:40:11 - situation_node - INFO - Updating map data for Jim
+2025-09-01 09:40:11 - situation_node - INFO - Updating map data for Jim
+2025-09-01 09:40:11 - situation_node - INFO - 🗺️ Updated map look data for Jim
+2025-09-01 09:40:11 - situation_node - INFO - Map look data updated for Jim
+2025-09-01 09:40:35 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-01 09:41:09 - situation_node - INFO - 📥 Received action: scan
+2025-09-01 09:41:15 - situation_node - INFO - 📥 Received action: scan
+2025-09-01 09:41:23 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-01 09:41:29 - situation_node - INFO - 📥 Received action: scan
+2025-09-01 09:41:32 - situation_node - INFO - 📥 Received action: inspect
+2025-09-01 09:41:35 - situation_node - INFO - 📥 Received action: think
+2025-09-01 09:41:36 - situation_node - INFO - 📥 Received action: place
+2025-09-01 09:41:43 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-01 09:41:47 - situation_node - INFO - 📥 Received action: take
+2025-09-01 09:41:48 - situation_node - INFO - 📥 Received action: place
+2025-09-01 09:41:51 - situation_node - INFO - 📥 Received action: think
+2025-09-01 09:41:53 - situation_node - INFO - 📥 Received action: think
+2025-09-01 09:41:58 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-01 09:42:03 - situation_node - INFO - 📥 Received action: scan
+2025-09-01 09:42:04 - situation_node - INFO - 📥 Received action: scan
+2025-09-01 09:42:05 - situation_node - INFO - 🧭 Proximity query for Fallenbranch22: False
+2025-09-01 09:42:05 - situation_node - INFO - 📥 Received action: use
+2025-09-01 09:42:24 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-01 09:42:29 - situation_node - INFO - 📥 Received action: scan
+2025-09-01 09:42:30 - situation_node - INFO - 📥 Received action: scan
+2025-09-01 09:42:33 - situation_node - INFO - 📥 Received action: think
+2025-09-01 09:42:40 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-01 09:42:54 - situation_node - INFO - 📥 Received action: think
+2025-09-01 09:42:55 - situation_node - INFO - 📥 Received action: scan
+2025-09-01 09:42:57 - situation_node - INFO - 📥 Received action: think
+2025-09-01 09:42:58 - situation_node - INFO - 📥 Received action: scan
+2025-09-01 09:43:01 - situation_node - INFO - 📥 Received action: inspect
+2025-09-01 09:43:03 - situation_node - INFO - 📥 Received action: think
+2025-09-01 09:43:09 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-01 09:43:18 - situation_node - INFO - 📥 Received action: think
+2025-09-01 09:43:19 - situation_node - INFO - 📥 Received action: scan
+2025-09-01 09:43:20 - situation_node - INFO - 📥 Received action: inspect
+2025-09-01 09:43:22 - situation_node - INFO - 📥 Received action: think
+2025-09-01 09:43:23 - situation_node - INFO - 📥 Received action: scan
+2025-09-01 09:43:26 - situation_node - INFO - 📥 Received action: inspect
+2025-09-01 09:43:33 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-01 09:43:39 - situation_node - INFO - 📥 Received action: think
+2025-09-01 09:43:40 - situation_node - INFO - 📥 Received action: scan
+2025-09-01 09:43:42 - situation_node - INFO - 📥 Received action: think
+2025-09-01 09:44:05 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-01 09:44:18 - situation_node - INFO - 📥 Received action: scan
+2025-09-01 09:44:21 - situation_node - INFO - 📥 Received action: think
+2025-09-01 09:44:22 - situation_node - INFO - 📥 Received action: scan
+2025-09-01 09:44:24 - situation_node - INFO - 📥 Received action: think
+2025-09-01 09:44:32 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-01 09:44:39 - situation_node - INFO - 📥 Received action: scan
+2025-09-01 09:44:40 - situation_node - INFO - 📥 Received action: scan
+2025-09-01 09:44:43 - situation_node - INFO - 📥 Received action: think
+2025-09-01 09:44:45 - situation_node - INFO - 📥 Received action: think
+2025-09-01 09:44:52 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-01 09:44:59 - situation_node - INFO - 📥 Received action: scan
+2025-09-01 09:45:00 - situation_node - INFO - 📥 Received action: scan
+2025-09-01 09:45:01 - situation_node - INFO - 📥 Received action: scan
+2025-09-01 09:45:02 - situation_node - INFO - 📥 Received action: place
+2025-09-01 09:45:03 - situation_node - INFO - 📥 Received action: place
+2025-09-01 09:45:05 - situation_node - INFO - 📥 Received action: think
+2025-09-01 09:45:12 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-01 09:45:19 - situation_node - INFO - 📥 Received action: think
+2025-09-01 09:45:20 - situation_node - INFO - 📥 Received action: scan
+2025-09-01 09:45:23 - situation_node - INFO - 📥 Received action: inspect
+2025-09-01 09:45:43 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-01 09:45:51 - situation_node - INFO - 📥 Received action: scan
+2025-09-01 09:45:54 - situation_node - INFO - 📥 Received action: inspect
+2025-09-01 09:45:55 - situation_node - INFO - 📥 Received action: scan
+2025-09-01 09:45:56 - situation_node - INFO - 📥 Received action: inspect
+2025-09-01 09:46:04 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-01 09:46:11 - situation_node - INFO - 📥 Received action: scan
+2025-09-01 09:46:14 - situation_node - INFO - 📥 Received action: inspect
+2025-09-01 09:46:17 - situation_node - INFO - 📥 Received action: think
+2025-09-01 09:46:23 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-01 09:46:29 - situation_node - INFO - 📥 Received action: scan
+2025-09-01 09:46:30 - situation_node - INFO - 📥 Received action: inspect
+2025-09-01 09:46:31 - situation_node - INFO - 📥 Received action: scan
+2025-09-01 09:46:34 - situation_node - INFO - 📥 Received action: inspect
+2025-09-01 09:46:35 - situation_node - INFO - 📥 Received action: place
+2025-09-01 09:46:41 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-01 09:47:02 - situation_node - INFO - 📥 Received action: think
+2025-09-01 09:47:03 - situation_node - INFO - 📥 Received action: scan
+2025-09-01 09:47:06 - situation_node - INFO - 📥 Received action: inspect
+2025-09-01 09:47:08 - situation_node - INFO - 📥 Received action: use
+2025-09-01 09:47:28 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-01 09:47:32 - situation_node - INFO - 📥 Received action: scan
+2025-09-01 09:47:33 - situation_node - INFO - 📥 Received action: inspect
+2025-09-01 09:47:40 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-01 09:47:51 - situation_node - INFO - 📥 Received action: think
+2025-09-01 09:47:52 - situation_node - INFO - 📥 Received action: scan

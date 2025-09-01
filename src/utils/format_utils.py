@@ -1,6 +1,8 @@
 import json
 from typing import List, Dict, Any
 
+from templates import PHYSIOLOGICAL_NEEDS
+
 
 def format_views_compact(views: List[Dict[str, Any]]) -> str:
     """Return one JSON object per line for each view direction without indentation.
@@ -20,6 +22,24 @@ def format_views_compact(views: List[Dict[str, Any]]) -> str:
                 import json
                 view = json.loads(view)
             
+            # Filter infrastructure paths by distance <= 16 (do not mutate original input)
+            try:
+                if isinstance(view, dict) and isinstance(view.get('paths'), list):
+                    filtered_paths = []
+                    for p in view.get('paths'):
+                        if isinstance(p, dict):
+                            try:
+                                if float(p.get('distance', 1e9)) <= 16:
+                                    filtered_paths.append(p)
+                            except Exception:
+                                # If distance missing or unparsable, exclude
+                                pass
+                    # Shallow copy to avoid side effects
+                    view = dict(view)
+                    view['paths'] = filtered_paths
+            except Exception:
+                pass
+
             # Format with clean quotes
             lines.append(_format_dict_clean(view))
         except Exception:
@@ -31,6 +51,22 @@ def format_views_compact(views: List[Dict[str, Any]]) -> str:
                 lines.append(str(view))
     return "\n".join(lines)
 
+def format_map_types(map_types: Dict[str, List[str]]) -> str:
+    """Format map types with clean, unescaped quotes for better readability."""
+    type_str = ''
+    map_types_str = f'\n#Available map types:\n'
+    if map_types.get('terrain_types'):
+        type_str += '\n'.join(map_types['terrain_types'])+'\n'
+    if map_types.get('infrastructure_types'):
+        type_str += '\n'.join(map_types['infrastructure_types'])+'\n'
+    if map_types.get('property_types'):
+        type_str += '\n'.join(map_types['property_types'])+'\n'
+    if map_types.get('resource_types'):
+        type_str += '\n'.join(map_types['resource_types'])+'\n'
+    type_str += '\n'.join([need['name'] for need in PHYSIOLOGICAL_NEEDS])
+    map_types_str += '\n'
+
+    return type_str.replace('\n\n','\n')
 
 def _format_dict_clean(data):
     """Format a dict with clean, unescaped quotes for better readability."""

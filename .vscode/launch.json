@@ -41,7 +41,7 @@
             "env": {
                 "PYTHONPATH": "${workspaceFolder}/src"
             },
-            "args": ["--scenario", "../scenarios/jim.yaml", "--character", "all", "--ontology", "load", "--middle", "load", "--activities", "create"],
+            "args": ["--scenario", "../scenarios/jim.yaml", "--character", "all", "--ontology", "create", "--middle", "create", "--activities", "create"],
             "justMyCode": false,
             "stopOnEntry": false,
             "preLaunchTask": "setup-zenoh-environment"

@@ -1,185 +1,295 @@
 {
   "places": [
-    "Farm",
-    "Field",
-    "Village",
-    "Market",
-    "Grassland",
-    "Forest",
-    "Well",
-    "River",
-    "Church"
+    "VillageSquare",
+    "ChurchYard",
+    "MarquartFarmyard",
+    "FouanFarmhouse",
+    "VillagePath",
+    "Riverbank",
+    "MarketStalls",
+    "SmallBarn",
+    "FamilyGarden",
+    "HayMeadow",
+    "VillageWell",
+    "NeighborsPorch"
   ],
   "tools": [
+    "WaterBucket",
+    "WickerBasket",
+    "WoodenPitchfork",
+    "Headscarf",
     "Hoe",
-    "Sickle",
-    "Basket",
-    "Bucket",
     "Apron",
-    "Bread",
-    "Bucket for water",
-    "Wool (raw/fiber)",
-    "Mill",
-    "Firewood",
-    "Blacksmith",
-    "Eggs",
-    "Vegetables"
+    "LoafOfBread",
+    "PrayerBook",
+    "MilkPail",
+    "Workshoes",
+    "WoolenShawl"
   ],
   "roles": [
-    "Daughter",
-    "Farm laborer",
-    "Village maiden",
-    "Market-goer",
-    "Churchgoer",
-    "Caretaker",
-    "Prospective bride",
-    "Neighbor"
+    "PeasantDaughter",
+    "FarmWorker",
+    "PotentialBride",
+    "VillageHelper",
+    "ChurchAttendee"
   ],
   "norms_rules": [
-    "Work diligently and without complaint.",
-    "Be modest and reserved in speech and dress.",
-    "Avoid being alone with unmarried men.",
-    "Attend church regularly.",
-    "Respect elders and authority figures.",
-    "Do not speak openly of desires or dreams.",
-    "Guard your family\u2019s reputation.",
-    "Help family before self.",
-    "Avoid idleness during daylight.",
-    "Do not challenge village traditions publicly.",
-    "Accept and serve guests with humility.",
-    "Avoid gossip, but beware of being subject to it."
+    "WorkBeginsAtSunrise",
+    "RespectChurchAuthority",
+    "AvoidUnchaperonedMeetingsWithMen",
+    "PreserveFamilyReputation",
+    "ShareExcessHarvestInVillage",
+    "ObserveSundayRest",
+    "GossipTravelsQuickly",
+    "DressModestly",
+    "ObeyOlderFamilyMembers"
   ],
   "hazards": [
-    "River (risk of drowning/falling in)",
-    "Forest (dangerous animals, getting lost)",
-    "Overexertion in fields (heatstroke, injury)",
-    "Scandal (damage to reputation)",
-    "Untrustworthy men",
-    "Sharp farm tools (injury)",
-    "Well (drowning hazard)",
-    "Market thieves",
-    "Illness"
+    "SocialScandal",
+    "MinorInjuryFromFarmTools",
+    "HeatFatigue",
+    "DrowningRiskAtRiver",
+    "SpoiledFood",
+    "ExcessiveGossip",
+    "PoorHarvest"
   ],
   "social_graph": [
+    "Jean",
+    "FatherMarquart",
+    "MotherMarquart",
+    "VillagePriest",
+    "FouanFamilyMembers",
+    "NeighbouringFarmers",
+    "VillageWomen",
+    "MarketVendors"
+  ],
+  "time_windows": [
+    "dawn",
+    "morning",
+    "afternoon",
+    "dusk",
+    "evening",
+    "day",
+    "night"
+  ],
+  "activities": [
     {
-      "name": "Jean Macquart",
-      "relation": "potential suitor, neighbor, fellow peasant",
-      "interactions": [
-        "work together",
-        "meet at market",
-        "church encounters",
-        "occasional shy conversation"
+      "id": "TendFarmChores",
+      "drive": "help your family with the endless chores",
+      "verbs": [
+        "Work",
+        "Harvest",
+        "Feed",
+        "Collect",
+        "Carry"
+      ],
+      "nouns": [
+        "Field",
+        "Barn",
+        "Animals",
+        "Basket",
+        "Tools"
       ]
     },
     {
-      "name": "FatherMarquart",
-      "relation": "neighboring patriarch",
-      "interactions": [
-        "formal greeting",
-        "work exchange",
-        "observed from a distance"
+      "id": "AttendWorship",
+      "drive": "avoid scandal and protecting your reputation",
+      "verbs": [
+        "Pray",
+        "Attend",
+        "Sit",
+        "Listen"
+      ],
+      "nouns": [
+        "Church",
+        "Priest",
+        "PrayerBook",
+        "Congregation"
       ]
     },
     {
-      "name": "MotherMarquart",
-      "relation": "neighboring matriarch",
-      "interactions": [
-        "polite conversation",
-        "help with farm chores",
-        "sharing of news or food"
+      "id": "SocializeRespectfully",
+      "drive": "find a good husband to marry, gain status and security",
+      "verbs": [
+        "Greet",
+        "Speak",
+        "Listen",
+        "Observe",
+        "Converse"
+      ],
+      "nouns": [
+        "VillageMan",
+        "Neighbour",
+        "Family",
+        "MarketSquare"
       ]
     },
     {
-      "name": "Village Women",
-      "relation": "peers, potential rivals/gossipers",
-      "interactions": [
-        "work, gossip, share chores"
+      "id": "RestInShade",
+      "drive": "brief moments of rest and simple joys amid the hardships",
+      "verbs": [
+        "Sit",
+        "Breathe",
+        "Observe",
+        "Enjoy",
+        "Recover"
+      ],
+      "nouns": [
+        "TreeShade",
+        "Meadow",
+        "Riverbank",
+        "CoolSpot"
       ]
     },
     {
-      "name": "Priest",
-      "relation": "moral authority, confessor",
-      "interactions": [
-        "church attendance",
-        "confession"
+      "id": "FetchWater",
+      "drive": "help your family with the endless chores",
+      "verbs": [
+        "Carry",
+        "Fill",
+        "Empty",
+        "Walk"
+      ],
+      "nouns": [
+        "WaterBucket",
+        "Well",
+        "River"
       ]
     },
     {
-      "name": "Family Members (Fouan)",
-      "relation": "immediate family",
-      "interactions": [
-        "daily work",
-        "support",
-        "shared meals"
+      "id": "ShareMeal",
+      "drive": "brief moments of rest and simple joys amid the hardships",
+      "verbs": [
+        "Eat",
+        "Share",
+        "Talk",
+        "Pass"
+      ],
+      "nouns": [
+        "Bread",
+        "Family",
+        "Table",
+        "Soup"
+      ]
+    },
+    {
+      "id": "SeekGuidance",
+      "drive": "avoid scandal and protecting your reputation",
+      "verbs": [
+        "Ask",
+        "Confide",
+        "Listen"
+      ],
+      "nouns": [
+        "VillagePriest",
+        "OlderWoman",
+        "Mother"
+      ]
+    },
+    {
+      "id": "PresentHarvest",
+      "drive": "gain status and security",
+      "verbs": [
+        "Display",
+        "Offer",
+        "Trade",
+        "Discuss"
+      ],
+      "nouns": [
+        "Produce",
+        "MarketStalls",
+        "Neighbours"
+      ]
+    },
+    {
+      "id": "ObserveMarket",
+      "drive": "find a good husband to marry, gain status and security",
+      "verbs": [
+        "Watch",
+        "Notice",
+        "Compare"
+      ],
+      "nouns": [
+        "VillageMan",
+        "Goods",
+        "Gossip"
       ]
     }
   ],
-  "time_windows": "morning",
   "affordances": {
-    "Farm": [
-      "milking cows",
-      "collecting eggs",
-      "feeding animals",
-      "weeding",
-      "harvesting vegetables",
-      "carrying water"
+    "VillageSquare": [
+      "SocializeRespectfully",
+      "PresentHarvest",
+      "ObserveMarket"
     ],
-    "Field": [
-      "weeding",
-      "planting",
-      "harvesting",
-      "resting under tree briefly"
+    "ChurchYard": [
+      "AttendWorship",
+      "SeekGuidance"
     ],
-    "Village": [
-      "greeting neighbors",
-      "avoiding gossip",
-      "buying and selling at market"
+    "MarquartFarmyard": [
+      "TendFarmChores",
+      "FetchWater"
     ],
-    "Market": [
-      "bartering goods",
-      "buying bread or salt",
-      "checking on prices",
-      "socializing cautiously"
+    "FouanFarmhouse": [
+      "ShareMeal",
+      "RestInShade"
     ],
-    "Grassland": [
-      "gathering wild herbs",
-      "watching livestock",
-      "walking to village"
+    "VillagePath": [
+      "Move",
+      "Greet"
     ],
-    "Forest": [
-      "gathering firewood",
-      "picking berries",
-      "avoiding dangerous animals"
+    "Riverbank": [
+      "FetchWater",
+      "RestInShade"
     ],
-    "Well": [
-      "drawing water",
-      "briefly chatting with other women",
-      "resting in the shade"
+    "MarketStalls": [
+      "PresentHarvest",
+      "ObserveMarket",
+      "Greet"
     ],
-    "Church": [
-      "praying",
-      "confession",
-      "joining public worship",
-      "observing villagers"
+    "SmallBarn": [
+      "TendFarmChores"
     ],
-    "River": [
-      "washing clothes",
-      "fetching water",
-      "reflecting in solitude"
+    "FamilyGarden": [
+      "TendFarmChores"
+    ],
+    "HayMeadow": [
+      "RestInShade",
+      "TendFarmChores"
+    ],
+    "VillageWell": [
+      "FetchWater"
+    ],
+    "NeighborsPorch": [
+      "SocializeRespectfully"
+    ]
+  },
+  "drive_coverage": {
+    "find a good husband to marry, gain status and security": [
+      "SocializeRespectfully",
+      "PresentHarvest",
+      "ObserveMarket"
+    ],
+    "gain status and security": [
+      "PresentHarvest"
+    ],
+    "avoid scandal and protecting your reputation": [
+      "AttendWorship",
+      "SeekGuidance"
+    ],
+    "help your family with the endless chores": [
+      "TendFarmChores",
+      "FetchWater"
+    ],
+    "brief moments of rest and simple joys amid the hardships": [
+      "RestInShade",
+      "ShareMeal"
     ]
   },
   "states": [
     "hunger",
     "fatigue",
     "injury",
-    "thirst",
-    "hope",
-    "anxiety",
-    "embarrassment",
-    "contentment",
-    "loneliness",
-    "anticipation",
-    "relief",
-    "worry"
+    "thirst"
   ]
 }

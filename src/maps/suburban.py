@@ -16,7 +16,7 @@ class SuburbanTerrain(Enum):
     City = 7        # Indoor work space
 
 class SuburbanInfrastructure(Enum):
-    Sidewalk = auto()  # Pedestrian infrastructure
+    Path = auto()  # Pedestrian infrastructure
 
 class SuburbanResources(Enum):
     Refrigerator = auto()
@@ -54,7 +54,7 @@ terrain_rules = {
 
 infrastructure_rules = {
     'road_density': 0.2,      # Higher density of paths in suburban area
-    'path_type': 'Sidewalk',  # Primary infrastructure type
+    'path_type': 'Path',  # Primary infrastructure type
     'slope_factor': 1.0,      # Minimal slope impact in suburban setting
     'terrain_costs': {
         'Water': float('inf'),

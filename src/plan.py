@@ -14,7 +14,8 @@ from utils import hash_utils
 from typing import Any, Dict, List
 from utils.llm_api import LLM
 from Messages import SystemMessage, UserMessage
-from templates import PLAN_TEMPLATE
+from templates import PLAN_TEMPLATE, PHYSIOLOGICAL_NEEDS
+from middle_ontology import build_allowed_scan_types, build_allowed_verbs
 # Type checking imports
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
@@ -544,12 +545,12 @@ REQ_CONDITION_KEYS = {
     "can_see": {"target"},
     "has_item": {"target"},
     "at_location": {"target"},
-    "believes": {"target"},
+    "believes": {"value"},
     "notnear": {"target"},
     "cant_see": {"target"},
     "hasnt_item": {"target"},
     "notat_location": {"target"},
-    "notbelieves": {"target"},
+    "notbelieves": {"value"},
     "bound": {"target"},
     "notbound": {"target"}
 }
@@ -654,6 +655,7 @@ def _validate_condition(condition: Any) -> bool:
 
 def generate_plan_with_context(
     character: ZenohExecutiveNode,
+    current_activity: json,
     goal_text: str,
     prompt_text: str,
     percepts_at_plan: Any = None,
@@ -669,26 +671,33 @@ def generate_plan_with_context(
     try:
         from middle_ontology import rewrite_goal
         finished_rewriting = False
-        while not finished_rewriting:
-            rewritten_goal = rewrite_goal(llm, character.character_name, 
+        iterations = 0
+        allowed_types = build_allowed_scan_types(character.middle_ontology, character.map_types)
+        allowed_verbs = build_allowed_verbs(character.middle_ontology)
+        rewritten_goal = rewrite_goal(llm, character.character_name, 
+                         current_activity,
                          character.ontology, 
                          character.middle_ontology, 
-                         character.map_types, 
+                         allowed_types,
+                         allowed_verbs,
                          goal_text)
-            goal_text = rewritten_goal['rewritten_step']
-            finished_rewriting = rewritten_goal['all_leaves']
-        system_prompt = (
-            "Respond only with a JSON plan according to the provided PLAN_TEMPLATE. "
-            "No prose; end with </end>."
-        )
+        goal_text = rewritten_goal['rewritten_step']
+        system_prompt = """Task: rewrite the following goal statement into a plan according to the PLAN_TEMPLATE below.
+Respond only with a JSON plan according to the provided PLAN_TEMPLATE. No prose or code fences; end with </end>."""
         parts = []
         parts.append("#Your current goal is:\n" + (goal_text or ""))
-        parts.append("\n#Planning prompt (dynamic):\n" + (prompt_text or ""))
+        parts.append("\n----Situation Data (dynamic)----\n" + (prompt_text or "")+'\n----End of Situation Data----\n')
         if percepts_at_plan is not None:
             try:
                 parts.append("\n#Percepts at plan start (JSON):\n" + json.dumps(percepts_at_plan, ensure_ascii=False, indent=2))
             except Exception:
                 pass
+        # Optionally include allowed scan targets (types) derived from middle ontology
+        try:
+            if allowed_types:
+                parts.append("\n#ALLOWED SCAN TARGETS (types)\n" + "\n".join(allowed_types))
+        except Exception:
+            pass
         parts.append("\n#Plan syntax specification:\n" + str(PLAN_TEMPLATE))
         parts.append("\nRespond only with JSON, no other text. End with </end>\n")
         user_prompt = "\n".join(parts)
@@ -700,6 +709,7 @@ def generate_plan_with_context(
             max_tokens=1500,
             stops=['</end>'],
             is_json=True,
+            log=True
         )
         if isinstance(response, dict):
             plan_candidate = response
@@ -815,8 +825,12 @@ def _evaluate_condition(character: ZenohExecutiveNode, condition: dict, observat
         
         condition_type = condition['type']
         normalized_type, negated = normalize_condition_type(condition_type)
-        raw_target = condition['target']
-        target = deref_plan_target(character.plan_bindings, condition['target'])
+        if 'target' in condition:
+            raw_target = condition['target']
+            target = deref_plan_target(character.plan_bindings, raw_target)
+        else:
+            raw_target = condition.get('value', '')
+            target = raw_target
         character_name = character.character_name
         result = {'value': False, 'binding': None}
         
@@ -859,6 +873,11 @@ def _evaluate_condition(character: ZenohExecutiveNode, condition: dict, observat
                             nm = r.get('name', '')
                             if nm and _target_matches(nm, tcap):
                                 return nm
+                    if 'paths' in view:
+                        for p in view['paths']:
+                            nm = p.get('name', '')
+                            if nm and nm == tcap:
+                                return nm
                     if 'terrain' in view:
                         terr = view.get('terrain')
                         if isinstance(terr, str) and terr == tcap:
@@ -884,6 +903,12 @@ def _evaluate_condition(character: ZenohExecutiveNode, condition: dict, observat
                                 nm = r.get('name', '')
                                 if nm and _target_matches(nm, tcap):
                                     return nm
+                    if 'paths' in view:
+                        for p in view['paths']:
+                            if float(p.get('distance', 20)) <= 2:
+                                nm = p.get('name', '')
+                                if nm and _target_matches(nm, tcap):
+                                    return nm
                     if 'terrain' in view:
                         terr = view.get('terrain')
                         if isinstance(terr, str) and terr == tcap:
@@ -907,6 +932,12 @@ def _evaluate_condition(character: ZenohExecutiveNode, condition: dict, observat
                         for r in view['resources']:
                             if float(r.get('distance', 20)) <= 2:
                                 nm = r.get('name', '')
+                                if nm and _target_matches(nm, tcap):
+                                    return nm
+                    if 'paths' in view:
+                        for p in view['paths']:
+                            if float(p.get('distance', 20)) <= 2:
+                                nm = p.get('name', '')
                                 if nm and _target_matches(nm, tcap):
                                     return nm
                     if 'terrain' in view:
@@ -991,7 +1022,8 @@ def _evaluate_condition(character: ZenohExecutiveNode, condition: dict, observat
             elif normalized_type in ('believes', 'notbelieves'):
                 try:
                     from Messages import SystemMessage, UserMessage
-                    sys_prompt = f"Question: Does the character believe: {target}? That is, is that statement in or directly derivable from the users facts below?Answer Yes or No only."
+                    statement = condition.get('value','False')
+                    sys_prompt = f"Question: Does the character believe: {statement}? That is, is that statement in or directly derivable from the users facts below?Answer Yes or No only."
                     user_prompt = f'User facts: {observations}\n\nDo not include any other text in your response, just Yes or No.'
                     resp = character.llm_client.generate([sys_prompt, user_prompt], max_tokens=10, stops=['</end>'])
                     text = resp if isinstance(resp, str) else getattr(resp, 'text', str(resp))

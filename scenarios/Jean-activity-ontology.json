@@ -1,129 +1,326 @@
 {
   "places": [
-    "Field",
-    "Farm",
-    "Village",
-    "Market",
-    "Well",
-    "River",
-    "Grassland",
-    "Forest"
+    "MarquartFarmhouse",
+    "MarquartBarn",
+    "FamilyOrchard",
+    "VegetableField",
+    "VillageMarketSquare",
+    "VillageChurch",
+    "Riverbank",
+    "NeighborFarmFouan",
+    "AnimalStable",
+    "WagonShed",
+    "KitchenGarden",
+    "VillageStreet",
+    "FatherMarquartRoom",
+    "CommunalWell"
   ],
   "tools": [
     "Hoe",
-    "Plough",
-    "Cart",
-    "Bucket",
     "Sickle",
+    "Plough",
+    "HorseCart",
+    "Bucket",
+    "WaterJug",
+    "BreadLoaf",
+    "CheeseRound",
+    "Scythe",
     "Pitchfork",
-    "Bread",
-    "Cheese",
-    "Milk",
-    "Well Water"
+    "WorkClothes",
+    "Apron",
+    "FamilyLedger",
+    "PrayerBook",
+    "WoodenTable",
+    "Bed",
+    "Fishnet",
+    "WoodenChair"
   ],
   "roles": [
+    "PeasantFarmer",
     "Farmhand",
     "Son",
-    "Potential Suitor",
-    "Market Customer",
-    "Villager"
+    "Heir",
+    "MarketCustomer",
+    "Neighbor",
+    "Churchgoer"
   ],
   "norms_rules": [
-    "Respect elders and parents, especially the farm patriarch",
-    "Work the land diligently from sunup",
-    "Avoid public displays of affection",
-    "Keep clear of scandal and gossip",
-    "Attend church regularly",
-    "Speak plainly but show respect to the local hierarchy (priest, landowners)",
-    "Help neighbors in times of need"
+    "RespectElders",
+    "AttendChurchOnSunday",
+    "WorkFromDawnToDusk",
+    "ShareMealsWithFamily",
+    "DoNotGossipAboutNeighbors",
+    "ReturnBorrowedTools",
+    "AssistFamilyWithFarmLabor",
+    "RespectInheritanceOrder",
+    "PreserveFamilyReputation",
+    "AvoidImproperConductWithUnmarriedWomen"
   ],
   "hazards": [
-    "River (drowning hazard)",
-    "Fatigue from overwork",
-    "Injury from farm equipment",
-    "Illness from poor water or weather",
-    "Gossip (social hazard)",
-    "FatherMarquart (displeasure or unfair inheritance)",
-    "Wild animals in Forest"
+    "FarmAnimalInjury",
+    "Overexertion",
+    "RiverAccident",
+    "SpoiledFood",
+    "Heatstroke",
+    "RustyToolInjury",
+    "GossipScandal"
   ],
   "social_graph": [
+    "Jean",
+    "FatherMarquart",
+    "MotherMarquart",
+    "Francoise",
+    "VillagePriest",
+    "VillageGossips",
+    "FouanFamily",
+    "OtherVillagers"
+  ],
+  "time_windows": [
+    "dawn",
+    "morning",
+    "afternoon",
+    "dusk",
+    "evening",
+    "day",
+    "night"
+  ],
+  "activities": [
     {
-      "name": "FatherMarquart",
-      "relation": "Father, farm patriarch, authority, gatekeeper of inheritance"
+      "id": "TendCrops",
+      "drive": "maintain and work the family farm",
+      "verbs": [
+        "Work",
+        "Inspect",
+        "CareFor"
+      ],
+      "nouns": [
+        "Crop",
+        "Field",
+        "Vegetable"
+      ]
     },
     {
-      "name": "MotherMarquart",
-      "relation": "Mother, supporter, cares for family welfare"
+      "id": "FeedAnimals",
+      "drive": "maintain and work the family farm",
+      "verbs": [
+        "Feed",
+        "Inspect",
+        "Lead"
+      ],
+      "nouns": [
+        "Animal",
+        "Stable",
+        "Hay"
+      ]
     },
     {
-      "name": "Francoise",
-      "relation": "Potential suitor, fellow villager, object of interest"
+      "id": "FetchWater",
+      "drive": "immediate needs of survival - food, shelter, health, rest from backbreaking labor",
+      "verbs": [
+        "Fetch",
+        "Carry",
+        "Pour"
+      ],
+      "nouns": [
+        "Water",
+        "Bucket",
+        "Jug"
+      ]
     },
     {
-      "name": "Villagers",
-      "relation": "Peers, important for reputation and assistance"
+      "id": "ShareMeal",
+      "drive": "immediate needs of survival - food, shelter, health, rest from backbreaking labor",
+      "verbs": [
+        "Eat",
+        "Share",
+        "Prepare"
+      ],
+      "nouns": [
+        "Bread",
+        "Cheese",
+        "Meal"
+      ]
     },
     {
-      "name": "Priest",
-      "relation": "Spiritual authority"
+      "id": "RestAfterLabor",
+      "drive": "immediate needs of survival - food, shelter, health, rest from backbreaking labor",
+      "verbs": [
+        "Rest",
+        "Sleep",
+        "Recover"
+      ],
+      "nouns": [
+        "Bed",
+        "Bench",
+        "Shade"
+      ]
+    },
+    {
+      "id": "AttendChurch",
+      "drive": "find love and a wife to build a family with",
+      "verbs": [
+        "Attend",
+        "Pray",
+        "Observe"
+      ],
+      "nouns": [
+        "Mass",
+        "Congregation",
+        "Priest"
+      ]
+    },
+    {
+      "id": "ConverseNeighbor",
+      "drive": "find love and a wife to build a family with",
+      "verbs": [
+        "Speak",
+        "Greet",
+        "Exchange"
+      ],
+      "nouns": [
+        "Greeting",
+        "Story",
+        "Gossip"
+      ]
+    },
+    {
+      "id": "CourtFrancoise",
+      "drive": "find love and a wife to build a family with",
+      "verbs": [
+        "Approach",
+        "Compliment",
+        "Accompany"
+      ],
+      "nouns": [
+        "Word",
+        "Smile",
+        "Gesture"
+      ]
+    },
+    {
+      "id": "DiscussInheritance",
+      "drive": "gain your rightful inheritance - justice and fairness in how the land is divided",
+      "verbs": [
+        "Speak",
+        "Request",
+        "Reason"
+      ],
+      "nouns": [
+        "Inheritance",
+        "Land",
+        "Share"
+      ]
+    },
+    {
+      "id": "SupportFather",
+      "drive": "gain your rightful inheritance - justice and fairness in how the land is divided",
+      "verbs": [
+        "Assist",
+        "CareFor",
+        "Consult"
+      ],
+      "nouns": [
+        "Father",
+        "Advice",
+        "Task"
+      ]
+    },
+    {
+      "id": "NegotiateMarket",
+      "drive": "maintain and work the family farm",
+      "verbs": [
+        "Negotiate",
+        "Buy",
+        "Sell"
+      ],
+      "nouns": [
+        "Goods",
+        "Neighbor",
+        "Price"
+      ]
     }
   ],
-  "time_windows": "morning",
   "affordances": {
-    "Field": [
-      "Plough field",
-      "Sow seeds",
-      "Harvest crops",
-      "Tend to livestock"
+    "MarquartFarmhouse": [
+      "ShareMeal",
+      "RestAfterLabor",
+      "DiscussInheritance",
+      "SupportFather"
     ],
-    "Farm": [
-      "Feed animals",
-      "Repair fences",
-      "Milk cows",
-      "Prepare farm tools",
-      "Eat breakfast"
+    "MarquartBarn": [
+      "FeedAnimals",
+      "TendCrops"
     ],
-    "Village": [
-      "Greet neighbors",
-      "Gather news",
-      "Visit church",
-      "Attend market"
+    "FamilyOrchard": [
+      "TendCrops",
+      "ConverseNeighbor"
     ],
-    "Market": [
-      "Sell produce",
-      "Buy goods",
-      "Meet villagers",
-      "Socialize with Francoise"
+    "VegetableField": [
+      "TendCrops"
     ],
-    "Well": [
-      "Draw water",
-      "Wash face",
-      "Socialize briefly"
+    "VillageMarketSquare": [
+      "NegotiateMarket",
+      "ConverseNeighbor"
     ],
-    "River": [
-      "Catch fish",
-      "Wash tools",
-      "Cool off"
+    "VillageChurch": [
+      "AttendChurch",
+      "ConverseNeighbor",
+      "CourtFrancoise"
     ],
-    "Grassland": [
-      "Graze livestock",
-      "Gather wild herbs"
+    "Riverbank": [
+      "FetchWater",
+      "RestAfterLabor"
     ],
-    "Forest": [
-      "Gather wood",
-      "Hunt small game",
-      "Seek privacy"
+    "NeighborFarmFouan": [
+      "ConverseNeighbor",
+      "CourtFrancoise"
+    ],
+    "AnimalStable": [
+      "FeedAnimals"
+    ],
+    "WagonShed": [
+      "TendCrops"
+    ],
+    "KitchenGarden": [
+      "TendCrops"
+    ],
+    "VillageStreet": [
+      "ConverseNeighbor",
+      "CourtFrancoise"
+    ],
+    "FatherMarquartRoom": [
+      "SupportFather",
+      "DiscussInheritance"
+    ],
+    "CommunalWell": [
+      "FetchWater"
+    ]
+  },
+  "drive_coverage": {
+    "gain your rightful inheritance - justice and fairness in how the land is divided": [
+      "DiscussInheritance",
+      "SupportFather"
+    ],
+    "maintain and work the family farm": [
+      "TendCrops",
+      "FeedAnimals",
+      "NegotiateMarket"
+    ],
+    "find love and a wife to build a family with": [
+      "AttendChurch",
+      "ConverseNeighbor",
+      "CourtFrancoise"
+    ],
+    "immediate needs of survival - food, shelter, health, rest from backbreaking labor": [
+      "FetchWater",
+      "ShareMeal",
+      "RestAfterLabor"
     ]
   },
   "states": [
     "hunger",
-    "fatigue",
-    "injury",
     "thirst",
-    "anger",
-    "hope",
-    "worry",
-    "pride",
-    "frustration"
+    "fatigue",
+    "injury"
   ]
 }

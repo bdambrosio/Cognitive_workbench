@@ -1,39 +1,466 @@
-2025-08-28 18:58:44 - memory_node - INFO - 🔧 Debug mode enabled for Jim
-2025-08-28 18:58:44 - llm_client - INFO - 🤖 Zenoh LLM Client initialized
-2025-08-28 18:58:44 - memory_node - INFO - 📂 No existing memory file, starting fresh
-2025-08-28 18:58:44 - memory_node - INFO - Memory Node initialized for character: Jim
-2025-08-28 18:58:44 - memory_node - INFO - Storage available at:
-2025-08-28 18:58:44 - memory_node - INFO -   - cognitive/Jim/memory/short_term/*
-2025-08-28 18:58:44 - memory_node - INFO -   - cognitive/Jim/memory/chat/*
-2025-08-28 18:58:44 - memory_node - INFO -   - cognitive/Jim/memory/long_term/*
-2025-08-28 18:58:44 - memory_node - INFO -   - cognitive/Jim/memory/entity/*
-2025-08-28 18:58:44 - memory_node - INFO -   - cognitive/Jim/memory/inventory
-2025-08-28 18:58:44 - memory_node - INFO - Subscriptions:
-2025-08-28 18:58:44 - memory_node - INFO -   - cognitive/Jim/memory/close_dialog
-2025-08-28 18:58:44 - memory_node - INFO - Memory Node running - press Ctrl+C to stop
-2025-08-28 18:58:48 - memory_node - INFO - 📢 Stored character announcement: Jim
-2025-08-28 18:59:00 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
-2025-08-28 18:59:00 - memory_node - INFO - 📦 Inventory query: returned 0 items
-2025-08-28 18:59:00 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
-2025-08-28 18:59:00 - memory_node - INFO - 📦 Inventory query: returned 0 items
-2025-08-28 19:00:48 - memory_node - INFO - 👥 Created new entity: Jim
-2025-08-28 19:00:48 - memory_node - INFO - 💾 Saved memory to data/memory/Jim_memory.json
-2025-08-28 19:00:48 - memory_node - INFO - 💬 Added conversation entry for Jim: Jim "#thought silence is key..."
-2025-08-28 19:00:48 - memory_node - INFO - 💬 Added response to entity Jim: Jim -> "#thought silence is key..."
-2025-08-28 19:00:55 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
-2025-08-28 19:00:55 - memory_node - INFO - 📦 Inventory query: returned 0 items
-2025-08-28 19:00:55 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
-2025-08-28 19:00:55 - memory_node - INFO - 📦 Inventory query: returned 0 items
-2025-08-28 19:00:55 - memory_node - INFO - 📝 Stored action: scan - 1
-2025-08-28 19:01:00 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
-2025-08-28 19:01:00 - memory_node - INFO - 📦 Inventory query: returned 0 items
-2025-08-28 19:01:00 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
-2025-08-28 19:01:00 - memory_node - INFO - 📦 Inventory query: returned 0 items
-2025-08-28 19:02:14 - memory_node - INFO - 📝 Generated summary for Jim: Entity: Jim | First seen: 2025-08-28 19:00 | Total...
-2025-08-28 19:02:28 - memory_node - INFO - 💾 Saved memory to data/memory/Jim_memory.json
-2025-08-28 19:02:28 - memory_node - INFO - 💬 Added conversation entry for Jim: Jim "#thought Safety is my top priority..."
-2025-08-28 19:02:28 - memory_node - INFO - 💬 Added response to entity Jim: Jim -> "#thought Safety is my top priority..."
-2025-08-28 19:02:40 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
-2025-08-28 19:02:40 - memory_node - INFO - 📦 Inventory query: returned 0 items
-2025-08-28 19:02:40 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
-2025-08-28 19:02:40 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:40:07 - memory_node - INFO - 🔧 Debug mode enabled for Jim
+2025-09-01 09:40:07 - llm_client - INFO - 🤖 Zenoh LLM Client initialized
+2025-09-01 09:40:07 - memory_node - INFO - 📂 No existing memory file, starting fresh
+2025-09-01 09:40:07 - memory_node - INFO - Memory Node initialized for character: Jim
+2025-09-01 09:40:07 - memory_node - INFO - Storage available at:
+2025-09-01 09:40:07 - memory_node - INFO -   - cognitive/Jim/memory/short_term/*
+2025-09-01 09:40:07 - memory_node - INFO -   - cognitive/Jim/memory/chat/*
+2025-09-01 09:40:07 - memory_node - INFO -   - cognitive/Jim/memory/long_term/*
+2025-09-01 09:40:07 - memory_node - INFO -   - cognitive/Jim/memory/entity/*
+2025-09-01 09:40:07 - memory_node - INFO -   - cognitive/Jim/memory/inventory
+2025-09-01 09:40:07 - memory_node - INFO - Subscriptions:
+2025-09-01 09:40:07 - memory_node - INFO -   - cognitive/Jim/memory/close_dialog
+2025-09-01 09:40:07 - memory_node - INFO - Memory Node running - press Ctrl+C to stop
+2025-09-01 09:40:11 - memory_node - INFO - 📢 Stored character announcement: Jim
+2025-09-01 09:40:22 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:40:22 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:40:22 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:40:22 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:41:09 - memory_node - INFO - 📝 Stored action: scan - 0
+2025-09-01 09:41:15 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:41:15 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:41:15 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:41:15 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:41:15 - memory_node - INFO - 📝 Stored action: scan - 1
+2025-09-01 09:41:16 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:41:16 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:41:16 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:41:16 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:41:23 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:41:23 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:41:23 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:41:23 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:41:29 - memory_node - INFO - 📝 Stored action: scan - 2
+2025-09-01 09:41:30 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:41:30 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:41:30 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:41:30 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:41:32 - memory_node - INFO - 📝 Stored action: inspect - inspect_1756744892
+2025-09-01 09:41:33 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:41:33 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:41:33 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:41:33 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:41:35 - memory_node - INFO - 👥 Created new entity: Jim
+2025-09-01 09:41:35 - memory_node - INFO - 💾 Saved memory to data/memory/Jim_memory.json
+2025-09-01 09:41:35 - memory_node - INFO - 💬 Added conversation entry for Jim: Jim "#thought Appletree11 is safe..."
+2025-09-01 09:41:35 - memory_node - INFO - 💬 Added response to entity Jim: Jim -> "#thought Appletree11 is safe..."
+2025-09-01 09:41:36 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:41:36 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:41:36 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:41:36 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:41:36 - memory_node - ERROR - Place action missing target: 5
+2025-09-01 09:41:37 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:41:37 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:41:37 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:41:37 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:41:43 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:41:43 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:41:43 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:41:43 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:41:47 - memory_node - INFO - 📦 Added Appletree11 to inventory
+2025-09-01 09:41:47 - memory_node - INFO - 📦 Added Appletree11 to Jim inventory via take action
+2025-09-01 09:41:48 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:41:48 - memory_node - INFO - 📦 Inventory query: returned 1 items
+2025-09-01 09:41:48 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:41:48 - memory_node - INFO - 📦 Inventory query: returned 1 items
+2025-09-01 09:41:48 - memory_node - INFO - 📦 Inventory query for Appletree11: True
+2025-09-01 09:41:48 - memory_node - INFO - 📦 Removed Appletree11 from inventory
+2025-09-01 09:41:48 - memory_node - INFO - 🧺 Removed Appletree11 from Jim inventory via place action
+2025-09-01 09:41:49 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:41:49 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:41:49 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:41:49 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:41:51 - memory_node - INFO - 💾 Saved memory to data/memory/Jim_memory.json
+2025-09-01 09:41:51 - memory_node - INFO - 💬 Added conversation entry for Jim: Jim "#thought Need marker to mark safe locations..."
+2025-09-01 09:41:51 - memory_node - INFO - 💬 Added response to entity Jim: Jim -> "#thought Need marker to mark safe locations..."
+2025-09-01 09:41:52 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:41:52 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:41:52 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:41:52 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:41:53 - memory_node - INFO - 💾 Saved memory to data/memory/Jim_memory.json
+2025-09-01 09:41:53 - memory_node - INFO - 💬 Added conversation entry for Jim: Jim "#thought Need to find a marker..."
+2025-09-01 09:41:53 - memory_node - INFO - 💬 Added response to entity Jim: Jim -> "#thought Need to find a marker..."
+2025-09-01 09:41:54 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:41:54 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:41:54 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:41:54 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:41:58 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:41:58 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:41:58 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:41:58 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:42:03 - memory_node - INFO - 📝 Stored action: scan - 11
+2025-09-01 09:42:04 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:42:04 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:42:04 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:42:04 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:42:04 - memory_node - INFO - 📝 Stored action: scan - 12
+2025-09-01 09:42:05 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:42:05 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:42:05 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:42:05 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:42:05 - memory_node - INFO - 📝 Stored action: use - 13
+2025-09-01 09:42:06 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:42:06 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:42:06 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:42:06 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:42:12 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:42:12 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:42:12 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:42:12 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:42:29 - memory_node - INFO - 📝 Stored action: scan - 14
+2025-09-01 09:42:30 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:42:30 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:42:30 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:42:30 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:42:30 - memory_node - INFO - 📝 Stored action: scan - 15
+2025-09-01 09:42:31 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:42:31 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:42:31 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:42:31 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:42:33 - memory_node - INFO - 💾 Saved memory to data/memory/Jim_memory.json
+2025-09-01 09:42:33 - memory_node - INFO - 💬 Added conversation entry for Jim: Jim "#thought Need a safe place to rest..."
+2025-09-01 09:42:33 - memory_node - INFO - 💬 Added response to entity Jim: Jim -> "#thought Need a safe place to rest..."
+2025-09-01 09:42:34 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:42:34 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:42:34 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:42:34 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:42:40 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:42:40 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:42:40 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:42:40 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:42:54 - memory_node - INFO - 💾 Saved memory to data/memory/Jim_memory.json
+2025-09-01 09:42:54 - memory_node - INFO - 💬 Added conversation entry for Jim: Jim "#thought Landmarks are key to navigation..."
+2025-09-01 09:42:54 - memory_node - INFO - 💬 Added response to entity Jim: Jim -> "#thought Landmarks are key to navigation..."
+2025-09-01 09:42:55 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:42:55 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:42:55 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:42:55 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:42:55 - memory_node - INFO - 📝 Stored action: scan - 18
+2025-09-01 09:42:56 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:42:56 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:42:56 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:42:56 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:42:57 - memory_node - INFO - 💾 Saved memory to data/memory/Jim_memory.json
+2025-09-01 09:42:57 - memory_node - INFO - 💬 Added conversation entry for Jim: Jim "#thought Need to inspect Appletree11..."
+2025-09-01 09:42:57 - memory_node - INFO - 💬 Added response to entity Jim: Jim -> "#thought Need to inspect Appletree11..."
+2025-09-01 09:42:58 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:42:58 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:42:58 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:42:58 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:42:58 - memory_node - INFO - 📝 Stored action: scan - 20
+2025-09-01 09:42:59 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:42:59 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:42:59 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:42:59 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:43:01 - memory_node - INFO - 📝 Stored action: inspect - inspect_1756744981
+2025-09-01 09:43:02 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:43:02 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:43:02 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:43:02 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:43:03 - memory_node - INFO - 💾 Saved memory to data/memory/Jim_memory.json
+2025-09-01 09:43:03 - memory_node - INFO - 💬 Added conversation entry for Jim: Jim "#thought Need to record Appletree11 in notebook..."
+2025-09-01 09:43:03 - memory_node - INFO - 💬 Added response to entity Jim: Jim -> "#thought Need to record Appletree11 in notebook..."
+2025-09-01 09:43:04 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:43:04 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:43:04 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:43:04 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:43:09 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:43:09 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:43:09 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:43:09 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:43:18 - memory_node - INFO - 💾 Saved memory to data/memory/Jim_memory.json
+2025-09-01 09:43:18 - memory_node - INFO - 💬 Added conversation entry for Jim: Jim "#thought Sun is best landmark..."
+2025-09-01 09:43:18 - memory_node - INFO - 💬 Added response to entity Jim: Jim -> "#thought Sun is best landmark..."
+2025-09-01 09:43:19 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:43:19 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:43:19 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:43:19 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:43:19 - memory_node - INFO - 📝 Stored action: scan - 24
+2025-09-01 09:43:20 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:43:20 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:43:20 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:43:20 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:43:20 - memory_node - INFO - 📝 Stored action: inspect - 25
+2025-09-01 09:43:21 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:43:21 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:43:21 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:43:21 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:43:22 - memory_node - INFO - 💾 Saved memory to data/memory/Jim_memory.json
+2025-09-01 09:43:22 - memory_node - INFO - 💬 Added conversation entry for Jim: Jim "#thought Need to use sun for orientation..."
+2025-09-01 09:43:22 - memory_node - INFO - 💬 Added response to entity Jim: Jim -> "#thought Need to use sun for orientation..."
+2025-09-01 09:43:23 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:43:23 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:43:23 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:43:23 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:43:23 - memory_node - INFO - 📝 Stored action: scan - 27
+2025-09-01 09:43:24 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:43:24 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:43:24 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:43:24 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:43:26 - memory_node - INFO - 📝 Stored action: inspect - inspect_1756745006
+2025-09-01 09:43:27 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:43:27 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:43:27 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:43:27 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:43:33 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:43:33 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:43:33 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:43:33 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:43:39 - memory_node - INFO - 💾 Saved memory to data/memory/Jim_memory.json
+2025-09-01 09:43:39 - memory_node - INFO - 💬 Added conversation entry for Jim: Jim "#thought Path2019 is nearest path..."
+2025-09-01 09:43:39 - memory_node - INFO - 💬 Added response to entity Jim: Jim -> "#thought Path2019 is nearest path..."
+2025-09-01 09:43:40 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:43:40 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:43:40 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:43:40 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:43:40 - memory_node - INFO - 📝 Stored action: scan - 30
+2025-09-01 09:43:41 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:43:41 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:43:41 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:43:41 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:43:42 - memory_node - INFO - 💾 Saved memory to data/memory/Jim_memory.json
+2025-09-01 09:43:42 - memory_node - INFO - 💬 Added conversation entry for Jim: Jim "#thought Path2019 leads to safety..."
+2025-09-01 09:43:42 - memory_node - INFO - 💬 Added response to entity Jim: Jim -> "#thought Path2019 leads to safety..."
+2025-09-01 09:43:43 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:43:43 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:43:43 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:43:43 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:43:49 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:43:49 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:43:49 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:43:49 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:44:18 - memory_node - INFO - 📝 Stored action: scan - 32
+2025-09-01 09:44:19 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:44:19 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:44:19 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:44:19 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:44:21 - memory_node - INFO - 💾 Saved memory to data/memory/Jim_memory.json
+2025-09-01 09:44:21 - memory_node - INFO - 💬 Added conversation entry for Jim: Jim "#thought Forest edge is key to escape..."
+2025-09-01 09:44:21 - memory_node - INFO - 💬 Added response to entity Jim: Jim -> "#thought Forest edge is key to escape..."
+2025-09-01 09:44:22 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:44:22 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:44:22 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:44:22 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:44:22 - memory_node - INFO - 📝 Stored action: scan - 34
+2025-09-01 09:44:23 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:44:23 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:44:23 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:44:23 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:44:24 - memory_node - INFO - 💾 Saved memory to data/memory/Jim_memory.json
+2025-09-01 09:44:24 - memory_node - INFO - 💬 Added conversation entry for Jim: Jim "#thought High ground offers better visibility..."
+2025-09-01 09:44:24 - memory_node - INFO - 💬 Added response to entity Jim: Jim -> "#thought High ground offers better visibility..."
+2025-09-01 09:44:25 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:44:25 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:44:25 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:44:25 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:44:32 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:44:32 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:44:32 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:44:32 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:44:39 - memory_node - INFO - 📝 Stored action: scan - 36
+2025-09-01 09:44:40 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:44:40 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:44:40 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:44:40 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:44:40 - memory_node - INFO - 📝 Stored action: scan - 37
+2025-09-01 09:44:41 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:44:41 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:44:41 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:44:41 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:44:43 - memory_node - INFO - 💾 Saved memory to data/memory/Jim_memory.json
+2025-09-01 09:44:43 - memory_node - INFO - 💬 Added conversation entry for Jim: Jim "#thought Path2019 is nearest escape route..."
+2025-09-01 09:44:43 - memory_node - INFO - 💬 Added response to entity Jim: Jim -> "#thought Path2019 is nearest escape route..."
+2025-09-01 09:44:44 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:44:44 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:44:44 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:44:44 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:44:45 - memory_node - INFO - 💾 Saved memory to data/memory/Jim_memory.json
+2025-09-01 09:44:45 - memory_node - INFO - 💬 Added conversation entry for Jim: Jim "#thought Need to follow Path2019..."
+2025-09-01 09:44:45 - memory_node - INFO - 💬 Added response to entity Jim: Jim -> "#thought Need to follow Path2019..."
+2025-09-01 09:44:46 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:44:46 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:44:46 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:44:46 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:44:52 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:44:52 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:44:52 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:44:52 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:44:59 - memory_node - INFO - 📝 Stored action: scan - 40
+2025-09-01 09:45:00 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:45:00 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:45:00 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:45:00 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:45:00 - memory_node - INFO - 📝 Stored action: scan - 41
+2025-09-01 09:45:01 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:45:01 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:45:01 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:45:01 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:45:01 - memory_node - INFO - 📝 Stored action: scan - 42
+2025-09-01 09:45:02 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:45:02 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:45:02 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:45:02 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:45:02 - memory_node - ERROR - Place action missing target: 43
+2025-09-01 09:45:03 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:45:03 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:45:03 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:45:03 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:45:03 - memory_node - ERROR - Place action missing target: 44
+2025-09-01 09:45:04 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:45:04 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:45:04 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:45:04 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:45:05 - memory_node - INFO - 💾 Saved memory to data/memory/Jim_memory.json
+2025-09-01 09:45:05 - memory_node - INFO - 💬 Added conversation entry for Jim: Jim "#thought Need to find nearest landmark..."
+2025-09-01 09:45:05 - memory_node - INFO - 💬 Added response to entity Jim: Jim -> "#thought Need to find nearest landmark..."
+2025-09-01 09:45:06 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:45:06 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:45:06 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:45:06 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:45:12 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:45:12 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:45:12 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:45:12 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:45:19 - memory_node - INFO - 💾 Saved memory to data/memory/Jim_memory.json
+2025-09-01 09:45:19 - memory_node - INFO - 💬 Added conversation entry for Jim: Jim "#thought Path2019 is nearest exit route..."
+2025-09-01 09:45:19 - memory_node - INFO - 💬 Added response to entity Jim: Jim -> "#thought Path2019 is nearest exit route..."
+2025-09-01 09:45:20 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:45:20 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:45:20 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:45:20 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:45:20 - memory_node - INFO - 📝 Stored action: scan - 47
+2025-09-01 09:45:21 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:45:21 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:45:21 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:45:21 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:45:23 - memory_node - INFO - 📝 Stored action: inspect - inspect_1756745123
+2025-09-01 09:45:24 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:45:24 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:45:24 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:45:24 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:45:30 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:45:30 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:45:30 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:45:30 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:45:51 - memory_node - INFO - 📝 Stored action: scan - 49
+2025-09-01 09:45:52 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:45:52 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:45:52 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:45:52 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:45:54 - memory_node - INFO - 📝 Stored action: inspect - inspect_1756745154
+2025-09-01 09:45:55 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:45:55 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:45:55 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:45:55 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:45:55 - memory_node - INFO - 📝 Stored action: scan - 51
+2025-09-01 09:45:56 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:45:56 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:45:56 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:45:56 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:45:56 - memory_node - INFO - 📝 Stored action: inspect - 52
+2025-09-01 09:45:57 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:45:57 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:45:57 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:45:57 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:46:04 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:46:04 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:46:04 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:46:04 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:46:11 - memory_node - INFO - 📝 Stored action: scan - 53
+2025-09-01 09:46:12 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:46:12 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:46:12 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:46:12 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:46:14 - memory_node - INFO - 📝 Stored action: inspect - inspect_1756745174
+2025-09-01 09:46:15 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:46:15 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:46:15 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:46:15 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:46:17 - memory_node - INFO - 💾 Saved memory to data/memory/Jim_memory.json
+2025-09-01 09:46:17 - memory_node - INFO - 💬 Added conversation entry for Jim: Jim "#thought Appletree11 provides food..."
+2025-09-01 09:46:17 - memory_node - INFO - 💬 Added response to entity Jim: Jim -> "#thought Appletree11 provides food..."
+2025-09-01 09:46:18 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:46:18 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:46:18 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:46:18 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:46:23 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:46:23 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:46:23 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:46:23 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:46:29 - memory_node - INFO - 📝 Stored action: scan - 56
+2025-09-01 09:46:30 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:46:30 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:46:30 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:46:30 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:46:30 - memory_node - INFO - 📝 Stored action: inspect - 57
+2025-09-01 09:46:31 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:46:31 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:46:31 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:46:31 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:46:31 - memory_node - INFO - 📝 Stored action: scan - 58
+2025-09-01 09:46:32 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:46:32 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:46:32 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:46:32 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:46:34 - memory_node - INFO - 📝 Stored action: inspect - inspect_1756745194
+2025-09-01 09:46:35 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:46:35 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:46:35 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:46:35 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:46:35 - memory_node - ERROR - Place action missing target: 60
+2025-09-01 09:46:36 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:46:36 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:46:36 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:46:36 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:46:41 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:46:41 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:46:41 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:46:41 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:47:02 - memory_node - INFO - 💾 Saved memory to data/memory/Jim_memory.json
+2025-09-01 09:47:02 - memory_node - INFO - 💬 Added conversation entry for Jim: Jim "#thought Hazards may be hidden from view..."
+2025-09-01 09:47:02 - memory_node - INFO - 💬 Added response to entity Jim: Jim -> "#thought Hazards may be hidden from view..."
+2025-09-01 09:47:03 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:47:03 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:47:03 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:47:03 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:47:03 - memory_node - INFO - 📝 Stored action: scan - 62
+2025-09-01 09:47:04 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:47:04 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:47:04 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:47:04 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:47:06 - memory_node - INFO - 📝 Stored action: inspect - inspect_1756745226
+2025-09-01 09:47:07 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:47:07 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:47:07 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:47:07 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:47:08 - memory_node - INFO - 📝 Stored action: use - 64
+2025-09-01 09:47:09 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:47:09 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:47:09 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:47:09 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:47:15 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:47:15 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:47:15 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:47:15 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:47:32 - memory_node - INFO - 📝 Stored action: scan - 65
+2025-09-01 09:47:33 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:47:33 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:47:33 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:47:33 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:47:33 - memory_node - INFO - 📝 Stored action: inspect - 66
+2025-09-01 09:47:34 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:47:34 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:47:34 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:47:34 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:47:40 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:47:40 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:47:40 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:47:40 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:47:51 - memory_node - INFO - 💾 Saved memory to data/memory/Jim_memory.json
+2025-09-01 09:47:51 - memory_node - INFO - 💬 Added conversation entry for Jim: Jim "#thought Landmark identification requires closer i..."
+2025-09-01 09:47:51 - memory_node - INFO - 💬 Added response to entity Jim: Jim -> "#thought Landmark identification requires closer i..."
+2025-09-01 09:47:52 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:47:52 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:47:52 - memory_node - INFO - 👥 Entity dialog query for Jim: completed
+2025-09-01 09:47:52 - memory_node - INFO - 📦 Inventory query: returned 0 items
+2025-09-01 09:47:52 - memory_node - INFO - 📝 Stored action: scan - 68

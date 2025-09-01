@@ -14,7 +14,7 @@ class ForestTerrain(Enum):
     Meadow = 6
 
 class ForestInfrastructure(Enum):
-    Trail = auto()    
+    Path = auto()    
 
 class ForestResources(Enum):
     Berries = auto()
@@ -47,7 +47,7 @@ terrain_rules = {
 
 infrastructure_rules = {
     'road_density': 0.05,     # Fewer roads in forest
-    'path_type': 'Trail',     # Specify the path type
+    'path_type': 'Path',     # Specify the path type
     'slope_factor': 2.5,      # Slightly higher penalty for slopes in forests
     'terrain_costs': {
         'Water': float('inf'),
