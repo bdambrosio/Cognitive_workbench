@@ -55,9 +55,11 @@ PHYSIOLOGICAL_NEEDS = [
             #{"name":"safety","metric":"safety","better_when":"increasing","bands":{"low":[0,30],"mid":[30,70],"high":[70,100]}}
 ]
 
-ONTOLOGY_TEMPLATE = """You are creating an ontology for daily activities. Attend especially to the era, setting, and locale, these will often be imagined, fantasy, or historical settings.
-Produce an ontology that is strictly consistent with the provided setting, character, and map_types.
-Do NOT introduce wilderness/survival elements (e.g., forest hazards, foraging) unless they are explicitly present in the setting/map_types.
+ONTOLOGY_TEMPLATE = """You are creating an ontology for daily activities for {{$character_name}}. 
+Attend to the era, setting, and locale, these will often be imagined, fantasy, or historical settings. These provide context for the activities the character engages in.
+Pay particular attention to the character's drives and physiological needs, these define, at a high level, the motivations for the activities.
+Produce an ontology that is strictly consistent with the provided setting, character, drives, and Base noun and verb types.
+Do NOT introduce wilderness/survival elements (e.g., forest hazards, foraging) unless they are explicitly present in the setting/map_types, they are for illustration purposes only.
 Likewise, do NOT import corporate/legal/online elements unless present. Stay data-driven by the inputs.
 
 INPUT:
@@ -93,7 +95,7 @@ INPUT:
 {{$other_characters}}
 ##
 
-Include mental, physical, and social activities that are possible and consistent with the character and their drives in this setting.
+Include mental, physical, social, and other activities that are possible and consistent with the character and their drives in this setting.
 Pay special attention to the character's drives in the context of the setting.
 
 OUTPUT (JSON) (All names - places, tools, roles, norms, hazards, social_graph - must be unique and must consist of letters only - no spaces or special characters)
@@ -385,25 +387,25 @@ Generate steps that can serve as achievable planning goals. Each step should:
 - Always use the broadest applicable period or season in the "when" field.
 
 #State Alignment Guidelines:
-- Activities that address urgent physiological needs (high hunger, fatigue, injury) will be prioritized by the system
+- Activities that address urgent physiological needs (high hunger, fatigue, thirst, injury) will be prioritized by the system
 - Use "states_addressed" to specify which needs the activity satisfies (e.g., eating activities address "hunger")
 - Consider the character's current state when designing activities - hungry characters should have access to hunger-reducing activities
 
 Do not include any other text, introductory, explanatory, markdown, code fences, etc.
 """
 
-REWRITE_TEMPLATE = """Task: rewrite an activity step statement into a goal statement using only allowed nouns and verbs.
-Output: only valid JSON – DO NOT include any other text whether introductory, explanatory, markdown, code fences, etc.
+REWRITE_TEMPLATE = """Task: rewrite an activity step into a goal statement using only allowed nouns and verbs.
+Output: a goal statement text string. Do not include any other text, introductory, explanatory, markdown, code fences, etc.
 
 INPUTS
 ------
 #Activity name:
 {{$activity_name}}
 
-#All steps (for context on pre/post conditions):
+#Activity context (planned sequence of steps):
 {{$activity_steps}}
 
-#Step to rewrite:
+#Activity step to rewrite:
 {{$step_to_rewrite}}
 
 #Allowed nouns:
@@ -414,20 +416,15 @@ INPUTS
 
 TASK
 ----
-Rewrite the given step using allowed nouns and verbs. This may involve approximation or interpretation in the context of the setting.
+Rewrite the given activity step to rewrite into a goal statement using allowed nouns and verbs. This may involve approximation or interpretation in the context of the setting.
 The object is not single-word substitution, but rather to re-express the statement in more specific terms, as an objective or goal.
 Despite the use of the phrase 'step', the rewritten statement need not contain only a single verb or a single sentence.
 The rewrite may be longer that the original step statement, but should be more specific in terms of the ontology provided.
 - Only use allowed nouns, verbs and common connectives. Do not generalize or invent.
 - Produce exactly one rewritten step statement.
-- Indicate whether any verbs or nouns in the rewritten statement are capable of further rewriting.
 
-OUTPUT (strict JSON only)
--------------------------
-{
-  "rewritten_step": "<string>",
-  "further_decomposition_possible": true | false,
-}
+Output ONLY the rewritten goal statement. Do not include any other text, introductory, explanatory, markdown, code fences, etc.
+end your response with </end>
 """
 
 GOAL_TEMPLATE = """What is the most relevant thing you should work on next? 
@@ -441,7 +438,7 @@ Consider in addition to the information above:
 
 #What is the central issue / opportunity / obligation demanding the character's attention?
 1. If any physiological state value rised to 90, the character dies. State values below 40 are desirable.
-2. Consider your current state (e.g., hunger, fatigue, injury); a survival-critical state (e.g., value above 70)should bias goals toward remediation.
+2. Consider your current state (e.g., hunger, fatigue, thirst, injury); a survival-critical state (e.g., value above 70) should bias goals toward remediation.
 3. Otherwise, Drives should be main priority,in the context of the current situation. Drives above are in priority order, highest first.
 
 #You MUST use ONLY verbs and nouns from the MANIFEST below. Use the exact 'id' strings (case-sensitive). 

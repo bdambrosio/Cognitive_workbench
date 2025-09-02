@@ -1389,6 +1389,13 @@ class FastAPIActionDisplayNode:
             updateActivityDataDisplay(characterName);
             updateCharacterDataDisplay(characterName);
             updateSituationDataDisplay(characterName);
+            // Also refresh state panel if it is the active tab
+            try {
+                const statePanel = document.getElementById('statePanel');
+                if (statePanel && statePanel.classList.contains('active')) {
+                    updateStateDataDisplay(characterName);
+                }
+            } catch (e) { /* no-op */ }
             
             console.log(`Selected character tab: ${characterName}`);
         }
@@ -1746,7 +1753,7 @@ class FastAPIActionDisplayNode:
             let html = '';
             Object.keys(state).forEach(key => {
                 const v = state[key] && typeof state[key].value !== 'undefined' ? state[key].value : '';
-                html += `<div class="character-data-item"><div class="character-data-label">${key.charAt(0).toUpperCase() + key.slice(1)}</div><div class="character-data-value">${v}/100</div></div>`;
+                html += `<div class="character-data-item"><div class="character-data-label">${key.charAt(0).toUpperCase() + key.slice(1)}</div><div class="character-data-value">${Math.round(Number(v) || 0)}/100</div></div>`;
             });
             stateDiv.innerHTML = html;
         }

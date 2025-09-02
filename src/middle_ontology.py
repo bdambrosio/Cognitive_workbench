@@ -930,10 +930,9 @@ def rewrite_goal(llm:LLM, character_name, current_activity, ontology, middle_ont
          "middle_ontology": json.dumps(middle_ontology, indent=2),
          "allowed_nouns": allowed_types,
          "allowed_verbs": allowed_verbs},
-        [SystemMessage(content="Rewrite to following Goal statement according to REWRITE_TEMPLATE. Respond only with JSON according to REWRITE_TEMPLATE. No prose or code fences; end with </end>."), UserMessage(content=REWRITE_TEMPLATE)],
+        [SystemMessage(content=REWRITE_TEMPLATE)],
         max_tokens=800,
         stops=['</end>'],
-        is_json=True,
    )
     print(resp)
     return resp

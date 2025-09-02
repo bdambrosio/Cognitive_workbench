@@ -1,6 +1,6 @@
 {
   "version": "0.5",
-  "setting_notes": "Wilderness survival at a forest edge, combining resource hunting, risk avoidance, navigation, and social trust. Noun and verb manifolds span perception, locomotion, social, and survival acts. Drives ensure coverage for escape, survival, physiological, and social needs; leaf nodes are mapped to concrete forest objects, bodily states, and agent tasks.",
+  "setting_notes": "Ontology covers exploration and survival in a temperate forest, balancing physiological, safety, companionship, and mystery-solving drives. Nodes focus on observable acts, available resources, hazards, social and environmental context. Each drive is supported by several verb+noun paths. All verbs anchor to primitive actions; all leaf nouns are anchored in supplied primitives.",
   "constraints": {
     "verb_nodes_max": 60,
     "noun_nodes_max": 60,
@@ -17,394 +17,370 @@
         "gloss": "obtain control of an entity"
       },
       {
-        "id": "Utilize",
-        "gloss": "use an object or resource"
+        "id": "Collect",
+        "gloss": "gather items present in the environment"
       },
       {
         "id": "Consume",
         "gloss": "ingest food or drink"
       },
       {
-        "id": "Scan",
-        "gloss": "examine environment for cues or objects"
-      },
-      {
         "id": "Inspect",
-        "gloss": "closely examine an object"
+        "gloss": "closely examine or evaluate"
       },
       {
-        "id": "Orient",
-        "gloss": "determine direction or bearings"
-      },
-      {
-        "id": "Navigate",
-        "gloss": "find or choose a path forward"
-      },
-      {
-        "id": "Approach",
-        "gloss": "move closer to target or place"
-      },
-      {
-        "id": "Move",
-        "gloss": "travel or relocate"
-      },
-      {
-        "id": "Wait",
-        "gloss": "remain in a state or place"
-      },
-      {
-        "id": "Rest",
-        "gloss": "recover by remaining passive"
-      },
-      {
-        "id": "Hide",
-        "gloss": "make self less visible"
-      },
-      {
-        "id": "Avoid",
-        "gloss": "take action to not contact hazard"
-      },
-      {
-        "id": "Mark",
-        "gloss": "leave a sign or trail for relocation"
-      },
-      {
-        "id": "Signal",
-        "gloss": "communicate need or status at a distance"
-      },
-      {
-        "id": "Greet",
-        "gloss": "open social contact"
-      },
-      {
-        "id": "Say",
-        "gloss": "verbalize intent or information"
-      },
-      {
-        "id": "Think",
-        "gloss": "internally reason or make decisions"
-      },
-      {
-        "id": "Assess",
-        "gloss": "judge situation or risk"
-      },
-      {
-        "id": "Negotiate",
-        "gloss": "exchange offers or requests socially"
-      },
-      {
-        "id": "TrustEvaluate",
-        "gloss": "analyze reliability of another"
-      },
-      {
-        "id": "Inventory",
-        "gloss": "systematically check possessions"
-      },
-      {
-        "id": "Exchange",
-        "gloss": "swap resources with another"
-      },
-      {
-        "id": "Enter",
-        "gloss": "move inside a bounded place"
-      },
-      {
-        "id": "Place",
-        "gloss": "set object at location"
-      },
-      {
-        "id": "Collect",
-        "gloss": "gather found objects"
-      },
-      {
-        "id": "Direct",
-        "gloss": "provide or interpret guidance"
-      },
-      {
-        "id": "Aid",
-        "gloss": "assist others to achieve a goal"
-      },
-      {
-        "id": "Share",
-        "gloss": "provide part of a resource to others"
-      },
-      {
-        "id": "Record",
-        "gloss": "note or log information"
-      },
-      {
-        "id": "Remember",
-        "gloss": "recall prior experiences"
-      },
-      {
-        "id": "Evaluate",
-        "gloss": "judge worth or safety"
-      },
-      {
-        "id": "Respond",
-        "gloss": "react to an event or cue"
-      },
-      {
-        "id": "ClueSeek",
-        "gloss": "search for indirect information"
-      },
-      {
-        "id": "RoutePlan",
-        "gloss": "formulate path or steps"
-      },
-      {
-        "id": "Observe",
-        "gloss": "gather perceptual data with attention"
-      },
-      {
-        "id": "Resist",
-        "gloss": "withstand urge or external threat"
-      },
-      {
-        "id": "Support",
-        "gloss": "maintain or stabilize physically or emotionally"
-      },
-      {
-        "id": "Prioritize",
-        "gloss": "choose most important action first"
-      },
-      {
-        "id": "Lead",
-        "gloss": "guide others physically or socially"
+        "id": "Scan",
+        "gloss": "rapidly look over an area to find entities"
       },
       {
         "id": "Locate",
-        "gloss": ""
+        "gloss": "determine where something is"
+      },
+      {
+        "id": "Approach",
+        "gloss": "move towards a target or location"
+      },
+      {
+        "id": "Orient",
+        "gloss": "align oneself with respect to features"
+      },
+      {
+        "id": "Map",
+        "gloss": "establish spatial layout or record terrain"
+      },
+      {
+        "id": "Signal",
+        "gloss": "communicate presence or need via visible/audible means"
+      },
+      {
+        "id": "Hide",
+        "gloss": "remove oneself from view"
+      },
+      {
+        "id": "Wait",
+        "gloss": "pause activity and remain ready"
+      },
+      {
+        "id": "Sit",
+        "gloss": "adopt a low-rest position"
+      },
+      {
+        "id": "Rest",
+        "gloss": "pause and recover abilities"
+      },
+      {
+        "id": "Evade",
+        "gloss": "actively avoid hazards or threats"
+      },
+      {
+        "id": "Mark",
+        "gloss": "alter environment to leave a cue"
+      },
+      {
+        "id": "Greet",
+        "gloss": "initiate social interaction nonverbally or verbally"
+      },
+      {
+        "id": "Negotiate",
+        "gloss": "exchange offers or information socially"
+      },
+      {
+        "id": "Share",
+        "gloss": "give or divide resource with others"
+      },
+      {
+        "id": "Test",
+        "gloss": "probe situation or actor to gain insight"
+      },
+      {
+        "id": "Observe",
+        "gloss": "attend to events or behavior"
+      },
+      {
+        "id": "Organize",
+        "gloss": "arrange or sort objects for use"
+      },
+      {
+        "id": "Count",
+        "gloss": "determine quantity of items"
+      },
+      {
+        "id": "Offer",
+        "gloss": "present resource or help to another"
+      },
+      {
+        "id": "Ask",
+        "gloss": "request help or information from another"
+      },
+      {
+        "id": "Introduce",
+        "gloss": "make oneself known socially"
+      },
+      {
+        "id": "Use",
+        "gloss": "manipulate or employ a tool or item"
+      },
+      {
+        "id": "Place",
+        "gloss": "set an object down at a location"
+      },
+      {
+        "id": "Notice",
+        "gloss": "detect presence or change in environment"
+      },
+      {
+        "id": "DetermineDirection",
+        "gloss": "identify compass or environmental orientation"
+      },
+      {
+        "id": "Estimate",
+        "gloss": "judge quantity, distance, or likelihood"
+      },
+      {
+        "id": "Reflect",
+        "gloss": "direct light or signal using a surface"
+      },
+      {
+        "id": "Cover",
+        "gloss": "shield or obscure an object or person"
+      },
+      {
+        "id": "Select",
+        "gloss": "choose from available options"
+      },
+      {
+        "id": "Pick",
+        "gloss": "harvest small objects by hand"
+      },
+      {
+        "id": "Scout",
+        "gloss": "reconnoiter an area for clues or paths"
+      },
+      {
+        "id": "Avoid",
+        "gloss": "stay away from hazards"
+      },
+      {
+        "id": "Move",
+        "gloss": "change physical location intentionally"
+      },
+      {
+        "id": "Say",
+        "gloss": "transmit information or express verbally"
+      },
+      {
+        "id": "Believe",
+        "gloss": "consider something true or possible"
       }
     ],
     "nouns": [
       {
         "id": "Resource",
-        "gloss": "any consumable or usable entity"
+        "gloss": "entity that provides utility or sustenance"
       },
       {
         "id": "Edible",
-        "gloss": "item providing nutrition"
+        "gloss": "item that can be safely consumed"
       },
       {
-        "id": "Drinkable",
-        "gloss": "liquid suitable for drinking"
+        "id": "WaterResource",
+        "gloss": "source or container for water"
       },
       {
-        "id": "Tool",
-        "gloss": "artifact for manipulating other entities"
+        "id": "FoodResource",
+        "gloss": "item or area providing food"
       },
       {
-        "id": "Guide",
-        "gloss": "source of navigation or instruction"
+        "id": "Berry",
+        "gloss": "small edible fruit"
       },
       {
-        "id": "Path",
-        "gloss": "spatial route through terrain"
+        "id": "Mushroom",
+        "gloss": "fungal growth, sometimes edible"
       },
       {
-        "id": "Landmark",
-        "gloss": "notable environmental feature"
+        "id": "Vegetation",
+        "gloss": "plant matter in the environment"
       },
       {
-        "id": "Place",
-        "gloss": "fixed location or locale"
+        "id": "Apple",
+        "gloss": "fruit from appletree"
       },
       {
-        "id": "Hazard",
-        "gloss": "potentially dangerous item or area"
+        "id": "Location",
+        "gloss": "distinct region or place"
       },
       {
-        "id": "Person",
-        "gloss": "social agent, human or character"
-      },
-      {
-        "id": "Promise",
-        "gloss": "social contract or intention"
-      },
-      {
-        "id": "Gesture",
-        "gloss": "observable social act"
-      },
-      {
-        "id": "Behavior",
-        "gloss": "pattern of actions by another"
+        "id": "Clearing",
+        "gloss": "open area within forest"
       },
       {
         "id": "Meadow",
-        "gloss": "open grassy place"
+        "gloss": "grassy open area"
       },
       {
         "id": "ForestEdge",
-        "gloss": "zone between forest and clearing"
+        "gloss": "boundary between forest and open land"
       },
       {
         "id": "Thicket",
-        "gloss": "dense area of shrubs/bushes"
+        "gloss": "dense mass of shrubs or bushes"
+      },
+      {
+        "id": "Patch",
+        "gloss": "small area containing resource"
+      },
+      {
+        "id": "Trail",
+        "gloss": "beaten path through terrain"
+      },
+      {
+        "id": "Path",
+        "gloss": "way between locations"
+      },
+      {
+        "id": "Structure",
+        "gloss": "built or natural shelter"
+      },
+      {
+        "id": "Hut",
+        "gloss": "simple shelter or cabin"
       },
       {
         "id": "Cave",
-        "gloss": "hollow in rock or earth"
+        "gloss": "natural underground enclosure"
       },
       {
         "id": "Spring",
         "gloss": "source of fresh water"
       },
       {
-        "id": "BerryPatch",
-        "gloss": "location with abundance of berries"
-      },
-      {
-        "id": "AppletreeGrove",
-        "gloss": "group of apple trees"
-      },
-      {
-        "id": "Backpack",
-        "gloss": "carryable container"
-      },
-      {
-        "id": "WaterBottle",
-        "gloss": "portable water container"
-      },
-      {
-        "id": "FoodRation",
-        "gloss": "packaged or preserved food"
-      },
-      {
-        "id": "MapScrap",
-        "gloss": "partial or makeshift map"
-      },
-      {
-        "id": "Notebook",
-        "gloss": "object for taking notes"
-      },
-      {
-        "id": "Mug",
-        "gloss": "container for drinking"
-      },
-      {
-        "id": "MultiTool",
-        "gloss": "multipurpose hand tool"
-      },
-      {
-        "id": "Flashlight",
-        "gloss": "portable light source"
-      },
-      {
-        "id": "Rock",
-        "gloss": "small or medium natural stone"
+        "id": "Branch",
+        "gloss": "woody appendage of tree"
       },
       {
         "id": "FallenBranch",
-        "gloss": "branch from tree on ground"
+        "gloss": "disconnected branch on ground"
+      },
+      {
+        "id": "Tool",
+        "gloss": "artifact usable for work"
+      },
+      {
+        "id": "Backpack",
+        "gloss": "bag for carrying items"
+      },
+      {
+        "id": "FoodPack",
+        "gloss": "container holding food"
+      },
+      {
+        "id": "Container",
+        "gloss": "object for holding materials"
+      },
+      {
+        "id": "Bottle",
+        "gloss": "portable water container"
+      },
+      {
+        "id": "Mirror",
+        "gloss": "reflective signaling device"
+      },
+      {
+        "id": "Basket",
+        "gloss": "container for collecting items"
+      },
+      {
+        "id": "Map",
+        "gloss": "representation of spatial layout"
+      },
+      {
+        "id": "Notebook",
+        "gloss": "book for recording information"
+      },
+      {
+        "id": "Pen",
+        "gloss": "writing tool"
+      },
+      {
+        "id": "Marker",
+        "gloss": "object for leaving a cue"
+      },
+      {
+        "id": "Sunlight",
+        "gloss": "illumination from sun"
+      },
+      {
+        "id": "Shadow",
+        "gloss": "region of reduced light"
+      },
+      {
+        "id": "Hazard",
+        "gloss": "source of potential harm"
+      },
+      {
+        "id": "Root",
+        "gloss": "portion of plant below surface"
+      },
+      {
+        "id": "Person",
+        "gloss": "individual human actor"
+      },
+      {
+        "id": "Companion",
+        "gloss": "trusted person in group"
+      },
+      {
+        "id": "Stranger",
+        "gloss": "unfamiliar person encountered"
+      },
+      {
+        "id": "Gesture",
+        "gloss": "physical sign or action"
+      },
+      {
+        "id": "Assistance",
+        "gloss": "resource or help requested or given"
+      },
+      {
+        "id": "Help",
+        "gloss": "aid or support"
+      },
+      {
+        "id": "Task",
+        "gloss": "activity or assignment"
       },
       {
         "id": "Clue",
-        "gloss": "indirect sign suggesting hidden information"
+        "gloss": "observation that suggests further information"
       },
       {
-        "id": "Footprint",
-        "gloss": "mark from walking"
+        "id": "Trust",
+        "gloss": "belief in reliability or integrity of another"
       },
       {
-        "id": "Sun",
-        "gloss": "celestial body used for orientation"
+        "id": "Signal",
+        "gloss": "communicative act or object"
       },
       {
-        "id": "Shade",
-        "gloss": "area shielded from sunlight"
-      },
-      {
-        "id": "Interior",
-        "gloss": "the inside of a building or space"
-      },
-      {
-        "id": "Door",
-        "gloss": "entry to a structure"
-      },
-      {
-        "id": "Mark",
-        "gloss": "physical sign left intentionally"
-      },
-      {
-        "id": "Directions",
-        "gloss": "information describing how to traverse"
-      },
-      {
-        "id": "Sound",
-        "gloss": "audible cue or noise"
+        "id": "Affordance",
+        "gloss": "feature enabling certain actions"
       },
       {
         "id": "State",
-        "gloss": "bodily or emotional condition"
+        "gloss": "condition of character (e.g., hunger, fatigue)"
       },
       {
         "id": "Hunger",
-        "gloss": "need for food"
+        "gloss": "physiological need for food"
       },
       {
         "id": "Thirst",
-        "gloss": "need for drink"
+        "gloss": "physiological need for water"
       },
       {
         "id": "Fatigue",
-        "gloss": "need for rest"
-      },
-      {
-        "id": "Hope",
-        "gloss": "feeling of expectation"
-      },
-      {
-        "id": "Loneliness",
-        "gloss": "feeling of social absence"
-      },
-      {
-        "id": "Worry",
-        "gloss": "state of concern"
-      },
-      {
-        "id": "Curiosity",
-        "gloss": "drive to gather information"
-      },
-      {
-        "id": "Berry",
-        "gloss": "small, edible fruit"
-      },
-      {
-        "id": "Mushroom",
-        "gloss": "fungal growth, possibly edible"
-      },
-      {
-        "id": "Appletree",
-        "gloss": "tree producing apples"
-      },
-      {
-        "id": "Hut",
-        "gloss": "small human dwelling"
-      },
-      {
-        "id": "SteepDrop",
-        "gloss": "dangerous change in elevation"
-      },
-      {
-        "id": "PoisonousBerries",
-        "gloss": "toxic berries found locally"
-      },
-      {
-        "id": "DenseBrush",
-        "gloss": "tangled undergrowth impeding movement"
-      },
-      {
-        "id": "Samantha",
-        "gloss": "person met in forest"
-      },
-      {
-        "id": "Hermit",
-        "gloss": "reclusive individual"
-      },
-      {
-        "id": "User",
-        "gloss": "main character"
+        "gloss": "level of tiredness"
       }
     ]
   },
@@ -417,7 +393,7 @@
           "pick_up",
           "take_possession"
         ],
-        "args": "object (Resource, Tool, Edible, Drinkable, Clue)",
+        "args": "object, optional source",
         "decomposition_patterns": [
           {
             "sequence": [
@@ -430,54 +406,32 @@
         "hint_anchor": "take"
       },
       {
-        "id": "Utilize",
+        "id": "Collect",
         "aliases": [
-          "use"
+          "gather",
+          "pick"
         ],
-        "args": "object (Tool, Resource)",
+        "args": "items, from location",
         "decomposition_patterns": [
           {
             "sequence": [
-              "Inspect",
-              "Apply"
-            ]
-          }
-        ],
-        "hint_anchor": "use"
-      },
-      {
-        "id": "Consume",
-        "aliases": [
-          "eat",
-          "drink"
-        ],
-        "args": "object (Edible, Drinkable)",
-        "decomposition_patterns": [
-          {
-            "sequence": [
-              "Acquire",
-              "Utilize"
+              "Approach",
+              "Pick"
             ]
           }
         ],
         "hint_anchor": "take"
       },
       {
-        "id": "Scan",
+        "id": "Consume",
         "aliases": [
-          "look_over",
-          "survey"
+          "eat",
+          "drink",
+          "ingest"
         ],
-        "args": "region/place (Place, Area, Landmark)",
-        "decomposition_patterns": [
-          {
-            "sequence": [
-              "Observe",
-              "Assess"
-            ]
-          }
-        ],
-        "hint_anchor": "scan"
+        "args": "object",
+        "decomposition_patterns": [],
+        "hint_anchor": "use"
       },
       {
         "id": "Inspect",
@@ -485,43 +439,212 @@
           "examine",
           "check"
         ],
-        "args": "object (Resource, Clue, Tool, Hazard, FoodRation, MapScrap)",
-        "decomposition_patterns": [
-          {
-            "sequence": [
-              "Observe"
-            ]
-          }
-        ],
+        "args": "object",
+        "decomposition_patterns": [],
         "hint_anchor": "inspect"
       },
       {
-        "id": "Orient",
+        "id": "Scan",
         "aliases": [
-          "find_direction"
+          "look_over",
+          "survey"
         ],
-        "args": "target/place (Sun, Directions, Landmark)",
+        "args": "area or space",
+        "decomposition_patterns": [],
+        "hint_anchor": "scan"
+      },
+      {
+        "id": "Locate",
+        "aliases": [
+          "find"
+        ],
+        "args": "object or place",
         "decomposition_patterns": [
           {
             "sequence": [
               "Scan",
-              "Think"
+              "Identify"
+            ]
+          }
+        ],
+        "hint_anchor": "scan"
+      },
+      {
+        "id": "Identify",
+        "aliases": [
+          "spot",
+          "recognize"
+        ],
+        "args": "target object",
+        "decomposition_patterns": [],
+        "hint_anchor": "inspect"
+      },
+      {
+        "id": "Approach",
+        "aliases": [
+          "move_to",
+          "walk_toward"
+        ],
+        "args": "location",
+        "decomposition_patterns": [],
+        "hint_anchor": "move"
+      },
+      {
+        "id": "Orient",
+        "aliases": [
+          "align",
+          "face_toward"
+        ],
+        "args": "reference feature",
+        "decomposition_patterns": [
+          {
+            "sequence": [
+              "DetermineDirection",
+              "AdjustPosition"
+            ]
+          }
+        ],
+        "hint_anchor": "move"
+      },
+      {
+        "id": "DetermineDirection",
+        "aliases": [
+          "find_direction",
+          "assess_bearing"
+        ],
+        "args": "reference object",
+        "decomposition_patterns": [],
+        "hint_anchor": "inspect"
+      },
+      {
+        "id": "AdjustPosition",
+        "aliases": [
+          "move_body",
+          "turn"
+        ],
+        "args": "direction",
+        "decomposition_patterns": [],
+        "hint_anchor": "move"
+      },
+      {
+        "id": "Map",
+        "aliases": [
+          "chart",
+          "record_layout"
+        ],
+        "args": "area",
+        "decomposition_patterns": [
+          {
+            "sequence": [
+              "Scan",
+              "Document"
             ]
           }
         ],
         "hint_anchor": "think"
       },
       {
-        "id": "Navigate",
+        "id": "Document",
         "aliases": [
-          "move_along_path",
-          "traverse"
+          "write",
+          "note"
         ],
-        "args": "path/region (Path, Trail, Place)",
+        "args": "observation to record",
+        "decomposition_patterns": [],
+        "hint_anchor": "say"
+      },
+      {
+        "id": "Signal",
+        "aliases": [
+          "alert",
+          "flag_down"
+        ],
+        "args": "recipient, means",
         "decomposition_patterns": [
           {
             "sequence": [
-              "Orient",
+              "Select",
+              "Use"
+            ]
+          }
+        ],
+        "hint_anchor": "say"
+      },
+      {
+        "id": "Hide",
+        "aliases": [
+          "conceal",
+          "cover_self"
+        ],
+        "args": "location",
+        "decomposition_patterns": [
+          {
+            "sequence": [
+              "Approach",
+              "Cover"
+            ]
+          }
+        ],
+        "hint_anchor": "move"
+      },
+      {
+        "id": "Cover",
+        "aliases": [
+          "shield",
+          "obscure"
+        ],
+        "args": "object",
+        "decomposition_patterns": [],
+        "hint_anchor": "place"
+      },
+      {
+        "id": "Wait",
+        "aliases": [
+          "pause",
+          "delay"
+        ],
+        "args": "optional condition",
+        "decomposition_patterns": [],
+        "hint_anchor": "wait"
+      },
+      {
+        "id": "Sit",
+        "aliases": [
+          "rest_pose",
+          "crouch"
+        ],
+        "args": "location",
+        "decomposition_patterns": [],
+        "hint_anchor": "wait"
+      },
+      {
+        "id": "Rest",
+        "aliases": [
+          "recover",
+          "relax"
+        ],
+        "args": "location, duration",
+        "decomposition_patterns": [
+          {
+            "sequence": [
+              "Sit",
+              "Wait"
+            ]
+          }
+        ],
+        "hint_anchor": "wait"
+      },
+      {
+        "id": "Evade",
+        "aliases": [
+          "escape",
+          "dodge"
+        ],
+        "args": "hazard",
+        "decomposition_patterns": [
+          {
+            "sequence": [
+              "Notice",
               "Move"
             ]
           }
@@ -529,16 +652,247 @@
         "hint_anchor": "move"
       },
       {
-        "id": "Approach",
+        "id": "Notice",
         "aliases": [
-          "go_to",
-          "draw_near"
+          "spot",
+          "be_alert_to"
         ],
-        "args": "target (Place, Person, Resource)",
+        "args": "entity",
+        "decomposition_patterns": [],
+        "hint_anchor": "scan"
+      },
+      {
+        "id": "Mark",
+        "aliases": [
+          "leave_trace",
+          "flag"
+        ],
+        "args": "location, marker",
         "decomposition_patterns": [
           {
             "sequence": [
-              "Move"
+              "Select",
+              "Place"
+            ]
+          }
+        ],
+        "hint_anchor": "place"
+      },
+      {
+        "id": "Select",
+        "aliases": [
+          "choose",
+          "pick_out"
+        ],
+        "args": "option",
+        "decomposition_patterns": [],
+        "hint_anchor": "take"
+      },
+      {
+        "id": "Place",
+        "aliases": [
+          "set_down",
+          "deposit"
+        ],
+        "args": "object, location",
+        "decomposition_patterns": [],
+        "hint_anchor": "place"
+      },
+      {
+        "id": "Greet",
+        "aliases": [
+          "salute",
+          "welcome"
+        ],
+        "args": "person",
+        "decomposition_patterns": [],
+        "hint_anchor": "say"
+      },
+      {
+        "id": "Negotiate",
+        "aliases": [
+          "bargain",
+          "reach_agreement"
+        ],
+        "args": "party, resource",
+        "decomposition_patterns": [
+          {
+            "sequence": [
+              "Ask",
+              "Offer",
+              "Agree"
+            ]
+          }
+        ],
+        "hint_anchor": "say"
+      },
+      {
+        "id": "Ask",
+        "aliases": [
+          "request",
+          "inquire"
+        ],
+        "args": "person, resource",
+        "decomposition_patterns": [],
+        "hint_anchor": "say"
+      },
+      {
+        "id": "Offer",
+        "aliases": [
+          "present",
+          "give"
+        ],
+        "args": "recipient, object",
+        "decomposition_patterns": [],
+        "hint_anchor": "say"
+      },
+      {
+        "id": "Agree",
+        "aliases": [
+          "consent",
+          "accept_term"
+        ],
+        "args": "proposal",
+        "decomposition_patterns": [],
+        "hint_anchor": "say"
+      },
+      {
+        "id": "Share",
+        "aliases": [
+          "divide",
+          "distribute"
+        ],
+        "args": "recipient, object",
+        "decomposition_patterns": [],
+        "hint_anchor": "give"
+      },
+      {
+        "id": "Test",
+        "aliases": [
+          "probe",
+          "try_out"
+        ],
+        "args": "target, action",
+        "decomposition_patterns": [
+          {
+            "sequence": [
+              "Observe",
+              "Act"
+            ]
+          }
+        ],
+        "hint_anchor": "inspect"
+      },
+      {
+        "id": "Observe",
+        "aliases": [
+          "watch",
+          "monitor"
+        ],
+        "args": "entity or behavior",
+        "decomposition_patterns": [],
+        "hint_anchor": "inspect"
+      },
+      {
+        "id": "Act",
+        "aliases": [
+          "do",
+          "take_action"
+        ],
+        "args": "action",
+        "decomposition_patterns": [],
+        "hint_anchor": "move"
+      },
+      {
+        "id": "Organize",
+        "aliases": [
+          "arrange",
+          "sort"
+        ],
+        "args": "objects",
+        "decomposition_patterns": [],
+        "hint_anchor": "place"
+      },
+      {
+        "id": "Count",
+        "aliases": [
+          "tally",
+          "enumerate"
+        ],
+        "args": "objects",
+        "decomposition_patterns": [],
+        "hint_anchor": "think"
+      },
+      {
+        "id": "Introduce",
+        "aliases": [
+          "present_self",
+          "declare_presence"
+        ],
+        "args": "person",
+        "decomposition_patterns": [],
+        "hint_anchor": "say"
+      },
+      {
+        "id": "Use",
+        "aliases": [
+          "employ",
+          "activate"
+        ],
+        "args": "tool or object",
+        "decomposition_patterns": [],
+        "hint_anchor": "use"
+      },
+      {
+        "id": "Reflect",
+        "aliases": [
+          "bounce_light",
+          "redirect"
+        ],
+        "args": "object, medium",
+        "decomposition_patterns": [],
+        "hint_anchor": "use"
+      },
+      {
+        "id": "Estimate",
+        "aliases": [
+          "guess",
+          "approximate"
+        ],
+        "args": "quantity or distance",
+        "decomposition_patterns": [],
+        "hint_anchor": "think"
+      },
+      {
+        "id": "Scout",
+        "aliases": [
+          "reconnoiter",
+          "explore_area"
+        ],
+        "args": "area",
+        "decomposition_patterns": [
+          {
+            "sequence": [
+              "Scan",
+              "Approach",
+              "Observe"
+            ]
+          }
+        ],
+        "hint_anchor": "move"
+      },
+      {
+        "id": "Avoid",
+        "aliases": [
+          "steer_clear",
+          "shun"
+        ],
+        "args": "hazard",
+        "decomposition_patterns": [
+          {
+            "sequence": [
+              "Notice",
+              "Evade"
             ]
           }
         ],
@@ -550,120 +904,9 @@
           "walk",
           "travel"
         ],
-        "args": "destination (Place, Path, Landmark, Interior)",
+        "args": "destination",
         "decomposition_patterns": [],
         "hint_anchor": "move"
-      },
-      {
-        "id": "Wait",
-        "aliases": [
-          "pause",
-          "linger"
-        ],
-        "args": "duration/location (State, Place, Shade)",
-        "decomposition_patterns": [],
-        "hint_anchor": "wait"
-      },
-      {
-        "id": "Rest",
-        "aliases": [
-          "recover",
-          "sleep"
-        ],
-        "args": "location (Place, Meadow, Clearing, Shade, Interior)",
-        "decomposition_patterns": [
-          {
-            "sequence": [
-              "Wait"
-            ]
-          }
-        ],
-        "hint_anchor": "wait"
-      },
-      {
-        "id": "Hide",
-        "aliases": [
-          "conceal",
-          "camouflage"
-        ],
-        "args": "place (Thicket, Cave, MossySpot, Shade)",
-        "decomposition_patterns": [
-          {
-            "sequence": [
-              "Approach",
-              "Wait"
-            ]
-          }
-        ],
-        "hint_anchor": "wait"
-      },
-      {
-        "id": "Avoid",
-        "aliases": [
-          "steer_clear",
-          "evade"
-        ],
-        "args": "hazard (Hazard, DenseBrush, SteepDrop, PoisonousBerries)",
-        "decomposition_patterns": [
-          {
-            "sequence": [
-              "Scan",
-              "Move"
-            ]
-          }
-        ],
-        "hint_anchor": "move"
-      },
-      {
-        "id": "Mark",
-        "aliases": [
-          "leave_sign",
-          "trailblaze"
-        ],
-        "args": "object/place (Mark, Trail, Rock, FallenBranch)",
-        "decomposition_patterns": [
-          {
-            "sequence": [
-              "Collect",
-              "Place"
-            ]
-          }
-        ],
-        "hint_anchor": "place"
-      },
-      {
-        "id": "Signal",
-        "aliases": [
-          "call_for_help",
-          "alert"
-        ],
-        "args": "object/method (Sound, Flashlight, Mark, Voice)",
-        "decomposition_patterns": [
-          {
-            "sequence": [
-              "Utilize",
-              "Say"
-            ]
-          }
-        ],
-        "hint_anchor": "say"
-      },
-      {
-        "id": "Greet",
-        "aliases": [
-          "introduce",
-          "meet"
-        ],
-        "args": "target (Person)",
-        "decomposition_patterns": [
-          {
-            "sequence": [
-              "Approach",
-              "Say"
-            ]
-          }
-        ],
-        "hint_anchor": "say"
       },
       {
         "id": "Say",
@@ -671,434 +914,133 @@
           "speak",
           "utter"
         ],
-        "args": "content/target (Person, Promise, Need)",
+        "args": "message, recipient",
         "decomposition_patterns": [],
         "hint_anchor": "say"
       },
       {
-        "id": "Think",
+        "id": "Believe",
         "aliases": [
-          "reason",
-          "reflect"
+          "suppose",
+          "assume_true"
         ],
-        "args": "topic (Directions, Options, Promise, Behavior, State)",
+        "args": "proposition",
         "decomposition_patterns": [],
         "hint_anchor": "think"
-      },
-      {
-        "id": "Assess",
-        "aliases": [
-          "judge",
-          "estimate"
-        ],
-        "args": "object/situation (Hazard, Person, Resource, State)",
-        "decomposition_patterns": [
-          {
-            "sequence": [
-              "Inspect",
-              "Think"
-            ]
-          }
-        ],
-        "hint_anchor": "inspect"
-      },
-      {
-        "id": "Negotiate",
-        "aliases": [
-          "bargain",
-          "deal"
-        ],
-        "args": "target/object (Person, Resource, Offer, MapScrap)",
-        "decomposition_patterns": [
-          {
-            "sequence": [
-              "Say",
-              "Exchange"
-            ]
-          }
-        ],
-        "hint_anchor": "say"
-      },
-      {
-        "id": "TrustEvaluate",
-        "aliases": [
-          "test_trust",
-          "probe_reliability"
-        ],
-        "args": "target (Person, Promise, Gesture, Behavior)",
-        "decomposition_patterns": [
-          {
-            "sequence": [
-              "Assess",
-              "Think"
-            ]
-          }
-        ],
-        "hint_anchor": "think"
-      },
-      {
-        "id": "Inventory",
-        "aliases": [
-          "check_supplies",
-          "review_contents"
-        ],
-        "args": "object (Backpack, Tool, Resource)",
-        "decomposition_patterns": [
-          {
-            "sequence": [
-              "Inspect"
-            ]
-          }
-        ],
-        "hint_anchor": "inspect"
-      },
-      {
-        "id": "Exchange",
-        "aliases": [
-          "trade",
-          "swap"
-        ],
-        "args": "object/target (Resource, Person)",
-        "decomposition_patterns": [
-          {
-            "sequence": [
-              "Acquire",
-              "Give"
-            ]
-          }
-        ],
-        "hint_anchor": "take"
-      },
-      {
-        "id": "Enter",
-        "aliases": [
-          "go_inside",
-          "access"
-        ],
-        "args": "place (Hut, Cave, Meadow, Interior)",
-        "decomposition_patterns": [
-          {
-            "sequence": [
-              "Approach",
-              "Move"
-            ]
-          }
-        ],
-        "hint_anchor": "move"
-      },
-      {
-        "id": "Place",
-        "aliases": [
-          "set_down",
-          "drop"
-        ],
-        "args": "object/location (Mark, Trail, Rock, FallenBranch, Mug)",
-        "decomposition_patterns": [],
-        "hint_anchor": "place"
-      },
-      {
-        "id": "Collect",
-        "aliases": [
-          "gather",
-          "pick"
-        ],
-        "args": "object (Edible, Resource, Mark)",
-        "decomposition_patterns": [],
-        "hint_anchor": "take"
-      },
-      {
-        "id": "Direct",
-        "aliases": [
-          "guide",
-          "instruct"
-        ],
-        "args": "person/place (Person, Directions, Path)",
-        "decomposition_patterns": [
-          {
-            "sequence": [
-              "Say",
-              "Orient"
-            ]
-          }
-        ],
-        "hint_anchor": "say"
-      },
-      {
-        "id": "Aid",
-        "aliases": [
-          "help",
-          "support"
-        ],
-        "args": "target (Person)",
-        "decomposition_patterns": [
-          {
-            "sequence": [
-              "Approach",
-              "Share"
-            ]
-          }
-        ],
-        "hint_anchor": "move"
-      },
-      {
-        "id": "Share",
-        "aliases": [
-          "give_portion",
-          "distribute"
-        ],
-        "args": "object/target (Resource, Person)",
-        "decomposition_patterns": [
-          {
-            "sequence": [
-              "Acquire",
-              "Give"
-            ]
-          }
-        ],
-        "hint_anchor": "place"
-      },
-      {
-        "id": "Record",
-        "aliases": [
-          "note",
-          "log"
-        ],
-        "args": "content (Clue, Directions, Promise)",
-        "decomposition_patterns": [
-          {
-            "sequence": [
-              "Observe",
-              "Note"
-            ]
-          }
-        ],
-        "hint_anchor": "think"
-      },
-      {
-        "id": "Remember",
-        "aliases": [
-          "recall",
-          "retrieve_memory"
-        ],
-        "args": "content (Clue, Route, Person)",
-        "decomposition_patterns": [],
-        "hint_anchor": "think"
-      },
-      {
-        "id": "Evaluate",
-        "aliases": [
-          "weigh",
-          "consider"
-        ],
-        "args": "option/object (Resource, Path, Strategy)",
-        "decomposition_patterns": [
-          {
-            "sequence": [
-              "Think"
-            ]
-          }
-        ],
-        "hint_anchor": "think"
-      },
-      {
-        "id": "Respond",
-        "aliases": [
-          "react",
-          "reply"
-        ],
-        "args": "cue/event (Person, Signal, Hazard)",
-        "decomposition_patterns": [],
-        "hint_anchor": "say"
-      },
-      {
-        "id": "ClueSeek",
-        "aliases": [
-          "search_clues"
-        ],
-        "args": "location (ForestEdge, Place, Trail)",
-        "decomposition_patterns": [
-          {
-            "sequence": [
-              "Scan",
-              "Inspect"
-            ]
-          }
-        ],
-        "hint_anchor": "scan"
-      },
-      {
-        "id": "RoutePlan",
-        "aliases": [
-          "plan_path"
-        ],
-        "args": "region (MapScrap, Path, Place)",
-        "decomposition_patterns": [
-          {
-            "sequence": [
-              "Think",
-              "Orient"
-            ]
-          }
-        ],
-        "hint_anchor": "think"
-      },
-      {
-        "id": "Observe",
-        "aliases": [
-          "perceive",
-          "watch"
-        ],
-        "args": "object/place (Resource, Person, Landmark)",
-        "decomposition_patterns": [],
-        "hint_anchor": "scan"
-      },
-      {
-        "id": "Resist",
-        "aliases": [
-          "withstand",
-          "hold_back"
-        ],
-        "args": "urge/stressor (Hunger, Thirst, Fatigue, Temptation)",
-        "decomposition_patterns": [],
-        "hint_anchor": "wait"
-      },
-      {
-        "id": "Support",
-        "aliases": [
-          "assist_physical"
-        ],
-        "args": "target (Person)",
-        "decomposition_patterns": [],
-        "hint_anchor": "move"
-      },
-      {
-        "id": "Prioritize",
-        "aliases": [
-          "choose_order"
-        ],
-        "args": "options (Strategy, Task, Resource)",
-        "decomposition_patterns": [
-          {
-            "sequence": [
-              "Think"
-            ]
-          }
-        ],
-        "hint_anchor": "think"
-      },
-      {
-        "id": "Lead",
-        "aliases": [
-          "guide_others"
-        ],
-        "args": "person/group (Person)",
-        "decomposition_patterns": [
-          {
-            "sequence": [
-              "Direct",
-              "Move"
-            ]
-          }
-        ],
-        "hint_anchor": "move"
-      },
-      {
-        "id": "Give",
-        "aliases": [
-          "hand_over"
-        ],
-        "args": "object/target (Resource, Person)",
-        "decomposition_patterns": [],
-        "hint_anchor": "place"
-      },
-      {
-        "id": "Apply",
-        "aliases": [
-          "use_on"
-        ],
-        "args": "tool/resource (Tool, Resource)",
-        "decomposition_patterns": [],
-        "hint_anchor": "use"
-      },
-      {
-        "id": "Note",
-        "aliases": [
-          "write",
-          "jot_down"
-        ],
-        "args": "content (Clue, Directions)",
-        "decomposition_patterns": [],
-        "hint_anchor": "think"
-      },
-      {
-        "id": "Locate",
-        "decomposition_patterns": []
       }
     ],
     "edges": [
       {
-        "from": "Navigate",
-        "to": "Approach"
+        "from": "Acquire",
+        "to": "Collect"
       },
       {
-        "from": "Navigate",
+        "from": "Acquire",
+        "to": "Consume"
+      },
+      {
+        "from": "Collect",
+        "to": "Pick"
+      },
+      {
+        "from": "Collect",
+        "to": "Select"
+      },
+      {
+        "from": "Approach",
+        "to": "Scout"
+      },
+      {
+        "from": "Orient",
+        "to": "DetermineDirection"
+      },
+      {
+        "from": "Orient",
+        "to": "AdjustPosition"
+      },
+      {
+        "from": "Map",
+        "to": "Document"
+      },
+      {
+        "from": "Test",
+        "to": "Observe"
+      },
+      {
+        "from": "Test",
+        "to": "Act"
+      },
+      {
+        "from": "Evade",
         "to": "Move"
+      },
+      {
+        "from": "Evade",
+        "to": "Notice"
+      },
+      {
+        "from": "Avoid",
+        "to": "Notice"
+      },
+      {
+        "from": "Avoid",
+        "to": "Evade"
+      },
+      {
+        "from": "Rest",
+        "to": "Sit"
       },
       {
         "from": "Rest",
         "to": "Wait"
       },
       {
-        "from": "Avoid",
-        "to": "Hide"
+        "from": "Negotiate",
+        "to": "Ask"
       },
       {
-        "from": "Avoid",
-        "to": "Move"
+        "from": "Negotiate",
+        "to": "Offer"
       },
       {
-        "from": "Acquire",
-        "to": "Collect"
+        "from": "Negotiate",
+        "to": "Agree"
       },
       {
-        "from": "Utilize",
-        "to": "Apply"
-      },
-      {
-        "from": "Signal",
-        "to": "Say"
-      },
-      {
-        "from": "Aid",
-        "to": "Support"
-      },
-      {
-        "from": "Aid",
-        "to": "Share"
+        "from": "Mark",
+        "to": "Select"
       },
       {
         "from": "Mark",
         "to": "Place"
       },
       {
-        "from": "Support",
-        "to": "Move"
+        "from": "Signal",
+        "to": "Use"
       },
       {
-        "from": "Lead",
-        "to": "Direct"
+        "from": "Signal",
+        "to": "Select"
       },
       {
-        "from": "Lead",
-        "to": "Move"
+        "from": "Scout",
+        "to": "Scan"
       },
       {
-        "from": "Record",
-        "to": "Note"
+        "from": "Scout",
+        "to": "Approach"
       },
       {
-        "from": "Share",
-        "to": "Give"
+        "from": "Scout",
+        "to": "Observe"
+      },
+      {
+        "from": "Hide",
+        "to": "Cover"
+      },
+      {
+        "from": "Hide",
+        "to": "Approach"
       }
     ]
   },
@@ -1107,64 +1049,306 @@
       {
         "id": "Resource",
         "aliases": [
-          "supply"
+          "supply",
+          "asset"
         ],
         "decomposition_patterns": [
           {
             "parts": [
               "Edible",
-              "Drinkable",
-              "Tool"
-            ]
-          }
-        ],
-        "anchor_types": [
-          "FoodRation",
-          "Water",
-          "Tool"
-        ]
-      },
-      {
-        "id": "Edible",
-        "aliases": [
-          "nutrition"
-        ],
-        "decomposition_patterns": [
-          {
-            "parts": [
-              "Berry",
-              "Mushroom",
-              "FoodRation",
-              "Appletree"
+              "WaterResource"
             ]
           }
         ],
         "anchor_types": [
           "Berries",
           "Mushrooms",
-          "FoodRation",
+          "Appletree",
+          "Spring",
+          "Water"
+        ]
+      },
+      {
+        "id": "Edible",
+        "aliases": [
+          "nutrition",
+          "food"
+        ],
+        "decomposition_patterns": [
+          {
+            "parts": [
+              "Berry",
+              "Mushroom",
+              "Apple"
+            ]
+          }
+        ],
+        "anchor_types": [
+          "Berries",
+          "Mushrooms",
           "Appletree"
         ]
       },
       {
-        "id": "Drinkable",
+        "id": "WaterResource",
         "aliases": [
-          "potable"
+          "water_source"
         ],
         "decomposition_patterns": [
           {
             "parts": [
               "Spring",
-              "WaterBottle",
-              "Mug"
+              "Bottle"
             ]
           }
         ],
         "anchor_types": [
-          "Water",
           "Spring",
-          "WaterBottle",
-          "Mug"
+          "Water"
+        ]
+      },
+      {
+        "id": "FoodResource",
+        "aliases": [
+          "source_of_food"
+        ],
+        "decomposition_patterns": [
+          {
+            "parts": [
+              "Edible",
+              "FoodPack"
+            ]
+          }
+        ],
+        "anchor_types": [
+          "Berries",
+          "Mushrooms",
+          "Appletree"
+        ]
+      },
+      {
+        "id": "Berry",
+        "aliases": [
+          "berries"
+        ],
+        "decomposition_patterns": [],
+        "anchor_types": [
+          "Berries"
+        ]
+      },
+      {
+        "id": "Mushroom",
+        "aliases": [
+          "mushrooms"
+        ],
+        "decomposition_patterns": [],
+        "anchor_types": [
+          "Mushrooms"
+        ]
+      },
+      {
+        "id": "Apple",
+        "aliases": [
+          "fruit"
+        ],
+        "decomposition_patterns": [],
+        "anchor_types": [
+          "Appletree"
+        ]
+      },
+      {
+        "id": "Vegetation",
+        "aliases": [
+          "plant",
+          "greenery"
+        ],
+        "decomposition_patterns": [
+          {
+            "parts": [
+              "Berry",
+              "Mushroom",
+              "Apple",
+              "Thicket",
+              "Branch"
+            ]
+          }
+        ],
+        "anchor_types": [
+          "Thicket",
+          "Fallenbranch"
+        ]
+      },
+      {
+        "id": "Location",
+        "aliases": [
+          "place",
+          "area"
+        ],
+        "decomposition_patterns": [
+          {
+            "parts": [
+              "Clearing",
+              "Meadow",
+              "ForestEdge",
+              "Thicket",
+              "Patch",
+              "Trail",
+              "Path",
+              "Structure"
+            ]
+          }
+        ],
+        "anchor_types": [
+          "Forest",
+          "Clearing",
+          "Meadow",
+          "Path",
+          "Thicket",
+          "Cave",
+          "Hut"
+        ]
+      },
+      {
+        "id": "Clearing",
+        "aliases": [
+          "open_area"
+        ],
+        "decomposition_patterns": [],
+        "anchor_types": [
+          "Clearing"
+        ]
+      },
+      {
+        "id": "Meadow",
+        "aliases": [
+          "grassy_meadow"
+        ],
+        "decomposition_patterns": [],
+        "anchor_types": [
+          "Meadow"
+        ]
+      },
+      {
+        "id": "ForestEdge",
+        "aliases": [
+          "edge"
+        ],
+        "decomposition_patterns": [],
+        "anchor_types": [
+          "Forest"
+        ]
+      },
+      {
+        "id": "Thicket",
+        "aliases": [
+          "brush",
+          "bush"
+        ],
+        "decomposition_patterns": [],
+        "anchor_types": [
+          "Thicket"
+        ]
+      },
+      {
+        "id": "Patch",
+        "aliases": [
+          "patch_of",
+          "cluster"
+        ],
+        "decomposition_patterns": [],
+        "anchor_types": [
+          "Berry",
+          "Mushroom"
+        ]
+      },
+      {
+        "id": "Trail",
+        "aliases": [
+          "track",
+          "footway"
+        ],
+        "decomposition_patterns": [],
+        "anchor_types": [
+          "Path"
+        ]
+      },
+      {
+        "id": "Path",
+        "aliases": [
+          "way"
+        ],
+        "decomposition_patterns": [],
+        "anchor_types": [
+          "Path"
+        ]
+      },
+      {
+        "id": "Structure",
+        "aliases": [
+          "shelter",
+          "cover"
+        ],
+        "decomposition_patterns": [
+          {
+            "parts": [
+              "Hut",
+              "Cave"
+            ]
+          }
+        ],
+        "anchor_types": [
+          "Hut",
+          "Cave"
+        ]
+      },
+      {
+        "id": "Hut",
+        "aliases": [
+          "cabin"
+        ],
+        "decomposition_patterns": [],
+        "anchor_types": [
+          "Hut"
+        ]
+      },
+      {
+        "id": "Cave",
+        "aliases": [
+          "cavern"
+        ],
+        "decomposition_patterns": [],
+        "anchor_types": [
+          "Cave"
+        ]
+      },
+      {
+        "id": "Spring",
+        "aliases": [
+          "fountain"
+        ],
+        "decomposition_patterns": [],
+        "anchor_types": [
+          "Spring"
+        ]
+      },
+      {
+        "id": "Branch",
+        "aliases": [
+          "limb"
+        ],
+        "decomposition_patterns": [],
+        "anchor_types": [
+          "Fallenbranch"
+        ]
+      },
+      {
+        "id": "FallenBranch",
+        "aliases": [
+          "fallen_limb"
+        ],
+        "decomposition_patterns": [],
+        "anchor_types": [
+          "Fallenbranch"
         ]
       },
       {
@@ -1175,111 +1359,148 @@
         "decomposition_patterns": [
           {
             "parts": [
-              "MultiTool",
-              "Flashlight",
+              "Backpack",
+              "FoodPack",
+              "Container",
+              "Bottle",
+              "Mirror",
+              "Basket",
+              "Map",
               "Notebook",
-              "Pencil"
+              "Pen"
             ]
           }
         ],
         "anchor_types": [
-          "MultiTool",
-          "Flashlight",
+          "Backpack",
+          "Bottle",
+          "FoodPack",
+          "Mirror",
+          "Basket",
+          "Map",
+          "Notebook",
+          "Pen"
+        ]
+      },
+      {
+        "id": "Backpack",
+        "aliases": [
+          "pack"
+        ],
+        "decomposition_patterns": [],
+        "anchor_types": [
+          "Backpack"
+        ]
+      },
+      {
+        "id": "FoodPack",
+        "aliases": [
+          "rations"
+        ],
+        "decomposition_patterns": [],
+        "anchor_types": [
+          "FoodPack"
+        ]
+      },
+      {
+        "id": "Container",
+        "aliases": [
+          "canister"
+        ],
+        "decomposition_patterns": [],
+        "anchor_types": [
+          "Bottle",
+          "Basket"
+        ]
+      },
+      {
+        "id": "Bottle",
+        "aliases": [
+          "waterbottle"
+        ],
+        "decomposition_patterns": [],
+        "anchor_types": [
+          "WaterBottle"
+        ]
+      },
+      {
+        "id": "Mirror",
+        "aliases": [
+          "signal_mirror"
+        ],
+        "decomposition_patterns": [],
+        "anchor_types": [
+          "SignalMirror"
+        ]
+      },
+      {
+        "id": "Basket",
+        "aliases": [
+          "gathering_basket"
+        ],
+        "decomposition_patterns": [],
+        "anchor_types": [
+          "Basket"
+        ]
+      },
+      {
+        "id": "Map",
+        "aliases": [
+          "map_fragment"
+        ],
+        "decomposition_patterns": [],
+        "anchor_types": [
+          "MapFragment"
+        ]
+      },
+      {
+        "id": "Notebook",
+        "aliases": [
+          "journal"
+        ],
+        "decomposition_patterns": [],
+        "anchor_types": [
           "Notebook"
         ]
       },
       {
-        "id": "Guide",
+        "id": "Pen",
         "aliases": [
-          "information_source"
+          "writing_utensil"
         ],
-        "decomposition_patterns": [
-          {
-            "parts": [
-              "MapScrap",
-              "Directions"
-            ]
-          }
-        ],
+        "decomposition_patterns": [],
         "anchor_types": [
-          "MapScrap",
-          "Directions"
+          "Pen"
         ]
       },
       {
-        "id": "Path",
+        "id": "Marker",
         "aliases": [
-          "trail"
+          "trail_marker"
         ],
-        "decomposition_patterns": [
-          {
-            "parts": [
-              "Footprint",
-              "Trail",
-              "Mark"
-            ]
-          }
-        ],
+        "decomposition_patterns": [],
         "anchor_types": [
-          "Path",
-          "Trail"
+          "Fallenbranch"
         ]
       },
       {
-        "id": "Landmark",
+        "id": "Sunlight",
         "aliases": [
-          "feature"
+          "light"
         ],
-        "decomposition_patterns": [
-          {
-            "parts": [
-              "ForestEdge",
-              "BerryPatch",
-              "AppletreeGrove",
-              "Sun"
-            ]
-          }
-        ],
+        "decomposition_patterns": [],
         "anchor_types": [
-          "ForestEdge",
-          "BerryPatch",
-          "AppletreeGrove",
-          "Sun"
+          "Sunlight"
         ]
       },
       {
-        "id": "Place",
+        "id": "Shadow",
         "aliases": [
-          "location",
-          "setting"
+          "shade"
         ],
-        "decomposition_patterns": [
-          {
-            "parts": [
-              "Meadow",
-              "Clearing",
-              "Thicket",
-              "Cave",
-              "Spring",
-              "BerryPatch",
-              "AppletreeGrove",
-              "Hut",
-              "Interior",
-              "Shade"
-            ]
-          }
-        ],
+        "decomposition_patterns": [],
         "anchor_types": [
-          "Meadow",
-          "Clearing",
-          "Thicket",
-          "Cave",
-          "Spring",
-          "BerryPatch",
-          "AppletreeGrove",
-          "Hut",
-          "Interior",
-          "Shade"
+          "Shadow"
         ]
       },
       {
@@ -1290,282 +1511,139 @@
         "decomposition_patterns": [
           {
             "parts": [
-              "SteepDrop",
-              "PoisonousBerries",
-              "DenseBrush"
+              "Root",
+              "Thicket"
             ]
           }
         ],
         "anchor_types": [
-          "SteepDrop",
-          "PoisonousBerries",
-          "DenseBrush"
+          "Root",
+          "Thicket"
+        ]
+      },
+      {
+        "id": "Root",
+        "aliases": [
+          "tree_root"
+        ],
+        "decomposition_patterns": [],
+        "anchor_types": [
+          "Root"
         ]
       },
       {
         "id": "Person",
         "aliases": [
-          "character",
-          "agent"
+          "actor",
+          "human"
         ],
         "decomposition_patterns": [
           {
             "parts": [
-              "Samantha",
-              "Hermit",
-              "User"
+              "Companion",
+              "Stranger"
             ]
           }
         ],
         "anchor_types": [
+          "Joe",
           "Samantha",
           "Hermit",
           "User"
         ]
       },
       {
-        "id": "Promise",
+        "id": "Companion",
         "aliases": [
-          "commitment"
+          "friend"
         ],
         "decomposition_patterns": [],
         "anchor_types": [
-          "Promise"
+          "Joe",
+          "Samantha"
+        ]
+      },
+      {
+        "id": "Stranger",
+        "aliases": [
+          "unknown_person"
+        ],
+        "decomposition_patterns": [],
+        "anchor_types": [
+          "Hermit"
         ]
       },
       {
         "id": "Gesture",
         "aliases": [
-          "gesture"
+          "sign",
+          "signal"
         ],
         "decomposition_patterns": [],
         "anchor_types": [
-          "Gesture"
+          "Signal"
         ]
       },
       {
-        "id": "Behavior",
+        "id": "Assistance",
         "aliases": [
-          "action_pattern"
+          "help"
         ],
         "decomposition_patterns": [],
         "anchor_types": [
-          "Behavior"
+          "Help"
         ]
       },
       {
-        "id": "Meadow",
-        "aliases": [],
+        "id": "Help",
+        "aliases": [
+          "aid"
+        ],
         "decomposition_patterns": [],
         "anchor_types": [
-          "Meadow"
+          "Help"
         ]
       },
       {
-        "id": "ForestEdge",
-        "aliases": [],
+        "id": "Task",
+        "aliases": [
+          "assignment"
+        ],
         "decomposition_patterns": [],
-        "anchor_types": [
-          "ForestEdge"
-        ]
-      },
-      {
-        "id": "Thicket",
-        "aliases": [],
-        "decomposition_patterns": [],
-        "anchor_types": [
-          "Thicket"
-        ]
-      },
-      {
-        "id": "Cave",
-        "aliases": [],
-        "decomposition_patterns": [],
-        "anchor_types": [
-          "Cave"
-        ]
-      },
-      {
-        "id": "Spring",
-        "aliases": [],
-        "decomposition_patterns": [],
-        "anchor_types": [
-          "Spring"
-        ]
-      },
-      {
-        "id": "BerryPatch",
-        "aliases": [],
-        "decomposition_patterns": [],
-        "anchor_types": [
-          "BerryPatch"
-        ]
-      },
-      {
-        "id": "AppletreeGrove",
-        "aliases": [],
-        "decomposition_patterns": [],
-        "anchor_types": [
-          "AppletreeGrove"
-        ]
-      },
-      {
-        "id": "Backpack",
-        "aliases": [],
-        "decomposition_patterns": [],
-        "anchor_types": [
-          "Backpack"
-        ]
-      },
-      {
-        "id": "WaterBottle",
-        "aliases": [],
-        "decomposition_patterns": [],
-        "anchor_types": [
-          "WaterBottle"
-        ]
-      },
-      {
-        "id": "FoodRation",
-        "aliases": [],
-        "decomposition_patterns": [],
-        "anchor_types": [
-          "FoodRation"
-        ]
-      },
-      {
-        "id": "MapScrap",
-        "aliases": [],
-        "decomposition_patterns": [],
-        "anchor_types": [
-          "MapScrap"
-        ]
-      },
-      {
-        "id": "Notebook",
-        "aliases": [],
-        "decomposition_patterns": [],
-        "anchor_types": [
-          "Notebook"
-        ]
-      },
-      {
-        "id": "Mug",
-        "aliases": [],
-        "decomposition_patterns": [],
-        "anchor_types": [
-          "Mug"
-        ]
-      },
-      {
-        "id": "MultiTool",
-        "aliases": [],
-        "decomposition_patterns": [],
-        "anchor_types": [
-          "MultiTool"
-        ]
-      },
-      {
-        "id": "Flashlight",
-        "aliases": [],
-        "decomposition_patterns": [],
-        "anchor_types": [
-          "Flashlight"
-        ]
-      },
-      {
-        "id": "Rock",
-        "aliases": [],
-        "decomposition_patterns": [],
-        "anchor_types": [
-          "Rock"
-        ]
-      },
-      {
-        "id": "FallenBranch",
-        "aliases": [],
-        "decomposition_patterns": [],
-        "anchor_types": [
-          "Fallenbranch"
-        ]
+        "anchor_types": []
       },
       {
         "id": "Clue",
         "aliases": [
-          "hint"
+          "hint",
+          "trace"
         ],
         "decomposition_patterns": [],
-        "anchor_types": [
-          "Clue"
-        ]
+        "anchor_types": []
       },
       {
-        "id": "Footprint",
-        "aliases": [],
-        "decomposition_patterns": [],
-        "anchor_types": [
-          "Footprint"
-        ]
-      },
-      {
-        "id": "Sun",
-        "aliases": [],
-        "decomposition_patterns": [],
-        "anchor_types": [
-          "Sun"
-        ]
-      },
-      {
-        "id": "Shade",
-        "aliases": [],
-        "decomposition_patterns": [],
-        "anchor_types": [
-          "Shade"
-        ]
-      },
-      {
-        "id": "Interior",
-        "aliases": [],
-        "decomposition_patterns": [],
-        "anchor_types": [
-          "Interior"
-        ]
-      },
-      {
-        "id": "Door",
-        "aliases": [],
-        "decomposition_patterns": [],
-        "anchor_types": [
-          "Door"
-        ]
-      },
-      {
-        "id": "Mark",
+        "id": "Trust",
         "aliases": [
-          "sign"
+          "faith"
         ],
         "decomposition_patterns": [],
-        "anchor_types": [
-          "Mark"
-        ]
+        "anchor_types": []
       },
       {
-        "id": "Directions",
-        "aliases": [],
-        "decomposition_patterns": [],
-        "anchor_types": [
-          "Directions"
-        ]
-      },
-      {
-        "id": "Sound",
+        "id": "Signal",
         "aliases": [
-          "noise"
+          "communication"
         ],
         "decomposition_patterns": [],
-        "anchor_types": [
-          "Sound"
-        ]
+        "anchor_types": []
+      },
+      {
+        "id": "Affordance",
+        "aliases": [
+          "opportunity"
+        ],
+        "decomposition_patterns": [],
+        "anchor_types": []
       },
       {
         "id": "State",
@@ -1577,22 +1655,14 @@
             "parts": [
               "Hunger",
               "Thirst",
-              "Fatigue",
-              "Hope",
-              "Worry",
-              "Loneliness",
-              "Curiosity"
+              "Fatigue"
             ]
           }
         ],
         "anchor_types": [
           "hunger",
           "thirst",
-          "fatigue",
-          "hope",
-          "worry",
-          "loneliness",
-          "curiosity"
+          "fatigue"
         ]
       },
       {
@@ -1618,118 +1688,6 @@
         "anchor_types": [
           "fatigue"
         ]
-      },
-      {
-        "id": "Hope",
-        "aliases": [],
-        "decomposition_patterns": [],
-        "anchor_types": [
-          "hope"
-        ]
-      },
-      {
-        "id": "Loneliness",
-        "aliases": [],
-        "decomposition_patterns": [],
-        "anchor_types": [
-          "loneliness"
-        ]
-      },
-      {
-        "id": "Worry",
-        "aliases": [],
-        "decomposition_patterns": [],
-        "anchor_types": [
-          "worry"
-        ]
-      },
-      {
-        "id": "Curiosity",
-        "aliases": [],
-        "decomposition_patterns": [],
-        "anchor_types": [
-          "curiosity"
-        ]
-      },
-      {
-        "id": "Berry",
-        "aliases": [],
-        "decomposition_patterns": [],
-        "anchor_types": [
-          "Berries"
-        ]
-      },
-      {
-        "id": "Mushroom",
-        "aliases": [],
-        "decomposition_patterns": [],
-        "anchor_types": [
-          "Mushrooms"
-        ]
-      },
-      {
-        "id": "Appletree",
-        "aliases": [],
-        "decomposition_patterns": [],
-        "anchor_types": [
-          "Appletree"
-        ]
-      },
-      {
-        "id": "Hut",
-        "aliases": [],
-        "decomposition_patterns": [],
-        "anchor_types": [
-          "Hut"
-        ]
-      },
-      {
-        "id": "SteepDrop",
-        "aliases": [],
-        "decomposition_patterns": [],
-        "anchor_types": [
-          "SteepDrop"
-        ]
-      },
-      {
-        "id": "PoisonousBerries",
-        "aliases": [],
-        "decomposition_patterns": [],
-        "anchor_types": [
-          "PoisonousBerries"
-        ]
-      },
-      {
-        "id": "DenseBrush",
-        "aliases": [],
-        "decomposition_patterns": [],
-        "anchor_types": [
-          "DenseBrush"
-        ]
-      },
-      {
-        "id": "Samantha",
-        "aliases": [],
-        "decomposition_patterns": [],
-        "anchor_types": [
-          "Samantha"
-        ]
-      },
-      {
-        "id": "Hermit",
-        "aliases": [],
-        "decomposition_patterns": [],
-        "anchor_types": [
-          "Hermit"
-        ]
-      },
-      {
-        "id": "User",
-        "aliases": [],
-        "decomposition_patterns": [],
-        "anchor_types": [
-          "User"
-        ]
       }
     ],
     "edges": [
@@ -1739,23 +1697,7 @@
       },
       {
         "from": "Resource",
-        "to": "Drinkable"
-      },
-      {
-        "from": "Resource",
-        "to": "Tool"
-      },
-      {
-        "from": "Tool",
-        "to": "MultiTool"
-      },
-      {
-        "from": "Tool",
-        "to": "Flashlight"
-      },
-      {
-        "from": "Tool",
-        "to": "Notebook"
+        "to": "WaterResource"
       },
       {
         "from": "Edible",
@@ -1767,115 +1709,139 @@
       },
       {
         "from": "Edible",
-        "to": "FoodRation"
+        "to": "Apple"
       },
       {
-        "from": "Edible",
-        "to": "Appletree"
+        "from": "FoodResource",
+        "to": "Edible"
       },
       {
-        "from": "Drinkable",
-        "to": "Spring"
+        "from": "FoodResource",
+        "to": "FoodPack"
       },
       {
-        "from": "Drinkable",
-        "to": "WaterBottle"
+        "from": "Vegetation",
+        "to": "Berry"
       },
       {
-        "from": "Drinkable",
-        "to": "Mug"
+        "from": "Vegetation",
+        "to": "Mushroom"
       },
       {
-        "from": "Place",
-        "to": "Meadow"
+        "from": "Vegetation",
+        "to": "Apple"
       },
       {
-        "from": "Place",
-        "to": "Clearing"
-      },
-      {
-        "from": "Place",
+        "from": "Vegetation",
         "to": "Thicket"
       },
       {
-        "from": "Place",
-        "to": "Cave"
+        "from": "Vegetation",
+        "to": "Branch"
       },
       {
-        "from": "Place",
-        "to": "Spring"
+        "from": "Location",
+        "to": "Clearing"
       },
       {
-        "from": "Place",
-        "to": "BerryPatch"
+        "from": "Location",
+        "to": "Meadow"
       },
       {
-        "from": "Place",
-        "to": "AppletreeGrove"
-      },
-      {
-        "from": "Place",
-        "to": "Hut"
-      },
-      {
-        "from": "Hazard",
-        "to": "SteepDrop"
-      },
-      {
-        "from": "Hazard",
-        "to": "PoisonousBerries"
-      },
-      {
-        "from": "Hazard",
-        "to": "DenseBrush"
-      },
-      {
-        "from": "Path",
-        "to": "Footprint"
-      },
-      {
-        "from": "Path",
-        "to": "Trail"
-      },
-      {
-        "from": "Path",
-        "to": "Mark"
-      },
-      {
-        "from": "Person",
-        "to": "Samantha"
-      },
-      {
-        "from": "Person",
-        "to": "Hermit"
-      },
-      {
-        "from": "Person",
-        "to": "User"
-      },
-      {
-        "from": "Landmark",
+        "from": "Location",
         "to": "ForestEdge"
       },
       {
-        "from": "Landmark",
-        "to": "BerryPatch"
+        "from": "Location",
+        "to": "Thicket"
       },
       {
-        "from": "Landmark",
-        "to": "AppletreeGrove"
+        "from": "Location",
+        "to": "Patch"
       },
       {
-        "from": "Landmark",
-        "to": "Sun"
+        "from": "Location",
+        "to": "Trail"
       },
       {
-        "from": "Guide",
-        "to": "MapScrap"
+        "from": "Location",
+        "to": "Path"
       },
       {
-        "from": "Guide",
-        "to": "Directions"
+        "from": "Location",
+        "to": "Structure"
+      },
+      {
+        "from": "Structure",
+        "to": "Hut"
+      },
+      {
+        "from": "Structure",
+        "to": "Cave"
+      },
+      {
+        "from": "Tool",
+        "to": "Backpack"
+      },
+      {
+        "from": "Tool",
+        "to": "FoodPack"
+      },
+      {
+        "from": "Tool",
+        "to": "Container"
+      },
+      {
+        "from": "Tool",
+        "to": "Bottle"
+      },
+      {
+        "from": "Tool",
+        "to": "Mirror"
+      },
+      {
+        "from": "Tool",
+        "to": "Basket"
+      },
+      {
+        "from": "Tool",
+        "to": "Map"
+      },
+      {
+        "from": "Tool",
+        "to": "Notebook"
+      },
+      {
+        "from": "Tool",
+        "to": "Pen"
+      },
+      {
+        "from": "WaterResource",
+        "to": "Spring"
+      },
+      {
+        "from": "WaterResource",
+        "to": "Bottle"
+      },
+      {
+        "from": "Marker",
+        "to": "FallenBranch"
+      },
+      {
+        "from": "Hazard",
+        "to": "Root"
+      },
+      {
+        "from": "Hazard",
+        "to": "Thicket"
+      },
+      {
+        "from": "Person",
+        "to": "Companion"
+      },
+      {
+        "from": "Person",
+        "to": "Stranger"
       },
       {
         "from": "State",
@@ -1888,56 +1854,21 @@
       {
         "from": "State",
         "to": "Fatigue"
-      },
-      {
-        "from": "State",
-        "to": "Worry"
-      },
-      {
-        "from": "State",
-        "to": "Hope"
-      },
-      {
-        "from": "State",
-        "to": "Curiosity"
-      },
-      {
-        "from": "State",
-        "to": "Loneliness"
       }
     ]
   },
   "indices": {
-    "scan": {
+    "noun": {
       "noun_to_map_types": {
-        "Place": [
-          "Cave",
-          "Hut",
-          "Spring",
-          "Thicket"
-        ],
-        "Thicket": [
-          "Thicket"
-        ],
-        "Drinkable": [
-          "Spring"
-        ],
-        "Mushroom": [
-          "Mushrooms"
-        ],
-        "Cave": [
-          "Cave"
-        ],
-        "Hut": [
-          "Hut"
-        ],
-        "Spring": [
-          "Spring"
-        ],
-        "Edible": [
+        "Vegetation": [
           "Appletree",
           "Berries",
-          "Mushrooms"
+          "Fallenbranch",
+          "Mushrooms",
+          "Thicket"
+        ],
+        "Hazard": [
+          "Thicket"
         ],
         "Resource": [
           "Appletree",
@@ -1945,52 +1876,311 @@
           "Mushrooms",
           "Spring"
         ],
-        "Berry": [
-          "Berries"
+        "Cave": [
+          "Cave"
+        ],
+        "WaterResource": [
+          "Spring"
+        ],
+        "Structure": [
+          "Cave",
+          "Hut"
+        ],
+        "Spring": [
+          "Spring"
+        ],
+        "Mushroom": [
+          "Mushrooms"
         ],
         "FallenBranch": [
           "Fallenbranch"
         ],
-        "Appletree": [
+        "Hut": [
+          "Hut"
+        ],
+        "Marker": [
+          "Fallenbranch"
+        ],
+        "Berry": [
+          "Berries"
+        ],
+        "Apple": [
           "Appletree"
+        ],
+        "Location": [
+          "Cave",
+          "Hut",
+          "Thicket"
+        ],
+        "Thicket": [
+          "Thicket"
+        ],
+        "Branch": [
+          "Fallenbranch"
+        ],
+        "Edible": [
+          "Appletree",
+          "Berries",
+          "Mushrooms"
+        ],
+        "FoodResource": [
+          "Appletree",
+          "Berries",
+          "Mushrooms"
         ]
       },
       "map_type_to_nouns": {
-        "Cave": [
-          "Cave",
-          "Place"
-        ],
-        "Hut": [
-          "Hut",
-          "Place"
-        ],
-        "Spring": [
-          "Drinkable",
-          "Place",
-          "Resource",
-          "Spring"
-        ],
-        "Thicket": [
-          "Place",
-          "Thicket"
-        ],
-        "Mushrooms": [
-          "Edible",
-          "Mushroom",
-          "Resource"
-        ],
         "Appletree": [
-          "Appletree",
+          "Apple",
           "Edible",
-          "Resource"
+          "FoodResource",
+          "Resource",
+          "Vegetation"
         ],
         "Berries": [
           "Berry",
           "Edible",
-          "Resource"
+          "FoodResource",
+          "Resource",
+          "Vegetation"
         ],
         "Fallenbranch": [
-          "FallenBranch"
+          "Branch",
+          "FallenBranch",
+          "Marker",
+          "Vegetation"
+        ],
+        "Mushrooms": [
+          "Edible",
+          "FoodResource",
+          "Mushroom",
+          "Resource",
+          "Vegetation"
+        ],
+        "Thicket": [
+          "Hazard",
+          "Location",
+          "Thicket",
+          "Vegetation"
+        ],
+        "Spring": [
+          "Resource",
+          "Spring",
+          "WaterResource"
+        ],
+        "Cave": [
+          "Cave",
+          "Location",
+          "Structure"
+        ],
+        "Hut": [
+          "Hut",
+          "Location",
+          "Structure"
+        ]
+      }
+    },
+    "verb": {
+      "verb_to_anchors": {
+        "Negotiate": [
+          "say"
+        ],
+        "Scout": [
+          "inspect",
+          "move"
+        ],
+        "Notice": [
+          "scan"
+        ],
+        "Estimate": [
+          "think"
+        ],
+        "Believe": [
+          "think"
+        ],
+        "Organize": [
+          "place"
+        ],
+        "Acquire": [
+          "inspect",
+          "move",
+          "scan",
+          "take",
+          "use"
+        ],
+        "AdjustPosition": [
+          "move"
+        ],
+        "Introduce": [
+          "say"
+        ],
+        "Signal": [
+          "say",
+          "take"
+        ],
+        "Identify": [
+          "inspect"
+        ],
+        "Greet": [
+          "say"
+        ],
+        "DetermineDirection": [
+          "inspect"
+        ],
+        "Map": [
+          "say",
+          "think"
+        ],
+        "Cover": [
+          "place"
+        ],
+        "Evade": [
+          "move",
+          "scan"
+        ],
+        "Locate": [
+          "inspect",
+          "scan"
+        ],
+        "Mark": [
+          "place",
+          "take"
+        ],
+        "Consume": [
+          "use"
+        ],
+        "Collect": [
+          "move",
+          "take"
+        ],
+        "Document": [
+          "say"
+        ],
+        "Share": [
+          "give"
+        ],
+        "Orient": [
+          "inspect",
+          "move"
+        ],
+        "Agree": [
+          "say"
+        ],
+        "Count": [
+          "think"
+        ],
+        "Observe": [
+          "inspect"
+        ],
+        "Avoid": [
+          "move",
+          "scan"
+        ],
+        "Ask": [
+          "say"
+        ],
+        "Reflect": [
+          "use"
+        ],
+        "Select": [
+          "take"
+        ],
+        "Approach": [
+          "move"
+        ],
+        "Test": [
+          "inspect",
+          "move"
+        ],
+        "Act": [
+          "move"
+        ],
+        "Rest": [
+          "wait"
+        ],
+        "Hide": [
+          "move",
+          "place"
+        ],
+        "Sit": [
+          "wait"
+        ],
+        "Offer": [
+          "say"
+        ]
+      },
+      "anchor_to_verbs": {
+        "say": [
+          "Agree",
+          "Ask",
+          "Document",
+          "Greet",
+          "Introduce",
+          "Map",
+          "Negotiate",
+          "Offer",
+          "Signal"
+        ],
+        "inspect": [
+          "Acquire",
+          "DetermineDirection",
+          "Identify",
+          "Locate",
+          "Observe",
+          "Orient",
+          "Scout",
+          "Test"
+        ],
+        "move": [
+          "Acquire",
+          "Act",
+          "AdjustPosition",
+          "Approach",
+          "Avoid",
+          "Collect",
+          "Evade",
+          "Hide",
+          "Orient",
+          "Scout",
+          "Test"
+        ],
+        "scan": [
+          "Acquire",
+          "Avoid",
+          "Evade",
+          "Locate",
+          "Notice"
+        ],
+        "think": [
+          "Believe",
+          "Count",
+          "Estimate",
+          "Map"
+        ],
+        "place": [
+          "Cover",
+          "Hide",
+          "Mark",
+          "Organize"
+        ],
+        "take": [
+          "Acquire",
+          "Collect",
+          "Mark",
+          "Select",
+          "Signal"
+        ],
+        "use": [
+          "Acquire",
+          "Consume",
+          "Reflect"
+        ],
+        "give": [
+          "Share"
+        ],
+        "wait": [
+          "Rest",
+          "Sit"
         ]
       }
     }

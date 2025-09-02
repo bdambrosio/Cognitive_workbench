@@ -135,6 +135,7 @@ def create_ontology(context, map_types,character_name, character, character_driv
         drive_lex = derive_drive_lexicon(character_drives_str)
 
         response = llm_client.ask({"setting": context, 
+                                   "character_name": character_name,
                                    "character": character, 
                                    "character_drives": character_drives_str, 
                                    "states": get_known_states(),
@@ -172,6 +173,7 @@ def create_activities(context, map_types, character_name, character, character_d
         map_types_str = format_map_types(map_types)    
 
         response = llm_client.ask({"character": character, 
+                                   "character_name": character_name,
                                    "character_drives": character_drives_str, 
                                    "states": get_known_states(),
                                    "other_characters": other_characters_str, 

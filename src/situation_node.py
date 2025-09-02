@@ -89,7 +89,7 @@ class ZenohSituationNode:
         
         # Thresholds for condition evaluation
         self.near_threshold = 2.0  # Distance threshold for "near" condition
-        self.at_location_threshold = 0.5  # Distance threshold for "at_location" condition
+        self.at_location_threshold = 1.0  # Distance threshold for "at_location" condition
         
         # Persistence setup
         self.situation_file = Path(f"data/situation/{character_name}_situation.json")
@@ -526,8 +526,8 @@ class ZenohSituationNode:
                     if not response:
                         for resource in view.get('resources', []):
                             if resource['name'].capitalize() == target_canonical:
-                                if ((not negated and resource.get('distance', float('inf')) <= self.location_threshold) 
-                                     or (negated and resource.get('distance', float('inf')) > self.location_threshold)):
+                                if ((not negated and resource.get('distance', float('inf')) <= self.at_location_threshold) 
+                                     or (negated and resource.get('distance', float('inf')) > self.at_location_threshold)):
                                     response = {'success': True, 'value': True, 'binding': resource['name']}
                                 else:
                                     response = {'success': True, 'value': False, 'binding': resource['name']}
@@ -536,8 +536,8 @@ class ZenohSituationNode:
                     if not response:
                         for path in view.get('paths', []):
                             if path.get('name', '').capitalize() == target_canonical:
-                                if ((not negated and path.get('distance', float('inf')) <= self.location_threshold)
-                                     or (negated and path.get('distance', float('inf')) > self.location_threshold)):
+                                if ((not negated and path.get('distance', float('inf')) <= self.at_location_threshold)
+                                     or (negated and path.get('distance', float('inf')) > self.at_location_threshold)):
                                     response = {'success': True, 'value': True, 'binding': path['name']}
                                 else:
                                     response = {'success': True, 'value': False, 'binding': path['name']}
@@ -547,8 +547,8 @@ class ZenohSituationNode:
                     if not response:
                         for character in view.get('characters', []):
                             if target_canonical == 'person' or ('name' in character and character['name'].capitalize() == target_canonical):
-                                if ((not negated and character.get('distance', float('inf')) <= self.location_threshold) 
-                                     or (negated and character.get('distance', float('inf')) > self.location_threshold)):
+                                if ((not negated and character.get('distance', float('inf')) <= self.at_location_threshold) 
+                                     or (negated and character.get('distance', float('inf')) > self.at_location_threshold)):
                                     response = {'success': True, 'value': True, 'binding': character['name']}
                                 else:
                                     response = {'success': True, 'value': False, 'binding': character['name']}
