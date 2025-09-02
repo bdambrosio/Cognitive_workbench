@@ -31,7 +31,7 @@ def clamp(value: float, lo: float = 0.0, hi: float = 100.0) -> float:
     return value
 
 
-def tick_state(state: Dict[str, Dict[str, Any]], dt_minutes: float, *, hunger_decay_per_min: float = 0.2, fatigue_decay_per_min: float = 0.2) -> None:
+def tick_state(state: Dict[str, Dict[str, Any]], dt_minutes: float, *, hunger_decay_per_min: float = 0.2, fatigue_decay_per_min: float = 0.2, thirst_decay_per_min: float = 0.6) -> None:
     """
     Advance state values forward in time by dt_minutes.
 
@@ -57,6 +57,11 @@ def tick_state(state: Dict[str, Dict[str, Any]], dt_minutes: float, *, hunger_de
     fatigue = float(state['fatigue'].get('value', 0.0))
     fatigue += fatigue_decay_per_min * float(dt_minutes)
     state['fatigue']['value'] = clamp(fatigue)
+
+    # Thirst worsens with time (faster than hunger)
+    thirst = float(state['thirst'].get('value', 0.0))
+    thirst += thirst_decay_per_min * float(dt_minutes)
+    state['thirst']['value'] = clamp(thirst)
 
 
 def apply_restore(state: Dict[str, Dict[str, Any]], key: str, amount: float) -> None:
@@ -89,7 +94,13 @@ def calculate_state_activity_alignment(activity: Dict[str, Any], character_state
         fatigue_bonus = (fatigue_val ** 2) * 0.6  # fatigue_constant = 0.6
         alignment_score += fatigue_bonus
     
-    # Future: injury, thirst, etc.
+    # Thirst alignment - drinking activities get bonus when thirsty
+    if 'thirst' in character_state and 'thirst' in activity.get('states_addressed', []):
+        thirst_val = character_state['thirst']['value'] / 100.0  # Normalize to 0-1
+        thirst_bonus = (thirst_val ** 2) * 0.6  # thirst_constant = 0.6
+        alignment_score += thirst_bonus
+    
+    # Future: injury, etc.
     # if 'injury' in character_state and 'injury' in activity.get('states_addressed', []):
     #     injury_val = character_state['injury']['value'] / 100.0
     #     injury_bonus = (injury_val ** 2) * 1.0  # injury_constant = 1.0 (most urgent)

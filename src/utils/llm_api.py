@@ -46,7 +46,7 @@ class LLM():
     def __init__(self, server_name='local', model_name=None):
         global vllm_model
         self.server_name = server_name
-        print(f'will use {self.server_name} as llm')
+        #print(f'will use {self.server_name} as llm')
         self.context_size = 16384  # conservative local mis/mixtral default
         if model_name is not None:
             self.model = model_name
@@ -164,12 +164,12 @@ class LLM():
         try:
             if response_prime_needed and type(prompt_msgs[-1]) != AssistantMessage:
                 prompt_msgs = prompt_msgs + [AssistantMessage(content='')]
-            print(f'{tag}...', end='')
+            #print(f'{tag}...', end='')
             substituted_prompt = self.substitute_bindings(prompt_msgs, input)
             response = self.run_request(substituted_prompt, top_p=top_p, temperature=temp, max_tokens=max_tokens, stops=stops, log=log, trace=trace)
             #response = response.replace('<|im_end|>', '')
             elapsed = time.time()-start
-            print(f'{elapsed:.2f}')
+            #print(f'{elapsed:.2f}')
             if not tag or tag == '':
                 tag = 'default'
             if tag != '':
@@ -183,8 +183,8 @@ class LLM():
                         print(f'{k}: {v:.2f}')
                     print(f'total: {sum(elapsed_times.values()):.2f}')
                     print()
-            if elapsed > 4.0:
-                print(f'llm excessive time: {elapsed:.2f}')
+            #if elapsed > 4.0:
+            #    print(f'llm excessive time: {elapsed:.2f}')
             if stops is not None and type(response) is str: # claude returns eos
                 if type(stops) is str:
                     stops = [stops]

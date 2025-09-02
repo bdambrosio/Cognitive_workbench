@@ -91,6 +91,8 @@ class ActionRecord:
     notes: Optional[str] = None
     # Phase 1 telemetry
     hunger_after: Optional[float] = None
+    fatigue_after: Optional[float] = None
+    thirst_after: Optional[float] = None
     proposed_minutes: Optional[int] = None
     simulation_time: Optional[str] = None
     # Optional traceability/telemetry extensions
@@ -537,6 +539,12 @@ class ZenohExecutiveNode:
                                 hunger_val = float(self.self_state.get('hunger', {}).get('value', 0.0))
                                 if hunger_val >= 100.0:
                                     logger.error(f'🍽️ {self.character_name} hunger reached 100 (worst)')
+                                fatigue_val = float(self.self_state.get('fatigue', {}).get('value', 0.0))
+                                if fatigue_val >= 100.0:
+                                    logger.error(f'🍽️ {self.character_name} fatigue reached 100 (worst)')
+                                thirst_val = float(self.self_state.get('thirst', {}).get('value', 0.0))
+                                if thirst_val >= 100.0:
+                                    logger.error(f'💧 {self.character_name} thirst reached 100 (worst)')
                             except Exception:
                                 pass
                             # Publish state snapshot for UI
@@ -879,8 +887,8 @@ class ZenohExecutiveNode:
                     goal_text=goal.name+(': '+goal.description if goal.description != goal.name else ''),
                     prompt_text=user_prompt,
                     percepts_at_plan=None,  # avoid double-including percepts
-                    server_name=os.getenv('CWB_LLM_SERVER', 'openai'),
-                    model_name=os.getenv('CWB_LLM_MODEL', 'gpt-4.1')
+                    server_name=os.getenv('CWB_LLM_SERVER', 'vllm'),
+                    model_name=os.getenv('CWB_LLM_MODEL', 'llama3.3-70B-instruct')
                 )
             else:
                 plan_candidate = None
@@ -1378,6 +1386,14 @@ end your response with </end>
                 action_record.hunger_after = float(self.self_state.get('hunger', {}).get('value', 0.0))
             except Exception:
                 action_record.hunger_after = None
+            try:
+                action_record.fatigue_after = float(self.self_state.get('fatigue', {}).get('value', 0.0))
+            except Exception:
+                action_record.fatigue_after = None
+            try:
+                action_record.thirst_after = float(self.self_state.get('thirst', {}).get('value', 0.0))
+            except Exception:
+                action_record.thirst_after = None
             action_record.proposed_minutes = proposed_minutes
             # Best-effort simulation time capture
             try:
@@ -1429,6 +1445,14 @@ end your response with </end>
                         action_record.hunger_after = float(self.self_state.get('hunger', {}).get('value', 0.0))
                     except Exception:
                         action_record.hunger_after = None
+                    try:
+                        action_record.fatigue_after = float(self.self_state.get('fatigue', {}).get('value', 0.0))
+                    except Exception:
+                        action_record.fatigue_after = None
+                    try:
+                        action_record.thirst_after = float(self.self_state.get('thirst', {}).get('value', 0.0))
+                    except Exception:
+                        action_record.thirst_after = None
                 # Request situation/map update for UI immediately after move
                 try:
                     self.map_update_request_publisher.put(json.dumps({'type': 'step_look'}))
@@ -1615,6 +1639,14 @@ end your response with </end>
                     action_record.hunger_after = float(self.self_state.get('hunger', {}).get('value', 0.0))
                 except Exception:
                     action_record.hunger_after = None
+                try:
+                    action_record.fatigue_after = float(self.self_state.get('fatigue', {}).get('value', 0.0))
+                except Exception:
+                    action_record.fatigue_after = None
+                try:
+                    action_record.thirst_after = float(self.self_state.get('thirst', {}).get('value', 0.0))
+                except Exception:
+                    action_record.thirst_after = None
             self.action_counter += 1
             return ok
         elif action['type'].lower() == "inspect":
@@ -1667,6 +1699,14 @@ end your response with </end>
                     action_record.hunger_after = float(self.self_state.get('hunger', {}).get('value', 0.0))
                 except Exception:
                     action_record.hunger_after = None
+                try:
+                    action_record.fatigue_after = float(self.self_state.get('fatigue', {}).get('value', 0.0))
+                except Exception:
+                    action_record.fatigue_after = None
+                try:
+                    action_record.thirst_after = float(self.self_state.get('thirst', {}).get('value', 0.0))
+                except Exception:
+                    action_record.thirst_after = None
                 # Publish result if available so UI can display it
                 try:
                     result_text = action_record.result if isinstance(action_record.result, str) else ''
@@ -1754,7 +1794,7 @@ end your response with </end>
                 # Resource/other use path
                 self.use(action, resolved, action_data)
                 action_data['result'] = self.action_history[-1].result
-                # Apply simple hunger restore if using an edible resource (Phase 1 heuristic)
+                # Apply simple hunger/thirst restore heuristics
                 try:
                     target_lower = (resolved or '').lower()
                     if any(k in target_lower for k in ['berry', 'berries', 'food']):
@@ -1763,6 +1803,12 @@ end your response with </end>
                         logger.info(f'🍽️ {self.character_name} ate {resolved}; hunger now {hunger_val:.1f}')
                         if hunger_val >= 100.0:
                             logger.error(f'🍽️ {self.character_name} hunger reached 100 (worst)')
+                    if any(k in target_lower for k in ['water', 'spring', 'river', 'stream', 'pond']):
+                        apply_restore(self.self_state, 'thirst', amount=40.0)
+                        thirst_val = float(self.self_state.get('thirst', {}).get('value', 0.0))
+                        logger.info(f'💧 {self.character_name} drank from {resolved}; thirst now {thirst_val:.1f}')
+                        if thirst_val >= 100.0:
+                            logger.error(f'💧 {self.character_name} thirst reached 100 (worst)')
                         # Publish state snapshot for UI after restore
                         try:
                             state_payload = {
@@ -1780,6 +1826,14 @@ end your response with </end>
                     action_record.hunger_after = float(self.self_state.get('hunger', {}).get('value', 0.0))
                 except Exception:
                     action_record.hunger_after = None
+                try:
+                    action_record.fatigue_after = float(self.self_state.get('fatigue', {}).get('value', 0.0))
+                except Exception:
+                    action_record.fatigue_after = None
+                try:
+                    action_record.thirst_after = float(self.self_state.get('thirst', {}).get('value', 0.0))
+                except Exception:
+                    action_record.thirst_after = None
             self.action_publisher.put(json.dumps(action_data))
             self.action_counter += 1
             return True
@@ -1817,6 +1871,14 @@ end your response with </end>
                 action_record.hunger_after = float(self.self_state.get('hunger', {}).get('value', 0.0))
             except Exception:
                 action_record.hunger_after = None
+            try:
+                action_record.fatigue_after = float(self.self_state.get('fatigue', {}).get('value', 0.0))
+            except Exception:
+                action_record.fatigue_after = None
+            try:
+                action_record.thirst_after = float(self.self_state.get('thirst', {}).get('value', 0.0))
+            except Exception:
+                action_record.thirst_after = None
             
             # Publish scan action result to FastAPI
             action_data = {
@@ -2013,6 +2075,22 @@ end your response with </end>
             hunger_min = min(hunger_values) if hunger_values else hunger_start
             hunger_max = max(hunger_values) if hunger_values else hunger_start
             hunger_delta = hunger_end - hunger_start
+
+            # Fatigue series
+            fatigue_values = [ar.fatigue_after for ar in self.action_history if getattr(ar, 'fatigue_after', None) is not None]
+            fatigue_start = fatigue_values[0] if fatigue_values else float(self.self_state.get('fatigue', {}).get('value', 0.0))
+            fatigue_end = fatigue_values[-1] if fatigue_values else fatigue_start
+            fatigue_min = min(fatigue_values) if fatigue_values else fatigue_start
+            fatigue_max = max(fatigue_values) if fatigue_values else fatigue_start
+            fatigue_delta = fatigue_end - fatigue_start
+
+            # Thirst series
+            thirst_values = [ar.thirst_after for ar in self.action_history if getattr(ar, 'thirst_after', None) is not None]
+            thirst_start = thirst_values[0] if thirst_values else float(self.self_state.get('thirst', {}).get('value', 0.0))
+            thirst_end = thirst_values[-1] if thirst_values else thirst_start
+            thirst_min = min(thirst_values) if thirst_values else thirst_start
+            thirst_max = max(thirst_values) if thirst_values else thirst_start
+            thirst_delta = thirst_end - thirst_start
             # Steps and outcomes
             steps_total = len(self.action_history)
             moves = sum(1 for ar in self.action_history if ar.action.get('type','').lower()=='move')
@@ -2065,6 +2143,20 @@ end your response with </end>
                     'max': hunger_max,
                     'delta': hunger_delta
                 },
+                'fatigue': {
+                    'start': fatigue_start,
+                    'end': fatigue_end,
+                    'min': fatigue_min,
+                    'max': fatigue_max,
+                    'delta': fatigue_delta
+                },
+                'thirst': {
+                    'start': thirst_start,
+                    'end': thirst_end,
+                    'min': thirst_min,
+                    'max': thirst_max,
+                    'delta': thirst_delta
+                },
                 'inventory': {
                     'taken': items_taken,
                     'used': items_used
@@ -2073,11 +2165,20 @@ end your response with </end>
         except Exception:
             metrics = {}
 
+        # Assess drive fulfillment (stubbed LLM scaffolding)
+        try:
+            drive_fulfillment = self._assess_drive_fulfillment()
+            if isinstance(drive_fulfillment, dict):
+                metrics['drive_fulfillment'] = drive_fulfillment
+        except Exception:
+            pass
+
         # Add goal satisfaction score to metrics for reflection scoring
         if 'goal_satisfaction' not in metrics:
             metrics['goal_satisfaction'] = plan_score / 100.0 if plan_score is not None else 0.0
 
         entry = {
+            'activity': self.current_activity['name'] if self.current_activity else 'None',
             'goal': self.current_goal.to_string() if self.current_goal else '',
             'prompt': self.current_plan_prompt,
             'plan': self.current_plan,
@@ -2094,7 +2195,7 @@ end your response with </end>
             pass
         try:
             os.makedirs('data', exist_ok=True)
-            with open('data/plans.jsonl', 'a') as f:
+            with open(f'data/{self.character_name}-plans.jsonl', 'a') as f:
                 f.write(json.dumps(entry, default=datetime_handler) + '\n')
         except Exception as e:
             logger.error(f'Error writing plan log to file: {e}')
@@ -2119,8 +2220,10 @@ end your response with </end>
             m = item.get('metrics', {})
             steps = m.get('steps', {})
             hunger = m.get('hunger', {})
+            fatigue = m.get('fatigue', {})
+            thirst = m.get('thirst', {})
             time_m = m.get('time', {})
-            metrics_summary = f"steps: {steps.get('total', 0)}, failures: {steps.get('failures', 0)}, minutes: {time_m.get('minutes_advanced', 0)}, hunger Δ: {hunger.get('delta', 0)}"
+            metrics_summary = f"steps: {steps.get('total', 0)}, failures: {steps.get('failures', 0)}, minutes: {time_m.get('minutes_advanced', 0)}, hunger Δ: {hunger.get('delta', 0)}, fatigue Δ: {fatigue.get('delta', 0)}, thirst Δ: {thirst.get('delta', 0)}"
             user_prompt += f"""
 
 #### Planning effort {n+1}
@@ -2479,7 +2582,8 @@ End your text with: </end>"""
         """Execute scan action and return the found target name."""
         target = action.get('target', '')
         var_name = action.get('out', '')
-        
+        if target.lower() == 'person':
+            target = 'Person'
         # Resolve noun target to one or more concrete map_types (if indices exist)
         candidates = []
         try:
@@ -2525,6 +2629,28 @@ End your text with: </end>"""
                 # If distance calc fails, accept first found
                 if not found_target:
                     found_target = name
+        
+        # Special-case: if target is Person, bind to nearest other character (exclude self)
+        try:
+            if str(target).strip().lower() == 'person':
+                best_name = ''
+                best_d = float('inf')
+                for view in (self.last_situation_data or {}).get('views', []):
+                    for character in view.get('characters', []) or []:
+                        nm = character.get('name', '')
+                        if not nm or nm == self.character_name:
+                            continue
+                        d = character.get('distance')
+                        if d is None:
+                            continue
+                        dd = float(d)
+                        if best_name == '' or dd < best_d or (dd == best_d and nm < best_name):
+                            best_name = nm
+                            best_d = dd
+                if best_name:
+                    found_target = best_name
+        except Exception:
+            pass
         
         # Store result in plan_bindings if var_name provided
         if var_name and found_target:
@@ -3079,6 +3205,134 @@ End your response with:
         except Exception as e:
             logger.error(f'Error storing in memory: {e}')
     
+    def _assess_drive_fulfillment(self) -> Dict[str, Any]:
+        """Assess drive fulfillment using an LLM. Returns structured scores per drive.
+
+        Output shape:
+          { "drives": [{"name": str, "score": float, "rationale": str}],
+            "summary": str,
+            "raw_text": str }
+        """
+        try:
+            drives_list = self.drives or []
+            goal_text = self.current_goal.to_string() if self.current_goal else ''
+            plan_text = json.dumps(self.current_plan, indent=2) if self.current_plan else '{}'
+            # Physiological snapshot
+            phys = {}
+            try:
+                for k, v in (self.self_state or {}).items():
+                    phys[k] = float(v.get('value', 0.0))
+            except Exception:
+                phys = {}
+            # Inventory (use cache)
+            inventory = []
+            try:
+                inventory = list(self.inventory_cache or [])
+            except Exception:
+                inventory = []
+            # Conversations (recent)
+            try:
+                chats = self._get_recent_chat_memories(10)
+            except Exception:
+                chats = []
+            # Knowledge: thoughts, inspects, uses
+            thoughts = []
+            try:
+                for ar in (self.action_history or []):
+                    if (ar.action or {}).get('type', '').lower() == 'think' and ar.result:
+                        thoughts.append(str(ar.result))
+            except Exception:
+                thoughts = []
+            inspects_map = {}
+            try:
+                inspects_map = dict(self.inspections or {})
+            except Exception:
+                inspects_map = {}
+            uses_map = {}
+            try:
+                uses_map = dict(self.uses or {})
+            except Exception:
+                uses_map = {}
+            # Recent actions compact
+            actions_compact = []
+            try:
+                for ar in (self.action_history or [])[-20:]:
+                    actions_compact.append({
+                        'type': (ar.action or {}).get('type', ''),
+                        'target': (ar.action or {}).get('target', ''),
+                        'result': ar.result or ''
+                    })
+            except Exception:
+                actions_compact = []
+
+            system_prompt = "Assess each drive's fulfillment (0.0 worst to 1.0 best) based on the provided context. Be strict and conservative. Return ONLY a JSON object: {\"drives\": [{\"name\": str, \"score\": float, \"rationale\": str}], \"summary\": str} and then </end>."
+            user_prompt = f"""
+Drives:
+{json.dumps(drives_list, indent=2)}
+
+Goal:
+{goal_text}
+
+Plan:
+{plan_text}
+
+Physiological state (0=best,100=worst):
+{json.dumps(phys, indent=2)}
+
+Inventory (ids):
+{json.dumps(inventory, indent=2)}
+
+Recent conversations (last 10):
+{json.dumps(chats, indent=2)}
+
+Knowledge gained - thoughts:
+{json.dumps(thoughts, indent=2)}
+
+Knowledge gained - inspections:
+{json.dumps(inspects_map, indent=2)}
+
+Knowledge gained - uses:
+{json.dumps(uses_map, indent=2)}
+
+Recent actions (last 20):
+{json.dumps(actions_compact, indent=2)}
+
+Instructions:
+For each drive, output a score in [0.0,1.0] where 1.0 means well satisfied/fulfilled, 0.0 means badly unmet. Use concise rationales. Then end with </end>.
+"""
+
+            if not self.llm_client or self.shutdown_requested:
+                return { 'drives': [ { 'name': d, 'score': 0.0, 'rationale': '' } for d in drives_list ], 'summary': '', 'raw_text': '' }
+
+            response = self.llm_client.generate(
+                messages=[system_prompt, user_prompt],
+                max_tokens=600,
+                temperature=0.3,
+                timeout=100.0,
+                is_json=True,
+                stops=['</end>']
+            )
+
+            try:
+                if response.success:
+                    if isinstance(response.text, dict):
+                        return response.text
+                    else:
+                        try:
+                            return json.loads(response.text.strip())
+                        except Exception as e:
+                            logger.error(f'Error parsing drive fulfillment response: {e}')
+                            return { }
+                else:
+                    logger.error(f'Error assessing drive fulfillment: {response.error}')
+                    return { }
+            except Exception as e:
+                logger.error(f'Error assessing drive fulfillment: {e}')
+                return { }
+        except Exception as e:
+            logger.error(f'Error assessing drive fulfillment: {e}')
+            return { }
+
     def get_entity_context(self, entity_name: str, limit: int = 20, scope='all') -> Dict[str, Any]:
         """
         Query entity data from memory node for context.

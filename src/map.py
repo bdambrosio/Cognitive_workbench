@@ -1891,11 +1891,11 @@ def hash_direction_info(direction_info, distance_threshold=10, world=None):
                         path_label_added = True
                     percept += f"{path['id']} distance {path['distance']}, "
                     paths.append(path['id'])
-            percept = percept[:-2] if path_label_added else percept
+            percept = (percept[:-2] + '; ') if path_label_added else percept
         # Preserve legacy aggregated distances for compatibility
         elif path_name in direction_info[dir] and len(direction_info[dir][path_name]) > 0:
             path_distances = direction_info[dir][path_name]['distances']
-            percept += f"{path_name}: distances {path_distances}"
+            percept += f"{path_name}: distances {path_distances}; "
             paths.append(path_name)
 
         if 'characters' in direction_info[dir] and len(direction_info[dir]['characters']) > 0:  

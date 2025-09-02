@@ -1,6 +1,6 @@
 {
   "version": "0.5",
-  "setting_notes": "Ontology centers on 19th-century rural village life, with drives balancing survival (hunger, thirst, fatigue), social status, and propriety. Verbs and nouns cover chores, socializing, worship, rest, and hazards; each is grounded in activities and environment. Graphs bridge scenario needs to primitive cognitive and manipulation operators.",
+  "setting_notes": "Ontology grounded in French rural 19th-century village life, with drives around work, status, kinship, reputation, and rest. Activities drive inclusion of manipulation, locomotion, social, and cognitive verbs; entities span persons, tools, infrastructure, status, hazards, and properties. Nodes maintain shallow depth, extensive coverage, and clear drive fulfillment paths.",
   "constraints": {
     "verb_nodes_max": 60,
     "noun_nodes_max": 60,
@@ -14,401 +14,389 @@
     "verbs": [
       {
         "id": "Move",
-        "gloss": "change physical position"
-      },
-      {
-        "id": "Acquire",
-        "gloss": "obtain or take possession"
-      },
-      {
-        "id": "Release",
-        "gloss": "relinquish or set down"
-      },
-      {
-        "id": "Consume",
-        "gloss": "ingest or use up resource"
-      },
-      {
-        "id": "Transfer",
-        "gloss": "hand over or pass item"
-      },
-      {
-        "id": "Interact",
-        "gloss": "manipulate or use physically"
-      },
-      {
-        "id": "Inspect",
-        "gloss": "observe in detail or check"
-      },
-      {
-        "id": "Collect",
-        "gloss": "gather multiple items"
-      },
-      {
-        "id": "Prepare",
-        "gloss": "make ready for use or action"
-      },
-      {
-        "id": "Clean",
-        "gloss": "remove dirt or make tidy"
-      },
-      {
-        "id": "Repair",
-        "gloss": "fix or restore to working order"
-      },
-      {
-        "id": "Tend",
-        "gloss": "care for plants, animals, or people"
-      },
-      {
-        "id": "Harvest",
-        "gloss": "gather crops or produce"
-      },
-      {
-        "id": "Feed",
-        "gloss": "provide food or nourishment"
-      },
-      {
-        "id": "Water",
-        "gloss": "supply water, esp. to plants/animals"
-      },
-      {
-        "id": "Attend",
-        "gloss": "be present and participate"
-      },
-      {
-        "id": "Pray",
-        "gloss": "engage in religious ritual"
-      },
-      {
-        "id": "Greet",
-        "gloss": "formally welcome someone"
-      },
-      {
-        "id": "Speak",
-        "gloss": "communicate with words"
-      },
-      {
-        "id": "Listen",
-        "gloss": "actively receive spoken words"
-      },
-      {
-        "id": "Converse",
-        "gloss": "engage in back-and-forth talk"
-      },
-      {
-        "id": "Ask",
-        "gloss": "request information or assistance"
-      },
-      {
-        "id": "Confide",
-        "gloss": "share confidential information"
-      },
-      {
-        "id": "Negotiate",
-        "gloss": "reach agreement via discussion"
-      },
-      {
-        "id": "Observe",
-        "gloss": "watch attentively"
+        "gloss": "change physical location"
       },
       {
         "id": "Rest",
-        "gloss": "pause activity, regain energy"
+        "gloss": "take a break or relax"
       },
       {
-        "id": "Recover",
-        "gloss": "restore health or composure"
+        "id": "Wait",
+        "gloss": "pause and delay further action"
       },
       {
-        "id": "Display",
-        "gloss": "show publicly for evaluation"
+        "id": "Acquire",
+        "gloss": "obtain possession of an object"
       },
       {
-        "id": "Offer",
-        "gloss": "present something voluntarily"
+        "id": "Carry",
+        "gloss": "transport item between locations"
       },
       {
-        "id": "Trade",
-        "gloss": "exchange goods or services"
+        "id": "Use",
+        "gloss": "employ an object to perform a task"
       },
       {
-        "id": "Compare",
-        "gloss": "examine similarities/differences"
+        "id": "Manipulate",
+        "gloss": "physically adjust or operate object"
       },
       {
-        "id": "Pass",
-        "gloss": "hand something across"
+        "id": "Eat",
+        "gloss": "consume food"
+      },
+      {
+        "id": "Drink",
+        "gloss": "consume liquid"
+      },
+      {
+        "id": "Observe",
+        "gloss": "gather information via senses"
+      },
+      {
+        "id": "Scan",
+        "gloss": "quickly visually check environment or people"
+      },
+      {
+        "id": "Inspect",
+        "gloss": "examine closely for details"
+      },
+      {
+        "id": "Say",
+        "gloss": "utter words to others"
+      },
+      {
+        "id": "Greet",
+        "gloss": "initiate respectful social interaction"
+      },
+      {
+        "id": "Converse",
+        "gloss": "exchange information socially"
+      },
+      {
+        "id": "Negotiate",
+        "gloss": "try to reach agreement in exchange"
+      },
+      {
+        "id": "ExpressOpinion",
+        "gloss": "offer judgment about topic"
       },
       {
         "id": "Think",
-        "gloss": "mentally process or reflect"
+        "gloss": "internal monologue or reflection"
       },
       {
-        "id": "Reflect",
-        "gloss": "consider past actions or future"
+        "id": "Recall",
+        "gloss": "retrieve a memory or past experience"
       },
       {
-        "id": "Obey",
-        "gloss": "follow rules or instructions"
+        "id": "Pray",
+        "gloss": "perform religious verbal ritual"
+      },
+      {
+        "id": "ObserveNorm",
+        "gloss": "adhere to community or social expectations"
+      },
+      {
+        "id": "Avoid",
+        "gloss": "deliberately keep away from a risk or person"
       },
       {
         "id": "Protect",
-        "gloss": "shield from harm or risk"
-      },
-      {
-        "id": "Manage",
-        "gloss": "organize activities or resources"
+        "gloss": "shield reputation or status"
       },
       {
         "id": "Monitor",
-        "gloss": "watch and track for change"
+        "gloss": "continually keep watch over situation"
       },
       {
-        "id": "Dress",
-        "gloss": "wear or arrange clothing"
+        "id": "ProvideAssistance",
+        "gloss": "aid others in tasks or need"
       },
       {
-        "id": "Locate",
-        "gloss": ""
+        "id": "Offer",
+        "gloss": "present something for accepting"
       },
       {
-        "id": "Approach",
-        "gloss": ""
+        "id": "Reject",
+        "gloss": "refuse a proposal or offer"
       },
       {
-        "id": "EatOrDrink",
-        "gloss": ""
-      },
-      {
-        "id": "Arrange",
-        "gloss": ""
-      },
-      {
-        "id": "FeedOrWater",
-        "gloss": ""
-      },
-      {
-        "id": "Propose",
-        "gloss": ""
-      },
-      {
-        "id": "Counter",
-        "gloss": ""
-      },
-      {
-        "id": "Conclude",
-        "gloss": ""
+        "id": "Invite",
+        "gloss": "encourage participation"
       },
       {
         "id": "Accept",
-        "gloss": ""
+        "gloss": "agree to offer or invitation"
       },
       {
-        "id": "DetectHazard",
-        "gloss": ""
+        "id": "ExpressGratitude",
+        "gloss": "show thankfulness"
       },
       {
-        "id": "RespondToHazard",
-        "gloss": ""
+        "id": "Comply",
+        "gloss": "follow request or directive"
       },
       {
-        "id": "Direct",
-        "gloss": ""
+        "id": "Prepare",
+        "gloss": "ready resources ahead of use"
+      },
+      {
+        "id": "Organize",
+        "gloss": "arrange items or persons for efficiency"
+      },
+      {
+        "id": "Plan",
+        "gloss": "formulate a structured course of action"
+      },
+      {
+        "id": "Clean",
+        "gloss": "make object or place tidy"
+      },
+      {
+        "id": "Harvest",
+        "gloss": "gather crops or animal produce"
+      },
+      {
+        "id": "Feed",
+        "gloss": "give food to others"
+      },
+      {
+        "id": "Water",
+        "gloss": "supply liquid to entities or plants"
+      },
+      {
+        "id": "Tend",
+        "gloss": "care for plants, animals, or infrastructure"
+      },
+      {
+        "id": "Work",
+        "gloss": "productively exert effort"
+      },
+      {
+        "id": "Relate",
+        "gloss": "maintain social/kin relationships"
+      },
+      {
+        "id": "SenseFatigue",
+        "gloss": "notice physical tiredness"
+      },
+      {
+        "id": "SenseThirst",
+        "gloss": "notice physical dehydration"
+      },
+      {
+        "id": "SenseHunger",
+        "gloss": "notice need for nourishment"
+      },
+      {
+        "id": "AvoidHazard",
+        "gloss": "stay away from risks"
+      },
+      {
+        "id": "ScanForThreat",
+        "gloss": "actively search for risk or dangers"
+      },
+      {
+        "id": "Evaluate",
+        "gloss": "judge quality or suitability"
+      },
+      {
+        "id": "ExpressJoy",
+        "gloss": "display happiness, especially socially"
+      },
+      {
+        "id": "Complain",
+        "gloss": "voice displeasure"
+      },
+      {
+        "id": "Praise",
+        "gloss": "give verbal approval or admiration"
       }
     ],
     "nouns": [
       {
+        "id": "Resource",
+        "gloss": "any object or supply usable for work or living"
+      },
+      {
         "id": "Place",
-        "gloss": "any defined location or setting"
+        "gloss": "physical location or area"
       },
       {
-        "id": "Dwelling",
-        "gloss": "place of residence"
-      },
-      {
-        "id": "Field",
-        "gloss": "cultivated land"
-      },
-      {
-        "id": "Barn",
-        "gloss": "farm outbuilding for storage/animals"
-      },
-      {
-        "id": "Well",
-        "gloss": "water source"
-      },
-      {
-        "id": "Market",
-        "gloss": "commercial gathering place"
-      },
-      {
-        "id": "Garden",
-        "gloss": "domestic crop patch"
-      },
-      {
-        "id": "Meadow",
-        "gloss": "open grassland"
-      },
-      {
-        "id": "Riverbank",
-        "gloss": "edge of a river"
+        "id": "Person",
+        "gloss": "human individual"
       },
       {
         "id": "Tool",
-        "gloss": "physical implement for work"
-      },
-      {
-        "id": "Container",
-        "gloss": "object for holding/substance"
-      },
-      {
-        "id": "Basket",
-        "gloss": "wicker container"
-      },
-      {
-        "id": "Bucket",
-        "gloss": "pail for liquid or items"
-      },
-      {
-        "id": "Pitchfork",
-        "gloss": "forked farm tool"
+        "gloss": "artifact enabling work"
       },
       {
         "id": "Edible",
-        "gloss": "item that can be eaten"
-      },
-      {
-        "id": "Bread",
-        "gloss": "loaf or slice of baked grain food"
-      },
-      {
-        "id": "Soup",
-        "gloss": "liquid food"
-      },
-      {
-        "id": "Meal",
-        "gloss": "grouped food serving"
+        "gloss": "item for consumption"
       },
       {
         "id": "Drinkable",
-        "gloss": "liquid for consumption"
+        "gloss": "item for drinking"
       },
       {
-        "id": "Water",
-        "gloss": "potable liquid, resource"
+        "id": "Chore",
+        "gloss": "repeating domestic or farm task"
       },
       {
-        "id": "Animal",
-        "gloss": "living creature, e.g., livestock"
+        "id": "Status",
+        "gloss": "relative social position"
       },
       {
-        "id": "Produce",
-        "gloss": "harvested plants/crops"
+        "id": "Reputation",
+        "gloss": "public perception"
       },
       {
-        "id": "Resource",
-        "gloss": "any useful or needed thing"
+        "id": "Norm",
+        "gloss": "shared community rule/convention"
+      },
+      {
+        "id": "Hazard",
+        "gloss": "risk or source of danger"
       },
       {
         "id": "Family",
-        "gloss": "persons related by kinship"
+        "gloss": "direct kinship group"
       },
       {
-        "id": "Neighbour",
-        "gloss": "member of nearby household"
-      },
-      {
-        "id": "Authority",
-        "gloss": "high-status or rule-setting person"
+        "id": "Neighbor",
+        "gloss": "adjacent or familiar non-kin"
       },
       {
         "id": "Priest",
         "gloss": "religious authority"
       },
       {
-        "id": "VillageWoman",
-        "gloss": "female member of village"
+        "id": "Bridegroom",
+        "gloss": "a marriageable male"
       },
       {
-        "id": "VillageMan",
-        "gloss": "male member of village"
+        "id": "MarriageProspect",
+        "gloss": "potential spouse"
       },
       {
-        "id": "Person",
-        "gloss": "any human entity"
+        "id": "RestingSpot",
+        "gloss": "location suited for rest"
       },
       {
-        "id": "Congregation",
-        "gloss": "assembly of people in worship"
+        "id": "Infrastructure",
+        "gloss": "facility or construction for living or working"
       },
       {
-        "id": "Norm",
-        "gloss": "local social rule or expectation"
+        "id": "Field",
+        "gloss": "agricultural parcel"
       },
       {
-        "id": "Hazard",
-        "gloss": "source of potential risk"
+        "id": "MarketStall",
+        "gloss": "location for economic exchange"
       },
       {
-        "id": "Injury",
-        "gloss": "bodily harm"
+        "id": "Church",
+        "gloss": "place of worship"
+      },
+      {
+        "id": "Bench",
+        "gloss": "seat or resting device"
+      },
+      {
+        "id": "Food",
+        "gloss": "edible material"
+      },
+      {
+        "id": "Drink",
+        "gloss": "liquid for hydration"
+      },
+      {
+        "id": "WaterSource",
+        "gloss": "location for collecting water"
+      },
+      {
+        "id": "TimeWindow",
+        "gloss": "period in a day or week"
+      },
+      {
+        "id": "Bread",
+        "gloss": "staple edible produced from grain"
+      },
+      {
+        "id": "Milk",
+        "gloss": "farm produce for drinking"
+      },
+      {
+        "id": "Egg",
+        "gloss": "farm produce for eating"
+      },
+      {
+        "id": "Vegetable",
+        "gloss": "edible plant harvested"
+      },
+      {
+        "id": "AnimalProduct",
+        "gloss": "edible or useful output from livestock"
+      },
+      {
+        "id": "FamilyMeal",
+        "gloss": "shared eating event"
+      },
+      {
+        "id": "ChoreTask",
+        "gloss": "specific household or farm duty"
       },
       {
         "id": "Scandal",
-        "gloss": "reputation harming event"
+        "gloss": "publicly damaging rumor or act"
       },
       {
-        "id": "Reputation",
-        "gloss": "standing in social view"
+        "id": "Gossip",
+        "gloss": "potentially reputational talk"
       },
       {
-        "id": "Chore",
-        "gloss": "routine domestic/farm task"
+        "id": "Workplace",
+        "gloss": "location specific to a productive activity"
       },
       {
-        "id": "Work",
-        "gloss": "category of productive activity"
+        "id": "Child",
+        "gloss": "a minor person"
       },
       {
-        "id": "Clothing",
-        "gloss": "article worn on the body"
+        "id": "Role",
+        "gloss": "social or economic function held"
       },
       {
-        "id": "Headwear",
-        "gloss": "item worn on head"
-      },
-      {
-        "id": "Apron",
-        "gloss": "protective workwear"
-      },
-      {
-        "id": "Book",
-        "gloss": "bound written material"
-      },
-      {
-        "id": "PrayerBook",
-        "gloss": "book of prayers"
+        "id": "StatusToken",
+        "gloss": "object signifying social standing"
       },
       {
         "id": "Pathway",
         "gloss": "route for movement"
       },
       {
-        "id": "State",
-        "gloss": "condition affecting person"
+        "id": "Livestock",
+        "gloss": "domesticated farm animal"
       },
       {
-        "id": "Hunger",
-        "gloss": "need for food"
+        "id": "Produce",
+        "gloss": "item resulting from agricultural labor"
       },
       {
-        "id": "Thirst",
-        "gloss": "need for water"
+        "id": "ToolCarrier",
+        "gloss": "container or accessory for tools"
       },
       {
-        "id": "Fatigue",
-        "gloss": "depletion of energy"
+        "id": "Property",
+        "gloss": "entity attributes (hunger, thirst, fatigue)"
+      },
+      {
+        "id": "Joy",
+        "gloss": "positive subjective state"
+      },
+      {
+        "id": "Event",
+        "gloss": "social or community gathering"
       }
     ]
   },
@@ -417,23 +405,67 @@
       {
         "id": "Move",
         "aliases": [
-          "walk",
           "go",
-          "proceed",
-          "travel"
+          "travel",
+          "walk"
         ],
-        "args": "destination (Place/Pathway)",
+        "args": "destination place",
+        "decomposition_patterns": [
+          {
+            "sequence": [
+              "Locate",
+              "Approach"
+            ]
+          }
+        ],
+        "hint_anchor": "move"
+      },
+      {
+        "id": "Locate",
+        "aliases": [
+          "find"
+        ],
+        "args": "entity to locate",
+        "decomposition_patterns": [],
+        "hint_anchor": "scan"
+      },
+      {
+        "id": "Approach",
+        "aliases": [
+          "walk_to",
+          "head_toward"
+        ],
+        "args": "target location or person",
         "decomposition_patterns": [],
         "hint_anchor": "move"
+      },
+      {
+        "id": "Rest",
+        "aliases": [
+          "relax",
+          "pause"
+        ],
+        "args": "location, optional companion",
+        "decomposition_patterns": [],
+        "hint_anchor": "wait"
+      },
+      {
+        "id": "Wait",
+        "aliases": [
+          "linger"
+        ],
+        "args": "duration, optional location",
+        "decomposition_patterns": [],
+        "hint_anchor": "wait"
       },
       {
         "id": "Acquire",
         "aliases": [
           "get",
-          "take_possession",
-          "fetch"
+          "pick_up",
+          "take_possession"
         ],
-        "args": "object (Resource/Edible/Tool)",
+        "args": "object to acquire, optional source",
         "decomposition_patterns": [
           {
             "sequence": [
@@ -446,210 +478,153 @@
         "hint_anchor": "take"
       },
       {
-        "id": "Release",
+        "id": "Collect",
         "aliases": [
-          "drop",
-          "leave",
-          "set_down"
+          "gather",
+          "harvest"
         ],
-        "args": "object (Resource/Tool/Container)",
+        "args": "resource/item",
         "decomposition_patterns": [],
-        "hint_anchor": "place"
+        "hint_anchor": "take"
       },
       {
-        "id": "Consume",
+        "id": "Carry",
         "aliases": [
-          "eat",
-          "drink"
+          "transport",
+          "bring"
         ],
-        "args": "object (Edible/Drinkable/Meal)",
-        "decomposition_patterns": [
-          {
-            "sequence": [
-              "Prepare",
-              "EatOrDrink"
-            ]
-          }
-        ],
-        "hint_anchor": "use"
-      },
-      {
-        "id": "Transfer",
-        "aliases": [
-          "pass",
-          "hand_over",
-          "give"
-        ],
-        "args": "object (Resource/Meal/Tool), recipient (Person)",
+        "args": "object, from, to",
         "decomposition_patterns": [
           {
             "sequence": [
               "Acquire",
-              "Approach",
-              "Offer"
+              "Move",
+              "Place"
             ]
           }
         ],
+        "hint_anchor": "take"
+      },
+      {
+        "id": "Place",
+        "aliases": [
+          "put",
+          "set_down",
+          "drop"
+        ],
+        "args": "object, target location",
+        "decomposition_patterns": [],
         "hint_anchor": "place"
       },
       {
-        "id": "Interact",
+        "id": "Use",
         "aliases": [
-          "use",
+          "utilize",
+          "employ"
+        ],
+        "args": "tool or resource, optional target",
+        "decomposition_patterns": [
+          {
+            "sequence": [
+              "Inspect",
+              "Manipulate"
+            ]
+          }
+        ],
+        "hint_anchor": "use"
+      },
+      {
+        "id": "Manipulate",
+        "aliases": [
+          "operate",
           "handle"
         ],
-        "args": "object (Tool/Resource/Container)",
+        "args": "object or mechanism",
         "decomposition_patterns": [],
         "hint_anchor": "use"
+      },
+      {
+        "id": "Eat",
+        "aliases": [
+          "consume_food",
+          "ingest"
+        ],
+        "args": "food object",
+        "decomposition_patterns": [
+          {
+            "sequence": [
+              "Acquire",
+              "Consume"
+            ]
+          }
+        ],
+        "hint_anchor": "use"
+      },
+      {
+        "id": "Drink",
+        "aliases": [
+          "consume_liquid",
+          "sip"
+        ],
+        "args": "drink object",
+        "decomposition_patterns": [
+          {
+            "sequence": [
+              "Acquire",
+              "Consume"
+            ]
+          }
+        ],
+        "hint_anchor": "use"
+      },
+      {
+        "id": "Consume",
+        "aliases": [
+          "devour",
+          "finish"
+        ],
+        "args": "edible or drinkable",
+        "decomposition_patterns": [],
+        "hint_anchor": "use"
+      },
+      {
+        "id": "Observe",
+        "aliases": [
+          "watch",
+          "notice"
+        ],
+        "args": "scene, person, or object",
+        "decomposition_patterns": [],
+        "hint_anchor": "scan"
+      },
+      {
+        "id": "Scan",
+        "aliases": [
+          "look_over",
+          "survey"
+        ],
+        "args": "environment, group, or individuals",
+        "decomposition_patterns": [],
+        "hint_anchor": "scan"
       },
       {
         "id": "Inspect",
         "aliases": [
           "check",
-          "look_over",
           "examine"
         ],
-        "args": "object (Produce/Edible/Animal/Resource/Place)",
+        "args": "object, area, or person",
         "decomposition_patterns": [],
         "hint_anchor": "inspect"
       },
       {
-        "id": "Collect",
+        "id": "Say",
         "aliases": [
-          "gather",
-          "pick_up"
+          "utter",
+          "speak"
         ],
-        "args": "objects (Produce/Resource/Edible)",
+        "args": "audience, message",
         "decomposition_patterns": [],
-        "hint_anchor": "take"
-      },
-      {
-        "id": "Prepare",
-        "aliases": [
-          "ready",
-          "set_up"
-        ],
-        "args": "object (Edible/Meal/Resource)",
-        "decomposition_patterns": [
-          {
-            "sequence": [
-              "Clean",
-              "Arrange"
-            ]
-          }
-        ],
-        "hint_anchor": "use"
-      },
-      {
-        "id": "Clean",
-        "aliases": [
-          "wash",
-          "tidy"
-        ],
-        "args": "object (Tool/Clothing/Place/Container)",
-        "decomposition_patterns": [],
-        "hint_anchor": "use"
-      },
-      {
-        "id": "Repair",
-        "aliases": [
-          "fix",
-          "mend"
-        ],
-        "args": "object (Tool/Clothing/Container)",
-        "decomposition_patterns": [],
-        "hint_anchor": "use"
-      },
-      {
-        "id": "Tend",
-        "aliases": [
-          "care_for",
-          "look_after"
-        ],
-        "args": "object (Animal/Plant/Person)",
-        "decomposition_patterns": [
-          {
-            "sequence": [
-              "Inspect",
-              "FeedOrWater"
-            ]
-          }
-        ],
-        "hint_anchor": "use"
-      },
-      {
-        "id": "Harvest",
-        "aliases": [
-          "reap",
-          "pick"
-        ],
-        "args": "object (Produce/Plants)",
-        "decomposition_patterns": [
-          {
-            "sequence": [
-              "Inspect",
-              "Collect"
-            ]
-          }
-        ],
-        "hint_anchor": "take"
-      },
-      {
-        "id": "Feed",
-        "aliases": [
-          "provide_food"
-        ],
-        "args": "target (Animal/Person), resource (Edible)",
-        "decomposition_patterns": [
-          {
-            "sequence": [
-              "Acquire",
-              "Offer"
-            ]
-          }
-        ],
-        "hint_anchor": "place"
-      },
-      {
-        "id": "Water",
-        "aliases": [
-          "provide_water"
-        ],
-        "args": "target (Animal/Plant), resource (Water)",
-        "decomposition_patterns": [
-          {
-            "sequence": [
-              "Acquire",
-              "Offer"
-            ]
-          }
-        ],
-        "hint_anchor": "place"
-      },
-      {
-        "id": "Attend",
-        "aliases": [
-          "be_present",
-          "participate"
-        ],
-        "args": "event (Activity/Place)",
-        "decomposition_patterns": [],
-        "hint_anchor": "move"
-      },
-      {
-        "id": "Pray",
-        "aliases": [
-          "worship"
-        ],
-        "args": "context (Place/Book)",
-        "decomposition_patterns": [
-          {
-            "sequence": [
-              "Reflect",
-              "Speak"
-            ]
-          }
-        ],
         "hint_anchor": "say"
       },
       {
@@ -658,29 +633,9 @@
           "salute",
           "welcome"
         ],
-        "args": "target (Person/Group)",
+        "args": "person or group",
         "decomposition_patterns": [],
         "hint_anchor": "say"
-      },
-      {
-        "id": "Speak",
-        "aliases": [
-          "tell",
-          "say_to"
-        ],
-        "args": "target (Person), content (Norm/Topic)",
-        "decomposition_patterns": [],
-        "hint_anchor": "say"
-      },
-      {
-        "id": "Listen",
-        "aliases": [
-          "attend_to",
-          "hear"
-        ],
-        "args": "source (Person/Group)",
-        "decomposition_patterns": [],
-        "hint_anchor": "think"
       },
       {
         "id": "Converse",
@@ -688,39 +643,12 @@
           "chat",
           "discuss"
         ],
-        "args": "target (Person), topic (Resource/Norm/Status)",
+        "args": "partner, topic",
         "decomposition_patterns": [
           {
             "sequence": [
-              "Speak",
-              "Listen"
-            ]
-          }
-        ],
-        "hint_anchor": "say"
-      },
-      {
-        "id": "Ask",
-        "aliases": [
-          "request",
-          "inquire"
-        ],
-        "args": "target (Person), content (Norm/Resource)",
-        "decomposition_patterns": [],
-        "hint_anchor": "say"
-      },
-      {
-        "id": "Confide",
-        "aliases": [
-          "disclose",
-          "share_secrecy"
-        ],
-        "args": "target (Person), content (Scandal/Concern)",
-        "decomposition_patterns": [
-          {
-            "sequence": [
-              "Reflect",
-              "Speak"
+              "Greet",
+              "ExpressOpinion"
             ]
           }
         ],
@@ -730,174 +658,98 @@
         "id": "Negotiate",
         "aliases": [
           "bargain",
-          "arrange"
+          "haggle"
         ],
-        "args": "partner (Person), item (Produce/Status)",
+        "args": "counterparty, exchange",
         "decomposition_patterns": [
           {
             "sequence": [
-              "Propose",
-              "Counter",
-              "Conclude"
+              "Converse",
+              "Offer"
             ]
           }
         ],
         "hint_anchor": "say"
       },
       {
-        "id": "Observe",
+        "id": "ExpressOpinion",
         "aliases": [
-          "watch",
-          "notice"
+          "comment",
+          "remark"
         ],
-        "args": "target (Person/Produce/Market/Event)",
+        "args": "audience, content",
         "decomposition_patterns": [],
-        "hint_anchor": "inspect"
-      },
-      {
-        "id": "Rest",
-        "aliases": [
-          "pause",
-          "relax",
-          "sit"
-        ],
-        "args": "place (Place/Dwelling/Meadow)",
-        "decomposition_patterns": [],
-        "hint_anchor": "wait"
-      },
-      {
-        "id": "Recover",
-        "aliases": [
-          "regain",
-          "recuperate"
-        ],
-        "args": "target_state (Fatigue/Injury)",
-        "decomposition_patterns": [
-          {
-            "sequence": [
-              "Rest",
-              "Reflect"
-            ]
-          }
-        ],
-        "hint_anchor": "wait"
-      },
-      {
-        "id": "Display",
-        "aliases": [
-          "show",
-          "present"
-        ],
-        "args": "object (Produce/Resource), audience (Person/Group)",
-        "decomposition_patterns": [],
-        "hint_anchor": "place"
-      },
-      {
-        "id": "Offer",
-        "aliases": [
-          "present",
-          "give"
-        ],
-        "args": "object (Resource/Produce/Meal), recipient (Person)",
-        "decomposition_patterns": [],
-        "hint_anchor": "place"
-      },
-      {
-        "id": "Trade",
-        "aliases": [
-          "exchange",
-          "barter"
-        ],
-        "args": "offering (Resource/Produce), desired (Resource/Produce), partner (Person)",
-        "decomposition_patterns": [
-          {
-            "sequence": [
-              "Offer",
-              "Negotiate",
-              "Accept"
-            ]
-          }
-        ],
-        "hint_anchor": "place"
-      },
-      {
-        "id": "Compare",
-        "aliases": [
-          "contrast",
-          "evaluate"
-        ],
-        "args": "items (Produce/Status/Resource)",
-        "decomposition_patterns": [],
-        "hint_anchor": "inspect"
-      },
-      {
-        "id": "Pass",
-        "aliases": [
-          "hand"
-        ],
-        "args": "object (Resource/Meal/Tool), to (Person)",
-        "decomposition_patterns": [],
-        "hint_anchor": "place"
+        "hint_anchor": "say"
       },
       {
         "id": "Think",
         "aliases": [
-          "cogitate"
+          "reflect",
+          "contemplate"
         ],
-        "args": "content (Norm/Status/Goal)",
+        "args": "topic",
         "decomposition_patterns": [],
         "hint_anchor": "think"
       },
       {
-        "id": "Reflect",
+        "id": "Recall",
         "aliases": [
-          "consider",
-          "reminisce"
+          "remember",
+          "recollect"
         ],
-        "args": "content (Action/Norm/Status)",
+        "args": "memory, topic",
         "decomposition_patterns": [],
         "hint_anchor": "think"
       },
       {
-        "id": "Obey",
+        "id": "Pray",
         "aliases": [
-          "follow",
-          "submit"
+          "worship",
+          "recite_prayer"
         ],
-        "args": "rule (Norm), source (Authority/Person)",
+        "args": "content, deity",
+        "decomposition_patterns": [
+          {
+            "sequence": [
+              "Say",
+              "ObserveNorm"
+            ]
+          }
+        ],
+        "hint_anchor": "say"
+      },
+      {
+        "id": "ObserveNorm",
+        "aliases": [
+          "follow_rule",
+          "respect_convention"
+        ],
+        "args": "norm, audience",
         "decomposition_patterns": [],
-        "hint_anchor": "use"
+        "hint_anchor": "wait"
+      },
+      {
+        "id": "Avoid",
+        "aliases": [
+          "bypass",
+          "shun"
+        ],
+        "args": "entity or hazard",
+        "decomposition_patterns": [],
+        "hint_anchor": "move"
       },
       {
         "id": "Protect",
         "aliases": [
           "defend",
-          "safeguard"
+          "shield"
         ],
-        "args": "object (Person/Reputation/Family)",
+        "args": "object or reputation",
         "decomposition_patterns": [
           {
             "sequence": [
-              "DetectHazard",
-              "RespondToHazard"
-            ]
-          }
-        ],
-        "hint_anchor": "use"
-      },
-      {
-        "id": "Manage",
-        "aliases": [
-          "organize",
-          "plan"
-        ],
-        "args": "activity (Chore/Work/Resource)",
-        "decomposition_patterns": [
-          {
-            "sequence": [
-              "Inspect",
-              "Direct",
-              "Monitor"
+              "Monitor",
+              "Avoid"
             ]
           }
         ],
@@ -906,180 +758,408 @@
       {
         "id": "Monitor",
         "aliases": [
-          "track",
-          "supervise"
+          "watch_over",
+          "keep_track"
         ],
-        "args": "object (Resource/Person/Norm)",
+        "args": "person, object, or situation",
         "decomposition_patterns": [],
-        "hint_anchor": "inspect"
+        "hint_anchor": "scan"
       },
       {
-        "id": "Dress",
+        "id": "ProvideAssistance",
         "aliases": [
-          "wear",
-          "put_on"
+          "help",
+          "support"
         ],
-        "args": "object (Clothing/Headwear/Apron)",
+        "args": "person, task",
+        "decomposition_patterns": [
+          {
+            "sequence": [
+              "Observe",
+              "Offer"
+            ]
+          }
+        ],
+        "hint_anchor": "use"
+      },
+      {
+        "id": "Offer",
+        "aliases": [
+          "propose",
+          "give"
+        ],
+        "args": "object, person",
+        "decomposition_patterns": [],
+        "hint_anchor": "say"
+      },
+      {
+        "id": "Reject",
+        "aliases": [
+          "refuse",
+          "decline"
+        ],
+        "args": "offer, person",
+        "decomposition_patterns": [],
+        "hint_anchor": "say"
+      },
+      {
+        "id": "Invite",
+        "aliases": [
+          "entreat",
+          "summon"
+        ],
+        "args": "person, event",
+        "decomposition_patterns": [],
+        "hint_anchor": "say"
+      },
+      {
+        "id": "Accept",
+        "aliases": [
+          "agree",
+          "consent"
+        ],
+        "args": "offer, invitation",
+        "decomposition_patterns": [],
+        "hint_anchor": "say"
+      },
+      {
+        "id": "ExpressGratitude",
+        "aliases": [
+          "thank"
+        ],
+        "args": "audience",
+        "decomposition_patterns": [],
+        "hint_anchor": "say"
+      },
+      {
+        "id": "Comply",
+        "aliases": [
+          "obey",
+          "follow"
+        ],
+        "args": "directive, norm",
+        "decomposition_patterns": [],
+        "hint_anchor": "wait"
+      },
+      {
+        "id": "Prepare",
+        "aliases": [
+          "ready",
+          "setup"
+        ],
+        "args": "resource, plan",
+        "decomposition_patterns": [
+          {
+            "sequence": [
+              "Organize",
+              "Clean"
+            ]
+          }
+        ],
+        "hint_anchor": "use"
+      },
+      {
+        "id": "Organize",
+        "aliases": [
+          "arrange",
+          "sort"
+        ],
+        "args": "items, persons",
         "decomposition_patterns": [],
         "hint_anchor": "use"
       },
       {
-        "id": "Locate",
-        "decomposition_patterns": []
+        "id": "Clean",
+        "aliases": [
+          "tidy",
+          "wash"
+        ],
+        "args": "object or place",
+        "decomposition_patterns": [],
+        "hint_anchor": "use"
       },
       {
-        "id": "Approach",
-        "decomposition_patterns": []
+        "id": "Harvest",
+        "aliases": [
+          "gather_produce",
+          "pick"
+        ],
+        "args": "crop, location",
+        "decomposition_patterns": [
+          {
+            "sequence": [
+              "Approach",
+              "Collect"
+            ]
+          }
+        ],
+        "hint_anchor": "take"
       },
       {
-        "id": "EatOrDrink",
-        "decomposition_patterns": []
+        "id": "Feed",
+        "aliases": [
+          "serve",
+          "distribute_food"
+        ],
+        "args": "food, person or animal",
+        "decomposition_patterns": [
+          {
+            "sequence": [
+              "Acquire",
+              "Offer"
+            ]
+          }
+        ],
+        "hint_anchor": "use"
       },
       {
-        "id": "Arrange",
-        "decomposition_patterns": []
+        "id": "Water",
+        "aliases": [
+          "irrigate",
+          "pour"
+        ],
+        "args": "liquid, target entity",
+        "decomposition_patterns": [
+          {
+            "sequence": [
+              "Acquire",
+              "Use"
+            ]
+          }
+        ],
+        "hint_anchor": "use"
       },
       {
-        "id": "FeedOrWater",
-        "decomposition_patterns": []
+        "id": "Tend",
+        "aliases": [
+          "care_for",
+          "maintain"
+        ],
+        "args": "plant, animal, or infrastructure",
+        "decomposition_patterns": [
+          {
+            "sequence": [
+              "Observe",
+              "Use"
+            ]
+          }
+        ],
+        "hint_anchor": "use"
       },
       {
-        "id": "Propose",
-        "decomposition_patterns": []
+        "id": "Work",
+        "aliases": [
+          "labor",
+          "perform_tasks"
+        ],
+        "args": "task, location",
+        "decomposition_patterns": [
+          {
+            "sequence": [
+              "Prepare",
+              "Manipulate"
+            ]
+          }
+        ],
+        "hint_anchor": "use"
       },
       {
-        "id": "Counter",
-        "decomposition_patterns": []
+        "id": "Relate",
+        "aliases": [
+          "connect",
+          "befriend"
+        ],
+        "args": "person, context",
+        "decomposition_patterns": [
+          {
+            "sequence": [
+              "Converse",
+              "ExpressJoy"
+            ]
+          }
+        ],
+        "hint_anchor": "say"
       },
       {
-        "id": "Conclude",
-        "decomposition_patterns": []
+        "id": "SenseFatigue",
+        "aliases": [
+          "feel_tired"
+        ],
+        "args": "",
+        "decomposition_patterns": [],
+        "hint_anchor": "think"
       },
       {
-        "id": "Accept",
-        "decomposition_patterns": []
+        "id": "SenseThirst",
+        "aliases": [
+          "feel_thirst"
+        ],
+        "args": "",
+        "decomposition_patterns": [],
+        "hint_anchor": "think"
       },
       {
-        "id": "DetectHazard",
-        "decomposition_patterns": []
+        "id": "SenseHunger",
+        "aliases": [
+          "feel_hungry"
+        ],
+        "args": "",
+        "decomposition_patterns": [],
+        "hint_anchor": "think"
       },
       {
-        "id": "RespondToHazard",
-        "decomposition_patterns": []
+        "id": "AvoidHazard",
+        "aliases": [
+          "evade_risk"
+        ],
+        "args": "hazard",
+        "decomposition_patterns": [
+          {
+            "sequence": [
+              "ScanForThreat",
+              "Avoid"
+            ]
+          }
+        ],
+        "hint_anchor": "move"
       },
       {
-        "id": "Direct",
-        "decomposition_patterns": []
+        "id": "ScanForThreat",
+        "aliases": [
+          "search_for_danger"
+        ],
+        "args": "environment",
+        "decomposition_patterns": [],
+        "hint_anchor": "scan"
+      },
+      {
+        "id": "Evaluate",
+        "aliases": [
+          "judge",
+          "assess"
+        ],
+        "args": "entity, property",
+        "decomposition_patterns": [
+          {
+            "sequence": [
+              "Observe",
+              "Think"
+            ]
+          }
+        ],
+        "hint_anchor": "think"
+      },
+      {
+        "id": "ExpressJoy",
+        "aliases": [
+          "cheer",
+          "celebrate"
+        ],
+        "args": "audience/companion",
+        "decomposition_patterns": [],
+        "hint_anchor": "say"
+      },
+      {
+        "id": "Complain",
+        "aliases": [
+          "grumble",
+          "object"
+        ],
+        "args": "audience, issue",
+        "decomposition_patterns": [],
+        "hint_anchor": "say"
+      },
+      {
+        "id": "Praise",
+        "aliases": [
+          "admire",
+          "approve"
+        ],
+        "args": "audience, subject",
+        "decomposition_patterns": [],
+        "hint_anchor": "say"
       }
     ],
     "edges": [
       {
-        "from": "Interact",
-        "to": "Clean"
-      },
-      {
-        "from": "Interact",
-        "to": "Repair"
-      },
-      {
-        "from": "Interact",
-        "to": "Dress"
-      },
-      {
-        "from": "Collect",
-        "to": "Harvest"
-      },
-      {
-        "from": "Prepare",
-        "to": "Clean"
-      },
-      {
-        "from": "Prepare",
-        "to": "Arrange"
-      },
-      {
-        "from": "Acquire",
-        "to": "Collect"
-      },
-      {
-        "from": "Acquire",
-        "to": "Harvest"
-      },
-      {
-        "from": "Attend",
-        "to": "Pray"
-      },
-      {
-        "from": "Attend",
-        "to": "Rest"
+        "from": "Converse",
+        "to": "Greet"
       },
       {
         "from": "Converse",
-        "to": "Speak"
-      },
-      {
-        "from": "Converse",
-        "to": "Listen"
+        "to": "ExpressOpinion"
       },
       {
         "from": "Negotiate",
         "to": "Converse"
       },
       {
-        "from": "Confide",
-        "to": "Speak"
-      },
-      {
-        "from": "Confide",
-        "to": "Reflect"
-      },
-      {
-        "from": "Pass",
-        "to": "Transfer"
-      },
-      {
-        "from": "Transfer",
+        "from": "Negotiate",
         "to": "Offer"
       },
       {
-        "from": "Transfer",
-        "to": "Display"
+        "from": "Acquire",
+        "to": "Locate"
       },
       {
-        "from": "Feed",
+        "from": "Acquire",
+        "to": "Approach"
+      },
+      {
+        "from": "Acquire",
+        "to": "Collect"
+      },
+      {
+        "from": "Carry",
+        "to": "Acquire"
+      },
+      {
+        "from": "Carry",
+        "to": "Move"
+      },
+      {
+        "from": "Carry",
+        "to": "Place"
+      },
+      {
+        "from": "Eat",
+        "to": "Acquire"
+      },
+      {
+        "from": "Eat",
+        "to": "Consume"
+      },
+      {
+        "from": "Drink",
+        "to": "Acquire"
+      },
+      {
+        "from": "Drink",
+        "to": "Consume"
+      },
+      {
+        "from": "Use",
+        "to": "Inspect"
+      },
+      {
+        "from": "Use",
+        "to": "Manipulate"
+      },
+      {
+        "from": "ProvideAssistance",
+        "to": "Observe"
+      },
+      {
+        "from": "ProvideAssistance",
         "to": "Offer"
       },
       {
-        "from": "Water",
-        "to": "Offer"
+        "from": "Pray",
+        "to": "Say"
       },
       {
-        "from": "Tend",
-        "to": "Feed"
-      },
-      {
-        "from": "Tend",
-        "to": "Water"
-      },
-      {
-        "from": "Speak",
-        "to": "Ask"
-      },
-      {
-        "from": "Speak",
-        "to": "Greet"
-      },
-      {
-        "from": "Consume",
-        "to": "EatOrDrink"
-      },
-      {
-        "from": "Recover",
-        "to": "Rest"
-      },
-      {
-        "from": "Recover",
-        "to": "Reflect"
+        "from": "Pray",
+        "to": "ObserveNorm"
       },
       {
         "from": "Protect",
@@ -1087,430 +1167,576 @@
       },
       {
         "from": "Protect",
-        "to": "Manage"
-      },
-      {
-        "from": "Manage",
-        "to": "Inspect"
+        "to": "Avoid"
       },
       {
         "from": "Prepare",
-        "to": "Arrange"
+        "to": "Organize"
       },
       {
-        "from": "Observe",
-        "to": "Inspect"
+        "from": "Prepare",
+        "to": "Clean"
       },
       {
-        "from": "Monitor",
+        "from": "Harvest",
+        "to": "Approach"
+      },
+      {
+        "from": "Harvest",
+        "to": "Collect"
+      },
+      {
+        "from": "Feed",
+        "to": "Acquire"
+      },
+      {
+        "from": "Feed",
+        "to": "Offer"
+      },
+      {
+        "from": "Water",
+        "to": "Acquire"
+      },
+      {
+        "from": "Water",
+        "to": "Use"
+      },
+      {
+        "from": "Tend",
         "to": "Observe"
+      },
+      {
+        "from": "Tend",
+        "to": "Use"
+      },
+      {
+        "from": "Work",
+        "to": "Prepare"
+      },
+      {
+        "from": "Work",
+        "to": "Manipulate"
+      },
+      {
+        "from": "Relate",
+        "to": "Converse"
+      },
+      {
+        "from": "Relate",
+        "to": "ExpressJoy"
+      },
+      {
+        "from": "AvoidHazard",
+        "to": "ScanForThreat"
+      },
+      {
+        "from": "AvoidHazard",
+        "to": "Avoid"
+      },
+      {
+        "from": "Evaluate",
+        "to": "Observe"
+      },
+      {
+        "from": "Evaluate",
+        "to": "Think"
       }
     ]
   },
   "nouns": {
     "nodes": [
       {
-        "id": "Place",
-        "aliases": [
-          "location",
-          "area"
-        ],
-        "decomposition_patterns": [
-          {
-            "parts": [
-              "Dwelling",
-              "Field",
-              "Barn",
-              "Well",
-              "Market",
-              "Garden",
-              "Meadow",
-              "Riverbank",
-              "Pathway"
-            ]
-          }
-        ],
-        "anchor_types": [
-          "Hut",
-          "Meadow",
-          "Spring",
-          "Path",
-          "Clearing",
-          "Thicket",
-          "Cave"
-        ]
-      },
-      {
-        "id": "Dwelling",
-        "aliases": [
-          "home",
-          "house"
-        ],
-        "decomposition_patterns": [],
-        "anchor_types": [
-          "Hut"
-        ]
-      },
-      {
-        "id": "Field",
-        "aliases": [
-          "farmland"
-        ],
-        "decomposition_patterns": [],
-        "anchor_types": [
-          "Meadow"
-        ]
-      },
-      {
-        "id": "Barn",
-        "aliases": [
-          "outbuilding"
-        ],
-        "decomposition_patterns": [],
-        "anchor_types": [
-          "Hut"
-        ]
-      },
-      {
-        "id": "Well",
-        "aliases": [
-          "water_source"
-        ],
-        "decomposition_patterns": [],
-        "anchor_types": [
-          "Spring"
-        ]
-      },
-      {
-        "id": "Market",
-        "aliases": [
-          "marketplace"
-        ],
-        "decomposition_patterns": [],
-        "anchor_types": [
-          "Clearing"
-        ]
-      },
-      {
-        "id": "Garden",
-        "aliases": [
-          "vegetable_patch"
-        ],
-        "decomposition_patterns": [],
-        "anchor_types": [
-          "Meadow"
-        ]
-      },
-      {
-        "id": "Meadow",
-        "aliases": [
-          "grassy_field"
-        ],
-        "decomposition_patterns": [],
-        "anchor_types": [
-          "Meadow"
-        ]
-      },
-      {
-        "id": "Riverbank",
-        "aliases": [
-          "bank"
-        ],
-        "decomposition_patterns": [],
-        "anchor_types": [
-          "Riverbank"
-        ]
-      },
-      {
-        "id": "Tool",
-        "aliases": [
-          "implement",
-          "instrument"
-        ],
-        "decomposition_patterns": [
-          {
-            "parts": [
-              "Pitchfork",
-              "Container"
-            ]
-          }
-        ],
-        "anchor_types": [
-          "Fallenbranch"
-        ]
-      },
-      {
-        "id": "Container",
-        "aliases": [
-          "vessel"
-        ],
-        "decomposition_patterns": [
-          {
-            "parts": [
-              "Bucket",
-              "Basket"
-            ]
-          }
-        ],
-        "anchor_types": [
-          "Bucket"
-        ]
-      },
-      {
-        "id": "Basket",
-        "aliases": [
-          "wicker_basket"
-        ],
-        "decomposition_patterns": [],
-        "anchor_types": [
-          "Basket"
-        ]
-      },
-      {
-        "id": "Bucket",
-        "aliases": [
-          "pail"
-        ],
-        "decomposition_patterns": [],
-        "anchor_types": [
-          "WaterBucket"
-        ]
-      },
-      {
-        "id": "Pitchfork",
-        "aliases": [
-          "fork"
-        ],
-        "decomposition_patterns": [],
-        "anchor_types": [
-          "Fallenbranch"
-        ]
-      },
-      {
-        "id": "Edible",
-        "aliases": [
-          "nutrition"
-        ],
-        "decomposition_patterns": [
-          {
-            "parts": [
-              "Bread",
-              "Soup",
-              "Produce"
-            ]
-          }
-        ],
-        "anchor_types": [
-          "Berries",
-          "Mushrooms",
-          "Bread"
-        ]
-      },
-      {
-        "id": "Bread",
-        "aliases": [
-          "loaf"
-        ],
-        "decomposition_patterns": [],
-        "anchor_types": [
-          "LoafOfBread"
-        ]
-      },
-      {
-        "id": "Soup",
-        "aliases": [
-          "broth"
-        ],
-        "decomposition_patterns": [],
-        "anchor_types": [
-          "Soup"
-        ]
-      },
-      {
-        "id": "Meal",
-        "aliases": [
-          "food_serving"
-        ],
-        "decomposition_patterns": [
-          {
-            "parts": [
-              "Bread",
-              "Soup"
-            ]
-          }
-        ],
-        "anchor_types": [
-          "Soup",
-          "Bread"
-        ]
-      },
-      {
-        "id": "Drinkable",
-        "aliases": [
-          "potable"
-        ],
-        "decomposition_patterns": [
-          {
-            "parts": [
-              "Water"
-            ]
-          }
-        ],
-        "anchor_types": [
-          "Water"
-        ]
-      },
-      {
-        "id": "Water",
-        "aliases": [
-          "H2O"
-        ],
-        "decomposition_patterns": [],
-        "anchor_types": [
-          "Water"
-        ]
-      },
-      {
-        "id": "Animal",
-        "aliases": [
-          "livestock"
-        ],
-        "decomposition_patterns": [],
-        "anchor_types": [
-          "Animals"
-        ]
-      },
-      {
-        "id": "Produce",
-        "aliases": [
-          "crop",
-          "harvest"
-        ],
-        "decomposition_patterns": [],
-        "anchor_types": [
-          "Berries",
-          "Mushrooms",
-          "Appletree"
-        ]
-      },
-      {
         "id": "Resource",
         "aliases": [
-          "asset"
+          "item",
+          "supply"
         ],
         "decomposition_patterns": [
           {
             "parts": [
+              "Tool",
               "Edible",
               "Drinkable",
-              "Tool",
               "Produce"
             ]
           }
         ],
         "anchor_types": [
           "Water",
-          "Bread",
-          "Berries",
-          "Fallenbranch",
-          "Mushrooms"
+          "BreadLoaf",
+          "EggCarton",
+          "MilkPail",
+          "Vegetable"
+        ]
+      },
+      {
+        "id": "Tool",
+        "aliases": [
+          "implement",
+          "utensil"
+        ],
+        "decomposition_patterns": [
+          {
+            "parts": [
+              "ToolCarrier"
+            ]
+          }
+        ],
+        "anchor_types": [
+          "Hoe",
+          "Rake",
+          "Basket",
+          "WaterBucket",
+          "Pitcher",
+          "MilkPail"
+        ]
+      },
+      {
+        "id": "ToolCarrier",
+        "aliases": [
+          "container"
+        ],
+        "decomposition_patterns": [],
+        "anchor_types": [
+          "Basket",
+          "MilkPail"
+        ]
+      },
+      {
+        "id": "Edible",
+        "aliases": [
+          "food"
+        ],
+        "decomposition_patterns": [
+          {
+            "parts": [
+              "Bread",
+              "Egg",
+              "Vegetable",
+              "AnimalProduct"
+            ]
+          }
+        ],
+        "anchor_types": [
+          "BreadLoaf",
+          "EggCarton",
+          "Vegetable",
+          "MilkPail"
+        ]
+      },
+      {
+        "id": "Bread",
+        "aliases": [],
+        "decomposition_patterns": [],
+        "anchor_types": [
+          "BreadLoaf"
+        ]
+      },
+      {
+        "id": "Egg",
+        "aliases": [],
+        "decomposition_patterns": [],
+        "anchor_types": [
+          "EggCarton"
+        ]
+      },
+      {
+        "id": "Vegetable",
+        "aliases": [],
+        "decomposition_patterns": [],
+        "anchor_types": [
+          "VegetableField"
+        ]
+      },
+      {
+        "id": "AnimalProduct",
+        "aliases": [
+          "dairy",
+          "livestock_output"
+        ],
+        "decomposition_patterns": [
+          {
+            "parts": [
+              "Milk"
+            ]
+          }
+        ],
+        "anchor_types": [
+          "MilkPail"
+        ]
+      },
+      {
+        "id": "Milk",
+        "aliases": [],
+        "decomposition_patterns": [],
+        "anchor_types": [
+          "MilkPail"
+        ]
+      },
+      {
+        "id": "Drinkable",
+        "aliases": [
+          "beverage"
+        ],
+        "decomposition_patterns": [
+          {
+            "parts": [
+              "Drink",
+              "Water"
+            ]
+          }
+        ],
+        "anchor_types": [
+          "Water",
+          "MilkPail"
+        ]
+      },
+      {
+        "id": "Drink",
+        "aliases": [],
+        "decomposition_patterns": [],
+        "anchor_types": [
+          "MilkPail",
+          "WaterBucket",
+          "Water"
+        ]
+      },
+      {
+        "id": "Place",
+        "aliases": [
+          "location",
+          "site"
+        ],
+        "decomposition_patterns": [
+          {
+            "parts": [
+              "RestingSpot",
+              "WaterSource",
+              "Workplace",
+              "Church",
+              "MarketStall",
+              "Field",
+              "Pathway",
+              "Infrastructure"
+            ]
+          }
+        ],
+        "anchor_types": [
+          "Village",
+          "MarketSquare",
+          "NotreDameChurch",
+          "FouanFarm",
+          "GrasslandField",
+          "Barn"
+        ]
+      },
+      {
+        "id": "RestingSpot",
+        "aliases": [
+          "seat",
+          "refuge"
+        ],
+        "decomposition_patterns": [
+          {
+            "parts": [
+              "Bench",
+              "Cottage"
+            ]
+          }
+        ],
+        "anchor_types": [
+          "WoodenBench",
+          "Cottage"
+        ]
+      },
+      {
+        "id": "Bench",
+        "aliases": [],
+        "decomposition_patterns": [],
+        "anchor_types": [
+          "WoodenBench"
+        ]
+      },
+      {
+        "id": "WaterSource",
+        "aliases": [],
+        "decomposition_patterns": [],
+        "anchor_types": [
+          "VillageWell",
+          "Riverbank"
+        ]
+      },
+      {
+        "id": "Workplace",
+        "aliases": [],
+        "decomposition_patterns": [
+          {
+            "parts": [
+              "MarketStall",
+              "Barn",
+              "Mill",
+              "Farm"
+            ]
+          }
+        ],
+        "anchor_types": [
+          "Barn",
+          "GrainMill",
+          "FouanFarm",
+          "MarketSquare"
+        ]
+      },
+      {
+        "id": "MarketStall",
+        "aliases": [],
+        "decomposition_patterns": [],
+        "anchor_types": [
+          "MarketSquare"
+        ]
+      },
+      {
+        "id": "Barn",
+        "aliases": [],
+        "decomposition_patterns": [],
+        "anchor_types": [
+          "Barn"
+        ]
+      },
+      {
+        "id": "Mill",
+        "aliases": [],
+        "decomposition_patterns": [],
+        "anchor_types": [
+          "GrainMill"
+        ]
+      },
+      {
+        "id": "Farm",
+        "aliases": [],
+        "decomposition_patterns": [],
+        "anchor_types": [
+          "FouanFarm",
+          "MarquartFarm"
+        ]
+      },
+      {
+        "id": "Church",
+        "aliases": [
+          "chapel",
+          "parish"
+        ],
+        "decomposition_patterns": [],
+        "anchor_types": [
+          "NotreDameChurch"
+        ]
+      },
+      {
+        "id": "Field",
+        "aliases": [
+          "cropland"
+        ],
+        "decomposition_patterns": [
+          {
+            "parts": [
+              "VegetableField",
+              "GrasslandField"
+            ]
+          }
+        ],
+        "anchor_types": [
+          "VegetableField",
+          "GrasslandField"
+        ]
+      },
+      {
+        "id": "VegetableField",
+        "aliases": [],
+        "decomposition_patterns": [],
+        "anchor_types": [
+          "VegetableField"
+        ]
+      },
+      {
+        "id": "GrasslandField",
+        "aliases": [],
+        "decomposition_patterns": [],
+        "anchor_types": [
+          "GrasslandField"
+        ]
+      },
+      {
+        "id": "Cottage",
+        "aliases": [
+          "house"
+        ],
+        "decomposition_patterns": [],
+        "anchor_types": [
+          "Cottage"
+        ]
+      },
+      {
+        "id": "Pathway",
+        "aliases": [
+          "track",
+          "trail"
+        ],
+        "decomposition_patterns": [],
+        "anchor_types": [
+          "VillagePath"
+        ]
+      },
+      {
+        "id": "Infrastructure",
+        "aliases": [
+          "facility"
+        ],
+        "decomposition_patterns": [],
+        "anchor_types": [
+          "Barn",
+          "GrainMill",
+          "BlacksmithWorkshop"
+        ]
+      },
+      {
+        "id": "Produce",
+        "aliases": [
+          "crop",
+          "yield"
+        ],
+        "decomposition_patterns": [],
+        "anchor_types": [
+          "EggCarton",
+          "Vegetable",
+          "MilkPail"
         ]
       },
       {
         "id": "Family",
         "aliases": [
-          "household"
+          "household",
+          "kin"
         ],
         "decomposition_patterns": [],
         "anchor_types": [
-          "Person"
+          "FouanFamily"
         ]
       },
       {
-        "id": "Neighbour",
-        "aliases": [
-          "neighbor"
-        ],
+        "id": "Neighbor",
+        "aliases": [],
         "decomposition_patterns": [],
         "anchor_types": [
-          "Person"
-        ]
-      },
-      {
-        "id": "Authority",
-        "aliases": [
-          "leader"
-        ],
-        "decomposition_patterns": [
-          {
-            "parts": [
-              "Priest"
-            ]
-          }
-        ],
-        "anchor_types": [
-          "Person"
+          "NeighboringFarmers"
         ]
       },
       {
         "id": "Priest",
-        "aliases": [
-          "religious_leader"
-        ],
+        "aliases": [],
         "decomposition_patterns": [],
         "anchor_types": [
-          "Person"
+          "VillagePriest",
+          "FatherMarquart"
         ]
       },
       {
-        "id": "VillageWoman",
-        "aliases": [
-          "woman"
-        ],
+        "id": "Bridegroom",
+        "aliases": [],
         "decomposition_patterns": [],
         "anchor_types": [
-          "Person"
+          "Jean"
         ]
       },
       {
-        "id": "VillageMan",
-        "aliases": [
-          "man"
+        "id": "MarriageProspect",
+        "aliases": [],
+        "decomposition_patterns": [
+          {
+            "parts": [
+              "Bridegroom"
+            ]
+          }
         ],
-        "decomposition_patterns": [],
         "anchor_types": [
-          "Person"
+          "Jean"
         ]
       },
       {
-        "id": "Person",
+        "id": "TimeWindow",
         "aliases": [
-          "individual"
+          "part_of_day"
         ],
         "decomposition_patterns": [],
         "anchor_types": [
-          "Person"
+          "morning",
+          "afternoon",
+          "night"
         ]
       },
       {
-        "id": "Congregation",
+        "id": "Child",
+        "aliases": [],
+        "decomposition_patterns": [],
+        "anchor_types": [
+          "LocalChildren"
+        ]
+      },
+      {
+        "id": "Role",
+        "aliases": [],
+        "decomposition_patterns": [],
+        "anchor_types": [
+          "MarketSeller",
+          "FieldWorker",
+          "Housekeeper"
+        ]
+      },
+      {
+        "id": "Status",
         "aliases": [
-          "assembly"
+          "rank"
+        ],
+        "decomposition_patterns": [
+          {
+            "parts": [
+              "StatusToken"
+            ]
+          }
+        ],
+        "anchor_types": [
+          "PotentialBride"
+        ]
+      },
+      {
+        "id": "StatusToken",
+        "aliases": [
+          "badge"
         ],
         "decomposition_patterns": [],
         "anchor_types": [
-          "Person"
+          "WoolApron"
+        ]
+      },
+      {
+        "id": "Reputation",
+        "aliases": [
+          "standing"
+        ],
+        "decomposition_patterns": [],
+        "anchor_types": [
+          "Gossip",
+          "Scandal"
         ]
       },
       {
         "id": "Norm",
         "aliases": [
           "rule",
-          "expectation"
+          "custom"
         ],
         "decomposition_patterns": [],
         "anchor_types": [
-          "Norm"
+          "SpeakRespectfullyToElders",
+          "AttendSundayMass"
         ]
       },
       {
@@ -1518,170 +1744,73 @@
         "aliases": [
           "danger"
         ],
-        "decomposition_patterns": [
-          {
-            "parts": [
-              "Injury",
-              "Scandal"
-            ]
-          }
-        ],
-        "anchor_types": [
-          "MinorInjuryFromFarmTools",
-          "DrowningRiskAtRiver",
-          "SocialScandal"
-        ]
-      },
-      {
-        "id": "Injury",
-        "aliases": [
-          "harm"
-        ],
         "decomposition_patterns": [],
         "anchor_types": [
-          "MinorInjuryFromFarmTools"
-        ]
-      },
-      {
-        "id": "Scandal",
-        "aliases": [
-          "disgrace"
-        ],
-        "decomposition_patterns": [],
-        "anchor_types": [
-          "SocialScandal"
-        ]
-      },
-      {
-        "id": "Reputation",
-        "aliases": [
-          "status"
-        ],
-        "decomposition_patterns": [],
-        "anchor_types": [
-          "status"
+          "Sunstroke",
+          "Blisters",
+          "CropFailure",
+          "SharpTools"
         ]
       },
       {
         "id": "Chore",
-        "aliases": [
-          "task"
-        ],
-        "decomposition_patterns": [],
-        "anchor_types": [
-          "chores"
-        ]
-      },
-      {
-        "id": "Work",
-        "aliases": [
-          "labor"
-        ],
+        "aliases": [],
         "decomposition_patterns": [
           {
             "parts": [
-              "Chore",
-              "Harvest",
-              "Feed",
-              "Clean",
-              "Tend"
+              "ChoreTask"
             ]
           }
         ],
         "anchor_types": [
-          "chores"
+          "HelpWithChores",
+          "AssistFamilyMeal"
         ]
       },
       {
-        "id": "Clothing",
+        "id": "ChoreTask",
         "aliases": [
-          "garment"
-        ],
-        "decomposition_patterns": [
-          {
-            "parts": [
-              "Headwear",
-              "Apron"
-            ]
-          }
-        ],
-        "anchor_types": [
-          "Headscarf",
-          "Apron"
-        ]
-      },
-      {
-        "id": "Headwear",
-        "aliases": [
-          "hat",
-          "headscarf"
+          "errand"
         ],
         "decomposition_patterns": [],
         "anchor_types": [
-          "Headscarf"
+          "HelpWithChores",
+          "GatherWater",
+          "AssistFamilyMeal"
         ]
       },
       {
-        "id": "Apron",
+        "id": "Scandal",
+        "aliases": [],
+        "decomposition_patterns": [],
+        "anchor_types": [
+          "Gossip"
+        ]
+      },
+      {
+        "id": "Gossip",
+        "aliases": [],
+        "decomposition_patterns": [],
+        "anchor_types": [
+          "Gossip"
+        ]
+      },
+      {
+        "id": "Event",
         "aliases": [
-          "work_apron"
+          "gathering"
         ],
         "decomposition_patterns": [],
         "anchor_types": [
-          "Apron"
+          "ParticipateVillageEvent"
         ]
       },
       {
-        "id": "Book",
+        "id": "Property",
         "aliases": [
-          "tome"
-        ],
-        "decomposition_patterns": [
-          {
-            "parts": [
-              "PrayerBook"
-            ]
-          }
-        ],
-        "anchor_types": [
-          "Book"
-        ]
-      },
-      {
-        "id": "PrayerBook",
-        "aliases": [
-          "missal"
+          "physiological_state"
         ],
         "decomposition_patterns": [],
-        "anchor_types": [
-          "PrayerBook"
-        ]
-      },
-      {
-        "id": "Pathway",
-        "aliases": [
-          "path",
-          "trail"
-        ],
-        "decomposition_patterns": [],
-        "anchor_types": [
-          "Path"
-        ]
-      },
-      {
-        "id": "State",
-        "aliases": [
-          "condition"
-        ],
-        "decomposition_patterns": [
-          {
-            "parts": [
-              "Hunger",
-              "Thirst",
-              "Fatigue"
-            ]
-          }
-        ],
         "anchor_types": [
           "hunger",
           "thirst",
@@ -1689,108 +1818,30 @@
         ]
       },
       {
-        "id": "Hunger",
+        "id": "Joy",
         "aliases": [
-          "need_for_food"
+          "simple_pleasure"
         ],
         "decomposition_patterns": [],
         "anchor_types": [
-          "hunger"
+          "rest"
         ]
       },
       {
-        "id": "Thirst",
+        "id": "Livestock",
         "aliases": [
-          "need_for_water"
+          "farm_animal"
         ],
         "decomposition_patterns": [],
         "anchor_types": [
-          "thirst"
-        ]
-      },
-      {
-        "id": "Fatigue",
-        "aliases": [
-          "tiredness"
-        ],
-        "decomposition_patterns": [],
-        "anchor_types": [
-          "fatigue"
+          "MilkPail"
         ]
       }
     ],
     "edges": [
       {
-        "from": "Place",
-        "to": "Dwelling"
-      },
-      {
-        "from": "Place",
-        "to": "Field"
-      },
-      {
-        "from": "Place",
-        "to": "Barn"
-      },
-      {
-        "from": "Place",
-        "to": "Well"
-      },
-      {
-        "from": "Place",
-        "to": "Market"
-      },
-      {
-        "from": "Place",
-        "to": "Garden"
-      },
-      {
-        "from": "Place",
-        "to": "Meadow"
-      },
-      {
-        "from": "Place",
-        "to": "Riverbank"
-      },
-      {
-        "from": "Place",
-        "to": "Pathway"
-      },
-      {
-        "from": "Tool",
-        "to": "Pitchfork"
-      },
-      {
-        "from": "Tool",
-        "to": "Container"
-      },
-      {
-        "from": "Container",
-        "to": "Bucket"
-      },
-      {
-        "from": "Container",
-        "to": "Basket"
-      },
-      {
-        "from": "Edible",
-        "to": "Bread"
-      },
-      {
-        "from": "Edible",
-        "to": "Soup"
-      },
-      {
-        "from": "Edible",
-        "to": "Produce"
-      },
-      {
-        "from": "Meal",
-        "to": "Bread"
-      },
-      {
-        "from": "Meal",
-        "to": "Soup"
+        "from": "Resource",
+        "to": "Tool"
       },
       {
         "from": "Resource",
@@ -1802,150 +1853,376 @@
       },
       {
         "from": "Resource",
-        "to": "Tool"
+        "to": "Produce"
       },
       {
-        "from": "Resource",
-        "to": "Produce"
+        "from": "Tool",
+        "to": "ToolCarrier"
+      },
+      {
+        "from": "Edible",
+        "to": "Bread"
+      },
+      {
+        "from": "Edible",
+        "to": "Egg"
+      },
+      {
+        "from": "Edible",
+        "to": "Vegetable"
+      },
+      {
+        "from": "Edible",
+        "to": "AnimalProduct"
+      },
+      {
+        "from": "AnimalProduct",
+        "to": "Milk"
+      },
+      {
+        "from": "Drinkable",
+        "to": "Drink"
       },
       {
         "from": "Drinkable",
         "to": "Water"
       },
       {
-        "from": "Clothing",
-        "to": "Headwear"
+        "from": "Place",
+        "to": "RestingSpot"
       },
       {
-        "from": "Clothing",
-        "to": "Apron"
+        "from": "Place",
+        "to": "WaterSource"
       },
       {
-        "from": "Book",
-        "to": "PrayerBook"
+        "from": "Place",
+        "to": "Workplace"
       },
       {
-        "from": "Hazard",
-        "to": "Injury"
+        "from": "Place",
+        "to": "Church"
       },
       {
-        "from": "Hazard",
-        "to": "Scandal"
+        "from": "Place",
+        "to": "MarketStall"
       },
       {
-        "from": "Work",
-        "to": "Chore"
+        "from": "Place",
+        "to": "Field"
       },
       {
-        "from": "Work",
-        "to": "Harvest"
+        "from": "Place",
+        "to": "Pathway"
       },
       {
-        "from": "Work",
-        "to": "Feed"
+        "from": "Place",
+        "to": "Infrastructure"
       },
       {
-        "from": "Work",
-        "to": "Clean"
+        "from": "RestingSpot",
+        "to": "Bench"
       },
       {
-        "from": "Work",
-        "to": "Tend"
+        "from": "RestingSpot",
+        "to": "Cottage"
       },
       {
-        "from": "Authority",
-        "to": "Priest"
+        "from": "Workplace",
+        "to": "MarketStall"
       },
       {
-        "from": "State",
-        "to": "Hunger"
+        "from": "Workplace",
+        "to": "Barn"
       },
       {
-        "from": "State",
-        "to": "Thirst"
+        "from": "Workplace",
+        "to": "Mill"
       },
       {
-        "from": "State",
-        "to": "Fatigue"
+        "from": "Workplace",
+        "to": "Farm"
+      },
+      {
+        "from": "Field",
+        "to": "VegetableField"
+      },
+      {
+        "from": "Field",
+        "to": "GrasslandField"
+      },
+      {
+        "from": "Status",
+        "to": "StatusToken"
+      },
+      {
+        "from": "MarriageProspect",
+        "to": "Bridegroom"
+      },
+      {
+        "from": "Chore",
+        "to": "ChoreTask"
       }
     ]
   },
   "indices": {
-    "scan": {
-      "noun_to_map_types": {
-        "Edible": [
-          "Appletree",
-          "Berries",
-          "Mushrooms"
+    "noun": {
+      "noun_to_map_types": {},
+      "map_type_to_nouns": {}
+    },
+    "verb": {
+      "verb_to_anchors": {
+        "Observe": [
+          "scan"
         ],
-        "Tool": [
-          "Fallenbranch"
+        "SenseThirst": [
+          "think"
         ],
-        "Produce": [
-          "Appletree",
-          "Berries",
-          "Mushrooms"
+        "Monitor": [
+          "scan"
         ],
-        "Well": [
-          "Spring"
+        "Manipulate": [
+          "use"
         ],
-        "Barn": [
-          "Hut"
+        "Evaluate": [
+          "scan",
+          "think"
         ],
-        "Place": [
-          "Cave",
-          "Hut",
-          "Spring",
-          "Thicket"
+        "Collect": [
+          "take"
         ],
-        "Pitchfork": [
-          "Fallenbranch"
+        "Tend": [
+          "scan",
+          "use"
         ],
-        "Resource": [
-          "Appletree",
-          "Berries",
-          "Fallenbranch",
-          "Mushrooms"
+        "Feed": [
+          "move",
+          "say",
+          "scan",
+          "take",
+          "use"
         ],
-        "Dwelling": [
-          "Hut"
+        "AvoidHazard": [
+          "move",
+          "scan"
+        ],
+        "Carry": [
+          "move",
+          "scan",
+          "take"
+        ],
+        "Offer": [
+          "say"
+        ],
+        "Water": [
+          "move",
+          "scan",
+          "take",
+          "use"
+        ],
+        "ExpressGratitude": [
+          "say"
+        ],
+        "Consume": [
+          "use"
+        ],
+        "ProvideAssistance": [
+          "say",
+          "scan",
+          "use"
+        ],
+        "Locate": [
+          "scan"
+        ],
+        "Recall": [
+          "think"
+        ],
+        "Converse": [
+          "say"
+        ],
+        "Reject": [
+          "say"
+        ],
+        "ExpressJoy": [
+          "say"
+        ],
+        "Clean": [
+          "use"
+        ],
+        "ObserveNorm": [
+          "wait"
+        ],
+        "Work": [
+          "use"
+        ],
+        "Complain": [
+          "say"
+        ],
+        "Approach": [
+          "move"
+        ],
+        "Acquire": [
+          "move",
+          "scan",
+          "take"
+        ],
+        "Greet": [
+          "say"
+        ],
+        "ScanForThreat": [
+          "scan"
+        ],
+        "Invite": [
+          "say"
+        ],
+        "Avoid": [
+          "move"
+        ],
+        "Negotiate": [
+          "say"
+        ],
+        "Eat": [
+          "move",
+          "scan",
+          "take",
+          "use"
+        ],
+        "Relate": [
+          "say"
+        ],
+        "Rest": [
+          "wait"
+        ],
+        "Prepare": [
+          "use"
+        ],
+        "Organize": [
+          "use"
+        ],
+        "ExpressOpinion": [
+          "say"
+        ],
+        "Comply": [
+          "wait"
+        ],
+        "Protect": [
+          "move",
+          "scan",
+          "think"
+        ],
+        "Harvest": [
+          "move",
+          "take"
+        ],
+        "Pray": [
+          "say",
+          "wait"
+        ],
+        "SenseFatigue": [
+          "think"
+        ],
+        "Accept": [
+          "say"
+        ],
+        "Drink": [
+          "move",
+          "scan",
+          "take",
+          "use"
+        ],
+        "SenseHunger": [
+          "think"
+        ],
+        "Praise": [
+          "say"
         ]
       },
-      "map_type_to_nouns": {
-        "Appletree": [
-          "Edible",
-          "Produce",
-          "Resource"
+      "anchor_to_verbs": {
+        "scan": [
+          "Acquire",
+          "AvoidHazard",
+          "Carry",
+          "Drink",
+          "Eat",
+          "Evaluate",
+          "Feed",
+          "Locate",
+          "Monitor",
+          "Observe",
+          "Protect",
+          "ProvideAssistance",
+          "ScanForThreat",
+          "Tend",
+          "Water"
         ],
-        "Berries": [
-          "Edible",
-          "Produce",
-          "Resource"
+        "think": [
+          "Evaluate",
+          "Protect",
+          "Recall",
+          "SenseFatigue",
+          "SenseHunger",
+          "SenseThirst"
         ],
-        "Mushrooms": [
-          "Edible",
-          "Produce",
-          "Resource"
+        "use": [
+          "Clean",
+          "Consume",
+          "Drink",
+          "Eat",
+          "Feed",
+          "Manipulate",
+          "Organize",
+          "Prepare",
+          "ProvideAssistance",
+          "Tend",
+          "Water",
+          "Work"
         ],
-        "Fallenbranch": [
-          "Pitchfork",
-          "Resource",
-          "Tool"
+        "take": [
+          "Acquire",
+          "Carry",
+          "Collect",
+          "Drink",
+          "Eat",
+          "Feed",
+          "Harvest",
+          "Water"
         ],
-        "Spring": [
-          "Place",
-          "Well"
+        "move": [
+          "Acquire",
+          "Approach",
+          "Avoid",
+          "AvoidHazard",
+          "Carry",
+          "Drink",
+          "Eat",
+          "Feed",
+          "Harvest",
+          "Protect",
+          "Water"
         ],
-        "Hut": [
-          "Barn",
-          "Dwelling",
-          "Place"
+        "say": [
+          "Accept",
+          "Complain",
+          "Converse",
+          "ExpressGratitude",
+          "ExpressJoy",
+          "ExpressOpinion",
+          "Feed",
+          "Greet",
+          "Invite",
+          "Negotiate",
+          "Offer",
+          "Praise",
+          "Pray",
+          "ProvideAssistance",
+          "Reject",
+          "Relate"
         ],
-        "Cave": [
-          "Place"
-        ],
-        "Thicket": [
-          "Place"
+        "wait": [
+          "Comply",
+          "ObserveNorm",
+          "Pray",
+          "Rest"
         ]
       }
     }

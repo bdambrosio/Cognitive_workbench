@@ -2,6 +2,26 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "Compute Scenario Score",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/Metrics/compute_scenario_score.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/src/Metrics",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src"
+            },
+            "args": ["--plans", "../data/plans.jsonl",
+            "--digest", "digest.jq", 
+            "--last-fraction", "0.5", 
+            "--soft-start", "70", "--danger", "80", "--hard", "90", 
+            "--goal-sat-weight", "0.25", 
+            "--out", "/tmp/scenario_report.json"],
+            "justMyCode": false,
+            "stopOnEntry": false,
+            "preLaunchTask": "setup-zenoh-environment"
+        },
+        {
             "name": "Rewrite Goal (Jim, load all)",
             "type": "debugpy",
             "request": "launch",

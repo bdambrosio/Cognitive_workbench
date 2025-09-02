@@ -681,7 +681,7 @@ def generate_plan_with_context(
                          allowed_types,
                          allowed_verbs,
                          goal_text)
-        goal_text = rewritten_goal['rewritten_step']
+        goal_text = rewritten_goal.strip()
         system_prompt = """Task: rewrite the following goal statement into a plan according to the PLAN_TEMPLATE below.
 Respond only with a JSON plan according to the provided PLAN_TEMPLATE. No prose or code fences; end with </end>."""
         parts = []
