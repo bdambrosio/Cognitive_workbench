@@ -39,3 +39,4 @@ src/logs/sense_node.log
 src/logs/character_launcher.log
 src/logs/executive_node.log
 src/logs/fastapi_action_display.log
+src/data
