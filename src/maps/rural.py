@@ -17,15 +17,25 @@ class RuralInfrastructure(Enum):
     Path = auto()
 
 class RuralResources(Enum):
+    Market = auto()
     Well = auto()
     Mill = auto()
-    Blacksmith = auto()
-    Farm = auto()
-    Market = auto()
+    Hoe = auto()
+    Plow = auto()
+    Scythe = auto()
+    Spring = auto()
+    Bread = auto()
+    Apple = auto()
+    Chicken = auto()
+    Egg = auto()
+    Milk = auto()
+    Cheese = auto()
+    Butter = auto()
 
 class RuralProperty(Enum):
     Farm = auto()
     Village = auto()
+    Blacksmith = auto()
 
 # Rules for terrain generation
 terrain_rules = {
@@ -33,8 +43,8 @@ terrain_rules = {
     'water_level': 0.2,
     'mountain_level': 0.8,
     'terrain_by_elevation': {
-        'water': {'max': 0.2, 'type': 'Water'},
-        'mountain': {'min': 0.8, 'type': 'Mountain'}
+        'water': {'max': 0.1, 'type': 'Water'},
+        'mountain': {'min': 0.7, 'type': 'Mountain'}
     },
     'lowland_distribution': {
         'Forest': 0.4,
@@ -57,6 +67,10 @@ infrastructure_rules = {
 }
 
 property_rules = {
+        'names': {
+        'Farm': ['MarquartFarm', 'FouanFarm'],
+    },
+
     'min_size': 50,
     'max_size': 150,
     'valid_terrain': ['Field', 'Grassland']
@@ -74,16 +88,13 @@ required_resource_name = "Mill"  # or "Market", etc.
 
 resource_rules = {
 
-    'names': {
-        'Farm': ['MarquartFarm', 'FouanFarm'],
-
-    },
     'allocations': [
         {
             'resource_type': resource_types.Well,
             'description': 'A deep well for water',
             'count': 5,
             'has_npc': True,
+            'can_take': False,
             'requires_property': True,
             'terrain_weights': {
                 terrain_types.Grassland: 1.0,
@@ -95,6 +106,7 @@ resource_rules = {
             'has_npc': True,
             'description': 'A grain mill',
             'count': 1,
+            'can_take': False,
             'requires_property': True,
             'terrain_weights': {
                 terrain_types.Field: 2.0,
@@ -102,10 +114,11 @@ resource_rules = {
             }
         },
         {
-            'resource_type': resource_types.Blacksmith,
+            'resource_type': resource_types.Hoe,
             'has_npc': True,
-            'description': 'A blacksmith workshop',
-            'count': 1,
+            'description': 'A hoe for tilling fields',
+            'count': 30,
+            'can_take': True,
             'requires_property': True,
             'terrain_weights': {
                 terrain_types.Field: 1.0,
@@ -113,26 +126,121 @@ resource_rules = {
             }
         },
         {
-            'resource_type': resource_types.Farm,
+            'resource_type': resource_types.Plow,
             'has_npc': True,
-            'description': 'A farmhouse with barn',
-            'count': 8,
-            'requires_property': True,
-            'terrain_weights': {
-                terrain_types.Field: 2.0,
-                terrain_types.Grassland: 1.0
-            }
-        },
-        {
-            'resource_type': resource_types.Market,
-            'description': 'The village market square',
-            'count': 1,
+            'description': 'A plow for plowing fields',
+            'count': 20,
+            'can_take': True,
             'requires_property': True,
             'terrain_weights': {
                 terrain_types.Field: 1.0,
                 terrain_types.Grassland: 1.0
             }
+        },
+        {
+            'resource_type': resource_types.Scythe,
+            'has_npc': True,
+            'description': 'A scythe for harvesting grass',
+            'count': 30,
+            'can_take': True,
+            'requires_property': True,
+            'terrain_weights': {
+                terrain_types.Field: 1.0,
+                terrain_types.Grassland: 1.0
+            }
+        },
+        {
+            'resource_type': resource_types.Spring,
+            'description': 'A natural spring of fresh water',
+            'count': 100,
+            'can_take': True,
+            'requires_property': True,
+            'terrain_weights': {
+                terrain_types.Field: 1.0,
+                terrain_types.Grassland: 1.0
+            },
+            'can_take': False
+        },
+                {
+            'resource_type': resource_types.Bread,
+            'description': 'A loaf of bread',
+            'count': 20,
+            'can_take': True,
+            'requires_property': True,
+            'terrain_weights': {
+                terrain_types.Field: 1.0,
+                terrain_types.Grassland: 1.0
+            },
+        },
+        {
+            'resource_type': resource_types.Apple,
+            'description': 'An apple',
+            'count': 20,
+            'can_take': True,
+            'requires_property': True,
+            'terrain_weights': {
+                terrain_types.Field: 1.0,
+                terrain_types.Grassland: 1.0
+            },
+            'can_take': False
+        },
+        {
+            'resource_type': resource_types.Chicken,
+            'description': 'A chicken',
+            'count': 20,
+            'can_take': True,
+            'requires_property': True,
+            'terrain_weights': {
+                terrain_types.Field: 1.0,
+                terrain_types.Grassland: 1.0
+            },
+        },
+        {
+            'resource_type': resource_types.Egg,
+            'description': 'An egg',
+            'count': 20,
+            'can_take': True,
+            'requires_property': True,
+            'terrain_weights': {
+                terrain_types.Field: 1.0,
+                terrain_types.Grassland: 1.0
+            },
+        },
+        {
+            'resource_type': resource_types.Milk,
+            'description': 'A glass of milk',
+            'count': 20,
+            'can_take': True,
+            'requires_property': True,
+            'terrain_weights': {
+                terrain_types.Field: 1.0,
+                terrain_types.Grassland: 1.0
+            },
+        },
+        {
+            'resource_type': resource_types.Cheese,
+            'description': 'A piece of cheese',
+            'count': 20,
+            'can_take': True,
+            'requires_property': True,
+            'terrain_weights': {
+                terrain_types.Field: 1.0,
+                terrain_types.Grassland: 1.0
+            },
+        },
+        {
+            'resource_type': resource_types.Butter,
+            'description': 'A stick of butter',
+            'count': 20,
+            'can_take': True,
+            'requires_property': True,
+            'terrain_weights': {
+                terrain_types.Field: 1.0,
+                terrain_types.Grassland: 1.0
+            },
         }
+
+
     ]
 }
 

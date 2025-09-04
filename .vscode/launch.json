@@ -11,7 +11,7 @@
             "env": {
                 "PYTHONPATH": "${workspaceFolder}/src"
             },
-            "args": ["--plans", "../data/plans.jsonl",
+            "args": ["--plans", "../data/Jean-plans.jsonl",
             "--digest", "digest.jq", 
             "--last-fraction", "0.5", 
             "--soft-start", "70", "--danger", "80", "--hard", "90", 
@@ -37,7 +37,7 @@
             "preLaunchTask": "setup-zenoh-environment"
         },
         {
-            "name": "Scenario Analysis (laTerre, create all)",
+            "name": "Scenario Analysis (laTerre)",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/src/scenario_analysis.py",
@@ -52,7 +52,7 @@
             "preLaunchTask": "setup-zenoh-environment"
         },
         {
-            "name": "Scenario Analysis (Jim, create all)",
+            "name": "Scenario Analysis (Jim)",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/src/scenario_analysis.py",
@@ -67,7 +67,7 @@
             "preLaunchTask": "setup-zenoh-environment"
         },
         {
-            "name": "Scenario Analysis (lost, create all)",
+            "name": "Scenario Analysis (lost)",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/src/scenario_analysis.py",

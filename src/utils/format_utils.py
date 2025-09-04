@@ -68,6 +68,32 @@ def format_map_types(map_types: Dict[str, List[str]]) -> str:
 
     return type_str.replace('\n\n','\n')
 
+def format_map_places(map_types: Dict[str, List[str]]) -> str:
+    """Format map types with clean, unescaped quotes for better readability."""
+    type_str = ''
+    map_types_str = f'\n#Available map places:\n'
+    if map_types.get('terrain_types'):
+        type_str += '\n'.join(map_types['terrain_types'])+'\n'
+    if map_types.get('infrastructure_types'):
+        type_str += '\n'.join(map_types['infrastructure_types'])+'\n'
+    if map_types.get('property_types'):
+        type_str += '\n'.join(map_types['property_types'])+'\n'
+    map_types_str += '\n'
+
+    return type_str.replace('\n\n','\n')
+
+def format_map_tools(map_types: Dict[str, List[str]]) -> str:
+    """Format map types with clean, unescaped quotes for better readability."""
+    type_str = ''
+    map_types_str = f'\n#Available map tools:\n'
+    if map_types.get('property_types'):
+        type_str += '\n'.join(map_types['property_types'])+'\n'
+ 
+    if map_types.get('resource_types'):
+        type_str += '\n'.join(map_types['resource_types'])+'\n'
+    map_types_str += '\n'
+    return type_str.replace('\n\n','\n')
+
 def _format_dict_clean(data):
     """Format a dict with clean, unescaped quotes for better readability."""
     if not isinstance(data, dict):
@@ -110,4 +136,12 @@ def _format_value_clean(value):
         # For numbers, booleans, None, etc., use str() for clean output
         return str(value)
 
+def format_middle_nouns(middle_ontology):
+    middle_nouns = middle_ontology.get('nouns', {}).get('nodes', [])
+    middle_nouns_str = '\n'.join([f"{n['id']}" for n in middle_nouns])
+    return middle_nouns_str
 
+def format_middle_verbs(middle_ontology):
+    middle_verbs = middle_ontology.get('verbs', {}).get('nodes', [])
+    middle_verbs_str = '\n'.join([f"{v['id']}" for v in middle_verbs])
+    return middle_verbs_str

@@ -19,7 +19,7 @@ from Messages import SystemMessage
 from utils import hash_utils
 from utils.state_utils import calculate_state_activity_alignment, get_known_states
 from templates import ONTOLOGY_TEMPLATE, MIDDLE_ONTOLOGY_TEMPLATE, ACTIVITIES_TEMPLATE, PLAN_TEMPLATE, PLAN_VERBS
-
+from utils.format_utils import format_middle_nouns, format_middle_verbs
 # Type checking imports
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
@@ -81,7 +81,7 @@ DEFAULT_ACTIVITY = {
 
 from templates import PHYSIOLOGICAL_NEEDS, ONTOLOGY_TEMPLATE, ACTIVITIES_TEMPLATE
 llm_client = None
-from utils.format_utils import format_map_types, format_views_compact
+from utils.format_utils import format_map_places, format_map_tools, format_map_types, format_views_compact
 
 
 def derive_drive_lexicon(character_drives_str: str) -> dict:
@@ -115,13 +115,15 @@ def derive_drive_lexicon(character_drives_str: str) -> dict:
     
 
 
-def create_ontology(context, map_types,character_name, character, character_drives, other_characters):
+def create_ontology(context, map_types, character_name, character, character_drives, other_characters):
     global llm_client
     """Get the ontology for a given setting and character from Zenoh."""
     # Initialize Zenoh session
 
     if llm_client:  
         map_types_str = format_map_types(map_types)
+        map_places_str = format_map_places(map_types)
+        map_tools_str = format_map_tools(map_types)
         other_characters_str = ''
         for other_character_name, other_character_desc in other_characters.items():
             if other_character_name != character_name:
@@ -142,6 +144,8 @@ def create_ontology(context, map_types,character_name, character, character_driv
                                    "other_characters": other_characters_str, 
                                    "primitive_nouns": map_types_str,
                                    "primitive_verbs": PLAN_VERBS,
+                                   "primitive_places": map_places_str,
+                                   "primitive_tools": map_tools_str,
                                    "physiological_needs": json.dumps(PHYSIOLOGICAL_NEEDS, indent=2),
                                    "drive_lexicon": json.dumps(drive_lex, indent=2)},
                     [SystemMessage(content=ONTOLOGY_TEMPLATE)],
@@ -168,6 +172,8 @@ def create_activities(context, map_types, character_name, character, character_d
             other_characters_str += f"\n\t{other_character_name}: {other_character_desc}"
 
     character_drives_str = '\n'.join(character_drives)
+    middle_nouns_str = format_middle_nouns(middle_ontology)
+    middle_verbs_str = format_middle_verbs(middle_ontology)
 
     if llm_client:
         map_types_str = format_map_types(map_types)    
@@ -178,7 +184,9 @@ def create_activities(context, map_types, character_name, character, character_d
                                    "states": get_known_states(),
                                    "other_characters": other_characters_str, 
                                    "ontology": json.dumps(ontology, indent=2),
-                                   "middle_ontology": json.dumps(middle_ontology, indent=2),
+                                   #"middle_ontology": json.dumps(middle_ontology, indent=2),
+                                   "middle_nouns": middle_nouns_str,
+                                   "middle_verbs": middle_verbs_str,
                                    "plan_template": PLAN_TEMPLATE,
                                    "primitive_nouns": map_types_str,
                                    "primitive_verbs": PLAN_VERBS,
@@ -267,6 +275,7 @@ class ActivityManager:
             if last_data.get('location'):
                 situation['current_location'] = {
                     'terrain': last_data['views'][0]['terrain'],  # This is the terrain string
+                    'property': last_data['views'][0]['property'],
                     'coordinates': last_data['location']  # Default coordinates
                 }
             
@@ -539,17 +548,29 @@ class ActivityManager:
     def _location_compatible(self, activity, situation):
         """Check if current location supports activity"""
         current_terrain = situation.get('current_location', {}).get('terrain', '')
+        current_property = situation.get('current_location', {}).get('property', '')
         views = situation.get('views', {})
         valid_locations = activity.get('where', []) or []
         if not isinstance(valid_locations, list):
             return False
 
+        for location in valid_locations: 
+            if location in self.executive_node.middle_ontology.get('nouns', {}).get('nodes', []):
+                anchor_types  = self.executive_node.middle_ontology.get('nouns', {}).get('nodes', []).get('anchor_types', [])
+                if anchor_types:
+                    for anchor_type in anchor_types:
+                        if anchor_type not in valid_locations:
+                            valid_locations.append(anchor_type)
+            
         # Build candidate primitive types at Current
         candidate_primitives = set()
         try:
             terrain = (current_terrain or '').strip()
+            property = (current_property or '').strip()
             if terrain:
                 candidate_primitives.add(terrain.lower())
+            if property:
+                candidate_primitives.add(property.lower())
         except Exception:
             pass
 
@@ -610,7 +631,7 @@ class ActivityManager:
             noun_ids_lc = {str(k).lower() for k in (noun_to_map.keys() if isinstance(noun_to_map, dict) else [])}
             mt_sets = []
             if isinstance(self.map_types, dict):
-                for key in ('resource_types', 'terrain_types', 'infrastructure_types'):
+                for key in ('resource_types', 'terrain_types', 'infrastructure_types', 'property_types'):
                     vals = self.map_types.get(key, [])
                     if isinstance(vals, list):
                         mt_sets.extend([str(v).lower() for v in vals if isinstance(v, str)])

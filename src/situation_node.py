@@ -639,6 +639,7 @@ class ZenohSituationNode:
             'direction': '',
             'visibility': 0,
             'terrain': '',
+            'property': '',
             'slope': '',
             'resources': [],
             'characters': [],
@@ -668,6 +669,8 @@ class ZenohSituationNode:
                     result['visibility'] = 0
             elif part.startswith('terrain'):
                 result['terrain'] = part.split()[1]
+            elif part.startswith('property'):
+                result['property'] = part.split()[1]
             elif part.startswith('slope'):
                 result['slope'] = part.split()[1]
         

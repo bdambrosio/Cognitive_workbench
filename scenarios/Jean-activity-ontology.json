@@ -1,63 +1,59 @@
 {
   "places": [
-    "MarquartFarmhouse",
-    "FamilyField",
-    "VillageSquare",
-    "VillageChurch",
-    "VillageWell",
-    "Riverbank",
-    "NeighborFarm",
-    "VillageMarket",
-    "BlacksmithWorkshop",
-    "VillageMill",
-    "FarmPath",
-    "KitchenGarden"
+    "Farm",
+    "Field",
+    "Village",
+    "Path",
+    "Market",
+    "Blacksmith",
+    "Well",
+    "Mill",
+    "Church",
+    "River",
+    "Spring"
   ],
   "tools": [
     "Hoe",
-    "Pitchfork",
-    "Plough",
-    "WaterBucket",
-    "BreadLoaf",
-    "FarmCart",
-    "Sickle",
-    "WoodenJug",
-    "Whetstone",
-    "Lantern",
-    "WorkClothes"
+    "Plow",
+    "Scythe",
+    "Bread",
+    "Apple",
+    "Chicken",
+    "Egg",
+    "Milk",
+    "Cheese",
+    "Butter"
   ],
   "roles": [
-    "SonWorker",
-    "HeirAspirant",
-    "PeasantFarmer",
-    "ProspectiveSuitor",
+    "Farmer",
+    "Son",
     "Villager",
-    "Laborer"
+    "Suitor"
   ],
   "norms_rules": [
-    "ObeyFamilyHierarchy",
-    "AttendChurchOnSunday",
-    "RespectElders",
-    "WorkWithDiligence",
-    "AvoidVillageGossip",
-    "AssistNeighborsWhenAble",
-    "ShareHarvestWithFamily",
-    "ProtectFamilyReputation"
+    "ObeyFather",
+    "WorkDiligently",
+    "RespectChurch",
+    "KeepFamilyHonor",
+    "AvoidScandal",
+    "HelpNeighbors",
+    "AttendMarketOnMarketDay",
+    "RespectElders"
   ],
   "hazards": [
-    "OverworkExhaustion",
-    "RiverAccident",
-    "FarmToolInjury",
-    "SocialScandal",
-    "CropFailure"
+    "Fatigue",
+    "Hunger",
+    "Thirst",
+    "InjuryFromFarmTools"
   ],
   "social_graph": [
     "FatherMarquart",
     "MotherMarquart",
     "Francoise",
-    "VillagePriest",
-    "NeighborPeasants",
-    "MarketMerchants"
+    "VillageElder",
+    "LocalPeasants",
+    "MarketVendors",
+    "Priest"
   ],
   "time_windows": [
     "dawn",
@@ -70,258 +66,215 @@
   ],
   "activities": [
     {
-      "id": "WorkFields",
+      "id": "TendFields",
       "drive": "maintain and work the family farm",
-      "verbs": [
-        "move",
-        "use",
-        "inspect",
-        "work"
-      ],
-      "nouns": [
-        "Field",
-        "Hoe",
-        "Plough",
-        "Crop"
+      "roles": [
+        "Farmer",
+        "Son"
       ]
     },
     {
-      "id": "TendLivestock",
+      "id": "IrrigateCrops",
       "drive": "maintain and work the family farm",
-      "verbs": [
-        "inspect",
-        "feed",
-        "move",
-        "use"
-      ],
-      "nouns": [
-        "Livestock",
-        "Barn",
-        "Feed"
+      "roles": [
+        "Farmer"
       ]
     },
     {
-      "id": "FetchWater",
-      "drive": "immediate needs of survival",
-      "verbs": [
-        "move",
-        "take",
-        "use"
-      ],
-      "nouns": [
-        "Water",
-        "Well",
-        "River",
-        "Jug"
+      "id": "HarvestProduce",
+      "drive": "maintain and work the family farm",
+      "roles": [
+        "Farmer"
       ]
     },
     {
-      "id": "ShareMeal",
-      "drive": "immediate needs of survival",
-      "verbs": [
-        "gather",
-        "eat",
-        "wait",
-        "say"
-      ],
-      "nouns": [
-        "Food",
-        "Family",
-        "Bread",
-        "Table"
+      "id": "CareForLivestock",
+      "drive": "maintain and work the family farm",
+      "roles": [
+        "Farmer",
+        "Son"
+      ]
+    },
+    {
+      "id": "MendFences",
+      "drive": "maintain and work the family farm",
+      "roles": [
+        "Farmer",
+        "Son"
+      ]
+    },
+    {
+      "id": "EatMeal",
+      "drive": "immediate needs of survival - food, shelter, health, rest from backbreaking labor",
+      "roles": [
+        "Farmer",
+        "Son",
+        "Villager"
+      ]
+    },
+    {
+      "id": "DrinkWater",
+      "drive": "immediate needs of survival - food, shelter, health, rest from backbreaking labor",
+      "roles": [
+        "Farmer",
+        "Son",
+        "Villager"
       ]
     },
     {
       "id": "RestRecover",
-      "drive": "immediate needs of survival",
-      "verbs": [
-        "wait",
-        "sleep",
-        "think"
-      ],
-      "nouns": [
-        "Bed",
-        "FieldEdge",
-        "Shelter"
+      "drive": "immediate needs of survival - food, shelter, health, rest from backbreaking labor",
+      "roles": [
+        "Farmer",
+        "Son"
       ]
     },
     {
-      "id": "AttendMass",
+      "id": "RepairTools",
       "drive": "maintain and work the family farm",
-      "verbs": [
-        "move",
-        "say",
-        "wait"
-      ],
-      "nouns": [
-        "Church",
-        "Villagers",
-        "Priest"
+      "roles": [
+        "Farmer",
+        "Son"
+      ]
+    },
+    {
+      "id": "VisitMarket",
+      "drive": "maintain and work the family farm",
+      "roles": [
+        "Farmer",
+        "Villager"
+      ]
+    },
+    {
+      "id": "GreetVillager",
+      "drive": "find love and a wife to build a family with",
+      "roles": [
+        "Suitor",
+        "Villager"
+      ]
+    },
+    {
+      "id": "ConverseWithFrancoise",
+      "drive": "find love and a wife to build a family with",
+      "roles": [
+        "Suitor"
+      ]
+    },
+    {
+      "id": "AttendChurch",
+      "drive": "find love and a wife to build a family with",
+      "roles": [
+        "Villager",
+        "Suitor"
       ]
     },
     {
       "id": "NegotiateInheritance",
       "drive": "gain your rightful inheritance - justice and fairness in how the land is divided",
-      "verbs": [
-        "say",
-        "think",
-        "argue",
-        "wait"
-      ],
-      "nouns": [
-        "Father",
-        "Mother",
-        "Land",
-        "Inheritance"
+      "roles": [
+        "Son"
       ]
     },
     {
-      "id": "CourtProspectiveWife",
-      "drive": "find love and a wife to build a family with",
-      "verbs": [
-        "move",
-        "say",
-        "think",
-        "wait"
-      ],
-      "nouns": [
-        "Francoise",
-        "Gift",
-        "Market",
-        "Path"
-      ]
-    },
-    {
-      "id": "TradeProduce",
-      "drive": "maintain and work the family farm",
-      "verbs": [
-        "move",
-        "say",
-        "trade",
-        "inspect"
-      ],
-      "nouns": [
-        "Market",
-        "Merchants",
-        "Goods",
-        "Cart"
-      ]
-    },
-    {
-      "id": "AssistNeighbors",
-      "drive": "maintain and work the family farm",
-      "verbs": [
-        "move",
-        "say",
-        "work"
-      ],
-      "nouns": [
-        "NeighborPeasants",
-        "Field",
-        "Tools"
-      ]
-    },
-    {
-      "id": "ConferWithFather",
+      "id": "AssistFather",
       "drive": "gain your rightful inheritance - justice and fairness in how the land is divided",
-      "verbs": [
-        "say",
-        "think",
-        "wait"
-      ],
-      "nouns": [
-        "Father",
-        "Land"
+      "roles": [
+        "Son"
       ]
     },
     {
-      "id": "AttendVillageGathering",
-      "drive": "find love and a wife to build a family with",
-      "verbs": [
-        "move",
-        "say",
-        "greet"
-      ],
-      "nouns": [
-        "Villagers",
-        "MarketSquare"
+      "id": "ExpressGratitude",
+      "drive": "gain your rightful inheritance - justice and fairness in how the land is divided",
+      "roles": [
+        "Son"
       ]
     },
     {
-      "id": "TendGarden",
-      "drive": "maintain and work the family farm",
-      "verbs": [
-        "move",
-        "inspect",
-        "use",
-        "work"
-      ],
-      "nouns": [
-        "Garden",
-        "VegetableBed"
+      "id": "ShareMealWithFamily",
+      "drive": "gain your rightful inheritance - justice and fairness in how the land is divided",
+      "roles": [
+        "Son",
+        "Villager"
       ]
     }
   ],
   "affordances": {
-    "MarquartFarmhouse": [
-      "ShareMeal",
+    "Farm": [
+      "TendFields",
+      "MendFences",
+      "CareForLivestock",
+      "RepairTools",
+      "EatMeal",
+      "DrinkWater",
       "RestRecover",
-      "ConferWithFather"
+      "AssistFather",
+      "ShareMealWithFamily"
     ],
-    "FamilyField": [
-      "WorkFields",
-      "AssistNeighbors"
+    "Field": [
+      "TendFields",
+      "HarvestProduce",
+      "IrrigateCrops",
+      "MendFences",
+      "CareForLivestock"
     ],
-    "VillageSquare": [
-      "AttendVillageGathering",
-      "TradeProduce"
+    "Village": [
+      "VisitMarket",
+      "AttendChurch",
+      "GreetVillager",
+      "ConverseWithFrancoise",
+      "ShareMealWithFamily"
     ],
-    "VillageChurch": [
-      "AttendMass"
+    "Market": [
+      "VisitMarket",
+      "GreetVillager"
     ],
-    "VillageWell": [
-      "FetchWater"
+    "Well": [
+      "DrinkWater"
     ],
-    "Riverbank": [
-      "FetchWater"
+    "Mill": [
+      "VisitMarket"
     ],
-    "NeighborFarm": [
-      "AssistNeighbors"
+    "Blacksmith": [
+      "RepairTools"
     ],
-    "VillageMarket": [
-      "TradeProduce",
-      "CourtProspectiveWife"
+    "Path": [
+      "Move",
+      "GreetVillager"
     ],
-    "BlacksmithWorkshop": [],
-    "VillageMill": [],
-    "FarmPath": [
-      "CourtProspectiveWife",
-      "Move"
+    "Church": [
+      "AttendChurch"
     ],
-    "KitchenGarden": [
-      "TendGarden"
+    "River": [
+      "DrinkWater"
+    ],
+    "Spring": [
+      "DrinkWater"
     ]
   },
   "drive_coverage": {
     "gain your rightful inheritance - justice and fairness in how the land is divided": [
       "NegotiateInheritance",
-      "ConferWithFather"
+      "AssistFather",
+      "ExpressGratitude",
+      "ShareMealWithFamily"
     ],
     "maintain and work the family farm": [
-      "WorkFields",
-      "TendLivestock",
-      "TradeProduce",
-      "AssistNeighbors",
-      "TendGarden",
-      "AttendMass"
+      "TendFields",
+      "IrrigateCrops",
+      "HarvestProduce",
+      "CareForLivestock",
+      "MendFences",
+      "RepairTools",
+      "VisitMarket"
     ],
     "find love and a wife to build a family with": [
-      "CourtProspectiveWife",
-      "AttendVillageGathering"
+      "ConverseWithFrancoise",
+      "GreetVillager",
+      "AttendChurch"
     ],
     "immediate needs of survival - food, shelter, health, rest from backbreaking labor": [
-      "FetchWater",
-      "ShareMeal",
+      "EatMeal",
+      "DrinkWater",
       "RestRecover"
     ]
   },

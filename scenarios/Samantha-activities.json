@@ -1,17 +1,17 @@
 {
-  "Eat Breakfast Snack": {
-    "name": "Eat Breakfast Snack",
+  "EatBreakfast": {
+    "name": "EatBreakfast",
     "category": "Physiological ADLs",
     "tags": [
       "physical",
       "solo",
-      "outdoors",
       "routine",
+      "outdoors",
       "survival"
     ],
-    "when": "daily@morning",
+    "when": "daily@dawn",
     "where": [
-      "SunlitClearing"
+      "Clearing"
     ],
     "duration": [
       10,
@@ -19,197 +19,367 @@
     ],
     "needs": [
       "Backpack",
-      "SnackBar"
+      "Berries"
     ],
     "states_addressed": [
       "hunger"
     ],
     "steps": [
-      "select edible item from backpack",
-      "find a comfortable spot in clearing",
-      "prepare snack for consumption",
-      "consume food slowly while listening to surroundings"
+      "inspect Backpack",
+      "acquire Edible",
+      "consume Edible",
+      "reflect on taste"
     ],
     "importance": 0.9,
     "habit": 0.7
   },
-  "Drink From Water Bottle": {
-    "name": "Drink From Water Bottle",
+  "DrinkWater": {
+    "name": "DrinkWater",
     "category": "Physiological ADLs",
     "tags": [
       "physical",
       "solo",
-      "outdoors",
       "routine",
+      "outdoors",
       "survival"
     ],
     "when": "opportunistic",
     "where": [
-      "any"
+      "Spring",
+      "Clearing"
     ],
     "duration": [
       5,
       10
     ],
     "needs": [
-      "WaterBottle"
+      "WaterBottle",
+      "Spring"
     ],
     "states_addressed": [
       "thirst"
     ],
     "steps": [
-      "check water level in bottle",
-      "take measured drink",
-      "assess thirst after drinking"
+      "locate WaterSource",
+      "collect Water",
+      "consume Water",
+      "secure WaterBottle"
     ],
-    "importance": 1.0,
-    "habit": 0.9
+    "importance": 0.9,
+    "habit": 0.6
   },
-  "Catnap Among Ferns": {
-    "name": "Catnap Among Ferns",
+  "RestInShade": {
+    "name": "RestInShade",
     "category": "Physiological ADLs",
     "tags": [
       "physical",
       "solo",
+      "routine",
       "outdoors",
-      "survival",
+      "survival"
+    ],
+    "when": "daily@afternoon",
+    "where": [
+      "Meadow",
+      "Forest"
+    ],
+    "duration": [
+      30,
+      60
+    ],
+    "needs": [
+      "Backpack"
+    ],
+    "states_addressed": [
+      "fatigue"
+    ],
+    "steps": [
+      "identify cool Area",
+      "recover physically",
+      "monitor fatigue state",
+      "remain alert to Hazard"
+    ],
+    "importance": 0.7,
+    "habit": 0.5
+  },
+  "SleepSafe": {
+    "name": "SleepSafe",
+    "category": "Physiological ADLs",
+    "tags": [
+      "physical",
+      "solo",
+      "routine",
+      "outdoors",
+      "survival"
+    ],
+    "when": "daily@night",
+    "where": [
+      "Forest",
+      "Cave",
+      "Thicket"
+    ],
+    "duration": [
+      300,
+      420
+    ],
+    "needs": [
+      "Backpack"
+    ],
+    "states_addressed": [
+      "fatigue"
+    ],
+    "steps": [
+      "select safe Place",
+      "prepare sleeping Area",
+      "rest recover",
+      "monitor for Hazard"
+    ],
+    "importance": 0.95,
+    "habit": 0.8
+  },
+  "PlanDay": {
+    "name": "PlanDay",
+    "category": "Instrumental ADLs/Logistics",
+    "tags": [
+      "mental",
+      "solo",
+      "routine",
+      "outdoors"
+    ],
+    "when": "daily@dawn",
+    "where": [
+      "Clearing"
+    ],
+    "duration": [
+      10,
+      15
+    ],
+    "needs": [
+      "Backpack"
+    ],
+    "states_addressed": [],
+    "steps": [
+      "inspect Backpack",
+      "survey Area",
+      "identify Resource",
+      "decide priorities"
+    ],
+    "importance": 0.7,
+    "habit": 0.6
+  },
+  "InventorySupplies": {
+    "name": "InventorySupplies",
+    "category": "Instrumental ADLs/Logistics",
+    "tags": [
+      "mental",
+      "physical",
+      "solo",
       "routine"
+    ],
+    "when": "daily@morning",
+    "where": [
+      "Clearing",
+      "Spring"
+    ],
+    "duration": [
+      10,
+      15
+    ],
+    "needs": [
+      "Backpack"
+    ],
+    "states_addressed": [],
+    "steps": [
+      "inspect Backpack",
+      "count Resource",
+      "assess water supply",
+      "decide what to forage"
+    ],
+    "importance": 0.75,
+    "habit": 0.7
+  },
+  "PrepareSnack": {
+    "name": "PrepareSnack",
+    "category": "Instrumental ADLs/Logistics",
+    "tags": [
+      "physical",
+      "solo",
+      "routine",
+      "outdoors"
     ],
     "when": "opportunistic",
     "where": [
-      "ShadedThicket",
-      "MeadowView"
+      "Meadow",
+      "Clearing"
+    ],
+    "duration": [
+      5,
+      10
+    ],
+    "needs": [
+      "Backpack"
+    ],
+    "states_addressed": [
+      "hunger"
+    ],
+    "steps": [
+      "inspect Edible",
+      "select safe Edible",
+      "prepare for consumption",
+      "consume Edible"
+    ],
+    "importance": 0.6,
+    "habit": 0.6
+  },
+  "WalkToSpring": {
+    "name": "WalkToSpring",
+    "category": "Mobility & Transport",
+    "tags": [
+      "physical",
+      "solo",
+      "outdoors",
+      "survival"
+    ],
+    "when": "opportunistic",
+    "where": [
+      "Path",
+      "Forest",
+      "Spring"
     ],
     "duration": [
       15,
       30
     ],
-    "needs": [],
+    "needs": [
+      "Backpack"
+    ],
     "states_addressed": [
-      "fatigue"
+      "thirst"
     ],
     "steps": [
-      "identify safe shaded area",
-      "clear space of debris",
-      "lie down and close eyes",
-      "rest and recover energy"
+      "scan for Path",
+      "move toward Spring",
+      "avoid Hazard",
+      "rest if needed"
     ],
-    "importance": 0.6,
-    "habit": 0.4
+    "importance": 0.8,
+    "habit": 0.5
   },
-  "Search For Edible Berries": {
-    "name": "Search For Edible Berries",
-    "category": "Physiological ADLs",
+  "MarkReturnTrail": {
+    "name": "MarkReturnTrail",
+    "category": "Mobility & Transport",
+    "tags": [
+      "physical",
+      "mental",
+      "solo",
+      "outdoors",
+      "survival"
+    ],
+    "when": "daily@morning",
+    "where": [
+      "Forest",
+      "Path"
+    ],
+    "duration": [
+      10,
+      20
+    ],
+    "needs": [
+      "Fallenbranch"
+    ],
+    "states_addressed": [],
+    "steps": [
+      "identify Landmark",
+      "place BoundaryMarker",
+      "inspect for TraceMark",
+      "remember way back"
+    ],
+    "importance": 0.75,
+    "habit": 0.5
+  },
+  "ScoutArea": {
+    "name": "ScoutArea",
+    "category": "Mobility & Transport",
     "tags": [
       "physical",
       "mental",
       "outdoors",
-      "survival",
+      "adventure",
       "solo"
     ],
-    "when": "seasonal@summer",
+    "when": "opportunistic",
     "where": [
-      "BerryPatch",
-      "ShadedThicket"
+      "Forest",
+      "Meadow",
+      "Clearing"
     ],
     "duration": [
       20,
       40
     ],
-    "needs": [],
+    "needs": [
+      "Backpack"
+    ],
+    "states_addressed": [],
+    "steps": [
+      "survey Area",
+      "assess Resource",
+      "observe Hazard",
+      "identify Wildlife"
+    ],
+    "importance": 0.7,
+    "habit": 0.4
+  },
+  "ForageBerries": {
+    "name": "ForageBerries",
+    "category": "Role/Production",
+    "tags": [
+      "physical",
+      "solo",
+      "outdoors",
+      "survival",
+      "routine"
+    ],
+    "when": "seasonal@summer",
+    "where": [
+      "Thicket",
+      "Forest"
+    ],
+    "duration": [
+      20,
+      40
+    ],
+    "needs": [
+      "Backpack",
+      "Berries"
+    ],
     "states_addressed": [
-      "hunger",
-      "curiosity"
+      "hunger"
     ],
     "steps": [
-      "move to possible berry patch location",
-      "inspect plants for edible berries",
-      "select ripe, safe berries",
-      "gather berries for immediate or later use"
+      "locate EdiblePlant",
+      "assess for safety",
+      "acquire Berries",
+      "store in Backpack"
     ],
-    "importance": 0.8,
-    "habit": 0.3
+    "importance": 0.85,
+    "habit": 0.5
   },
-  "Inventory Backpack": {
-    "name": "Inventory Backpack",
-    "category": "Instrumental ADLs/Logistics",
+  "CollectSpringWater": {
+    "name": "CollectSpringWater",
+    "category": "Role/Production",
     "tags": [
-      "mental",
+      "physical",
       "solo",
-      "routine",
       "outdoors"
     ],
-    "when": "daily@morning",
+    "when": "opportunistic",
     "where": [
-      "SunlitClearing"
+      "Spring"
     ],
     "duration": [
       10,
       15
-    ],
-    "needs": [
-      "Backpack"
-    ],
-    "states_addressed": [
-      "curiosity",
-      "hope"
-    ],
-    "steps": [
-      "find quiet place to sit",
-      "empty and inspect backpack contents",
-      "check food, water, and supplies",
-      "decide what to keep handy"
-    ],
-    "importance": 0.7,
-    "habit": 0.6
-  },
-  "Prioritize Today's Tasks": {
-    "name": "Prioritize Today's Tasks",
-    "category": "Instrumental ADLs/Logistics",
-    "tags": [
-      "mental",
-      "solo",
-      "outdoors",
-      "routine"
-    ],
-    "when": "daily@dawn",
-    "where": [
-      "MeadowView",
-      "SunlitClearing"
-    ],
-    "duration": [
-      5,
-      10
-    ],
-    "needs": [],
-    "states_addressed": [
-      "hope"
-    ],
-    "steps": [
-      "assess current needs and risks",
-      "identify available resources",
-      "set intention for morning activities",
-      "commit to most urgent goals"
-    ],
-    "importance": 0.6,
-    "habit": 0.5
-  },
-  "Scout for Water Refill": {
-    "name": "Scout for Water Refill",
-    "category": "Instrumental ADLs/Logistics",
-    "tags": [
-      "physical",
-      "mental",
-      "outdoors",
-      "survival"
-    ],
-    "when": "daily@afternoon",
-    "where": [
-      "SpringSource"
-    ],
-    "duration": [
-      20,
-      30
     ],
     "needs": [
       "WaterBottle"
@@ -218,285 +388,110 @@
       "thirst"
     ],
     "steps": [
-      "plan route to nearest water source",
-      "travel carefully to spring",
-      "refill bottle with clean water",
-      "return to safe place"
+      "locate Spring",
+      "inspect WaterSource",
+      "collect Water",
+      "store in WaterBottle"
     ],
-    "importance": 0.8,
-    "habit": 0.3
+    "importance": 0.85,
+    "habit": 0.5
   },
-  "Move To Meadow View": {
-    "name": "Move To Meadow View",
-    "category": "Mobility & Transport",
-    "tags": [
-      "physical",
-      "outdoors",
-      "solo",
-      "routine"
-    ],
-    "when": "opportunistic",
-    "where": [
-      "MeadowView"
-    ],
-    "duration": [
-      10,
-      20
-    ],
-    "needs": [],
-    "states_addressed": [
-      "curiosity",
-      "hope"
-    ],
-    "steps": [
-      "orient to direction of meadow",
-      "navigate terrain safely",
-      "scan for obstacles and tracks",
-      "arrive at meadow overlook"
-    ],
-    "importance": 0.7,
-    "habit": 0.3
-  },
-  "Navigate Overgrown Path": {
-    "name": "Navigate Overgrown Path",
-    "category": "Mobility & Transport",
-    "tags": [
-      "physical",
-      "mental",
-      "outdoors",
-      "survival"
-    ],
-    "when": "opportunistic",
-    "where": [
-      "OvergrownPath"
-    ],
-    "duration": [
-      15,
-      30
-    ],
-    "needs": [
-      "SmallKnife"
-    ],
-    "states_addressed": [
-      "curiosity",
-      "fear"
-    ],
-    "steps": [
-      "locate possible trailhead",
-      "clear loose branches if needed",
-      "move cautiously along path",
-      "mark or remember waypoints"
-    ],
-    "importance": 0.6,
-    "habit": 0.2
-  },
-  "Circle Back To Known Landmark": {
-    "name": "Circle Back To Known Landmark",
-    "category": "Mobility & Transport",
-    "tags": [
-      "physical",
-      "mental",
-      "outdoors"
-    ],
-    "when": "opportunistic",
-    "where": [
-      "MixedForestEdge",
-      "AppletreeStand",
-      "SpringSource"
-    ],
-    "duration": [
-      10,
-      30
-    ],
-    "needs": [
-      "MapSketch"
-    ],
-    "states_addressed": [
-      "fear",
-      "hope"
-    ],
-    "steps": [
-      "recall last visited landmark",
-      "move safely back toward location",
-      "verify surroundings match memory",
-      "update personal map sketch"
-    ],
-    "importance": 0.7,
-    "habit": 0.2
-  },
-  "Build Temporary Shade Shelter": {
-    "name": "Build Temporary Shade Shelter",
+  "ScanEdibles": {
+    "name": "ScanEdibles",
     "category": "Role/Production",
     "tags": [
-      "physical",
+      "mental",
       "outdoors",
-      "solo",
-      "survival"
+      "survival",
+      "solo"
     ],
     "when": "seasonal@summer",
     "where": [
-      "SunlitClearing",
-      "FallenBranchCluster"
+      "Forest",
+      "Thicket"
     ],
     "duration": [
-      25,
-      45
+      10,
+      25
     ],
     "needs": [
-      "FallenBranchCluster",
       "Backpack"
     ],
     "states_addressed": [
-      "fatigue",
-      "excessiveSunExposure"
+      "hunger"
     ],
     "steps": [
-      "gather branches from cluster",
-      "select quiet spot in clearing",
-      "arrange shelter for shade",
-      "rest beneath created shade"
+      "scan for EdiblePlant",
+      "identify safe Edible",
+      "collect Edible",
+      "share with Companion if present"
     ],
     "importance": 0.7,
-    "habit": 0.3
+    "habit": 0.4
   },
-  "Mark Trail With Ribbon": {
-    "name": "Mark Trail With Ribbon",
-    "category": "Role/Production",
-    "tags": [
-      "physical",
-      "mental",
-      "outdoors",
-      "routine",
-      "survival"
-    ],
-    "when": "opportunistic",
-    "where": [
-      "OvergrownPath",
-      "MixedForestEdge"
-    ],
-    "duration": [
-      15,
-      20
-    ],
-    "needs": [
-      "TrailMarkRibbon"
-    ],
-    "states_addressed": [
-      "fear",
-      "hope"
-    ],
-    "steps": [
-      "identify location to mark",
-      "tie ribbon onto visible branch",
-      "record location in notebook",
-      "verify marker visibility on return"
-    ],
-    "importance": 0.8,
-    "habit": 0.2
-  },
-  "Gather Firewood (if cold)": {
-    "name": "Gather Firewood (if cold)",
-    "category": "Role/Production",
-    "tags": [
-      "physical",
-      "outdoors",
-      "solo",
-      "survival"
-    ],
-    "when": "opportunistic",
-    "where": [
-      "FallenBranchCluster"
-    ],
-    "duration": [
-      15,
-      30
-    ],
-    "needs": [],
-    "states_addressed": [
-      "hope",
-      "fatigue"
-    ],
-    "steps": [
-      "search for dry fallen branches",
-      "collect manageable pieces",
-      "organize wood by size",
-      "bring resources to shelter area"
-    ],
-    "importance": 0.4,
-    "habit": 0.2
-  },
-  "Share Food With Stranger": {
-    "name": "Share Food With Stranger",
+  "AssistCompanion": {
+    "name": "AssistCompanion",
     "category": "Role/Production",
     "tags": [
       "social",
-      "mental",
-      "outdoors"
+      "outdoors",
+      "survival"
     ],
     "when": "opportunistic",
     "where": [
-      "SunlitClearing",
-      "HiddenHut"
+      "Clearing",
+      "Path"
     ],
     "duration": [
       10,
-      15
+      30
     ],
     "needs": [
-      "SnackBar",
       "Backpack"
     ],
-    "states_addressed": [
-      "loneliness",
-      "hope"
-    ],
+    "states_addressed": [],
     "steps": [
-      "offer food to companion or stranger",
-      "observe response to gesture",
-      "share meal and casual conversation",
-      "reflect on possible trust gains"
+      "inspect Companion state",
+      "offer Resource",
+      "share food or water",
+      "negotiate Assistance"
     ],
-    "importance": 0.4,
-    "habit": 0.1
+    "importance": 0.6,
+    "habit": 0.3
   },
-  "Observe Animal Tracks": {
-    "name": "Observe Animal Tracks",
+  "ObserveWildlife": {
+    "name": "ObserveWildlife",
     "category": "Learning & Practice",
     "tags": [
       "mental",
-      "solo",
       "outdoors",
-      "adventure"
+      "solo",
+      "adventure",
+      "learning"
     ],
-    "when": "opportunistic",
+    "when": "daily@morning",
     "where": [
-      "MeadowView",
-      "ShadedThicket",
-      "AppletreeStand"
+      "Meadow",
+      "Forest",
+      "Path"
     ],
     "duration": [
-      10,
-      20
+      15,
+      25
     ],
-    "needs": [
-      "Notebook",
-      "Pencil"
-    ],
-    "states_addressed": [
-      "curiosity",
-      "hope"
-    ],
+    "needs": [],
+    "states_addressed": [],
     "steps": [
-      "look for fresh tracks on ground",
-      "compare patterns and sizes",
-      "sketch or note findings",
-      "speculate on animal behavior"
+      "scan Area",
+      "watch Wildlife",
+      "note behavior",
+      "reflect on meaning"
     ],
-    "importance": 0.6,
-    "habit": 0.2
+    "importance": 0.7,
+    "habit": 0.4
   },
-  "Study Edible Plants": {
-    "name": "Study Edible Plants",
+  "PracticeNavigation": {
+    "name": "PracticeNavigation",
     "category": "Learning & Practice",
     "tags": [
       "mental",
@@ -505,489 +500,444 @@
     ],
     "when": "opportunistic",
     "where": [
-      "BerryPatch",
-      "AppletreeStand"
+      "Forest",
+      "Path",
+      "Meadow"
+    ],
+    "duration": [
+      10,
+      20
+    ],
+    "needs": [
+      "Backpack"
+    ],
+    "states_addressed": [],
+    "steps": [
+      "orient to Landmark",
+      "identify Path",
+      "believe direction correct",
+      "move a short way"
+    ],
+    "importance": 0.6,
+    "habit": 0.3
+  },
+  "ReflectOnSituation": {
+    "name": "ReflectOnSituation",
+    "category": "Cognitive/Inner",
+    "tags": [
+      "mental",
+      "solo",
+      "routine"
+    ],
+    "when": "daily@evening",
+    "where": [
+      "Clearing",
+      "Forest"
     ],
     "duration": [
       15,
       30
     ],
-    "needs": [
-      "Notebook",
-      "Pencil"
-    ],
-    "states_addressed": [
-      "curiosity"
-    ],
+    "needs": [],
+    "states_addressed": [],
     "steps": [
-      "inspect potential edible plants",
-      "compare to mental notes or sketches",
-      "record distinguishing features",
-      "memorize safe plants for future use"
+      "think about experiences",
+      "identify feelings",
+      "assess fears",
+      "consider trust"
     ],
-    "importance": 0.7,
-    "habit": 0.3
+    "importance": 0.8,
+    "habit": 0.7
   },
-  "Reflect On The Day": {
-    "name": "Reflect On The Day",
+  "ChallengeFear": {
+    "name": "ChallengeFear",
     "category": "Cognitive/Inner",
     "tags": [
       "mental",
       "solo",
-      "outdoors",
-      "routine"
+      "survival"
     ],
-    "when": "daily@dusk",
+    "when": "opportunistic",
     "where": [
-      "MeadowView",
-      "AppletreeStand"
+      "Forest",
+      "Meadow"
     ],
     "duration": [
       10,
-      20
+      15
     ],
     "needs": [],
-    "states_addressed": [
-      "hope",
-      "fear",
-      "curiosity"
-    ],
+    "states_addressed": [],
     "steps": [
-      "find peaceful spot to sit",
-      "review day's experiences",
-      "acknowledge feelings of hope or fear",
-      "consider adjustments for tomorrow"
+      "acknowledge fear",
+      "identify source",
+      "inspect surroundings",
+      "decide to act or wait"
     ],
     "importance": 0.7,
-    "habit": 0.4
+    "habit": 0.2
   },
-  "Write in Notebook": {
-    "name": "Write in Notebook",
-    "category": "Cognitive/Inner",
-    "tags": [
-      "mental",
-      "solo",
-      "outdoors",
-      "routine"
-    ],
-    "when": "daily@evening",
-    "where": [
-      "MeadowView",
-      "BerryPatch"
-    ],
-    "duration": [
-      10,
-      20
-    ],
-    "needs": [
-      "Notebook",
-      "Pencil"
-    ],
-    "states_addressed": [
-      "curiosity",
-      "hope"
-    ],
-    "steps": [
-      "recall notable events",
-      "summarize discoveries or worries",
-      "jot down hopes or philosophical thoughts",
-      "close notebook for the night"
-    ],
-    "importance": 0.7,
-    "habit": 0.5
-  },
-  "Relax And Watch Clouds": {
-    "name": "Relax And Watch Clouds",
+  "CloudWatch": {
+    "name": "CloudWatch",
     "category": "Recreation & Leisure",
     "tags": [
       "mental",
-      "solo",
       "outdoors",
-      "leisure"
+      "leisure",
+      "solo"
     ],
     "when": "daily@afternoon",
     "where": [
-      "MeadowView",
-      "SunlitClearing"
+      "Meadow",
+      "Clearing"
+    ],
+    "duration": [
+      15,
+      25
+    ],
+    "needs": [],
+    "states_addressed": [],
+    "steps": [
+      "identify open Area",
+      "lie down",
+      "observe clouds",
+      "create stories"
+    ],
+    "importance": 0.5,
+    "habit": 0.3
+  },
+  "SketchNature": {
+    "name": "SketchNature",
+    "category": "Recreation & Leisure",
+    "tags": [
+      "mental",
+      "outdoors",
+      "leisure",
+      "solo"
+    ],
+    "when": "opportunistic",
+    "where": [
+      "Forest",
+      "Meadow"
+    ],
+    "duration": [
+      20,
+      30
+    ],
+    "needs": [],
+    "states_addressed": [],
+    "steps": [
+      "observe Wildlife",
+      "select view",
+      "sketch memory image",
+      "review sketch"
+    ],
+    "importance": 0.45,
+    "habit": 0.2
+  },
+  "ShareStory": {
+    "name": "ShareStory",
+    "category": "Recreation & Leisure",
+    "tags": [
+      "social",
+      "outdoors",
+      "leisure"
+    ],
+    "when": "opportunistic",
+    "where": [
+      "Clearing"
     ],
     "duration": [
       10,
       20
     ],
     "needs": [],
-    "states_addressed": [
-      "hope"
-    ],
+    "states_addressed": [],
     "steps": [
-      "lie back on grass and observe sky",
-      "note shapes and drift of clouds",
-      "let thoughts wander without pressure",
-      "enjoy moment of calm"
+      "approach Companion",
+      "presentSelf",
+      "say memory story",
+      "invite reply"
     ],
-    "importance": 0.5,
+    "importance": 0.4,
     "habit": 0.2
   },
-  "Explore For New Vistas": {
-    "name": "Explore For New Vistas",
-    "category": "Recreation & Leisure",
+  "AvoidHazard": {
+    "name": "AvoidHazard",
+    "category": "Safety/Emergency",
+    "tags": [
+      "physical",
+      "outdoors",
+      "solo",
+      "survival",
+      "proactive"
+    ],
+    "when": "opportunistic",
+    "where": [
+      "Forest",
+      "Path",
+      "Mountain"
+    ],
+    "duration": [
+      1,
+      5
+    ],
+    "needs": [],
+    "states_addressed": [
+      "injury"
+    ],
+    "steps": [
+      "scan for Hazard",
+      "assess risk",
+      "choose safe Path",
+      "move carefully"
+    ],
+    "importance": 0.9,
+    "habit": 0.7
+  },
+  "SignalForHelp": {
+    "name": "SignalForHelp",
+    "category": "Safety/Emergency",
     "tags": [
       "physical",
       "mental",
       "outdoors",
-      "adventure"
+      "survival",
+      "reactive"
     ],
     "when": "opportunistic",
     "where": [
-      "MountainSlope",
-      "MeadowView"
+      "Clearing",
+      "Meadow"
     ],
     "duration": [
-      20,
-      35
+      10,
+      20
     ],
-    "needs": [],
-    "states_addressed": [
-      "curiosity",
-      "hope"
+    "needs": [
+      "Backpack"
     ],
+    "states_addressed": [],
     "steps": [
-      "choose promising direction",
-      "move uphill or to open area",
-      "scan for expansive views",
-      "pause to appreciate scenery"
+      "decide to signal",
+      "use bright Item",
+      "create visible TraceMark",
+      "wait for response"
     ],
-    "importance": 0.6,
-    "habit": 0.1
+    "importance": 0.85,
+    "habit": 0.2
   },
-  "Sketch A Wildflower": {
-    "name": "Sketch A Wildflower",
-    "category": "Recreation & Leisure",
+  "HideInThicket": {
+    "name": "HideInThicket",
+    "category": "Safety/Emergency",
     "tags": [
-      "mental",
+      "physical",
       "outdoors",
       "solo",
-      "leisure",
-      "romantic"
+      "survival",
+      "proactive"
     ],
     "when": "opportunistic",
     "where": [
-      "MeadowView",
-      "BerryPatch"
+      "Thicket",
+      "Forest"
     ],
     "duration": [
       10,
       30
     ],
-    "needs": [
-      "Notebook",
-      "Pencil"
-    ],
-    "states_addressed": [
-      "hope",
-      "curiosity"
-    ],
+    "needs": [],
+    "states_addressed": [],
     "steps": [
-      "locate interesting wildflower",
-      "sit where view is best",
-      "sketch flower with pencil",
-      "label details for future memory"
+      "locate dense Thicket",
+      "move quietly",
+      "scan for danger",
+      "remain hidden"
     ],
-    "importance": 0.4,
-    "habit": 0.1
+    "importance": 0.7,
+    "habit": 0.3
   },
-  "Mark Hazardous Area": {
-    "name": "Mark Hazardous Area",
-    "category": "Safety/Emergency",
+  "TreatMinorInjury": {
+    "name": "TreatMinorInjury",
+    "category": "Health Management (self-care)",
     "tags": [
       "physical",
-      "outdoors",
       "solo",
+      "routine",
       "survival"
     ],
     "when": "opportunistic",
     "where": [
-      "FallenBranchCluster",
-      "OvergrownPath"
+      "Clearing",
+      "Forest"
     ],
     "duration": [
       10,
-      15
+      20
     ],
     "needs": [
-      "TrailMarkRibbon"
+      "Backpack"
     ],
     "states_addressed": [
-      "fear",
-      "hope"
+      "injury"
     ],
     "steps": [
-      "identify area with hazard (branches, slippery ground)",
-      "tie ribbon nearby as warning",
-      "record location in notebook",
-      "avoid area in future travel"
+      "inspect injury",
+      "clean with Water",
+      "cover injury",
+      "monitor state"
     ],
     "importance": 0.8,
-    "habit": 0.2
+    "habit": 0.4
   },
-  "Quick Hide in Thicket": {
-    "name": "Quick Hide in Thicket",
-    "category": "Safety/Emergency",
+  "StretchMuscles": {
+    "name": "StretchMuscles",
+    "category": "Health Management (self-care)",
     "tags": [
       "physical",
-      "mental",
-      "outdoors",
-      "survival"
+      "solo",
+      "routine",
+      "outdoors"
+    ],
+    "when": "daily@morning",
+    "where": [
+      "Clearing",
+      "Meadow"
+    ],
+    "duration": [
+      5,
+      10
+    ],
+    "needs": [],
+    "states_addressed": [
+      "fatigue"
+    ],
+    "steps": [
+      "rest in safe Area",
+      "stretch arms",
+      "stretch legs",
+      "monitor fatigue"
+    ],
+    "importance": 0.55,
+    "habit": 0.6
+  },
+  "WashHands": {
+    "name": "WashHands",
+    "category": "Health Management (self-care)",
+    "tags": [
+      "physical",
+      "routine",
+      "outdoors"
     ],
     "when": "opportunistic",
     "where": [
-      "ShadedThicket",
-      "SecludedCave"
+      "Spring"
     ],
     "duration": [
       3,
-      10
-    ],
-    "needs": [],
-    "states_addressed": [
-      "fear"
-    ],
-    "steps": [
-      "spot possible threat (noise, wild animal, stranger)",
-      "move quickly but quietly into dense thicket or cave",
-      "remain still and quiet",
-      "monitor threat until safe"
-    ],
-    "importance": 0.8,
-    "habit": 0.15
-  },
-  "Respond to Sudden Weather Change": {
-    "name": "Respond to Sudden Weather Change",
-    "category": "Safety/Emergency",
-    "tags": [
-      "physical",
-      "mental",
-      "outdoors",
-      "survival"
-    ],
-    "when": "opportunistic",
-    "where": [
-      "any"
-    ],
-    "duration": [
-      5,
-      20
+      7
     ],
     "needs": [
-      "Backpack"
+      "WaterBottle",
+      "Spring"
     ],
-    "states_addressed": [
-      "fear",
-      "fatigue"
-    ],
+    "states_addressed": [],
     "steps": [
-      "recognize shifting weather signs",
-      "decide on most accessible shelter",
-      "move rapidly to safe location",
-      "take shelter and secure gear"
+      "acquire Water",
+      "clean hands",
+      "dry hands",
+      "inspect cleanliness"
     ],
-    "importance": 0.9,
-    "habit": 0.1
-  },
-  "Bandage Minor Injury": {
-    "name": "Bandage Minor Injury",
-    "category": "Health Management (self-care)",
-    "tags": [
-      "physical",
-      "solo",
-      "outdoors",
-      "survival"
-    ],
-    "when": "opportunistic",
-    "where": [
-      "any"
-    ],
-    "duration": [
-      5,
-      15
-    ],
-    "needs": [
-      "Backpack"
-    ],
-    "states_addressed": [
-      "injury",
-      "fear"
-    ],
-    "steps": [
-      "locate clean cloth or aid in backpack",
-      "clean minor wound",
-      "apply pressure and cover with makeshift bandage",
-      "assess readiness to continue activities"
-    ],
-    "importance": 0.8,
-    "habit": 0.15
-  },
-  "Stretch and Self-Check": {
-    "name": "Stretch and Self-Check",
-    "category": "Health Management (self-care)",
-    "tags": [
-      "physical",
-      "mental",
-      "outdoors",
-      "solo",
-      "routine"
-    ],
-    "when": "daily@morning",
-    "where": [
-      "MeadowView",
-      "SunlitClearing"
-    ],
-    "duration": [
-      5,
-      10
-    ],
-    "needs": [],
-    "states_addressed": [
-      "fatigue"
-    ],
-    "steps": [
-      "stand or sit in woken area",
-      "gently stretch limbs and back",
-      "scan for soreness or injury",
-      "note any new aches"
-    ],
-    "importance": 0.7,
-    "habit": 0.6
-  },
-  "Clean Up Personal Area": {
-    "name": "Clean Up Personal Area",
-    "category": "Health Management (self-care)",
-    "tags": [
-      "physical",
-      "solo",
-      "outdoors",
-      "routine"
-    ],
-    "when": "daily@morning",
-    "where": [
-      "SunlitClearing",
-      "SecludedCave"
-    ],
-    "duration": [
-      10,
-      15
-    ],
-    "needs": [],
-    "states_addressed": [
-      "hope"
-    ],
-    "steps": [
-      "remove litter or refuse",
-      "shake out sleeping spot or gear",
-      "organize belongings for access",
-      "assess site for comfort"
-    ],
-    "importance": 0.5,
+    "importance": 0.55,
     "habit": 0.5
   },
-  "Check and Repair Gear": {
-    "name": "Check and Repair Gear",
+  "ReinforceBackpack": {
+    "name": "ReinforceBackpack",
     "category": "Maintenance & Repair",
     "tags": [
       "physical",
       "mental",
       "solo",
-      "outdoors"
+      "routine"
     ],
-    "when": "daily@afternoon",
+    "when": "opportunistic",
     "where": [
-      "SunlitClearing",
-      "SecludedCave"
+      "Clearing"
     ],
     "duration": [
       10,
       20
     ],
     "needs": [
-      "SmallKnife",
-      "Backpack"
+      "Fallenbranch"
     ],
-    "states_addressed": [
-      "curiosity",
-      "hope"
-    ],
+    "states_addressed": [],
     "steps": [
-      "inspect backpack, water bottle, clothing",
-      "identify any rips, leaks, or damage",
-      "use knife and materials for minor repairs",
-      "ensure gear is ready for use"
+      "inspect Backpack",
+      "identify weak point",
+      "reinforce with Fallenbranch",
+      "test pack"
     ],
-    "importance": 0.6,
-    "habit": 0.4
+    "importance": 0.5,
+    "habit": 0.2
   },
-  "Repack Backpack Efficiently": {
-    "name": "Repack Backpack Efficiently",
+  "CheckWaterBottle": {
+    "name": "CheckWaterBottle",
     "category": "Maintenance & Repair",
     "tags": [
       "physical",
-      "mental",
       "solo",
       "routine"
     ],
     "when": "daily@morning",
     "where": [
-      "SunlitClearing"
+      "Clearing",
+      "Spring"
     ],
     "duration": [
-      5,
-      10
+      2,
+      7
     ],
     "needs": [
-      "Backpack"
+      "WaterBottle"
     ],
-    "states_addressed": [
-      "hope"
-    ],
+    "states_addressed": [],
     "steps": [
-      "assess items for today\u2019s priorities",
-      "pack essentials for easy access",
-      "minimize weight and bulk",
-      "secure backpack snugly"
+      "inspect WaterBottle",
+      "assess volume",
+      "check for leaks",
+      "clean if dirty"
     ],
-    "importance": 0.5,
-    "habit": 0.4
+    "importance": 0.55,
+    "habit": 0.6
   },
-  "Restore Ribbon Markers": {
-    "name": "Restore Ribbon Markers",
+  "ClearRestArea": {
+    "name": "ClearRestArea",
     "category": "Maintenance & Repair",
     "tags": [
       "physical",
       "solo",
-      "outdoors",
-      "routine"
+      "routine",
+      "outdoors"
     ],
-    "when": "opportunistic",
+    "when": "daily@evening",
     "where": [
-      "OvergrownPath",
-      "MixedForestEdge"
+      "Clearing",
+      "Meadow"
     ],
     "duration": [
       10,
-      20
+      15
     ],
-    "needs": [
-      "TrailMarkRibbon"
-    ],
-    "states_addressed": [
-      "fear",
-      "hope"
-    ],
+    "needs": [],
+    "states_addressed": [],
     "steps": [
-      "walk previously marked trail",
-      "check status of ribbon markers",
-      "replace missing or faded ribbons",
-      "record changed locations if needed"
+      "select Area",
+      "remove debris",
+      "inspect for Hazard",
+      "prepare sleeping spot"
     ],
-    "importance": 0.4,
-    "habit": 0.2
+    "importance": 0.6,
+    "habit": 0.5
   }
 }

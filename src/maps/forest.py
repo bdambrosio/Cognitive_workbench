@@ -17,6 +17,7 @@ class ForestInfrastructure(Enum):
     Path = auto()    
 
 class ForestResources(Enum):
+    Hut = auto()         # Added for the new required_resource
     Berries = auto()
     Mushrooms = auto()
     Appletree = auto()
@@ -24,9 +25,10 @@ class ForestResources(Enum):
     Spring = auto()     # Water source
     Cave = auto()       # Potential shelter
     Thicket = auto()    # Dense vegetation, potential shelter
-    Hut = auto()         # Added for the new required_resource
+
 
 class ForestProperty(Enum):
+    Village = auto()
     pass  # Keeping property system but wilderness has no ownership
 
 # Rules for terrain generation
@@ -59,8 +61,8 @@ infrastructure_rules = {
 }
 
 property_rules = {
-    'min_size': 0,    # No properties in wilderness
-    'max_size': 0,
+    'min_size': 100,    # No properties in wilderness
+    'max_size': 500,
     'valid_terrain': ['Clearing', 'Meadow']  # Add this even if no properties are used
 }
 
@@ -79,7 +81,7 @@ resource_rules = {
         {
             'resource_type': resource_types.Berries,
             'description': 'A bush with edible berries',
-            'count': 15,
+            'count': 100,
             'requires_property': False,
             'terrain_weights': {
                 terrain_types.Clearing: 2.0,
@@ -90,7 +92,7 @@ resource_rules = {
         {
             'resource_type': resource_types.Mushrooms,
             'description': 'A patch of mushrooms',
-            'count': 10,
+            'count': 100,
             'requires_property': False,
             'terrain_weights': {
                 terrain_types.Forest: 2.0
@@ -99,7 +101,7 @@ resource_rules = {
         {
             'resource_type': resource_types.Fallenbranch,
             'description': 'A large fallen tree branch',
-            'count': 24,
+            'count': 50,
             'requires_property': False,
             'terrain_weights': {
                 terrain_types.Forest: 1.0,
@@ -119,7 +121,7 @@ resource_rules = {
          {
             'resource_type': resource_types.Spring,
             'description': 'A natural spring of fresh water',
-            'count': 3,
+            'count': 30,
             'requires_property': False,
             'terrain_weights': {
                 terrain_types.Forest: 1.0

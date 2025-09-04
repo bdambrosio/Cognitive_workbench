@@ -1,59 +1,59 @@
-2025-09-01 20:28:57 - character_launcher - INFO - ✅ Launcher subscribed to cognitive/launcher/shutdown and ready to publish ready signal
-2025-09-01 20:28:57 - character_launcher - INFO - Added character: Jean
-2025-09-01 20:28:57 - character_launcher - INFO - Added character: Francoise
-2025-09-01 20:28:57 - character_launcher - INFO - Added character: Fathermarquart
-2025-09-01 20:28:57 - character_launcher - INFO - Added character: Mothermarquart
-2025-09-01 20:29:01 - character_launcher - INFO - Launching 4 characters...
-2025-09-01 20:29:01 - character_launcher - INFO - Launching shared services...
-2025-09-01 20:29:01 - character_launcher - INFO - ✅ LLM Service Node launched with server: vllm, model: llama3.1-8b-instruct
-2025-09-01 20:29:01 - character_launcher - INFO - ✅ FastAPI Action Display Node launched on port 3000
-2025-09-01 20:29:01 - character_launcher - INFO -    - Web UI available at: http://localhost:3000
-2025-09-01 20:29:03 - character_launcher - INFO - ✅ Map Node launched with map: rural.py
-2025-09-01 20:29:03 - character_launcher - INFO - ⏳ Waiting for Map Node to initialize...
-2025-09-01 20:29:10 - character_launcher - INFO - Launching character: Jean
-2025-09-01 20:29:10 - character_launcher - INFO - ✅ Jean memory_node launched
-2025-09-01 20:29:11 - character_launcher - INFO - ✅ Jean situation_node launched
-2025-09-01 20:29:11 - character_launcher - INFO - ✅ Jean sense_node launched
-2025-09-01 20:29:12 - character_launcher - INFO - ✅ Jean executive_node launched
-2025-09-01 20:29:13 - character_launcher - INFO - Launching character: Francoise
-2025-09-01 20:29:13 - character_launcher - INFO - ✅ Francoise memory_node launched
-2025-09-01 20:29:13 - character_launcher - INFO - ✅ Francoise situation_node launched
-2025-09-01 20:29:14 - character_launcher - INFO - ✅ Francoise sense_node launched
-2025-09-01 20:29:14 - character_launcher - INFO - ✅ Francoise executive_node launched
-2025-09-01 20:29:15 - character_launcher - INFO - Launching character: Fathermarquart
-2025-09-01 20:29:15 - character_launcher - INFO - ✅ Fathermarquart memory_node launched
-2025-09-01 20:29:16 - character_launcher - INFO - ✅ Fathermarquart situation_node launched
-2025-09-01 20:29:16 - character_launcher - INFO - ✅ Fathermarquart sense_node launched
-2025-09-01 20:29:17 - character_launcher - INFO - ✅ Fathermarquart executive_node launched
-2025-09-01 20:29:18 - character_launcher - INFO - Launching character: Mothermarquart
-2025-09-01 20:29:18 - character_launcher - INFO - ✅ Mothermarquart memory_node launched
-2025-09-01 20:29:18 - character_launcher - INFO - ✅ Mothermarquart situation_node launched
-2025-09-01 20:29:19 - character_launcher - INFO - ✅ Mothermarquart sense_node launched
-2025-09-01 20:29:19 - character_launcher - INFO - ✅ Mothermarquart executive_node launched
-2025-09-01 20:29:20 - character_launcher - INFO - ✅ All characters launched
-2025-09-01 20:29:20 - character_launcher - INFO - 🚀 Published ready signal: 4 characters active
-2025-09-01 20:29:20 - character_launcher - INFO - Monitoring processes...
-2025-09-01 20:34:14 - character_launcher - INFO - Received signal 2, initiating shutdown...
-2025-09-01 20:34:15 - character_launcher - INFO - 🛑 Initiating graceful shutdown...
-2025-09-01 20:34:15 - character_launcher - INFO - 📨 Sending SIGTERM to 19 processes...
-2025-09-01 20:34:15 - character_launcher - INFO -   ✉️  SIGTERM sent to Jean process 573377
-2025-09-01 20:34:15 - character_launcher - INFO -   ✉️  SIGTERM sent to Jean process 573384
-2025-09-01 20:34:15 - character_launcher - INFO -   ✉️  SIGTERM sent to Jean process 573403
-2025-09-01 20:34:15 - character_launcher - INFO -   ✉️  SIGTERM sent to Jean process 573412
-2025-09-01 20:34:15 - character_launcher - INFO -   ✉️  SIGTERM sent to Francoise process 573466
-2025-09-01 20:34:15 - character_launcher - INFO -   ✉️  SIGTERM sent to Francoise process 573472
-2025-09-01 20:34:15 - character_launcher - INFO -   ✉️  SIGTERM sent to Francoise process 573477
-2025-09-01 20:34:15 - character_launcher - INFO -   ✉️  SIGTERM sent to Francoise process 573532
-2025-09-01 20:34:15 - character_launcher - INFO -   ✉️  SIGTERM sent to Fathermarquart process 573565
-2025-09-01 20:34:15 - character_launcher - INFO -   ✉️  SIGTERM sent to Fathermarquart process 573568
-2025-09-01 20:34:15 - character_launcher - INFO -   ✉️  SIGTERM sent to Fathermarquart process 573612
-2025-09-01 20:34:15 - character_launcher - INFO -   ✉️  SIGTERM sent to Fathermarquart process 573616
-2025-09-01 20:34:15 - character_launcher - INFO -   ✉️  SIGTERM sent to Mothermarquart process 573701
-2025-09-01 20:34:15 - character_launcher - INFO -   ✉️  SIGTERM sent to Mothermarquart process 573742
-2025-09-01 20:34:15 - character_launcher - INFO -   ✉️  SIGTERM sent to Mothermarquart process 573769
-2025-09-01 20:34:15 - character_launcher - INFO -   ✉️  SIGTERM sent to Mothermarquart process 573794
-2025-09-01 20:34:15 - character_launcher - INFO -   ✉️  SIGTERM sent to shared process 573045
-2025-09-01 20:34:15 - character_launcher - INFO -   ✉️  SIGTERM sent to shared process 573046
-2025-09-01 20:34:15 - character_launcher - INFO -   ✉️  SIGTERM sent to shared process 573087
-2025-09-01 20:34:15 - character_launcher - INFO - ⏳ Waiting up to 15s for graceful shutdown...
-2025-09-01 20:34:20 - character_launcher - WARNING -   ⏰ 11 processes still running after 5s...
+2025-09-03 18:01:54 - character_launcher - INFO - ✅ Launcher subscribed to cognitive/launcher/shutdown and ready to publish ready signal
+2025-09-03 18:01:54 - character_launcher - INFO - Added character: Jean
+2025-09-03 18:01:54 - character_launcher - INFO - Added character: Francoise
+2025-09-03 18:01:54 - character_launcher - INFO - Added character: Fathermarquart
+2025-09-03 18:01:54 - character_launcher - INFO - Added character: Mothermarquart
+2025-09-03 18:01:59 - character_launcher - INFO - Launching 4 characters...
+2025-09-03 18:01:59 - character_launcher - INFO - Launching shared services...
+2025-09-03 18:01:59 - character_launcher - INFO - ✅ LLM Service Node launched with server: vllm, model: llama3.1-8b-instruct
+2025-09-03 18:01:59 - character_launcher - INFO - ✅ FastAPI Action Display Node launched on port 3000
+2025-09-03 18:01:59 - character_launcher - INFO -    - Web UI available at: http://localhost:3000
+2025-09-03 18:02:01 - character_launcher - INFO - ✅ Map Node launched with map: rural.py
+2025-09-03 18:02:01 - character_launcher - INFO - ⏳ Waiting for Map Node to initialize...
+2025-09-03 18:02:08 - character_launcher - INFO - Launching character: Jean
+2025-09-03 18:02:08 - character_launcher - INFO - ✅ Jean memory_node launched
+2025-09-03 18:02:08 - character_launcher - INFO - ✅ Jean situation_node launched
+2025-09-03 18:02:09 - character_launcher - INFO - ✅ Jean sense_node launched
+2025-09-03 18:02:09 - character_launcher - INFO - ✅ Jean executive_node launched
+2025-09-03 18:02:10 - character_launcher - INFO - Launching character: Francoise
+2025-09-03 18:02:10 - character_launcher - INFO - ✅ Francoise memory_node launched
+2025-09-03 18:02:11 - character_launcher - INFO - ✅ Francoise situation_node launched
+2025-09-03 18:02:11 - character_launcher - INFO - ✅ Francoise sense_node launched
+2025-09-03 18:02:12 - character_launcher - INFO - ✅ Francoise executive_node launched
+2025-09-03 18:02:13 - character_launcher - INFO - Launching character: Fathermarquart
+2025-09-03 18:02:13 - character_launcher - INFO - ✅ Fathermarquart memory_node launched
+2025-09-03 18:02:13 - character_launcher - INFO - ✅ Fathermarquart situation_node launched
+2025-09-03 18:02:14 - character_launcher - INFO - ✅ Fathermarquart sense_node launched
+2025-09-03 18:02:14 - character_launcher - INFO - ✅ Fathermarquart executive_node launched
+2025-09-03 18:02:15 - character_launcher - INFO - Launching character: Mothermarquart
+2025-09-03 18:02:15 - character_launcher - INFO - ✅ Mothermarquart memory_node launched
+2025-09-03 18:02:16 - character_launcher - INFO - ✅ Mothermarquart situation_node launched
+2025-09-03 18:02:16 - character_launcher - INFO - ✅ Mothermarquart sense_node launched
+2025-09-03 18:02:17 - character_launcher - INFO - ✅ Mothermarquart executive_node launched
+2025-09-03 18:02:18 - character_launcher - INFO - ✅ All characters launched
+2025-09-03 18:02:18 - character_launcher - INFO - 🚀 Published ready signal: 4 characters active
+2025-09-03 18:02:18 - character_launcher - INFO - Monitoring processes...
+2025-09-03 18:21:42 - character_launcher - INFO - Received signal 2, initiating shutdown...
+2025-09-03 18:21:43 - character_launcher - INFO - 🛑 Initiating graceful shutdown...
+2025-09-03 18:21:43 - character_launcher - INFO - 📨 Sending SIGTERM to 19 processes...
+2025-09-03 18:21:43 - character_launcher - INFO -   ✉️  SIGTERM sent to Jean process 487150
+2025-09-03 18:21:43 - character_launcher - INFO -   ✉️  SIGTERM sent to Jean process 487157
+2025-09-03 18:21:43 - character_launcher - INFO -   ✉️  SIGTERM sent to Jean process 487172
+2025-09-03 18:21:43 - character_launcher - INFO -   ✉️  SIGTERM sent to Jean process 487181
+2025-09-03 18:21:43 - character_launcher - INFO -   ✉️  SIGTERM sent to Francoise process 487207
+2025-09-03 18:21:43 - character_launcher - INFO -   ✉️  SIGTERM sent to Francoise process 487256
+2025-09-03 18:21:43 - character_launcher - INFO -   ✉️  SIGTERM sent to Francoise process 487266
+2025-09-03 18:21:43 - character_launcher - INFO -   ✉️  SIGTERM sent to Francoise process 487307
+2025-09-03 18:21:43 - character_launcher - INFO -   ✉️  SIGTERM sent to Fathermarquart process 487342
+2025-09-03 18:21:43 - character_launcher - INFO -   ✉️  SIGTERM sent to Fathermarquart process 487345
+2025-09-03 18:21:43 - character_launcher - INFO -   ✉️  SIGTERM sent to Fathermarquart process 487348
+2025-09-03 18:21:43 - character_launcher - INFO -   ✉️  SIGTERM sent to Fathermarquart process 487357
+2025-09-03 18:21:43 - character_launcher - INFO -   ✉️  SIGTERM sent to Mothermarquart process 487392
+2025-09-03 18:21:43 - character_launcher - INFO -   ✉️  SIGTERM sent to Mothermarquart process 487413
+2025-09-03 18:21:43 - character_launcher - INFO -   ✉️  SIGTERM sent to Mothermarquart process 487457
+2025-09-03 18:21:43 - character_launcher - INFO -   ✉️  SIGTERM sent to Mothermarquart process 487473
+2025-09-03 18:21:43 - character_launcher - INFO -   ✉️  SIGTERM sent to shared process 486798
+2025-09-03 18:21:43 - character_launcher - INFO -   ✉️  SIGTERM sent to shared process 486799
+2025-09-03 18:21:43 - character_launcher - INFO -   ✉️  SIGTERM sent to shared process 486859
+2025-09-03 18:21:43 - character_launcher - INFO - ⏳ Waiting up to 15s for graceful shutdown...
+2025-09-03 18:21:48 - character_launcher - WARNING -   ⏰ 13 processes still running after 5s...

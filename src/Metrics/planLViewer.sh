@@ -3,11 +3,20 @@
 # Minimal pager for plans.jsonl using digest.jq.
 # Controls:
 #   n = next, p = prev, j = jump to index, t = toggle text/json, q = quit
-# Usage: ./planview.sh /path/to/plans.jsonl [start_index]
+# Usage: ./planLViewer.sh <CharacterName>|/path/to/plans.jsonl [start_index]
 
 set -euo pipefail
 
-FILE="${1:-../data/plans.jsonl}"
+ARG1="${1:-}"
+if [[ -z "${ARG1}" ]]; then
+  FILE="../data/plans.jsonl"
+else
+  if [[ -f "${ARG1}" ]]; then
+    FILE="${ARG1}"
+  else
+    FILE="../data/${ARG1}-plans.jsonl"
+  fi
+fi
 IDX="${2:-1}"
 MODE="text"        # or "json"
 DIGEST="${DIGEST_JQ:-digest.jq}"

@@ -75,6 +75,14 @@ INPUT:
 {{$primitive_verbs}}
 ##
 
+#Base place types:
+{{$primitive_places}}
+##
+
+#Base tool types:
+{{$primitive_tools}}
+##
+
 #Physiological needs of characters (metrics and thresholds):
 {{$physiological_needs}}
 ##
@@ -100,8 +108,8 @@ Pay special attention to the character's drives in the context of the setting.
 
 OUTPUT (JSON) (All names - places, tools, roles, norms, hazards, social_graph - must be unique and must consist of letters only - no spaces or special characters)
 
-- places[]            - setting-specific venues or loci (e.g., offices, meeting rooms, cafés, classrooms, courtrooms, parks, streets, online rooms/spaces) aligned to map_types when provided.
-- tools[]             - artifacts/means usable by the character (e.g., documents, contracts, slide decks, phones/apps, keycards, vehicles) and, only if appropriate to setting, tangible survival items.
+- places[]            - setting-specific venues or loci (e.g., offices, meeting rooms, benches) these must be either primitive places or plausible generalizations of them. Do not invent new places.
+- tools[]             - artifacts/means usable by the character (e.g., documents, contracts, slide decks, phones/apps, keycards, vehicles) these should be primitive tools or plausible generalizations. Do not invent new tools.
 - roles[]             - roles the character can adopt
 - norms_rules[]       - norms and rules that constrain behavior
 - hazards[]           - hazards to avoid
@@ -118,20 +126,19 @@ activities[] elements:
 {
   "id": "SurveyArea",                 # letters only, unique
   "drive": "SolveMystery|Safety|Companionship|Physiological",  # pick the best-aligned primary drive
-  "verbs": ["Survey","Orient","ScanFor"],               # if a middle-ontology MANIFEST exists at generation time, prefer its verb ids; otherwise use a small set of setting / character / drives -appropriate core verbs
-  "nouns": ["Landmark","ForestEdge","Clue"],            # if a middle-ontology MANIFEST exists at generation time, prefer its verb ids; otherwise use a small set of setting / character / drives -appropriate core nouns
+  "roles": ["Farmer|Son|Villager|Suitor"],  # pick the best-aligned roles
 }
 
 affordances:
 {
-  "MixedForestEdge": ["SurveyArea","ScanForPaths","SearchForEdibles"],
-  "SunlitClearing": ["RestRecover","SignalHelp","InventoryBackpack"]
+  "Forest": ["HideSelf","SearchForEdibles"],
+  "Clearing": ["RestRecover","SignalHelp","InventoryBackpack"]
   ...
 }
 
 drive_coverage:
 {
-  "Solve the mystery of how I ended up here. Find a way out of the forest.": ["SurveyArea","ScanForPaths","OrientToForestEdge"],
+  "Solve the mystery of how I ended up here. Find a way out of the forest.": ["SurveyArea","ScanForPaths","OrientToHut"],
   "safety from threats ...": ["AvoidHazard","MarkTrail","HideSelf"],
   "companionship, community ...": ["GreetStranger","TestTrust","NegotiateAssistance"],
   "immediate physiological needs ...": ["CollectWater","ForageBerries","RestRecover"]
@@ -178,9 +185,18 @@ Physiological needs (metrics and thresholds):
 {{$primitive_verbs}}
 ##
 
-GOAL
+#Base place types:
+{{$primitive_places}}
+##
+
+#Base tool types:
+{{$primitive_tools}}
+##
+
+#GOAL
 ----
 Return a compact, reusable, scenario-aware pair of DAGs that are bounded above by the ontology.json and character drives, and from below by primitive nouns and verbs.
+Include nouns from the upper ontology places, tools, roles, and activities as starting points for the noun DAG.
 A “leaf” node is any node with no outgoing refines edge and no decomposition_patterns. Leaf nodes are the most specific categories in the DAGs. Internal nodes are those with at least one child via refines or decomposition.
 - The DAGs will support multi-level decomposition or typing via "decomposition_patterns" that point to NEXT-LOWER-LEVEL TERMS (not primitives).
 - Decomposition_patterns must only reference existing verb/noun IDs from the manifest (verbs for verb decompositions, nouns for noun decompositions),
@@ -188,10 +204,10 @@ A “leaf” node is any node with no outgoing refines edge and no decomposition
 - Noun decompositions are PART_OF (mereology); they list noun subparts only, never procedures, verbs, or subtypes.
 - Remain acyclic so that iterative refinement or compilation can topologically traverse them later.
 - Verb ontology size: between 40 and 60 nodes (inclusive).
-- Noun ontology size: between 40 and 60 nodes (inclusive). 
+- Noun ontology size: between 40 and 80 nodes (inclusive). 
 - Are bounded in height (depth of decomposition ≤ 3).
 - **Every verb node must include exactly one hint_anchor chosen from existing primitive verbs. Exclude any verb that cannot be anchored without inventing new families.**
-- **Every leaf noun must map to ≥1 primitive noun. Do not invent abstract anchors; internal nouns inherit anchors from descendants. Do not list raw primitive map_types as node IDs.**",
+- **Every leaf noun must have an 'anchor_types' field containing at least one primitive noun. Do not invent abstract anchors; internal nouns inherit anchors from descendants. Do not list raw primitive map_types as node IDs.**",
 - **Each character drive has at least two verb+noun path exists that plausibly fulfills it (e.g., hunger → Acquire+Edible).**
 - **Exclude verbs not used by any activity step, ontology term, or drive.**
 - **Do not provide transitive closure of edges, only direct immediate descendants.**
@@ -205,7 +221,7 @@ OUTPUT (STRICT JSON ONLY; NO MARKDOWN)
   "setting_notes": "≤ 60 words about setting cues, drives, and ontology inputs shaping coverage",
   "constraints": {
     "verb_nodes_max": 60,
-    "noun_nodes_max": 60,
+    "noun_nodes_max": 80,
     "edge_kinds": ["refines"],
     "acyclic": true,
     "max_depth": 3
@@ -260,15 +276,15 @@ CONSTRAINTS
   "invariants": [
     "No cycles in either graph (verbs or nouns), either in the edge graph (subtypes) or the decomposition graph (sequences for verbs, parts for nouns).",
     "Every decomposition_patterns references existing nodes in the same graph.",
-    "Verb decomposition is SEQUENCE only; sequences contain verb ids exclusively (no nouns, no primitives).",
-    "Noun decomposition is PART_OF only; sequences contain noun ids exclusively (no verbs, no primitives).",
+    "Verb decomposition is SEQUENCE only; sequences can contain only verb ids or primitive verbs).",
+    "Noun decomposition is PART_OF only; decomposition_patterns can contain noun ids or primitive nouns).",
     "No execution details appear; this is not a plan.",
     "Aliases collapse near-synonyms to reduce proliferation.",
     "All Node IDs are unique, letters only, and in python capitalize. Do not duplicate primitive nouns or verbs that may be in lower case.
     "Prefer general terms; introduce scenario-specific leaves only when required by drives or activities.",
     "Decomposition depth ≤ 3.",
-    "**Every verb node must include a hint_anchor chosen from {move, take, place, inspect, use, scan, say, think, wait}. Exclude any verb that cannot be anchored without inventing new families.**",
-    "**Every leaf noun must map to ≥1 primitive noun. Do not invent abstract anchors; internal nouns inherit anchors from descendants. Do not list primitive nouns as node IDs.**",
+    "**Every verb node must include a hint_anchor chosen from {move, take, place, inspect, use, scan, say, think, wait}.**",
+    "**Every leaf noun must have an 'anchor_types' field containing at least one primitive noun. Do not invent abstract anchors; internal nouns inherit anchors from descendants. Do not list primitive nouns as node IDs.**",
     "**Each drive has at least 2 verb+noun paths that plausibly fulfill it.**",
     "**≥ 95% of activity steps and plan template operators must map to a verb+noun path.** ",
     "**Exclude verbs not supported by any activity step, ontology term, or drive.**",
@@ -291,9 +307,10 @@ CONSTRAINTS
 
 GUIDANCE
 --------
-1) STEP 1: Propose a manifest of verb and noun IDs + glosses. Use only these IDs thereafter.
-2) STEP 2: Build verbs by mining activity steps; keep them general. Collapse near-synonyms into aliases. Use drives to filter: if no drive supports a candidate verb, exclude it.
-3) STEP 3: Build nouns from ontology affordances, map resource types, and activity objects. Collapse near-synonyms into aliases. Ground all in manifest.
+1) STEP 1: Propose a manifest of verb and noun IDs + glosses,using Ontology places, tools, and activity names as starting points. Use only these IDs thereafter.
+2) STEP 2: Build verbs ontology by refinement or decomposition to primitive verbs. Collapse near-synonyms into aliases. Use drives to filter: if no drive supports a candidate verb, exclude it.
+3) STEP 3: Build nouns from Ontology places, tools, and activity names. 
+4) STEP 4: Build nouns ontology by refinement or decomposition to primitive nouns. Collapse near-synonyms into aliases.
 4) Decomposition_patterns ONLY to point to lower-level nodes (verbs→verbs, nouns→nouns) or primitives. Do Not invent new verbs or nouns in decomposition_patterns. Do not mirror decomposition in edges.
 5) Keep DAGs shallow (≤3 layers). Edges are “refines”, ie subtype edges; direction is parent→child.
 6) Ensure each drive is supported by at least one verb path (e.g., hunger→Acquire+Consume, safety→DetectThreat+RespondToThreat, social→Greet+Negotiate).
@@ -330,7 +347,7 @@ TASK: Generate 24-30 activities as a JSON object, with the keys being the activi
 
 #GUIDANCE
 # 1. Generate activities consistent with the character, their drives, and the setting.
-# 2. At least 8 activities should be advance one or more character drives.
+# 2. At least 50% of the activities should be support one or more character drives.
 
 In the following schema: 
 <period> is one of: dawn, morning, afternoon, dusk, evening, night, day
@@ -342,11 +359,11 @@ Each Activity should conform to this schema:
   "category": <category from above>,
   "tags": ["physical","mental","social","solo","outdoors","survival","routine"],
   "when": "daily@<period> | opportunistic | seasonal@<season>", 
-  "where": ["place ids"], - drawn from ontology places
+  "where": ["place ids"], - only nouns from the middle ontology or base types
   "duration": [min_minutes, max_minutes],
-  "needs": ["tools or innate capacities"], - drawn from ontology tools or character status or inventory
+  "needs": ["tools or innate capacities"], - only nouns from the middle ontology or base types
   "states_addressed": [one or more items from the ontology states field], - what physiological/psychological needs this activity satisfies
-  "steps": ["3–5 terse steps that will serve as planning goals"],
+  "steps": ["3–5 terse steps that will serve as planning goals. These must be stated using only nouns and verbs from the middle ontology, base types, base actions and common connectives."],
   "importance": 0.0,
   "habit": 0.0
 }
@@ -358,10 +375,14 @@ The following ontologies must be used to fill in the details of activities:
 Note the activities listed in the ontology above are *examples* and are not exhaustive. 
 You may use them as a guide to generate activities that are more specific to the character and setting.
 ##
-- MIDDLE ONTOLOGY:
-{{$middle_ontology}}
+
+- MIDDLE ONTOLOGY NOUNS:
+{{$middle_nouns}}
 ##
 
+- MIDDLE ONTOLOGY VERBS:
+{{$middle_verbs}}
+##
 - BASE TYPES:
 {{$primitive_nouns}}
 
@@ -369,7 +390,8 @@ You may use them as a guide to generate activities that are more specific to the
 {{$primitive_verbs}}
 ##
 
-Use nouns and verbs from the middle ontology or BASE TYPES or BASE ACTIONS to fill in the details of activities. Do not invent new nouns or verbs.
+
+Use only middle ontology nouns and verbs or BASE TYPES or BASE ACTIONS to fill in the where, needs and steps fields. Do not invent new nouns or verbs.
 Include self-care actions that remediate physiological needs (e.g. eating reduces hunger, rest reduces fatigue, injury or sickness). Make sure to specify which states each activity addresses in the "states_addressed" field.
 
 #Characters you can interact with (if any):
@@ -377,14 +399,15 @@ Include self-care actions that remediate physiological needs (e.g. eating reduce
 ##
 
 #Step Guidelines:
-Generate steps that can serve as achievable planning goals. Each step should:
+Generate steps that can serve as achievable planning goals. Each step should be a single verb or verb phrase, and all nouns and verbs must be drawn from the middle ontology or BASE TYPES or BASE ACTIONS.
+Each step should:
 
 - Be outcome-focused rather than method-focused: "acquire drinkable water" rather than "purify water using specific method"
-- Have clear success criteria: "locate edible resources within area" rather than "find food" (too vague)
+- Have clear success criteria.
 - Be situationally adaptable: "prepare food for consumption" rather than "cook food over fire" (assumes fire available)
 - Avoid meta-cognitive abstractions: "identify today's priorities" rather than "set goals" (too abstract)
 - Specify scope when needed: "inspect personal equipment for damage" rather than "inspect gear" (scope unclear)
-- Always use the broadest applicable period or season in the "when" field.
+- Always use the broadest applicable period or season in the "when" field, broadest applicable place in the "where" field, and broadest applicable tool in the "needs" field.
 
 #State Alignment Guidelines:
 - Activities that address urgent physiological needs (high hunger, fatigue, thirst, injury) will be prioritized by the system
@@ -394,7 +417,7 @@ Generate steps that can serve as achievable planning goals. Each step should:
 Do not include any other text, introductory, explanatory, markdown, code fences, etc.
 """
 
-REWRITE_TEMPLATE = """Task: rewrite an activity step into a goal statement using only allowed nouns and verbs.
+REWRITE_TEMPLATE = """Task: rewrite an activity step into a concisegoal statement using only allowed nouns and verbs.
 Output: a goal statement text string. Do not include any other text, introductory, explanatory, markdown, code fences, etc.
 
 INPUTS
@@ -416,14 +439,15 @@ INPUTS
 
 TASK
 ----
-Rewrite the given activity step to rewrite into a goal statement using allowed nouns and verbs. This may involve approximation or interpretation in the context of the setting.
+Rewrite the given activity step to rewrite into a goal statement using allowed nouns and verbs. Be concise and specific. 
+This may involve approximation or interpretation in the context of the setting if there are no exact match nouns or verbs.
 The object is not single-word substitution, but rather to re-express the statement in more specific terms, as an objective or goal.
 Despite the use of the phrase 'step', the rewritten statement need not contain only a single verb or a single sentence.
 The rewrite may be longer that the original step statement, but should be more specific in terms of the ontology provided.
 - Only use allowed nouns, verbs and common connectives. Do not generalize or invent.
 - Produce exactly one rewritten step statement.
 
-Output ONLY the rewritten goal statement. Do not include any other text, introductory, explanatory, markdown, code fences, etc.
+Output ONLY the concise, specific, rewritten goal statement. Do not include any reasoning, introduction, explanation, markdown, code fences, etc.
 end your response with </end>
 """
 

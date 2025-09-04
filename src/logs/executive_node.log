@@ -1,21 +1,40 @@
-2025-09-01 20:34:14 - executive_node - WARNING - Received signal 2, initiating shutdown...
-2025-09-01 20:34:15 - executive_node - WARNING - Received signal 15, initiating shutdown...
-WARNING - _location_compatible: unknown where term 'cottage' has no known map_type substring; treating as compatible
-2025-09-01 20:30:20 - activity - WARNING - _location_compatible: unknown where term 'barn' has no known map_type substring; treating as compatible
-2025-09-01 202025-09-01 20:33:15 - executive_node - WARNING - ⚠️ Jean scan failed to find target "Person" for variable person_to_assist
-2025-09-01 20:34:14 - executive_node - WARNING - Received signal 2, initiating shutdown...
-2025-09-01 20:34:15 - executive_node - WARNING - Received signal 15, initiating shutdown...
-vity - WARNING - _location_compatible: unknown where term 'villagegreen' has no known map_type substring; treating as compatible
-2025-09-01 20:30:20 - activity - WARNING - _location_compatible: unknown where term 'villagegreen' has no known map_type substring; treating as compatible
-2025-09-01 20:30:20 - activity - WARNING - _location_compatible: unknown where term 'villagegreen' has no known map_type substring; treating as compatible
-2025-09-01 20:30:20 - activity - WARNING - _location_compatible: unknown where term 'notredamechurch' has no known map_type substring; treating as compatible
-2025-09-01 20:30:20 - activity - WARNING - _location_compatible: unknown where term 'villagegreen' has no known map_type substring; treating as compatible
-2025-09-01 20:30:20 - activity - WARNING - _location_compatible: unknown where term 'riverbank' has no known map_type substring; treating as compatible
-2025-09-01 20:30:20 - activity - WARNING - _location_compatible: unknown where term 'villagegreen' has no known map_type substring; treating as compatible
-2025-09-01 20:30:20 - activity - WARNING - _location_compatible: unknown where term 'villagegreen' has no known map_type substring; treating as compatible
-2025-09-01 20:30:20 - activity - WARNING - _location_compatible: unknown where term 'barn' has no known map_type substring; treating as compatible
-2025-09-01 20:30:20 - activity - WARNING - _location_compatible: unknown where term 'barn' has no known map_type substring; treating as compatible
-2025-09-01 20:30:20 - activity - WARNING - _location_compatible: unknown where term 'cottage' has no known map_type substring; treating as compatible
-2025-09-01 20:30:20 - activity - WARNING - _location_compatible: unknown where term 'barn' has no known map_type substring; treating as compatible
-2025-09-01 20:34:14 - executive_node - WARNING - Received signal 2, initiating shutdown...
-2025-09-01 20:34:15 - executive_node - WARNING - Received signal 15, initiating shutdown...
+2025-09-03 18:21:42 - executive_node - WARNING - Received signal 2, initiating shutdown...
+2025-09-03 18:21:43 - executive_node - WARNING - Received signal 15, initiating shutdown...
+, pbly completed
+2025-09-03 18:08:12 - executive_node - WARNING - 🚫 Jean no action found for plan, p2025-09-03 18:2025-09-03 18:09:15 - executive_node - WARNING - 🚫 Jean no action found for plan, pbly c2025-09-02025-09-03 18:09:39 - executive_node - WARNING - 🚫 Jean no actio2025-09-03 18:09:53 - executive_n2025-09-03 18:09:54 - executive_node - WARNING - 🚫 Jean no action fou2025-09-03 18:11:15 - executive_node - WARNING - 🚫 Francoise no action found for plan, pbly completed
+2025-09-03 18:12:20 - executive_node - WARNING - 🤖 Francoise Replanning.
+2025-09-03 18:12:20 - executive_node - ERROR - Variable $nearest_person referenced in say action but not bound by any scan action
+2025-09-03 18:12:20 - executive_node - WARNING - ❌ Plan validation failed
+2025-09-03 18:12:20 - executive_node - WARNING - Generated remaining plan failed validation, returning empty plan
+2025-09-03 18:13:01 - executive_node - WARNING - 🚫 Francoise no action found for plan, pbly completed
+2025-09-03 18:13:39 - executive_node - WARNING - 🚫 Francoise no action found for plan, pbly completed
+2025-09-03 18:14:29 - executive_node - WARNING - 🚫 Francoise no action found for plan, pbly completed
+2025-09-03 18:15:06 - executive_node - WARNING - 🚫 Francoise no action found for plan, pbly completed
+2025-09-03 18:16:57 - executive_node - WARNING - 🚫 Francoise no action found for plan, pbly completed
+2025-09-03 18:18:50 - executive_node - WARNING - 🚫 Francoise no action found for plan, pbly completed
+2025-09-03 18:20:17 - executive_node - WARNING - 🚫 Francoise no action found for plan, pbly completed
+2025-09-03 18:20:57 - executive_node - WARNING - 🤖 Francoise Replanning.
+2025-09-03 18:20:57 - executive_node - ERROR - Variable $nearest_person referenced in say action but not bound by any scan action
+2025-09-03 18:20:57 - executive_node - WARNING - ❌ Plan validation failed
+2025-09-03 18:20:57 - executive_node - WARNING - Generated remaining plan failed validation, returning empty plan
+2025-09-03 18:21:18 - executive_node - WARNING - 🚫 Francoise no action found for plan, pbly completed
+2025-09-03 18:21:42 - executive_node - WARNING - Received signal 2, initiating shutdown...
+2025-09-03 18:21:43 - executive_node - WARNING - Received signal 15, initiating shutdown...
+mpleted
+2025-09-03 18:16:15 - executive_node - WARNING - 🚫 Jean no action found for plan, pbly completed
+2025-09-03 18:17:30 - executive_node - WARNING - 🚫 Jean no action found for plan, pbly completed
+2025-09-03 18:17:51 - executive_node - WARNING - 🤖 Jean Replanning.
+2025-09-03 18:18:10 - executive_node - WARNING - 🚫 Jean no action found for plan, pbly completed
+2025-09-03 18:19:10 - executive_node - ERROR - Failed to acquire conversation lock: Lock unavailable
+2025-09-03 18:19:10 - executive_node - ERROR - 📤 Published action: say (failed - lock unavailable)
+2025-09-03 18:19:10 - executive_node - WARNING - 🤖 Jean Replanning.
+2025-09-03 18:19:10 - executive_node - ERROR - Variable $nearest_person referenced in say action but not bound by any scan action
+2025-09-03 18:19:10 - executive_node - WARNING - ❌ Plan validation failed
+2025-09-03 18:19:10 - executive_node - WARNING - Generated remaining plan failed validation, returning empty plan
+2025-09-03 18:19:27 - executive_node - WARNING - 🚫 Jean no action found for plan, pbly completed
+2025-09-03 18:20:39 - executive_node - WARNING - 🚫 Jean no action found for plan, pbly completed
+2025-09-03 18:20:57 - executive_node - ERROR - Failed to acquire conversation lock: Lock unavailable
+2025-09-03 18:20:57 - executive_node - ERROR - 📤 Published action: say (failed - lock unavailable)
+2025-09-03 18:21:02 - executive_node - WARNING - 🤖 Jean Replanning.
+2025-09-03 18:21:42 - executive_node - WARNING - Received signal 2, initiating shutdown...
+2025-09-03 18:21:43 - executive_node - WARNING - Received signal 15, initiating shutdown...
