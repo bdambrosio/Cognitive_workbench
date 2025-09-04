@@ -14,7 +14,7 @@ import json
 import numpy as np
 import zenoh
 
-from utils.format_utils import format_map_types
+from utils.format_utils import format_map_places, format_map_tools, format_map_types
 #from sentence_transformers import SentenceTransformer
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from Messages import SystemMessage, UserMessage
@@ -69,6 +69,8 @@ from llm_client import ZenohLLMClient
 
 def create_middle_ontology(ontology, llm, map_types, drives):
     map_types_str = format_map_types(map_types)    
+    map_places_str = format_map_places(map_types)
+    map_tools_str = format_map_tools(map_types)
     character_drives_str = '\n'.join(drives)   
     drive_lex = derive_drive_lexicon(character_drives_str)
 
@@ -78,8 +80,10 @@ def create_middle_ontology(ontology, llm, map_types, drives):
          "plan_template": PLAN_TEMPLATE, 
          "primitive_verbs": PLAN_VERBS,
          "primitive_nouns":  map_types_str, 
+         "primitive_places": map_places_str,
+         "primitive_tools": map_tools_str,
          "character_drives": drives,
-         "physiological_needs": json.dumps(PHYSIOLOGICAL_NEEDS, indent=2),
+         "physiological_needs": '\n'.join([need['name'] for need in PHYSIOLOGICAL_NEEDS]),
          "drive_lexicon": json.dumps(drive_lex, indent=2)},
         [SystemMessage(content=MIDDLE_ONTOLOGY_TEMPLATE)],
         max_tokens=10000,
@@ -931,7 +935,7 @@ def rewrite_goal(llm:LLM, character_name, current_activity, ontology, middle_ont
          "allowed_nouns": allowed_types,
          "allowed_verbs": allowed_verbs},
         [SystemMessage(content=REWRITE_TEMPLATE)],
-        max_tokens=800,
+        max_tokens=100,
         stops=['</end>'],
    )
     print(resp)

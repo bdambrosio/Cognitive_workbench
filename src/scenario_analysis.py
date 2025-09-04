@@ -5,6 +5,7 @@ import os
 import subprocess
 import sys
 import time
+import traceback
 
 import zenoh
 
@@ -38,12 +39,12 @@ def _ensure_map_types(session, scenario: dict):
     """
     # First attempt
     try:
-        for reply in session.get("cognitive/map/types", timeout=25.0):
+        for reply in session.get("cognitive/map/types", timeout=10.0):
             if reply.ok:
                 data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
                 if data.get('success'):
                     return data, None
-    except Exception:
+    except Exception: # expected if map_node is not running
         pass
 
     # Launch map_node if missing
@@ -59,21 +60,28 @@ def _ensure_map_types(session, scenario: dict):
             logger.info('Debug mode enabled via CWB_DEBUG - map turn timeout will be disabled')
         map_process = subprocess.Popen(map_args, env=env)
         logger.info('⏳ Waiting for Map Node to initialize...')
-        time.sleep(8)
+        time.sleep(10)
     except Exception as e:
         logger.error(f"Failed to launch Map Node: {e}")
         map_process = None
 
-    # Retry
     try:
-        for reply in session.get("cognitive/map/types", timeout=25.0):
+        types = {}
+        for reply in session.get("cognitive/map/types", timeout=60.0):
             if reply.ok:
                 data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
                 if data.get('success'):
-                    return data, map_process
-    except Exception:
+                    types = data
+                    break
+
+        if not types:
+            
+            return {}, map_process
+    except Exception as e:
+        logger.error(f"Failed to get map types: {e}")
+        traceback.print_exc()
         pass
-    return {}, map_process
+    return types, map_process
 
 
 def main():
@@ -170,6 +178,7 @@ def main():
                 logger.error("map/types unavailable; cannot create middle ontology")
                 raise RuntimeError("missing map types")
             middle = create_middle_ontology(ontology, middle_llm, map_types, character_drives)
+            save_middle_ontology(name, middle, scenario_dir)
         if not isinstance(middle, dict):
             raise RuntimeError("create_middle_ontology failed")
         problems, report = validate_ontology(middle)
@@ -181,8 +190,8 @@ def main():
             problems2, _ = validate_ontology(middle)
             if problems2:
                 logger.error(f"Middle ontology validation problems after repair: {problems2}")
-            # Build and attach indices
-            try:
+        # Build and attach indices
+        try:
                 from middle_ontology import build_noun_indices, build_verb_indices
                 noun_indices = build_noun_indices(middle, map_types)
                 if isinstance(noun_indices, dict):
@@ -205,9 +214,9 @@ def main():
                     at = verb_indices.get('anchor_to_verbs', {}) or {}
                     for anchor, vids in at.items():
                         logger.info(f"verb-index anchor {anchor} <- {', '.join(vids)}")
-            except Exception as _e:
-                logger.warning(f"Failed to attach indices: {_e}")
-            save_middle_ontology(name, middle, scenario_dir)
+        except Exception as _e:
+            logger.warning(f"Failed to attach indices: {_e}")
+        save_middle_ontology(name, middle, scenario_dir)
 
         # Activities
         if args.activities == 'load':

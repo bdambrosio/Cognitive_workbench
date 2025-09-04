@@ -1,77 +1,68 @@
 {
   "places": [
-    "MarketSquare",
-    "VillageWell",
-    "NotreDameChurch",
-    "FouanFarm",
-    "MarquartFarm",
-    "VillagePath",
-    "Riverbank",
-    "GrainMill",
-    "BlacksmithWorkshop",
-    "GrasslandField",
-    "Barn",
-    "Cottage",
-    "VillageGreen",
-    "VegetableField"
+    "Village",
+    "Farm",
+    "Field",
+    "Market",
+    "Well",
+    "Mill",
+    "Blacksmith",
+    "Path",
+    "Grassland",
+    "Water",
+    "Mountain",
+    "Forest",
+    "Spring",
+    "Church"
   ],
   "tools": [
-    "WaterBucket",
-    "Basket",
     "Hoe",
-    "Rake",
-    "BreadLoaf",
-    "Pitcher",
-    "MilkPail",
-    "WoolApron",
-    "PrayerBook",
-    "WoodenBench",
+    "Plow",
     "Scythe",
-    "EggCarton"
+    "Bread",
+    "Apple",
+    "Chicken",
+    "Egg",
+    "Milk",
+    "Cheese",
+    "Butter"
   ],
   "roles": [
-    "FarmDaughter",
-    "Sister",
-    "MarketSeller",
-    "FieldWorker",
-    "Churchgoer",
-    "Neighbor",
-    "PotentialBride",
-    "Housekeeper"
+    "Villager",
+    "Farmer",
+    "Daughter",
+    "Suitor",
+    "Acquaintance",
+    "Helper"
   ],
   "norms_rules": [
-    "SpeakRespectfullyToElders",
-    "DressModestlyInPublic",
-    "AttendSundayMass",
-    "WorkBeforeRest",
-    "AvoidScandalousBehavior",
-    "HelpFamilyFirst",
-    "RespectPrivacy",
-    "NoPublicQuarrels",
-    "GreetVillagersPolitely",
-    "NoIdlenessInDaylight"
+    "Speak respectfully to elders and men",
+    "Avoid being seen alone with unmarried men",
+    "Attend church regularly",
+    "Dress modestly and neatly",
+    "Help family with farm chores",
+    "Do not gossip",
+    "Protect family reputation",
+    "Be diligent and hardworking",
+    "Respect village traditions"
   ],
   "hazards": [
     "Gossip",
-    "Exhaustion",
-    "Blisters",
-    "Sunstroke",
-    "RiverFlooding",
-    "CropFailure",
-    "BurnsFromStove",
-    "LivestockKicks",
-    "SharpTools"
+    "Scandal",
+    "Fatigue",
+    "Hunger",
+    "Thirst"
   ],
   "social_graph": [
-    "Francoise",
     "Jean",
     "FatherMarquart",
     "MotherMarquart",
-    "FouanFamily",
-    "VillagePriest",
-    "MarketWomen",
-    "LocalChildren",
-    "NeighboringFarmers"
+    "VillageWomen",
+    "VillageMen",
+    "MarketVendors",
+    "ParishPriest",
+    "Fran\u00e7oiseFamily",
+    "OtherSuitors"
   ],
   "time_windows": [
     "dawn",
@@ -84,238 +75,204 @@
   ],
   "activities": [
     {
-      "id": "HelpWithChores",
+      "id": "PerformChores",
       "drive": "help your family with the endless chores",
-      "verbs": [
-        "move",
-        "carry",
-        "use",
-        "take"
-      ],
-      "nouns": [
-        "Hoe",
-        "Basket",
-        "Field",
-        "WaterBucket",
-        "Barn",
-        "VegetableField"
+      "roles": [
+        "Farmer",
+        "Daughter",
+        "Helper"
       ]
     },
     {
-      "id": "AttendMass",
-      "drive": "avoid scandal and protecting your reputation",
-      "verbs": [
-        "move",
-        "wait",
-        "say",
-        "think"
-      ],
-      "nouns": [
-        "NotreDameChurch",
-        "PrayerBook",
-        "VillagePriest"
+      "id": "TendAnimals",
+      "drive": "help your family with the endless chores",
+      "roles": [
+        "Farmer",
+        "Daughter",
+        "Helper"
       ]
     },
     {
       "id": "GatherWater",
       "drive": "help your family with the endless chores",
-      "verbs": [
-        "move",
-        "take",
-        "use",
-        "carry"
-      ],
-      "nouns": [
-        "WaterBucket",
-        "VillageWell",
-        "Riverbank"
+      "roles": [
+        "Helper",
+        "Daughter"
       ]
     },
     {
-      "id": "TendMarketStall",
-      "drive": "gain status and security",
-      "verbs": [
-        "move",
-        "say",
-        "use",
-        "wait"
-      ],
-      "nouns": [
-        "MarketSquare",
-        "BreadLoaf",
-        "EggCarton",
-        "MarketWomen"
-      ]
-    },
-    {
-      "id": "ShareMomentOfRest",
-      "drive": "brief moments of rest and simple joys amid the hardships",
-      "verbs": [
-        "rest",
-        "wait",
-        "think",
-        "say"
-      ],
-      "nouns": [
-        "WoodenBench",
-        "Riverbank",
-        "GrasslandField",
-        "Cottage"
-      ]
-    },
-    {
-      "id": "ConverseWithNeighbor",
-      "drive": "avoid scandal and protecting your reputation",
-      "verbs": [
-        "say",
-        "think",
-        "scan"
-      ],
-      "nouns": [
-        "NeighboringFarmers",
-        "MarketSquare",
-        "VillageGreen"
-      ]
-    },
-    {
-      "id": "AssistFamilyMeal",
+      "id": "PrepareFood",
       "drive": "help your family with the endless chores",
-      "verbs": [
-        "use",
-        "carry",
-        "move",
-        "wait"
-      ],
-      "nouns": [
-        "BreadLoaf",
-        "MilkPail",
-        "Cottage",
-        "FouanFamily"
+      "roles": [
+        "Daughter",
+        "Helper"
       ]
     },
     {
-      "id": "ScanForProspects",
-      "drive": "find a good husband to marry",
-      "verbs": [
-        "scan",
-        "think",
-        "observe"
-      ],
-      "nouns": [
-        "MarketSquare",
-        "VillageGreen",
-        "Jean",
-        "NeighboringFarmers"
+      "id": "VisitMarket",
+      "drive": "help your family with the endless chores",
+      "roles": [
+        "Daughter",
+        "Villager",
+        "Helper"
       ]
     },
     {
-      "id": "ParticipateVillageEvent",
-      "drive": "gain status and security",
-      "verbs": [
-        "move",
-        "say",
-        "wait"
-      ],
-      "nouns": [
-        "VillageGreen",
-        "MarketSquare",
-        "LocalChildren"
-      ]
-    },
-    {
-      "id": "ProtectReputation",
+      "id": "AttendChurch",
       "drive": "avoid scandal and protecting your reputation",
-      "verbs": [
-        "think",
-        "avoid",
-        "say"
-      ],
-      "nouns": [
-        "Gossip",
-        "MarketWomen",
-        "NeighboringFarmers"
+      "roles": [
+        "Villager",
+        "Daughter"
+      ]
+    },
+    {
+      "id": "GreetVillagers",
+      "drive": "gain status and security",
+      "roles": [
+        "Villager",
+        "Daughter"
+      ]
+    },
+    {
+      "id": "ConverseWithSuitor",
+      "drive": "find a good husband to marry",
+      "roles": [
+        "Villager",
+        "Suitor",
+        "Daughter"
+      ]
+    },
+    {
+      "id": "GuardReputation",
+      "drive": "avoid scandal and protecting your reputation",
+      "roles": [
+        "Daughter",
+        "Villager"
+      ]
+    },
+    {
+      "id": "SeekAdvice",
+      "drive": "find a good husband to marry",
+      "roles": [
+        "Daughter",
+        "Villager"
+      ]
+    },
+    {
+      "id": "RestInShade",
+      "drive": "brief moments of rest and simple joys amid the hardships",
+      "roles": [
+        "Daughter",
+        "Helper"
+      ]
+    },
+    {
+      "id": "ShareMeal",
+      "drive": "brief moments of rest and simple joys amid the hardships",
+      "roles": [
+        "Daughter",
+        "Villager"
+      ]
+    },
+    {
+      "id": "TakeWalk",
+      "drive": "brief moments of rest and simple joys amid the hardships",
+      "roles": [
+        "Daughter",
+        "Villager"
       ]
     }
   ],
   "affordances": {
-    "MarketSquare": [
-      "TendMarketStall",
-      "ConverseWithNeighbor",
-      "ScanForProspects",
-      "ParticipateVillageEvent"
+    "Farm": [
+      "PerformChores",
+      "TendAnimals",
+      "GatherWater",
+      "PrepareFood",
+      "RestInShade"
     ],
-    "VillageWell": [
+    "Field": [
+      "PerformChores",
+      "TendAnimals",
+      "RestInShade"
+    ],
+    "Well": [
       "GatherWater"
     ],
-    "NotreDameChurch": [
-      "AttendMass"
+    "Market": [
+      "VisitMarket",
+      "GreetVillagers",
+      "ShareMeal"
     ],
-    "FouanFarm": [
-      "HelpWithChores",
-      "AssistFamilyMeal"
+    "Village": [
+      "GreetVillagers",
+      "ConverseWithSuitor",
+      "TakeWalk",
+      "ShareMeal"
     ],
-    "MarquartFarm": [
-      "HelpWithChores"
+    "Blacksmith": [
+      "GreetVillagers",
+      "TakeWalk"
     ],
-    "VillagePath": [
-      "Move"
+    "Church": [
+      "AttendChurch",
+      "SeekAdvice",
+      "GuardReputation"
     ],
-    "Riverbank": [
+    "Path": [
+      "TakeWalk",
+      "GreetVillagers"
+    ],
+    "Grassland": [
+      "TakeWalk",
+      "RestInShade"
+    ],
+    "Water": [
       "GatherWater",
-      "ShareMomentOfRest"
+      "RestInShade"
     ],
-    "GrainMill": [
-      "HelpWithChores"
+    "Forest": [
+      "TakeWalk",
+      "RestInShade"
     ],
-    "BlacksmithWorkshop": [
-      "ConverseWithNeighbor"
+    "Spring": [
+      "GatherWater",
+      "RestInShade"
     ],
-    "GrasslandField": [
-      "HelpWithChores",
-      "ShareMomentOfRest"
-    ],
-    "Barn": [
-      "HelpWithChores"
-    ],
-    "Cottage": [
-      "AssistFamilyMeal",
-      "ShareMomentOfRest"
-    ],
-    "VillageGreen": [
-      "ParticipateVillageEvent",
-      "ConverseWithNeighbor",
-      "ScanForProspects"
-    ],
-    "VegetableField": [
-      "HelpWithChores"
+    "Mill": [
+      "VisitMarket",
+      "GreetVillagers"
     ]
   },
   "drive_coverage": {
     "find a good husband to marry": [
-      "ScanForProspects"
+      "ConverseWithSuitor",
+      "SeekAdvice"
     ],
     "gain status and security": [
-      "TendMarketStall",
-      "ParticipateVillageEvent"
+      "GreetVillagers",
+      "VisitMarket"
     ],
     "avoid scandal and protecting your reputation": [
-      "AttendMass",
-      "ConverseWithNeighbor",
-      "ProtectReputation"
+      "GuardReputation",
+      "AttendChurch"
     ],
     "help your family with the endless chores": [
-      "HelpWithChores",
+      "PerformChores",
+      "TendAnimals",
       "GatherWater",
-      "AssistFamilyMeal"
+      "PrepareFood",
+      "VisitMarket"
     ],
     "brief moments of rest and simple joys amid the hardships": [
-      "ShareMomentOfRest"
+      "RestInShade",
+      "ShareMeal",
+      "TakeWalk"
     ]
   },
   "states": [
     "hunger",
-    "fatigue",
     "thirst",
-    "injury"
+    "fatigue"
   ]
 }

@@ -1,3 +1,4 @@
+from __future__ import annotations
 #!/usr/bin/env python3
 
 import asyncio
@@ -988,7 +989,7 @@ Do not include any other text, reasoning, introductory, expository, or markdown.
                     'error': f"Agent for character '{character_name}' not found"
                 }
             else:
-                agent = self.agent_registry[canonical_character_name]
+                agent: Agent = self.agent_registry[canonical_character_name]
                 
                 # Call agent's look method
                 look_result = agent.look()

@@ -643,7 +643,7 @@ class ZenohExecutiveNode:
         """Format the situation data for the LLM."""
         formatted_situation = ''
         if self.last_situation_data and self.last_situation_data.get('location'):
-            formatted_situation += f"\n#You are at location: {self.last_situation_data['location']}\n"
+            formatted_situation += f"\n#You are at location: {self.last_situation_data['location']}, in terrain: {self.last_situation_data['views'][0]['terrain']}, on property type: {self.last_situation_data['views'][0]['property']}\n"
         if self.last_situation_data and self.last_situation_data.get('visible_characters'):
             formatted_situation += f"\n#You can see {len(self.last_situation_data['visible_characters'])} people: {', and '.join(self.last_situation_data['visible_characters'])}\n"
         if self.last_situation_data and self.last_situation_data.get('look'):
@@ -1847,19 +1847,14 @@ end your response with </end>
                     action_record.bindings_after = {var_name: scan_result}
                     # If distance is available in situation, include minimal evidence
                     try:
-                        # Re-evaluate nearest distance from last_situation_data
-                        target_lower = scan_result.lower()
+                        # Prefer the cached scan distance if available; fallback to recompute
                         best_dist = None
-                        for view in (self.last_situation_data or {}).get('views', []):
-                            for key in ('characters','resources'):
-                                for ent in view.get(key, []) or []:
-                                    name = ent.get('name','')
-                                    if name and name.lower() == target_lower:
-                                        d = ent.get('distance')
-                                        if d is not None:
-                                            dd = float(d)
-                                            if best_dist is None or dd < best_dist:
-                                                best_dist = dd
+                        try:
+                            if hasattr(self, '_last_scan_distance') and self._last_scan_distance is not None:
+                                best_dist = float(self._last_scan_distance)
+                        except Exception:
+                            best_dist = None
+
                         if best_dist is not None:
                             action_record.binding_evidence = {"criterion":"nearest","distance": best_dist}
                     except Exception:
@@ -2601,34 +2596,17 @@ End your text with: </end>"""
         # If multiple candidate types, choose globally nearest match across them
         found_target = ''
         best_dist = float('inf')
+        chosen_dist = None
         for cand in candidates:
-            name = self._find_target_in_situation(cand)
+            name, dist = self._find_target_in_situation(cand)
             if not name:
                 continue
-            # compute distance for this name (nearest over all views)
-            try:
-                target_lower = name.lower()
-                nearest = None
-                for view in (self.last_situation_data or {}).get('views', []):
-                    for key in ('characters','resources'):
-                        for ent in view.get(key, []) or []:
-                            nm = ent.get('name','')
-                            if nm and nm.lower() == target_lower:
-                                d = ent.get('distance')
-                                if d is not None:
-                                    dd = float(d)
-                                    if nearest is None or dd < nearest:
-                                        nearest = dd
-                # Terrain has no distance; de-prioritize vs finite distances
-                if nearest is None and name:
-                    nearest = 1e8
-                if nearest is not None and nearest < best_dist:
-                    best_dist = nearest
-                    found_target = name
-            except Exception:
-                # If distance calc fails, accept first found
-                if not found_target:
-                    found_target = name
+            # Normalize missing distance (terrain) to mid-priority
+            nearest = float(dist) if dist is not None else 1e8
+            if nearest < best_dist:
+                best_dist = nearest
+                found_target = name
+                chosen_dist = nearest
         
         # Special-case: if target is Person, bind to nearest other character (exclude self)
         try:
@@ -2649,6 +2627,7 @@ End your text with: </end>"""
                             best_d = dd
                 if best_name:
                     found_target = best_name
+                    chosen_dist = best_d
         except Exception:
             pass
         
@@ -2661,12 +2640,22 @@ End your text with: </end>"""
         elif not var_name:
             logger.error(f'🔍 {self.character_name} scan found target "{target}" but no variable to bind')
         
+        # Cache chosen scan distance for evidence use
+        try:
+            if not hasattr(self, '_last_scan_distance'):
+                self._last_scan_distance = None
+            self._last_scan_distance = chosen_dist if found_target else None
+        except Exception:
+            pass
         return found_target if found_target else ''
 
-    def _find_target_in_situation(self, target: str) -> str:
-        """Search last_situation_data for target, return nearest match found (by distance)."""
+    def _find_target_in_situation(self, target: str) -> tuple[str, float | None]:
+        """Search last_situation_data for target, return (nearest_name, distance).
+
+        distance is None for terrain-only matches (no distance available).
+        """
         if not self.last_situation_data:
-            return ''
+            return '', None
             
         target_lower = target.lower()
         
@@ -2717,7 +2706,10 @@ End your text with: </end>"""
                         best_name = terrain
                         best_dist = 1e8
         
-        return best_name
+        # If best_name is terrain (no distance), best_dist may be 1e8 sentinel. Normalize to None.
+        if best_name and best_dist == 1e8:
+            return best_name, None
+        return (best_name, best_dist) if best_name else ('', None)
             
     def _find_target_direction(self, target: str) -> str:
         """Find which direction a target (character or resource) is visible in."""
@@ -3344,6 +3336,8 @@ For each drive, output a score in [0.0,1.0] where 1.0 means well satisfied/fulfi
         Returns:
             Dictionary with entity data or None if query failed
         """
+        # safeguard - don't allow variables in query
+        entity_name = entity_name.replace('$', '')
         try:
             # Query entity data from memory node with query and limit parameters
             for reply in self.session.get(f"cognitive/{self.character_name}/memory/entity/{entity_name}?query=dialog&limit={limit}&scope={scope}", timeout=3.0 if not self.debug else 600.0):

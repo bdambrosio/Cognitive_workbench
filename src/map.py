@@ -416,6 +416,7 @@ class WorldMap:
 
         if 'Water' not in [t.name for t in self.terrain_types]:
             raise ValueError("Scenario must define a Water terrain type")
+        print("WorldMap initialized")
 
     def get_owned_resources(self):
         """Get all resources that are NPC-owned"""
@@ -512,7 +513,7 @@ class WorldMap:
                         if (0 <= nx < self.width and 
                             0 <= ny < self.height):
                             ntype = self.patches[nx][ny].terrain_type
-                            # Skip elevation-determined neighbors (WATER, MOUNTAIN)
+                            # Skip elevation-determined neighbors (WATER, MOUNTAIN)].property
                             elevation_terrain = False
                             for terrain_def in terrain_by_elevation.values():
                                 if ntype == getattr(self.terrain_types, terrain_def['type']):
@@ -697,8 +698,9 @@ class WorldMap:
                     self.patches[x][y].property_id is None and
                     self.patches[x][y].terrain_type in valid_terrain):
                     self.patches[x][y].property_id = None
+                    self.patches[x][y].property_type = None
         
-        property_id = 0
+        property_id = 1
         min_size = self._property_rules.get('min_size', 50)
         max_size = self._property_rules.get('max_size', 150)
         
@@ -727,8 +729,10 @@ class WorldMap:
             size = self.flood_fill_property(start_x, start_y, property_id, target_size, property_patches)
             if size >= min_size:
                 self.register_property(property_id, property_patches)
-                property_id += 1
                 print(f"Created property {property_id} with {size} patches")
+                property_id += 1
+            else:
+                pass
 
     def is_near_path(self, x: int, y: int, max_distance: int) -> bool:
         # Get path type from infrastructure rules
@@ -774,7 +778,6 @@ class WorldMap:
                 self.patches[x][y].property_id is None and
                 self.patches[x][y].terrain_type != self.terrain_types.Water):
                 
-                self.patches[x][y].property_id = property_id
                 property_patches.append((x, y))  # Collect patch coordinates
                 size += 1
                 
@@ -1104,6 +1107,11 @@ class WorldMap:
             'patches': patches,  # List of (x,y) tuples
             'owner': None
         }
+        #ToDo, extend properties with counts or proportions
+        property_type = random.choice(list(self.property_types))  # e.g., RuralProperty.Farm
+        for patch in patches:
+            self.patches[patch[0]][patch[1]].property_id = property_id
+            self.patches[patch[0]][patch[1]].property_type = property_type
 
     def set_property_owner(self, property_id, owner):
         """Set the owner of a property"""
@@ -1251,7 +1259,9 @@ class WorldMap:
         
         # Track connected resources
         connected = {(market_x, market_y)}
-        
+        total_resources = len(self.resource_registry) - 1
+        fraction_to_connect = 100.0/total_resources
+        resources_to_connect = int(total_resources * fraction_to_connect)
         # Connect each resource to nearest part of existing network
         while True:
             best_cost = float('inf')
@@ -1262,6 +1272,8 @@ class WorldMap:
             # Find nearest unconnected resource
             for resource_id, resource in self.resource_registry.items():
                 if resource['type'] == self.scenario_module.required_resource:
+                    continue
+                if random.random() > resources_to_connect:
                     continue
                     
                 res_x, res_y = resource['location']
@@ -1277,7 +1289,7 @@ class WorldMap:
                         best_end = (res_x, res_y)
             
             # No more resources to connect
-            if best_start is None:
+            if best_start is None or len(connected) >= resources_to_connect*fraction_to_connect:
                 break
                 
             # Build the road
@@ -1671,7 +1683,8 @@ def get_slope_description(elevation_change):
 
 def get_detailed_visibility_description(world: WorldMap, camera_x: int, camera_y: int, observer: Agent, observer_height: int):
     visible_patches = world.get_visibility(camera_x, camera_y, observer_height)
-    visible_patches.append(world.patches[camera_x][camera_y])  # Add current patch
+    if world.patches[camera_x][camera_y] not in visible_patches:
+        visible_patches.append(world.patches[camera_x][camera_y])  # Add current patch
 
     root = ET.Element("visibility_report")
     pos = ET.SubElement(root, "position")
@@ -1699,6 +1712,7 @@ def get_detailed_visibility_description(world: WorldMap, camera_x: int, camera_y
         ET.SubElement(direction_element, "visibility").text = str(max_distance)
 
         ET.SubElement(direction_element, "terrain").text = adjacent_patch.terrain_type.name
+        ET.SubElement(direction_element, "property").text = adjacent_patch.property_type.name if adjacent_patch.property_type else "None"
 
         slope_element = ET.SubElement(direction_element, "slope")
         slope_element.text = get_slope_description(elevation_change)
@@ -1794,6 +1808,8 @@ def extract_direction_info(world, xml_string, direction_name):
         info['visibility'] = 0
 
     info['terrain'] = direction_elem.findtext('terrain')
+    info['property'] = direction_elem.findtext('property')
+
 
     # Extract slope information if available
     slope_elem = direction_elem.find('slope')
@@ -1861,12 +1877,15 @@ def hash_direction_info(direction_info, distance_threshold=10, world=None):
     paths = []
     for dir in direction_info.keys():
         if dir == 'Current':
-            percept_summary = f'You are in {direction_info[dir]['terrain']} terrain. '
+            percept_summary = f'You are in {direction_info[dir]['terrain']} terrain, viewing property: {direction_info[dir]['property']}. '
+
         percept += f"#view {dir}:"
         if 'visibility' in direction_info[dir]:
             percept += f" visibility {direction_info[dir]['visibility']}"
         if 'terrain' in direction_info[dir]:
             percept += f", terrain {direction_info[dir]['terrain']}"
+        if 'property' in direction_info[dir]:
+            percept += f", property {direction_info[dir]['property']}"
         if 'slope' in direction_info[dir]:
             percept += f", slope {direction_info[dir]['slope']['description']} "
         percept += "; "

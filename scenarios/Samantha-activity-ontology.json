@@ -1,51 +1,47 @@
 {
   "places": [
-    "MixedForestEdge",
-    "SunlitClearing",
-    "ShadedThicket",
-    "MeadowView",
-    "AppletreeStand",
-    "BerryPatch",
-    "SpringSource",
-    "MountainSlope",
-    "FallenBranchCluster",
-    "SecludedCave",
-    "OvergrownPath",
-    "HiddenHut"
+    "Forest",
+    "Clearing",
+    "Meadow",
+    "Path",
+    "Mountain",
+    "Spring",
+    "Village",
+    "Hut",
+    "Thicket",
+    "Cave"
   ],
   "tools": [
     "Backpack",
-    "WaterBottle",
-    "SmallKnife",
-    "Notebook",
-    "Pencil",
-    "TrailMarkRibbon",
-    "SnackBar",
-    "MapSketch"
+    "Berries",
+    "Mushrooms",
+    "Appletree",
+    "Fallenbranch",
+    "WaterBottle"
   ],
   "roles": [
     "Explorer",
-    "Forager",
-    "Companion",
-    "Thinker",
+    "Hiker",
     "Seeker",
-    "Guest"
+    "Companion",
+    "Outsider",
+    "Forager"
   ],
   "norms_rules": [
-    "RespectPersonalBoundaries",
-    "ShareLimitedResources",
-    "KeepNoiseLow",
-    "MarkTrailsResponsibly",
-    "EngageInOpenCommunication",
-    "DoNotCauseHarm"
+    "Do not harm forest creatures without cause",
+    "Do not enter huts without invitation",
+    "Share found resources with companions when possible",
+    "Respect personal boundaries and privacy",
+    "Leave no trace; avoid unnecessary damage to forest"
   ],
   "hazards": [
-    "WildAnimalEncounter",
-    "SlipperyGround",
-    "PoisonousPlantContact",
-    "SuddenWeatherChange",
-    "ExcessiveSunExposure",
-    "LooseFallenBranches"
+    "GettingLost",
+    "Dehydration",
+    "Fatigue",
+    "InjuryMinor",
+    "RoughTerrain",
+    "PoisonousPlant",
+    "UnstableGround"
   ],
   "social_graph": [
     "Samantha",
@@ -66,284 +62,205 @@
     {
       "id": "SurveyArea",
       "drive": "SolveMystery",
-      "verbs": [
-        "Scan",
-        "Think",
-        "Inspect"
-      ],
-      "nouns": [
-        "Landmark",
-        "ForestEdge",
-        "Clue"
+      "roles": [
+        "Explorer",
+        "Seeker"
       ]
     },
     {
       "id": "ScanForPaths",
       "drive": "SolveMystery",
-      "verbs": [
-        "Scan",
-        "Inspect",
-        "Think"
-      ],
-      "nouns": [
-        "Path",
-        "Trail",
-        "Direction"
+      "roles": [
+        "Explorer",
+        "Hiker"
       ]
     },
     {
-      "id": "OrientToForestEdge",
-      "drive": "SolveMystery",
-      "verbs": [
-        "Move",
-        "Think",
-        "Scan"
-      ],
-      "nouns": [
-        "Edge",
-        "Sunlight",
-        "Landform"
+      "id": "ExploreNewPlace",
+      "drive": "Adventure",
+      "roles": [
+        "Explorer",
+        "Hiker"
       ]
     },
     {
-      "id": "AvoidHazard",
-      "drive": "Safety",
-      "verbs": [
-        "Inspect",
-        "Avoid",
-        "Move"
-      ],
-      "nouns": [
-        "Hazard",
-        "Ground",
-        "Obstacle"
-      ]
-    },
-    {
-      "id": "MarkTrail",
-      "drive": "Safety",
-      "verbs": [
-        "Mark",
-        "Use",
-        "Place"
-      ],
-      "nouns": [
-        "Tree",
-        "Ribbon",
-        "Landmark"
-      ]
-    },
-    {
-      "id": "HideSelf",
-      "drive": "Safety",
-      "verbs": [
-        "Move",
-        "Hide",
-        "Wait"
-      ],
-      "nouns": [
-        "Thicket",
-        "Cave",
-        "Bush"
-      ]
-    },
-    {
-      "id": "CollectWater",
-      "drive": "Physiological",
-      "verbs": [
-        "Move",
-        "Collect",
-        "Use"
-      ],
-      "nouns": [
-        "Spring",
-        "Water",
-        "Bottle"
+      "id": "ObserveWildlife",
+      "drive": "Learn",
+      "roles": [
+        "Seeker",
+        "Explorer"
       ]
     },
     {
       "id": "ForageBerries",
       "drive": "Physiological",
-      "verbs": [
-        "Inspect",
-        "Take",
-        "Eat"
-      ],
-      "nouns": [
-        "Berries",
-        "Plant",
-        "Patch"
+      "roles": [
+        "Forager",
+        "Explorer"
+      ]
+    },
+    {
+      "id": "CollectWater",
+      "drive": "Physiological",
+      "roles": [
+        "Forager",
+        "Explorer"
       ]
     },
     {
       "id": "RestRecover",
       "drive": "Physiological",
-      "verbs": [
-        "Wait",
-        "Rest",
-        "Think"
-      ],
-      "nouns": [
-        "Clearing",
-        "Meadow",
-        "Shade"
+      "roles": [
+        "Hiker",
+        "Explorer"
       ]
     },
     {
       "id": "InventoryBackpack",
-      "drive": "Physiological",
-      "verbs": [
-        "Inspect",
-        "Take",
-        "Use"
-      ],
-      "nouns": [
-        "Backpack",
-        "Food",
-        "Item"
+      "drive": "Safety",
+      "roles": [
+        "Hiker",
+        "Explorer"
+      ]
+    },
+    {
+      "id": "AvoidHazard",
+      "drive": "Safety",
+      "roles": [
+        "Explorer",
+        "Hiker"
+      ]
+    },
+    {
+      "id": "MarkTrail",
+      "drive": "Safety",
+      "roles": [
+        "Explorer",
+        "Hiker"
+      ]
+    },
+    {
+      "id": "HideSelf",
+      "drive": "Safety",
+      "roles": [
+        "Outsider",
+        "Explorer"
       ]
     },
     {
       "id": "GreetStranger",
       "drive": "Companionship",
-      "verbs": [
-        "Say",
-        "Watch",
-        "Greet"
-      ],
-      "nouns": [
-        "Person",
-        "Stranger",
-        "Companion"
+      "roles": [
+        "Companion",
+        "Outsider"
       ]
     },
     {
       "id": "TestTrust",
       "drive": "Companionship",
-      "verbs": [
-        "Say",
-        "Think",
-        "Inspect"
-      ],
-      "nouns": [
-        "Stranger",
-        "Gesture",
-        "Response"
+      "roles": [
+        "Companion",
+        "Outsider"
       ]
     },
     {
       "id": "NegotiateAssistance",
       "drive": "Companionship",
-      "verbs": [
-        "Say",
-        "Think",
-        "Request"
-      ],
-      "nouns": [
-        "Help",
-        "Resource",
-        "Task"
+      "roles": [
+        "Companion",
+        "Outsider"
       ]
     },
     {
-      "id": "LearnNature",
-      "drive": "Learn",
-      "verbs": [
-        "Inspect",
-        "Think",
-        "Note"
-      ],
-      "nouns": [
-        "Plant",
-        "Animal",
-        "Track"
-      ]
-    },
-    {
-      "id": "ExploreMeadow",
+      "id": "ReflectOnExperience",
       "drive": "Adventure",
-      "verbs": [
-        "Move",
-        "Scan",
-        "Inspect"
-      ],
-      "nouns": [
-        "Meadow",
-        "Flower",
-        "Vista"
+      "roles": [
+        "Seeker",
+        "Explorer"
       ]
     },
     {
-      "id": "RecordThoughts",
-      "drive": "Adventure",
-      "verbs": [
-        "Think",
-        "Note",
-        "Scan"
-      ],
-      "nouns": [
-        "Notebook",
-        "Feeling",
-        "Event"
+      "id": "OrientToHut",
+      "drive": "SolveMystery",
+      "roles": [
+        "Seeker",
+        "Explorer"
+      ]
+    },
+    {
+      "id": "SignalHelp",
+      "drive": "Safety",
+      "roles": [
+        "Explorer"
+      ]
+    },
+    {
+      "id": "SearchForEdibles",
+      "drive": "Physiological",
+      "roles": [
+        "Forager"
       ]
     }
   ],
   "affordances": {
-    "MixedForestEdge": [
+    "Forest": [
       "SurveyArea",
-      "ScanForPaths",
-      "SearchForEdibles"
+      "ObserveWildlife",
+      "ForageBerries",
+      "SearchForEdibles",
+      "AvoidHazard",
+      "HideSelf",
+      "MarkTrail",
+      "ExploreNewPlace",
+      "ReflectOnExperience"
     ],
-    "SunlitClearing": [
+    "Clearing": [
       "RestRecover",
       "SignalHelp",
+      "InventoryBackpack",
+      "GreetStranger",
+      "TestTrust",
+      "NegotiateAssistance"
+    ],
+    "Meadow": [
+      "SurveyArea",
+      "ObserveWildlife",
+      "RestRecover",
+      "ExploreNewPlace"
+    ],
+    "Path": [
+      "ScanForPaths",
+      "MarkTrail",
+      "AvoidHazard",
+      "ExploreNewPlace"
+    ],
+    "Mountain": [
+      "SurveyArea",
+      "ObserveWildlife",
+      "AvoidHazard",
+      "ReflectOnExperience"
+    ],
+    "Spring": [
+      "CollectWater",
+      "RestRecover",
       "InventoryBackpack"
     ],
-    "ShadedThicket": [
-      "HideSelf",
-      "ForageBerries",
-      "LearnNature"
-    ],
-    "AppletreeStand": [
-      "ForageBerries",
-      "LearnNature",
-      "RestRecover"
-    ],
-    "BerryPatch": [
-      "ForageBerries",
-      "LearnNature",
-      "RecordThoughts"
-    ],
-    "SpringSource": [
-      "CollectWater",
-      "RestRecover"
-    ],
-    "MountainSlope": [
-      "SurveyArea",
-      "OrientToForestEdge",
-      "ExploreMeadow"
-    ],
-    "MeadowView": [
-      "ExploreMeadow",
-      "RecordThoughts",
-      "RestRecover"
-    ],
-    "FallenBranchCluster": [
-      "MarkTrail",
-      "AvoidHazard"
-    ],
-    "SecludedCave": [
-      "HideSelf",
-      "RestRecover"
-    ],
-    "OvergrownPath": [
-      "ScanForPaths",
-      "MarkTrail"
-    ],
-    "HiddenHut": [
-      "NegotiateAssistance",
-      "TestTrust",
+    "Village": [
       "GreetStranger",
+      "NegotiateAssistance"
+    ],
+    "Hut": [
+      "GreetStranger",
+      "NegotiateAssistance",
+      "RestRecover"
+    ],
+    "Thicket": [
+      "HideSelf",
+      "ForageBerries",
+      "SearchForEdibles"
+    ],
+    "Cave": [
+      "HideSelf",
       "RestRecover"
     ]
   },
@@ -351,42 +268,32 @@
     "Live safely and survivein the forest.": [
       "AvoidHazard",
       "MarkTrail",
-      "HideSelf"
-    ],
-    "Learn about the forest and the animals, plants, and resources in the forest.": [
-      "LearnNature",
-      "SurveyArea",
-      "ForageBerries"
-    ],
-    "Adventure, excitement, and the thrill of the unknown.": [
-      "ExploreMeadow",
-      "RecordThoughts"
-    ],
-    "love and belonging, including home, acceptance, friendship, trust, intimacy.": [
-      "GreetStranger",
-      "TestTrust",
-      "NegotiateAssistance"
-    ],
-    "immediate physiological needs (hunger, thirst, fatigue)": [
-      "CollectWater",
-      "ForageBerries",
+      "HideSelf",
+      "SignalHelp",
       "RestRecover",
       "InventoryBackpack"
     ],
-    "Solve the mystery of how I ended up here. Find a way out of the forest.": [
+    "Learn about the forest and the animals, plants, and resources in the forest.": [
       "SurveyArea",
-      "ScanForPaths",
-      "OrientToForestEdge"
+      "ObserveWildlife",
+      "SearchForEdibles",
+      "ScanForPaths"
+    ],
+    "Adventure, excitement, and the thrill of the unknown.": [
+      "ExploreNewPlace",
+      "ReflectOnExperience",
+      "OrientToHut"
+    ],
+    "love and belonging, including home, acceptance, friendship, trust, intimacy.": [
+      "GreetStranger",
+      "NegotiateAssistance",
+      "TestTrust"
     ]
   },
   "states": [
     "hunger",
     "thirst",
     "fatigue",
-    "injury",
-    "curiosity",
-    "fear",
-    "loneliness",
-    "hope"
+    "injury"
   ]
 }
