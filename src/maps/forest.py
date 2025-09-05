@@ -83,6 +83,7 @@ resource_rules = {
             'description': 'A bush with edible berries',
             'count': 100,
             'requires_property': False,
+            'remove_on_take': True,   # Can be taken by the player
             'terrain_weights': {
                 terrain_types.Clearing: 2.0,
                 terrain_types.Meadow: 1.0,
@@ -94,6 +95,7 @@ resource_rules = {
             'description': 'A patch of mushrooms',
             'count': 100,
             'requires_property': False,
+            'remove_on_take': True,   # Can be taken by the player
             'terrain_weights': {
                 terrain_types.Forest: 2.0
             }
@@ -103,6 +105,7 @@ resource_rules = {
             'description': 'A large fallen tree branch',
             'count': 50,
             'requires_property': False,
+            'remove_on_take': True,   # Can be taken by the player
             'terrain_weights': {
                 terrain_types.Forest: 1.0,
                 terrain_types.Clearing: 0.5
@@ -113,6 +116,7 @@ resource_rules = {
             'description': 'A large apple tree with apples',
             'count': 16,
             'requires_property': False,
+            'remove_on_take': True,   # Can be taken by the player
             'terrain_weights': {
                 terrain_types.Forest: 0.6,
                 terrain_types.Clearing: 1.0
@@ -123,6 +127,7 @@ resource_rules = {
             'description': 'A natural spring of fresh water',
             'count': 30,
             'requires_property': False,
+            'remove_on_take': True,   # Can be taken by the player
             'terrain_weights': {
                 terrain_types.Forest: 1.0
             }
@@ -133,6 +138,7 @@ resource_rules = {
             'has_npc': True,
             'count': 1,
             'requires_property': False,
+            'remove_on_take': False,   # Can be taken by the player
             'terrain_weights': {
                 terrain_types.Mountain: 2.0
             }
@@ -143,6 +149,7 @@ resource_rules = {
             'has_npc': True,
             'count': 1,
             'requires_property': False,
+            'remove_on_take': False,   # Can be taken by the player
             'terrain_weights': {
                 terrain_types.Mountain: 2.0
             }
@@ -152,6 +159,7 @@ resource_rules = {
             'description': 'A dense thicket of vegetation',
             'count': 12,
             'requires_property': False,
+            'remove_on_take': False,   # Can be taken by the player
             'terrain_weights': {
                 terrain_types.Forest: 2.0,
                 terrain_types.Clearing: 1.0

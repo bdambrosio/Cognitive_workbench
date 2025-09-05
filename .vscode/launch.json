@@ -11,7 +11,7 @@
             "env": {
                 "PYTHONPATH": "${workspaceFolder}/src"
             },
-            "args": ["--plans", "../data/Jean-plans.jsonl",
+            "args": ["--plans", "../data/Francoise-plans.jsonl",
             "--digest", "digest.jq", 
             "--last-fraction", "0.5", 
             "--soft-start", "70", "--danger", "80", "--hard", "90", 
@@ -276,7 +276,7 @@
             "env": {
                 "PYTHONPATH": "${workspaceFolder}/src"
             },
-            "args": ["--v2", "--microbatch", "5", "--seed", "42", "--s1_out", "data/reflection_stage1.json"],
+            "args": ["--v2", "--microbatch", "5", "--plans", "data/Francoise-plans.jsonl", "--seed", "42", "--s1_out", "data/reflection_stage1.json"],
             "justMyCode": false,
             "stopOnEntry": false,
             "preLaunchTask": "setup-zenoh-environment"

@@ -215,6 +215,12 @@ Do not include any other text, reasoning, introductory, expository, or markdown.
             self.handle_resource_by_name
         )
         
+        # Resource rules by type queryable
+        self.resource_rules_queryable = self.session.declare_queryable(
+            "cognitive/map/resource_rules/*",
+            self.handle_resource_rules_by_name
+        )
+        
         # Resource removal queryable
         self.resource_remove_queryable = self.session.declare_queryable(
             "cognitive/map/resource/remove/*",
@@ -729,6 +735,92 @@ Do not include any other text, reasoning, introductory, expository, or markdown.
             }
             query.reply(query.key_expr, json.dumps(error_response).encode('utf-8'))
     
+    def handle_resource_rules_by_name(self, query):
+        """Return the resource_rules entry for a resource type (JSON-safe).
+
+        Topic: cognitive/map/resource_rules/<resource_type_or_instance>
+        If an instance name with numeric suffix is provided (e.g., Farm3), the
+        numeric suffix is stripped to resolve the type (e.g., Farm).
+        """
+        try:
+            # Extract name from query key
+            key_parts = str(query.key_expr).split('/')
+            raw_name = key_parts[-1] if len(key_parts) > 0 else None
+
+            if not raw_name:
+                raise ValueError("No resource name provided")
+
+            # Strip numeric suffix if present (e.g., Farm3 -> Farm)
+            type_name = raw_name
+            while type_name and type_name[-1].isdigit():
+                type_name = type_name[:-1]
+
+            rules = getattr(self.world_map, '_resource_rules', None) or {}
+            allocations = rules.get('allocations') or []
+
+            found = None
+            for allocation in allocations:
+                rt = allocation.get('resource_type')
+                rt_name = ''
+                try:
+                    rt_name = rt.name  # Enum or ResourceType
+                except Exception:
+                    rt_name = getattr(rt, 'name', str(rt))
+
+                if isinstance(rt_name, str) and rt_name.lower() == type_name.lower():
+                    # Build JSON-safe object
+                    result = {
+                        'resource_type': rt_name,
+                    }
+                    if 'description' in allocation:
+                        result['description'] = allocation.get('description')
+                    if 'count' in allocation:
+                        result['count'] = allocation.get('count')
+                    if 'requires_property' in allocation:
+                        result['requires_property'] = allocation.get('requires_property')
+                    if 'has_npc' in allocation:
+                        result['has_npc'] = allocation.get('has_npc')
+
+                    # terrain_weights: convert enum keys to names
+                    tw = allocation.get('terrain_weights') or {}
+                    if isinstance(tw, dict) and tw:
+                        tw_out = {}
+                        for k, v in tw.items():
+                            key_name = getattr(k, 'name', str(k))
+                            tw_out[str(key_name)] = v
+                        result['terrain_weights'] = tw_out
+
+                    # Optional names list for this type, if defined
+                    names_map = rules.get('names') or {}
+                    try:
+                        if isinstance(names_map, dict) and rt_name in names_map:
+                            result['names'] = names_map[rt_name]
+                    except Exception:
+                        pass
+
+                    found = result
+                    break
+
+            if found is None:
+                response = {
+                    'success': False,
+                    'error': f"Resource type '{raw_name}' not found"
+                }
+            else:
+                response = {
+                    'success': True,
+                    'resource_rules': found
+                }
+
+            query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
+        except Exception as e:
+            logger.error(f"Error handling resource rules query: {e}")
+            error_response = {
+                'success': False,
+                'error': str(e)
+            }
+            query.reply(query.key_expr, json.dumps(error_response).encode('utf-8'))
+    
     def handle_resource_remove(self, query):
         """Handle resource removal queries"""
         try:
@@ -739,7 +831,7 @@ Do not include any other text, reasoning, introductory, expository, or markdown.
             if not resource_name:
                 raise ValueError("No resource name provided")
             
-            # Get resource to remove by name
+            # Get resource instance by name (instance-only)
             resource = self.world_map.get_resource_by_name(resource_name)
             if not resource:
                 response = {
@@ -747,21 +839,59 @@ Do not include any other text, reasoning, introductory, expository, or markdown.
                     'error': f"Resource '{resource_name}' not found"
                 }
             else:
-                # Remove the resource using the resource ID
-                resource_id = resource['name']  # The 'name' field contains the resource_id
-                success = self.world_map.remove_resource(resource_id)
-                
-                if success:
+                # Determine type and consult rules
+                try:
+                    rtype_obj = resource.get('type')
+                    rtype_name = getattr(rtype_obj, 'name', str(rtype_obj))
+                except Exception:
+                    rtype_name = None
+
+                rules = getattr(self.world_map, '_resource_rules', None) or {}
+                allocations = rules.get('allocations') or []
+
+                remove_allowed = None  # None = unknown type
+                for allocation in allocations:
+                    rt = allocation.get('resource_type')
+                    rt_name = ''
+                    try:
+                        rt_name = rt.name
+                    except Exception:
+                        rt_name = getattr(rt, 'name', str(rt))
+                    if rtype_name and isinstance(rt_name, str) and rt_name.lower() == rtype_name.lower():
+                        # Default to True if key missing
+                        remove_allowed = bool(allocation.get('remove_on_take', True))
+                        break
+
+                if remove_allowed is False:
+                    # Policy: do not remove from map, but treat as success
                     response = {
                         'success': True,
-                        'message': f"Resource '{resource_name}' removed successfully"
+                        'removed': False,
+                        'message': f"Removal skipped by policy for '{resource_name}'"
                     }
-                    logger.info(f"Resource '{resource_name}' removed from map")
-                else:
+                elif remove_allowed is None and rtype_name:
+                    # Unknown type: skip removal but succeed
                     response = {
-                        'success': False,
-                        'error': f"Failed to remove resource '{resource_name}'"
+                        'success': True,
+                        'removed': False,
+                        'message': f"Removal skipped: unknown resource type '{rtype_name}'"
                     }
+                else:
+                    # Proceed with actual removal (either rule allows or no rule exists)
+                    resource_id = resource['name']  # The 'name' field contains the resource_id
+                    success = self.world_map.remove_resource(resource_id)
+                    if success:
+                        response = {
+                            'success': True,
+                            'removed': True,
+                            'message': f"Resource '{resource_name}' removed successfully"
+                        }
+                        logger.info(f"Resource '{resource_name}' removed from map")
+                    else:
+                        response = {
+                            'success': False,
+                            'error': f"Failed to remove resource '{resource_name}'"
+                        }
             
             query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
         except Exception as e:

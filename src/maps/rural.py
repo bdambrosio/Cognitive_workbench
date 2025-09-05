@@ -94,7 +94,7 @@ resource_rules = {
             'description': 'A deep well for water',
             'count': 5,
             'has_npc': True,
-            'can_take': False,
+            'remove_on_take': False,
             'requires_property': True,
             'terrain_weights': {
                 terrain_types.Grassland: 1.0,
@@ -106,7 +106,7 @@ resource_rules = {
             'has_npc': True,
             'description': 'A grain mill',
             'count': 1,
-            'can_take': False,
+            'remove_on_take': False,
             'requires_property': True,
             'terrain_weights': {
                 terrain_types.Field: 2.0,
@@ -118,7 +118,7 @@ resource_rules = {
             'has_npc': True,
             'description': 'A hoe for tilling fields',
             'count': 30,
-            'can_take': True,
+            'remove_on_take': True,
             'requires_property': True,
             'terrain_weights': {
                 terrain_types.Field: 1.0,
@@ -130,7 +130,7 @@ resource_rules = {
             'has_npc': True,
             'description': 'A plow for plowing fields',
             'count': 20,
-            'can_take': True,
+            'remove_on_take': True,
             'requires_property': True,
             'terrain_weights': {
                 terrain_types.Field: 1.0,
@@ -142,7 +142,7 @@ resource_rules = {
             'has_npc': True,
             'description': 'A scythe for harvesting grass',
             'count': 30,
-            'can_take': True,
+            'remove_on_take': True,
             'requires_property': True,
             'terrain_weights': {
                 terrain_types.Field: 1.0,
@@ -153,19 +153,18 @@ resource_rules = {
             'resource_type': resource_types.Spring,
             'description': 'A natural spring of fresh water',
             'count': 100,
-            'can_take': True,
+            'remove_on_take': True,
             'requires_property': True,
             'terrain_weights': {
                 terrain_types.Field: 1.0,
                 terrain_types.Grassland: 1.0
             },
-            'can_take': False
         },
                 {
             'resource_type': resource_types.Bread,
             'description': 'A loaf of bread',
             'count': 20,
-            'can_take': True,
+            'remove_on_take': True,
             'requires_property': True,
             'terrain_weights': {
                 terrain_types.Field: 1.0,
@@ -176,19 +175,19 @@ resource_rules = {
             'resource_type': resource_types.Apple,
             'description': 'An apple',
             'count': 20,
-            'can_take': True,
+            'remove_on_take': True,
             'requires_property': True,
             'terrain_weights': {
                 terrain_types.Field: 1.0,
                 terrain_types.Grassland: 1.0
             },
-            'can_take': False
+
         },
         {
             'resource_type': resource_types.Chicken,
             'description': 'A chicken',
             'count': 20,
-            'can_take': True,
+            'remove_on_take': True,
             'requires_property': True,
             'terrain_weights': {
                 terrain_types.Field: 1.0,
@@ -199,7 +198,7 @@ resource_rules = {
             'resource_type': resource_types.Egg,
             'description': 'An egg',
             'count': 20,
-            'can_take': True,
+            'remove_on_take': True,
             'requires_property': True,
             'terrain_weights': {
                 terrain_types.Field: 1.0,
@@ -210,7 +209,7 @@ resource_rules = {
             'resource_type': resource_types.Milk,
             'description': 'A glass of milk',
             'count': 20,
-            'can_take': True,
+            'remove_on_take': True,
             'requires_property': True,
             'terrain_weights': {
                 terrain_types.Field: 1.0,
@@ -221,7 +220,7 @@ resource_rules = {
             'resource_type': resource_types.Cheese,
             'description': 'A piece of cheese',
             'count': 20,
-            'can_take': True,
+            'remove_on_take': True,
             'requires_property': True,
             'terrain_weights': {
                 terrain_types.Field: 1.0,
@@ -232,7 +231,7 @@ resource_rules = {
             'resource_type': resource_types.Butter,
             'description': 'A stick of butter',
             'count': 20,
-            'can_take': True,
+            'remove_on_take': True,
             'requires_property': True,
             'terrain_weights': {
                 terrain_types.Field: 1.0,

@@ -1,40 +1,6 @@
-2025-09-03 18:02:26 - sense_node - INFO - 👁️ Sense Node initialized for character: Mothermarquart
-2025-09-03 18:02:26 - sense_node - INFO - Console Text Sensor ready - will auto-disable if external input detected
-2025-09-03 18:02:26 - sense_node - INFO - Sense Node running - press Ctrl+2025-2025-09-03 18:06:02 - sense_node - INFO - 👁️ Visual event received: agent_detected - {'agent_name': 'Jean', 'position': [20, 19], 'distance': 2, 'timestamp': '2025-09-03T18:06:02.097477'}
-2025-09-03 18:07:55 - sense_node - INFO - 👁️ Visual event received: agent_detected - {'agent_name': 'Jean', 'position': [19, 13], 'distance': 10, 'timestamp': '2025-09-03T18:07:55.864930'}
-20252025-09-03 18:18:38 - sense_node - INFO - 🔄 External input detected - console input disabled to prevent conflicts
-2025-09-03 18:18:38 - sense_node - INFO - 📨 Received external text input from Fathermarquart: "I am Father Marquart, and I say: I am not Mothermarquart, I am Father Marquart, and I do not see Mothermarquart, I se2025-09-03 18:21:42 - sense_node - INFO - Received signal 2, initiating shutdown...
-2025-09-03 18:21:42 - sense_node - INFO - Sense Node shutdown initiated...
-2025-09-03 18:21:43 - sense_node - INFO - Sense Node shutdown complete
-2025-09-03 18:21:43 - sense_node - INFO - Received signal 15, initiating shutdown...
-right here, near me, near my farm, in ze forest, you can see her, no?"
-2025-09-03 18:18:47 - sense_node - INFO - 📤 Published sense data: 1
-2025-09-03 18:19:01 - sense_node - INFO - 📨 Received external text input from Fathermarquart: "I am Father Marquart, and I say: She is right here, I see her, she is standing right next to me, no?"
-2025-09-03 18:19:01 - sense_node - INFO - 📤 Published sense data: 2
-2025-09-03 18:19:59 - sense_node - INFO - 📨 Received external text input from Fathermarquart: "I am Father Marquart, and I say: Ah, work, zis is a good topic, I am always working, on my farm, in ze forest, I know a thing or two about work, what is it you want to share, or talk about, eh?"
-2025-09-03 18:19:59 - sense_node - INFO - 📤 Published sense data: 3
-2025-09-03 18:20:21 - sense_node - INFO - 📨 Received external text input from Fa2025-09-03 18:20:51 - sense_node - INFO - 📨 Received external text input from Fathermarquart: "I am Father Marquart, and I say: Ah, share a meal, zis is a good idea, I am a bit hungry, and I have some bread, and some milk, and some water, we can share, eh?"
-2025-09-03 18:20:51 - sense_node - INFO - 📤 Published sense data: 4
-2025-09-03 18:21:42 - sense_node - INFO - Received signal 2, initiating shutdown...
-2025-09-03 18:21:43 - sense_node - INFO - Sense Node shutdown initiated...
-2025-09-03 18:21:43 - sense_node - INFO - Sense Node shutdown complete
-2025-09-03 18:21:43 - sense_node - INFO - Received signal 15, initiating shutdown...
-ating shutdown...
- input from Jean: "I am Jean, your son, and I see you, Father Marquart, and I see Mothermarquart, and I am looking for Francoise, I need to talk to her about work, where is she?"
-2025-09-03 18:18:43 - sense_node - INFO - 📤 Published sense data: 7
-2025-09-03 18:18:56 - sense_node - INFO - 📨 Received external text input from Jean: "I am Jean, and I say: No, Father Marquart, I do not see Francoise, I see you, and I see Mothermarquart, but I do not see Francoise, where is she, exactly?"
-2025-09-03 18:18:56 - sense_node - INFO - 📤 Published sense data: 8
-2025-09-03 18:19:07 - sense_node - INFO - 📨 Received external text input from Jean: "I am Jean, and I say: No, Father Marquart, I do not see Francoise, she is not standing next to you, I see you, and I see Mothermarquart, but I do not see Francoise, are you sure you see her?"
-2025-09-03 18:19:07 - sense_node - INFO - 📤 Published sense data: 9
-2025-09-03 18:19:47 - sense_node - INFO - 📨 Received external text input from Jean: "Hello, I am looking for someone to share thoughts on work with, maybe you, Father Marquart, can help me, no?"
-2025-09-03 18:19:47 - sense_node - INFO - 📤 Published sense data: 10
-2025-09-03 18:20:12 - sense_node - INFO - 📨 Received external text input from Jean: "I am Jean, and I say: Ah, work, zis is a good topic, I know a thing or two about work too, Father Marquart, I have been working on ze farm, in ze forest, since I left ze military, I am strong, and I am honest, and I am committed to working ze land, but I am tired, and I am hungry, and I am thirsty, I need rest, and I need food, and I need water, I want to share with you, Father Marquart, my thoughts on work, and my hopes for ze future, I hope to inherit a share of ze family farm, and make a living as a farmer, I want to find love, and build a family, and live a good life, what do you think, Father Marquart, eh?"
-2025-09-03 18:20:12 - sense_node - INFO - 📤 Published sense data: 11
-2025-09-03 18:20:46 - sense_node - INFO - 📨 Received external text input from Francoise: "Let's share a meal, Fathermarquart, if you wish"
-2025-09-03 18:20:46 - sense_node - INFO - 📤 Published sense data: 12
-2025-09-03 18:20:56 - sense_node - INFO - 📨 Received external text input from Francoise: "I am a bit hungry, too, Father Marquart, and I have some cheese, and some apple, we can share, yes?"
-2025-09-03 18:20:56 - sense_node - INFO - 📤 Published sense data: 13
-2025-09-03 18:21:42 - sense_node - INFO - Received signal 2, initiating shutdown...
-2025-09-03 18:21:43 - sense_node - INFO - Sense Node shutdown initiated...
-2025-09-03 18:21:43 - sense_node - INFO - Sense Node shutdown complete
-2025-09-03 18:21:43 - sense_node - INFO - Received signal 15, initiating shutdown...
+2025-09-04 18:33:48 - sense_node - INFO - 🔧 Debug mode enabled for User
+2025-09-04 18:33:48 - sense_node - INFO - 👁️ Sense Node initialized for character: User
+2025-09-04 18:33:48 - sense_node - INFO - Console Text Sensor ready - will auto-disable if external input detected
+2025-09-04 18:33:48 - sense_node - INFO - Sense Node running - press Ctrl+C to sto2025-02025-09-04 18:38:30 - sense_node - INFO - 👁️ Visual event received: agent_detected - {'agent_name': 'Joe', 'position': [20, 26], 'distance': 10, 'timestamp': '2025-09-04T18:38:30.526625'}
+2025-09-04 18:53:04 - sense_node - INFO - 👁️ Visual event received: agent_detected - {'agent_name': 'Samantha', 'position': [17, 23], 'distance': 10, 'timestamp': '2025-09-04T18:53:04.254451'}
+9-04 18:49:10 - sense_node - INFO - 👁️ Visual event received: agent_detected - {'agent_name': 'Samantha', 'position': [15, 16], 'distance': 9, 'timestamp': '2025-09-04T18:49:10.952141'}
