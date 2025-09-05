@@ -4,45 +4,43 @@
     "Clearing",
     "Meadow",
     "Path",
-    "Water",
     "Mountain",
+    "Water",
     "Village",
     "Hut",
-    "Spring",
     "Thicket",
-    "Cave",
-    "Appletree"
+    "Spring",
+    "Cave"
   ],
   "tools": [
     "Backpack",
     "Berries",
     "Mushrooms",
+    "Appletree",
     "Fallenbranch",
     "Spring",
-    "Mushrooms",
-    "Berries",
-    "Appletree"
+    "Thicket"
   ],
   "roles": [
-    "Outsider",
     "Explorer",
     "Seeker",
+    "Survivor",
     "Companion"
   ],
   "norms_rules": [
-    "Respect boundaries and privacy of others",
-    "Share resources fairly when together",
-    "Aid others in distress",
-    "Preserve the environment and leave minimal impact",
-    "Signal for help if lost or in trouble",
-    "Be honest about personal needs and well-being"
+    "Do not harm others.",
+    "Respect personal boundaries and property.",
+    "Share useful information when approached.",
+    "Prioritize safety in unknown terrain.",
+    "Do not consume unknown substances.",
+    "Offer assistance if someone appears in need."
   ],
   "hazards": [
-    "UnfamiliarTerrain",
-    "PoisonousEdibles",
     "Dehydration",
-    "Exhaustion",
-    "FallingBranch"
+    "Fatigue",
+    "Hunger",
+    "GettingLost",
+    "Injury"
   ],
   "social_graph": [
     "Joe",
@@ -63,8 +61,7 @@
       "id": "SurveyArea",
       "drive": "SolveMystery",
       "roles": [
-        "Explorer",
-        "Seeker"
+        "Explorer"
       ]
     },
     {
@@ -82,24 +79,39 @@
       ]
     },
     {
-      "id": "SignalHelp",
-      "drive": "Safety",
+      "id": "RestRecover",
+      "drive": "Physiological",
       "roles": [
-        "Outsider"
+        "Survivor"
+      ]
+    },
+    {
+      "id": "CollectWater",
+      "drive": "Physiological",
+      "roles": [
+        "Survivor"
+      ]
+    },
+    {
+      "id": "ForageBerries",
+      "drive": "Physiological",
+      "roles": [
+        "Survivor"
+      ]
+    },
+    {
+      "id": "InventoryBackpack",
+      "drive": "Physiological",
+      "roles": [
+        "Survivor"
       ]
     },
     {
       "id": "AvoidHazard",
       "drive": "Safety",
       "roles": [
-        "Explorer"
-      ]
-    },
-    {
-      "id": "HideSelf",
-      "drive": "Safety",
-      "roles": [
-        "Seeker"
+        "Explorer",
+        "Survivor"
       ]
     },
     {
@@ -110,30 +122,15 @@
       ]
     },
     {
-      "id": "RestRecover",
-      "drive": "Physiological",
+      "id": "HideSelf",
+      "drive": "Safety",
       "roles": [
-        "Explorer",
-        "Companion"
+        "Survivor"
       ]
     },
     {
-      "id": "CollectWater",
-      "drive": "Physiological",
-      "roles": [
-        "Explorer"
-      ]
-    },
-    {
-      "id": "ForageBerries",
-      "drive": "Physiological",
-      "roles": [
-        "Explorer"
-      ]
-    },
-    {
-      "id": "InventoryBackpack",
-      "drive": "Physiological",
+      "id": "SignalHelp",
+      "drive": "Safety",
       "roles": [
         "Explorer"
       ]
@@ -142,8 +139,7 @@
       "id": "GreetStranger",
       "drive": "Companionship",
       "roles": [
-        "Companion",
-        "Outsider"
+        "Companion"
       ]
     },
     {
@@ -157,8 +153,7 @@
       "id": "NegotiateAssistance",
       "drive": "Companionship",
       "roles": [
-        "Companion",
-        "Seeker"
+        "Companion"
       ]
     }
   ],
@@ -166,84 +161,71 @@
     "Forest": [
       "SurveyArea",
       "ScanForPaths",
-      "HideSelf",
-      "AvoidHazard",
       "ForageBerries",
+      "AvoidHazard",
       "MarkTrail",
-      "SignalHelp"
+      "HideSelf"
     ],
     "Clearing": [
       "RestRecover",
       "SignalHelp",
-      "InventoryBackpack",
-      "GreetStranger"
+      "InventoryBackpack"
     ],
     "Meadow": [
       "SurveyArea",
-      "ForageBerries",
-      "RestRecover",
-      "SignalHelp"
+      "SignalHelp",
+      "RestRecover"
     ],
     "Path": [
       "ScanForPaths",
-      "MarkTrail",
-      "OrientToHut"
+      "MarkTrail"
+    ],
+    "Mountain": [
+      "SurveyArea",
+      "ScanForPaths"
     ],
     "Water": [
       "CollectWater",
       "RestRecover"
     ],
-    "Mountain": [
-      "SurveyArea",
-      "ScanForPaths",
-      "SignalHelp"
-    ],
     "Village": [
       "GreetStranger",
       "NegotiateAssistance",
-      "RestRecover"
-    ],
-    "Hut": [
-      "GreetStranger",
-      "NegotiateAssistance",
-      "RestRecover",
       "TestTrust"
     ],
-    "Spring": [
-      "CollectWater",
-      "RestRecover"
+    "Hut": [
+      "OrientToHut",
+      "RestRecover",
+      "GreetStranger"
     ],
     "Thicket": [
       "HideSelf",
-      "ForageBerries",
-      "AvoidHazard"
+      "ForageBerries"
+    ],
+    "Spring": [
+      "CollectWater"
     ],
     "Cave": [
       "HideSelf",
-      "RestRecover"
-    ],
-    "Appletree": [
-      "ForageBerries",
       "RestRecover"
     ]
   },
   "drive_coverage": {
     "Find a way out of the forest.": [
       "SurveyArea",
-      "ScanForPaths",
-      "OrientToHut"
-    ],
-    "Find Hut1.": [
-      "OrientToHut",
       "ScanForPaths"
     ],
+    "Find Hut1.": [
+      "OrientToHut"
+    ],
     "Live and survive safely while finding a way out of the forest or waiting for rescue.": [
-      "AvoidHazard",
       "RestRecover",
       "CollectWater",
       "ForageBerries",
-      "InventoryBackpack",
+      "AvoidHazard",
       "MarkTrail",
+      "HideSelf",
+      "InventoryBackpack",
       "SignalHelp"
     ],
     "companionship, community, family, acceptance, trust, intimacy.": [
@@ -254,8 +236,8 @@
   },
   "states": [
     "hunger",
-    "fatigue",
     "thirst",
+    "fatigue",
     "injury"
   ]
 }

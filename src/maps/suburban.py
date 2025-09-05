@@ -90,6 +90,7 @@ resource_rules = {
             'description': 'A comfortable bed',
             'count': 1,
             'requires_property': True,
+            'remove_on_take': False,
             'terrain_weights': {
                 terrain_types.House: 1.0
             }
@@ -99,6 +100,7 @@ resource_rules = {
             'description': 'A bathroom with shower',
             'count': 1,
             'requires_property': True,
+            'remove_on_take': False,
             'terrain_weights': {
                 terrain_types.House: 1.0
             }
@@ -108,6 +110,7 @@ resource_rules = {
             'description': 'A closet with clothes',
             'count': 1,
             'requires_property': True,
+            'remove_on_take': False,
             'terrain_weights': {
                 terrain_types.House: 1.0
             }
@@ -117,6 +120,7 @@ resource_rules = {
             'description': 'An automatic coffee maker',
             'count': 1,
             'requires_property': True,
+            'remove_on_take': True,
             'terrain_weights': {
                 terrain_types.House: 1.0
             }
@@ -126,6 +130,7 @@ resource_rules = {
             'description': 'A parked car',
             'count': 1,
             'requires_property': True,
+            'remove_on_take': True,
             'terrain_weights': {
                 terrain_types.Yard: 1.0
             }
@@ -135,6 +140,7 @@ resource_rules = {
             'description': 'A mailbox',
             'count': 1,
             'requires_property': True,
+            'remove_on_take': True,
             'terrain_weights': {
                 terrain_types.Yard: 1.0
             }
@@ -144,6 +150,7 @@ resource_rules = {
             'description': 'A bus stop',
             'count': 2,
             'requires_property': False,
+            'remove_on_take': False,
             'terrain_weights': {
                 terrain_types.Sidewalk: 1.0
             }
@@ -153,6 +160,7 @@ resource_rules = {
             'description': 'A downtown office building',
             'count': 1,
             'requires_property': True,
+            'remove_on_take': False,
             'terrain_weights': {
                 terrain_types.City: 2.0  # Higher weight to ensure placement
             }

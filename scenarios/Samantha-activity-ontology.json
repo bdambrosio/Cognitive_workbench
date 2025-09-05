@@ -1,47 +1,46 @@
 {
   "places": [
+    "Water",
+    "Mountain",
     "Forest",
     "Clearing",
     "Meadow",
     "Path",
-    "Mountain",
-    "Spring",
-    "Village",
-    "Hut",
-    "Thicket",
-    "Cave"
+    "Village"
   ],
   "tools": [
-    "Backpack",
+    "Village",
+    "Hut",
     "Berries",
     "Mushrooms",
     "Appletree",
     "Fallenbranch",
-    "WaterBottle"
+    "Spring",
+    "Cave",
+    "Thicket"
   ],
   "roles": [
     "Explorer",
-    "Hiker",
-    "Seeker",
+    "Forager",
+    "RestSeeker",
     "Companion",
-    "Outsider",
-    "Forager"
+    "Philosopher",
+    "Scout",
+    "Villager"
   ],
   "norms_rules": [
-    "Do not harm forest creatures without cause",
-    "Do not enter huts without invitation",
-    "Share found resources with companions when possible",
-    "Respect personal boundaries and privacy",
-    "Leave no trace; avoid unnecessary damage to forest"
+    "Respectotherspace",
+    "Avoidunnecessaryrisk",
+    "Sharefindingsiftrustestablished",
+    "Preservenaturalresources",
+    "Remaincautiouswithstrangers"
   ],
   "hazards": [
-    "GettingLost",
+    "Highfatigue",
     "Dehydration",
-    "Fatigue",
-    "InjuryMinor",
-    "RoughTerrain",
-    "PoisonousPlant",
-    "UnstableGround"
+    "Exposure",
+    "Gettinglost",
+    "Suspiciousstrangers"
   ],
   "social_graph": [
     "Samantha",
@@ -61,46 +60,30 @@
   "activities": [
     {
       "id": "SurveyArea",
-      "drive": "SolveMystery",
+      "drive": "Adventure",
       "roles": [
         "Explorer",
-        "Seeker"
+        "Scout"
       ]
     },
     {
       "id": "ScanForPaths",
-      "drive": "SolveMystery",
-      "roles": [
-        "Explorer",
-        "Hiker"
-      ]
-    },
-    {
-      "id": "ExploreNewPlace",
       "drive": "Adventure",
       "roles": [
         "Explorer",
-        "Hiker"
-      ]
-    },
-    {
-      "id": "ObserveWildlife",
-      "drive": "Learn",
-      "roles": [
-        "Seeker",
-        "Explorer"
-      ]
-    },
-    {
-      "id": "ForageBerries",
-      "drive": "Physiological",
-      "roles": [
-        "Forager",
-        "Explorer"
+        "Scout"
       ]
     },
     {
       "id": "CollectWater",
+      "drive": "Physiological",
+      "roles": [
+        "Explorer",
+        "Forager"
+      ]
+    },
+    {
+      "id": "SearchForEdibles",
       "drive": "Physiological",
       "roles": [
         "Forager",
@@ -111,15 +94,93 @@
       "id": "RestRecover",
       "drive": "Physiological",
       "roles": [
-        "Hiker",
-        "Explorer"
+        "RestSeeker"
+      ]
+    },
+    {
+      "id": "SignalHelp",
+      "drive": "Safety",
+      "roles": [
+        "Explorer",
+        "Scout"
+      ]
+    },
+    {
+      "id": "HideSelf",
+      "drive": "Safety",
+      "roles": [
+        "Explorer",
+        "Scout"
+      ]
+    },
+    {
+      "id": "MarkTrail",
+      "drive": "Safety",
+      "roles": [
+        "Explorer",
+        "Scout"
+      ]
+    },
+    {
+      "id": "GreetStranger",
+      "drive": "Companionship",
+      "roles": [
+        "Companion",
+        "Villager"
+      ]
+    },
+    {
+      "id": "TestTrust",
+      "drive": "Companionship",
+      "roles": [
+        "Companion",
+        "Philosopher"
+      ]
+    },
+    {
+      "id": "NegotiateAssistance",
+      "drive": "Companionship",
+      "roles": [
+        "Companion",
+        "Villager"
       ]
     },
     {
       "id": "InventoryBackpack",
       "drive": "Safety",
       "roles": [
-        "Hiker",
+        "Explorer",
+        "Forager"
+      ]
+    },
+    {
+      "id": "ObserveWildlife",
+      "drive": "Learn",
+      "roles": [
+        "Explorer",
+        "Philosopher"
+      ]
+    },
+    {
+      "id": "InspectPlants",
+      "drive": "Learn",
+      "roles": [
+        "Forager",
+        "Explorer"
+      ]
+    },
+    {
+      "id": "Reflect",
+      "drive": "Learn",
+      "roles": [
+        "Philosopher"
+      ]
+    },
+    {
+      "id": "RecordFindings",
+      "drive": "Learn",
+      "roles": [
+        "Philosopher",
         "Explorer"
       ]
     },
@@ -128,140 +189,75 @@
       "drive": "Safety",
       "roles": [
         "Explorer",
-        "Hiker"
-      ]
-    },
-    {
-      "id": "MarkTrail",
-      "drive": "Safety",
-      "roles": [
-        "Explorer",
-        "Hiker"
-      ]
-    },
-    {
-      "id": "HideSelf",
-      "drive": "Safety",
-      "roles": [
-        "Outsider",
-        "Explorer"
-      ]
-    },
-    {
-      "id": "GreetStranger",
-      "drive": "Companionship",
-      "roles": [
-        "Companion",
-        "Outsider"
-      ]
-    },
-    {
-      "id": "TestTrust",
-      "drive": "Companionship",
-      "roles": [
-        "Companion",
-        "Outsider"
-      ]
-    },
-    {
-      "id": "NegotiateAssistance",
-      "drive": "Companionship",
-      "roles": [
-        "Companion",
-        "Outsider"
-      ]
-    },
-    {
-      "id": "ReflectOnExperience",
-      "drive": "Adventure",
-      "roles": [
-        "Seeker",
-        "Explorer"
+        "Scout"
       ]
     },
     {
       "id": "OrientToHut",
-      "drive": "SolveMystery",
+      "drive": "Adventure",
       "roles": [
-        "Seeker",
-        "Explorer"
-      ]
-    },
-    {
-      "id": "SignalHelp",
-      "drive": "Safety",
-      "roles": [
-        "Explorer"
-      ]
-    },
-    {
-      "id": "SearchForEdibles",
-      "drive": "Physiological",
-      "roles": [
-        "Forager"
+        "Explorer",
+        "Scout"
       ]
     }
   ],
   "affordances": {
     "Forest": [
       "SurveyArea",
-      "ObserveWildlife",
-      "ForageBerries",
       "SearchForEdibles",
-      "AvoidHazard",
+      "ObserveWildlife",
       "HideSelf",
-      "MarkTrail",
-      "ExploreNewPlace",
-      "ReflectOnExperience"
+      "AvoidHazard",
+      "InspectPlants",
+      "MarkTrail"
     ],
     "Clearing": [
       "RestRecover",
       "SignalHelp",
-      "InventoryBackpack",
       "GreetStranger",
-      "TestTrust",
-      "NegotiateAssistance"
+      "InventoryBackpack",
+      "TestTrust"
     ],
     "Meadow": [
       "SurveyArea",
-      "ObserveWildlife",
       "RestRecover",
-      "ExploreNewPlace"
+      "ObserveWildlife",
+      "SignalHelp",
+      "Reflect"
     ],
     "Path": [
       "ScanForPaths",
       "MarkTrail",
-      "AvoidHazard",
-      "ExploreNewPlace"
-    ],
-    "Mountain": [
-      "SurveyArea",
-      "ObserveWildlife",
-      "AvoidHazard",
-      "ReflectOnExperience"
-    ],
-    "Spring": [
-      "CollectWater",
-      "RestRecover",
-      "InventoryBackpack"
+      "OrientToHut",
+      "AvoidHazard"
     ],
     "Village": [
-      "GreetStranger",
-      "NegotiateAssistance"
-    ],
-    "Hut": [
-      "GreetStranger",
       "NegotiateAssistance",
-      "RestRecover"
+      "TestTrust",
+      "GreetStranger"
     ],
-    "Thicket": [
-      "HideSelf",
-      "ForageBerries",
-      "SearchForEdibles"
+    "Water": [
+      "CollectWater",
+      "RestRecover",
+      "ObserveWildlife"
     ],
     "Cave": [
       "HideSelf",
+      "AvoidHazard",
       "RestRecover"
+    ],
+    "Appletree": [
+      "SearchForEdibles",
+      "InspectPlants"
+    ],
+    "Berries": [
+      "SearchForEdibles",
+      "InspectPlants"
+    ],
+    "Thicket": [
+      "HideSelf",
+      "SearchForEdibles",
+      "AvoidHazard"
     ]
   },
   "drive_coverage": {
@@ -270,30 +266,32 @@
       "MarkTrail",
       "HideSelf",
       "SignalHelp",
+      "InventoryBackpack",
       "RestRecover",
-      "InventoryBackpack"
+      "CollectWater",
+      "SearchForEdibles"
     ],
     "Learn about the forest and the animals, plants, and resources in the forest.": [
-      "SurveyArea",
       "ObserveWildlife",
-      "SearchForEdibles",
-      "ScanForPaths"
+      "InspectPlants",
+      "RecordFindings",
+      "Reflect"
     ],
     "Adventure, excitement, and the thrill of the unknown.": [
-      "ExploreNewPlace",
-      "ReflectOnExperience",
+      "SurveyArea",
+      "ScanForPaths",
       "OrientToHut"
     ],
     "love and belonging, including home, acceptance, friendship, trust, intimacy.": [
       "GreetStranger",
-      "NegotiateAssistance",
-      "TestTrust"
+      "TestTrust",
+      "NegotiateAssistance"
     ]
   },
   "states": [
     "hunger",
-    "thirst",
     "fatigue",
+    "thirst",
     "injury"
   ]
 }

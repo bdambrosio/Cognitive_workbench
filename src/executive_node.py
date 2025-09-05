@@ -531,7 +531,7 @@ class ZenohExecutiveNode:
                         self.last_state_update_time = self.current_time
                     else:
                         dt_minutes = max(0.0, (self.current_time - self.last_state_update_time).total_seconds() / 60.0)
-                        if dt_minutes > 0:
+                        if dt_minutes > 0 and self.manual is False:
                             tick_state(self.self_state, dt_minutes)
                             self.last_state_update_time = self.current_time
                             # Log cap condition
