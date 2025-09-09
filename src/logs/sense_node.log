@@ -1,6 +1,0 @@
-2025-09-08 18:59:26 - sense_node - INFO - 🔧 Debug mode enabled for User
-2025-09-08 18:59:26 - sense_node - INFO - 👁️ Sense Node initialized for character: User
-2025-09-08 18:59:26 - sense_node - INFO - Console Text Sensor ready - will auto-disable if external input detected
-2025-09-08 18:59:26 - sense_node - INFO - Sense Node running - press Ctrl+C to sto2025-09-08 19:07:36 - sense_node - INFO - 👁️ Visual event received: agent_detected - {'agent_name': 'Samantha', 'position': [21, 19], 'distance': 8, 'timestamp': '2025-09-08T19:07:36.378270'}
-5-2025-09-08 19:26:56 - sense_node - INFO - 👁️ Visual event received: agent_detected - {'agent_name': 'Joe', 'position': [30, 27], 'distance': 10, 'timestamp': '2025-09-08T19:26:56.554512'}
-2025-09-08 19:32:24 - sense_node - INFO - 👁️ Visual event received: agent_detected - {'agent_name': 'Joe', 'position': [29, 26], 'distance': 10, 'timestamp': '2025-09-08T19:32:24.308797'}
