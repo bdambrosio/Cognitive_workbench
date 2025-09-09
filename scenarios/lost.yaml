@@ -4,6 +4,8 @@ llm_config:
   server_name: "vllm"
   model_name: "llama3.1-8b-instruct"
 
+max_turns: 200
+
 setting: |
   early summer morning in the modern era, setting is a temperate, mixed forest-open landscape with no buildings, no roads, no other signs of humanity. 
     It is a early morning on what seems like it will be a warm, sunny day. mid-2020s, western, moderate climate.

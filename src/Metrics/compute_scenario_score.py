@@ -8,6 +8,8 @@ import math
 import argparse
 import shutil
 import subprocess
+import hashlib
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 def run_jq_digest(line: str, jq_path: str) -> Optional[Dict[str, Any]]:
@@ -104,13 +106,47 @@ def max_state_from_entry(d: Dict[str, Any]) -> Optional[float]:
         return None
     return max(vals)
 
+def state_geomean_from_entry(d: Dict[str, Any]) -> Optional[float]:
+    """Geometric mean over hunger/fatigue/thirst using 'max' then 'end', scaled to [0,1]."""
+    vals = []
+    for key in ["hunger", "fatigue", "thirst"]:
+        blk = d.get(key) or {}
+        v = blk.get("max")
+        if v is None:
+            v = blk.get("end")
+        if v is None:
+            continue
+        try:
+            x = float(v)
+            # scale to [0,1]
+            x = max(0.0, min(100.0, x)) / 100.0
+            vals.append(x)
+        except Exception:
+            continue
+    if not vals:
+        return None
+    # geometric mean
+    try:
+        prod = 1.0
+        for x in vals:
+            # ensure non-negative
+            prod *= max(0.0, x)
+        gm = prod ** (1.0 / len(vals))
+        return gm
+    except Exception:
+        return None
+
 def drive_vector_from_entry(d: Dict[str, Any]) -> List[float]:
     """Extract drive scores (0..1) in listed order."""
     drives = (((d.get("drive_fulfillment") or {}).get("drives")) or [])
     vec = []
     for dr in drives:
         try:
-            vec.append(float(dr.get("score", 0.0)))
+            # Back-compat: prefer plan_score, fallback to score
+            v = dr.get("plan_score")
+            if v is None:
+                v = dr.get("score", 0.0)
+            vec.append(float(v))
         except Exception:
             vec.append(0.0)
     return vec
@@ -136,6 +172,12 @@ def scenario_score_for_file(
     avg_goal_sat_num = 0.0
     avg_goal_sat_den = 0.0
     avg_drive_num = 0.0  # NEW: time-weighted sum of drive-only (pre-survival)
+    plan_score_sum = 0.0
+    plan_score_den = 0.0
+    state_gm_sum = 0.0
+    state_gm_den = 0.0
+    failure_rate_sum = 0.0
+    failure_rate_den = 0.0
 
     with open(jsonl_path, "r", encoding="utf-8") as f:
         for raw in f:
@@ -185,12 +227,47 @@ def scenario_score_for_file(
                 avg_goal_sat_num += float(gs) * wt
                 avg_goal_sat_den += wt
 
+            # Per-plan extras
+            # plan_score from digest summary_score (0..100) scaled to 0..1
+            ps_raw = d.get("summary_score")
+            ps_scaled = None
+            try:
+                if ps_raw is not None:
+                    ps_scaled = clamp(float(ps_raw) / 100.0, 0.0, 1.0)
+                    plan_score_sum += ps_scaled
+                    plan_score_den += 1.0
+            except Exception:
+                ps_scaled = None
+
+            # State geomean (0..1)
+            st_gm = state_geomean_from_entry(d)
+            if isinstance(st_gm, (int, float)):
+                state_gm_sum += float(st_gm)
+                state_gm_den += 1.0
+
+            # Failure rate per plan
+            try:
+                counts = d.get("counts", {}) or {}
+                steps_total = counts.get("steps_total")
+                failures = counts.get("failures")
+                if steps_total and float(steps_total) > 0:
+                    fr = max(0.0, float(failures or 0) / float(steps_total))
+                    failure_rate_sum += fr
+                    failure_rate_den += 1.0
+                else:
+                    fr = 0.0
+            except Exception:
+                fr = None
+
             per_plan.append({
                 "minutes": wt,
                 "drive_weighted": round(dv_weighted, 4),
+                "drive_fulfillment": round(dv_weighted, 4),
                 "survival_penalty": round(pen, 4),
                 "contribution": round(contrib, 4),
                 "goal_satisfaction": gs if gs is None else round(float(gs), 4),
+                "plan_score": (None if ps_scaled is None else round(float(ps_scaled), 4)),
+                "state_geomean": (None if st_gm is None else round(float(st_gm), 4)),
                 "max_state": mstate if mstate is None else round(float(mstate), 2),
             })
 
@@ -207,6 +284,11 @@ def scenario_score_for_file(
         avg_gs = None
         blended = base
 
+    # Scenario-level new aggregates (unweighted means over plans with values)
+    avg_plan_score = (plan_score_sum / plan_score_den) if plan_score_den > 0 else None
+    avg_state_geomean = (state_gm_sum / state_gm_den) if state_gm_den > 0 else None
+    avg_failure_rate = (failure_rate_sum / failure_rate_den) if failure_rate_den > 0 else None
+
     return {
         "file": jsonl_path,
         "used_digest_jq": bool(use_jq),
@@ -220,23 +302,46 @@ def scenario_score_for_file(
         "avg_drive_fulfillment": round(avg_drive, 4),
         "scenario_score_base": round(base, 4),
         "scenario_score_final": round(blended, 4),
+        "avg_plan_score": (None if avg_plan_score is None else round(float(avg_plan_score), 4)),
+        "avg_state_geomean": (None if avg_state_geomean is None else round(float(avg_state_geomean), 4)),
+        "avg_failure_rate": (None if avg_failure_rate is None else round(float(avg_failure_rate), 4)),
         "per_plan": per_plan,
     }
 
 def main():
     ap = argparse.ArgumentParser(description="Compute scenario score from plans.jsonl using digest.jq (optional).")
-    ap.add_argument("--plans", required=True, help="Path to plans.jsonl")
+    grp = ap.add_mutually_exclusive_group(required=True)
+    grp.add_argument("--plans", help="Path to plans.jsonl")
+    grp.add_argument("--character", help="Character name to resolve input as data/<Character>-plans.jsonl")
     ap.add_argument("--digest", default=None, help="Path to digest.jq (optional but recommended)")
     ap.add_argument("--last-fraction", type=float, default=0.5, help="Weight of last drive relative to first (default 0.5)")
     ap.add_argument("--soft-start", type=float, default=70.0, help="Survival soft start threshold (default 70)")
     ap.add_argument("--danger", type=float, default=80.0, help="Survival danger threshold (default 80)")
     ap.add_argument("--hard", type=float, default=100.0, help="Survival hard cutoff (default 100)")
-    ap.add_argument("--goal-sat-weight", type=float, default=0.0, help="Blend factor [0..1] to include avg goal satisfaction multiplicatively")
-    ap.add_argument("--out", default=None, help="Write JSON report to this file")
+    ap.add_argument("--goal-sat-weight", type=float, default=0.25, help="Blend factor [0..1] to include avg goal satisfaction multiplicatively")
+    ap.add_argument("--out", default=None, help="Write JSON report to this file (overrides analysis dir write)")
+    ap.add_argument("--yes", action="store_true", help="Overwrite scenario_score.json without prompting if it exists")
     args = ap.parse_args()
 
+    # Resolve input path and character
+    if args.plans:
+        plans_path = args.plans
+        character = None
+        base = os.path.basename(plans_path)
+        if base.endswith("-plans.jsonl"):
+            character = base[:-len("-plans.jsonl")]
+    else:
+        character = (args.character or "").strip()
+        character = character.capitalize() if character else character
+        plans_path = os.path.join("..", "data", f"{character}-plans.jsonl")
+
+    if not os.path.exists(plans_path):
+        print(f"ERROR: plans file not found: {plans_path}", file=sys.stderr)
+        sys.exit(2)
+
+    # Compute report
     report = scenario_score_for_file(
-        jsonl_path=args.plans,
+        jsonl_path=plans_path,
         jq_path=args.digest,
         last_fraction=args.last_fraction,
         soft_start=args.soft_start,
@@ -245,13 +350,74 @@ def main():
         goal_sat_weight=args.goal_sat_weight,
     )
 
-    out = json.dumps(report, indent=2)
+    out_json = json.dumps(report, indent=2)
+
+    # If explicit output path provided, honor it for backward-compat
     if args.out:
         with open(args.out, "w", encoding="utf-8") as f:
-            f.write(out + "\n")
+            f.write(out_json + "\n")
         print(f"Wrote report to {args.out}")
-    else:
-        print(out)
+        return
+
+    # Create analysis directory: analysis/<Character>-<YYYYMMDD-HHMMSS>
+    # Derive character if still unknown
+    if not character:
+        base = os.path.basename(plans_path)
+        character = base[:-len("-plans.jsonl")] if base.endswith("-plans.jsonl") else os.path.splitext(base)[0]
+
+    st = os.stat(plans_path)
+    mtime = datetime.fromtimestamp(st.st_mtime, tz=timezone.utc)
+    ts_str = mtime.strftime("%Y%m%d-%H%M%S")
+    run_dir = os.path.join("analysis", f"{character}-{ts_str}")
+    os.makedirs(run_dir, exist_ok=True)
+
+    # Copy input plans into run directory
+    dst_plans = os.path.join(run_dir, os.path.basename(plans_path))
+    try:
+        shutil.copy2(plans_path, dst_plans)
+    except Exception:
+        # Fallback to copy without metadata
+        shutil.copy(plans_path, dst_plans)
+
+    # Prepare output path
+    score_path = os.path.join(run_dir, "scenario_score.json")
+    if os.path.exists(score_path) and not args.yes:
+        try:
+            ans = input(f"File exists: {score_path}. Overwrite? [y/N]: ").strip().lower()
+        except Exception:
+            ans = "n"
+        if ans not in ("y", "yes"):
+            print("Aborted by user (won't overwrite).", file=sys.stderr)
+            sys.exit(3)
+
+    with open(score_path, "w", encoding="utf-8") as f:
+        f.write(out_json + "\n")
+    print(f"Wrote scenario score to {score_path}")
+
+    # Write manifest.json
+    try:
+        # Compute SHA256 of input
+        sha256 = hashlib.sha256()
+        with open(plans_path, "rb") as pf:
+            for chunk in iter(lambda: pf.read(8192), b""):
+                sha256.update(chunk)
+        manifest = {
+            "character_name": character,
+            "input_path": os.path.abspath(plans_path),
+            "input_basename": os.path.basename(plans_path),
+            "input_mtime_utc": mtime.isoformat(),
+            "input_sha256": sha256.hexdigest(),
+            "analysis_dir": os.path.abspath(run_dir),
+            "scenario_score_path": os.path.abspath(score_path),
+            "used_digest_jq": bool(args.digest and shutil.which("jq") and os.path.exists(args.digest)),
+            "digest_cli": (["jq", "-f", args.digest] if args.digest else None),
+            "compute_cli": sys.argv,
+        }
+        with open(os.path.join(run_dir, "manifest.json"), "w", encoding="utf-8") as mf:
+            json.dump(manifest, mf, indent=2)
+        print(f"Wrote manifest to {os.path.join(run_dir, 'manifest.json')}")
+    except Exception as e:
+        print(f"WARNING: failed to write manifest: {e}", file=sys.stderr)
 
 if __name__ == "__main__":
     main()

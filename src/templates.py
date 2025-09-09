@@ -21,17 +21,26 @@ import os
 console_handler = logging.StreamHandler(sys.stdout)
 console_handler.setLevel(logging.WARNING)
 
-# File handler with INFO level (full logging)
-file_handler = logging.FileHandler('logs/executive_node.log', mode='w')
-file_handler.setLevel(logging.WARNING)
-if os.getenv('CWB_DEBUG', '') in ('1', 'true', 'yes', 'on'):
-    file_handler.setLevel(logging.INFO)
+# File handler with INFO level (full logging) – ensure logs dir exists relative to this file
+handlers_list = [console_handler]
+try:
+    _log_dir = os.path.join(os.path.dirname(__file__), 'logs')
+    os.makedirs(_log_dir, exist_ok=True)
+    _log_path = os.path.join(_log_dir, 'executive_node.log')
+    file_handler = logging.FileHandler(_log_path, mode='w')
+    file_handler.setLevel(logging.WARNING)
+    if os.getenv('CWB_DEBUG', '') in ('1', 'true', 'yes', 'on'):
+        file_handler.setLevel(logging.INFO)
+    handlers_list.append(file_handler)
+except Exception:
+    # Fall back to console-only if file handler setup fails
+    pass
 
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     datefmt='%Y-%m-%d %H:%M:%S',
-    handlers=[console_handler, file_handler],
+    handlers=handlers_list,
     force=True
 )
 logger = logging.getLogger('executive_node')
@@ -47,7 +56,7 @@ except ImportError as e:
     print(f"⚠️  LLM Client not available: {e}")
     LLM_CLIENT_AVAILABLE = False
 
-PHYSIOLOGICAL_NEEDS = [
+PHYSIOLOGICAL_STATES = [
             {"name":"hunger","metric":"hunger","better_when":"decreasing","bands":{"low":[0,30],"mid":[30,70],"high":[70,100]}},
             {"name":"thirst","metric":"thirst","better_when":"decreasing","bands":{"low":[0,30],"mid":[30,70],"high":[70,100]}},
             {"name":"fatigue","metric":"fatigue","better_when":"decreasing","bands":{"low":[0,30],"mid":[30,70],"high":[70,100]}}
@@ -57,7 +66,7 @@ PHYSIOLOGICAL_NEEDS = [
 
 ONTOLOGY_TEMPLATE = """You are creating an ontology for daily activities for {{$character_name}}. 
 Attend to the era, setting, and locale, these will often be imagined, fantasy, or historical settings. These provide context for the activities the character engages in.
-Pay particular attention to the character's drives and physiological needs, these define, at a high level, the motivations for the activities.
+Pay particular attention to the character's drives and physiological states, these define, at a high level, the motivations for the activities.
 Produce an ontology that is strictly consistent with the provided setting, character, drives, and Base noun and verb types.
 Do NOT introduce wilderness/survival elements (e.g., forest hazards, foraging) unless they are explicitly present in the setting/map_types, they are for illustration purposes only.
 Likewise, do NOT import corporate/legal/online elements unless present. Stay data-driven by the inputs.
@@ -67,88 +76,69 @@ INPUT:
 {{$setting}}
 ##
 
-#Base noun types:
-{{$primitive_nouns}}
-##
-    
-#Base verb types:
-{{$primitive_verbs}}
+#Physiological states of characters (metrics and thresholds):
+{{$physiological_states}}
 ##
 
-#Base place types:
-{{$primitive_places}}
-##
-
-#Base tool types:
-{{$primitive_tools}}
-##
-
-#Physiological needs of characters (metrics and thresholds):
-{{$physiological_needs}}
-##
-
-#Character personality:
+#Character description:
 {{$character}}
 ##
 
 #Character drives:    
 {{$character_drives}}
 ##
-    
+
 #Drive lexicon hints (nouns and verbs in drives above):
-{{$drive_lexicon}}   
+{{$drive_lexicon}}
 ##
 
-#Other Characters {{#character_name}} might interact with:
-{{$other_characters}}
+##The following are built-in primitives for the ontology:
+
+#Primitive nouns:
+{{$primitive_nouns}}
+##
+    
+#Primitive verbs:
+{{$primitive_verbs}}
+##
+
+#Primitive places (a subset of primitive nouns):
+{{$primitive_places}}
+##
+
+#Primitive tool & resource types (a subset of primitive nouns):
+{{$primitive_tools}}
+##
+
+#Character names (a subset of primitive nouns):
+{{$character_names}}
 ##
 
 Include mental, physical, social, and other activities that are possible and consistent with the character and their drives in this setting.
-Pay special attention to the character's drives in the context of the setting.
+Pay special attention to the character's physiological states and their drives in the context of the setting.
 
-OUTPUT (JSON) (All names - places, tools, roles, norms, hazards, social_graph - must be unique and must consist of letters only - no spaces or special characters)
+OUTPUT (JSON) ((words in places, tools & resources, and resources must be unique and must consist of letters only - no spaces or special characters))
 
-- places[]            - setting-specific venues or loci (e.g., offices, meeting rooms, benches) these must be either primitive places or plausible generalizations of them. Do not invent new places.
-- tools[]             - artifacts/means usable by the character (e.g., documents, contracts, slide decks, phones/apps, keycards, vehicles) these should be primitive tools or plausible generalizations. Do not invent new tools.
-- roles[]             - roles the character can adopt
-- norms_rules[]       - norms and rules that constrain behavior
+- activities[]        - canonical activity types for the setting, given the character\'s drives and physiological states. 
+  Express activities as concise verb phrases using the most general nouns and verbs covering available characters, places, tools & resources, resources, and primitive actions, e.g. consume food vs eat apple.
+- characters[]        - character names in scenario, including self.
+- places[]            - setting-specific locations where activities can occur. these must be either primitive places, plausible generalizations of them, or supersets of primitive places. Do not invent new places other than plausible generalizations or supersets of primitive places.
+- tools_&_resources[] - artifacts/objects usable by the character in performing activities. these should be primitive tools, plausible generalizations, or supersets of primitive tools. Do not invent new tools other than plausible generalizations or supersets of primitive tools.
+- resources []        - resources that are available in the setting that might be referenced in activities and not included in tools_&_resources. 
+  these should be primitive resources, plausible generalizations, or supersets of primitive resources. 
+  Do not invent new resources other than plausible generalizations or supersets of primitive resources.
+  Include a noun for each of the groups of places or tools_&_resources that generalizes over all primitive resources that can reduceh a physiological need.
+- norms_rules[]       - norms and rules that constrain behavior and activities in the setting.
 - hazards[]           - hazards to avoid
 - social_graph[]      - social actors/groups present in the setting
 - time_windows        - [dawn, morning, afternoon, dusk, evening, day, night]
-- activities[]        - canonical activity types (drive-facing), each with a stable id and minimal schema
-- affordances         - mapping: place -> [activity_id], where place can be physical or institutional/virtual (e.g., “ConferenceRoomA”: ["PitchClient","NegotiateContract"], “WeChatThread”: ["GatherGossip","ScheduleMeeting"])
-- drive_coverage      - mapping: drive_name -> [activity_id] (≥1 activity per drive)
 - states[]            - physiological/psychological states the character can experience (include: {{$states}})
 
-Schema details:
-
-activities[] elements:
-{
-  "id": "SurveyArea",                 # letters only, unique
-  "drive": "SolveMystery|Safety|Companionship|Physiological",  # pick the best-aligned primary drive
-  "roles": ["Farmer|Son|Villager|Suitor"],  # pick the best-aligned roles
-}
-
-affordances:
-{
-  "Forest": ["HideSelf","SearchForEdibles"],
-  "Clearing": ["RestRecover","SignalHelp","InventoryBackpack"]
-  ...
-}
-
-drive_coverage:
-{
-  "Solve the mystery of how I ended up here. Find a way out of the forest.": ["SurveyArea","ScanForPaths","OrientToHut"],
-  "safety from threats ...": ["AvoidHazard","MarkTrail","HideSelf"],
-  "companionship, community ...": ["GreetStranger","TestTrust","NegotiateAssistance"],
-  "immediate physiological needs ...": ["CollectWater","ForageBerries","RestRecover"]
-}
-
 Constraints:
-- Every drive in {{$character_drives}} MUST appear as a key in drive_coverage with ≥1 activity_id.
-- Every activity_id referenced in affordances and drive_coverage MUST exist in activities[].
-- Activities should be concise and reusable (setting-general), not micro-steps.
-- If a middle-ontology MANIFEST is available downstream, its verb/noun ids SHOULD be used when later expressing plans/goals; the upper ontology should not invent conflicting taxonomies.
+- Physiological states - hunger, thirst, fatigue - are primary drives. Ensure places, tools & resources, and activities address them and the nouns and verbs that can reduce them.
+- Every drive in character drives MUST be a target drive of two or more activities..
+- Every noun and verb appearing in activities MUST be in the ontology, or a generalization or collection of primitive nouns or verbs.
+- Activities should be concise and reusable (setting-general), not situational micro-steps.
 
 Do not import examples or terminology from unrelated domains. If you are unsure, prefer neutral, setting-consistent terms derived from the provided setting, map_types, character_drives, and social graph.
 respond only with the JSON, no other text.
@@ -156,10 +146,11 @@ end your response with </end>
 """
 llm_client = None
 
-MIDDLE_ONTOLOGY_TEMPLATE = prompt ="""You are constructing TWO DIRECTED ACYCLIC GRAPHS (DAGs) that form a middle-layer ontology:
+MIDDLE_ONTOLOGY_TEMPLATE = prompt ="""You are constructing TWO DIRECTED ACYCLIC ONTOLOGY GRAPHS (DAGs) that form a middle-layer ontology.
+These DAGS connecting all the nouns and verbs (respectively), appearing in characters, places, tools & resources, resources, activities, and states in the ontology provided.
 (1) a VERB graph (action frames/operators), and
-(2) a NOUN graph (entity/resource/infrastructure/property type categories).
-These bridge from activity steps (in activities.json) to primitive nouns / verbs WITHOUT producing executable plans.
+(2) a NOUN graph (characters/resources/infrastructure/places/tools & resources/resources/property type categories).
+These bridge from activities in the provided ontology to primitive nouns / verbs WITHOUT producing executable plans.
 
 INPUTS
 -------
@@ -169,14 +160,15 @@ INPUTS
 # CHARACTER DRIVES
 {{$character_drives}}
 
-Physiological needs (metrics and thresholds):
-{{$physiological_needs}}
+Physiological states (metrics and thresholds):
+{{$physiological_states}}
 ##
 
 #Drive lexicon hints (nouns and verbs in drives above):
 {{$drive_lexicon}} 
 ##
 
+------------------------- The primitives available to ground (serve as leaves of) the ontology DAGs are --------------------
 #Primitive Nouns
 {{$primitive_nouns}}
 ##
@@ -189,14 +181,19 @@ Physiological needs (metrics and thresholds):
 {{$primitive_places}}
 ##
 
-#Base tool types:
+#Base tool and resource types:
 {{$primitive_tools}}
 ##
 
+#Character names:
+{{$character_names}}
+##
+----------------------- end primitives ----------------------------
+
 #GOAL
 ----
-Return a compact, reusable, scenario-aware pair of DAGs that are bounded above by the ontology.json and character drives, and from below by primitive nouns and verbs.
-Include nouns from the upper ontology places, tools, roles, and activities as starting points for the noun DAG.
+Return a compact, reusable, scenario-aware pair of DAGs that are bounded above by the ONTOLOGY and character drives, and from below by primitive nouns and verbs.
+Include nouns from the upper ontology places, tools & resources, resources, roles, and activities as starting points for the noun DAG. Some of these nouns may be primitive, but others may be more specific.
 A “leaf” node is any node with no outgoing refines edge and no decomposition_patterns. Leaf nodes are the most specific categories in the DAGs. Internal nodes are those with at least one child via refines or decomposition.
 - The DAGs will support multi-level decomposition or typing via "decomposition_patterns" that point to NEXT-LOWER-LEVEL TERMS (not primitives).
 - Decomposition_patterns must only reference existing verb/noun IDs from the manifest (verbs for verb decompositions, nouns for noun decompositions),
@@ -206,12 +203,12 @@ A “leaf” node is any node with no outgoing refines edge and no decomposition
 - Verb ontology size: between 40 and 60 nodes (inclusive).
 - Noun ontology size: between 40 and 80 nodes (inclusive). 
 - Are bounded in height (depth of decomposition ≤ 3).
-- **Every verb node must include exactly one hint_anchor chosen from existing primitive verbs. Exclude any verb that cannot be anchored without inventing new families.**
-- **Every leaf noun must have an 'anchor_types' field containing at least one primitive noun. Do not invent abstract anchors; internal nouns inherit anchors from descendants. Do not list raw primitive map_types as node IDs.**",
-- **Each character drive has at least two verb+noun path exists that plausibly fulfills it (e.g., hunger → Acquire+Edible).**
-- **Exclude verbs not used by any activity step, ontology term, or drive.**
-- **Do not provide transitive closure of edges, only direct immediate descendants.**
-- **Edges are strictly refines taxonomy only. Decomposition_patterns are procedural scaffolds (for verbs) or part_of (for nouns) and must never be encoded as edges. The two are disjoint.**
+- Every verb node must include exactly one hint_anchor chosen from existing primitive verbs. Exclude any verb that cannot be anchored without inventing new families.
+- Every leaf noun must have an 'anchor_types' field containing at least one primitive noun. Do not invent abstract anchors; internal nouns inherit anchors from descendants. Do not list raw primitive map_types as node IDs.
+- Each character drive has at least two verb+noun path exists that plausibly fulfills it (e.g., hunger → Acquire+Edible).
+- Exclude verbs not used by any activity step, ontology term, or drive.
+- Do not provide transitive closure of edges, only direct immediate descendants.
+- Edges are strictly refines taxonomy only. Decomposition_patterns are procedural scaffolds (for verbs) or part_of (for nouns) and must never be encoded as edges. The two are disjoint.
 - **Refines edge direction is parent→child (general→specific). Never include both A→B and B→A.**
 
 OUTPUT (STRICT JSON ONLY; NO MARKDOWN)
@@ -246,25 +243,23 @@ OUTPUT (STRICT JSON ONLY; NO MARKDOWN)
     "nodes": [
       {
         "id": "Acquire",
-        "aliases": ["get","pick_up","take_possession"],
-        "args": "object to acquire, optional source",
+        "target": "object to acquire",
         "decomposition_patterns": [{"sequence":["Locate","Approach","Collect"]}], 
         "hint_anchor": "take"
       }
       /* … 40-60 verb nodes total … */
     ],
-    /* edges: taxonomy refines only (parent→child). Do NOT list decomposition steps here. */
+    /* edges: taxonomy refines only (parent→child, e.g. Acquire→Take). Do NOT list verbs in decomposition_patterns here. */
     "edges": [ {"from": "parent", "to": "child"},... ]
   },
 
   "nouns": {
     "nodes": [ {
       "id": "Edible",
-      "aliases": ["nutrition"],
       "decomposition_patterns": [{"parts": ["<noun_part_id>","<noun_part_id>"]}],
       "anchor_types": ["AppleTree","Path"]
     }... ],
-    /* edges: taxonomy refines only (parent→child). Do NOT list decomposition steps here. */
+    /* edges: taxonomy refines only (parent→child, e.g. Edible→Apple). Do NOT list nouns in decomposition_patterns here. */
     "edges": [ {"from": "parent", "to": "child"},... ]
   }
 }
@@ -275,19 +270,19 @@ CONSTRAINTS
 -----------
   "invariants": [
     "No cycles in either graph (verbs or nouns), either in the edge graph (subtypes) or the decomposition graph (sequences for verbs, parts for nouns).",
-    "Every decomposition_patterns references existing nodes in the same graph.",
+    "Every decomposition_patterns references only existing nodes in the same graph.",
     "Verb decomposition is SEQUENCE only; sequences can contain only verb ids or primitive verbs).",
     "Noun decomposition is PART_OF only; decomposition_patterns can contain noun ids or primitive nouns).",
     "No execution details appear; this is not a plan.",
-    "Aliases collapse near-synonyms to reduce proliferation.",
+    "Collapse near-synonyms to reduce proliferation. Choose the most general term.",
     "All Node IDs are unique, letters only, and in python capitalize. Do not duplicate primitive nouns or verbs that may be in lower case.
     "Prefer general terms; introduce scenario-specific leaves only when required by drives or activities.",
     "Decomposition depth ≤ 3.",
-    "**Every verb node must include a hint_anchor chosen from {move, take, place, inspect, use, scan, say, think, wait}.**",
-    "**Every leaf noun must have an 'anchor_types' field containing at least one primitive noun. Do not invent abstract anchors; internal nouns inherit anchors from descendants. Do not list primitive nouns as node IDs.**",
-    "**Each drive has at least 2 verb+noun paths that plausibly fulfill it.**",
-    "**≥ 95% of activity steps and plan template operators must map to a verb+noun path.** ",
-    "**Exclude verbs not supported by any activity step, ontology term, or drive.**",
+    "Every verb node must include a hint_anchor chosen from {move, take, place, inspect, use, scan, say, think, wait}.",
+    "Every leaf noun must have an 'anchor_types' field containing all primitive nouns (characters, places, tools & resources, resources), that it plausibly can be. Do not invent abstract anchors; internal nouns inherit anchors from descendants. Do not list primitive nouns as node IDs.",
+    "Each drive has at least 2 verb+noun paths that plausibly fulfill it.",
+    "≥ 95% of activity steps and plan template operators must map to a verb+noun path. ",
+    "Exclude verbs not supported by any activity step, ontology term, or drive.",
     "Edges list contains only 'refines' taxonomy links; decompositions must appear only in decomposition_patterns.",
     "No reciprocal refines (forbid A→B and B→A).",
     "Refines direction is parent→child (general→specific).",
@@ -308,8 +303,8 @@ CONSTRAINTS
 GUIDANCE
 --------
 1) STEP 1: Propose a manifest of verb and noun IDs + glosses,using Ontology places, tools, and activity names as starting points. Use only these IDs thereafter.
-2) STEP 2: Build verbs ontology by refinement or decomposition to primitive verbs. Collapse near-synonyms into aliases. Use drives to filter: if no drive supports a candidate verb, exclude it.
-3) STEP 3: Build nouns from Ontology places, tools, and activity names. 
+2) STEP 2: Build verbs ontology by refinement or decomposition to from activity verbs to primitive verbs. Use drives to filter: if no drive supports a candidate verb, exclude it.
+3) STEP 3: Build nouns from Ontology characters, places, tools & resources, resources, and nouns in activity names. 
 4) STEP 4: Build nouns ontology by refinement or decomposition to primitive nouns. Collapse near-synonyms into aliases.
 4) Decomposition_patterns ONLY to point to lower-level nodes (verbs→verbs, nouns→nouns) or primitives. Do Not invent new verbs or nouns in decomposition_patterns. Do not mirror decomposition in edges.
 5) Keep DAGs shallow (≤3 layers). Edges are “refines”, ie subtype edges; direction is parent→child.
@@ -320,19 +315,117 @@ Output ONLY the JSON, no other text. Do not include any other text, whether intr
 
 """
 
-ACTIVITIES_TEMPLATE = """You are generating a comprehensive activity list for a character. 
-CHARACTER: 
-{{$character}}
+DRIVE_ACTIVITY_TEMPLATE = """TASK
+You are analyzing a DRIVE in the context of a CLOSED-WORLD BASE ONTOLOGY.  
+The ontology lists all possible base nouns and verbs in this world.  
+Your task is to return a JSON object describing:  
+1. The minimal set of orthogonal state–antonym AXES implied by the Drive.  
+2. For each axis, a general ACTIVITY–ITEMCLASS pair that would move the agent from the negative to the positive state.  
+3. A mapping from the ITEMCLASS to INCLUDED and EXCLUDED base nouns, under the closed-world assumption.  
 
-SETTING:
-{{$setting}}
+---
 
-DRIVES:
-{{$character_drives}}
+### PROCESS
 
+Step 1: Identify AXES  
+- Return 2–5 orthogonal state–antonym pairs that span the drive.  
+- State names should be concise, agent-centered (e.g. "Thirsty" vs "Not-Thirsty").  
+
+Step 2: For each AXIS, generate an ACTIVITY–ITEMCLASS pair.  
+- **Activity**: A verb consistent with the axis that, when combined with the ItemClass, would move the agent from the negative to the positive state. 
+  Verbs should not be drawn from the primitive verbs, but rather should express a general action that is consistent with the axis, e.g. Acquire rather than Take.
+- **ItemClass**: a general category noun. The noun should be as general as possible consistent with the activity, and must include at least one base noun from the ontology as a subtype.
+- **Subtypes included**: base nouns that instantiate or function as sources of this ItemClass. When ambiguous, err on the side of inclusivity.   
+- **Subtypes excluded**: group all other base nouns.  
+
+If an ItemClass has no base nouns usable for this activity in the closed world, return an empty list for `subtypes_included'.
+
+---
+
+### INPUTS
+
+# DRIVE  
+{{$drive_statement}}  
+
+# BASE ONTOLOGY (closed world)  
+{------------------------- The primitives available to ground  are --------------------
+#Primitive Nouns
+{{$primitive_nouns}}
 ##
 
-TASK: Generate 24-30 activities as a JSON object, with the keys being the activity names. Distribute across these categories:
+#Primitive Verbs
+{{$primitive_verbs}}
+##
+
+#Primitive place types:
+{{$primitive_places}}
+##
+
+#Primitive tool and resource types:
+{{$primitive_tools}}
+##
+
+#Character names:
+{{$character_names}}
+##
+----------------------- end primitives ----------------------------
+
+### OUTPUT FORMAT (strict JSON)
+
+```json
+{
+  "drive": "<drive_statement>",
+  "axes": [
+    {
+      "axis": ["<negative_state>", "<positive_state>"],
+      "activity_itemclass": {
+        "activity": "<general_verb>",
+        "itemclass": "<general_noun_class>"
+      },
+      "subtypes_included": ["<base nouns drawn from ontology>"],
+      "subtypes_excluded": ["<base nouns drawn from ontology>"]
+    }
+    // repeat for each axis
+  ]
+}
+
+"""
+
+ACTIVITIES_TEMPLATE = """TASK: 
+You are generating a comprehensive activity list for a character. 
+#CHARACTER: 
+{{$character}}
+##
+#SETTING:
+{{$setting}}
+##
+#DRIVES:
+{{$character_drives}}
+##
+#STATES:
+{{$states}}
+##
+#CHARACTER NAMES:
+{{$character_names}}
+##
+#OTHER CHARACTERS:
+{{$other_characters}}
+##
+#ONTOLOGY NOUNS:
+{{$ontology_nouns}}
+##
+#ONTOLOGY VERBS:
+{{$ontology_verbs}}
+##
+#BASE NOUNS:
+{{$primitive_nouns}}
+##
+#BASE VERBS:
+{{$primitive_verbs}}
+##
+
+TASK: Generate 24-40 activities as a JSON object, with the keys being the activity names. Distribute across these categories:
+#CATEGORIES
 - Physiological ADLs (eating, drinking, sleeping) - 3-4 activities situated in the setting and your available roles
 - Instrumental ADLs/Logistics (planning, preparing) - 2-3 activities  situated in the setting and your available roles
 - Mobility & Transport  - 2-3 activities situated in the setting and your available roles
@@ -347,7 +440,8 @@ TASK: Generate 24-30 activities as a JSON object, with the keys being the activi
 
 #GUIDANCE
 # 1. Generate activities consistent with the character, their drives, and the setting.
-# 2. At least 50% of the activities should be support one or more character drives.
+# 2. A significant number of the activities should simply be activities of daily living (ADLs) and should be located in the setting and your available roles.
+# 3. At least 50% of the activities should be support one or more character drives.
 
 In the following schema: 
 <period> is one of: dawn, morning, afternoon, dusk, evening, night, day
@@ -358,44 +452,31 @@ Each Activity should conform to this schema:
   "name": "string", ** even though the activity name is also the object key, also include it inside the object.
   "category": <category from above>,
   "tags": ["physical","mental","social","solo","outdoors","survival","routine"],
+  "steps": ["step", "step", ...] - 3–5 terse steps that will serve as planning goals.
+    **These must be stated using only nouns and verbs from the ontology nouns, ontology verbs, base nouns, base verbs and common connectives**."],
   "when": "daily@<period> | opportunistic | seasonal@<season>", 
-  "where": ["place ids"], - only nouns from the middle ontology or base types
+  "where": ["place ids"], - constraint on initial location. Often empty, e.g. if activity starts with 'move to'. include ONLY nouns from the ontology nounsor base nouns
   "duration": [min_minutes, max_minutes],
-  "needs": ["tools or innate capacities"], - only nouns from the middle ontology or base types
-  "states_addressed": [one or more items from the ontology states field], - what physiological/psychological needs this activity satisfies
-  "steps": ["3–5 terse steps that will serve as planning goals. These must be stated using only nouns and verbs from the middle ontology, base types, base actions and common connectives."],
+  "needs": ["tools or innate capacities"], - ONLY nouns from the ontology or base types
+  "states_addressed": [one or more items from the ontology states field], - what physiological/psychological states this activity satisfies
   "importance": 0.0,
   "habit": 0.0
 }
 
-The following ontologies must be used to fill in the details of activities:
-- ONTOLOGY: 
-{{$ontology}}
+The following activities suggest the types of activities that may be generated:
+# ACTIVITIES EXAMPLES: 
+{{$ontology-activities}}
 
 Note the activities listed in the ontology above are *examples* and are not exhaustive. 
 You may use them as a guide to generate activities that are more specific to the character and setting.
 ##
 
-- MIDDLE ONTOLOGY NOUNS:
-{{$middle_nouns}}
-##
+**Use only ONTOLOGY NOUNS, ONTOLOGY VERBS, BASE NOUNS, and BASE VERBS to fill in the where and needs fields. Do not invent new nouns or verbs.**
+Include self-care actions that remediate flagging physiological states (e.g. eating reduces hunger, rest reduces fatigue, injury or sickness). 
+Make sure to specify which states each activity addresses in the "states_addressed" field.
 
-- MIDDLE ONTOLOGY VERBS:
-{{$middle_verbs}}
-##
-- BASE TYPES:
-{{$primitive_nouns}}
-
-- BASE ACTIONS:
-{{$primitive_verbs}}
-##
-
-
-Use only middle ontology nouns and verbs or BASE TYPES or BASE ACTIONS to fill in the where, needs and steps fields. Do not invent new nouns or verbs.
-Include self-care actions that remediate physiological needs (e.g. eating reduces hunger, rest reduces fatigue, injury or sickness). Make sure to specify which states each activity addresses in the "states_addressed" field.
-
-#Characters you can interact with (if any):
-{{$other_characters}}
+#Characters you might encounter or interact with (if any):
+{{$character_names}}
 ##
 
 #Step Guidelines:
@@ -410,14 +491,17 @@ Each step should:
 - Always use the broadest applicable period or season in the "when" field, broadest applicable place in the "where" field, and broadest applicable tool in the "needs" field.
 
 #State Alignment Guidelines:
-- Activities that address urgent physiological needs (high hunger, fatigue, thirst, injury) will be prioritized by the system
-- Use "states_addressed" to specify which needs the activity satisfies (e.g., eating activities address "hunger")
+- Activities that address urgent physiological states (high hunger, fatigue, thirst, injury) will be prioritized by the system
+- Use "states_addressed" to specify which states the activity satisfies (e.g., eating activities address "hunger")
 - Consider the character's current state when designing activities - hungry characters should have access to hunger-reducing activities
+
+#CONSTRAINTS:
+- Use only ONTOLOGY NOUNS, ONTOLOGY VERBS, BASE NOUNS, and BASE VERBS to fill in the "steps", "where" and "needs" fields. Do not invent new nouns or verbs.
 
 Do not include any other text, introductory, explanatory, markdown, code fences, etc.
 """
 
-REWRITE_TEMPLATE = """Task: rewrite an activity step into a concisegoal statement using only allowed nouns and verbs.
+REWRITE_TEMPLATE = """Task: rewrite an activity step into a concise goal statement using only allowed nouns and verbs.
 Output: a goal statement text string. Do not include any other text, introductory, explanatory, markdown, code fences, etc.
 
 INPUTS
@@ -454,26 +538,37 @@ end your response with </end>
 GOAL_TEMPLATE = """What is the most relevant thing you should work on next? 
 Consider in addition to the information above:
 
-#Character Basic Needs
-{{$physiological_needs}}
+#Character Basic Physiological States 
+{{$physiological_states}}
 
 #Character Drives
 {{$character_drives}}
 
 #What is the central issue / opportunity / obligation demanding the character's attention?
-1. If any physiological state value rised to 90, the character dies. State values below 40 are desirable.
-2. Consider your current state (e.g., hunger, fatigue, thirst, injury); a survival-critical state (e.g., value above 70) should bias goals toward remediation.
-3. Otherwise, Drives should be main priority,in the context of the current situation. Drives above are in priority order, highest first.
+1. If any physiological state value rised to 95, the character dies. State values below 40 are desirable.
+   Consider your current state (e.g., hunger, fatigue, thirst, injury); a survival-critical state (e.g., value above 70) should bias goals toward remediation.
+2. Otherwise, Drives should be main priority, in the context of the current situation. Drives above are listed in priority order, highest first.
 
-#You MUST use ONLY verbs and nouns from the MANIFEST below. Use the exact 'id' strings (case-sensitive). 
- - Do NOT introduce synonyms (e.g., use 'Acquire' not 'Find'). If a needed concept is absent, pick the closest available MANIFEST term rather than inventing a new one.
- - Outside MANIFEST terms, you may use only function words and connectors:
+#You MUST use ONLY verbs and nouns from the ONTOLOGY below. Use the exact 'id' strings (case-sensitive). 
+ - Do NOT introduce synonyms (e.g., use 'Acquire' not 'Find'). If a needed concept is absent, pick the closest available ONTOLOGY term rather than inventing a new one.
+ - Outside ONTOLOGY terms, you may use only non-content words and connectors, e.g.:
 {a, an, the, this, that, these, those, of, to, from, for, with, near, toward, by, and, or, if, until, then}.
 You may also use concrete instance IDs visible in the situation (e.g., Appletree7, Spring3) and numerals.
  - No other content words are allowed.
 
-ONTOLOGY MANIFEST
-{{$middle_ontology}}
+------ ONTOLOGY ------
+BASE NOUNS
+{{$primitive_nouns}}
+
+BASE VERBS
+{{$primitive_verbs}}
+
+ABSTRACT NOUNS
+{{$abstract_nouns}}
+
+ABSTRACT VERBS
+{{$abstract_verbs}}
+----- END ONTOLOGY -----
 
 Nothing in this or other instructions limits your use of deception or surprise to continue work on your drives..
                   
@@ -483,8 +578,8 @@ be careful to insert line breaks only where shown, separating a value from the n
 
 #goal: 5–8 words; MUST begin with one MANIFEST verb id; include ≥1 MANIFEST noun id or a visible instance ID (e.g., “Acquire Edible from Appletree7” or “Survey ForestEdge for Landmark”).
 #description: 8–14 words; MUST include ≥1 MANIFEST verb id and ≥1 MANIFEST noun id; only allowed function words beyond MANIFEST terms.
-#otherCharacterName: a visible character name or “None”.
-#termination: 5–6 words; MUST be a checkable condition phrased with MANIFEST terms (e.g., “Reached ForestEdge within visibility” or “Acquired Edible from Appletree7”).
+#otherCharacterName: a name of another character involved in this goal, if any, or “None”.
+#termination: 5–6 words; MUST be a checkable condition phrased with ONTOLOGY terms (e.g., “Reached ForestEdge within visibility” or “Acquired Edible from Appletree7”).
 ##
 
 Respond ONLY with the above hash-formatted text.
@@ -629,7 +724,7 @@ outside a while, if, or wait condition, "type" can take the values "say", "move"
      Inspect a resource or character to learn something about it. Must be 'near' the resource or character to inspect it. reason focuses the inspection on some specific aspect of the resource or character.
  - "use": { "type": "use", "target": "resource_name", "reason": "what outcome do you hope to achieve? - 5 words max"} 
      Using a resource or infrastructure. You must be 'near' the resource or infrastructure to use it. 
-     "use" on a path will move you one stepalong it to a new location.
+     "use" on a path will move you one step along it to a new location.
      You may want to inspect a resource first to learn the effect of using it. Some resources are consumables; using edible resources (e.g., Berries) can reduce hunger.
 
 A plan must include no more than 8 steps including all nested while and if branches.
@@ -639,3 +734,43 @@ PLAN_TEMPLATE_C = """
 """
 
 PLAN_TEMPLATE = PLAN_TEMPLATE_A + PLAN_TEMPLATE_B + PLAN_TEMPLATE_C
+
+DRIVE_ASSESSMENT_TEMPLATE = """TASK:
+Assess how well the following Drive was met by the following Plan (0.0 worst to 1.0 best) based on the provided context. 
+Be strict and conservative. 
+Return ONLY a JSON object: {score": float, "rationale": a terse string}]}
+
+Drive:
+{{$drive}}
+
+Goal:
+{{$goal}}
+
+Plan:
+{{$plan}}
+
+Physiological state (0=best,100=worst):
+{{$state}}
+
+Inventory (ids):
+{{$inventory}}
+
+Recent conversations (last 10):
+{{$chats}}
+
+Knowledge gained - thoughts:
+{{$thoughts}}
+
+Knowledge gained - inspections:
+{{$inspects_map}}
+
+Knowledge gained - uses:
+{{$uses_map}}
+
+Recent actions (last 20):
+{{$actions}}
+
+Instructions:
+Generate a score in [0.0,1.0] where 1.0 means well satisfied/fulfilled, 0.0 means badly unmet. Use concise rationales.
+Return ONLY a JSON object: {"score": float, "rationale": a terse string}]}"""
+

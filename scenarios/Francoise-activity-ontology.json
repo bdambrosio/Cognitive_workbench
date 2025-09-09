@@ -1,278 +1,351 @@
 {
-  "places": [
-    "Village",
-    "Farm",
-    "Field",
-    "Market",
-    "Well",
-    "Mill",
-    "Blacksmith",
-    "Path",
-    "Grassland",
-    "Water",
-    "Mountain",
-    "Forest",
-    "Spring",
-    "Church"
-  ],
-  "tools": [
-    "Hoe",
-    "Plow",
-    "Scythe",
-    "Bread",
-    "Apple",
-    "Chicken",
-    "Egg",
-    "Milk",
-    "Cheese",
-    "Butter"
-  ],
-  "roles": [
-    "Villager",
-    "Farmer",
-    "Daughter",
-    "Suitor",
-    "Acquaintance",
-    "Helper"
-  ],
-  "norms_rules": [
-    "Speak respectfully to elders and men",
-    "Avoid being seen alone with unmarried men",
-    "Attend church regularly",
-    "Dress modestly and neatly",
-    "Help family with farm chores",
-    "Do not gossip",
-    "Protect family reputation",
-    "Be diligent and hardworking",
-    "Respect village traditions"
-  ],
-  "hazards": [
-    "Gossip",
-    "Scandal",
-    "Fatigue",
-    "Hunger",
-    "Thirst"
-  ],
-  "social_graph": [
-    "Jean",
-    "FatherMarquart",
-    "MotherMarquart",
-    "VillageWomen",
-    "VillageMen",
-    "MarketVendors",
-    "ParishPriest",
-    "Fran\u00e7oiseFamily",
-    "OtherSuitors"
-  ],
-  "time_windows": [
-    "dawn",
-    "morning",
-    "afternoon",
-    "dusk",
-    "evening",
-    "day",
-    "night"
-  ],
   "activities": [
     {
-      "id": "PerformChores",
+      "axis": [
+        "Unmarried",
+        "Married"
+      ],
+      "drive": "find a good husband to marry, gain status and security",
+      "activity_itemclass": {
+        "activity": "FormUnion",
+        "itemclass": "Person"
+      },
+      "subtypes_included": [
+        "Jean",
+        "Francoise",
+        "FatherMarquart",
+        "MotherMarquart"
+      ]
+    },
+    {
+      "axis": [
+        "LowStatus",
+        "HighStatus"
+      ],
+      "drive": "find a good husband to marry, gain status and security",
+      "activity_itemclass": {
+        "activity": "Associate",
+        "itemclass": "Community"
+      },
+      "subtypes_included": [
+        "Village",
+        "Market",
+        "Farm",
+        "Blacksmith",
+        "Jean",
+        "Francoise",
+        "FatherMarquart",
+        "MotherMarquart"
+      ]
+    },
+    {
+      "axis": [
+        "Insecure",
+        "Secure"
+      ],
+      "drive": "find a good husband to marry, gain status and security",
+      "activity_itemclass": {
+        "activity": "Obtain",
+        "itemclass": "Resource"
+      },
+      "subtypes_included": [
+        "Farmhouse",
+        "Bread",
+        "Apple",
+        "Chicken",
+        "Egg",
+        "Milk",
+        "Cheese",
+        "Butter",
+        "Well",
+        "Spring",
+        "Farm",
+        "Market",
+        "Field"
+      ]
+    },
+    {
+      "axis": [
+        "Hungry",
+        "Not-Hungry"
+      ],
       "drive": "help your family with the endless chores",
-      "roles": [
-        "Farmer",
-        "Daughter",
-        "Helper"
+      "activity_itemclass": {
+        "activity": "Provide",
+        "itemclass": "Food"
+      },
+      "subtypes_included": [
+        "Bread",
+        "Apple",
+        "Chicken",
+        "Egg",
+        "Milk",
+        "Cheese",
+        "Butter"
       ]
     },
     {
-      "id": "TendAnimals",
+      "axis": [
+        "Thirsty",
+        "Not-Thirsty"
+      ],
       "drive": "help your family with the endless chores",
-      "roles": [
-        "Farmer",
-        "Daughter",
-        "Helper"
+      "activity_itemclass": {
+        "activity": "Supply",
+        "itemclass": "Drink"
+      },
+      "subtypes_included": [
+        "Water",
+        "Well",
+        "Spring",
+        "Milk"
       ]
     },
     {
-      "id": "GatherWater",
+      "axis": [
+        "Fatigued",
+        "Rested"
+      ],
       "drive": "help your family with the endless chores",
-      "roles": [
-        "Helper",
-        "Daughter"
+      "activity_itemclass": {
+        "activity": "Enable",
+        "itemclass": "Shelter"
+      },
+      "subtypes_included": [
+        "Farmhouse"
       ]
     },
     {
-      "id": "PrepareFood",
+      "axis": [
+        "Unmaintained",
+        "Maintained"
+      ],
       "drive": "help your family with the endless chores",
-      "roles": [
-        "Daughter",
-        "Helper"
+      "activity_itemclass": {
+        "activity": "Perform",
+        "itemclass": "Chore"
+      },
+      "subtypes_included": [
+        "Field",
+        "Farm",
+        "Hoe",
+        "Plow",
+        "Scythe",
+        "Mill"
       ]
     },
     {
-      "id": "VisitMarket",
-      "drive": "help your family with the endless chores",
-      "roles": [
-        "Daughter",
-        "Villager",
-        "Helper"
-      ]
-    },
-    {
-      "id": "AttendChurch",
-      "drive": "avoid scandal and protecting your reputation",
-      "roles": [
-        "Villager",
-        "Daughter"
-      ]
-    },
-    {
-      "id": "GreetVillagers",
-      "drive": "gain status and security",
-      "roles": [
-        "Villager",
-        "Daughter"
-      ]
-    },
-    {
-      "id": "ConverseWithSuitor",
-      "drive": "find a good husband to marry",
-      "roles": [
-        "Villager",
-        "Suitor",
-        "Daughter"
-      ]
-    },
-    {
-      "id": "GuardReputation",
-      "drive": "avoid scandal and protecting your reputation",
-      "roles": [
-        "Daughter",
-        "Villager"
-      ]
-    },
-    {
-      "id": "SeekAdvice",
-      "drive": "find a good husband to marry",
-      "roles": [
-        "Daughter",
-        "Villager"
-      ]
-    },
-    {
-      "id": "RestInShade",
+      "axis": [
+        "Fatigued",
+        "Rested"
+      ],
       "drive": "brief moments of rest and simple joys amid the hardships",
-      "roles": [
-        "Daughter",
-        "Helper"
+      "activity_itemclass": {
+        "activity": "Rest",
+        "itemclass": "Shelter"
+      },
+      "subtypes_included": [
+        "Farmhouse"
       ]
     },
     {
-      "id": "ShareMeal",
+      "axis": [
+        "Joyless",
+        "Joyful"
+      ],
       "drive": "brief moments of rest and simple joys amid the hardships",
-      "roles": [
-        "Daughter",
-        "Villager"
+      "activity_itemclass": {
+        "activity": "Experience",
+        "itemclass": "SimplePleasure"
+      },
+      "subtypes_included": [
+        "Apple",
+        "Bread",
+        "Egg",
+        "Milk",
+        "Cheese",
+        "Butter",
+        "Chicken"
       ]
     },
     {
-      "id": "TakeWalk",
-      "drive": "brief moments of rest and simple joys amid the hardships",
-      "roles": [
-        "Daughter",
-        "Villager"
+      "axis": [
+        "Thirsty",
+        "Not-Thirsty"
+      ],
+      "drive": "Maintain hydration \u2014 avoid thirst and keep the body supplied with fluids.",
+      "activity_itemclass": {
+        "activity": "Consume",
+        "itemclass": "Drink"
+      },
+      "subtypes_included": [
+        "Water",
+        "Milk"
+      ]
+    },
+    {
+      "axis": [
+        "NoFluidSource",
+        "FluidSourceAccessible"
+      ],
+      "drive": "Maintain hydration \u2014 avoid thirst and keep the body supplied with fluids.",
+      "activity_itemclass": {
+        "activity": "Access",
+        "itemclass": "Fluid Source"
+      },
+      "subtypes_included": [
+        "Well",
+        "Spring"
+      ]
+    },
+    {
+      "axis": [
+        "Fatigued",
+        "Rested"
+      ],
+      "drive": "Maintain alertness \u2014 avoid fatigue and keep the body rested.",
+      "activity_itemclass": {
+        "activity": "Recover",
+        "itemclass": "Shelter"
+      },
+      "subtypes_included": [
+        "Farmhouse"
+      ]
+    },
+    {
+      "axis": [
+        "Hungry",
+        "Not-Hungry"
+      ],
+      "drive": "Maintain energy \u2014 avoid hunger and keep the body supplied with nutrients.",
+      "activity_itemclass": {
+        "activity": "Obtain",
+        "itemclass": "Food"
+      },
+      "subtypes_included": [
+        "Bread",
+        "Apple",
+        "Chicken",
+        "Egg",
+        "Milk",
+        "Cheese",
+        "Butter"
+      ]
+    },
+    {
+      "axis": [
+        "Thirsty",
+        "Not-Thirsty"
+      ],
+      "drive": "Maintain energy \u2014 avoid hunger and keep the body supplied with nutrients.",
+      "activity_itemclass": {
+        "activity": "Acquire",
+        "itemclass": "Drink"
+      },
+      "subtypes_included": [
+        "Water",
+        "Milk",
+        "Well",
+        "Spring"
       ]
     }
   ],
-  "affordances": {
-    "Farm": [
-      "PerformChores",
-      "TendAnimals",
-      "GatherWater",
-      "PrepareFood",
-      "RestInShade"
+  "verbs": [
+    "FormUnion",
+    "Associate",
+    "Obtain",
+    "Provide",
+    "Supply",
+    "Enable",
+    "Perform",
+    "Rest",
+    "Experience",
+    "Consume",
+    "Access",
+    "Recover",
+    "Acquire"
+  ],
+  "nouns": [
+    "Person",
+    "Community",
+    "Resource",
+    "Food",
+    "Drink",
+    "Shelter",
+    "Chore",
+    "SimplePleasure",
+    "Fluid Source"
+  ],
+  "noun_mappings": {
+    "Person": [
+      "Jean",
+      "Francoise",
+      "FatherMarquart",
+      "MotherMarquart"
     ],
-    "Field": [
-      "PerformChores",
-      "TendAnimals",
-      "RestInShade"
+    "Community": [
+      "Village",
+      "Market",
+      "Farm",
+      "Blacksmith",
+      "Jean",
+      "Francoise",
+      "FatherMarquart",
+      "MotherMarquart"
     ],
-    "Well": [
-      "GatherWater"
+    "Resource": [
+      "Farmhouse",
+      "Bread",
+      "Apple",
+      "Chicken",
+      "Egg",
+      "Milk",
+      "Cheese",
+      "Butter",
+      "Well",
+      "Spring",
+      "Farm",
+      "Market",
+      "Field"
     ],
-    "Market": [
-      "VisitMarket",
-      "GreetVillagers",
-      "ShareMeal"
+    "Food": [
+      "Bread",
+      "Apple",
+      "Chicken",
+      "Egg",
+      "Milk",
+      "Cheese",
+      "Butter"
     ],
-    "Village": [
-      "GreetVillagers",
-      "ConverseWithSuitor",
-      "TakeWalk",
-      "ShareMeal"
+    "Drink": [
+      "Water",
+      "Well",
+      "Spring",
+      "Milk"
     ],
-    "Blacksmith": [
-      "GreetVillagers",
-      "TakeWalk"
+    "Shelter": [
+      "Farmhouse"
     ],
-    "Church": [
-      "AttendChurch",
-      "SeekAdvice",
-      "GuardReputation"
+    "Chore": [
+      "Field",
+      "Farm",
+      "Hoe",
+      "Plow",
+      "Scythe",
+      "Mill"
     ],
-    "Path": [
-      "TakeWalk",
-      "GreetVillagers"
+    "SimplePleasure": [
+      "Apple",
+      "Bread",
+      "Egg",
+      "Milk",
+      "Cheese",
+      "Butter",
+      "Chicken"
     ],
-    "Grassland": [
-      "TakeWalk",
-      "RestInShade"
-    ],
-    "Water": [
-      "GatherWater",
-      "RestInShade"
-    ],
-    "Forest": [
-      "TakeWalk",
-      "RestInShade"
-    ],
-    "Spring": [
-      "GatherWater",
-      "RestInShade"
-    ],
-    "Mill": [
-      "VisitMarket",
-      "GreetVillagers"
+    "Fluid Source": [
+      "Well",
+      "Spring"
     ]
-  },
-  "drive_coverage": {
-    "find a good husband to marry": [
-      "ConverseWithSuitor",
-      "SeekAdvice"
-    ],
-    "gain status and security": [
-      "GreetVillagers",
-      "VisitMarket"
-    ],
-    "avoid scandal and protecting your reputation": [
-      "GuardReputation",
-      "AttendChurch"
-    ],
-    "help your family with the endless chores": [
-      "PerformChores",
-      "TendAnimals",
-      "GatherWater",
-      "PrepareFood",
-      "VisitMarket"
-    ],
-    "brief moments of rest and simple joys amid the hardships": [
-      "RestInShade",
-      "ShareMeal",
-      "TakeWalk"
-    ]
-  },
-  "states": [
-    "hunger",
-    "thirst",
-    "fatigue"
-  ]
+  }
 }

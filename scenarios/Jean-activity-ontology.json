@@ -1,287 +1,429 @@
 {
-  "places": [
-    "Farm",
-    "Field",
-    "Village",
-    "Path",
-    "Market",
-    "Blacksmith",
-    "Well",
-    "Mill",
-    "Church",
-    "River",
-    "Spring"
-  ],
-  "tools": [
-    "Hoe",
-    "Plow",
-    "Scythe",
-    "Bread",
-    "Apple",
-    "Chicken",
-    "Egg",
-    "Milk",
-    "Cheese",
-    "Butter"
-  ],
-  "roles": [
-    "Farmer",
-    "Son",
-    "Villager",
-    "Suitor"
-  ],
-  "norms_rules": [
-    "ObeyFather",
-    "WorkDiligently",
-    "RespectChurch",
-    "KeepFamilyHonor",
-    "AvoidScandal",
-    "HelpNeighbors",
-    "AttendMarketOnMarketDay",
-    "RespectElders"
-  ],
-  "hazards": [
-    "Fatigue",
-    "Hunger",
-    "Thirst",
-    "InjuryFromFarmTools"
-  ],
-  "social_graph": [
-    "FatherMarquart",
-    "MotherMarquart",
-    "Francoise",
-    "VillageElder",
-    "LocalPeasants",
-    "MarketVendors",
-    "Priest"
-  ],
-  "time_windows": [
-    "dawn",
-    "morning",
-    "afternoon",
-    "dusk",
-    "evening",
-    "day",
-    "night"
-  ],
   "activities": [
     {
-      "id": "TendFields",
+      "axis": [
+        "Disinherited",
+        "Inherited"
+      ],
+      "drive": "gain your rightful inheritance - justice and fairness in how the land is divided",
+      "activity_itemclass": {
+        "activity": "Claim",
+        "itemclass": "Landholding"
+      },
+      "subtypes_included": [
+        "Mountain",
+        "Forest",
+        "Grassland",
+        "Field",
+        "Farm"
+      ]
+    },
+    {
+      "axis": [
+        "Unjust",
+        "Just"
+      ],
+      "drive": "gain your rightful inheritance - justice and fairness in how the land is divided",
+      "activity_itemclass": {
+        "activity": "Receive",
+        "itemclass": "Share"
+      },
+      "subtypes_included": [
+        "Mountain",
+        "Forest",
+        "Grassland",
+        "Field",
+        "Farm"
+      ]
+    },
+    {
+      "axis": [
+        "Excluded",
+        "Included"
+      ],
+      "drive": "gain your rightful inheritance - justice and fairness in how the land is divided",
+      "activity_itemclass": {
+        "activity": "Join",
+        "itemclass": "Community"
+      },
+      "subtypes_included": [
+        "Village",
+        "Farmhouse",
+        "Farm"
+      ]
+    },
+    {
+      "axis": [
+        "Unproductive",
+        "Productive"
+      ],
       "drive": "maintain and work the family farm",
-      "roles": [
-        "Farmer",
-        "Son"
+      "activity_itemclass": {
+        "activity": "Cultivate",
+        "itemclass": "Field"
+      },
+      "subtypes_included": [
+        "Field"
       ]
     },
     {
-      "id": "IrrigateCrops",
+      "axis": [
+        "Fatigued",
+        "Rested"
+      ],
       "drive": "maintain and work the family farm",
-      "roles": [
-        "Farmer"
+      "activity_itemclass": {
+        "activity": "Rest",
+        "itemclass": "Shelter"
+      },
+      "subtypes_included": [
+        "Farmhouse"
       ]
     },
     {
-      "id": "HarvestProduce",
+      "axis": [
+        "Hungry",
+        "Not-Hungry"
+      ],
       "drive": "maintain and work the family farm",
-      "roles": [
-        "Farmer"
+      "activity_itemclass": {
+        "activity": "Nourish",
+        "itemclass": "Food"
+      },
+      "subtypes_included": [
+        "Bread",
+        "Apple",
+        "Chicken",
+        "Egg",
+        "Milk",
+        "Cheese",
+        "Butter"
       ]
     },
     {
-      "id": "CareForLivestock",
+      "axis": [
+        "Thirsty",
+        "Not-Thirsty"
+      ],
       "drive": "maintain and work the family farm",
-      "roles": [
-        "Farmer",
-        "Son"
+      "activity_itemclass": {
+        "activity": "Quench",
+        "itemclass": "Drink"
+      },
+      "subtypes_included": [
+        "Water",
+        "Well",
+        "Spring",
+        "Milk"
       ]
     },
     {
-      "id": "MendFences",
-      "drive": "maintain and work the family farm",
-      "roles": [
-        "Farmer",
-        "Son"
-      ]
-    },
-    {
-      "id": "EatMeal",
-      "drive": "immediate needs of survival - food, shelter, health, rest from backbreaking labor",
-      "roles": [
-        "Farmer",
-        "Son",
-        "Villager"
-      ]
-    },
-    {
-      "id": "DrinkWater",
-      "drive": "immediate needs of survival - food, shelter, health, rest from backbreaking labor",
-      "roles": [
-        "Farmer",
-        "Son",
-        "Villager"
-      ]
-    },
-    {
-      "id": "RestRecover",
-      "drive": "immediate needs of survival - food, shelter, health, rest from backbreaking labor",
-      "roles": [
-        "Farmer",
-        "Son"
-      ]
-    },
-    {
-      "id": "RepairTools",
-      "drive": "maintain and work the family farm",
-      "roles": [
-        "Farmer",
-        "Son"
-      ]
-    },
-    {
-      "id": "VisitMarket",
-      "drive": "maintain and work the family farm",
-      "roles": [
-        "Farmer",
-        "Villager"
-      ]
-    },
-    {
-      "id": "GreetVillager",
+      "axis": [
+        "Alone",
+        "Partnered"
+      ],
       "drive": "find love and a wife to build a family with",
-      "roles": [
-        "Suitor",
-        "Villager"
+      "activity_itemclass": {
+        "activity": "FormBond",
+        "itemclass": "Person"
+      },
+      "subtypes_included": [
+        "Jean",
+        "Francoise",
+        "FatherMarquart",
+        "MotherMarquart"
       ]
     },
     {
-      "id": "ConverseWithFrancoise",
+      "axis": [
+        "WithoutFamily",
+        "WithFamily"
+      ],
       "drive": "find love and a wife to build a family with",
-      "roles": [
-        "Suitor"
+      "activity_itemclass": {
+        "activity": "EstablishHousehold",
+        "itemclass": "Farmhouse"
+      },
+      "subtypes_included": [
+        "Farmhouse"
       ]
     },
     {
-      "id": "AttendChurch",
-      "drive": "find love and a wife to build a family with",
-      "roles": [
-        "Villager",
-        "Suitor"
+      "axis": [
+        "Hungry",
+        "Not-Hungry"
+      ],
+      "drive": "immediate needs of survival - food, shelter, health, rest from backbreaking labor",
+      "activity_itemclass": {
+        "activity": "Consume",
+        "itemclass": "Food"
+      },
+      "subtypes_included": [
+        "Bread",
+        "Apple",
+        "Chicken",
+        "Egg",
+        "Milk",
+        "Cheese",
+        "Butter"
       ]
     },
     {
-      "id": "NegotiateInheritance",
-      "drive": "gain your rightful inheritance - justice and fairness in how the land is divided",
-      "roles": [
-        "Son"
+      "axis": [
+        "Thirsty",
+        "Not-Thirsty"
+      ],
+      "drive": "immediate needs of survival - food, shelter, health, rest from backbreaking labor",
+      "activity_itemclass": {
+        "activity": "Drink",
+        "itemclass": "Drinkable"
+      },
+      "subtypes_included": [
+        "Water",
+        "Well",
+        "Spring",
+        "Milk"
       ]
     },
     {
-      "id": "AssistFather",
-      "drive": "gain your rightful inheritance - justice and fairness in how the land is divided",
-      "roles": [
-        "Son"
+      "axis": [
+        "Exposed",
+        "Sheltered"
+      ],
+      "drive": "immediate needs of survival - food, shelter, health, rest from backbreaking labor",
+      "activity_itemclass": {
+        "activity": "Seek",
+        "itemclass": "Shelter"
+      },
+      "subtypes_included": [
+        "Farmhouse"
       ]
     },
     {
-      "id": "ExpressGratitude",
-      "drive": "gain your rightful inheritance - justice and fairness in how the land is divided",
-      "roles": [
-        "Son"
+      "axis": [
+        "Fatigued",
+        "Rested"
+      ],
+      "drive": "immediate needs of survival - food, shelter, health, rest from backbreaking labor",
+      "activity_itemclass": {
+        "activity": "Rest",
+        "itemclass": "RestingPlace"
+      },
+      "subtypes_included": [
+        "Farmhouse"
       ]
     },
     {
-      "id": "ShareMealWithFamily",
-      "drive": "gain your rightful inheritance - justice and fairness in how the land is divided",
-      "roles": [
-        "Son",
-        "Villager"
+      "axis": [
+        "Thirsty",
+        "Not-Thirsty"
+      ],
+      "drive": "Maintain hydration \u2014 avoid thirst and keep the body supplied with fluids.",
+      "activity_itemclass": {
+        "activity": "Consume",
+        "itemclass": "Hydrating Substance"
+      },
+      "subtypes_included": [
+        "Water",
+        "Milk"
+      ]
+    },
+    {
+      "axis": [
+        "Unsupplied",
+        "Supplied"
+      ],
+      "drive": "Maintain hydration \u2014 avoid thirst and keep the body supplied with fluids.",
+      "activity_itemclass": {
+        "activity": "Access",
+        "itemclass": "Fluid Source"
+      },
+      "subtypes_included": [
+        "Well",
+        "Spring",
+        "Milk"
+      ]
+    },
+    {
+      "axis": [
+        "Fatigued",
+        "Rested"
+      ],
+      "drive": "Maintain alertness \u2014 avoid fatigue and keep the body rested.",
+      "activity_itemclass": {
+        "activity": "Rest",
+        "itemclass": "Shelter"
+      },
+      "subtypes_included": [
+        "Farmhouse"
+      ]
+    },
+    {
+      "axis": [
+        "Hungry",
+        "Not-Hungry"
+      ],
+      "drive": "Maintain energy \u2014 avoid hunger and keep the body supplied with nutrients.",
+      "activity_itemclass": {
+        "activity": "Consume",
+        "itemclass": "Food"
+      },
+      "subtypes_included": [
+        "Bread",
+        "Apple",
+        "Chicken",
+        "Egg",
+        "Milk",
+        "Cheese",
+        "Butter"
+      ]
+    },
+    {
+      "axis": [
+        "Undernourished",
+        "Nourished"
+      ],
+      "drive": "Maintain energy \u2014 avoid hunger and keep the body supplied with nutrients.",
+      "activity_itemclass": {
+        "activity": "Acquire",
+        "itemclass": "Nutrient Source"
+      },
+      "subtypes_included": [
+        "Bread",
+        "Apple",
+        "Chicken",
+        "Egg",
+        "Milk",
+        "Cheese",
+        "Butter"
+      ]
+    },
+    {
+      "axis": [
+        "Thirsty",
+        "Not-Thirsty"
+      ],
+      "drive": "Maintain energy \u2014 avoid hunger and keep the body supplied with nutrients.",
+      "activity_itemclass": {
+        "activity": "Drink",
+        "itemclass": "Drinkable"
+      },
+      "subtypes_included": [
+        "Water",
+        "Milk",
+        "Well",
+        "Spring"
       ]
     }
   ],
-  "affordances": {
-    "Farm": [
-      "TendFields",
-      "MendFences",
-      "CareForLivestock",
-      "RepairTools",
-      "EatMeal",
-      "DrinkWater",
-      "RestRecover",
-      "AssistFather",
-      "ShareMealWithFamily"
+  "verbs": [
+    "Claim",
+    "Receive",
+    "Join",
+    "Cultivate",
+    "Rest",
+    "Nourish",
+    "Quench",
+    "FormBond",
+    "EstablishHousehold",
+    "Consume",
+    "Drink",
+    "Seek",
+    "Access",
+    "Acquire"
+  ],
+  "nouns": [
+    "Landholding",
+    "Share",
+    "Community",
+    "Field",
+    "Shelter",
+    "Food",
+    "Drink",
+    "Person",
+    "Farmhouse",
+    "Drinkable",
+    "RestingPlace",
+    "Hydrating Substance",
+    "Fluid Source",
+    "Nutrient Source"
+  ],
+  "noun_mappings": {
+    "Landholding": [
+      "Mountain",
+      "Forest",
+      "Grassland",
+      "Field",
+      "Farm"
+    ],
+    "Share": [
+      "Mountain",
+      "Forest",
+      "Grassland",
+      "Field",
+      "Farm"
+    ],
+    "Community": [
+      "Village",
+      "Farmhouse",
+      "Farm"
     ],
     "Field": [
-      "TendFields",
-      "HarvestProduce",
-      "IrrigateCrops",
-      "MendFences",
-      "CareForLivestock"
+      "Field"
     ],
-    "Village": [
-      "VisitMarket",
-      "AttendChurch",
-      "GreetVillager",
-      "ConverseWithFrancoise",
-      "ShareMealWithFamily"
+    "Shelter": [
+      "Farmhouse"
     ],
-    "Market": [
-      "VisitMarket",
-      "GreetVillager"
+    "Food": [
+      "Bread",
+      "Apple",
+      "Chicken",
+      "Egg",
+      "Milk",
+      "Cheese",
+      "Butter"
     ],
-    "Well": [
-      "DrinkWater"
+    "Drink": [
+      "Water",
+      "Well",
+      "Spring",
+      "Milk"
     ],
-    "Mill": [
-      "VisitMarket"
+    "Person": [
+      "Jean",
+      "Francoise",
+      "FatherMarquart",
+      "MotherMarquart"
     ],
-    "Blacksmith": [
-      "RepairTools"
+    "Farmhouse": [
+      "Farmhouse"
     ],
-    "Path": [
-      "Move",
-      "GreetVillager"
+    "Drinkable": [
+      "Water",
+      "Well",
+      "Spring",
+      "Milk"
     ],
-    "Church": [
-      "AttendChurch"
+    "RestingPlace": [
+      "Farmhouse"
     ],
-    "River": [
-      "DrinkWater"
+    "Hydrating Substance": [
+      "Water",
+      "Milk"
     ],
-    "Spring": [
-      "DrinkWater"
+    "Fluid Source": [
+      "Well",
+      "Spring",
+      "Milk"
+    ],
+    "Nutrient Source": [
+      "Bread",
+      "Apple",
+      "Chicken",
+      "Egg",
+      "Milk",
+      "Cheese",
+      "Butter"
     ]
-  },
-  "drive_coverage": {
-    "gain your rightful inheritance - justice and fairness in how the land is divided": [
-      "NegotiateInheritance",
-      "AssistFather",
-      "ExpressGratitude",
-      "ShareMealWithFamily"
-    ],
-    "maintain and work the family farm": [
-      "TendFields",
-      "IrrigateCrops",
-      "HarvestProduce",
-      "CareForLivestock",
-      "MendFences",
-      "RepairTools",
-      "VisitMarket"
-    ],
-    "find love and a wife to build a family with": [
-      "ConverseWithFrancoise",
-      "GreetVillager",
-      "AttendChurch"
-    ],
-    "immediate needs of survival - food, shelter, health, rest from backbreaking labor": [
-      "EatMeal",
-      "DrinkWater",
-      "RestRecover"
-    ]
-  },
-  "states": [
-    "hunger",
-    "thirst",
-    "fatigue",
-    "injury"
-  ]
+  }
 }

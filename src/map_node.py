@@ -56,7 +56,7 @@ except ImportError as e:
 
 
 class MapNode:
-    def __init__(self, map_file: str, world_name: str = None, setting: str = None):
+    def __init__(self, map_file: str, world_name: str = None, setting: str = None, max_turns: int = None):
         self.map_file = map_file
         self.world_name = world_name or map_file.replace('.py', '')
         self.world_map = None
@@ -104,6 +104,12 @@ class MapNode:
         self.time_delay_setting_subscriber = None
         self.time_advanced_publisher = None
         
+        # Optional scenario cap on turns
+        try:
+            self.max_turns = int(max_turns) if max_turns is not None else None
+        except Exception:
+            self.max_turns = None
+
         # Load the map module
         self.load_map_module()
         
@@ -269,6 +275,12 @@ Do not include any other text, reasoning, introductory, expository, or markdown.
             self.handle_agent_move
         )
         
+        # Agent move-to-resource queryable
+        self.agent_move_to_queryable = self.session.declare_queryable(
+            "cognitive/map/agent/*/move_to",
+            self.handle_agent_move_to
+        )
+        
         # Agent use_path queryable
         self.agent_use_path_queryable = self.session.declare_queryable(
             "cognitive/map/agent/*/use_path",
@@ -383,6 +395,10 @@ Do not include any other text, reasoning, introductory, expository, or markdown.
             self.time_advanced_publisher = self.session.declare_publisher(
                 "cognitive/map/time_advanced"
             )
+            # Publisher for scenario completion
+            self.scenario_complete_publisher = self.session.declare_publisher(
+                "cognitive/map/scenario_complete"
+            )
             
             # Turn control state
             self.turn_control_mode = "step"  # "step" or "run"
@@ -409,6 +425,21 @@ Do not include any other text, reasoning, introductory, expository, or markdown.
         """Start a new turn for all active characters"""
         import random
         
+        # Enforce max_turns if configured
+        try:
+            if self.max_turns is not None and self.turn_state['turn_number'] >= int(self.max_turns):
+                logger.info(f"🛑 Reached max_turns={self.max_turns}; not starting a new turn")
+                try:
+                    notice = {"reason": "max_turns", "max_turns": self.max_turns, "turn_number": self.turn_state['turn_number']}
+                    self.scenario_complete_publisher.put(json.dumps(notice).encode('utf-8'))
+                except Exception:
+                    pass
+                # Freeze auto-progression
+                self.auto_progression_enabled = False
+                return
+        except Exception:
+            pass
+
         # Get active characters and randomize order
         active_characters = self.get_active_characters()
         logger.info(f"Starting new turn with active characters: {active_characters}")
@@ -780,6 +811,9 @@ Do not include any other text, reasoning, introductory, expository, or markdown.
                         result['requires_property'] = allocation.get('requires_property')
                     if 'has_npc' in allocation:
                         result['has_npc'] = allocation.get('has_npc')
+                    if 'use' in allocation:
+                        # Pass through use effects (list of {need, effect})
+                        result['use'] = allocation.get('use')
 
                     # terrain_weights: convert enum keys to names
                     tw = allocation.get('terrain_weights') or {}
@@ -1179,7 +1213,7 @@ Do not include any other text, reasoning, introductory, expository, or markdown.
                     'error': f"Agent for character '{character_name}' not found"
                 }
             else:
-                agent = self.agent_registry[canonical_character_name]
+                agent:Agent = self.agent_registry[canonical_character_name]
                 
                 # Call agent's move method
                 move_result = agent.move(direction)
@@ -1203,6 +1237,74 @@ Do not include any other text, reasoning, introductory, expository, or markdown.
                 'error': str(e)
             }
             query.reply(query.key_expr, json.dumps(error_response).encode('utf-8'))
+
+
+    def handle_agent_move_to(self, query):
+        """Handle agent move-to-resource command (instance-only)."""
+        try:
+            # Extract character name from query key
+            key_parts = str(query.key_expr).split('/')
+            character_name = key_parts[-2] if len(key_parts) > 1 else None
+            if not character_name:
+                raise ValueError("No character name provided")
+
+            canonical_character_name = character_name.capitalize()
+            if canonical_character_name not in self.agent_registry:
+                response = {
+                    'success': False,
+                    'error': f"Agent for character '{character_name}' not found"
+                }
+                query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
+                return
+
+            # Parse payload for resource instance name
+            resource_name = None
+            if query.payload:
+                try:
+                    payload = query.payload.to_bytes().decode('utf-8')
+                    data = json.loads(payload) if payload else {}
+                    resource_name = data.get('resource_name')
+                except Exception:
+                    resource_name = None
+            if not resource_name:
+                response = {'success': False, 'error': 'Missing resource_name in payload'}
+                query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
+                return
+
+            # Resolve instance by name and move
+            resource = self.world_map.get_resource_by_name(resource_name)
+            if not resource:
+                response = {
+                    'success': False,
+                    'error': f"Resource '{resource_name}' not found"
+                }
+                query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
+                return
+
+            resource_id = resource.get('name')
+            agent: Agent = self.agent_registry[canonical_character_name]
+            ok = agent.move_to_resource(resource_id)
+
+            if ok:
+                response = {
+                    'success': True,
+                    'location': [agent.x, agent.y]
+                }
+            else:
+                response = {
+                    'success': False,
+                    'error': 'Failed to move to resource'
+                }
+
+            query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
+        except Exception as e:
+            logger.error(f"Error handling agent move_to: {e}")
+            error_response = {
+                'success': False,
+                'error': str(e)
+            }
+            query.reply(query.key_expr, json.dumps(error_response).encode('utf-8'))
+
 
     def handle_agent_use_path(self, query):
         """Handle agent use_path command"""
@@ -2171,6 +2273,8 @@ def main():
                        help='World name (defaults to map file name without .py)')
     parser.add_argument('-s', '--setting', 
                        help='Setting text string (defaults to None)')
+    parser.add_argument('--max-turns', type=int, default=None,
+                       help='Maximum number of turns before stopping (optional)')
     
     args = parser.parse_args()
     
@@ -2180,7 +2284,7 @@ def main():
         signal.signal(signal.SIGINT, signal_handler)
         
         # Create and run map node
-        map_node = MapNode(args.map_file, args.world_name, setting=args.setting)
+        map_node = MapNode(args.map_file, args.world_name, setting=args.setting, max_turns=args.max_turns)
         signal_handler.map_node = map_node  # Store reference for signal handler
         
         map_node.run()

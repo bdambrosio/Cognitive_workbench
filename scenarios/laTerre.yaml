@@ -29,6 +29,7 @@ characters:
       - "maintain and work the family farm"
       - "find love and a wife to build a family with"
       - "immediate needs of survival - food, shelter, health, rest from backbreaking labor"
+      
 
   Francoise:
     character: |
@@ -44,6 +45,7 @@ characters:
       - "avoid scandal and protecting your reputation"
       - "help your family with the endless chores"
       - "brief moments of rest and simple joys amid the hardships"
+    location: Farmhouse2
 
   FatherMarquart:
     manual: true

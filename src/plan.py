@@ -14,7 +14,7 @@ from utils import hash_utils
 from typing import Any, Dict, List
 from utils.llm_api import LLM
 from Messages import SystemMessage, UserMessage
-from templates import PLAN_TEMPLATE, PHYSIOLOGICAL_NEEDS
+from templates import PLAN_TEMPLATE, PHYSIOLOGICAL_STATES
 from middle_ontology import build_allowed_scan_types, build_allowed_verbs
 # Type checking imports
 from typing import TYPE_CHECKING
@@ -669,6 +669,7 @@ def generate_plan_with_context(
     """
     llm = LLM(server_name=server_name, model_name=model_name)
     try:
+        """
         from middle_ontology import rewrite_goal
         finished_rewriting = False
         iterations = 0
@@ -682,6 +683,7 @@ def generate_plan_with_context(
                          allowed_verbs,
                          goal_text)
         goal_text = rewritten_goal.strip()
+        """
         system_prompt = """Task: rewrite the following goal statement into a plan according to the PLAN_TEMPLATE below.
 Respond only with a JSON plan according to the provided PLAN_TEMPLATE. No prose or code fences; end with </end>."""
         parts = []
@@ -693,11 +695,14 @@ Respond only with a JSON plan according to the provided PLAN_TEMPLATE. No prose 
             except Exception:
                 pass
         # Optionally include allowed scan targets (types) derived from middle ontology
-        try:
-            if allowed_types:
-                parts.append("\n#ALLOWED SCAN TARGETS (types)\n" + "\n".join(allowed_types))
-        except Exception:
-            pass
+        allowed_types = character.ontology.get('nouns', {}).copy()
+        allowed_types.extend(character.map_types.get('resource_types', []))
+        allowed_types.extend(character.map_types.get('terrain_types', []))
+        allowed_types.extend(character.map_types.get('infrastructure_types', []))
+        allowed_types.extend(character.map_types.get('property_types', []))
+
+        parts.append("\n#ALLOWED SCAN TARGETS (types)\n" + "\n".join(allowed_types)+"\n##")
+
         parts.append("\n#Plan syntax specification:\n" + str(PLAN_TEMPLATE))
         parts.append("\nRespond only with JSON, no other text. End with </end>\n")
         user_prompt = "\n".join(parts)

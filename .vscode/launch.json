@@ -22,16 +22,16 @@
             "preLaunchTask": "setup-zenoh-environment"
         },
         {
-            "name": "Rewrite Goal (Jim, load all)",
+            "name": "Scenario Analysis (ABetterLife)",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/src/middle_ontology.py",
+            "program": "${workspaceFolder}/src/scenario_analysis.py",
             "console": "integratedTerminal",
             "cwd": "${workspaceFolder}/src",
             "env": {
                 "PYTHONPATH": "${workspaceFolder}/src"
             },
-            "args": ["--scenario", "../scenarios/jim.yaml", "--target_character", "jim", "--ontology", "load", "--middle", "load", "--activities", "load"],
+            "args": ["--scenario", "../scenarios/ABetterLife.yaml", "--character", "all", "--ontology", "create", "--middle", "skip", "--activities", "create"],
             "justMyCode": false,
             "stopOnEntry": false,
             "preLaunchTask": "setup-zenoh-environment"
@@ -46,7 +46,7 @@
             "env": {
                 "PYTHONPATH": "${workspaceFolder}/src"
             },
-            "args": ["--scenario", "../scenarios/laTerre.yaml", "--character", "all", "--ontology", "create", "--middle", "create", "--activities", "create"],
+            "args": ["--scenario", "../scenarios/laTerre.yaml", "--character", "all", "--ontology", "create", "--middle", "skip", "--activities", "create"],
             "justMyCode": false,
             "stopOnEntry": false,
             "preLaunchTask": "setup-zenoh-environment"
@@ -61,7 +61,7 @@
             "env": {
                 "PYTHONPATH": "${workspaceFolder}/src"
             },
-            "args": ["--scenario", "../scenarios/jim.yaml", "--character", "all", "--ontology", "create", "--middle", "create", "--activities", "create"],
+            "args": ["--scenario", "../scenarios/jim.yaml", "--character", "all", "--ontology", "create", "--middle", "skip", "--activities", "create"],
             "justMyCode": false,
             "stopOnEntry": false,
             "preLaunchTask": "setup-zenoh-environment"
@@ -76,41 +76,12 @@
             "env": {
                 "PYTHONPATH": "${workspaceFolder}/src"
             },
-            "args": ["--scenario", "../scenarios/lost.yaml", "--character", "all", "--ontology", "create", "--middle", "create", "--activities", "create"],
+            "args": ["--scenario", "../scenarios/lost.yaml", "--character", "all", "--ontology", "create", "--middle", "skip", "--activities", "create"],
             "justMyCode": false,
             "stopOnEntry": false,
             "preLaunchTask": "setup-zenoh-environment"
         },
         {
-            "name": "Generate Middle Ontology",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${workspaceFolder}/src/middle_ontology.py",
-            "console": "integratedTerminal",
-            "cwd": "${workspaceFolder}/src",
-            "env": {
-                "PYTHONPATH": "${workspaceFolder}/src"
-            },
-            "args": ["../scenarios/jim.yaml", "../scenarios/Jim-activity-ontology.json", "Jim"],
-            "justMyCode": false,
-            "stopOnEntry": false,
-            "preLaunchTask": "setup-zenoh-environment"
-        },
-        {
-            "name": "Generate Activities (ABetterLife.yaml)",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${workspaceFolder}/src/activity.py",
-            "console": "integratedTerminal",
-            "cwd": "${workspaceFolder}/src",
-            "env": {
-                "PYTHONPATH": "${workspaceFolder}/src"
-            },
-            "args": ["../scenarios/ABetterLife.yaml"],
-            "justMyCode": false,
-            "stopOnEntry": false,
-            "preLaunchTask": "setup-zenoh-environment"
-        },{
             "name": "Jim - single character",
             "type": "debugpy",
             "request": "launch",

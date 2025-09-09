@@ -18,6 +18,7 @@ class RuralInfrastructure(Enum):
 
 class RuralResources(Enum):
     Market = auto()
+    Farmhouse = auto()
     Well = auto()
     Mill = auto()
     Hoe = auto()
@@ -68,7 +69,7 @@ infrastructure_rules = {
 
 property_rules = {
         'names': {
-        'Farm': ['MarquartFarm', 'FouanFarm'],
+        'Farm': ['Farmhouse1', 'Farmhouse2'],
     },
 
     'min_size': 50,
@@ -92,10 +93,24 @@ resource_rules = {
         {
             'resource_type': resource_types.Well,
             'description': 'A deep well for water',
-            'count': 5,
+            'count': 10,
             'has_npc': True,
             'remove_on_take': False,
             'requires_property': True,
+            'use': [{"need": 'thirst', "effect": -30}, {"need": 'fatigue', "effect": -10}],
+            'terrain_weights': {
+                terrain_types.Grassland: 1.0,
+                terrain_types.Field: 1.0
+            }
+        },
+        {
+            'resource_type': resource_types.Farmhouse,
+            'description': 'A farmhouse for housing',
+            'count': 4,
+            'has_npc': False,
+            'remove_on_take': False,
+            'requires_property': True,
+            'use': [{"need": 'fatigue', "effect": -50}],
             'terrain_weights': {
                 terrain_types.Grassland: 1.0,
                 terrain_types.Field: 1.0
@@ -108,6 +123,7 @@ resource_rules = {
             'count': 1,
             'remove_on_take': False,
             'requires_property': True,
+            'use': [],
             'terrain_weights': {
                 terrain_types.Field: 2.0,
                 terrain_types.Grassland: 1.0
@@ -120,6 +136,7 @@ resource_rules = {
             'count': 30,
             'remove_on_take': True,
             'requires_property': True,
+            'use': [],
             'terrain_weights': {
                 terrain_types.Field: 1.0,
                 terrain_types.Grassland: 1.0
@@ -132,6 +149,7 @@ resource_rules = {
             'count': 20,
             'remove_on_take': True,
             'requires_property': True,
+            'use': [],
             'terrain_weights': {
                 terrain_types.Field: 1.0,
                 terrain_types.Grassland: 1.0
@@ -144,6 +162,7 @@ resource_rules = {
             'count': 30,
             'remove_on_take': True,
             'requires_property': True,
+            'use': [{"need": 'thirst', "effect": 10}],
             'terrain_weights': {
                 terrain_types.Field: 1.0,
                 terrain_types.Grassland: 1.0
@@ -153,11 +172,13 @@ resource_rules = {
             'resource_type': resource_types.Spring,
             'description': 'A natural spring of fresh water',
             'count': 100,
-            'remove_on_take': True,
+            'remove_on_take': False,
             'requires_property': True,
+            'use': [{"need": 'thirst', "effect": -50}],
             'terrain_weights': {
                 terrain_types.Field: 1.0,
-                terrain_types.Grassland: 1.0
+                terrain_types.Grassland: 1.0,
+                terrain_types.Forest: 1.0
             },
         },
                 {
@@ -166,6 +187,7 @@ resource_rules = {
             'count': 20,
             'remove_on_take': True,
             'requires_property': True,
+            'use': [{"need": 'hunger', "effect": -30}],
             'terrain_weights': {
                 terrain_types.Field: 1.0,
                 terrain_types.Grassland: 1.0
@@ -177,6 +199,7 @@ resource_rules = {
             'count': 20,
             'remove_on_take': True,
             'requires_property': True,
+            'use': [{"need": 'hunger', "effect": -10}],
             'terrain_weights': {
                 terrain_types.Field: 1.0,
                 terrain_types.Grassland: 1.0
@@ -189,6 +212,7 @@ resource_rules = {
             'count': 20,
             'remove_on_take': True,
             'requires_property': True,
+            'use': [{"need": 'hunger', "effect": -30}],
             'terrain_weights': {
                 terrain_types.Field: 1.0,
                 terrain_types.Grassland: 1.0
@@ -200,6 +224,7 @@ resource_rules = {
             'count': 20,
             'remove_on_take': True,
             'requires_property': True,
+            'use': [{"need": 'hunger', "effect": -10}],
             'terrain_weights': {
                 terrain_types.Field: 1.0,
                 terrain_types.Grassland: 1.0
@@ -211,6 +236,7 @@ resource_rules = {
             'count': 20,
             'remove_on_take': True,
             'requires_property': True,
+            'use': [{"need": 'hunger', "effect": -10}, {"need": 'thirst', "effect": -30}],
             'terrain_weights': {
                 terrain_types.Field: 1.0,
                 terrain_types.Grassland: 1.0
@@ -222,6 +248,7 @@ resource_rules = {
             'count': 20,
             'remove_on_take': True,
             'requires_property': True,
+            'use': [{"need": 'hunger', "effect": -10}, {"need": 'thirst', "effect": 5}],
             'terrain_weights': {
                 terrain_types.Field: 1.0,
                 terrain_types.Grassland: 1.0
@@ -233,6 +260,7 @@ resource_rules = {
             'count': 20,
             'remove_on_take': True,
             'requires_property': True,
+            'use': [{"need": 'hunger', "effect": -10}],
             'terrain_weights': {
                 terrain_types.Field: 1.0,
                 terrain_types.Grassland: 1.0

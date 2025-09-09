@@ -1,243 +1,343 @@
 {
-  "places": [
-    "Forest",
-    "Clearing",
-    "Meadow",
-    "Path",
-    "Mountain",
-    "Water",
-    "Village",
-    "Hut",
-    "Thicket",
-    "Spring",
-    "Cave"
-  ],
-  "tools": [
-    "Backpack",
-    "Berries",
-    "Mushrooms",
-    "Appletree",
-    "Fallenbranch",
-    "Spring",
-    "Thicket"
-  ],
-  "roles": [
-    "Explorer",
-    "Seeker",
-    "Survivor",
-    "Companion"
-  ],
-  "norms_rules": [
-    "Do not harm others.",
-    "Respect personal boundaries and property.",
-    "Share useful information when approached.",
-    "Prioritize safety in unknown terrain.",
-    "Do not consume unknown substances.",
-    "Offer assistance if someone appears in need."
-  ],
-  "hazards": [
-    "Dehydration",
-    "Fatigue",
-    "Hunger",
-    "GettingLost",
-    "Injury"
-  ],
-  "social_graph": [
-    "Joe",
-    "Samantha",
-    "Hermit"
-  ],
-  "time_windows": [
-    "dawn",
-    "morning",
-    "afternoon",
-    "dusk",
-    "evening",
-    "day",
-    "night"
-  ],
   "activities": [
     {
-      "id": "SurveyArea",
-      "drive": "SolveMystery",
-      "roles": [
-        "Explorer"
+      "axis": [
+        "Inside-Forest",
+        "Outside-Forest"
+      ],
+      "drive": "Find a way out of the forest.",
+      "activity_itemclass": {
+        "activity": "Exit",
+        "itemclass": "PlaceOfEgress"
+      },
+      "subtypes_included": [
+        "Path",
+        "Clearing",
+        "Meadow",
+        "Village"
       ]
     },
     {
-      "id": "ScanForPaths",
-      "drive": "SolveMystery",
-      "roles": [
-        "Explorer"
+      "axis": [
+        "Uncertain-Route",
+        "Certain-Route"
+      ],
+      "drive": "Find a way out of the forest.",
+      "activity_itemclass": {
+        "activity": "Identify",
+        "itemclass": "Landmark"
+      },
+      "subtypes_included": [
+        "Path",
+        "Clearing",
+        "Meadow",
+        "Village",
+        "Hut",
+        "Appletree",
+        "Spring",
+        "Cave",
+        "Thicket",
+        "Mountain"
       ]
     },
     {
-      "id": "OrientToHut",
-      "drive": "SolveMystery",
-      "roles": [
-        "Seeker"
+      "axis": [
+        "Not-LocatedAtGoal",
+        "LocatedAtGoal"
+      ],
+      "drive": "Find Hut1.",
+      "activity_itemclass": {
+        "activity": "Locate",
+        "itemclass": "Shelter"
+      },
+      "subtypes_included": [
+        "Hut",
+        "Cave"
       ]
     },
     {
-      "id": "RestRecover",
-      "drive": "Physiological",
-      "roles": [
-        "Survivor"
+      "axis": [
+        "Hungry",
+        "Not-Hungry"
+      ],
+      "drive": "Live and survive safely while finding a way out of the forest or waiting for rescue.",
+      "activity_itemclass": {
+        "activity": "Consume",
+        "itemclass": "Food"
+      },
+      "subtypes_included": [
+        "Berries",
+        "Mushrooms",
+        "Appletree"
       ]
     },
     {
-      "id": "CollectWater",
-      "drive": "Physiological",
-      "roles": [
-        "Survivor"
+      "axis": [
+        "Thirsty",
+        "Not-Thirsty"
+      ],
+      "drive": "Live and survive safely while finding a way out of the forest or waiting for rescue.",
+      "activity_itemclass": {
+        "activity": "Drink",
+        "itemclass": "DrinkableWaterSource"
+      },
+      "subtypes_included": [
+        "Spring"
       ]
     },
     {
-      "id": "ForageBerries",
-      "drive": "Physiological",
-      "roles": [
-        "Survivor"
+      "axis": [
+        "Fatigued",
+        "Rested"
+      ],
+      "drive": "Live and survive safely while finding a way out of the forest or waiting for rescue.",
+      "activity_itemclass": {
+        "activity": "Rest",
+        "itemclass": "Shelter"
+      },
+      "subtypes_included": [
+        "Hut",
+        "Cave"
       ]
     },
     {
-      "id": "InventoryBackpack",
-      "drive": "Physiological",
-      "roles": [
-        "Survivor"
+      "axis": [
+        "Lost",
+        "Oriented"
+      ],
+      "drive": "Live and survive safely while finding a way out of the forest or waiting for rescue.",
+      "activity_itemclass": {
+        "activity": "Navigate",
+        "itemclass": "LandmarkOrPath"
+      },
+      "subtypes_included": [
+        "Path",
+        "Village",
+        "Mountain",
+        "Clearing",
+        "Meadow",
+        "Hut",
+        "Spring",
+        "Cave",
+        "Forest",
+        "Appletree",
+        "Thicket"
       ]
     },
     {
-      "id": "AvoidHazard",
-      "drive": "Safety",
-      "roles": [
-        "Explorer",
-        "Survivor"
+      "axis": [
+        "Unsafe",
+        "Safe"
+      ],
+      "drive": "Live and survive safely while finding a way out of the forest or waiting for rescue.",
+      "activity_itemclass": {
+        "activity": "TakeShelter",
+        "itemclass": "ProtectiveLocation"
+      },
+      "subtypes_included": [
+        "Hut",
+        "Cave"
       ]
     },
     {
-      "id": "MarkTrail",
-      "drive": "Safety",
-      "roles": [
-        "Explorer"
+      "axis": [
+        "Isolated",
+        "Connected"
+      ],
+      "drive": "companionship, community, family, acceptance, trust, intimacy.",
+      "activity_itemclass": {
+        "activity": "Interact",
+        "itemclass": "Person"
+      },
+      "subtypes_included": [
+        "Samantha",
+        "Joe",
+        "Hermit",
+        "User"
       ]
     },
     {
-      "id": "HideSelf",
-      "drive": "Safety",
-      "roles": [
-        "Survivor"
+      "axis": [
+        "Unaccepted",
+        "Accepted"
+      ],
+      "drive": "companionship, community, family, acceptance, trust, intimacy.",
+      "activity_itemclass": {
+        "activity": "Join",
+        "itemclass": "Community"
+      },
+      "subtypes_included": [
+        "Village"
       ]
     },
     {
-      "id": "SignalHelp",
-      "drive": "Safety",
-      "roles": [
-        "Explorer"
+      "axis": [
+        "Untrusted",
+        "Trusted"
+      ],
+      "drive": "companionship, community, family, acceptance, trust, intimacy.",
+      "activity_itemclass": {
+        "activity": "BuildTrust",
+        "itemclass": "Person"
+      },
+      "subtypes_included": [
+        "Samantha",
+        "Joe",
+        "Hermit",
+        "User"
       ]
     },
     {
-      "id": "GreetStranger",
-      "drive": "Companionship",
-      "roles": [
-        "Companion"
+      "axis": [
+        "Thirsty",
+        "Not-Thirsty"
+      ],
+      "drive": "Maintain hydration \u2014 avoid thirst and keep the body supplied with fluids.",
+      "activity_itemclass": {
+        "activity": "Consume",
+        "itemclass": "Drinkable Resource"
+      },
+      "subtypes_included": [
+        "Water",
+        "Spring"
       ]
     },
     {
-      "id": "TestTrust",
-      "drive": "Companionship",
-      "roles": [
-        "Companion"
+      "axis": [
+        "Fatigued",
+        "Rested"
+      ],
+      "drive": "Maintain alertness \u2014 avoid fatigue and keep the body rested.",
+      "activity_itemclass": {
+        "activity": "Recover",
+        "itemclass": "Shelter"
+      },
+      "subtypes_included": [
+        "Hut",
+        "Cave"
       ]
     },
     {
-      "id": "NegotiateAssistance",
-      "drive": "Companionship",
-      "roles": [
-        "Companion"
+      "axis": [
+        "Hungry",
+        "Not-Hungry"
+      ],
+      "drive": "Maintain energy \u2014 avoid hunger and keep the body supplied with nutrients.",
+      "activity_itemclass": {
+        "activity": "Consume",
+        "itemclass": "Food"
+      },
+      "subtypes_included": [
+        "Berries",
+        "Mushrooms",
+        "Appletree"
+      ]
+    },
+    {
+      "axis": [
+        "Thirsty",
+        "Not-Thirsty"
+      ],
+      "drive": "Maintain energy \u2014 avoid hunger and keep the body supplied with nutrients.",
+      "activity_itemclass": {
+        "activity": "Drink",
+        "itemclass": "WaterSource"
+      },
+      "subtypes_included": [
+        "Spring"
       ]
     }
   ],
-  "affordances": {
-    "Forest": [
-      "SurveyArea",
-      "ScanForPaths",
-      "ForageBerries",
-      "AvoidHazard",
-      "MarkTrail",
-      "HideSelf"
+  "verbs": [
+    "Exit",
+    "Identify",
+    "Locate",
+    "Consume",
+    "Drink",
+    "Rest",
+    "Navigate",
+    "TakeShelter",
+    "Interact",
+    "Join",
+    "BuildTrust",
+    "Recover"
+  ],
+  "nouns": [
+    "PlaceOfEgress",
+    "Landmark",
+    "Shelter",
+    "Food",
+    "DrinkableWaterSource",
+    "LandmarkOrPath",
+    "ProtectiveLocation",
+    "Person",
+    "Community",
+    "Drinkable Resource",
+    "WaterSource"
+  ],
+  "noun_mappings": {
+    "PlaceOfEgress": [
+      "Path",
+      "Clearing",
+      "Meadow",
+      "Village"
     ],
-    "Clearing": [
-      "RestRecover",
-      "SignalHelp",
-      "InventoryBackpack"
+    "Landmark": [
+      "Path",
+      "Clearing",
+      "Meadow",
+      "Village",
+      "Hut",
+      "Appletree",
+      "Spring",
+      "Cave",
+      "Thicket",
+      "Mountain"
     ],
-    "Meadow": [
-      "SurveyArea",
-      "SignalHelp",
-      "RestRecover"
+    "Shelter": [
+      "Hut",
+      "Cave"
     ],
-    "Path": [
-      "ScanForPaths",
-      "MarkTrail"
+    "Food": [
+      "Berries",
+      "Mushrooms",
+      "Appletree"
     ],
-    "Mountain": [
-      "SurveyArea",
-      "ScanForPaths"
+    "DrinkableWaterSource": [
+      "Spring"
     ],
-    "Water": [
-      "CollectWater",
-      "RestRecover"
+    "LandmarkOrPath": [
+      "Path",
+      "Village",
+      "Mountain",
+      "Clearing",
+      "Meadow",
+      "Hut",
+      "Spring",
+      "Cave",
+      "Forest",
+      "Appletree",
+      "Thicket"
     ],
-    "Village": [
-      "GreetStranger",
-      "NegotiateAssistance",
-      "TestTrust"
+    "ProtectiveLocation": [
+      "Hut",
+      "Cave"
     ],
-    "Hut": [
-      "OrientToHut",
-      "RestRecover",
-      "GreetStranger"
+    "Person": [
+      "Samantha",
+      "Joe",
+      "Hermit",
+      "User"
     ],
-    "Thicket": [
-      "HideSelf",
-      "ForageBerries"
+    "Community": [
+      "Village"
     ],
-    "Spring": [
-      "CollectWater"
+    "Drinkable Resource": [
+      "Water",
+      "Spring"
     ],
-    "Cave": [
-      "HideSelf",
-      "RestRecover"
+    "WaterSource": [
+      "Spring"
     ]
-  },
-  "drive_coverage": {
-    "Find a way out of the forest.": [
-      "SurveyArea",
-      "ScanForPaths"
-    ],
-    "Find Hut1.": [
-      "OrientToHut"
-    ],
-    "Live and survive safely while finding a way out of the forest or waiting for rescue.": [
-      "RestRecover",
-      "CollectWater",
-      "ForageBerries",
-      "AvoidHazard",
-      "MarkTrail",
-      "HideSelf",
-      "InventoryBackpack",
-      "SignalHelp"
-    ],
-    "companionship, community, family, acceptance, trust, intimacy.": [
-      "GreetStranger",
-      "TestTrust",
-      "NegotiateAssistance"
-    ]
-  },
-  "states": [
-    "hunger",
-    "thirst",
-    "fatigue",
-    "injury"
-  ]
+  }
 }

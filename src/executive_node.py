@@ -27,7 +27,7 @@ from utils.zenoh_utils import datetime_handler
 import plan as plan_module
 from dataclasses import dataclass, asdict
 import os
-from templates import GOAL_TEMPLATE, PLAN_TEMPLATE, PHYSIOLOGICAL_NEEDS
+from templates import DRIVE_ASSESSMENT_TEMPLATE, GOAL_TEMPLATE, PLAN_TEMPLATE, PHYSIOLOGICAL_STATES, PLAN_VERBS
 from plan import generate_plan_with_context
 from utils.format_utils import format_map_types, format_views_compact
 from utils.state_utils import tick_state, apply_restore, initialize_character_states
@@ -187,7 +187,7 @@ class ZenohExecutiveNode:
         # LLM client
         self.llm_client = None
         if LLM_CLIENT_AVAILABLE:
-            self.llm_client = ZenohLLMClient(service_timeout=30.0 if not self.debug else 600.0)
+            self.llm_client = ZenohLLMClient(service_timeout=200.0 if not self.debug else 600.0)
         self.llm = LLM(server_name="openai", model_name="gpt-4.1")
         # Internal state
         self.action_counter = 0
@@ -232,12 +232,6 @@ class ZenohExecutiveNode:
             self.ontology = {}
             if not self.manual:
                 logger.warning(f"No activity ontology for {self.character_name}: {e}")
-        try:
-            self.middle_ontology = json.load(open(f'../scenarios/{self.character_name}-middle-ontology.json'))
-        except Exception as e:
-            self.middle_ontology = {}
-            if not self.manual:
-                logger.warning(f"No middle ontology for {self.character_name}: {e}")
         self.map_types = {}
         for reply in self.session.get("cognitive/map/types", timeout=2.0 if not self.debug else 600.0):
             if reply.ok:
@@ -303,13 +297,7 @@ class ZenohExecutiveNode:
         except Exception as e:
             if not self.manual:
                 logger.error(f'Error loading activities for {self.character_name}: {e}')
-            self.activities = {}
-        self.activity_manager: ActivityManager = ActivityManager(self, self.activities, self.llm_client, self.map_types)
 
-        # Register signal handlers for graceful shutdown
-        signal.signal(signal.SIGTERM, self._signal_handler)
-        signal.signal(signal.SIGINT, self._signal_handler)
-        
         logger.info(f'🧠 Zenoh Executive Node initialized for character: {character_name}')
         logger.info(f'   - Subscribing to: cognitive/{character_name}/sense_data')
         logger.info(f'   - Subscribing to: cognitive/{character_name}/situation/update')
@@ -324,6 +312,24 @@ class ZenohExecutiveNode:
         logger.info(f'   - Publishing to: cognitive/{character_name}/decided_action')
         logger.info(f'   - Publishing to: cognitive/map/turn/complete/{character_name}')
         logger.info(f'   - Publishing to: cognitive/map/time_proposal')
+
+        self.activity_manager: ActivityManager = ActivityManager(self, self.activities, self.llm_client, self.map_types)
+
+        # Register signal handlers for graceful shutdown
+        signal.signal(signal.SIGTERM, self._signal_handler)
+        signal.signal(signal.SIGINT, self._signal_handler)
+
+    def _snapshot_physiology(self, action_record: ActionRecord) -> None:
+        """Capture current physiology into the given action_record.
+        Errors are contained here to avoid try proliferation in callers.
+        """
+        try:
+            action_record.hunger_after = float(self.self_state.get('hunger', {}).get('value', 0.0))
+            action_record.fatigue_after = float(self.self_state.get('fatigue', {}).get('value', 0.0))
+            action_record.thirst_after = float(self.self_state.get('thirst', {}).get('value', 0.0))
+        except Exception:
+            logger.error(f'Error capturing physiology: {e}')
+            traceback.print_exc()
     
     def _signal_handler(self, signum, frame):
         """Handle shutdown signals gracefully."""
@@ -537,14 +543,14 @@ class ZenohExecutiveNode:
                             # Log cap condition
                             try:
                                 hunger_val = float(self.self_state.get('hunger', {}).get('value', 0.0))
-                                if hunger_val >= 100.0:
-                                    logger.error(f'🍽️ {self.character_name} hunger reached 100 (worst)')
+                                if hunger_val >= 95.0:
+                                    logger.error(f'🍽️ {self.character_name} hunger reached 95 (worst)')
                                 fatigue_val = float(self.self_state.get('fatigue', {}).get('value', 0.0))
-                                if fatigue_val >= 100.0:
-                                    logger.error(f'🍽️ {self.character_name} fatigue reached 100 (worst)')
+                                if fatigue_val >= 95.0:
+                                    logger.error(f'🍽️ {self.character_name} fatigue reached 95 (worst)')
                                 thirst_val = float(self.self_state.get('thirst', {}).get('value', 0.0))
-                                if thirst_val >= 100.0:
-                                    logger.error(f'💧 {self.character_name} thirst reached 100 (worst)')
+                                if thirst_val >= 95.0:
+                                    logger.error(f'💧 {self.character_name} thirst reached 95 (worst)')
                             except Exception:
                                 pass
                             # Publish state snapshot for UI
@@ -612,6 +618,7 @@ class ZenohExecutiveNode:
             self.current_goal = self._orient(observations, new_goal)
             if self.current_goal != prev_goal:
                 self._publish_goal(self.current_goal)
+                self._plan_completed(reason='goal changed')
                 logger.info(f'🎯 {self.character_name} oriented to goal: {self.current_goal.to_string()}')
 
             # Plan: Return existing plan or create single-action plan
@@ -773,13 +780,30 @@ class ZenohExecutiveNode:
 
     def format_current_physiological_state(self):
         """Format the current physiological state for the LLM."""
-        def_str = 'DEFINITIONS:\n'+'+\n'.join(str(need) for need in PHYSIOLOGICAL_NEEDS)
+        def_str = 'DEFINITIONS:\n'+'+\n'.join(str(need) for need in PHYSIOLOGICAL_STATES)
         return def_str+'\n'+'CURRENT_STATE:\n'+'\n'.join([f'{key.capitalize()}: {item["value"]:.1f}' for key, item in self.self_state.items()])
 
     def _orient(self, observations: Dict[str, Any], new_goal: plan_module.Goal = None):
         """Orient: Assess current state and drives"""
         """{'static': system_prompt, 'dynamic': user_prompt}"""
         # If we have a real goal (not placeholder), return it
+        physiological_drives = {"thirst": """Maintain hydration — avoid thirst and keep the body supplied with fluids.""", 
+        "fatigue":"""Maintain alertness — avoid fatigue and keep the body rested.""", 
+        "hunger":"""Maintain energy — avoid hunger and keep the body supplied with nutrients."""}
+        if self.self_state:
+            worst_state_value = 0
+            worst_state_key = None
+            for key, item in self.self_state.items():
+                if item['value'] > 75:
+                    logger.warning(f'{self.character_name} is in danger of death')
+                    if item['value'] > worst_state_value:
+                        worst_state_value = item['value']
+                        worst_state_key = key
+            if worst_state_key and self.current_goal and worst_state_key not in self.current_goal.name:
+                    self.current_goal = plan_module.Goal(physiological_drives[worst_state_key], actors=[self.character_name], termination=f'{worst_state_key} below 50')
+                    return self.current_goal
+            
+            
         if self.current_goal:
             return self.current_goal
 
@@ -792,28 +816,45 @@ class ZenohExecutiveNode:
             logger.info(f'🤔 {self.character_name} received placeholder goal, creating situated goal')
 
         # Create a new goal based on current situation
-        self.map_update_request_publisher.put(json.dumps({'type': 'goal_look'}))
-        system_prompt = """Task: generate a goal statement for your next objective."""
-        user_prompt = observations['static']
-        user_prompt += '\n\n' + observations['dynamic']
+        other_characters_str = ''
+        for other_character_name, other_character_desc in self.config.get('characters', {}).items():
+            if other_character_name != self.character_name:
+                other_characters_str += f"\n\t{other_character_name}: {other_character_desc}"
+        character_names = list(self.config.get("characters", {}).keys())
 
+        self.map_update_request_publisher.put(json.dumps({'type': 'goal_look'}))
+        map_types_str = format_map_types(self.map_types)
+        ontology_nouns_str = '\n'.join(self.ontology['nouns'])
+        ontology_verbs_str = '\n'.join(self.ontology['verbs'])
+        character_drives = self.drives
+        character_drives_str = '\n'.join(character_drives)   
+
+        drives = character_drives.copy()
+        physiological_drives = ["""Maintain hydration — avoid thirst and keep the body supplied with fluids.""", 
+        """Maintain alertness — avoid fatigue and keep the body rested.""", 
+        """Maintain energy — avoid hunger and keep the body supplied with nutrients."""]
+        drives.extend(physiological_drives)
         character_drives_str = '\n'.join(self.drives)   
 
         # Make LLM call
         if self.llm_client and not self.shutdown_requested:
             # Use shorter timeout during shutdown
-            timeout = 5.0 if self.shutdown_requested else None
+            timeout = 200.0 if self.shutdown_requested else None
             response = self.llm_client.generate(
-                messages=[system_prompt, user_prompt, GOAL_TEMPLATE],
+                messages=[GOAL_TEMPLATE],
                 bindings={
-                    "physiological_needs": self.format_current_physiological_state(),
+                    "physiological_states": self.format_current_physiological_state(),
                     "character_drives": character_drives_str,
-                    "middle_ontology": json.dumps((self.middle_ontology or {}).get('manifest', {}), indent=2),
+                    "primitive_nouns": map_types_str,
+                    "primitive_verbs": PLAN_VERBS,
+                    "abstract_nouns": ontology_nouns_str,
+                    "abstract_verbs": ontology_verbs_str,
+                    "character_names": character_names,
+                    "other_characters": other_characters_str,
                 },
                 max_tokens=400,
                 temperature=0.5,
                 stops=['</end>'],
-                
                 timeout=timeout
             )
 
@@ -1066,10 +1107,11 @@ end your response with </end>
             self._publish_goal(self.current_goal)
         return self.current_goal
         
-    def _plan_completed(self):
+    def _plan_completed(self, reason='done'):
         """Handle successful plan completion."""
         # Existing telemetry and cleanup
-        self._summarize_plan_execution()
+        if reason != 'goal changed':
+            self._summarize_plan_execution()
         self.current_plan = None
         if hasattr(self, 'plan_bindings') and self.plan_bindings:
             logger.info(f'🔄 {self.character_name} cleared plan_bindings (plan completed)')
@@ -1077,6 +1119,8 @@ end your response with </end>
         self.plan_bindings_cache = {}
         self.action_history = []
         self.plan_state = None
+        if reason == 'goal changed':
+            return
         
         # Handle activity advancement
         if hasattr(self, 'activity_manager') and self.activity_manager.has_active_activity():
@@ -1103,7 +1147,6 @@ end your response with </end>
             self.current_goal = None
             self._publish_goal(self.current_goal)
 
-        
         self._publish_current_plan()
         
 
@@ -1409,6 +1452,10 @@ end your response with </end>
             return True
         if action['type'].lower() == 'think':
             thought = self.think_about(action)
+            try:
+                self._snapshot_physiology(action_record)
+            except Exception:
+                pass
             return True
             
         if action['type'].lower() == "move":
@@ -1443,13 +1490,7 @@ end your response with </end>
                     # Telemetry snapshot after action
                     try:
                         action_record.hunger_after = float(self.self_state.get('hunger', {}).get('value', 0.0))
-                    except Exception:
-                        action_record.hunger_after = None
-                    try:
                         action_record.fatigue_after = float(self.self_state.get('fatigue', {}).get('value', 0.0))
-                    except Exception:
-                        action_record.fatigue_after = None
-                    try:
                         action_record.thirst_after = float(self.self_state.get('thirst', {}).get('value', 0.0))
                     except Exception:
                         action_record.thirst_after = None
@@ -1464,6 +1505,10 @@ end your response with </end>
                 self.move(random.choice(cardinal_directions))
                 try:
                     self.map_update_request_publisher.put(json.dumps({'type': 'step_look'}))
+                except Exception:
+                    pass
+                try:
+                    self._snapshot_physiology(action_record)
                 except Exception:
                     pass
                 return True
@@ -1481,6 +1526,10 @@ end your response with </end>
                 pass
             if resolved_target and self._acquire_conversation_lock(resolved_target):
                 self.generate_speech(action['value'], resolved_target, mode='say')
+                try:
+                    self._snapshot_physiology(action_record)
+                except Exception:
+                    pass
             else:
                 # Lock acquisition failed, publish failure action
                 action_data = {
@@ -1499,6 +1548,11 @@ end your response with </end>
                 # Telemetry failure tagging
                 action_record.outcome_status = 'failure'
                 action_record.failure_code = 'lock:conversation_unavailable'
+                try:
+                    action_record.result = 'failed - conversation lock unavailable'
+                    self._snapshot_physiology(action_record)
+                except Exception:
+                    pass
                 self.action_counter += 1
                 return False
         elif action['type'].lower() == "take":
@@ -1556,6 +1610,10 @@ end your response with </end>
                 # Record a concise failure result for summaries
                 if self.action_history:
                     self.action_history[-1].result = 'failed - target not nearby/visible'
+                try:
+                    self._snapshot_physiology(action_record)
+                except Exception:
+                    pass
                 self.action_counter += 1
                 return False
             ok = self.take(resolved)
@@ -1563,6 +1621,10 @@ end your response with </end>
             try:
                 if self.action_history:
                     self.action_history[-1].result = f'took {resolved}' if ok else 'take failed'
+            except Exception:
+                pass
+            try:
+                self._snapshot_physiology(action_record)
             except Exception:
                 pass
             self.action_counter += 1
@@ -1629,6 +1691,10 @@ end your response with </end>
                 # Record a concise failure result for summaries
                 if self.action_history:
                     self.action_history[-1].result = 'failed - item not in inventory'
+                try:
+                    self._snapshot_physiology(action_record)
+                except Exception:
+                    pass
                 self.action_counter += 1
                 return False
             # Perform place on map
@@ -1637,13 +1703,7 @@ end your response with </end>
             if ok:
                 try:
                     action_record.hunger_after = float(self.self_state.get('hunger', {}).get('value', 0.0))
-                except Exception:
-                    action_record.hunger_after = None
-                try:
                     action_record.fatigue_after = float(self.self_state.get('fatigue', {}).get('value', 0.0))
-                except Exception:
-                    action_record.fatigue_after = None
-                try:
                     action_record.thirst_after = float(self.self_state.get('thirst', {}).get('value', 0.0))
                 except Exception:
                     action_record.thirst_after = None
@@ -1691,19 +1751,17 @@ end your response with </end>
                 # Record a concise failure result for summaries
                 if self.action_history:
                     self.action_history[-1].result = 'failed - target not nearby/visible'
+                try:
+                    self._snapshot_physiology(action_record)
+                except Exception:
+                    pass
             else:
                 # Perform inspect which may populate last_action_result
                 self.inspect(action, resolved)
                 # Telemetry snapshot after action
                 try:
                     action_record.hunger_after = float(self.self_state.get('hunger', {}).get('value', 0.0))
-                except Exception:
-                    action_record.hunger_after = None
-                try:
                     action_record.fatigue_after = float(self.self_state.get('fatigue', {}).get('value', 0.0))
-                except Exception:
-                    action_record.fatigue_after = None
-                try:
                     action_record.thirst_after = float(self.self_state.get('thirst', {}).get('value', 0.0))
                 except Exception:
                     action_record.thirst_after = None
@@ -1769,6 +1827,10 @@ end your response with </end>
                         'failed - target not nearby/visible'
                         if (binding and not binding.get('value')) else 'failed - item not in inventory'
                     )
+                try:
+                    self._snapshot_physiology(action_record)
+                except Exception:
+                    pass
                 return False
             else:
                 # Infrastructure: invoke map use_path to traverse
@@ -1789,48 +1851,83 @@ end your response with </end>
                                 action_data['status'] = 'failed'
                             break
                     self.action_publisher.put(json.dumps(action_data))
+                    try:
+                        self._snapshot_physiology(action_record)
+                    except Exception:
+                        pass
                     self.action_counter += 1
                     return True
                 # Resource/other use path
                 self.use(action, resolved, action_data)
                 action_data['result'] = self.action_history[-1].result
+                # Apply rules-driven physiological effects based on resource type
+                try:
+                    if isinstance(resolved, str) and resolved:
+                        # Query resource rules using instance name (handler strips numeric suffix)
+                        rules_response = None
+                        for reply in self.session.get(f"cognitive/map/resource_rules/{resolved}", timeout=3.0 if not self.debug else 600.0):
+                            if reply.ok:
+                                rules_response = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
+                                break
+                        if rules_response and rules_response.get('success'):
+                            rr = rules_response.get('resource_rules') or {}
+                            use_effects = rr.get('use') or []
+                            if isinstance(use_effects, list) and use_effects:
+                                # Build case-insensitive map of current needs
+                                try:
+                                    need_key_map = {str(k).lower(): k for k in (self.self_state or {}).keys()}
+                                except Exception:
+                                    need_key_map = {}
+                                for eff in use_effects:
+                                    try:
+                                        need_name = str(eff.get('need', '')).lower()
+                                        delta = float(eff.get('effect', 0.0))
+                                        if not need_name:
+                                            continue
+                                        if need_name not in need_key_map:
+                                            logger.error(f"Unknown need in use effects: '{eff.get('need')}'")
+                                            continue
+                                        key = need_key_map[need_name]
+                                        # Read current value
+                                        cur = 0.0
+                                        try:
+                                            cur = float((self.self_state.get(key) or {}).get('value', 0.0))
+                                        except Exception:
+                                            cur = 0.0
+                                        new_val = cur + delta
+                                        # Clamp to 0..100
+                                        if new_val < 0.0:
+                                            new_val = 0.0
+                                        elif new_val > 100.0:
+                                            new_val = 100.0
+                                        # Write back
+                                        try:
+                                            if key not in self.self_state or not isinstance(self.self_state[key], dict):
+                                                self.self_state[key] = {'value': new_val}
+                                            else:
+                                                self.self_state[key]['value'] = new_val
+                                        except Exception:
+                                            pass
+                                    except Exception:
+                                        # Skip malformed effect entries
+                                        pass
+                except Exception:
+                    # Rules lookup/apply errors are non-fatal for the action
+                    pass
                 # Apply simple hunger/thirst restore heuristics
                 try:
-                    target_lower = (resolved or '').lower()
-                    if any(k in target_lower for k in ['berry', 'berries', 'food']):
-                        apply_restore(self.self_state, 'hunger', amount=30.0)
-                        hunger_val = float(self.self_state.get('hunger', {}).get('value', 0.0))
-                        logger.info(f'🍽️ {self.character_name} ate {resolved}; hunger now {hunger_val:.1f}')
-                        if hunger_val >= 100.0:
-                            logger.error(f'🍽️ {self.character_name} hunger reached 100 (worst)')
-                    if any(k in target_lower for k in ['water', 'spring', 'river', 'stream', 'pond']):
-                        apply_restore(self.self_state, 'thirst', amount=40.0)
-                        thirst_val = float(self.self_state.get('thirst', {}).get('value', 0.0))
-                        logger.info(f'💧 {self.character_name} drank from {resolved}; thirst now {thirst_val:.1f}')
-                        if thirst_val >= 100.0:
-                            logger.error(f'💧 {self.character_name} thirst reached 100 (worst)')
-                        # Publish state snapshot for UI after restore
-                        try:
-                            state_payload = {
-                                'character': self.character_name,
-                                'timestamp': datetime.now().isoformat(),
-                                'state': self.self_state
-                            }
-                            self.current_state_publisher.put(json.dumps(state_payload))
-                        except Exception:
-                            pass
+                    state_payload = {
+                        'character': self.character_name,
+                        'timestamp': datetime.now().isoformat(),
+                        'state': self.self_state
+                    }
+                    self.current_state_publisher.put(json.dumps(state_payload))
                 except Exception:
                     pass
                 # Telemetry snapshot after action (post-use may alter hunger)
                 try:
                     action_record.hunger_after = float(self.self_state.get('hunger', {}).get('value', 0.0))
-                except Exception:
-                    action_record.hunger_after = None
-                try:
                     action_record.fatigue_after = float(self.self_state.get('fatigue', {}).get('value', 0.0))
-                except Exception:
-                    action_record.fatigue_after = None
-                try:
                     action_record.thirst_after = float(self.self_state.get('thirst', {}).get('value', 0.0))
                 except Exception:
                     action_record.thirst_after = None
@@ -1864,13 +1961,7 @@ end your response with </end>
             # Telemetry snapshot after action
             try:
                 action_record.hunger_after = float(self.self_state.get('hunger', {}).get('value', 0.0))
-            except Exception:
-                action_record.hunger_after = None
-            try:
                 action_record.fatigue_after = float(self.self_state.get('fatigue', {}).get('value', 0.0))
-            except Exception:
-                action_record.fatigue_after = None
-            try:
                 action_record.thirst_after = float(self.self_state.get('thirst', {}).get('value', 0.0))
             except Exception:
                 action_record.thirst_after = None
@@ -1894,6 +1985,11 @@ end your response with </end>
             return True if scan_result else False
         else:
             logger.error(f'❌ Unknown action type: {action.get("type", "unknown")}')
+            try:
+                action_record.result = 'failed - unknown action'
+                self._snapshot_physiology(action_record)
+            except Exception:
+                pass
             return False
 
         # Request situation/map update for UI after non-move actions that may affect visibility/adjacency
@@ -2037,7 +2133,8 @@ end your response with </end>
         
         #why concise (8-10 words) explanation how this plan intends to achieve the goal
         #outcome concise (16-24 words) explanation of the outcome - did it achieve the goal? If not, where did it fail and why?
-        #score nn (0-100)
+        #plan_score nn (0-100)
+        #goal_score nn (0-100) - how well the goal was met as measured by goal termination condition
         ##
         
         Do not include any other introductory, explanatory, discursive, or formatting text in your response.
@@ -2047,15 +2144,23 @@ end your response with </end>
         summary_text = response.text if hasattr(response, 'text') else str(response)
         why_text = hash_utils.find('why', summary_text)
         outcome_text = hash_utils.find('outcome', summary_text)
-        score_text = hash_utils.find('score', summary_text)
+        plan_score_text = hash_utils.find('plan_score', summary_text)
+        goal_score_text = hash_utils.find('goal_score', summary_text)
         plan_score = None
-        if score_text:
+        if plan_score_text:
             try:
-                plan_score = int(score_text)
+                plan_score = int(plan_score_text)
             except Exception:
                 plan_score = 0
-        metrics = {"rationale": why_text, "outcome": outcome_text, "score": score_text}
-        self.plan_summary = f'{summary_text}\n{json.dumps(metrics, indent=2)}'
+        goal_score = None
+        if goal_score_text:
+            try:
+                goal_score = int(goal_score_text)
+            except Exception:
+                goal_score = 0
+        summary = {"rationale": why_text, "outcome": outcome_text, "plan_score": plan_score, "goal_satisfaction": goal_score}
+        self.plan_summary = f'{summary_text}\n{json.dumps(summary, indent=2)}'
+
 
         logger.info(f'📝 Plan post-mortem prepared for {self.character_name}\n{self.plan_summary}\n')
         
@@ -2169,8 +2274,16 @@ end your response with </end>
             pass
 
         # Add goal satisfaction score to metrics for reflection scoring
-        if 'goal_satisfaction' not in metrics:
-            metrics['goal_satisfaction'] = plan_score / 100.0 if plan_score is not None else 0.0
+        if 'goal_satisfaction' in summary:
+            metrics['goal_satisfaction'] = summary['goal_satisfaction']/100.0
+        else:
+            metrics['goal_satisfaction'] = 0.0
+
+        # Add goal satisfaction score to metrics for reflection scoring
+        if 'plan_score' in summary:
+            metrics['plan_score'] = summary['plan_score']/100.0
+        else:
+            metrics['plan_score'] = 0.0
 
         entry = {
             'activity': self.current_activity['name'] if self.current_activity else 'None',
@@ -2582,10 +2695,8 @@ End your text with: </end>"""
         # Resolve noun target to one or more concrete map_types (if indices exist)
         candidates = []
         try:
-            scan_idx = ((self.middle_ontology or {}).get('indices', {})
-                        .get('noun', {}) if isinstance(self.middle_ontology, dict) else {})
-            noun_to_map = scan_idx.get('noun_to_map_types', {}) if isinstance(scan_idx, dict) else {}
-            mapped = noun_to_map.get(target)
+            noun_mappings = self.ontology.get('noun_mappings', {})
+            mapped = noun_mappings.get(target)
             if isinstance(mapped, list) and mapped:
                 candidates = [c for c in mapped if isinstance(c, str) and c]
         except Exception:
@@ -2805,6 +2916,11 @@ End your text with: </end>"""
                     entry['resources'] = resources_out
                 if chars_out:
                     entry['characters'] = chars_out
+                paths_out = []
+                for ch in (view.get('paths') or [])[:5]:
+                    chars_out.append({'name': ch.get('name'), 'distance': ch.get('distance')})
+                if paths_out:
+                    entry['paths'] = paths_out
                 snapshot.append(entry)
         except Exception:
             return []
@@ -3197,134 +3313,87 @@ End your response with:
         except Exception as e:
             logger.error(f'Error storing in memory: {e}')
     
+
     def _assess_drive_fulfillment(self) -> Dict[str, Any]:
         """Assess drive fulfillment using an LLM. Returns structured scores per drive.
 
         Output shape:
-          { "drives": [{"name": str, "score": float, "rationale": str}],
-            "summary": str,
-            "raw_text": str }
+          { "drives": [{"name": str, "score": float, "rationale": str}]}
         """
+        assessment = []
         try:
-            drives_list = self.drives or []
             goal_text = self.current_goal.to_string() if self.current_goal else ''
             plan_text = json.dumps(self.current_plan, indent=2) if self.current_plan else '{}'
             # Physiological snapshot
-            phys = {}
-            try:
-                for k, v in (self.self_state or {}).items():
-                    phys[k] = float(v.get('value', 0.0))
-            except Exception:
-                phys = {}
+            state = {}
+            for k, v in (self.self_state or {}).items():
+                state[k] = float(v.get('value', 0.0))
+            state_text = json.dumps(state, indent=2)
             # Inventory (use cache)
-            inventory = []
-            try:
-                inventory = list(self.inventory_cache or [])
-            except Exception:
-                inventory = []
+            inventory_text = list(self.inventory_cache or [])
             # Conversations (recent)
-            try:
-                chats = self._get_recent_chat_memories(10)
-            except Exception:
-                chats = []
+            chats_text = self._get_recent_chat_memories(10)
             # Knowledge: thoughts, inspects, uses
             thoughts = []
-            try:
-                for ar in (self.action_history or []):
-                    if (ar.action or {}).get('type', '').lower() == 'think' and ar.result:
-                        thoughts.append(str(ar.result))
-            except Exception:
-                thoughts = []
-            inspects_map = {}
-            try:
-                inspects_map = dict(self.inspections or {})
-            except Exception:
-                inspects_map = {}
-            uses_map = {}
-            try:
-                uses_map = dict(self.uses or {})
-            except Exception:
-                uses_map = {}
+            for ar in (self.action_history or []):
+                if (ar.action or {}).get('type', '').lower() == 'think' and ar.result:
+                    thoughts.append(str(ar.result))
+            thoughts_text = '\n'.join(thoughts)
+            inspects_map = dict(self.inspections or {})
+            uses_map = dict(self.uses or {})
             # Recent actions compact
-            actions_compact = []
-            try:
-                for ar in (self.action_history or [])[-20:]:
-                    actions_compact.append({
-                        'type': (ar.action or {}).get('type', ''),
-                        'target': (ar.action or {}).get('target', ''),
-                        'result': ar.result or ''
-                    })
-            except Exception:
-                actions_compact = []
+            actions_text = ''
+            for ar in (self.action_history or [])[-20:]:
+                actions_text += f"""{ar.action.get('type', '')}, {ar.action .get('target', '')}: result: {ar.result or ''}\n"""
 
-            system_prompt = "Assess each drive's fulfillment (0.0 worst to 1.0 best) based on the provided context. Be strict and conservative. Return ONLY a JSON object: {\"drives\": [{\"name\": str, \"score\": float, \"rationale\": str}], \"summary\": str} and then </end>."
-            user_prompt = f"""
-Drives:
-{json.dumps(drives_list, indent=2)}
+        except Exception as e:
+            logger.error(f'Error collecting drive assessment context: {e}')
+            traceback.print_exc()
+            return []
 
-Goal:
-{goal_text}
-
-Plan:
-{plan_text}
-
-Physiological state (0=best,100=worst):
-{json.dumps(phys, indent=2)}
-
-Inventory (ids):
-{json.dumps(inventory, indent=2)}
-
-Recent conversations (last 10):
-{json.dumps(chats, indent=2)}
-
-Knowledge gained - thoughts:
-{json.dumps(thoughts, indent=2)}
-
-Knowledge gained - inspections:
-{json.dumps(inspects_map, indent=2)}
-
-Knowledge gained - uses:
-{json.dumps(uses_map, indent=2)}
-
-Recent actions (last 20):
-{json.dumps(actions_compact, indent=2)}
-
-Instructions:
-For each drive, output a score in [0.0,1.0] where 1.0 means well satisfied/fulfilled, 0.0 means badly unmet. Use concise rationales. Then end with </end>.
-"""
-
+        for drive in self.drives:
             if not self.llm_client or self.shutdown_requested:
-                return { 'drives': [ { 'name': d, 'score': 0.0, 'rationale': '' } for d in drives_list ], 'summary': '', 'raw_text': '' }
-
+                continue
             response = self.llm_client.generate(
-                messages=[system_prompt, user_prompt],
+                messages=[DRIVE_ASSESSMENT_TEMPLATE],
+                bindings={
+                    "drive": drive,
+                    "goal": goal_text,
+                    "plan": plan_text,
+                    "state": state_text,
+                    "inventory": inventory_text,
+                    "chats": chats_text,
+                    "thoughts": thoughts_text,
+                    "inspects_map": inspects_map,
+                    "uses_map": uses_map,
+                    "actions": actions_text
+                },
                 max_tokens=600,
                 temperature=0.3,
-                timeout=100.0,
+                timeout=200.0,
                 is_json=True,
                 stops=['</end>']
             )
 
-            try:
-                if response.success:
-                    if isinstance(response.text, dict):
-                        return response.text
-                    else:
-                        try:
-                            return json.loads(response.text.strip())
-                        except Exception as e:
-                            logger.error(f'Error parsing drive fulfillment response: {e}')
-                            return { }
+            if response.success:
+                if isinstance(response.text, dict):
+                    result = response.text.copy()
+                    result['name'] = drive
+                    assessment.append(result)
                 else:
-                    logger.error(f'Error assessing drive fulfillment: {response.error}')
-                    return { }
-            except Exception as e:
-                logger.error(f'Error assessing drive fulfillment: {e}')
+                    try:
+                        result = json.loads(response.text.strip())
+                        result['name'] = drive
+                        assessment.append(result)
+                    except Exception as e:
+                        logger.error(f'Error parsing drive fulfillment response: {e}')
+                        return { }
+            else:
+                logger.error(f'Error assessing drive fulfillment: {response.error}')
                 return { }
-        except Exception as e:
-            logger.error(f'Error assessing drive fulfillment: {e}')
-            return { }
+        return { 'drives': assessment }
 
+ 
     def get_entity_context(self, entity_name: str, limit: int = 20, scope='all') -> Dict[str, Any]:
         """
         Query entity data from memory node for context.

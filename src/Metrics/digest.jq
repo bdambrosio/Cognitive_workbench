@@ -22,7 +22,7 @@ def _loc_from_prompt:
   | (try ($p | capture("(?ms)#You are at location:\\s*\\[(?<x>-?\\d+),\\s*(?<y>-?\\d+)\\]")) catch null)
   | if .!=null then [ (.x|tonumber), (.y|tonumber) ] else null end;
 
-# Try to pull structured JSON (rationale/outcome/score) embedded in .summary
+# Try to pull structured JSON (rationale/outcome/plan_score) embedded in .summary
 def _summary_json:
   (.summary // "") as $s
   | (try ($s | capture("(?s)(?<obj>\\{.*\\})")) catch null)
@@ -134,7 +134,7 @@ def _digest:
           }
       ),
       goal_satisfaction: (.metrics.goal_satisfaction // null),
-      summary_score: ($sj.score // null),
+      summary_score: ($sj.plan_score // $sj.score // null),
       summary_outcome: ($sj.outcome // null),
       summary_rationale: ($sj.rationale // null),
       actions: (_actions_compact),
@@ -170,7 +170,7 @@ def _text:
   | ($d.thirst.delta // null) as $tdel
   | ($d.drive_fulfillment.drives // []) as $dfs
   | ($dfs | length) as $dfs_len
-  | ($dfs | map((.name // "?") + "=" + ((.score // 0)|tostring))) as $df_lines
+  | ($dfs | map((.name // "?") + "=" + (((.plan_score // .score // 0))|tostring))) as $df_lines
   | ($d.drive_fulfillment.summary // null) as $dfsum
   | ($d.goal_satisfaction // null) as $sat
   | ($d.summary_outcome // null) as $out
@@ -210,7 +210,7 @@ def _text:
       (if $out!=null then "outcome: " + ($out) + "\n" else "" end) +
       (if $dfsum!=null then "drive summary: " + ($dfsum) + "\n" else "" end) +
       (if $why!=null then "rationale: " + ($why) + "\n" else "" end) +
-      (if $sc!=null then "score: " + ($sc|tostring) + "\n" else "" end) +
+      (if $sc!=null then "plan_score: " + ($sc|tostring) + "\n" else "" end) +
       "flags: loop_suspect=" + ($loop|tostring) + " | binding_yield=" + (($by // "n/a")|tostring) + "\n"
     );
 

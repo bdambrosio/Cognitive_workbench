@@ -43,7 +43,7 @@ def _ensure_map_types(session, scenario: dict):
             if reply.ok:
                 data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
                 if data.get('success'):
-                    return data, None
+                    return data, None, None
     except Exception: # expected if map_node is not running
         pass
 
@@ -75,21 +75,46 @@ def _ensure_map_types(session, scenario: dict):
                     break
 
         if not types:
-            
-            return {}, map_process
+            return {}, '', map_process
+        for reply in session.get("cognitive/map/types", timeout=10.0):
+            if reply.ok:
+                data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
+                if data.get('success'):
+                    types = data
+                    break
+        resource_type_str = ''
+        if types.get('resource_types'):
+            for resource_type in types['resource_types']:
+                resource_type_str += f"\n{resource_type}"
+                for reply in session.get(f"cognitive/map/resource_rules/{resource_type}", timeout=5):
+                    if reply.ok:
+                        rules_response = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
+                        break
+                if rules_response and rules_response.get('success') and 'resource_rules' in rules_response:
+                    rules_response = rules_response['resource_rules']
+                    if 'description' in rules_response:
+                        resource_type_str += f": {rules_response['description']}"
+                    use_effects = ''
+                    for effect in rules_response.get('use', []):
+                        if use_effects == '':
+                            use_effects += ' Effects when used: ' + f'{"reduces" if effect.get("effect", 0.0) < 0.0 else "increases"} {effect.get("need", "")} by {effect.get("effect", 0.0)}'
+                        else:
+                            use_effects += '; ' + f'{"reduces" if effect.get("effect", 0.0) < 0.0 else "increases"} {effect.get("need", "")} by {effect.get("effect", 0.0)}'
+                    resource_type_str += f"\n\t{use_effects}"
+            resource_type_str = resource_type_str.replace('\n\n','\n')
+
     except Exception as e:
         logger.error(f"Failed to get map types: {e}")
         traceback.print_exc()
         pass
-    return types, map_process
-
+    return types, resource_type_str, map_process
 
 def main():
     parser = argparse.ArgumentParser(description="Scenario analysis driver for ontology and activities generation")
     parser.add_argument('--scenario', required=True, help='Path to scenario YAML file')
     parser.add_argument('--character', default='all', help="Character name or 'all'")
     parser.add_argument('--ontology', choices=['load', 'create'], default='load', help='Load or create ontology')
-    parser.add_argument('--middle', choices=['load', 'create'], default='load', help='Load or create middle ontology')
+    parser.add_argument('--middle', choices=['load', 'create', 'skip'], default='load', help='Load or create middle ontology')
     parser.add_argument('--activities', choices=['load', 'create'], default='create', help='Load or create activities')
     parser.add_argument('--server', default='openai', help='LLM server name (for middle ontology/planner)')
     parser.add_argument('--model', default='gpt-4.1', help='LLM model name (for middle ontology/planner)')
@@ -112,6 +137,7 @@ def main():
     logger.info(f"Scenario: {args.scenario}")
     logger.info(f"Setting: {setting}")
     logger.info(f"Characters: {', '.join(characters.keys())}")
+    character_names = list(characters.keys())
 
     # Initialize Zenoh session (reused for map/types)
     session = zenoh.open(zenoh.Config())
@@ -133,7 +159,7 @@ def main():
     middle_llm = LLM(server_name=args.server, model_name=args.model)
 
     # Try to get map_types (without launching map node). Fail if not present and any stage needs it.
-    map_types, map_process = _ensure_map_types(session, scenario)
+    map_types, resource_type_str, map_process = _ensure_map_types(session, scenario)
 
     # Helper: run per character
     def process_character(name: str, data: dict):
@@ -162,36 +188,39 @@ def main():
             if not map_types:
                 logger.error("map/types unavailable; cannot create ontology")
                 raise RuntimeError("missing map types")
-            ontology = create_ontology(setting, map_types, name, character_desc, character_drives, characters)
+            ontology = create_ontology(setting, map_types, resource_type_str, name, character_desc, character_drives, characters)
             if not ontology:
                 raise RuntimeError("create_ontology failed")
             save_ontology(name, ontology, scenario_dir)
 
         # Middle ontology
+        middle = None
         if args.middle == 'load':
             if not os.path.exists(middle_path):
                 raise FileNotFoundError(f"Missing middle ontology: {middle_path}")
             with open(middle_path, 'r') as f:
                 middle = json.load(f)
-        else:
+        elif args.middle == 'create':
             if not map_types:
                 logger.error("map/types unavailable; cannot create middle ontology")
                 raise RuntimeError("missing map types")
-            middle = create_middle_ontology(ontology, middle_llm, map_types, character_drives)
+            middle = create_middle_ontology(ontology, middle_llm, map_types, resource_type_str, character_drives, characters)
             save_middle_ontology(name, middle, scenario_dir)
-        if not isinstance(middle, dict):
-            raise RuntimeError("create_middle_ontology failed")
-        problems, report = validate_ontology(middle)
-        if problems:
-            logger.error(f"Middle ontology validation problems: {problems}")
-            from middle_ontology import repair_ontology
-            middle, repairs = repair_ontology(middle, report, mode='nodes')
-            logger.info(f"Applied ontology repairs: {repairs}")
-            problems2, _ = validate_ontology(middle)
-            if problems2:
-                logger.error(f"Middle ontology validation problems after repair: {problems2}")
-        # Build and attach indices
-        try:
+            if not isinstance(middle, dict):
+                raise RuntimeError("create_middle_ontology failed")
+            else:
+                raise ValueError(f"Invalid middle ontology mode: {args.middle}")
+            problems, report = validate_ontology(middle, map_types)
+            if problems:
+                logger.error(f"Middle ontology validation problems: {problems}")
+            #    from middle_ontology import repair_ontology
+            #    middle, repairs = repair_ontology(middle, report, mode='nodes')
+            #    logger.info(f"Applied ontology repairs: {repairs}")
+            #    problems2, _ = validate_ontology(middle)
+            #    if problems2:
+            #        logger.error(f"Middle ontology validation problems after repair: {problems2}")
+            # Build and attach indices
+            try:
                 from middle_ontology import build_noun_indices, build_verb_indices
                 noun_indices = build_noun_indices(middle, map_types)
                 if isinstance(noun_indices, dict):
@@ -214,9 +243,9 @@ def main():
                     at = verb_indices.get('anchor_to_verbs', {}) or {}
                     for anchor, vids in at.items():
                         logger.info(f"verb-index anchor {anchor} <- {', '.join(vids)}")
-        except Exception as _e:
-            logger.warning(f"Failed to attach indices: {_e}")
-        save_middle_ontology(name, middle, scenario_dir)
+            except Exception as _e:
+                logger.warning(f"Failed to attach indices: {_e}")
+            save_middle_ontology(name, middle, scenario_dir)
 
         # Activities
         if args.activities == 'load':

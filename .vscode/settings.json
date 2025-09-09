@@ -20,5 +20,8 @@
     },
     "terminal.integrated.env.windows": {
         "PYTHONPATH": "${workspaceFolder}/src"
-    }
+    },
+    "cursorpyright.analysis.extraPaths": [
+        "./src"
+    ]
 } 
