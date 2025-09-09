@@ -42,3 +42,4 @@ src/logs/fastapi_action_display.log
 src/data
 src/logs/
 *.log
+src/logs/*.log
