@@ -1,0 +1,53 @@
+{
+  "updates": [
+    {
+      "op": "append",
+      "block_id": "pc-non-specific-or-unbound-scan-2ef39cea",
+      "kind": "example",
+      "title": "Bind variables via scan and always use $var after binding",
+      "rationale": "Demonstrates correct variable scan binding, followed by variable usage. Avoids unbound variable usage and ensures scan target is concrete.",
+      "content": "# BEGIN_C_BLOCK block_id=pc-non-specific-or-unbound-scan-2ef39cea kind=example title=\"Bind variables via scan and always use $var after binding\"\n{\n  \"plan\": [\n    { \"type\": \"scan\", \"target\": \"WaterSource\", \"out\": \"water_location\" },\n    { \"type\": \"while\", \"condition\": { \"type\": \"notnear\", \"target\": \"$water_location\" }, \"body\": [\n      { \"type\": \"move\", \"target\": \"$water_location\" }\n    ]},\n    { \"type\": \"take\", \"target\": \"$water_location\" }\n  ]\n}\n# END_C_BLOCK block_id=pc-non-specific-or-unbound-scan-2ef39cea",
+      "source_pids": [
+        "s1-1757299144-2228c7:plan-1f055659:p1",
+        "s1-1757299144-2228c7:plan-f943e5b0:p1",
+        "s1-1757299144-2228c7:plan-65f9875d:p1"
+      ]
+    },
+    {
+      "op": "append",
+      "block_id": "pc-goal-mismatch-missing-action-1fb5ba1d",
+      "kind": "example",
+      "title": "Every step advances the main goal directly",
+      "rationale": "Illustrates each plan action contributing directly to the stated intent, with no missing required actions or extraneous steps.",
+      "content": "# BEGIN_C_BLOCK block_id=pc-goal-mismatch-missing-action-1fb5ba1d kind=example title=\"Every step advances the main goal directly\"\n{\n  \"plan\": [\n    { \"type\": \"scan\", \"target\": \"Berries\", \"out\": \"berries_loc\" },\n    { \"type\": \"while\", \"condition\": { \"type\": \"notnear\", \"target\": \"$berries_loc\" }, \"body\": [\n      { \"type\": \"move\", \"target\": \"$berries_loc\" }\n    ]},\n    { \"type\": \"take\", \"target\": \"$berries_loc\" },\n    { \"type\": \"use\", \"target\": \"$berries_loc\", \"reason\": \"eat to reduce hunger\" }\n  ]\n}\n# END_C_BLOCK block_id=pc-goal-mismatch-missing-action-1fb5ba1d",
+      "source_pids": [
+        "s1-1757299144-2228c7:plan-84f0d7a8:p1"
+      ]
+    },
+    {
+      "op": "append",
+      "block_id": "pc-inefficient-or-extra-actions-54c09c36",
+      "kind": "example",
+      "title": "Minimal direct path: No redundant movement or checks",
+      "rationale": "Shows how to complete a basic obtain/consume with the smallest sensible action set, avoiding inefficiencies.",
+      "content": "# BEGIN_C_BLOCK block_id=pc-inefficient-or-extra-actions-54c09c36 kind=example title=\"Minimal direct path: No redundant movement or checks\"\n{\n  \"plan\": [\n    { \"type\": \"scan\", \"target\": \"Stick\", \"out\": \"stick_loc\" },\n    { \"type\": \"while\", \"condition\": { \"type\": \"notnear\", \"target\": \"$stick_loc\" }, \"body\": [\n      { \"type\": \"move\", \"target\": \"$stick_loc\" }\n    ]},\n    { \"type\": \"take\", \"target\": \"$stick_loc\" }\n  ]\n}\n# END_C_BLOCK block_id=pc-inefficient-or-extra-actions-54c09c36",
+      "source_pids": [
+        "s1-1757299144-2228c7:plan-60a1c14e:p1",
+        "s1-1757299144-2228c7:plan-3acb8abd:p1",
+        "s1-1757299144-2228c7:plan-7c27dbb8:p1",
+        "s1-1757299144-2228c7:plan-d6f50849:p1"
+      ]
+    },
+    {
+      "op": "append",
+      "block_id": "pc-missing-precondition-for-action-37f4d2c7",
+      "kind": "example",
+      "title": "Precondition checked: Near before take/use/inspect",
+      "rationale": "Demonstrates that before take/use/inspect, agent always ensures 'near' precondition, as enforced with a while loop.",
+      "content": "# BEGIN_C_BLOCK block_id=pc-missing-precondition-for-action-37f4d2c7 kind=example title=\"Precondition checked: Near before take/use/inspect\"\n{\n  \"plan\": [\n    { \"type\": \"scan\", \"target\": \"Apple\", \"out\": \"apple_loc\" },\n    { \"type\": \"while\", \"condition\": { \"type\": \"notnear\", \"target\": \"$apple_loc\" }, \"body\": [\n      { \"type\": \"move\", \"target\": \"$apple_loc\" }\n    ]},\n    { \"type\": \"inspect\", \"target\": \"$apple_loc\", \"reason\": \"quality check\" },\n    { \"type\": \"take\", \"target\": \"$apple_loc\" }\n  ]\n}\n# END_C_BLOCK block_id=pc-missing-precondition-for-action-37f4d2c7",
+      "source_pids": [
+        "s1-1757299144-2228c7:plan-4528a96a:p1"
+      ]
+    }
+  ]
+}

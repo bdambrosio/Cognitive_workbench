@@ -1,332 +1,713 @@
-2025-09-04 18:33:47 - situation_node - INFO - 🔧 Debug mode enabled for User
-2025-09-04 18:33:47 - situation_node - INFO - 📂 No existing situation file for User, starting fresh
-2025-09-04 18:33:47 - situation_node - INFO - 🧭 Situation Node initialized for character: User
-2025-09-04 18:33:47 - situation_node - INFO -    - Subscribing to: cognitive/User/sense_data
-2025-09-04 18:33:47 - situation_node - INFO -    - Subscribing to: cognitive/User/action
-2025-09-04 18:33:47 - situation_node - INFO -    - Subscribing to: cognitive/User/situation/request_update
-2025-09-04 18:33:47 - situation_node - INFO -    - Publishing to: cognitive/User/situation/update
-2025-09-04 18:33:47 - situation_node - INFO -    - Queryable at: cognitive/User/situation/current_situation
-2025-09-04 18:33:47 - situation_node - INFO -    - Proximity queryable at: cognitive/User/situation/proximity
-2025-09-04 18:33:47 - situation_node - INFO -    - Visibility queryable at: cognitive/User/situation/visibility
-2025-09-04 18:33:47 - situation_node - INFO -    - Location queryable at: cognitive/User/situation/location
-2025-09-04 18:33:47 - situation_node - INFO -    - Storage available at: data/situation/User_situation.json
-2025-09-04 18:33:47 - situation_node - INFO - Situation Node running - press Ctrl+C to stop
-2025-09-04 18:33:52 - situation_node - INFO - 📥 Received action: announcement
-2025-09-04 18:33:52 - situation_node - INFO - Updating map data for User
-2025-09-04 18:33:52 - situation_node - INFO - Updating map data for User
-2025-09-04 18:33:52 - situation_node - INFO - 🗺️ Updated map look data for User
-2025-09-04 18:33:52 - situation_node - INFO - Map look data updated for User
-2025-09-04 18:34:57 - situation_node - INFO - 🗺️ Updated map look data for User
-2025-09-04 18:34:57 - situation_node - INFO - Map look data updated for User
-8 - situation_node - INFO - 🧭 Situation query: returned current situa2025-2025-09-04 18:34:44 - situation_node - INFO - 📥 Received action: scan
-2025-09-04 18:34:59 - situation_node - INFO - 📥 Received action: think
-2025-09-04 18:35:23 - situation_node - INFO - 🧭 Situation query: returned current situation
-2025-09-04 18:35:40 - situation_node - INFO - 📥 Received action: scan
-2025-09-04 18:35:41 - situation_node - INFO - 🧭 Proximity query for Path2023: True
-2025-09-04 18:35:41 - situation_node - INFO - 🧭 Situation query: returned current situation
-2025-09-04 18:35:41 - situation_node - INFO - 📥 Received action: move
-2025-09-04 18:35:41 - situation_node - INFO - Updating map data for Joe
-2025-09-04 18:35:41 - situation_node - INFO - Updating map data for Joe
-2025-09-04 18:35:41 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-09-04 18:35:41 - situation_node - INFO - Map look data updated for Joe
-2025-09-04 18:35:42 - situation_node - INFO - 📥 Received action: use
-2025-09-04 18:35:43 - situation_node - INFO - 📥 Received action: scan
-2025-09-04 18:36:05 - situation_node - INFO - 📥 Received action: think
-2025-09-04 18:36:12 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-09-04 18:36:12 - situation_node - INFO - Map look data updated for Joe
-2025-09-04 18:36:33 - situation_node - INFO - 🧭 Situation query: returned current situation
-2025-09-04 18:36:49 - situation_node - INFO - 📥 Received action: scan
-2025-09-04 18:36:50 - situation_node - INFO - 📥 Received action: use
-2025-09-04 18:37:04 - situation_node - INFO - 📥 Received action: scan
-2025-09-04 18:37:35 - situation_node - INFO - 🧭 Situation query: returned current situation
-2025-09-04 18:37:45 - situation_node - INFO - 📥 Received action: scan
-2025-09-04 18:37:46 - situation_node - INFO - 🧭 Proximity query for Hut1: True
-2025-09-04 18:37:46 - situation_node - INFO - 🧭 Situation query: returned current situation
-2025-09-04 18:37:46 - situation_node - INFO - 📥 Received action: move
-2025-09-04 18:37:46 - situation_node - INFO - Updating map data for Joe
-2025-09-04 18:37:46 - situation_node - INFO - Updating map data for Joe
-2025-09-04 18:37:46 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-09-04 18:37:46 - situation_node - INFO - Map look data updated for Joe
-2025-09-04 18:37:47 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-09-04 18:37:47 - situation_node - INFO - Map look data updated for Joe
-2025-09-04 18:38:03 - situation_node - INFO - 2025-09-04 18:38:03 - situation_node - INFO - 🗺️ Updated map look data for Samantha
-2025-09-04 18:38:03 - situation_node - INFO - Map look data updated for Samantha
-2025-09-04 18:38:03 - situation_node - INFO - 🧭 Situation query: returned current situation
-2025-09-04 18:38:22 - situation_node - INFO - 📥 Received action: scan
-2025-09-04 18:38:23 - situation_node - INFO - 📥 Received action: inspect
-2025-09-04 18:38:23 - situation_node - INFO - Updating map data for Samantha
-2025-09-04 18:38:25 - situation_node - INFO - 🗺️ Updated map look data for Samantha
-2025-09-04 18:38:25 - situation_node - INFO - Map look data updated for Samantha
-2025-09-04 18:38:29 - situation_node - INFO - 📥 Received action: think
-2025-09-04 18:39:07 - situation_node - INFO - 🧭 Situation query: returned current situation
-2025-09-04 18:39:17 - situation_node - INFO - 📥 Received action: scan
-2025-09-04 18:39:18 - situation_node - INFO - 🧭 Proximity query for Berries42: True
-2025-09-04 18:39:18 - situation_node - INFO - 🧭 Situation query: returned current situation
-2025-09-04 18:39:18 - situation_node - INFO - 📥 Received action: move
-2025-09-04 18:39:18 - situation_node - INFO - Updating map data for Samantha
-2025-09-04 18:39:18 - situation_node - INFO - Updating map data for Samantha
-2025-09-04 18:39:18 - situation_node - INFO - 🗺️ Updated map look data for Samantha
-2025-09-04 18:39:18 - situation_node - INFO - Map look data updated for Samantha
-2025-09-04 18:39:18 - situation_node - INFO - 🗺️ Updated map look data for Samantha
-2025-09-04 18:39:18 - situation_node - INFO - Map look data updated for Samantha
-2025-09-04 18:39:19 - situation_node - INFO - 📥 Received action: take
-2025-09-04 18:39:19 - situation_node - INFO - Updating map data for Samantha
-2025-09-04 18:39:19 - situation_node - INFO - 🗺️ Updated map look data for Samantha
-2025-09-04 18:39:19 - situation_node - INFO - Map look data updated for Samantha
-2025-09-04 18:39:22 - situation_node - INFO - 📥 Received action: use
-2025-09-04 18:39:41 - situation_node - INFO - 🧭 Situation query: returned current situation
-2025-09-04 18:39:51 - situation_node - INFO - 📥 Received action: scan
-2025-09-04 18:39:52 - situation_node - INFO - 🧭 Proximity query for Berries21: True
-2025-09-04 18:39:52 - situation_node - INFO - 🧭 Situation query: returned current situation
-2025-09-04 18:39:52 - situation_node - INFO - 📥 Received action: move
-2025-09-04 18:39:52 - situation_node - INFO - Updating map data for Samantha
-2025-09-04 18:39:52 - situation_node - INFO - Updating map data for Samantha
-2025-09-04 18:39:52 - situation_node - INFO - 🗺️ Updated map look data for Samantha
-2025-09-04 18:39:52 - situation_node - INFO - Map look data updated for Samantha
-2025-09-04 18:39:52 - situation_node - INFO - 🗺️ Updated map look data for Samantha
-2025-09-04 18:39:52 - situation_node - INFO - Map look data updated for Samantha
-2025-09-04 18:39:53 - situation_node - INFO - 🧭 Proximity query for Berries21: True
-2025-09-04 18:39:53 - situation_node - INFO - 🧭 Situation query: returned current situation
-2025-09-04 18:39:53 - situation_node - INFO - 📥 Received action: move
-2025-09-04 18:39:53 - situation_node - INFO - Updating map data for Samantha
-2025-09-04 18:39:53 - situation_node - INFO - Updating map data for Samantha
-2025-09-04 18:39:53 - situation_node - INFO - 🗺️ Updated map look data for Samantha
-2025-09-04 18:39:53 - situation_node - INFO - Map look data updated for Samantha
-2025-09-04 18:39:53 - situation_node - INFO - 🗺️ Updated map look data for Samantha
-2025-09-04 18:39:53 - situation_node - INFO - Map look data updated for Samantha
-2025-09-04 18:39:54 - situation_node - INFO - 🧭 Proximity query for Berries21: True
-2025-09-04 18:39:54 - situation_node - INFO - 🧭 Situation query: returned current situation
-2025-09-04 18:39:54 - situation_node - INFO - Updating map data for Samantha
-2025-09-04 18:39:54 - situation_node - INFO - 📥 Received action: move
-2025-09-04 18:39:54 - situation_node - INFO - Updating map data for Samantha
-2025-09-04 18:39:54 - situation_node - INFO - 🗺️ Updated map look data for Samantha
-2025-09-04 18:39:54 - situation_node - INFO - Map look data updated for Samantha
-2025-09-04 18:39:54 - situation_node - INFO - 🗺️ Updated map look data for Samantha
-2025-09-04 18:39:54 - situation_node - INFO - Map look data updated for Samantha
-2025-09-04 18:39:55 - situation_node - INFO - 📥 Received action: take
-2025-09-04 18:39:55 - situation_node - INFO - Updating map data for Samantha
-2025-09-04 18:39:58 - situation_node - INFO - 📥 Received action: use
-2025-09-04 18:40:20 - situation_node - INFO - 🧭 Situation query: returned current situation
-2025-09-04 18:40:40 - situation_node - INFO - 📥 Received action: scan
-2025-09-04 18:41:01 - situation_node - INFO - 🧭 Proximity query for Spring17: True
-2025-09-04 18:41:01 - situation_node - INFO - 🧭 Situation query: returned current situation
-2025-09-04 18:41:01 - situation_node - INFO - 📥 Received action: move
-2025-09-04 18:41:01 - situation_node - INFO - Updating map data for Samantha
-2025-09-04 18:41:01 - situation_node - INFO - 🗺️ Updated map look data for Samantha
-2025-09-04 18:41:01 - situation_node - INFO - Map look data updated for Samantha
-2025-09-04 18:41:01 - situation_node - INFO - Updating map data for Samantha
-2025-09-04 18:41:01 - situation_node - INFO - 🗺️ Updated map look data for Samantha
-2025-09-04 18:41:01 - situation_node - INFO - Map look data updated for Samantha
-2025-09-04 18:41:02 - situation_node - INFO - 🧭 Proximity query for Spring17: True
-2025-09-04 18:41:02 - situation_node - INFO - 🧭 Situation query: returned current situation
-2025-09-04 18:41:02 - situation_node - INFO - 📥 Received action: move
-2025-09-04 18:41:02 - situation_node - INFO - Updating map data for Samantha
-2025-09-04 18:41:02 - situation_node - INFO - 🗺️ Updated map look data for Samantha
-2025-09-04 18:41:02 - situation_node - INFO - Map look data updated for Samantha
-2025-09-04 18:41:02 - situation_node - INFO - Updating map data for Samantha
-2025-09-04 18:41:02 - situation_node - INFO - 🗺️ Updated map look data for Samantha
-2025-09-04 18:41:02 - situation_node - INFO - Map look data updated for Samantha
-2025-09-04 18:41:02 - situation_node - INFO - 🗺️ Updated map look data for Samantha
-2025-09-04 18:41:02 - situation_node - INFO - Map look data updated for Samantha
-2025-09-04 18:41:03 - situation_node - INFO - 🧭 Proximity query for Spring17: True
-2025-09-04 18:41:03 - situation_node - INFO - 🧭 Situation query: returned current situation
-2025-09-04 18:41:03 - situation_node - INFO - Updating map data for Samantha
-2025-09-04 18:41:03 - situation_node - INFO - 📥 Received action: move
-2025-09-04 18:41:03 - situation_node - INFO - Updating map data for Samantha
-2025-09-04 18:41:03 - situation_node - INFO - 🗺️ Updated map look data for Samantha
-2025-09-04 18:41:03 - situation_node - INFO - Map look data updated for Samantha
-2025-09-04 18:41:03 - situation_node - INFO - 🗺️ Updated map look data for Samantha
-2025-09-04 18:41:03 - situation_node - INFO - Map look data updated for Samantha
-2025-09-04 18:41:06 - situation_node - INFO - 📥 Received action: inspect
-2025-09-04 18:41:06 - situation_node - INFO - Updating map data for Samantha
-2025-09-04 18:41:07 - situation_node - INFO - 🗺️ Updated map look data for Samantha
-2025-09-04 18:41:07 - situation_node - INFO - Map look data updated for Samantha
-2025-09-04 18:41:27 - situation_node - INFO - 🧭 Situation query: returned current situation
-2025-09-04 18:41:41 - situation_node - INFO - 📥 Received action: scan
-2025-09-04 18:41:45 - situation_node - INFO - 📥 Received action: inspect
-2025-09-04 18:41:45 - situation_node - INFO - Updating map data for Samantha
-2025-09-04 18:41:45 - situation_node - INFO - 🗺️ Updated map look data for Samantha
-2025-09-04 18:41:45 - situation_node - INFO - Map look data updated for Samantha
-2025-09-04 18:41:51 - situation_node - INFO - 📥 Received action: use
-2025-09-04 18:42:11 - situation_node - INFO - 🧭 Situation query: returned current situation
-2025-09-04 18:42:25 - situation_node - INFO - 📥 Received action: scan
-2025-09-04 18:42:30 - situation_node - INFO - 📥 Received action: inspect
-2025-09-04 18:42:30 - situation_node - INFO - Updating map data for Samantha
-2025-09-04 18:42:53 - situation_node - INFO - 📥 Received action: use
-2025-09-04 18:43:39 - situation_node - INFO - 🧭 Situation query: returned current situation
-2025-09-04 18:43:50 - situation_node - INFO - 📥 Received action: scan
-2025-09-04 18:43:51 - situation_node - INFO - 🧭 Proximity query for Berries64: True
-2025-09-04 18:43:51 - situation_node - INFO - 🧭 Situation query: returned current situation
-2025-09-04 18:43:51 - situation_node - INFO - 📥 Received action: move
-2025-09-04 18:43:51 - situation_node - INFO - Updating map data for Samantha
-2025-09-04 18:43:51 - situation_node - INFO - 🗺️ Updated map look data for Samantha
-2025-09-04 18:43:51 - situation_node - INFO - Map look data updated for Samantha
-2025-09-04 18:43:51 - situation_node - INFO - Updating map data for Samantha
-2025-09-04 18:43:51 - situation_node - INFO - 🗺️ Updated map look data for Samantha
-2025-09-04 18:43:51 - situation_node - INFO - Map look data updated for Samantha
-2025-09-04 18:44:02 - situation_node - INFO - 🧭 Proximity query for Berries64: True
-2025-09-04 18:44:02 - situation_node - INFO - 🧭 Situation query: returned current situation
-2025-09-04 18:44:02 - situation_node - INFO - 📥 Received action: move
-2025-09-04 18:44:02 - situation_node - INFO - Updating map data for Samantha
-2025-09-04 18:44:02 - situation_node - INFO - 🗺️ Updated map look data for Samantha
-2025-09-04 18:44:02 - situation_node - INFO - Map look data updated for Samantha
-2025-09-04 18:44:02 - situation_node - INFO - Updating map data for Samantha
-2025-09-04 18:44:02 - situation_node - INFO - 🗺️ Updated map look data for Samantha
-2025-09-04 18:44:02 - situation_node - INFO - Map look data updated for Samantha
-2025-09-04 18:44:06 - situation_node - INFO - 📥 Received action: take
-2025-09-04 18:44:28 - situation_node - INFO - 📥 Received action: use
-2025-09-04 18:44:53 - situation_node - INFO - 🧭 Situation query: returned current situation
-2025-09-04 18:45:05 - situation_node - INFO - 📥 Received action: scan
-2025-09-04 18:45:11 - situation_node - INFO - 📥 Received action: take
-2025-09-04 18:45:43 - situation_node - INFO - 🗺️ Updated map look data for Samantha
-2025-09-04 18:45:43 - situation_node - INFO - Map look data updated for Samantha
-2025-09-04 18:45:43 - situation_node - INFO - Updating map data for Samantha
-2025-09-04 18:45:45 - situation_node - INFO - 📥 Received action: use
-2025-09-04 18:45:46 - situation_node - INFO - 🗺️ Updated map look data for Samantha
-2025-09-04 18:45:46 - situation_node - INFO - Map look data updated for Samantha
-2025-09-04 18:45:46 - situation_node - INFO - Updating map data for Samantha
-2025-09-04 18:46:04 - situation_node - INFO - 🧭 Situation query: returned current situation
-2025-09-04 18:46:16 - situation_node - INFO - 📥 Received action: scan
-2025-09-04 18:46:17 - situation_node - INFO - 🧭 Proximity query for Thicket12: True
-2025-09-04 18:46:17 - situation_node - INFO - 🧭 Situation query: returned current situation
-2025-09-04 18:46:17 - situation_node - INFO - 📥 Received action: move
-2025-09-04 18:46:17 - situation_node - INFO - Updating map data for Samantha
-2025-09-04 18:46:17 - situation_node - INFO - 🗺️ Updated map look data for Samantha
-2025-09-04 18:46:17 - situation_node - INFO - Map look data updated for Samantha
-2025-09-04 18:46:17 - situation_node - INFO - Updating map data for Samantha
-2025-09-04 18:46:17 - situation_node - INFO - 🗺️ Updated map look data for Samantha
-2025-09-04 18:46:17 - situation_node - INFO - Map look data updated for Samantha
-2025-09-04 18:46:35 - situation_node - INFO - 🧭 Proximity query for Thicket12: True
-2025-09-04 18:46:35 - situation_node - INFO - 🧭 Situation query: returned current situation
-2025-09-04 18:46:35 - situation_node - INFO - 📥 Received action: move
-2025-09-04 18:46:35 - situation_node - INFO - Updating map data for Samantha
-2025-09-04 18:46:35 - situation_node - INFO - 🗺️ Updated map look data for Samantha
-2025-09-04 18:46:35 - situation_node - INFO - Map look data updated for Samantha
-2025-09-04 18:46:35 - situation_node - INFO - Updating map data for Samantha
-2025-09-04 18:46:35 - situation_node - INFO - 🗺️ Updated map look data for Samantha
-2025-09-04 18:46:35 - situation_node - INFO - Map look data updated for Samantha
-2025-09-04 18:46:47 - situation_node - INFO - 🧭 Proximity query for Thicket12: True
-2025-09-04 18:46:47 - situation_node - INFO - 🧭 Situation query: returned current situation
-2025-09-04 18:46:47 - situation_node - INFO - 📥 Received action: move
-2025-09-04 18:46:47 - situation_node - INFO - Updating map data for Samantha
-2025-09-04 18:46:47 - situation_node - INFO - 🗺️ Updated map look data for Samantha
-2025-09-04 18:46:47 - situation_node - INFO - Map look data updated for Samantha
-2025-09-04 18:46:47 - situation_node - INFO - Updating map data for Samantha
-2025-09-04 18:46:47 - situation_node - INFO - 🗺️ Updated map look data for Samantha
-2025-09-04 18:46:47 - situation_node - INFO - Map look data updated for Samantha
-2025-09-04 18:46:47 - situation_node - INFO - 🗺️ Updated map look data for Samantha
-2025-09-04 18:46:47 - situation_node - INFO - Map look data updated for Samantha
-2025-09-04 18:46:51 - situation_node - INFO - 📥 Received action: inspect
-2025-09-04 18:46:51 - situation_node - INFO - Updating map data for Samantha
-2025-09-04 18:46:52 - situation_node - INFO - 🗺️ Updated map look data for Samantha
-2025-09-04 18:46:52 - situation_node - INFO - Map look data updated for Samantha
-2025-09-04 18:46:52 - situation_node - INFO - 📥 Received action: take
-2025-09-04 18:47:36 - situation_node - INFO - 🧭 Situation query: returned current situation
-2025-09-04 18:47:50 - situation_node - INFO - 📥 Received action: scan
-2025-09-04 18:47:51 - situation_node - INFO - Updating map data for Samantha
-2025-09-04 18:47:51 - situation_node - INFO - 📥 Received action: take
-2025-09-04 18:47:51 - situation_node - INFO - 🗺️ Updated map look data for Samantha
-2025-09-04 18:47:51 - situation_node - INFO - Map look data updated for Samantha
-2025-09-04 18:47:54 - situation_node - INFO - 📥 Received action: scan
-2025-09-04 18:48:11 - situation_node - INFO - 📥 Received action: place
-2025-09-04 18:48:41 - situation_node - INFO - 🧭 Situation query: returned current situation
-2025-09-04 18:48:53 - situation_node - INFO - 📥 Received action: scan
-2025-09-04 18:48:54 - situation_node - INFO - 🧭 Proximity query for Berries26: True
-2025-09-04 18:48:54 - situation_node - INFO - 🧭 Situation query: returned current situation
-2025-09-04 18:48:54 - situation_node - INFO - Updating map data for Samantha
-2025-09-04 18:48:54 - situation_node - INFO - 📥 Received action: move
-2025-09-04 18:48:54 - situation_node - INFO - Updating map data for Samantha
-2025-09-04 18:48:54 - situation_node - INFO - 🗺️ Updated map look data for Samantha
-2025-09-04 18:48:54 - situation_node - INFO - Map look data updated for Samantha
-2025-09-04 18:48:54 - situation_node - INFO - 🗺️ Updated map look data for Samantha
-2025-09-04 18:48:54 - situation_node - INFO - Map look data updated for Samantha
-2025-09-04 18:49:10 - situation_node - INFO - 🧭 Proximity query for Berries26: True
-2025-09-04 18:49:10 - situation_node - INFO - 🧭 Situation query: returned current situation
-2025-09-04 18:49:10 - situation_node - INFO - 📥 Received action: move
-2025-09-04 18:49:10 - situation_node - INFO - Updating map data for Samantha
-2025-09-04 18:49:10 - situation_node - INFO - Updating map data for Samantha
-2025-09-04 18:49:11 - situation_node - INFO - 🗺️ Updated map look data for Samantha
-2025-09-04 18:49:11 - situation_node - INFO - Map look data updated for Samantha
-2025-09-04 18:49:43 - situation_node - INFO - 📥 Received action: take
-2025-09-04 18:49:47 - situation_node - INFO - 📥 Received action: use
-2025-09-04 18:50:43 - situation_node - INFO - 🧭 Situation query: returned current situation
-2025-09-04 18:50:53 - situation_node - INFO - 📥 Received action: scan
-2025-09-04 18:50:54 - situation_node - INFO - 📥 Received action: take
-2025-09-04 18:51:14 - situation_node - INFO - 📥 Received action: use
-2025-09-04 18:51:38 - situation_node - INFO - 🧭 Situation query: returned current situation
-2025-09-04 18:51:47 - situation_node - INFO - 📥 Received action: scan
-2025-09-04 18:52:00 - situation_node - INFO - 🧭 Proximity query for Path1724: True
-2025-09-04 18:52:00 - situation_node - INFO - 🧭 Situation query: returned current situation
-2025-09-04 18:52:00 - situation_node - INFO - 📥 Received action: move
-2025-09-04 18:52:00 - situation_node - INFO - Updating map data for Samantha
-2025-09-04 18:52:00 - situation_node - INFO - 🗺️ Updated map look data for Samantha
-2025-09-04 18:52:00 - situation_node - INFO - Map look data updated for Samantha
-2025-09-04 18:52:00 - situation_node - INFO - Updating map data for Samantha
-2025-09-04 18:52:01 - situation_node - INFO - 🗺️ Updated map look data for Samantha
-2025-09-04 18:52:01 - situation_node - INFO - Map look data updated for Samantha
-2025-09-04 18:52:11 - situation_node - INFO - 🧭 Proximity query for Path1724: True
-2025-09-04 18:52:11 - situation_node - INFO - 🧭 Situation query: returned current situation
-2025-09-04 18:52:11 - situation_node - INFO - 📥 Received action: move
-2025-09-04 18:52:11 - situation_node - INFO - Updating map data for Samantha
-2025-09-04 18:52:11 - situation_node - INFO - 🗺️ Updated map look data for Samantha
-2025-09-04 18:52:11 - situation_node - INFO - Map look data updated for Samantha
-2025-09-04 18:52:11 - situation_node - INFO - Updating map data for Samantha
-2025-09-04 18:52:11 - situation_node - INFO - 🗺️ Updated map look data for Samantha
-2025-09-04 18:52:11 - situation_node - INFO - Map look data updated for Samantha
-2025-09-04 18:52:12 - situation_node - INFO - 🗺️ Updated map look data for Samantha
-2025-09-04 18:52:12 - situation_node - INFO - Map look data updated for Samantha
-2025-09-04 18:52:12 - situation_node - INFO - Updating map data for Samantha
-2025-09-04 18:52:12 - situation_node - INFO - 🧭 Proximity query for Path1724: True
-2025-09-04 18:52:12 - situation_node - INFO - 🧭 Situation query: returned current situation
-2025-09-04 18:52:12 - situation_node - INFO - 📥 Received action: move
-2025-09-04 18:52:12 - situation_node - INFO - Updating map data for Samantha
-2025-09-04 18:52:12 - situation_node - INFO - 🗺️ Updated map look data for Samantha
-2025-09-04 18:52:12 - situation_node - INFO - Map look data updated for Samantha
-2025-09-04 18:52:12 - situation_node - INFO - Updating map data for Samantha
-2025-09-04 18:52:12 - situation_node - INFO - 🗺️ Updated map look data for Samantha
-2025-09-04 18:52:12 - situation_node - INFO - Map look data updated for Samantha
-2025-09-04 18:52:13 - situation_node - INFO - 🗺️ Updated map look data for Samantha
-2025-09-04 18:52:13 - situation_node - INFO - Map look data updated for Samantha
-2025-09-04 18:52:13 - situation_node - INFO - Updating map data for Samantha
-2025-09-04 18:52:13 - situation_node - INFO - 🧭 Proximity query for Path1724: True
-2025-09-04 18:52:13 - situation_node - INFO - 🧭 Situation query: returned current situation
-2025-09-04 18:52:13 - situation_node - INFO - 📥 Received action: move
-2025-09-04 18:52:13 - situation_node - INFO - Updating map data for Samantha
-2025-09-04 18:52:13 - situation_node - INFO - 🗺️ Updated map look data for Samantha
-2025-09-04 18:52:13 - situation_node - INFO - Map look data updated for Samantha
-2025-09-04 18:52:13 - situation_node - INFO - Updating map data for Samantha
-2025-09-04 18:52:13 - situation_node - INFO - 🗺️ Updated map look data for Samantha
-2025-09-04 18:52:13 - situation_node - INFO - Map look data updated for Samantha
-2025-09-04 18:52:17 - situation_node - INFO - 🧭 Proximity query for Path1724: True
-2025-09-04 18:52:17 - situation_node - INFO - 🧭 Situation query: returned current situation
-2025-09-04 18:52:17 - situation_node - INFO - 📥 Received action: move
-2025-09-04 18:52:17 - situation_node - INFO - Updating map data for Samantha
-2025-09-04 18:52:17 - situation_node - INFO - 🗺️ Updated map look data for Samantha
-2025-09-04 18:52:17 - situation_node - INFO - Map look data updated for Samantha
-2025-09-04 18:52:17 - situation_node - INFO - Updating map data for Samantha
-2025-09-04 18:52:17 - situation_node - INFO - 🗺️ Updated map look data for Samantha
-2025-09-04 18:52:17 - situation_node - INFO - Map look data updated for Samantha
-2025-09-04 18:52:34 - situation_node - INFO - 🧭 Proximity query for Path1724: True
-2025-09-04 18:52:34 - situation_node - INFO - 🧭 Situation query: returned current situation
-2025-09-04 18:52:34 - situation_node - INFO - 📥 Received action: move
-2025-09-04 18:52:34 - situation_node - INFO - Updating map data for Samantha
-2025-09-04 18:52:34 - situation_node - INFO - 🗺️ Updated map look data for Samantha
-2025-09-04 18:52:34 - situation_node - INFO - Map look data updated for Samantha
-2025-09-04 18:52:34 - situation_node - INFO - Updating map data for Samantha
-2025-09-04 18:52:34 - situation_node - INFO - 🗺️ Updated map look data for Samantha
-2025-09-04 18:52:34 - situation_node - INFO - Map look data updated for Samantha
-2025-09-04 18:53:04 - situation_node - INFO - 🧭 Proximity query for Path1724: True
-2025-09-04 18:53:04 - situation_node - INFO - 🧭 Situation query: returned current situation
-2025-09-04 18:53:04 - situation_node - INFO - 📥 Received action: move
-2025-09-04 18:53:04 - situation_node - INFO - Updating map data for Samantha
-2025-09-04 18:53:04 - situation_node - INFO - 🗺️ Updated map look data for Samantha
-2025-09-04 18:53:04 - situation_node - INFO - Map look data updated for Samantha
-2025-09-04 18:53:04 - situation_node - INFO - Updating map data for Samantha
-2025-09-04 18:53:04 - situation_node - INFO - 🗺️ Updated map look data for Samantha
-2025-09-04 18:53:04 - situation_2025-09-04 18:53:07 - situation_node - INFO - �2025-09-04 18:53:07 - sit2025-09-04 18:53:08 - situation_node - INFO - �2025-09-04 18:53:08 - situation_node - INFO - 🗺️ Updated map look data for Samantha
-2025-09-04 18:53:08 - situation_node - INFO - Map look data updated for Samantha
-2025-09-04 18:53:30 - situation_node - INFO - 🧭 Situation query: returned current situation
-2025-09-04 18:53:43 - situation_node - INFO - 📥 Received action: scan
-04 18:53:30 - situation_node - INFO - 🧭 Situation query: returned current situation
-2025-09-04 19:03:08 - situation_node - INFO - 🗺️ Updated map look data for Joe
-2025-09-04 19:03:08 - situation_node - INFO - Map look data updated for Joe
+2025-09-08 18:59:24 - situation_node - INFO - 🔧 Debug mode enabled for User
+2025-09-08 18:59:24 - situation_node - INFO - 📂 No existing situation file for User, starting fresh
+2025-09-08 18:59:24 - situation_node - INFO - 🧭 Situation Node initialized for character: User
+2025-09-08 18:59:24 - situation_node - INFO -    - Subscribing to: cognitive/User/sense_data
+2025-09-08 18:59:24 - situation_node - INFO -    - Subscribing to: cognitive/User/action
+2025-09-08 18:59:24 - situation_node - INFO -    - Subscribing to: cognitive/User/situation/request_update
+2025-09-08 18:59:24 - situation_node - INFO -    - Publishing to: cognitive/User/situation/update
+2025-09-08 18:59:24 - situation_node - INFO -    - Queryable at: cognitive/User/situation/current_situation
+2025-09-08 18:59:24 - situation_node - INFO -    - Proximity queryable at: cognitive/User/situation/proximity
+2025-09-08 18:59:24 - situation_node - INFO -    - Visibility queryable at: cognitive/User/situation/visibility
+2025-09-08 18:59:24 - situation_node - INFO -    - Location queryable at: cognitive/User/situation/location
+2025-09-08 18:59:24 - situation_node - INFO -    - Storage available at: data/situation/User_situation.json
+2025-09-08 18:59:24 - situation_node - INFO - Situation Node running - press Ctrl+C to stop
+2025-09-08 18:59:30 - situation_node - INFO - 📥 Received action: announcement
+2025-09-08 18:59:30 - situation_node - INFO - Updating map data for User
+2025-09-08 18:59:30 - situation_node - INFO - Updating map data for User
+2025-09-08 18:59:30 - situation_node - INFO - 🗺️ Updated map look data for User
+2025-09-08 18:59:30 - situation_node - INFO - Map look data updated for User
+2025-09-08 19:01:45 - situation_node - INFO - 🗺️ Updated map look data for User
+2025-09-08 19:01:45 - situation_node - INFO - Map look data updated for User
+9 - situation_node - INFO - 🧭 Situation query: returned current situa2025-2025-09-08 19:00:15 - situation_node - INFO - 📥 Received action: scan
+2025-09-08 19:01:36 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-08 19:01:44 - situation_node - INFO - 📥 Received action: scan
+2025-09-08 19:01:45 - situation_node - INFO - 📥 Received action: inspect
+2025-09-08 19:01:45 - situation_node - INFO - Updating map data f2025-092025-09-08 19:02:01 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-08 19:02:09 - situation_node - INFO 2025-09-08 19:02:09 - situati2025-09-08 19:02:10 - situation_node - INFO 2025-09-08 19:02:10 - situation_node - INFO - 📥 Received action: scan
+2025-09-08 19:02:27 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-08 19:02:42 - situation_node - INFO - 📥 Received action: scan
+2025-09-08 19:02:43 - situation_node - INFO - 📥 Received action: scan
+2025-09-08 19:02:44 - situation_node - INFO - 📥 Received action: scan
+2025-09-08 19:02:45 - situation_node - INFO - 📥 Received action: scan
+2025-09-08 19:02:46 - situation_node - INFO - 📥 Received action: scan
+2025-09-08 19:02:47 - situation_node - INFO - 📥 Received action: scan
+2025-09-08 19:03:04 - situation_node - INFO - 📥 Received action: scan
+2025-09-08 19:03:13 - situation_node - INFO - 📥 Received action: scan
+2025-09-08 19:03:31 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-08 19:03:40 - situation_node - INFO - 📥 Received action: think
+2025-09-08 19:03:56 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-08 19:04:07 - situation_node - INFO - 📥 Received action: scan
+2025-09-08 19:04:12 - situation_node - INFO - 📥 Received action: take
+2025-09-08 19:04:12 - situation_node - INFO - Updating map data for Samantha
+2025-09-08 19:04:46 - situation_node - INFO - 📥 Received action: use
+2025-09-08 19:05:33 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-08 19:05:44 - situation_node - INFO - 📥 Received action: scan
+2025-09-08 19:05:45 - situation_node - INFO - 📥 Received action: take
+2025-09-08 19:05:56 - situation_node - INFO - 📥 Received action: use
+2025-09-08 19:06:11 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-08 19:06:23 - situation_node - INFO - 📥 Received action: scan
+2025-09-08 19:06:24 - situation_node - INFO - 🗺️ Updated map look data for Samantha
+2025-09-08 19:06:24 - situation_node - INFO - Map look data updated for Samantha
+2025-09-08 19:06:24 - situation_node - INFO - Updating map data for Samantha
+2025-09-08 19:06:26 - situation_node - INFO - 📥 Received action: inspect
+2025-09-08 19:06:40 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-08 19:06:50 - situation_node - INFO - 📥 Received action: scan
+2025-09-08 19:06:56 - situation_node - INFO - 📥 Received action: take
+2025-09-08 19:07:08 - situation_node - INFO - 🗺️ Updated map look data for Samantha
+2025-09-08 19:07:08 - situation_node - INFO - Map look data updated for Samantha
+2025-09-08 19:07:08 - situation_node - INFO - Updating map data for Samantha
+2025-09-08 19:07:10 - situation_node - INFO - 📥 Received action: use
+2025-09-08 19:07:11 - situation_node - INFO - 🗺️ Updated map look data for Samantha
+2025-09-08 19:07:11 - situation_node - INFO - Map look data updated for Samantha
+2025-09-08 19:07:11 - situation_node - INFO - Updating map data for Samantha
+2025-09-08 19:07:24 - situation_node - INFO - 🗺️ Updated map look data for Samantha
+2025-09-08 19:07:24 - situation_node - INFO - Map look data updated for Samantha
+2025-09-08 19:07:25 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-08 19:07:35 - situation_node - INFO - 📥 Received action: scan
+2025-09-08 19:07:36 - situation_node - INFO - 🧭 Proximity query for Berries93: True
+2025-09-08 19:07:36 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-08 19:07:36 - situation_node - INFO - 📥 Received action: move
+2025-09-08 19:07:36 - situation_node - INFO - Updating map data for Samantha
+2025-09-08 19:07:36 - situation_node - INFO - Updating map data for Samantha
+2025-09-08 19:07:36 - situation_node - INFO - 🗺️ Updated map look data for Samantha
+2025-09-08 19:07:36 - situation_node - INFO - Map look data updated for Samantha
+2025-09-08 19:07:39 - situation_node - INFO - Updating map data for Samantha
+2025-09-08 19:07:39 - situation_node - INFO - 🗺️ Updated map look data for Samantha
+2025-09-08 19:07:39 - situation_node - INFO - Map look data updated for Samantha
+2025-09-08 19:07:39 - situation_node - INFO - 📥 Received action: take
+2025-09-08 19:07:58 - situation_node - INFO - 📥 Received action: use
+2025-09-08 19:08:28 - situation_node - INFO - 🗺️ Updated map look data for Samantha
+2025-09-08 19:08:28 - situation_node - INFO - Map look data updated for Samantha
+2025-09-08 19:09:01 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-08 19:09:11 - situation_node - INFO - 📥 Received action: scan
+2025-09-08 19:09:12 - situation_node - INFO - 🧭 Proximity query for Berries21: True
+2025-09-08 19:09:12 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-08 19:09:12 - situation_node - INFO - 📥 Received action: move
+2025-09-08 19:09:12 - situation_node - INFO - Updating map data for Samantha
+2025-09-08 19:09:12 - situation_node - INFO - Updating map data for Samantha
+2025-09-08 19:09:12 - situation_node - INFO - 🗺️ Updated map look data for Samantha
+2025-09-08 19:09:12 - situation_node - INFO - Map look data updated for Samantha
+2025-09-08 19:09:13 - situation_node - INFO - 🗺️ Updated map look data for Samantha
+2025-09-08 19:09:13 - situation_node - INFO - Map look data updated for Samantha
+2025-09-08 19:09:13 - situation_node - INFO - 🧭 Proximity query for Berries21: True
+2025-09-08 19:09:13 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-08 19:09:13 - situation_node - INFO - 📥 Received action: move
+2025-09-08 19:09:13 - situation_node - INFO - Updating map data for Samantha
+2025-09-08 19:09:13 - situation_node - INFO - Updating map data for Samantha
+2025-09-08 19:09:13 - situation_node - INFO - 🗺️ Updated map look data for Samantha
+2025-09-08 19:09:13 - situation_node - INFO - Map look data updated for Samantha
+2025-09-08 19:09:14 - situation_node - INFO - 📥 Received action: take
+2025-09-08 19:09:21 - situation_node - INFO - 📥 Received action: use
+2025-09-08 19:09:49 - situation_node - INFO - 🗺️ Updated map look data for Samantha
+2025-09-08 19:09:49 - situation_node - INFO - Map look data updated for Samantha
+2025-09-08 19:09:49 - situation_node - INFO - Updating map data for Samantha
+2025-09-08 19:09:50 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-08 19:10:00 - situation_node - INFO - 📥 Received action: scan
+2025-09-08 19:10:01 - situation_node - INFO - 🗺️ Updated map look data for Samantha
+2025-09-08 19:10:01 - situation_node - INFO - Map look data updated for Samantha
+2025-09-08 19:10:02 - situation_node - INFO - 📥 Received action: take
+2025-09-08 19:10:02 - situation_node - INFO - Updating map data for Samantha
+2025-09-08 19:10:02 - situation_node - INFO - 🗺️ Updated map look data for Samantha
+2025-09-08 19:10:02 - situation_node - INFO - Map look data updated for Samantha
+2025-09-08 19:10:05 - situation_node - INFO - 📥 Received action: use
+2025-09-08 19:10:21 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-08 19:10:30 - situation_node - INFO - 📥 Received action: scan
+2025-09-08 19:10:42 - situation_node - INFO - 📥 Received action: inspect
+2025-09-08 19:10:42 - situation_node - INFO - Updating map data for Samantha
+2025-09-08 19:10:49 - situation_node - INFO - 🗺️ Updated map look data for Samantha
+2025-09-08 19:10:49 - situation_node - INFO - Map look data updated for Samantha
+2025-09-08 19:11:02 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-08 19:11:12 - situation_node - INFO - 📥 Received action: scan
+2025-09-08 19:11:15 - situation_node - INFO - 📥 Received action: inspect
+2025-09-08 19:11:15 - situation_node - INFO - Updating map data for Samantha
+2025-09-08 19:11:44 - situation_node - INFO - 🗺️ Updated map look data for Samantha
+2025-09-08 19:11:44 - situation_node - INFO - Map look data updated for Samantha
+2025-09-08 19:12:04 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-08 19:12:13 - situation_node - INFO - 📥 Received action: scan
+2025-09-08 19:12:14 - situation_node - INFO - 🧭 Proximity query for Spring3: True
+2025-09-08 19:12:14 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-08 19:12:14 - situation_node - INFO - 📥 Received action: move
+2025-09-08 19:12:14 - situation_node - INFO - Updating map data for Samantha
+2025-09-08 19:12:14 - situation_node - INFO - Updating map data for Samantha
+2025-09-08 19:12:14 - situation_node - INFO - 🗺️ Updated map look data for Samantha
+2025-09-08 19:12:14 - situation_node - INFO - Map look data updated for Samantha
+2025-09-08 19:12:14 - situation_node - INFO - 🗺️ Updated map look data for Samantha
+2025-09-08 19:12:14 - situation_node - INFO - Map look data updated for Samantha
+2025-09-08 19:12:15 - situation_node - INFO - 🧭 Proximity query for Spring3: True
+2025-09-08 19:12:15 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-08 19:12:15 - situation_node - INFO - 📥 Received action: move
+2025-09-08 19:12:15 - situation_node - INFO - Updating map data for Samantha
+2025-09-08 19:12:15 - situation_node - INFO - Updating map data for Samantha
+2025-09-08 19:12:15 - situation_node - INFO - 🗺️ Updated map look data for Samantha
+2025-09-08 19:12:15 - situation_node - INFO - Map look data updated for Samantha
+2025-09-08 19:12:15 - situation_node - INFO - 🗺️ Updated map look data for Samantha
+2025-09-08 19:12:15 - situation_node - INFO - Map look data updated for Samantha
+2025-09-08 19:12:16 - situation_node - INFO - 🧭 Proximity query for Spring3: True
+2025-09-08 19:12:16 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-08 19:12:16 - situation_node - INFO - 📥 Received action: move
+2025-09-08 19:12:16 - situation_node - INFO - Updating map data for Samantha
+2025-09-08 19:12:16 - situation_node - INFO - Updating map data for Samantha
+2025-09-08 19:12:16 - situation_node - INFO - 🗺️ Updated map look data for Samantha
+2025-09-08 19:12:16 - situation_node - INFO - Map look data updated for Samantha
+2025-09-08 19:12:19 - situation_node - INFO - 🧭 Proximity query for Spring3: True
+2025-09-08 19:12:19 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-08 19:12:19 - situation_node - INFO - 📥 Received action: move
+2025-09-08 19:12:19 - situation_node - INFO - Updating map data for Samantha
+2025-09-08 19:12:19 - situation_node - INFO - 🗺️ Updated map look data for Samantha
+2025-09-08 19:12:19 - situation_node - INFO - Map look data updated for Samantha
+2025-09-08 19:12:19 - situation_node - INFO - Updating map data for Samantha
+2025-09-08 19:12:19 - situation_node - INFO - 🗺️ Updated map look data for Samantha
+2025-09-08 19:12:19 - situation_node - INFO - Map look data updated for Samantha
+2025-09-08 19:12:34 - situation_node - INFO - 🧭 Proximity query for Spring3: True
+2025-09-08 19:12:34 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-08 19:12:34 - situation_node - INFO - 📥 Received action: move
+2025-09-08 19:12:34 - situation_node - INFO - Updating map data for Samantha
+2025-09-08 19:12:34 - situation_node - INFO - 🗺️ Updated map look data for Samantha
+2025-09-08 19:12:34 - situation_node - INFO - Map look data updated for Samantha
+2025-09-08 19:12:34 - situation_node - INFO - Updating map data for Samantha
+2025-09-08 19:12:34 - situation_node - INFO - 🗺️ Updated map look data for Samantha
+2025-09-08 19:12:34 - situation_node - INFO - Map look data updated for Samantha
+2025-09-08 19:12:45 - situation_node - INFO - 🧭 Proximity query for Spring3: True
+2025-09-08 19:12:45 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-08 19:12:45 - situation_node - INFO - 📥 Received action: move
+2025-09-08 19:12:45 - situation_node - INFO - Updating map data for Samantha
+2025-09-08 19:12:45 - situation_node - INFO - 🗺️ Updated map look data for Samantha
+2025-09-08 19:12:45 - situation_node - INFO - Map look data updated for Samantha
+2025-09-08 19:12:45 - situation_node - INFO - Updating map data for Samantha
+2025-09-08 19:12:45 - situation_node - INFO - 🗺️ Updated map look data for Samantha
+2025-09-08 19:12:45 - situation_node - INFO - Map look data updated for Samantha
+2025-09-08 19:12:45 - situation_node - INFO - 🗺️ Updated map look data for Samantha
+2025-09-08 19:12:45 - situation_node - INFO - Map look data updated for Samantha
+2025-09-08 19:12:46 - situation_node - INFO - 📥 Received action: take
+2025-09-08 19:12:46 - situation_node - INFO - Updating map data for Samantha
+2025-09-08 19:13:06 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-08 19:13:18 - situation_node - INFO - 📥 Received action: inspect
+2025-09-08 19:13:35 - situation_node - INFO - 🗺️ Updated map look data for Samantha
+2025-09-08 19:13:35 - situation_node - INFO - Map look data updated for Samantha
+2025-09-08 19:13:35 - situation_node - INFO - Updating map data for Samantha
+2025-09-08 19:13:50 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-08 19:14:02 - situation_node - INFO - 📥 Received action: scan
+2025-09-08 19:14:02 - situation_node - INFO - 🗺️ Updated map look data for Samantha
+2025-09-08 19:14:02 - situation_node - INFO - Map look data updated for Samantha
+2025-09-08 19:14:03 - situation_node - INFO - 🧭 Proximity query for Spring14: True
+2025-09-08 19:14:03 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-08 19:14:03 - situation_node - INFO - 📥 Received action: move
+2025-09-08 19:14:03 - situation_node - INFO - Updating map data for Samantha
+2025-09-08 19:14:03 - situation_node - INFO - Updating map data for Samantha
+2025-09-08 19:14:03 - situation_node - INFO - 🗺️ Updated map look data for Samantha
+2025-09-08 19:14:03 - situation_node - INFO - Map look data updated for Samantha
+2025-09-08 19:14:03 - situation_node - INFO - 🗺️ Updated map look data for Samantha
+2025-09-08 19:14:03 - situation_node - INFO - Map look data updated for Samantha
+2025-09-08 19:14:04 - situation_node - INFO - 🧭 Proximity query for Spring14: True
+2025-09-08 19:14:04 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-08 19:14:04 - situation_node - INFO - 📥 Received action: move
+2025-09-08 19:14:04 - situation_node - INFO - Updating map data for Samantha
+2025-09-08 19:14:04 - situation_node - INFO - Updating map data for Samantha
+2025-09-08 19:14:04 - situation_node - INFO - 🗺️ Updated map look data for Samantha
+2025-09-08 19:14:04 - situation_node - INFO - Map look data updated for Samantha
+2025-09-08 19:14:05 - situation_node - INFO - 🧭 Proximity query for Spring14: True
+2025-09-08 19:14:05 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-08 19:14:05 - situation_node - INFO - 📥 Received action: move
+2025-09-08 19:14:05 - situation_node - INFO - Updating map data for Samantha
+2025-09-08 19:14:05 - situation_node - INFO - 🗺️ Updated map look data for Samantha
+2025-09-08 19:14:05 - situation_node - INFO - Map look data updated for Samantha
+2025-09-08 19:14:05 - situation_node - INFO - Updating map data for Samantha
+2025-09-08 19:14:05 - situation_node - INFO - 🗺️ Updated map look data for Samantha
+2025-09-08 19:14:05 - situation_node - INFO - Map look data updated for Samantha
+2025-09-08 19:14:08 - situation_node - INFO - 🧭 Proximity query for Spring14: True
+2025-09-08 19:14:08 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-08 19:14:08 - situation_node - INFO - 📥 Received action: move
+2025-09-08 19:14:08 - situation_node - INFO - Updating map data for Samantha
+2025-09-08 19:14:08 - situation_node - INFO - 🗺️ Updated map look data for Samantha
+2025-09-08 19:14:08 - situation_node - INFO - Map look data updated for Samantha
+2025-09-08 19:14:08 - situation_node - INFO - Updating map data for Samantha
+2025-09-08 19:14:08 - situation_node - INFO - 🗺️ Updated map look data for Samantha
+2025-09-08 19:14:08 - situation_node - INFO - Map look data updated for Samantha
+2025-09-08 19:14:23 - situation_node - INFO - 🧭 Proximity query for Spring14: True
+2025-09-08 19:14:23 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-08 19:14:23 - situation_node - INFO - 📥 Received action: move
+2025-09-08 19:14:23 - situation_node - INFO - Updating map data for Samantha
+2025-09-08 19:14:23 - situation_node - INFO - 🗺️ Updated map look data for Samantha
+2025-09-08 19:14:23 - situation_node - INFO - Map look data updated for Samantha
+2025-09-08 19:14:23 - situation_node - INFO - Updating map data for Samantha
+2025-09-08 19:14:23 - situation_node - INFO - 🗺️ Updated map look data for Samantha
+2025-09-08 19:14:23 - situation_node - INFO - Map look data updated for Samantha
+2025-09-08 19:14:33 - situation_node - INFO - 🧭 Proximity query for Spring14: True
+2025-09-08 19:14:33 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-08 19:14:33 - situation_node - INFO - 📥 Received action: move
+2025-09-08 19:14:33 - situation_node - INFO - Updating map data for Samantha
+2025-09-08 19:14:33 - situation_node - INFO - 🗺️ Updated map look data for Samantha
+2025-09-08 19:14:33 - situation_node - INFO - Map look data updated for Samantha
+2025-09-08 19:14:33 - situation_node - INFO - Updating map data for Samantha
+2025-09-08 19:14:33 - situation_node - INFO - 🗺️ Updated map look data for Samantha
+2025-09-08 19:14:33 - situation_node - INFO - Map look data updated for Samantha
+2025-09-08 19:14:40 - situation_node - INFO - 📥 Received action: use
+2025-09-08 19:15:10 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-08 19:15:20 - situation_node - INFO - 📥 Received action: scan
+2025-09-08 19:15:25 - situation_node - INFO - 📥 Received action: use
+2025-09-08 19:16:16 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-08 19:16:25 - situation_node - INFO - 📥 Received action: scan
+2025-09-08 19:16:26 - situation_node - INFO - 🧭 Proximity query for Berries72: True
+2025-09-08 19:16:26 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-08 19:16:26 - situation_node - INFO - 📥 Received action: move
+2025-09-08 19:16:26 - situation_node - INFO - Updating map data for Samantha
+2025-09-08 19:16:26 - situation_node - INFO - 🗺️ Updated map look data for Samantha
+2025-09-08 19:16:26 - situation_node - INFO - Map look data updated for Samantha
+2025-09-08 19:16:26 - situation_node - INFO - Updating map data for Samantha
+2025-09-08 19:16:26 - situation_node - INFO - 🗺️ Updated map look data for Samantha
+2025-09-08 19:16:26 - situation_node - INFO - Map look data updated for Samantha
+2025-09-08 19:16:42 - situation_node - INFO - 🧭 Proximity query for Berries72: True
+2025-09-08 19:16:42 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-08 19:16:42 - situation_node - INFO - 📥 Received action: move
+2025-09-08 19:16:42 - situation_node - INFO - Updating map data for Samantha
+2025-09-08 19:16:42 - situation_node - INFO - 🗺️ Updated map look data for Samantha
+2025-09-08 19:16:42 - situation_node - INFO - Map look data updated for Samantha
+2025-09-08 19:16:42 - situation_node - INFO - Updating map data for Samantha
+2025-09-08 19:16:42 - situation_node - INFO - 🗺️ Updated map look data for Samantha
+2025-09-08 19:16:42 - situation_node - INFO - Map look data updated for Samantha
+2025-09-08 19:17:08 - situation_node - INFO - 🗺️ Updated map look data for Samantha
+2025-09-08 19:17:08 - situation_node - INFO - Map look data updated for Samantha
+2025-09-08 19:17:09 - situation_node - INFO - 📥 Received action: take
+2025-09-08 19:17:09 - situation_node - INFO - Updating map data for Samantha
+2025-09-08 19:17:26 - situation_node - INFO - 📥 Received action: use
+2025-09-08 19:17:33 - situation_node - INFO - 🗺️ Updated map look data for Samantha
+2025-09-08 19:17:33 - situation_node - INFO - Map look data updated for Samantha
+2025-09-08 19:17:46 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-08 19:17:54 - situation_node - INFO - 📥 Received action: scan
+2025-09-08 19:17:55 - situation_node - INFO - 🧭 Proximity query for Berries84: True
+2025-09-08 19:17:55 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-08 19:17:55 - situation_node - INFO - 📥 Received action: move
+2025-09-08 19:17:55 - situation_node - INFO - Updating map data for Samantha
+2025-09-08 19:17:55 - situation_node - INFO - Updating map data for Samantha
+2025-09-08 19:17:55 - situation_node - INFO - 🗺️ Updated map look data for Samantha
+2025-09-08 19:17:55 - situation_node - INFO - Map look data updated for Samantha
+2025-09-08 19:17:55 - situation_node - INFO - 🗺️ Updated map look data for Samantha
+2025-09-08 19:17:55 - situation_node - INFO - Map look data updated for Samantha
+2025-09-08 19:17:56 - situation_node - INFO - 🧭 Proximity query for Berries84: True
+2025-09-08 19:17:56 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-08 19:17:56 - situation_node - INFO - 📥 Received action: move
+2025-09-08 19:17:56 - situation_node - INFO - Updating map data for Samantha
+2025-09-08 19:17:56 - situation_node - INFO - Updating map data for Samantha
+2025-09-08 19:17:56 - situation_node - INFO - 🗺️ Updated map look data for Samantha
+2025-09-08 19:17:56 - situation_node - INFO - Map look data updated for Samantha
+2025-09-08 19:17:59 - situation_node - INFO - 🧭 Proximity query for Berries84: True
+2025-09-08 19:17:59 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-08 19:17:59 - situation_node - INFO - 📥 Received action: move
+2025-09-08 19:17:59 - situation_node - INFO - Updating map data for Samantha
+2025-09-08 19:17:59 - situation_node - INFO - 🗺️ Updated map look data for Samantha
+2025-09-08 19:17:59 - situation_node - INFO - Map look data upd2025-09-08 19:18:13 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-08 19:18:24 - situation_node - INFO - 📥 Received action: scan
+2025-09-08 19:18:25 - situation_node - INFO - 🧭 Proximity query for Berries88: True
+2025-09-08 19:18:25 - situation_node - INFO - 🧭 Situation query: returned current s2025-09-08 19:18:25 - situation_node - INFO - 🗺️ Updated map look data for Samantha
+2025-09-08 19:18:25 - situation_node - INFO - Map look data updated for Samantha
+2025-09-08 19:18:25 - situation_node - INFO - Updating m2025-09-08 19:18:25 -2025-09-08 19:18:37 - situation_node - INFO - 🗺️ Updated map look data for Samantha
+2025-09-08 19:18:37 - situation_node - INFO - Map look data updated for Samantha
+2025-09-08 19:18:37 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-08 19:18:49 - situation_node - INFO - 📥 Received action: think
+2025-09-08 19:18:50 - situation_node - INFO - 📥 Received action: scan
+2025-09-08 19:18:51 - situation_node - INFO - 🧭 Proximity query for Spring12: True
+2025-09-08 19:18:51 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-08 19:18:51 - situation_node - INFO - 📥 Received action: move
+2025-09-08 19:18:51 - situation_node - INFO - Updating map data for Samantha
+2025-09-08 19:18:51 - situation_node - INFO - Updating map data for Samantha
+2025-09-08 19:18:51 - situation_node - INFO - 🗺️ Updated map look data for Samantha
+2025-09-08 19:18:51 - situation_node - INFO - Map look data updated for Samantha
+2025-09-08 19:18:51 - situation_node - INFO - 🗺️ Updated map look data for Samantha
+2025-09-08 19:18:51 - situation_node - INFO - Map look data updated for Samantha
+2025-09-08 19:18:52 - situation_node - INFO - 🧭 Proximity query for Spring12: True
+2025-09-08 19:18:52 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-08 19:18:52 - situation_node - INFO - 📥 Received action: move
+2025-09-08 19:18:52 - situation_node - INFO - Updating map data for Samantha
+2025-09-08 19:18:52 - situation_node - INFO - Updating map data for Samantha
+2025-09-08 19:18:52 - situation_node - INFO - 🗺️ Updated map look data for Samantha
+2025-09-08 19:18:52 - situation_node - INFO - Map look data updated for Samantha
+2025-09-08 19:18:55 - situation_node - INFO - 🧭 Proximity query for Spring12: True
+2025-09-08 19:18:55 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-08 19:18:55 - situation_node - INFO - 📥 Received action: move
+2025-09-08 19:18:55 - situation_node - INFO - Updating map data for Samantha
+2025-09-08 19:18:55 - situation_node - INFO -2025-09-08 19:19:10 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-08 19:19:19 - situation_node - INFO - 📥 Received action: scan
+2025-09-08 19:19:20 - situation_node - INFO - 🧭 Proximity query for Berries2: True
+2025-09-08 19:19:20 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-08 19:19:20 - situation_node - INFO - 📥 Received action: move
+2025-09-08 19:19:20 - situation_node - INFO - Updating map data for Joe
+2025-09-08 19:19:20 - situation_node - INFO - Updating map data for Joe
+2025-09-08 19:19:20 - situation_node - INFO - 🗺️ Updated map look data for Joe
+2025-09-08 19:19:20 - situation_node - INFO - Map look data updated for Joe
+2025-09-08 19:19:23 - situation_node - INFO - 🧭 Proximity query for Berries2: True
+2025-09-08 19:19:23 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-08 19:19:23 - situation_node - INFO - Updating map data for Joe
+2025-09-08 19:19:23 - situation_node - INFO - 🗺️ Updated map look data for Joe
+2025-09-08 19:19:23 - situation_node - INFO - Map look data updated for Joe
+2025-09-08 19:19:23 - situation_node - INFO - 📥 Received action: move
+2025-09-08 19:19:23 - situation_node - INFO - Updating map data for Joe
+2025-09-08 19:19:23 - situation_node - INFO - 🗺️ Updated map look data fo2025-09-08 19:19:37 - situation_node - INFO - 🧭 Situation query: returned curre2025-09-08 192025-09-08 19:19:45 - situation_node - INFO - 📥 Received action: scan
+2025-09-08 19:19:46 - situation_node - INFO - 📥 Received action: take
+2025-09-08 19:19:46 - situation_node - INFO - Updating map data for Samantha
+2025-09-08 19:19:52 - situation_node - INFO - 📥 Received action: use
+2025-09-08 19:20:19 - situation_node - INFO - 🗺️ Updated map look data for Samantha
+2025-09-08 19:20:19 - situation_node - INFO - Map look data updated for Samantha
+2025-09-08 19:20:37 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-08 19:20:46 - situation_node - INFO - 📥 Received action: scan
+2025-09-08 19:20:47 - situation_node - INFO - 🧭 Proximity query for Berries54: True
+2025-09-08 19:20:47 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-08 19:20:47 - situation_node - INFO - 📥 Received action: move
+2025-09-08 19:20:47 - situation_node - INFO - Updating map data for Samantha
+2025-09-08 19:20:47 - situation_node - INFO - Updating map data for Samantha
+2025-09-08 19:20:47 - situation_node - INFO - 🗺️ Updated map look data for Samantha
+2025-09-08 19:20:47 - situation_node - INFO - Map look data updated for Samantha
+2025-09-08 19:20:48 - situation_node - INFO - 🗺️ Updated map look data for Samantha
+2025-09-08 19:20:48 - situation_node - INFO - Map look data updated for Samantha
+2025-09-08 19:20:48 - situation_node - INFO - 📥 Received action: take
+2025-09-08 19:20:48 - situation_node - INFO - Updating map data for Samantha
+2025-09-08 19:20:49 - situation_node - INFO - 🗺️ Updated map look data for Samantha
+2025-09-08 19:20:49 - situation_node - INFO - Map look data updated for Samantha
+2025-09-08 19:20:51 - situation_node - INFO - 📥 Received action: use
+2025-09-08 19:21:05 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-08 19:21:13 - situation_node - INFO - 📥 Received action: scan
+2025-09-08 19:21:19 - situation_node - INFO - 🧭 Proximity query for Berries68: True
+2025-09-08 19:21:19 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-08 19:21:19 - situation_node - INFO - 📥 Received action: move
+2025-09-08 19:21:19 - situation_node - INFO - Updating map data for Samantha
+2025-09-08 19:21:19 - situation_node - INFO - Updating map data for Samantha
+2025-09-08 19:21:19 - situation_node - INFO - 🗺️ Updated map look data for Samantha
+2025-09-08 19:21:19 - situation_node - INFO - Map look data updated for Samantha
+2025-09-08 19:21:50 - situation_node - INFO - 🗺️ Updated map look data for Samantha
+2025-09-08 19:21:50 - situation_node - INFO - Map look data updated for Samantha
+2025-09-08 19:21:51 - situation_node - INFO - 📥 Received action: inspect
+2025-09-08 19:21:51 - situation_node - INFO - Updating map data for Samantha
+2025-09-08 19:21:52 - situation_node - INFO - 🗺️ Updated map look data for Samantha
+2025-09-08 19:21:52 - situation_node - INFO - Map look data updated for Samantha
+2025-09-08 19:22:05 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-08 19:22:15 - situation_node - INFO - 📥 Received action: scan
+2025-09-08 19:22:16 - situation_node - INFO - 📥 Received action: take
+2025-09-08 19:22:16 - situation_node - INFO - Updating map data for Samantha
+2025-09-08 19:22:35 - situation_node - INFO - 📥 Received action: use
+2025-09-08 19:22:41 - situation_node - INFO - 🗺️ Updated map look data for Samantha
+2025-09-08 19:22:41 - situation_node - INFO - Map look data updated for Samantha
+2025-09-08 19:22:52 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-08 19:23:01 - situation_node - INFO - 📥 Received action: scan
+2025-09-08 19:23:02 - situation_node - INFO - 📥 Received action: take
+2025-09-08 19:23:02 - situation_node - INFO - Updating map data for Samantha
+2025-09-08 19:23:03 - situation_node - INFO - 🗺️ Updated map look data for Samantha
+2025-09-08 19:23:03 - situation_node - INFO - Map look data updated for Samantha
+2025-09-08 19:23:07 - situation_node - INFO - 📥 Received action: use
+2025-09-08 19:23:52 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-08 19:24:00 - situation_node - INFO - 📥 Received action: scan
+2025-09-08 19:24:01 - situation_node - INFO - 🧭 Proximity query for Spring12: True
+2025-09-08 19:24:01 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-08 19:24:01 - situation_node - INFO - 📥 Received action: move
+2025-09-08 19:24:01 - situation_node - INFO - Updating map data for Samantha
+2025-09-08 19:24:01 - situation_node - INFO - Updating map data for Samantha
+2025-09-08 19:24:01 - situation_node - INFO - 🗺️ Updated map look data for Samantha
+2025-09-08 19:24:01 - situation_node - INFO - Map look data updated for Samantha
+2025-09-08 19:24:01 - situation_node - INFO - 🗺️ Updated map look data for Samantha
+2025-09-08 19:24:01 - situation_node - INFO - Map look data updated for Samantha
+2025-09-08 19:24:17 - situation_node - INFO - 📥 Received action: use
+2025-09-08 19:24:37 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-08 19:24:46 - situation_node - INFO - 📥 Received action: scan
+2025-09-08 19:24:49 - situation_node - INFO - 📥 Received action: inspect
+2025-09-08 19:24:49 - situation_node - INFO - Updating map data for Samantha
+2025-09-08 19:24:49 - situation_node - INFO - 🗺️ Updated map look data for Samantha
+2025-09-08 19:24:49 - situation_node - INFO - Map look data updated for Samantha
+2025-09-08 19:25:20 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-08 19:25:28 - situation_node - INFO - 📥 Received action: scan
+2025-09-08 19:25:32 - situation_node - INFO - 📥 Received action: inspect
+2025-09-08 19:25:32 - situation_node - INFO - Updating map data for Samantha
+2025-09-08 19:25:32 - situation_node - INFO - 🗺️ Updated map look data for Samantha
+2025-09-08 19:25:32 - situation_node - INFO - Map look data updated for Samantha
+2025-09-08 19:25:36 - situation_node - INFO - 📥 Received action: use
+2025-09-08 19:26:15 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-08 19:26:25 - situation_node - INFO - 📥 Received action: scan
+2025-09-08 19:26:35 - situation_node - INFO - 📥 Received action: inspect
+2025-09-08 19:26:35 - situation_node - INFO - Updating map data for Samantha
+2025-09-08 19:26:35 - situation_node - INFO - 🗺️ Updated map look data for Samantha
+2025-09-08 19:26:35 - situation_node - INFO - Map look data updated for Samantha
+2025-09-08 19:26:42 - situation_node - INFO - 📥 Received action: use
+2025-09-08 19:27:12 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-08 19:27:22 - situation_node - INFO - 📥 Received action: scan
+2025-09-08 19:27:23 - situation_node - INFO - 🧭 Proximity query for Mushrooms11: True
+2025-09-08 19:27:23 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-08 19:27:23 - situation_node - INFO - 📥 Received action: move
+2025-09-08 19:27:23 - situation_node - INFO - Updating map data for Samantha
+2025-09-08 19:27:23 - situation_node - INFO - Updating map data for Samantha
+2025-09-08 19:27:23 - situation_node - INFO - 🗺️ Updated map look data for Samantha
+2025-09-08 19:27:23 - situation_node - INFO - Map look data updated for Samantha
+2025-09-08 19:27:23 - situation_node - INFO - 🗺️ Updated map look data for Samantha
+2025-09-08 19:27:23 - situation_node - INFO - Map look data updated for Samantha
+2025-09-08 19:27:24 - situation_node - INFO - 🧭 Proximity query for Mushrooms11: True
+2025-09-08 19:27:24 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-08 19:27:24 - situation_node - INFO - 📥 Received action: move
+2025-09-08 19:27:24 - situation_node - INFO - Updating map data for Samantha
+2025-09-08 19:27:24 - situation_node - INFO - Updating map data for Samantha
+2025-09-08 19:27:24 - situation_node - INFO - 🗺️ Updated map look data for Samantha
+2025-09-08 19:27:24 - situation_node - INFO - Map look data updated for Samantha
+2025-09-08 19:27:25 - situation_node - INFO - 🧭 Proximity query for Mushrooms11: True
+2025-09-08 19:27:25 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-08 19:27:25 - situation_node - INFO - Updating map data for Samantha
+2025-09-08 19:27:25 - situation_node - INFO - 🗺️ Updated map look data for Samantha
+2025-09-08 19:27:25 - situation_node - INFO - Map look data updated for Samantha
+2025-09-08 19:27:25 - situation_node - INFO - 📥 Received action: move
+2025-09-08 19:27:25 - situation_node - INFO - Updating map data for Samantha
+2025-09-08 19:27:25 - situation_node - INFO - 🗺️ Updated map look data for Samantha
+2025-09-08 19:27:25 - situation_node - INFO - Map look data updated for Samantha
+2025-09-08 19:27:27 - situation_node - INFO - 🧭 Proximity query for Mushrooms11: True
+2025-09-08 19:27:27 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-08 19:27:27 - situation_node - INFO - Updating map data for Samantha
+2025-09-08 19:27:27 - situation_node - INFO - 🗺️ Updated map look data for Samantha
+2025-09-08 19:27:27 - situation_node - INFO - Map look data updated for Samantha
+2025-09-08 19:27:27 - situation_node - INFO - 📥 Received action: move
+2025-09-08 19:27:27 - situation_node - INFO - Updating map data for Samantha
+2025-09-08 19:27:27 - situation_node - INFO - 🗺️ Updated map look data for Samantha
+2025-09-08 19:27:27 - situation_node - INFO - Map look data updated for Samantha
+2025-09-08 19:27:42 - situation_node - INFO - Updating map data for Samantha
+2025-09-08 19:27:42 - situation_node - INFO - 🗺️ Updated map look data for Samantha
+2025-09-08 19:27:42 - situation_node - INFO - Map look data updated for Samantha
+2025-09-08 19:27:42 - situation_node - INFO - 📥 Received action: take
+2025-09-08 19:27:55 - situation_node - INFO - 📥 Received action: use
+2025-09-08 19:28:12 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-08 19:28:23 - situation_node - INFO - 📥 Received action: scan
+2025-09-08 19:28:28 - situation_node - INFO - 📥 Received action: inspect
+2025-09-08 19:28:46 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-08 19:28:57 - situation_node - INFO - 📥 Received action: scan
+2025-09-08 19:28:58 - situation_node - INFO - 📥 Received action: take
+2025-09-08 19:29:17 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-08 19:29:39 - situation_node - INFO - 📥 Received action: scan
+2025-09-08 19:29:49 - situation_node - INFO - 📥 Received action: take
+2025-09-08 19:29:50 - situation_node - INFO - 🗺️ Updated map look data for Samantha
+2025-09-08 19:29:50 - situation_node - INFO - Map look data updated for Samantha
+2025-09-08 19:29:50 - situation_node - INFO - Updating map data for Samantha
+2025-09-08 19:29:51 - situation_node - INFO - 🗺️ Updated map look data for Samantha
+2025-09-08 19:29:51 - situation_node - INFO - Map look data updated for Samantha
+2025-09-08 19:29:51 - situation_node - INFO - Updating map data for Samantha
+2025-09-08 19:29:52 - situation_node - INFO - 📥 Received action: use
+2025-09-08 19:29:53 - situation_node - INFO - 🗺️ Updated map look data for Samantha
+2025-09-08 19:29:53 - situation_node - INFO - Map look data updated for Samantha
+2025-09-08 19:29:53 - situation_node - INFO - Updating map data for Samantha
+2025-09-08 19:30:04 - situation_node - INFO - 🗺️ Updated map look data for Samantha
+2025-09-08 19:30:04 - situation_node - INFO - Map look data updated for Samantha
+2025-09-08 19:30:21 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-08 19:30:30 - situation_node - INFO - 📥 Received action: scan
+2025-09-08 19:30:31 - situation_node - INFO - 🧭 Proximity query for Mushrooms23: True
+2025-09-08 19:30:31 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-08 19:30:31 - situation_node - INFO - 📥 Received action: move
+2025-09-08 19:30:31 - situation_node - INFO - Updating map data for Samantha
+2025-09-08 19:30:31 - situation_node - INFO - Updating map data for Samantha
+2025-09-08 19:30:31 - situation_node - INFO - 🗺️ Updated map look data for Samantha
+2025-09-08 19:30:31 - situation_node - INFO - Map look data updated for Samantha
+2025-09-08 19:30:33 - situation_node - INFO - 🧭 Proximity query for Mushrooms23: True
+2025-09-08 19:30:33 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-08 19:30:33 - situation_node - INFO - Updating map data for Samantha
+2025-09-08 19:30:33 - situation_node - INFO - 🗺️ Updated map look data for Samantha
+2025-09-08 19:30:33 - situation_node - INFO - Map look data updated for Samantha
+2025-09-08 19:30:33 - situation_node - INFO - 📥 Received action: move
+2025-09-08 19:30:33 - situation_node - INFO - Updating map data for Samantha
+2025-09-08 19:30:33 - situation_node - INFO - 🗺️ Updated map look data for Samantha
+2025-09-08 19:30:33 - situation_node - INFO - Map look data updated for Samantha
+2025-09-08 19:30:49 - situation_node - INFO - 🧭 Proximity query for Mushrooms23: True
+2025-09-08 19:30:49 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-08 19:30:49 - situation_node - INFO - Updating map data for Samantha
+2025-09-08 19:30:49 - situation_node - INFO - 🗺️ Updated map look data for Samantha
+2025-09-08 19:30:49 - situation_node - INFO - Map look data updated for Samantha
+2025-09-08 19:30:49 - situation_node - INFO - 📥 Received action: move
+2025-09-08 19:30:49 - situation_node - INFO - Updating map data for Samantha
+2025-09-08 19:30:49 - situation_node - INFO - 🗺️ Updated map look data for Samantha
+2025-09-08 19:30:49 - situation_node - INFO - Map look data updated for Samantha
+2025-09-08 19:30:57 - situation_node - INFO - 🧭 Proximity query for Mushrooms23: True
+2025-09-08 19:30:57 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-08 19:30:57 - situation_node - INFO - Updating map data for Samantha
+2025-09-08 19:30:57 - situation_node - INFO - 🗺️ Updated map look data for Samantha
+2025-09-08 19:30:57 - situation_node - INFO - Map look data updated for Samantha
+2025-09-08 19:30:57 - situation_node - INFO - 📥 Received action: move
+2025-09-08 19:30:57 - situation_node - INFO - Updating map data for Samantha
+2025-09-08 19:30:57 - situation_node - INFO - 🗺️ Updated map look data for Samantha
+2025-09-08 19:30:57 - situation_node - INFO - Map look data updated for Samantha
+2025-09-08 19:30:58 - situation_node - INFO - 🗺️ Updated map look data for Samantha
+2025-09-08 19:30:58 - situation_node - INFO - Map look data updated for Samantha
+2025-09-08 19:30:59 - situation_node - INFO - 📥 Received action: take
+2025-09-08 19:30:59 - situation_node - INFO - Updating map data for Samantha
+2025-09-08 19:31:17 - situation_node - INFO - 📥 Received action: use
+2025-09-08 19:31:23 - situation_node - INFO - 🗺️ Updated map look data for Samantha
+2025-09-08 19:31:23 - situation_node - INFO - Map look data updated for Samantha
+2025-09-08 19:31:34 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-08 19:31:43 - situation_node - INFO - 📥 Received action: scan
+2025-09-08 19:31:54 - situation_node - INFO - 📥 Received action: inspect
+2025-09-08 19:31:54 - situation_node - INFO - Updating map data for Samantha
+2025-09-08 19:32:00 - situation_node - INFO - 🗺️ Updated map look data for Samantha
+2025-09-08 19:32:00 - situation_node - INFO - Map look data updated for Samantha
+2025-09-08 19:32:11 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-08 19:32:23 - situation_node - INFO - 📥 Received action: think
+2025-09-08 19:32:24 - situation_node - INFO - 📥 Received action: scan
+2025-09-08 19:32:25 - situation_node - INFO - 🧭 Proximity query for Spring12: True
+2025-09-08 19:32:25 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-08 19:32:25 - situation_node - INFO - 📥 Received action: move
+2025-09-08 19:32:25 - situation_node - INFO - Updating map data for Samantha
+2025-09-08 19:32:25 - situation_node - INFO - Updating map data for Samantha
+2025-09-08 19:32:25 - situation_node - INFO - 🗺️ Updated map look data for Samantha
+2025-09-08 19:32:25 - situation_node - INFO - Map look data updated for Samantha
+2025-09-08 19:32:26 - situation_node - INFO - 🗺️ Updated map look data for Samantha
+2025-09-08 19:32:26 - situation_node - INFO - Map look data updated for Samantha
+2025-09-08 19:32:26 - situation_node - INFO - 🧭 Proximity query for Spring12: True
+2025-09-08 19:32:26 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-08 19:32:26 - situation_node - INFO - 📥 Received action: move
+2025-09-08 19:32:26 - situation_node - INFO - Updating map data for Samantha
+2025-09-08 19:32:26 - situation_node - INFO - Updating map data for Samantha
+2025-09-08 19:32:26 - situation_node - INFO - 🗺️ Updated map look data for Samantha
+2025-09-08 19:32:26 - situation_node - INFO - Map look data updated for Samantha
+2025-09-08 19:32:27 - situation_node - INFO - 🧭 Proximity query for Spring12: True
+2025-09-08 19:32:27 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-08 19:32:27 - situation_node - INFO - 📥 Received action: move
+2025-09-08 19:32:27 - situation_node - INFO - Updating map data for Samantha
+2025-09-08 19:32:27 - situation_node - INFO - 🗺️ Updated map look data for Samantha
+2025-09-08 19:32:27 - situation_node - INFO - Map look data updated for Samantha
+2025-09-08 19:32:27 - situation_node - INFO - Updating map data for Samantha
+2025-09-08 19:32:27 - situation_node - INFO - 🗺️ Updated map look data for Samantha
+2025-09-08 19:32:27 - situation_node - INFO - Map look data updated for Samantha
+2025-09-08 19:32:28 - situation_node - INFO - 🧭 Proximity query for Spring12: True
+2025-09-08 19:32:28 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-08 19:32:28 - situation_node - INFO - 📥 Received action: move
+2025-09-08 19:32:28 - situation_node - INFO - Updating map data for Samantha
+2025-09-08 19:32:28 - situation_node - INFO - 🗺️ Updated map look data for Samantha
+2025-09-08 19:32:28 - situation_node - INFO - Map look data updated for Samantha
+2025-09-08 19:32:28 - situation_node - INFO - Updating map data for Samantha
+2025-09-08 19:32:28 - situation_node - INFO - 🗺️ Updated map look data for Samantha
+2025-09-08 19:32:28 - situation_node - INFO - Map look data updated for Samantha
+2025-09-08 19:32:47 - situation_node - INFO - 📥 Received action: use
+2025-09-08 19:33:06 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-08 19:33:16 - situation_node - INFO - 📥 Received action: scan
+2025-09-08 19:33:23 - situation_node - INFO - 🧭 Proximity query for Berries22: True
+2025-09-08 19:33:23 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-08 19:33:23 - situation_node - INFO - 📥 Received action: move
+2025-09-08 19:33:23 - situation_node - INFO - Updating map data for Samantha
+2025-09-08 19:33:23 - situation_node - INFO - 🗺️ Updated map look data for Samantha
+2025-09-08 19:33:23 - situation_node - INFO - Map look data updated for Samantha
+2025-09-08 19:33:23 - situation_node - INFO - Updating map data for Samantha
+2025-09-08 19:33:23 - situation_node - INFO - 🗺️ Updated map look data for Samantha
+2025-09-08 19:33:23 - situation_node - INFO - Map look data updated for Samantha
+2025-09-08 19:33:48 - situation_node - INFO - 🗺️ Updated map look data for Samantha
+2025-09-08 19:33:48 - situation_node - INFO - Map look data updated for Samantha
+2025-09-08 19:33:48 - situation_node - INFO - 🧭 Proximity query for Berries22: True
+2025-09-08 19:33:48 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-08 19:33:48 - situation_node - INFO - 📥 Received action: move
+2025-09-08 19:33:48 - situation_node - INFO - Updating map data for Samantha
+2025-09-08 19:33:48 - situation_node - INFO - Updating map data for Samantha
+2025-09-08 19:33:48 - situation_node - INFO - 🗺️ Updated map look data for Samantha
+2025-09-08 19:33:48 - situation_node - INFO - Map look data updated for Samantha
+2025-09-08 19:34:01 - situation_node - INFO - 🧭 Proximity query for Berries22: True
+2025-09-08 19:34:01 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-08 19:34:01 - situation_node - INFO - 📥 Received action: move
+2025-09-08 19:34:01 - situation_node - INFO - Updating map data for Samantha
+2025-09-08 19:34:01 - situation_node - INFO - 🗺️ Updated map look data for Samantha
+2025-09-08 19:34:01 - situation_node - INFO - Map look data updated for Samantha
+2025-09-08 19:34:01 - situation_node - INFO - Updating map data for Samantha
+2025-09-08 19:34:02 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-08 19:34:10 - situation_node - INFO - 📥 Received action: scan
+2025-09-08 19:34:12 - situation_node - INFO - 📥 Received action: take
+2025-09-08 19:34:12 - situation_node - INFO - Updating map data for Joe
+2025-09-08 19:34:12 - situation_node - INFO - 🗺️ Updated map look data for Joe
+2025-09-08 19:34:12 - situation_node - INFO - Map look data updated for Joe
+2025-09-08 19:34:15 - situation_node - INFO - 📥 Received action: use
+2025-09-08 19:34:30 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-08 19:34:40 - situation_node - INFO - 📥 Received action: scan
+2025-09-08 19:34:41 - situation_node - INFO - 🧭 Proximity query for Berries9: True
+2025-09-08 19:34:41 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-08 19:34:41 - situation_node - INFO - 📥 Received action: move
+2025-09-08 19:34:41 - situation_node - INFO - Updating map data for Joe
+2025-09-08 19:34:41 - situation_node - INFO - Updating map data for Joe
+2025-09-08 19:34:41 - situation_node - INFO - 🗺️ Updated map look data for Joe
+2025-09-08 19:34:41 - situation_node - INFO - Map look data updated for Joe
+2025-09-08 19:34:53 - situation_node - INFO - 🧭 Proximity query for Berries9: True
+2025-09-08 19:34:53 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-08 19:34:53 - situation_node - INFO - 📥 Received action: move
+2025-09-08 19:34:53 - situation_node - INFO - Updating map data for Joe
+2025-09-08 19:34:53 - situation_node - INFO - 🗺️ Updated map look data for Joe
+2025-09-08 19:34:53 - situation_node - INFO - Map look data updated for Joe
+2025-09-08 19:34:53 - situation_node - INFO - Updating map data for Joe
+2025-09-08 19:34:53 - situation_node - INFO - 🗺️ Updated map look data for Joe
+2025-09-08 19:34:53 - situation_node - INFO - Map look data updated for Joe
+2025-09-08 19:35:19 - situation_node - INFO - 📥 Received action: take
+2025-09-08 19:35:20 - situation_node - INFO - 🗺️ Updated map look data for Joe
+2025-09-08 19:35:20 - situation_node - INFO - Map look data updated for Joe
+2025-09-08 19:35:20 - situation_node - INFO - Updating map data for Joe
+2025-09-08 19:35:21 - situation_node - INFO - 🗺️ Updated map look data for Joe
+2025-09-08 19:35:21 - situation_node - INFO - Map look data updated for Joe
+2025-09-08 19:35:23 - situation_node - INFO - 📥 Received action: use
+2025-09-08 19:35:39 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-08 19:35:49 - situation_node - INFO - 📥 Received action: scan
+2025-09-08 19:35:50 - situation_node - INFO - 🧭 Proximity query for Berries51: True
+2025-09-08 19:35:50 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-08 19:35:50 - situation_node - INFO - 📥 Received action: move
+2025-09-08 19:35:50 - situation_node - INFO - Updating map data for Joe
+2025-09-08 19:35:50 - situation_node - INFO - Updating map data for Joe
+2025-09-08 19:35:50 - situation_node - INFO - 🗺️ Updated map look data for Joe
+2025-09-08 19:35:50 - situation_node - INFO - Map look data updated for Joe
+2025-09-08 19:35:50 - situation_node - INFO - 🗺️ Updated map look data for Joe
+2025-09-08 19:35:50 - situation_node - INFO - Map look data updated for Joe
+2025-09-08 19:36:03 - situation_node - INFO - 🧭 Proximity query for Berries51: True
+2025-09-08 19:36:03 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-08 19:36:03 - situation_node - INFO - 📥 Received action: move
+2025-09-08 19:36:03 - situation_node - INFO - Updating map data for Joe
+2025-09-08 19:36:03 - situation_node - INFO - Updating map data for Joe
+2025-09-08 19:36:03 - situation_node - INFO - 🗺️ Updated map look data for Joe
+2025-09-08 19:36:03 - situation_node - INFO - Map look data updated for Joe
+2025-09-08 19:36:12 - situation_node - INFO - 🧭 Proximity query for Berries51: True
+2025-09-08 19:36:12 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-08 19:36:12 - situation_node - INFO - 📥 Received action: move
+2025-09-08 19:36:12 - situation_node - INFO - Updating map data for Joe
+2025-09-08 19:36:12 - situation_node - INFO - 🗺️ Updated map look data for Joe
+2025-09-08 19:36:12 - situation_node - INFO - Map look data updated for2025-09-08 19:36:12 - situation_node - INFO - 🧭 Proximity query for Spring4: True
+2025-09-08 19:36:12 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-08 19:36:12 - situation_node - INFO - 📥 Receiv2025-09-08 19:36:12 - situation_node - INFO - 🗺️ Updated map look data for Joe
+2025-09-08 19:36:12 - situation_node - INFO - Map look data updated for Joe
+2025-09-08 19:36:13 - situation_node - INFO - 📥 Received action: take
+2025-09-08 19:36:13 - situation_node - INFO - Updating map data for Joe
+2025-09-08 19:36:13 - situation_node - INFO - 🗺️ Updated map look data for Joe
+2025-09-08 19:36:13 - situation_node - INFO - Map look data updated for Joe
+2025-09-08 19:36:16 - situation_node - INFO - 📥 Received action: use
+2025-09-08 19:36:32 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-08 19:36:41 - situation_node - INFO - 📥 Received action: scan
+2025-09-08 19:36:42 - situation_node - INFO - 🧭 Proximity query for Berries18: True
+2025-09-08 19:36:42 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-08 19:36:42 - situation_node - INFO - 📥 Received action: move
+2025-09-08 19:36:42 - situation_node - INFO - Updating map data for Joe
+2025-09-08 19:36:42 - situation_node - INFO - Updating map data for Joe
+2025-09-08 19:36:42 - situation_node - INFO - 🗺️ Updated map look data for Joe
+2025-09-08 19:36:42 - situation_node - INFO - Map look data updated for Joe
+2025-09-08 19:36:43 - situation_node - INFO - 🗺️ Updated map look data for Joe
+2025-09-08 19:36:43 - situation_node - INFO - Map look data updated for Joe
+2025-09-08 19:36:44 - situation_node - INFO - 📥 Received action: take
+2025-09-08 19:36:44 - situation_node - INFO - Updating map data for Joe
+2025-09-08 19:37:02 - situation_node - INFO - 📥 Received action: use
+2025-09-08 19:37:43 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-08 19:37:48 - situation_node - INFO - 📥 Received action: inspect
+2025-09-08 19:38:05 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-08 19:38:14 - situation_node - INFO - 📥 Received action: scan
+2025-09-08 19:46:44 - situation_node - INFO - 🗺️ Updated map look data for Joe
+2025-09-08 19:46:44 - situation_node - INFO - Map look data updated for Joe
+2025-09-08 19:46:44 - situation_node - INFO - Updating map data for Joe
+node - INFO - Map look data updated for Samantha
+2025-09-08 19:36:16 - situation_node - INFO - 📥 Received action: move
+2025-09-08 19:36:16 - situation_node - INFO - Updating map data for Samantha
+2025-09-08 19:36:16 - situation_node - INFO - 🗺️ Updated map look data for Samantha
+2025-09-08 19:36:16 - situation_node - INFO - Map look data updated for Samantha
+2025-09-08 19:36:32 - situation_node - INFO - 🧭 Proximity query for Spring4: True
+2025-09-08 19:36:32 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-08 19:36:32 - situation_node - INFO - Updating map data for Samantha
+2025-09-08 19:36:32 - situation_node - INFO - 🗺️ Updated map look data for Samantha
+2025-09-08 19:36:32 - situation_node - INFO - Map look data updated for Samantha
+2025-09-08 19:36:32 - situation_node - INFO - 📥 Received action: move
+2025-09-08 19:36:32 - situation_node - INFO - Updating map data for Samantha
+2025-09-08 19:36:32 - situation_node - INFO - 🗺️ Updated map look data for Samantha
+2025-09-08 19:36:32 - situation_node - INFO - Map look data updated for Samantha
+2025-09-08 19:36:42 - situation_node - INFO - 🗺️ Updated map look data for Samantha
+2025-09-08 19:36:42 - situation_node - INFO - Map look data updated for Samantha
+2025-09-08 19:36:43 - situation_node - INFO - 📥 Received action: inspect
+2025-09-08 19:36:43 - situation_node - INFO - Updating map data for Samantha
+2025-09-08 19:36:44 - situation_node - INFO - 🗺️ Updated map look data for Samantha
+2025-09-08 19:36:44 - situation_node - INFO - Map look data updated for Samantha
+2025-09-08 19:36:58 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-08 19:37:07 - situation_node - INFO - 📥 Received action: scan
+2025-09-08 19:37:10 - situation_node - INFO - 📥 Received action: use
+2025-09-08 19:37:49 - situation_node - INFO - 🧭 Situation query: returned current situation
+2025-09-08 19:37:58 - situation_node - INFO - 📥 Received action: scan
+2025-09-08 19:38:09 - situation_node - INFO - 📥 Received action: use

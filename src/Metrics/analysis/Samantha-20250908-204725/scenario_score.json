@@ -1,0 +1,111 @@
+{
+  "file": "../data/Samantha-plans.jsonl",
+  "used_digest_jq": false,
+  "total_plans": 8,
+  "total_minutes": 41.0,
+  "drive_dimensions": 3,
+  "weights_last_fraction": 0.5,
+  "survival_params": {
+    "soft_start": 70.0,
+    "danger": 80.0,
+    "hard": 100.0
+  },
+  "goal_sat_weight": 0.25,
+  "avg_goal_satisfaction": 0.439,
+  "avg_drive_fulfillment": 0.1268,
+  "scenario_score_base": 0.1268,
+  "scenario_score_final": 0.109,
+  "avg_plan_score": null,
+  "avg_state_geomean": 0.0628,
+  "avg_failure_rate": null,
+  "per_plan": [
+    {
+      "minutes": 1.0,
+      "drive_weighted": 0.2667,
+      "drive_fulfillment": 0.2667,
+      "survival_penalty": 1.0,
+      "contribution": 0.2667,
+      "goal_satisfaction": 0.0,
+      "plan_score": null,
+      "state_geomean": 0.0,
+      "max_state": 0.0
+    },
+    {
+      "minutes": 18.0,
+      "drive_weighted": 0.0,
+      "drive_fulfillment": 0.0,
+      "survival_penalty": 1.0,
+      "contribution": 0.0,
+      "goal_satisfaction": 0.0,
+      "plan_score": null,
+      "state_geomean": 0.0447,
+      "max_state": 9.3
+    },
+    {
+      "minutes": 7.0,
+      "drive_weighted": 0.4222,
+      "drive_fulfillment": 0.4222,
+      "survival_penalty": 1.0,
+      "contribution": 0.4222,
+      "goal_satisfaction": 1.0,
+      "plan_score": null,
+      "state_geomean": 0.0685,
+      "max_state": 14.25
+    },
+    {
+      "minutes": 3.0,
+      "drive_weighted": 0.0889,
+      "drive_fulfillment": 0.0889,
+      "survival_penalty": 1.0,
+      "contribution": 0.0889,
+      "goal_satisfaction": 0.0,
+      "plan_score": null,
+      "state_geomean": 0.0858,
+      "max_state": 17.85
+    },
+    {
+      "minutes": 3.0,
+      "drive_weighted": 0.1556,
+      "drive_fulfillment": 0.1556,
+      "survival_penalty": 1.0,
+      "contribution": 0.1556,
+      "goal_satisfaction": 1.0,
+      "plan_score": null,
+      "state_geomean": 0.1022,
+      "max_state": 21.45
+    },
+    {
+      "minutes": 1.0,
+      "drive_weighted": 0.0,
+      "drive_fulfillment": 0.0,
+      "survival_penalty": 1.0,
+      "contribution": 0.0,
+      "goal_satisfaction": 0.0,
+      "plan_score": null,
+      "state_geomean": 0.0427,
+      "max_state": 22.8
+    },
+    {
+      "minutes": 0.0,
+      "drive_weighted": 0.0444,
+      "drive_fulfillment": 0.0444,
+      "survival_penalty": 1.0,
+      "contribution": 0.0444,
+      "goal_satisfaction": 1.0,
+      "plan_score": null,
+      "state_geomean": 0.0716,
+      "max_state": 26.25
+    },
+    {
+      "minutes": 8.0,
+      "drive_weighted": 0.1556,
+      "drive_fulfillment": 0.1556,
+      "survival_penalty": 1.0,
+      "contribution": 0.1556,
+      "goal_satisfaction": 1.0,
+      "plan_score": null,
+      "state_geomean": 0.0866,
+      "max_state": 28.8
+    }
+  ]
+}

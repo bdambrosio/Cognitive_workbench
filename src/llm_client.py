@@ -104,7 +104,7 @@ class ZenohLLMClient:
         
         try:
             timeout_value = timeout or self.service_timeout
-            result = future.result(timeout=timeout_value)
+            result = future.result(timeout=max(timeout_value, 200.0))
             return result
         except Exception as e:
             return LLMResponse(

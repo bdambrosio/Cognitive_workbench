@@ -39,6 +39,12 @@ if [[ "$IDX" -gt "$TOTAL" ]]; then IDX="$TOTAL"; fi
 render() {
   clear
   echo "[${IDX}/${TOTAL}] file: ${FILE} · mode: ${MODE}"
+  # Brief metrics header (goal_satisfaction, plan_score)
+  if [[ "$MODE" == "text" ]]; then
+    GS=$(sed -n "${IDX}p" "$FILE" | jq -r -f "$DIGEST" --arg mode json 2>/dev/null | jq -r '.goal_satisfaction // "n/a"' 2>/dev/null || echo "n/a")
+    PS=$(sed -n "${IDX}p" "$FILE" | jq -r -f "$DIGEST" --arg mode json 2>/dev/null | jq -r '.summary_score // "n/a"' 2>/dev/null || echo "n/a")
+    echo "goal_satisfaction: ${GS} | plan_score: ${PS}"
+  fi
   echo "────────────────────────────────────────────────────────────"
   sed -n "${IDX}p" "$FILE" | jq -r -f "$DIGEST" --arg mode "$MODE" || echo "(parse error)"
   echo "────────────────────────────────────────────────────────────"

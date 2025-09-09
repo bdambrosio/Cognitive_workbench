@@ -1,0 +1,51 @@
+{
+  "coverage": [
+    {
+      "class_id": "pc-non-specific-or-unbound-scan",
+      "updates": [
+        {
+          "op": "append",
+          "kind": "heuristic",
+          "title": "Always specify concrete scan targets and bind variables before usage"
+        }
+      ]
+    },
+    {
+      "class_id": "pc-goal-mismatch-missing-action",
+      "updates": [
+        {
+          "op": "append",
+          "kind": "heuristic",
+          "title": "Ensure all steps in plan contribute directly to achieving the stated goal"
+        }
+      ]
+    },
+    {
+      "class_id": "pc-inefficient-or-extra-actions",
+      "updates": [
+        {
+          "op": "append",
+          "kind": "heuristic",
+          "title": "Avoid redundant or circular actions; eliminate inefficiencies for direct goal attainment"
+        }
+      ]
+    },
+    {
+      "class_id": "pc-missing-precondition-for-action",
+      "updates": [
+        {
+          "op": "append",
+          "kind": "heuristic",
+          "title": "Check all preconditions are true before performing any action (e.g., be near item before take/use/inspect)"
+        }
+      ]
+    }
+  ],
+  "global_priorities_addressed": [
+    "goal",
+    "strategy",
+    "efficiency",
+    "realism",
+    "validity"
+  ]
+}

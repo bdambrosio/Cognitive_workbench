@@ -17,12 +17,19 @@ from Messages import SystemMessage, UserMessage
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
-# Add dedicated handler for llm_api logger
+# Add dedicated handler for llm_api logger (CWD-agnostic)
 llm_api_logger = logging.getLogger('llm_api')
-llm_api_file_handler = logging.FileHandler('logs/llm_api.log', mode='a')
-llm_api_file_handler.setLevel(logging.INFO)
-llm_api_file_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s', '%Y-%m-%d %H:%M:%S'))
-llm_api_logger.addHandler(llm_api_file_handler)
+try:
+    _log_dir = os.path.join(os.path.dirname(__file__), 'logs')
+    os.makedirs(_log_dir, exist_ok=True)
+    _log_path = os.path.join(_log_dir, 'llm_api.log')
+    llm_api_file_handler = logging.FileHandler(_log_path, mode='a')
+    llm_api_file_handler.setLevel(logging.INFO)
+    llm_api_file_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s', '%Y-%m-%d %H:%M:%S'))
+    llm_api_logger.addHandler(llm_api_file_handler)
+except Exception:
+    # Fall back to default root handlers if file setup fails
+    pass
 llm_api_logger.setLevel(logging.INFO)
 
 # Simple normalization targets (can be tuned per project needs)
@@ -976,11 +983,12 @@ def run_reflection_pipeline_v2(
 def main():
     parser = argparse.ArgumentParser(description='Run planning reflection over saved plan logs (v1) or the new pipeline v2')
     parser.add_argument('--plans', default='data/plans.jsonl', help='Path to plans JSONL file')
+    parser.add_argument('--analysis', default=None, help='Analysis run directory name or path (e.g., Francoise-YYYYMMDD-HHMMSS). Bare names resolve under analysis/.')
     parser.add_argument('--min', dest='min_entries', type=int, default=3, help='Minimum entries required to run review')
     parser.add_argument('--max', dest='max_entries', type=int, default=20, help='Max entries to load from JSONL')
     parser.add_argument('--server', default='openai', help='LLM server name')
     parser.add_argument('--model', default='gpt-4.1', help='LLM model name')
-    parser.add_argument('--v2', action='store_true', help='Run the new multi-stage pipeline v2 (Stage 1 implemented)')
+    parser.add_argument('--v2', action='store_true', default=True, help='Run the new multi-stage pipeline v2 (Stage 1 implemented)')
     parser.add_argument('--microbatch', type=int, default=5, help='Micro-batch size for Stage 1 (v2)')
     parser.add_argument('--seed', type=int, default=None, help='Random seed for micro-batch sampling (v2)')
     parser.add_argument('--s1_out', default='data/reflection_stage1.json', help='Output path for Stage 1 results (v2)')
@@ -997,17 +1005,55 @@ def main():
 
     args = parser.parse_args()
 
-    plan_log = _load_plan_log_from_jsonl(args.plans, max_entries=args.max_entries)
+    # Resolve analysis directory if provided (assumes working dir is src/Metrics)
+    run_dir = None
+    if args.analysis:
+        # Treat bare names as analysis/<name>, otherwise use as path
+        if os.sep in args.analysis or args.analysis.startswith('.') or args.analysis.startswith('/'):
+            run_dir = args.analysis
+        else:
+            run_dir = os.path.join('analysis', args.analysis)
+        if not os.path.isdir(run_dir):
+            logger.error(f"Analysis directory not found: {run_dir}")
+            return
+        # Find exactly one *-plans.jsonl in run_dir
+        candidates = [f for f in os.listdir(run_dir) if f.endswith('-plans.jsonl')]
+        if len(candidates) == 0:
+            logger.error(f"No *-plans.jsonl found in {run_dir}")
+            return
+        if len(candidates) > 1:
+            logger.error(f"Multiple plan files found in {run_dir}: {candidates}. Please specify --plans instead.")
+            return
+        resolved_plans = os.path.join(run_dir, candidates[0])
+        plans_path = resolved_plans
+    else:
+        plans_path = args.plans
+
+    plan_log = _load_plan_log_from_jsonl(plans_path, max_entries=args.max_entries)
 
     # Run new v2 pipeline if requested
     if args.v2 and not args.replan:
+        # Determine output paths: if --analysis provided, write all stage outputs to that directory
+        if run_dir:
+            s1_out = os.path.join(run_dir, 'reflection_stage1.json')
+            s2_out = os.path.join(run_dir, 'reflection_stage2.json')
+            s3_out = os.path.join(run_dir, 'reflection_stage3.json')
+            s4_out = os.path.join(run_dir, 'reflection_stage4.json')
+            s5_out = os.path.join(run_dir, 'reflection_stage5.json')
+        else:
+            s1_out = args.s1_out
+            s2_out = args.s2_out
+            s3_out = args.s3_out
+            s4_out = args.s4_out
+            s5_out = args.s5_out
+
         # Clear Stage 1 output file at the start to prepare for multiple runs/appends
-        if args.s1_out:
+        if s1_out:
             try:
-                dirpath = os.path.dirname(args.s1_out)
+                dirpath = os.path.dirname(s1_out)
                 if dirpath:
                     os.makedirs(dirpath, exist_ok=True)
-                with open(args.s1_out, 'w', encoding='utf-8') as f:
+                with open(s1_out, 'w', encoding='utf-8') as f:
                     f.write("")
             except Exception:
                 pass
@@ -1017,13 +1063,13 @@ def main():
             model_name=args.model,
             microbatch_size=args.microbatch,
             seed=args.seed,
-            s1_output_path=args.s1_out,
+            s1_output_path=s1_out,
             s1_iterations=args.s1_iters,
-            s2_output_path=args.s2_out,
-            s3_output_path=args.s3_out,
+            s2_output_path=s2_out,
+            s3_output_path=s3_out,
             s3_max_updates=args.s3_max,
-            s4_output_path=args.s4_out,
-            s5_output_path=args.s5_out,
+            s4_output_path=s4_out,
+            s5_output_path=s5_out,
         )
         if result:
             # Print Stage 1 output JSON for convenience

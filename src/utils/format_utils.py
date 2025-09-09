@@ -1,7 +1,7 @@
 import json
 from typing import List, Dict, Any
 
-from templates import PHYSIOLOGICAL_NEEDS
+from templates import PHYSIOLOGICAL_STATES
 
 
 def format_views_compact(views: List[Dict[str, Any]]) -> str:
@@ -63,7 +63,7 @@ def format_map_types(map_types: Dict[str, List[str]]) -> str:
         type_str += '\n'.join(map_types['property_types'])+'\n'
     if map_types.get('resource_types'):
         type_str += '\n'.join(map_types['resource_types'])+'\n'
-    type_str += '\n'.join([need['name'] for need in PHYSIOLOGICAL_NEEDS])
+    type_str += '\n'.join([need['name'] for need in PHYSIOLOGICAL_STATES])
     map_types_str += '\n'
 
     return type_str.replace('\n\n','\n')
@@ -72,8 +72,6 @@ def format_map_places(map_types: Dict[str, List[str]]) -> str:
     """Format map types with clean, unescaped quotes for better readability."""
     type_str = ''
     map_types_str = f'\n#Available map places:\n'
-    if map_types.get('terrain_types'):
-        type_str += '\n'.join(map_types['terrain_types'])+'\n'
     if map_types.get('infrastructure_types'):
         type_str += '\n'.join(map_types['infrastructure_types'])+'\n'
     if map_types.get('property_types'):
@@ -85,7 +83,7 @@ def format_map_places(map_types: Dict[str, List[str]]) -> str:
 def format_map_tools(map_types: Dict[str, List[str]]) -> str:
     """Format map types with clean, unescaped quotes for better readability."""
     type_str = ''
-    map_types_str = f'\n#Available map tools:\n'
+    map_types_str = f'\n#Available map resources and tools:\n'
     if map_types.get('property_types'):
         type_str += '\n'.join(map_types['property_types'])+'\n'
  

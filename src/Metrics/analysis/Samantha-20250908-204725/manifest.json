@@ -1,0 +1,16 @@
+{
+  "character_name": "Samantha",
+  "input_path": "/home/bruce/Downloads/Cognitive_workbench/src/data/Samantha-plans.jsonl",
+  "input_basename": "Samantha-plans.jsonl",
+  "input_mtime_utc": "2025-09-08T20:47:25.213749+00:00",
+  "input_sha256": "874091de5ca6b528032481bb7344f012cdcb53258669d8258070c1956f5ec414",
+  "analysis_dir": "/home/bruce/Downloads/Cognitive_workbench/src/Metrics/analysis/Samantha-20250908-204725",
+  "scenario_score_path": "/home/bruce/Downloads/Cognitive_workbench/src/Metrics/analysis/Samantha-20250908-204725/scenario_score.json",
+  "used_digest_jq": false,
+  "digest_cli": null,
+  "compute_cli": [
+    "compute_scenario_score.py",
+    "--character",
+    "Samantha"
+  ]
+}

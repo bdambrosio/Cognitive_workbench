@@ -24,7 +24,7 @@ from templates import PLAN_TEMPLATE, PLAN_VERBS, MIDDLE_ONTOLOGY_TEMPLATE
 from utils.llm_api import LLM
 from activity import load_scenario
 from activity import derive_drive_lexicon
-from templates import PHYSIOLOGICAL_NEEDS
+from templates import PHYSIOLOGICAL_STATES
 
 # Type checking imports
 from typing import TYPE_CHECKING
@@ -67,7 +67,7 @@ llm_client_logger.setLevel(logging.INFO)
 from llm_client import ZenohLLMClient
 
 
-def create_middle_ontology(ontology, llm, map_types, drives):
+def create_middle_ontology(ontology, llm, map_types, resource_type_str, drives, characters):
     map_types_str = format_map_types(map_types)    
     map_places_str = format_map_places(map_types)
     map_tools_str = format_map_tools(map_types)
@@ -78,23 +78,25 @@ def create_middle_ontology(ontology, llm, map_types, drives):
         {"ontology": json.dumps(ontology, indent=2), 
          #"activities": json.dumps(activities, indent=2), 
          "plan_template": PLAN_TEMPLATE, 
-         "primitive_verbs": PLAN_VERBS,
-         "primitive_nouns":  map_types_str, 
-         "primitive_places": map_places_str,
-         "primitive_tools": map_tools_str,
+         "character_names": '\n'.join(characters.keys()),
+         "primitive_verbs": PLAN_VERBS.strip(),
+         "primitive_nouns":  map_types_str.strip()+'\n'+'\n'.join(characters.keys()), 
+         "primitive_places": map_places_str.strip(),
+         "primitive_tools": resource_type_str.strip(),
          "character_drives": drives,
-         "physiological_needs": '\n'.join([need['name'] for need in PHYSIOLOGICAL_NEEDS]),
-         "drive_lexicon": json.dumps(drive_lex, indent=2)},
+         "physiological_states": '\n'.join([need['name'] for need in PHYSIOLOGICAL_STATES]),
+         "drive_lexicon": json.dumps(drive_lex, indent=2).strip()},
         [SystemMessage(content=MIDDLE_ONTOLOGY_TEMPLATE)],
-        max_tokens=10000,
+        max_tokens=20000,
         stops=['</end>'],
         is_json=True,
     )
     #print(response)
     return response
 
-def validate_ontology(ont):
+def validate_ontology(ont, map_types):
     problems = []
+    map_types_str = format_map_types(map_types)
     report = {
         "missing_decomposition_refs": {
             "verbs": [],
@@ -129,13 +131,14 @@ def validate_ontology(ont):
             seq = pat.get("sequence", []) if isinstance(pat, dict) else []
             for ref in seq:
                 if ref not in graph_ids:
-                    # Cross-kind references are invalid; do not treat as missing
-                    if ref in other_ids:
-                        problems.append(f"{kind} {node_id} decomposition references wrong kind {ref}")
-                    else:
-                        problems.append(f"{kind} {node_id} decomposition references missing {ref}")
-                        bucket = "verbs" if kind == "Verb" else "nouns"
-                        report["missing_decomposition_refs"][bucket].append({"owner": node_id, "ref": ref})
+                    if (kind == "Verb" and ref not in PLAN_VERBS) or (kind == "Noun" and ref not in map_types):
+                        # Cross-kind references are invalid; do not treat as missing
+                        if ref in other_ids:
+                            problems.append(f"{kind} {node_id} decomposition references wrong kind {ref}")
+                        else:
+                            problems.append(f"{kind} {node_id} decomposition references missing {ref}")
+                            bucket = "verbs" if kind == "Verb" else "nouns"
+                            report["missing_decomposition_refs"][bucket].append({"owner": node_id, "ref": ref})
 
     for v in ont.get("verbs", {}).get("nodes", []):
         check_decomp(v, verb_ids, noun_ids, "Verb")
@@ -251,7 +254,7 @@ def validate_ontology(ont):
     for nid in noun_leaves:
         node = noun_node_map.get(nid, {})
         anchors = node.get('anchor_types')
-        if not isinstance(anchors, list) or len(anchors) == 0:
+        if (not isinstance(anchors, list) or len(anchors) == 0) and nid not in map_types_str:
             problems.append(f"Noun leaf missing anchor_types: {nid}")
 
     # --- node count sanity ---
@@ -677,7 +680,7 @@ def build_allowed_scan_types(middle_ontology, map_types):
       - Noun ids that ground to at least one resource type (via indices or anchors)
       - Map resource types
       - Terrain and infrastructure types (if available)
-      - Physiological needs
+      - Physiological states
       - Generic 'Person'
     """
     try:
@@ -705,7 +708,7 @@ def build_allowed_scan_types(middle_ontology, map_types):
         res_types = map_types.get('resource_types', []) if isinstance(map_types, dict) else []
         terr_types = map_types.get('terrain_types', []) if isinstance(map_types, dict) else []
         infra_types = map_types.get('infrastructure_types', []) if isinstance(map_types, dict) else []
-        phys_needs_types = [need['name'] for need in PHYSIOLOGICAL_NEEDS]
+        phys_states_types = [need['name'] for need in PHYSIOLOGICAL_STATES]
 
         names = set()
         for s in (allowed_nouns or []):

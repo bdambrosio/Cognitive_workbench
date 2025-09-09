@@ -84,6 +84,7 @@ resource_rules = {
             'count': 100,
             'requires_property': False,
             'remove_on_take': True,   # Can be taken by the player
+            'use': [{"need": 'hunger', "effect": -10}],
             'terrain_weights': {
                 terrain_types.Clearing: 2.0,
                 terrain_types.Meadow: 1.0,
@@ -96,6 +97,7 @@ resource_rules = {
             'count': 100,
             'requires_property': False,
             'remove_on_take': True,   # Can be taken by the player
+            'use': [{"need": 'hunger', "effect": -10}],
             'terrain_weights': {
                 terrain_types.Forest: 2.0
             }
@@ -106,6 +108,7 @@ resource_rules = {
             'count': 50,
             'requires_property': False,
             'remove_on_take': True,   # Can be taken by the player
+            'use': [],
             'terrain_weights': {
                 terrain_types.Forest: 1.0,
                 terrain_types.Clearing: 0.5
@@ -117,6 +120,7 @@ resource_rules = {
             'count': 16,
             'requires_property': False,
             'remove_on_take': True,   # Can be taken by the player
+            'use': [{"need": 'hunger', "effect": -30}],
             'terrain_weights': {
                 terrain_types.Forest: 0.6,
                 terrain_types.Clearing: 1.0
@@ -128,6 +132,7 @@ resource_rules = {
             'count': 30,
             'requires_property': False,
             'remove_on_take': True,   # Can be taken by the player
+            'use': [{"need": 'thirst', "effect": -50}],
             'terrain_weights': {
                 terrain_types.Forest: 1.0
             }
@@ -139,6 +144,7 @@ resource_rules = {
             'count': 1,
             'requires_property': False,
             'remove_on_take': False,   # Can be taken by the player
+            'use': [{"need": 'fatigue', "effect": -40}],
             'terrain_weights': {
                 terrain_types.Mountain: 2.0
             }
@@ -150,6 +156,7 @@ resource_rules = {
             'count': 1,
             'requires_property': False,
             'remove_on_take': False,   # Can be taken by the player
+            'use': [{"need": 'fatigue', "effect": -40}],
             'terrain_weights': {
                 terrain_types.Mountain: 2.0
             }
@@ -160,6 +167,7 @@ resource_rules = {
             'count': 12,
             'requires_property': False,
             'remove_on_take': False,   # Can be taken by the player
+            'use': [{"need": 'fatigue', "effect": 10}],
             'terrain_weights': {
                 terrain_types.Forest: 2.0,
                 terrain_types.Clearing: 1.0

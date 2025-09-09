@@ -3,7 +3,7 @@ from PyQt5.QtWidgets import (QApplication, QTextEdit, QVBoxLayout, QWidget,
                             QPushButton, QDialog, QProgressDialog, QMessageBox,
                             QFileDialog)
 from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QFont
+from PyQt5.QtGui import QFont, QTextCursor
 from pathlib import Path
 import json, requests
 import sys
@@ -67,6 +67,106 @@ def _format_value_clean(value):
         return str(value)
 
 
+def _is_scalar_json(v):
+    return isinstance(v, (str, int, float, bool)) or v is None
+
+
+def _render_json_compact(node, indent=0, indent_step=2):
+    sp = ' ' * indent
+    if isinstance(node, dict):
+        # Leaf dict: all values scalar → single line preserving insertion order
+        if all(_is_scalar_json(v) for v in node.values()):
+            items = [f'"{k}": {json.dumps(v, ensure_ascii=False)}' for k, v in node.items()]
+            return sp + '{' + ', '.join(items) + '}'
+        # Expanded dict
+        parts = [sp + '{']
+        first = True
+        for k, v in node.items():
+            if not first:
+                parts[-1] += ','
+            first = False
+            parts.append(' ' * (indent + indent_step) + f'"{k}": ' + _render_json_compact(v, 0, indent_step).lstrip())
+        parts.append(sp + '}')
+        return '\n'.join(parts)
+    elif isinstance(node, list):
+        # Leaf list: all elements scalar → single line
+        if all(_is_scalar_json(x) for x in node):
+            items = [json.dumps(x, ensure_ascii=False) for x in node]
+            return sp + '[' + ', '.join(items) + ']'
+        # Expanded list
+        parts = [sp + '[']
+        for i, x in enumerate(node):
+            line = _render_json_compact(x, indent + indent_step, indent_step)
+            if i < len(node) - 1:
+                line += ','
+            parts.append(line)
+        parts.append(sp + ']')
+        return '\n'.join(parts)
+    else:
+        return sp + json.dumps(node, ensure_ascii=False)
+
+
+def _format_embedded_json_blocks(text: str) -> str:
+    """Scan text, find JSON objects/arrays outside quotes, and reprint them with custom rules.
+    Safely replaces only spans that json.loads can parse.
+    """
+    n = len(text)
+    i = 0
+    out = []
+    in_str = False
+    esc = False
+    stack = []  # holds opening chars '[' or '{' and start index
+    spans = []
+
+    while i < n:
+        ch = text[i]
+        if in_str:
+            out.append(ch)
+            if esc:
+                esc = False
+            elif ch == '\\':
+                esc = True
+            elif ch == '"':
+                in_str = False
+            i += 1
+            continue
+        else:
+            if ch == '"':
+                in_str = True
+                out.append(ch)
+                i += 1
+                continue
+            if ch in '{[':
+                stack.append((ch, len(out), i))  # remember output buffer index and source index
+                out.append(ch)
+                i += 1
+                continue
+            if ch in '}]' and stack:
+                open_ch, out_pos, src_pos = stack[-1]
+                if (open_ch == '{' and ch == '}') or (open_ch == '[' and ch == ']'):
+                    # tentatively close
+                    out.append(ch)
+                    stack.pop()
+                    if not stack:
+                        # We have a top-level JSON span in out buffer from out_pos to current end
+                        span_text = ''.join(out[out_pos:])
+                        # Try parse this span only
+                        try:
+                            obj = json.loads(span_text)
+                            pretty = _render_json_compact(obj)
+                            # replace segment in out
+                            out = out[:out_pos]
+                            out.append(pretty)
+                        except Exception:
+                            # leave as-is
+                            pass
+                    i += 1
+                    continue
+            out.append(ch)
+            i += 1
+    return ''.join(out)
+
+
 def import_file():
     file_path, _ = QFileDialog.getOpenFileName(
         window,
@@ -85,11 +185,11 @@ def import_file():
 def format_text():
     raw_text = text_edit.toPlainText()
     
-    # First: Apply existing \n literal replacement
-    formatted_text = raw_text.replace("\\t", "\t").replace("\\n", "\n")
+    # First pass: format embedded JSON blocks with custom rules
+    formatted_text = _format_embedded_json_blocks(raw_text)
     
-    # Second: Apply Python structure formatting to improve readability
-    formatted_text = format_python_structure(formatted_text)
+    # Second pass: convert escaped newlines and tabs globally
+    formatted_text = formatted_text.replace("\\t", "\t").replace("\\n", "\n")
     
     text_edit.setPlainText(formatted_text)
 
@@ -131,6 +231,7 @@ text_edit.setPlaceholderText("Paste your text here...")
 text_edit.setTabStopDistance(40)  # Set tab stop distance (in pixels)
 textFont = QFont(); textFont.setPointSize(16)
 text_edit.setFont(textFont)  
+text_edit.setAcceptRichText(False)
 layout.addWidget(text_edit)
 
 # Create a QPushButton to import files
@@ -144,6 +245,30 @@ layout.addWidget(format_button)
 
 # Connect the button's clicked signal to the function
 format_button.clicked.connect(format_text)
+
+# Add simple zoom controls (A+ / A-)
+zoom_in_button = QPushButton("A+")
+layout.addWidget(zoom_in_button)
+
+zoom_out_button = QPushButton("A-")
+layout.addWidget(zoom_out_button)
+
+def _zoom_all(delta: int):
+    try:
+        cur = text_edit.textCursor()
+        sel = QTextCursor(cur)
+        sel.select(QTextCursor.Document)
+        text_edit.setTextCursor(sel)
+        if delta > 0:
+            text_edit.zoomIn(delta)
+        elif delta < 0:
+            text_edit.zoomOut(-delta)
+        text_edit.setTextCursor(cur)
+    except Exception:
+        pass
+
+zoom_in_button.clicked.connect(lambda: _zoom_all(1))
+zoom_out_button.clicked.connect(lambda: _zoom_all(-1))
 
 clear_button = QPushButton("Clear Text")
 layout.addWidget(clear_button)

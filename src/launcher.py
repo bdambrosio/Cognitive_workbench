@@ -152,6 +152,13 @@ class CharacterLauncher:
                 map_args.extend(['-m', map_file, '-w', world_name])
             if setting:
                 map_args.extend(['-s', setting])   
+            # Optional max_turns from env (set via YAML or externally)
+            try:
+                max_turns = os.environ.get('CWB_MAX_TURNS')
+                if max_turns:
+                    map_args.extend(['--max-turns', str(int(max_turns))])
+            except Exception:
+                pass
             # Propagate optional debug flag to disable map turn timeouts
             env = os.environ.copy()
             if env.get('CWB_DEBUG', ''):
@@ -383,6 +390,13 @@ def main():
         # Extract optional map file from YAML (key: 'map')
         yaml_map_file = config_data.get('map')
         setting = config_data.get('setting', {})
+        # Optional: scenario-level max_turns (documented in YAML; can be commented out with #)
+        max_turns_yaml = config_data.get('max_turns', None)
+        if max_turns_yaml is not None:
+            try:
+                os.environ['CWB_MAX_TURNS'] = str(int(max_turns_yaml))
+            except Exception:
+                pass
 
         # Extract characters configuration
         characters_config = config_data.get('characters', [])

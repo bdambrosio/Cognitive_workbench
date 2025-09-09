@@ -1,0 +1,94 @@
+{
+  "classes": [
+    {
+      "class_id": "pc-non-specific-or-unbound-scan",
+      "name": "Non-specific or unbound scan target",
+      "problems": [
+        "s1-1757299144-2228c7:plan-1f055659:p1",
+        "s1-1757299144-2228c7:plan-f943e5b0:p1",
+        "s1-1757299144-2228c7:plan-65f9875d:p1"
+      ],
+      "priorities": [
+        "strategy"
+      ],
+      "urgency": 4
+    },
+    {
+      "class_id": "pc-goal-mismatch-missing-action",
+      "name": "Goal mismatch or missing required action",
+      "problems": [
+        "s1-1757299144-2228c7:plan-84f0d7a8:p1"
+      ],
+      "priorities": [
+        "goal"
+      ],
+      "urgency": 5
+    },
+    {
+      "class_id": "pc-inefficient-or-extra-actions",
+      "name": "Inefficient or unnecessary actions",
+      "problems": [
+        "s1-1757299144-2228c7:plan-60a1c14e:p1",
+        "s1-1757299144-2228c7:plan-3acb8abd:p1",
+        "s1-1757299144-2228c7:plan-7c27dbb8:p1",
+        "s1-1757299144-2228c7:plan-d6f50849:p1"
+      ],
+      "priorities": [
+        "efficiency"
+      ],
+      "urgency": 3
+    },
+    {
+      "class_id": "pc-missing-precondition-for-action",
+      "name": "Missing precondition for action",
+      "problems": [
+        "s1-1757299144-2228c7:plan-4528a96a:p1"
+      ],
+      "priorities": [
+        "strategy"
+      ],
+      "urgency": 4
+    }
+  ],
+  "priority_order": [
+    "goal",
+    "strategy",
+    "efficiency"
+  ],
+  "problem_to_classes": {
+    "s1-1757299144-2228c7:plan-1f055659:p1": [
+      "pc-non-specific-or-unbound-scan"
+    ],
+    "s1-1757299144-2228c7:plan-60a1c14e:p1": [
+      "pc-inefficient-or-extra-actions"
+    ],
+    "s1-1757299144-2228c7:plan-3acb8abd:p1": [
+      "pc-inefficient-or-extra-actions"
+    ],
+    "s1-1757299144-2228c7:plan-65f9875d:p1": [
+      "pc-non-specific-or-unbound-scan"
+    ],
+    "s1-1757299144-2228c7:plan-84f0d7a8:p1": [
+      "pc-goal-mismatch-missing-action"
+    ],
+    "s1-1757299144-2228c7:plan-f943e5b0:p1": [
+      "pc-non-specific-or-unbound-scan"
+    ],
+    "s1-1757299144-2228c7:plan-7c27dbb8:p1": [
+      "pc-inefficient-or-extra-actions"
+    ],
+    "s1-1757299144-2228c7:plan-4528a96a:p1": [
+      "pc-missing-precondition-for-action"
+    ],
+    "s1-1757299144-2228c7:plan-d6f50849:p1": [
+      "pc-inefficient-or-extra-actions"
+    ]
+  },
+  "priority_rank": {
+    "goal": 5,
+    "strategy": 4,
+    "efficiency": 3,
+    "realism": 2,
+    "validity": 1
+  }
+}

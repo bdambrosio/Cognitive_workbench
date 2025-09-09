@@ -5,6 +5,7 @@ import random
 import subprocess
 import time
 import argparse
+import traceback
 import yaml
 from weakref import WeakValueDictionary
 import os, sys
@@ -18,7 +19,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from Messages import SystemMessage
 from utils import hash_utils
 from utils.state_utils import calculate_state_activity_alignment, get_known_states
-from templates import ONTOLOGY_TEMPLATE, MIDDLE_ONTOLOGY_TEMPLATE, ACTIVITIES_TEMPLATE, PLAN_TEMPLATE, PLAN_VERBS
+from templates import DRIVE_ACTIVITY_TEMPLATE, ONTOLOGY_TEMPLATE, MIDDLE_ONTOLOGY_TEMPLATE, ACTIVITIES_TEMPLATE, PLAN_TEMPLATE, PLAN_VERBS
 from utils.format_utils import format_middle_nouns, format_middle_verbs
 # Type checking imports
 from typing import TYPE_CHECKING
@@ -79,7 +80,7 @@ DEFAULT_ACTIVITY = {
 }
 
 
-from templates import PHYSIOLOGICAL_NEEDS, ONTOLOGY_TEMPLATE, ACTIVITIES_TEMPLATE
+from templates import PHYSIOLOGICAL_STATES, ONTOLOGY_TEMPLATE, ACTIVITIES_TEMPLATE
 llm_client = None
 from utils.format_utils import format_map_places, format_map_tools, format_map_types, format_views_compact
 
@@ -115,66 +116,102 @@ def derive_drive_lexicon(character_drives_str: str) -> dict:
     
 
 
-def create_ontology(context, map_types, character_name, character, character_drives, other_characters):
+
+def create_ontology(context, map_types, resource_type_str, character_name, character, character_drives, characters):
     global llm_client
     """Get the ontology for a given setting and character from Zenoh."""
     # Initialize Zenoh session
 
-    if llm_client:  
+    try:  
         map_types_str = format_map_types(map_types)
         map_places_str = format_map_places(map_types)
         map_tools_str = format_map_tools(map_types)
         other_characters_str = ''
-        for other_character_name, other_character_desc in other_characters.items():
+        for other_character_name, other_character_desc in characters.items():
             if other_character_name != character_name:
                 other_characters_str += f"\n\t{other_character_name}: {other_character_desc}"
         
         character_drives_str = '\n'.join(character_drives)   
-
+        character_names = list(characters.keys())
+        drives = character_drives.copy()
+        physiological_drives = ["""Maintain hydration — avoid thirst and keep the body supplied with fluids.""", 
+        """Maintain alertness — avoid fatigue and keep the body rested.""", 
+        """Maintain energy — avoid hunger and keep the body supplied with nutrients."""]
+        drives.extend(physiological_drives)
         # Static, scenario-invariant physiological needs block
 
-        # Derive a small drive lexicon from drives
-        drive_lex = derive_drive_lexicon(character_drives_str)
-
-        response = llm_client.ask({"setting": context, 
+        drive_activities = []
+        final_activities = []; verbs = []; nouns = []; noun_mappings = {}
+        for drive in drives:
+            activity = llm_client.ask({"setting": context, 
                                    "character_name": character_name,
                                    "character": character, 
-                                   "character_drives": character_drives_str, 
+                                   "drive_statement": drive.strip(), 
                                    "states": get_known_states(),
                                    "other_characters": other_characters_str, 
-                                   "primitive_nouns": map_types_str,
-                                   "primitive_verbs": PLAN_VERBS,
-                                   "primitive_places": map_places_str,
-                                   "primitive_tools": map_tools_str,
-                                   "physiological_needs": json.dumps(PHYSIOLOGICAL_NEEDS, indent=2),
-                                   "drive_lexicon": json.dumps(drive_lex, indent=2)},
-                    [SystemMessage(content=ONTOLOGY_TEMPLATE)],
-                    max_tokens=10000,
+                                   "character_names": '\n'.join(character_names),
+                                   "primitive_nouns": map_types_str.strip(),
+                                   "primitive_verbs": PLAN_VERBS.strip(),
+                                   "primitive_places": map_places_str.strip(),
+                                   "primitive_tools": resource_type_str.strip()},
+                   [SystemMessage(content=DRIVE_ACTIVITY_TEMPLATE)],
+                    max_tokens=1000,
                     temp=0.7,
                     stops=['</end>'],
                     is_json=True,
-                    log=True
+                    #log=True
                 )
 
-    if type(response) == dict:
-        response['time_windows'] = ['dawn', 'morning', 'afternoon', 'dusk', 'evening', 'day', 'night']
-        print(f'🤖  Activity taxonomy: \n{response}')
-        return response
-    else:
-        print(f'❌ Failed to get ontology: {response}')
+            logger.info(f"Drive: {activity['drive']}")
+            for axis in activity['axes']:
+                logger.info(f"Axis {axis['axis']}: Activity: {axis['activity_itemclass']['activity']}, ItemClass: {axis['activity_itemclass']['itemclass']}")
+                if not axis['subtypes_included']:
+                    logger.info(f"No base nouns usable for this activity in the closed world")
+                else:
+                    logger.info(f"Base nouns usable for this activity in the closed world: {axis['subtypes_included']}")
+                    activity = {}
+                    activity['axis'] = axis['axis']
+                    activity['drive'] = drive
+                    activity['activity_itemclass'] = axis['activity_itemclass']
+                    activity['subtypes_included'] = axis['subtypes_included']
+                    final_activities.append(activity)
+                    verb = axis['activity_itemclass']['activity']
+                    if verb not in verbs:
+                        verbs.append(verb)
+                    noun = axis['activity_itemclass']['itemclass']
+                    if noun not in nouns:
+                        nouns.append(noun)
+                    if noun not in noun_mappings:
+                        noun_mappings[noun] = axis['subtypes_included']
+                    else:
+                        for base_type in axis['subtypes_included']:
+                            if base_type not in noun_mappings[noun]:
+                                noun_mappings[noun].append(base_type)
+        
+        ontology = {"activities": final_activities, "verbs": verbs, "nouns": nouns, "noun_mappings": noun_mappings}
+        return ontology
+
+    except Exception as e:
+        traceback.print_exc()
+        print(f'❌ Failed to get ontology: {e}')
         return None
 
-def create_activities(context, map_types, character_name, character, character_drives, other_characters, ontology, middle_ontology):
+
+
+def create_activities(context, map_types, character_name, character, character_drives, characters, ontology, middle_ontology):
 
     other_characters_str = ''
-    for other_character_name, other_character_desc in other_characters.items():
+    for other_character_name, other_character_desc in characters.items():
         if other_character_name != character_name:
             other_characters_str += f"\n\t{other_character_name}: {other_character_desc}"
 
     character_drives_str = '\n'.join(character_drives)
-    middle_nouns_str = format_middle_nouns(middle_ontology)
-    middle_verbs_str = format_middle_verbs(middle_ontology)
-
+    #middle_nouns_str = format_middle_nouns(middle_ontology)
+    #middle_verbs_str = format_middle_verbs(middle_ontology)
+    middle_nouns_str = '\n'.join(ontology['nouns'])
+    middle_verbs_str = '\n'.join(ontology['verbs'])
+    ontology_activities_str = json.dumps(ontology['activities'], indent=2)
+    character_names = list(characters.keys())
     if llm_client:
         map_types_str = format_map_types(map_types)    
 
@@ -182,17 +219,16 @@ def create_activities(context, map_types, character_name, character, character_d
                                    "character_name": character_name,
                                    "character_drives": character_drives_str, 
                                    "states": get_known_states(),
-                                   "other_characters": other_characters_str, 
-                                   "ontology": json.dumps(ontology, indent=2),
-                                   #"middle_ontology": json.dumps(middle_ontology, indent=2),
-                                   "middle_nouns": middle_nouns_str,
-                                   "middle_verbs": middle_verbs_str,
+                                   "character_names": character_names,
+                                   "ontology-activities": json.dumps(ontology['activities'], indent=2),
+                                   "ontology_nouns": middle_nouns_str,
+                                   "ontology_verbs": middle_verbs_str,
                                    "plan_template": PLAN_TEMPLATE,
                                    "primitive_nouns": map_types_str,
                                    "primitive_verbs": PLAN_VERBS,
                                    "setting": context},
                     [SystemMessage(content=ACTIVITIES_TEMPLATE)],
-                    max_tokens=6000,
+                    max_tokens=8000,
                     temp=0.7,
                     stops=['</end>'],
                     is_json=True,
@@ -266,6 +302,9 @@ class ActivityManager:
     def _format_situation_data(self):
         """Build structured situation data for activity selection"""
         situation = {}
+
+        if hasattr(self.executive_node, 'self_state') and self.executive_node.self_state:
+            situation['character_state'] = self.executive_node.self_state
         
         # Use the same data source as format_situation: last_situation_data
         if hasattr(self.executive_node, 'last_situation_data') and self.executive_node.last_situation_data:
@@ -547,24 +586,29 @@ class ActivityManager:
     
     def _location_compatible(self, activity, situation):
         """Check if current location supports activity"""
-        current_terrain = situation.get('current_location', {}).get('terrain', '')
-        current_property = situation.get('current_location', {}).get('property', '')
+        #
+        if activity.get('steps', []) and 'move' in activity.get('steps', [])[0]:
+            return True
         views = situation.get('views', {})
         valid_locations = activity.get('where', []) or []
         if not isinstance(valid_locations, list):
             return False
 
         for location in valid_locations: 
-            if location in self.executive_node.middle_ontology.get('nouns', {}).get('nodes', []):
-                anchor_types  = self.executive_node.middle_ontology.get('nouns', {}).get('nodes', []).get('anchor_types', [])
+            if location in self.executive_node.ontology.get('nouns', {}):
+                anchor_types  = self.executive_node.ontology.get('noun_mappings', {}).get('noun', [])
                 if anchor_types:
                     for anchor_type in anchor_types:
                         if anchor_type not in valid_locations:
                             valid_locations.append(anchor_type)
-            
+        
+        # valid locations now includes all declared nouns and all their base types.
+
         # Build candidate primitive types at Current
         candidate_primitives = set()
         try:
+            current_terrain = situation.get('current_location', {}).get('terrain', '')
+            current_property = situation.get('current_location', {}).get('property', '')
             terrain = (current_terrain or '').strip()
             property = (current_property or '').strip()
             if terrain:
@@ -595,32 +639,13 @@ class ActivityManager:
             except Exception:
                 pass
             # Paths/infrastructure: include a single generic 'path' if any present
-            try:
-                if current_view.get('paths'):
-                    candidate_primitives.add('path')
-            except Exception:
-                pass
+            if current_view.get('paths'):
+                candidate_primitives.add('path')
 
         # Map primitives -> nouns via indices if available (executive_node caches middle_ontology)
         candidate_nouns = set()
-        try:
-            middle_ontology = getattr(self.executive_node, 'middle_ontology', {})
-            scan_idx = (middle_ontology.get('indices', {}) or {}).get('noun', {}) if isinstance(middle_ontology, dict) else {}
-            mt_to_nouns = scan_idx.get('map_type_to_nouns', {}) if isinstance(scan_idx, dict) else {}
-            noun_to_map = scan_idx.get('noun_to_map_types', {}) if isinstance(scan_idx, dict) else {}
-            # reverse match: any primitive that appears as a map_type key maps to nouns
-            for prim in list(candidate_primitives):
-                # Case-insensitive keys: check both exact and capitalized
-                candidates_keys = [prim, prim.capitalize()]
-                for key in candidates_keys:
-                    nouns = mt_to_nouns.get(key)
-                    if isinstance(nouns, list):
-                        for nid in nouns:
-                            if isinstance(nid, str) and nid:
-                                candidate_nouns.add(nid.lower())
-        except Exception:
-            scan_idx = {}
-            noun_to_map = {}
+        ontology = getattr(self.executive_node, 'ontology', {})
+        noun_mappings = ontology.get('noun_mappings', {})
 
         # Prepare valid_locations lowercase set
         want = {str(x).lower() for x in valid_locations if isinstance(x, (str,))}
@@ -628,7 +653,7 @@ class ActivityManager:
         # Early guard: if any where-term is neither a known noun id nor a map_type,
         # allow and warn ONLY if it does not contain any known map_type substring
         try:
-            noun_ids_lc = {str(k).lower() for k in (noun_to_map.keys() if isinstance(noun_to_map, dict) else [])}
+            noun_ids_lc = {str(k).lower() for k in (noun_mappings.keys() if isinstance(noun_mappings, dict) else [])}
             mt_sets = []
             if isinstance(self.map_types, dict):
                 for key in ('resource_types', 'terrain_types', 'infrastructure_types', 'property_types'):
@@ -643,7 +668,8 @@ class ActivityManager:
                     if not contains_any_mt:
                         logger.warning(f"_location_compatible: unknown where term '{u}' has no known map_type substring; treating as compatible")
                         return True
-        except Exception:
+        except Exception as e:
+            logger.warning(f"_location_compatible: {e}")
             pass
 
         # Direct primitive match or noun match is acceptable
@@ -657,7 +683,8 @@ class ActivityManager:
                 for prim in candidate_primitives:
                     if prim and prim in w:
                         return True
-        except Exception:
+        except Exception as e:
+            logger.warning(f"_score_contextual_alignment: {e}")
             pass
 
         return False
@@ -729,12 +756,18 @@ Instantiate the steps for this activity:
 ##
 
 In the following context:
-#Context:
-Character: {self.executive_node.character_name}\n
+
+#Character: {self.executive_node.character_name}\n
 {self.executive_node.character_config['character']}\n
 Drives: {self.executive_node.character_config['drives']}\n
-Other characters present: {situation.get('characters', [])}\n
+Physiological state: {self.executive_node.self_state}\n
+##
 
+#Other characters present: 
+{situation.get('characters', [])}\n
+##
+
+#Setting:
 Resources available: {self._summarize_resources(situation)}
 Time: {situation.get('time_info', {})}
 Weather: {situation.get('weather', 'unknown')}
@@ -743,10 +776,11 @@ Visible resources: {self._summarize_resources(situation)}
 Views (compact, one JSON object per line):\n{situation.get('views_compact', '')}
 
 #You have two tasks:
-#Your first task is to evaluate how well this activity serves the character's drives.
+#Your first task is to evaluate how well this activity serves the character's physiological states and character drives.
 Character drives: {self.executive_node.character_config['drives']}
 
-Rate 0-1 how well this activity serves the character's drives.
+Rate 0-1 how well this activity serves the character's physiological states and drives. 
+A Physiological state is a priority when its value is over 60, and the sole concern  when its value is over 90.
 If the activity serves all the character's drives completely, return a drive score of 1.0.
 If the activity serves none of the character's drives in any way, return a drive score of 0.0.
 Otherwise, compute a drive score between 0.0 and 1.0 based on how well the activity serves the character's drives.
@@ -867,11 +901,11 @@ End with </end>.
         #    return False, "Duration limit reached"
         
         # Check if character needs are satisfied
-        if self._needs_satisfied(situation):
+        if self._states_satisfied(situation):
             # Record state delta for satisfied needs
             end_state = self.executive_node.self_state.copy() if hasattr(self.executive_node, 'self_state') else None
-            self._record_state_delta('needs_satisfied', end_state)
-            return False, "Character needs satisfied"
+            self._record_state_delta('states_satisfied', end_state)
+            return False, "Character states satisfied"
         
         # Activity should continue
         return True, "Activity continuing"
@@ -935,12 +969,12 @@ End with </end>.
         
         return False
     
-    def _needs_satisfied(self, situation):
-        """Check if the character's needs that led to this activity are satisfied"""
+    def _states_satisfied(self, situation):
+        """Check if the character's states that led to this activity are satisfied"""
         # This is a simplified check - in practice, you'd track what need the activity was addressing
-        if 'addressing_need' in self.current_activity:
-            need = self.current_activity['addressing_need']
-            return self._need_satisfied(need, situation)
+        if 'addressing_state' in self.current_activity:
+            state = self.current_activity['addressing_state']
+            return self._state_satisfied(state, situation)
         
         return False
     

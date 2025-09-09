@@ -1,0 +1,628 @@
+{
+  "file": "../data/Jean-plans.jsonl",
+  "used_digest_jq": false,
+  "total_plans": 76,
+  "total_minutes": 274.0,
+  "drive_dimensions": 4,
+  "weights_last_fraction": 0.5,
+  "survival_params": {
+    "soft_start": 70.0,
+    "danger": 80.0,
+    "hard": 100.0
+  },
+  "goal_sat_weight": 0.0,
+  "avg_goal_satisfaction": null,
+  "avg_drive_fulfillment": 0.1279,
+  "scenario_score_base": 0.1279,
+  "scenario_score_final": 0.1279,
+  "per_plan": [
+    {
+      "minutes": 10.0,
+      "drive_weighted": 0.2222,
+      "survival_penalty": 1.0,
+      "contribution": 0.2222,
+      "goal_satisfaction": 1.0,
+      "max_state": 49.3
+    },
+    {
+      "minutes": 5.0,
+      "drive_weighted": 0.1167,
+      "survival_penalty": 1.0,
+      "contribution": 0.1167,
+      "goal_satisfaction": 1.0,
+      "max_state": 50.5
+    },
+    {
+      "minutes": 0.0,
+      "drive_weighted": 0.0833,
+      "survival_penalty": 1.0,
+      "contribution": 0.0833,
+      "goal_satisfaction": 0.0,
+      "max_state": 14.7
+    },
+    {
+      "minutes": 2.0,
+      "drive_weighted": 0.0833,
+      "survival_penalty": 1.0,
+      "contribution": 0.0833,
+      "goal_satisfaction": 1.0,
+      "max_state": 15.2
+    },
+    {
+      "minutes": 5.0,
+      "drive_weighted": 0.1167,
+      "survival_penalty": 1.0,
+      "contribution": 0.1167,
+      "goal_satisfaction": 1.0,
+      "max_state": 18.35
+    },
+    {
+      "minutes": 6.0,
+      "drive_weighted": 0.0833,
+      "survival_penalty": 1.0,
+      "contribution": 0.0833,
+      "goal_satisfaction": 1.0,
+      "max_state": 18.95
+    },
+    {
+      "minutes": 0.0,
+      "drive_weighted": 0.1556,
+      "survival_penalty": 1.0,
+      "contribution": 0.1556,
+      "goal_satisfaction": 0.8,
+      "max_state": 25.85
+    },
+    {
+      "minutes": 1.0,
+      "drive_weighted": 0.1,
+      "survival_penalty": 1.0,
+      "contribution": 0.1,
+      "goal_satisfaction": 0.0,
+      "max_state": 26.75
+    },
+    {
+      "minutes": 1.0,
+      "drive_weighted": 0.1,
+      "survival_penalty": 1.0,
+      "contribution": 0.1,
+      "goal_satisfaction": 0.0,
+      "max_state": 28.25
+    },
+    {
+      "minutes": 0.0,
+      "drive_weighted": 0.1556,
+      "survival_penalty": 1.0,
+      "contribution": 0.1556,
+      "goal_satisfaction": 0.5,
+      "max_state": 29.75
+    },
+    {
+      "minutes": 1.0,
+      "drive_weighted": 0.1556,
+      "survival_penalty": 1.0,
+      "contribution": 0.1556,
+      "goal_satisfaction": 0.0,
+      "max_state": 36.95
+    },
+    {
+      "minutes": 0.0,
+      "drive_weighted": 0.1222,
+      "survival_penalty": 1.0,
+      "contribution": 0.1222,
+      "goal_satisfaction": 1.0,
+      "max_state": 40.55
+    },
+    {
+      "minutes": 8.0,
+      "drive_weighted": 0.1222,
+      "survival_penalty": 1.0,
+      "contribution": 0.1222,
+      "goal_satisfaction": 1.0,
+      "max_state": 42.35
+    },
+    {
+      "minutes": 5.0,
+      "drive_weighted": 0.1222,
+      "survival_penalty": 1.0,
+      "contribution": 0.1222,
+      "goal_satisfaction": 0.2,
+      "max_state": 46.25
+    },
+    {
+      "minutes": 6.0,
+      "drive_weighted": 0.1167,
+      "survival_penalty": 1.0,
+      "contribution": 0.1167,
+      "goal_satisfaction": 1.0,
+      "max_state": 50.45
+    },
+    {
+      "minutes": 1.0,
+      "drive_weighted": 0.1,
+      "survival_penalty": 1.0,
+      "contribution": 0.1,
+      "goal_satisfaction": 0.0,
+      "max_state": 31.35
+    },
+    {
+      "minutes": 1.0,
+      "drive_weighted": 0.1167,
+      "survival_penalty": 1.0,
+      "contribution": 0.1167,
+      "goal_satisfaction": 1.0,
+      "max_state": 31.85
+    },
+    {
+      "minutes": 6.0,
+      "drive_weighted": 0.2389,
+      "survival_penalty": 1.0,
+      "contribution": 0.2389,
+      "goal_satisfaction": 0.6,
+      "max_state": 34.5
+    },
+    {
+      "minutes": 0.0,
+      "drive_weighted": 0.1556,
+      "survival_penalty": 1.0,
+      "contribution": 0.1556,
+      "goal_satisfaction": 1.0,
+      "max_state": 37.3
+    },
+    {
+      "minutes": 4.0,
+      "drive_weighted": 0.1556,
+      "survival_penalty": 1.0,
+      "contribution": 0.1556,
+      "goal_satisfaction": 1.0,
+      "max_state": 38.1
+    },
+    {
+      "minutes": 0.0,
+      "drive_weighted": 0.1556,
+      "survival_penalty": 1.0,
+      "contribution": 0.1556,
+      "goal_satisfaction": 1.0,
+      "max_state": 38.6
+    },
+    {
+      "minutes": 10.0,
+      "drive_weighted": 0.1222,
+      "survival_penalty": 1.0,
+      "contribution": 0.1222,
+      "goal_satisfaction": 1.0,
+      "max_state": 41.6
+    },
+    {
+      "minutes": 5.0,
+      "drive_weighted": 0.1222,
+      "survival_penalty": 1.0,
+      "contribution": 0.1222,
+      "goal_satisfaction": 0.0,
+      "max_state": 42.9
+    },
+    {
+      "minutes": 0.0,
+      "drive_weighted": 0.0833,
+      "survival_penalty": 1.0,
+      "contribution": 0.0833,
+      "goal_satisfaction": 0.0,
+      "max_state": 44.1
+    },
+    {
+      "minutes": 5.0,
+      "drive_weighted": 0.0,
+      "survival_penalty": 1.0,
+      "contribution": 0.0,
+      "goal_satisfaction": 1.0,
+      "max_state": 48.0
+    },
+    {
+      "minutes": 0.0,
+      "drive_weighted": 0.1667,
+      "survival_penalty": 1.0,
+      "contribution": 0.1667,
+      "goal_satisfaction": 0.0,
+      "max_state": 0.0
+    },
+    {
+      "minutes": 0.0,
+      "drive_weighted": 0.1667,
+      "survival_penalty": 1.0,
+      "contribution": 0.1667,
+      "goal_satisfaction": 0.5,
+      "max_state": 0.0
+    },
+    {
+      "minutes": 1.0,
+      "drive_weighted": 0.1556,
+      "survival_penalty": 1.0,
+      "contribution": 0.1556,
+      "goal_satisfaction": 1.0,
+      "max_state": 6.0
+    },
+    {
+      "minutes": 6.0,
+      "drive_weighted": 0.1222,
+      "survival_penalty": 1.0,
+      "contribution": 0.1222,
+      "goal_satisfaction": 1.0,
+      "max_state": 0.6
+    },
+    {
+      "minutes": 0.0,
+      "drive_weighted": 0.0667,
+      "survival_penalty": 1.0,
+      "contribution": 0.0667,
+      "goal_satisfaction": 0.0,
+      "max_state": 6.6
+    },
+    {
+      "minutes": 1.0,
+      "drive_weighted": 0.0333,
+      "survival_penalty": 1.0,
+      "contribution": 0.0333,
+      "goal_satisfaction": 0.0,
+      "max_state": 7.5
+    },
+    {
+      "minutes": 0.0,
+      "drive_weighted": 0.0333,
+      "survival_penalty": 1.0,
+      "contribution": 0.0333,
+      "goal_satisfaction": 0.0,
+      "max_state": 15.3
+    },
+    {
+      "minutes": 7.0,
+      "drive_weighted": 0.1222,
+      "survival_penalty": 1.0,
+      "contribution": 0.1222,
+      "goal_satisfaction": 1.0,
+      "max_state": 22.2
+    },
+    {
+      "minutes": 0.0,
+      "drive_weighted": 0.1556,
+      "survival_penalty": 1.0,
+      "contribution": 0.1556,
+      "goal_satisfaction": 1.0,
+      "max_state": 41.5
+    },
+    {
+      "minutes": 1.0,
+      "drive_weighted": 0.1222,
+      "survival_penalty": 1.0,
+      "contribution": 0.1222,
+      "goal_satisfaction": 0.0,
+      "max_state": 43.6
+    },
+    {
+      "minutes": 5.0,
+      "drive_weighted": 0.1167,
+      "survival_penalty": 1.0,
+      "contribution": 0.1167,
+      "goal_satisfaction": 1.0,
+      "max_state": 50.5
+    },
+    {
+      "minutes": 5.0,
+      "drive_weighted": 0.1167,
+      "survival_penalty": 1.0,
+      "contribution": 0.1167,
+      "goal_satisfaction": 1.0,
+      "max_state": 14.8
+    },
+    {
+      "minutes": 1.0,
+      "drive_weighted": 0.1167,
+      "survival_penalty": 1.0,
+      "contribution": 0.1167,
+      "goal_satisfaction": 0.0,
+      "max_state": 15.9
+    },
+    {
+      "minutes": 8.0,
+      "drive_weighted": 0.1333,
+      "survival_penalty": 1.0,
+      "contribution": 0.1333,
+      "goal_satisfaction": 1.0,
+      "max_state": 16.75
+    },
+    {
+      "minutes": 5.0,
+      "drive_weighted": 0.1167,
+      "survival_penalty": 1.0,
+      "contribution": 0.1167,
+      "goal_satisfaction": 1.0,
+      "max_state": 20.55
+    },
+    {
+      "minutes": 1.0,
+      "drive_weighted": 0.1167,
+      "survival_penalty": 1.0,
+      "contribution": 0.1167,
+      "goal_satisfaction": 1.0,
+      "max_state": 21.75
+    },
+    {
+      "minutes": 1.0,
+      "drive_weighted": 0.1167,
+      "survival_penalty": 1.0,
+      "contribution": 0.1167,
+      "goal_satisfaction": 1.0,
+      "max_state": 22.95
+    },
+    {
+      "minutes": 4.0,
+      "drive_weighted": 0.1167,
+      "survival_penalty": 1.0,
+      "contribution": 0.1167,
+      "goal_satisfaction": 1.0,
+      "max_state": 26.8
+    },
+    {
+      "minutes": 1.0,
+      "drive_weighted": 0.1167,
+      "survival_penalty": 1.0,
+      "contribution": 0.1167,
+      "goal_satisfaction": 1.0,
+      "max_state": 27.9
+    },
+    {
+      "minutes": 9.0,
+      "drive_weighted": 0.1167,
+      "survival_penalty": 1.0,
+      "contribution": 0.1167,
+      "goal_satisfaction": 1.0,
+      "max_state": 29.7
+    },
+    {
+      "minutes": 14.0,
+      "drive_weighted": 0.0833,
+      "survival_penalty": 1.0,
+      "contribution": 0.0833,
+      "goal_satisfaction": 1.0,
+      "max_state": 31.7
+    },
+    {
+      "minutes": 6.0,
+      "drive_weighted": 0.1,
+      "survival_penalty": 1.0,
+      "contribution": 0.1,
+      "goal_satisfaction": 1.0,
+      "max_state": 41.45
+    },
+    {
+      "minutes": 1.0,
+      "drive_weighted": 0.1222,
+      "survival_penalty": 1.0,
+      "contribution": 0.1222,
+      "goal_satisfaction": 0.0,
+      "max_state": 43.25
+    },
+    {
+      "minutes": 4.0,
+      "drive_weighted": 0.1556,
+      "survival_penalty": 1.0,
+      "contribution": 0.1556,
+      "goal_satisfaction": 1.0,
+      "max_state": 47.45
+    },
+    {
+      "minutes": 1.0,
+      "drive_weighted": 0.1167,
+      "survival_penalty": 1.0,
+      "contribution": 0.1167,
+      "goal_satisfaction": 1.0,
+      "max_state": 59.85
+    },
+    {
+      "minutes": 1.0,
+      "drive_weighted": 0.2556,
+      "survival_penalty": 1.0,
+      "contribution": 0.2556,
+      "goal_satisfaction": 0.0,
+      "max_state": 11.6
+    },
+    {
+      "minutes": 1.0,
+      "drive_weighted": 0.0667,
+      "survival_penalty": 1.0,
+      "contribution": 0.0667,
+      "goal_satisfaction": 0.0,
+      "max_state": 15.25
+    },
+    {
+      "minutes": 5.0,
+      "drive_weighted": 0.1,
+      "survival_penalty": 1.0,
+      "contribution": 0.1,
+      "goal_satisfaction": 0.0,
+      "max_state": 16.45
+    },
+    {
+      "minutes": 5.0,
+      "drive_weighted": 0.1167,
+      "survival_penalty": 1.0,
+      "contribution": 0.1167,
+      "goal_satisfaction": 1.0,
+      "max_state": 14.5
+    },
+    {
+      "minutes": 6.0,
+      "drive_weighted": 0.1167,
+      "survival_penalty": 1.0,
+      "contribution": 0.1167,
+      "goal_satisfaction": 1.0,
+      "max_state": 17.6
+    },
+    {
+      "minutes": 3.0,
+      "drive_weighted": 0.1167,
+      "survival_penalty": 1.0,
+      "contribution": 0.1167,
+      "goal_satisfaction": 1.0,
+      "max_state": 19.2
+    },
+    {
+      "minutes": 3.0,
+      "drive_weighted": 0.1167,
+      "survival_penalty": 1.0,
+      "contribution": 0.1167,
+      "goal_satisfaction": 1.0,
+      "max_state": 20.3
+    },
+    {
+      "minutes": 1.0,
+      "drive_weighted": 0.1167,
+      "survival_penalty": 1.0,
+      "contribution": 0.1167,
+      "goal_satisfaction": 1.0,
+      "max_state": 20.8
+    },
+    {
+      "minutes": 5.0,
+      "drive_weighted": 0.1167,
+      "survival_penalty": 1.0,
+      "contribution": 0.1167,
+      "goal_satisfaction": 1.0,
+      "max_state": 21.3
+    },
+    {
+      "minutes": 0.0,
+      "drive_weighted": 0.1556,
+      "survival_penalty": 1.0,
+      "contribution": 0.1556,
+      "goal_satisfaction": 0.5,
+      "max_state": 23.4
+    },
+    {
+      "minutes": 6.0,
+      "drive_weighted": 0.1556,
+      "survival_penalty": 1.0,
+      "contribution": 0.1556,
+      "goal_satisfaction": 1.0,
+      "max_state": 23.7
+    },
+    {
+      "minutes": 6.0,
+      "drive_weighted": 0.2389,
+      "survival_penalty": 1.0,
+      "contribution": 0.2389,
+      "goal_satisfaction": 0.9,
+      "max_state": 30.1
+    },
+    {
+      "minutes": 1.0,
+      "drive_weighted": 0.2389,
+      "survival_penalty": 1.0,
+      "contribution": 0.2389,
+      "goal_satisfaction": 0.0,
+      "max_state": 31.3
+    },
+    {
+      "minutes": 15.0,
+      "drive_weighted": 0.1,
+      "survival_penalty": 1.0,
+      "contribution": 0.1,
+      "goal_satisfaction": 1.0,
+      "max_state": 38.65
+    },
+    {
+      "minutes": 1.0,
+      "drive_weighted": 0.1167,
+      "survival_penalty": 1.0,
+      "contribution": 0.1167,
+      "goal_satisfaction": 1.0,
+      "max_state": 50.05
+    },
+    {
+      "minutes": 13.0,
+      "drive_weighted": 0.1333,
+      "survival_penalty": 1.0,
+      "contribution": 0.1333,
+      "goal_satisfaction": 1.0,
+      "max_state": 29.15
+    },
+    {
+      "minutes": 4.0,
+      "drive_weighted": 0.1333,
+      "survival_penalty": 1.0,
+      "contribution": 0.1333,
+      "goal_satisfaction": 1.0,
+      "max_state": 22.15
+    },
+    {
+      "minutes": 4.0,
+      "drive_weighted": 0.1333,
+      "survival_penalty": 1.0,
+      "contribution": 0.1333,
+      "goal_satisfaction": 1.0,
+      "max_state": 30.45
+    },
+    {
+      "minutes": 7.0,
+      "drive_weighted": 0.1167,
+      "survival_penalty": 1.0,
+      "contribution": 0.1167,
+      "goal_satisfaction": 1.0,
+      "max_state": 32.55
+    },
+    {
+      "minutes": 5.0,
+      "drive_weighted": 0.1167,
+      "survival_penalty": 1.0,
+      "contribution": 0.1167,
+      "goal_satisfaction": 1.0,
+      "max_state": 12.7
+    },
+    {
+      "minutes": 5.0,
+      "drive_weighted": 0.1167,
+      "survival_penalty": 1.0,
+      "contribution": 0.1167,
+      "goal_satisfaction": 1.0,
+      "max_state": 13.9
+    },
+    {
+      "minutes": 5.0,
+      "drive_weighted": 0.2556,
+      "survival_penalty": 1.0,
+      "contribution": 0.2556,
+      "goal_satisfaction": 1.0,
+      "max_state": 16.8
+    },
+    {
+      "minutes": 0.0,
+      "drive_weighted": 0.1167,
+      "survival_penalty": 1.0,
+      "contribution": 0.1167,
+      "goal_satisfaction": 0.0,
+      "max_state": 17.2
+    },
+    {
+      "minutes": 1.0,
+      "drive_weighted": 0.1222,
+      "survival_penalty": 1.0,
+      "contribution": 0.1222,
+      "goal_satisfaction": 0.0,
+      "max_state": 17.5
+    },
+    {
+      "minutes": 3.0,
+      "drive_weighted": 0.1556,
+      "survival_penalty": 1.0,
+      "contribution": 0.1556,
+      "goal_satisfaction": 0.0,
+      "max_state": 18.1
+    },
+    {
+      "minutes": 4.0,
+      "drive_weighted": 0.1333,
+      "survival_penalty": 1.0,
+      "contribution": 0.1333,
+      "goal_satisfaction": 1.0,
+      "max_state": 20.1
+    }
+  ]
+}
