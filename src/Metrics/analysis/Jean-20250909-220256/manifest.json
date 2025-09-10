@@ -1,0 +1,16 @@
+{
+  "character_name": "Jean",
+  "input_path": "/home/bruce/Downloads/Cognitive_workbench/src/data/Jean-plans.jsonl",
+  "input_basename": "Jean-plans.jsonl",
+  "input_mtime_utc": "2025-09-09T22:02:56.436867+00:00",
+  "input_sha256": "868d1cff085bdd8100678117aed9b321f777a1dd351443f7a9721053d6d06242",
+  "analysis_dir": "/home/bruce/Downloads/Cognitive_workbench/src/Metrics/analysis/Jean-20250909-220256",
+  "scenario_score_path": "/home/bruce/Downloads/Cognitive_workbench/src/Metrics/analysis/Jean-20250909-220256/scenario_score.json",
+  "used_digest_jq": false,
+  "digest_cli": null,
+  "compute_cli": [
+    "compute_scenario_score.py",
+    "--character",
+    "Jean"
+  ]
+}

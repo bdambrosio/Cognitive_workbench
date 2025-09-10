@@ -15,7 +15,6 @@ from typing import Any, Dict, List
 from utils.llm_api import LLM
 from Messages import SystemMessage, UserMessage
 from templates import PLAN_TEMPLATE, PHYSIOLOGICAL_STATES
-from middle_ontology import build_allowed_scan_types, build_allowed_verbs
 # Type checking imports
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
@@ -669,21 +668,7 @@ def generate_plan_with_context(
     """
     llm = LLM(server_name=server_name, model_name=model_name)
     try:
-        """
-        from middle_ontology import rewrite_goal
-        finished_rewriting = False
-        iterations = 0
-        allowed_types = build_allowed_scan_types(character.middle_ontology, character.map_types)
-        allowed_verbs = build_allowed_verbs(character.middle_ontology)
-        rewritten_goal = rewrite_goal(llm, character.character_name, 
-                         current_activity,
-                         character.ontology, 
-                         character.middle_ontology, 
-                         allowed_types,
-                         allowed_verbs,
-                         goal_text)
-        goal_text = rewritten_goal.strip()
-        """
+
         system_prompt = """Task: rewrite the following goal statement into a plan according to the PLAN_TEMPLATE below.
 Respond only with a JSON plan according to the provided PLAN_TEMPLATE. No prose or code fences; end with </end>."""
         parts = []

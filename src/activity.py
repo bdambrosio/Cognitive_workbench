@@ -19,7 +19,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from Messages import SystemMessage
 from utils import hash_utils
 from utils.state_utils import calculate_state_activity_alignment, get_known_states
-from templates import DRIVE_ACTIVITY_TEMPLATE, ONTOLOGY_TEMPLATE, MIDDLE_ONTOLOGY_TEMPLATE, ACTIVITIES_TEMPLATE, PLAN_TEMPLATE, PLAN_VERBS
+from templates import ACTIVITIES_TEMPLATE, DRIVE_ACTIVITY_TEMPLATE, PLAN_TEMPLATE, PLAN_VERBS
 from utils.format_utils import format_middle_nouns, format_middle_verbs
 # Type checking imports
 from typing import TYPE_CHECKING
@@ -80,7 +80,7 @@ DEFAULT_ACTIVITY = {
 }
 
 
-from templates import PHYSIOLOGICAL_STATES, ONTOLOGY_TEMPLATE, ACTIVITIES_TEMPLATE
+from templates import PHYSIOLOGICAL_STATES
 llm_client = None
 from utils.format_utils import format_map_places, format_map_tools, format_map_types, format_views_compact
 
@@ -164,29 +164,30 @@ def create_ontology(context, map_types, resource_type_str, character_name, chara
 
             logger.info(f"Drive: {activity['drive']}")
             for axis in activity['axes']:
-                logger.info(f"Axis {axis['axis']}: Activity: {axis['activity_itemclass']['activity']}, ItemClass: {axis['activity_itemclass']['itemclass']}")
-                if not axis['subtypes_included']:
-                    logger.info(f"No base nouns usable for this activity in the closed world")
-                else:
-                    logger.info(f"Base nouns usable for this activity in the closed world: {axis['subtypes_included']}")
-                    activity = {}
-                    activity['axis'] = axis['axis']
-                    activity['drive'] = drive
-                    activity['activity_itemclass'] = axis['activity_itemclass']
-                    activity['subtypes_included'] = axis['subtypes_included']
-                    final_activities.append(activity)
-                    verb = axis['activity_itemclass']['activity']
-                    if verb not in verbs:
-                        verbs.append(verb)
-                    noun = axis['activity_itemclass']['itemclass']
-                    if noun not in nouns:
-                        nouns.append(noun)
-                    if noun not in noun_mappings:
-                        noun_mappings[noun] = axis['subtypes_included']
+                logger.info(f"Axis {axis['axis']}: Activity: {axis['activity_itemclasses'][0]['activity']}, ItemClass: {axis['activity_itemclasses'][0]['itemclass']}")
+                for activity_itemclass in axis['activity_itemclasses']:                
+                    if not activity_itemclass['subtypes_included']:
+                        logger.info(f"No base nouns usable for this activity in the closed world")
                     else:
-                        for base_type in axis['subtypes_included']:
-                            if base_type not in noun_mappings[noun]:
-                                noun_mappings[noun].append(base_type)
+                        logger.info(f"Base nouns usable for this activity in the closed world: {activity_itemclass['subtypes_included']}")
+                        activity = {}
+                        activity['axis'] = axis['axis']
+                        activity['drive'] = drive
+                        activity['activity_itemclass'] = activity_itemclass
+                        final_activities.append(activity)
+
+                        verb = activity_itemclass['activity']
+                        if verb not in verbs:
+                            verbs.append(verb)
+                        noun = activity_itemclass['itemclass']
+                        if noun not in nouns:
+                            nouns.append(noun)
+                        if noun not in noun_mappings:
+                            noun_mappings[noun] = activity_itemclass['subtypes_included']
+                        else:
+                            for base_type in activity_itemclass['subtypes_included']:
+                                if base_type not in noun_mappings[noun]:
+                                    noun_mappings[noun].append(base_type)
         
         ontology = {"activities": final_activities, "verbs": verbs, "nouns": nouns, "noun_mappings": noun_mappings}
         return ontology
@@ -197,8 +198,7 @@ def create_ontology(context, map_types, resource_type_str, character_name, chara
         return None
 
 
-
-def create_activities(context, map_types, character_name, character, character_drives, characters, ontology, middle_ontology):
+def create_activities(context, map_types, character_name, character, character_drives, characters, ontology):
 
     other_characters_str = ''
     for other_character_name, other_character_desc in characters.items():
@@ -220,6 +220,7 @@ def create_activities(context, map_types, character_name, character, character_d
                                    "character_drives": character_drives_str, 
                                    "states": get_known_states(),
                                    "character_names": character_names,
+                                   "other_characters": other_characters_str,
                                    "ontology-activities": json.dumps(ontology['activities'], indent=2),
                                    "ontology_nouns": middle_nouns_str,
                                    "ontology_verbs": middle_verbs_str,

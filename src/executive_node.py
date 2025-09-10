@@ -2132,7 +2132,7 @@ end your response with </end>
         Conclude with a hash-formatted assessment of the plan's success or failure in meeting the goal, in the following format:
         
         #why concise (8-10 words) explanation how this plan intends to achieve the goal
-        #outcome concise (16-24 words) explanation of the outcome - did it achieve the goal? If not, where did it fail and why?
+        #outcome concise (20-28 words) explanation of the outcome - did it achieve the goal? If not, where did it fail and why?
         #plan_score nn (0-100)
         #goal_score nn (0-100) - how well the goal was met as measured by goal termination condition
         ##
@@ -2158,6 +2158,8 @@ end your response with </end>
                 goal_score = int(goal_score_text)
             except Exception:
                 goal_score = 0
+        else:
+            logger.error(f'❌ No goal score found in summary: {summary_text}')
         summary = {"rationale": why_text, "outcome": outcome_text, "plan_score": plan_score, "goal_satisfaction": goal_score}
         self.plan_summary = f'{summary_text}\n{json.dumps(summary, indent=2)}'
 
@@ -2274,7 +2276,7 @@ end your response with </end>
             pass
 
         # Add goal satisfaction score to metrics for reflection scoring
-        if 'goal_satisfaction' in summary:
+        if 'goal_satisfaction' in summary and summary['goal_satisfaction'] is not None:
             metrics['goal_satisfaction'] = summary['goal_satisfaction']/100.0
         else:
             metrics['goal_satisfaction'] = 0.0
