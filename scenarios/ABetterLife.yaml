@@ -2,7 +2,9 @@ map: suburban.py
 # Cognitive Workbench Configuration
 llm_config:
   server_name: "vllm"
-  model_name: "gpt-4.1-mini"
+  model_name: "llama3.3-70b-instruct"
+
+max_turns: 200
 
 setting: |
   Fall morning in the modern era, setting is a busy urban neighborhood with mixed residential, university, 
