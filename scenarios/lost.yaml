@@ -2,7 +2,7 @@ map: forest.py
 # Cognitive Workbench Configuration
 llm_config:
   server_name: "vllm"
-  model_name: "llama3.1-8b-instruct"
+  model_name: "llama3.3-70b-instruct"
 
 max_turns: 200
 
