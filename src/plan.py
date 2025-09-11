@@ -680,14 +680,15 @@ Respond only with a JSON plan according to the provided PLAN_TEMPLATE. No prose 
             except Exception:
                 pass
         # Optionally include allowed scan targets (types) derived from middle ontology
-        allowed_types = character.ontology.get('nouns', {}).copy()
+        allowed_types = []
+        if character.ontology:
+            allowed_types.extend(character.ontology.get('nouns', {}).copy())
         allowed_types.extend(character.map_types.get('resource_types', []))
-        allowed_types.extend(character.map_types.get('terrain_types', []))
+        #allowed_types.extend(character.map_types.get('terrain_types', []))
         allowed_types.extend(character.map_types.get('infrastructure_types', []))
         allowed_types.extend(character.map_types.get('property_types', []))
 
         parts.append("\n#ALLOWED SCAN TARGETS (types)\n" + "\n".join(allowed_types)+"\n##")
-
         parts.append("\n#Plan syntax specification:\n" + str(PLAN_TEMPLATE))
         parts.append("\nRespond only with JSON, no other text. End with </end>\n")
         user_prompt = "\n".join(parts)

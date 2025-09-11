@@ -5,6 +5,8 @@ llm_config:
   model_name: "llama3.3-70b-instruct"
 
 max_turns: 200
+Ontology: True
+Activities: True
 
 setting: |
   Summer morning in rural france, 19th century, a small village in the countryside.
@@ -31,7 +33,7 @@ characters:
       - "maintain and work the family farm"
       - "find love and a wife to build a family with"
       - "immediate needs of survival - food, shelter, health, rest from backbreaking labor"
-      
+    location: Farmhouse1
 
   Francoise:
     character: |
@@ -61,6 +63,7 @@ characters:
     drives:
       - "preserve your legacy for future generations."
       - "maintain and work the family farm"
+    location: Farmhouse1
 
   MotherMarquart:
     manual: true
@@ -75,3 +78,4 @@ characters:
       - "support your husband and children"
       - "preserve your legacy for future generations."
       - "keep the family farm going"
+    location: Farmhouse1

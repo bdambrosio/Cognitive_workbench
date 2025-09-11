@@ -68,10 +68,6 @@ infrastructure_rules = {
 }
 
 property_rules = {
-        'names': {
-        'Farm': ['Farmhouse1', 'Farmhouse2'],
-    },
-
     'min_size': 50,
     'max_size': 150,
     'valid_terrain': ['Field', 'Grassland']
@@ -106,7 +102,7 @@ resource_rules = {
         {
             'resource_type': resource_types.Farmhouse,
             'description': 'A farmhouse for housing',
-            'count': 4,
+            'count': 5,
             'has_npc': False,
             'remove_on_take': False,
             'requires_property': True,

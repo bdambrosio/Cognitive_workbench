@@ -85,6 +85,11 @@ def extract_from_raw(line_obj: Dict[str, Any]) -> Dict[str, Any]:
         "time": {"actual_minutes": time_m.get("actual_minutes", time_m.get("minutes_advanced"))},
         "drive_fulfillment": {"drives": drives},
         "goal_satisfaction": gs,
+        # Prefer root-level plan_score, then metrics.plan_score for parity with digest
+        "summary_score": (
+            (line_obj.get("plan_score") if isinstance(line_obj, dict) else None)
+            or (metrics.get("plan_score") if isinstance(metrics, dict) else None)
+        ),
         "hunger": {"max": hunger.get("max"), "end": hunger.get("end")},
         "fatigue": {"max": fatigue.get("max"), "end": fatigue.get("end")},
         "thirst": {"max": thirst.get("max"), "end": thirst.get("end")},
