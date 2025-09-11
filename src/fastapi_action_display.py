@@ -2658,7 +2658,7 @@ class FastAPIActionDisplayNode:
             if new_time_info and 'datetime' in new_time_info:
                 # Cache the full time data for future requests
                 self.current_simulation_time = time_data
-                logger.info(f'⏰ Time advanced: {new_time_info["datetime"]}')
+                #logger.info(f'⏰ Time advanced: {new_time_info["datetime"]}')
                 
                 # Send time update to web clients
                 self._send_time_update_to_websockets(new_time_info)

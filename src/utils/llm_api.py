@@ -22,7 +22,6 @@ try:
 except Exception as e:
     pass
 
-
 openrouter_client = None
 try:
     openrouter_client = OpenRouterClient.OpenRouterClient(api_key=os.getenv("OPENROUTER_API_KEY"))
@@ -93,7 +92,7 @@ class LLM():
 
         return substituted_prompt
 
-    def run_request(self, substituted_prompt, top_p=1.0, temperature=0.7, max_tokens=400, stops=[], log=False, trace=True):
+    def run_request(self, substituted_prompt, top_p=1.0, temperature=0.7, max_tokens=400, stops=[], log=False, trace=False):
         global vllm_model
         #
         ### first substitute for {{$var-name}} in prompt
@@ -103,7 +102,7 @@ class LLM():
         if trace:
             print(f'\n{json.dumps(substituted_prompt)}\n')      
         if log:
-            logger.info(f'Prompt: {substituted_prompt}\n')
+            logger.debug(f'Prompt: {substituted_prompt}\n')
         if 'openai' in self.server_name:
             response = self.openai_client.executeRequest(prompt=substituted_prompt, temperature=temperature, top_p=top_p, max_tokens=max_tokens, stops=stops, model=self.model)
             return response
@@ -202,7 +201,7 @@ class LLM():
                 except Exception as e:
                     response = self.repair_json(substituted_prompt, response, e)
             if log:
-                logger.info(f'Response:\n{response}\n')
+                logger.debug(f'Response:\n{response}\n')
             return response
         except Exception as e:
             traceback.print_exc()

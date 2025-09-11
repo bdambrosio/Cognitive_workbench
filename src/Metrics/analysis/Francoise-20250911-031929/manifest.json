@@ -1,0 +1,16 @@
+{
+  "character_name": "Francoise",
+  "input_path": "/home/bruce/Downloads/Cognitive_workbench/src/data/Francoise-plans.jsonl",
+  "input_basename": "Francoise-plans.jsonl",
+  "input_mtime_utc": "2025-09-11T03:19:29.361846+00:00",
+  "input_sha256": "443f024c47412360cb602c0e073f1b0c5e69b5ad2612ff8d77943a98463fcc6d",
+  "analysis_dir": "/home/bruce/Downloads/Cognitive_workbench/src/Metrics/analysis/Francoise-20250911-031929",
+  "scenario_score_path": "/home/bruce/Downloads/Cognitive_workbench/src/Metrics/analysis/Francoise-20250911-031929/scenario_score.json",
+  "used_digest_jq": false,
+  "digest_cli": null,
+  "compute_cli": [
+    "compute_scenario_score.py",
+    "--character",
+    "Francoise"
+  ]
+}

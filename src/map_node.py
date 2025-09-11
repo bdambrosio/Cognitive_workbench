@@ -1563,7 +1563,7 @@ Do not include any other text, reasoning, introductory, expository, or markdown.
                 
                 self.time_advanced_publisher.put(json.dumps(advancement_data).encode('utf-8'))
                 
-                logger.info(f"⏰ Time advanced by {advance_minutes} minutes: {old_time_info['datetime']} → {new_time_info['datetime']}")
+                logger.debug(f"⏰ Time advanced by {advance_minutes} minutes: {old_time_info['datetime']} → {new_time_info['datetime']}")
                 
                 # Log period/season changes
                 if old_time_info['period'] != new_time_info['period']:

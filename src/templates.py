@@ -482,7 +482,7 @@ PLAN_TEMPLATE_C = """
 PLAN_TEMPLATE = PLAN_TEMPLATE_A + PLAN_TEMPLATE_B + PLAN_TEMPLATE_C
 
 DRIVE_ASSESSMENT_TEMPLATE = """TASK:
-Assess how well the following Drive was met by the following Plan (0.0 worst to 1.0 best) based on the provided context. 
+Assess how well the following Drive was aligned with the following Goal and Plan (0.0 worst to 1.0 best) based on the provided context. 
 Be strict and conservative. 
 Return ONLY a JSON object: {score": float, "rationale": a terse string}]}
 
@@ -517,6 +517,6 @@ Recent actions (last 20):
 {{$actions}}
 
 Instructions:
-Generate a score in [0.0,1.0] where 1.0 means well satisfied/fulfilled, 0.0 means badly unmet. Use concise rationales.
+Generate a score in [0.0,1.0] where 1.0 means perfectly aligned, 0.0 means completely unrelated. Use very concise rationales.
 Return ONLY a JSON object: {"score": float, "rationale": a terse string}]}"""
 

@@ -1,0 +1,34 @@
+{
+  "file": "../data/Jean-plans.jsonl",
+  "used_digest_jq": false,
+  "total_plans": 1,
+  "total_minutes": 0.0,
+  "drive_dimensions": 4,
+  "weights_last_fraction": 0.5,
+  "survival_params": {
+    "soft_start": 70.0,
+    "danger": 80.0,
+    "hard": 100.0
+  },
+  "goal_sat_weight": 0.25,
+  "avg_goal_satisfaction": null,
+  "avg_drive_fulfillment": 0.0,
+  "scenario_score_base": 0.0,
+  "scenario_score_final": 0.0,
+  "avg_plan_score": 0.0,
+  "avg_state_geomean": 0.0,
+  "avg_failure_rate": null,
+  "per_plan": [
+    {
+      "minutes": 0.0,
+      "drive_weighted": 0.0,
+      "drive_fulfillment": 0.0,
+      "survival_penalty": 1.0,
+      "contribution": 0.0,
+      "goal_satisfaction": 0.0,
+      "plan_score": 0.0,
+      "state_geomean": 0.0,
+      "max_state": 0.0
+    }
+  ]
+}

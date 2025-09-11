@@ -34,17 +34,14 @@ from utils.state_utils import tick_state, apply_restore, initialize_character_st
 from utils.format_utils import format_views_compact
 from utils.condition_utils import deref_plan_target
 
-    
-
-
 # Configure logging with unbuffered output
 # Console handler with WARNING level (less verbose)
 console_handler = logging.StreamHandler(sys.stdout)
-console_handler.setLevel(logging.WARNING)
+console_handler.setLevel(logging.INFO)
 
 # File handler with INFO level (full logging)
 file_handler = logging.FileHandler('logs/executive_node.log', mode='w')
-file_handler.setLevel(logging.WARNING)
+file_handler.setLevel(logging.INFO)
 if os.getenv('CWB_DEBUG', '') in ('1', 'true', 'yes', 'on'):
     file_handler.setLevel(logging.INFO)
 
@@ -56,6 +53,7 @@ logging.basicConfig(
     force=True
 )
 logger = logging.getLogger('executive_node')
+logger.setLevel(logging.INFO)
 
 # Import LLM client
 import os
@@ -67,8 +65,6 @@ try:
 except ImportError as e:
     print(f"⚠️  LLM Client not available: {e}")
     LLM_CLIENT_AVAILABLE = False
-
-
 
 @dataclass
 class ActionRecord:
@@ -202,6 +198,8 @@ class ZenohExecutiveNode:
         self.action_history = []  # List of ActionRecord instances
         
         # Plan execution state
+        self.current_activity = None
+        self.current_step = None
         self.current_plan = None
         self.plan_state = None
         self.plan_bindings_cache = {}
@@ -227,7 +225,10 @@ class ZenohExecutiveNode:
         self.last_state_update_time: Optional[datetime] = None
         # Ontology (guard for manual characters / missing files)
         try:
-            self.ontology = json.load(open(f'../scenarios/{self.character_name}-activity-ontology.json'))
+            if self.character_config.get('ontology', True):
+                self.ontology = json.load(open(f'../scenarios/{self.character_name}-activity-ontology.json'))
+            else:
+                self.ontology = {}
         except Exception as e:
             self.ontology = {}
             if not self.manual:
@@ -289,11 +290,9 @@ class ZenohExecutiveNode:
         self.inspections = {} # cache of inspections
         self.uses = {} # cache of uses
         self.activities = {} # dictionary of all available activities for initializing activity manager
-
         try:
-            self.activities = json.load(open(f'../scenarios/{self.character_name}-activities.json'))
-            if 'activities' in self.activities: # happens sometimes, not sure why
-                self.activities = self.activities['activities']
+            if self.character_config.get('activities', True):
+                self.activities = json.load(open(f'../scenarios/{self.character_name}-activities.json'))
         except Exception as e:
             if not self.manual:
                 logger.error(f'Error loading activities for {self.character_name}: {e}')
@@ -313,7 +312,9 @@ class ZenohExecutiveNode:
         logger.info(f'   - Publishing to: cognitive/map/turn/complete/{character_name}')
         logger.info(f'   - Publishing to: cognitive/map/time_proposal')
 
-        self.activity_manager: ActivityManager = ActivityManager(self, self.activities, self.llm_client, self.map_types)
+        self.activity_manager = None
+        if self.activities:
+            self.activity_manager = ActivityManager(self, self.activities, self.llm_client, self.map_types)
 
         # Register signal handlers for graceful shutdown
         signal.signal(signal.SIGTERM, self._signal_handler)
@@ -476,7 +477,7 @@ class ZenohExecutiveNode:
             logger.info(f'📋 Published current plan for {self.character_name}')
             
             # Log plan_bindings if they exist
-            if hasattr(self, 'plan_bindings') and self.plan_bindings:
+            if self.plan_bindings:
                 logger.info(f'🔗 {self.character_name} current plan_bindings: {self.plan_bindings}')
             
         except Exception as e:
@@ -490,23 +491,23 @@ class ZenohExecutiveNode:
             current_step = None
             activity_state = None
             
-            if hasattr(self, 'activity_manager') and self.activity_manager:
+            if self.activity_manager:
                 current_activity = self.activity_manager.current_activity
                 activity_state = self.activity_manager.current_activity_state
                 if current_activity and activity_state:
                     current_step = self.activity_manager.activity_step()
             
-            current_activity_data = {
-                'current_activity': json.dumps(current_activity, indent=2) if current_activity else '',
-                'activity_data': current_activity,
-                'current_step': current_step,
-                'activity_state': activity_state,
-                'timestamp': datetime.now().isoformat(),
-                'character': self.character_name
-            }
-            
-            self.current_activity_publisher.put(json.dumps(current_activity_data, default=datetime_handler))
-            logger.info(f'🎯 Published current activity for {self.character_name}')
+                current_activity_data = {
+                    'current_activity': json.dumps(current_activity, indent=2) if current_activity else '',
+                    'activity_data': current_activity,
+                    'current_step': current_step,
+                    'activity_state': activity_state,
+                    'timestamp': datetime.now().isoformat(),
+                    'character': self.character_name
+                }
+                
+                self.current_activity_publisher.put(json.dumps(current_activity_data, default=datetime_handler))
+                logger.info(f'🎯 Published current activity for {self.character_name}')
             
         except Exception as e:
             logger.error(f'Error publishing current activity: {e}')
@@ -526,50 +527,48 @@ class ZenohExecutiveNode:
         except Exception as e:
             logger.error(f'Error publishing time proposal: {e}')
 
+    def _ooda_housekeeping(self):
+        try:
+            if self.current_time is not None:
+                # Initialize last update on first tick
+                if self.last_state_update_time is None:
+                    self.last_state_update_time = self.current_time
+                else:
+                    dt_minutes = max(0.0, (self.current_time - self.last_state_update_time).total_seconds() / 60.0)
+                    if dt_minutes > 0 and self.manual is False:
+                        tick_state(self.self_state, dt_minutes)
+                        self.last_state_update_time = self.current_time
+                        # Log cap condition
+                        hunger_val = float(self.self_state.get('hunger', {}).get('value', 0.0))
+                        if hunger_val >= 95.0:
+                            logger.error(f'🍽️ {self.character_name} hunger reached 95 (worst)')
+                        fatigue_val = float(self.self_state.get('fatigue', {}).get('value', 0.0))
+                        if fatigue_val >= 95.0:
+                            logger.error(f'🍽️ {self.character_name} fatigue reached 95 (worst)')
+                        thirst_val = float(self.self_state.get('thirst', {}).get('value', 0.0))
+                        state_payload = {
+                            'character': self.character_name,
+                            'timestamp': datetime.now().isoformat(),
+                            'state': self.self_state
+                        }
+                        self.current_state_publisher.put(json.dumps(state_payload))
+                        state_payload = {
+                            'character': self.character_name,
+                            'timestamp': datetime.now().isoformat(),
+                            'state': self.self_state
+                        }
+                        self.current_state_publisher.put(json.dumps(state_payload))
+        except Exception:
+            # Non-fatal; continue OODA
+            pass
+
     def _run_ooda_loop(self):
         """Execute the OODA loop: Observe, Orient, Decide, Act."""
         try:
             # Tick local physiology/state using global simulation time if available
-            try:
-                if self.current_time is not None:
-                    # Initialize last update on first tick
-                    if self.last_state_update_time is None:
-                        self.last_state_update_time = self.current_time
-                    else:
-                        dt_minutes = max(0.0, (self.current_time - self.last_state_update_time).total_seconds() / 60.0)
-                        if dt_minutes > 0 and self.manual is False:
-                            tick_state(self.self_state, dt_minutes)
-                            self.last_state_update_time = self.current_time
-                            # Log cap condition
-                            try:
-                                hunger_val = float(self.self_state.get('hunger', {}).get('value', 0.0))
-                                if hunger_val >= 95.0:
-                                    logger.error(f'🍽️ {self.character_name} hunger reached 95 (worst)')
-                                fatigue_val = float(self.self_state.get('fatigue', {}).get('value', 0.0))
-                                if fatigue_val >= 95.0:
-                                    logger.error(f'🍽️ {self.character_name} fatigue reached 95 (worst)')
-                                thirst_val = float(self.self_state.get('thirst', {}).get('value', 0.0))
-                                if thirst_val >= 95.0:
-                                    logger.error(f'💧 {self.character_name} thirst reached 95 (worst)')
-                            except Exception:
-                                pass
-                            # Publish state snapshot for UI
-                            try:
-                                state_payload = {
-                                    'character': self.character_name,
-                                    'timestamp': datetime.now().isoformat(),
-                                    'state': self.self_state
-                                }
-                                self.current_state_publisher.put(json.dumps(state_payload))
-                            except Exception:
-                                pass
-            except Exception:
-                # Non-fatal; continue OODA
-                pass
-
+            self._ooda_housekeeping()
             # Observe: Collect current situation and sense data
             observations = self._observe()
-
             # Manual characters skip orient/plan entirely
             if self.manual:
                 if self.current_plan:
@@ -581,11 +580,13 @@ class ZenohExecutiveNode:
                             logger.info(f'Manual action failed for {self.character_name}, will retry same step next turn')
                             return
                 return
+            
             # Check for active activity and get current step
-            if hasattr(self, 'activity_manager') and self.activity_manager.has_active_activity():
+            if self.activity_manager and self.activity_manager.has_active_activity():
                 should_continue, reason = self.activity_manager.continue_activity()
                 if should_continue:
                     self.current_step = self.activity_manager.activity_step()  # Get current step without advancing
+                    logger.info(f'🎯 {self.character_name} continuing activity: {self.current_activity["name"]}')
                 else:
                     # Abandon current activity
                     self.activity_manager.step_completion('failure', reason)
@@ -596,9 +597,10 @@ class ZenohExecutiveNode:
                     self._publish_current_activity()
                     logger.info(f'🚫 {self.character_name} abandoned activity: {reason}')
                     # Fall through to select new activity
-            
+            else:
+                logger.info(f'🚫 {self.character_name} Activities not active')
             # No active activity or current one was abandoned - select new one
-            if hasattr(self, 'activity_manager') and not self.activity_manager.has_active_activity():
+            if self.activity_manager and not self.activity_manager.has_active_activity():
                 self.current_step, self.current_activity = self.activity_manager.select_activity()
                 self.current_goal = None
                 self._publish_current_activity()
@@ -606,9 +608,10 @@ class ZenohExecutiveNode:
                     logger.info(f'🎯 {self.character_name} starting new activity: {self.current_activity["name"]}')
                 else:
                     logger.warning(f'🚫 {self.character_name} no activity selected')
+            
 
             # Convert step to goal or use existing goal/orient
-            new_goal = None # this should only be if we have a new step
+            new_goal = self.current_goal # this should only be if we have a new step
             if self.current_step:
                 # Only create new goal if we don't have the right one already
                 if not self.current_goal or self.current_goal.name != self.current_step['name']:
@@ -619,7 +622,7 @@ class ZenohExecutiveNode:
             if self.current_goal != prev_goal:
                 self._publish_goal(self.current_goal)
                 self._plan_completed(reason='goal changed')
-                logger.info(f'🎯 {self.character_name} oriented to goal: {self.current_goal.to_string()}')
+            logger.info(f'🎯 {self.character_name} oriented to goal: {self.current_goal.to_string()}')
 
             # Plan: Return existing plan or create single-action plan
             plan = self._plan(self.current_goal)
@@ -629,9 +632,6 @@ class ZenohExecutiveNode:
 
             # Plan Step: Execute current step of plan
             action = self._plan_step(plan)
-            if not action:
-                logger.warning(f'🚫 {self.character_name} no action found for plan, pbly completed')
-                return
 
             # Act: Execute the chosen action (if we have one)
             if action is not None:
@@ -643,7 +643,7 @@ class ZenohExecutiveNode:
             
         except Exception as e:
             logger.error(f'Error in OODA loop: {e}')
-            logger.error(traceback.format_exc())
+            traceback.format_exc()
         return
 
     def format_situation(self):
@@ -700,7 +700,7 @@ class ZenohExecutiveNode:
     def _update_system_prompt(self):
         """Update the system prompt with the current situation."""
         system_prompt = self.observations['static']
-        if hasattr(self, 'activity_manager') and self.activity_manager.has_active_activity():
+        if self.activity_manager and self.activity_manager.has_active_activity():
             system_prompt += f"\n#Your current hi-level activity is:\n\t{self.activity_manager.current_activity.get('name')}\n"
         if self.current_goal:
             system_prompt += f"\n#Your current goal is:\n\t{self.current_goal.to_string()}\n"
@@ -803,7 +803,6 @@ class ZenohExecutiveNode:
                     self.current_goal = plan_module.Goal(physiological_drives[worst_state_key], actors=[self.character_name], termination=f'{worst_state_key} below 50')
                     return self.current_goal
             
-            
         if self.current_goal:
             return self.current_goal
 
@@ -817,15 +816,19 @@ class ZenohExecutiveNode:
 
         # Create a new goal based on current situation
         other_characters_str = ''
-        for other_character_name, other_character_desc in self.config.get('characters', {}).items():
+        for other_character_name, other_character_desc in self.character_config.get('characters', {}).items():
             if other_character_name != self.character_name:
                 other_characters_str += f"\n\t{other_character_name}: {other_character_desc}"
-        character_names = list(self.config.get("characters", {}).keys())
+        character_names = list(self.character_config.get("characters", {}).keys())
 
         self.map_update_request_publisher.put(json.dumps({'type': 'goal_look'}))
         map_types_str = format_map_types(self.map_types)
-        ontology_nouns_str = '\n'.join(self.ontology['nouns'])
-        ontology_verbs_str = '\n'.join(self.ontology['verbs'])
+        if self.ontology:
+            ontology_nouns_str = '\n'.join(self.ontology['nouns'])
+            ontology_verbs_str = '\n'.join(self.ontology['verbs'])
+        else:
+            ontology_nouns_str = ''
+            ontology_verbs_str = ''
         character_drives = self.drives
         character_drives_str = '\n'.join(character_drives)   
 
@@ -894,6 +897,7 @@ class ZenohExecutiveNode:
         """Plan: Return existing plan or create single-action plan from goal."""
         # If we already have a plan, return it
         if self.current_plan is not None:
+            logger.info(f'🎯 {self.character_name} continuing existing plan')
             return self.current_plan
         if not self.current_goal or self.current_goal.name == 'sleep':
             single_action = None
@@ -943,7 +947,7 @@ class ZenohExecutiveNode:
                         logger.error(f'Invalid plan JSON from planner')
                         plan_candidate = None
                     else:
-                        logger.info(f'📋 {self.character_name} generated new plan: {json.dumps(plan_candidate, indent=2)}')
+                        logger.debug(f'📋 {self.character_name} generated new plan: {json.dumps(plan_candidate, indent=2)}')
                 except Exception as e:
                     logger.error(f'Invalid plan structure from planner: {e}')
                     plan_candidate = None
@@ -1113,7 +1117,7 @@ end your response with </end>
         if reason != 'goal changed':
             self._summarize_plan_execution()
         self.current_plan = None
-        if hasattr(self, 'plan_bindings') and self.plan_bindings:
+        if self.plan_bindings:
             logger.info(f'🔄 {self.character_name} cleared plan_bindings (plan completed)')
             self.plan_bindings = {}
         self.plan_bindings_cache = {}
@@ -1123,7 +1127,7 @@ end your response with </end>
             return
         
         # Handle activity advancement
-        if hasattr(self, 'activity_manager') and self.activity_manager.has_active_activity():
+        if self.activity_manager and self.activity_manager.has_active_activity():
             # Advance to next activity step
             next_step, activity = self.activity_manager.step_completion('success')
             self._publish_current_activity()
@@ -1175,25 +1179,16 @@ end your response with </end>
                     if val >= 95.0:
                         logger.error(f'🚫 {self.character_name} aborting plan due to state threshold: {key}={val:.1f}')
                         # Finalize current plan and publish plan log
-                        try:
-                            self._plan_completed()
-                        except Exception:
-                            pass
+                        self._plan_completed()
                         # Publish stop to map turn controller and UI reflects via turn_status
-                        try:
-                            self.session.put("cognitive/map/turn/stop", json.dumps({"character": self.character_name, "reason": "state_threshold", "metric": key, "value": val}).encode())
-                        except Exception:
-                            pass
+                        self.session.put("cognitive/map/turn/stop", json.dumps({"character": self.character_name, "reason": "state_threshold", "metric": key, "value": val}).encode())
                         # Clear plan/activity state
                         self.current_plan = None
                         self._publish_current_plan()
                         # Terminate current activity if present
-                        if hasattr(self, 'activity_manager') and self.activity_manager.has_active_activity():
-                            try:
-                                self.activity_manager.step_completion('failure', 'state_threshold')
-                                self._publish_current_activity()
-                            except Exception:
-                                pass
+                        if self.activity_manager and self.activity_manager.has_active_activity():
+                            self.activity_manager.step_completion('failure', 'state_threshold')
+                            self._publish_current_activity()
                         return None
         except Exception:
             pass
@@ -1393,6 +1388,7 @@ end your response with </end>
                             "wait": 5,  # use explicit duration
                             }
 
+        logger.info (f'🎯 {self.character_name} performing action: {str(action)}')
         if action['type'] in ACTION_TIME_COSTS:
             proposed_minutes = ACTION_TIME_COSTS[action['type']]
         else:
@@ -1424,21 +1420,9 @@ end your response with </end>
             action_data = {'type': 'sleep','action_id': self.action_counter,'timestamp': datetime.now().isoformat(),'target': self.character_name}
             self.action_publisher.put(json.dumps(action_data))
             action_record.result = 'slept'
-            # Record per-action telemetry
-            try:
-                action_record.hunger_after = float(self.self_state.get('hunger', {}).get('value', 0.0))
-            except Exception:
-                action_record.hunger_after = None
-            try:
-                action_record.fatigue_after = float(self.self_state.get('fatigue', {}).get('value', 0.0))
-            except Exception:
-                action_record.fatigue_after = None
-            try:
-                action_record.thirst_after = float(self.self_state.get('thirst', {}).get('value', 0.0))
-            except Exception:
-                action_record.thirst_after = None
-            action_record.proposed_minutes = proposed_minutes
-            # Best-effort simulation time capture
+            self._snapshot_physiology(action_record)
+            action_record.outcome_status = 'success'
+            action_record.failure_code = None
             try:
                 for time_reply in self.session.get("cognitive/map/simulation_time", timeout=2.0 if not self.debug else 600.0):
                     if time_reply.ok:
@@ -1452,10 +1436,9 @@ end your response with </end>
             return True
         if action['type'].lower() == 'think':
             thought = self.think_about(action)
-            try:
-                self._snapshot_physiology(action_record)
-            except Exception:
-                pass
+            self._snapshot_physiology(action_record)
+            action_record.outcome_status = 'success'
+            action_record.failure_code = None
             return True
             
         if action['type'].lower() == "move":
@@ -1488,12 +1471,9 @@ end your response with </end>
                 if move_direction:
                     self.move(move_direction)
                     # Telemetry snapshot after action
-                    try:
-                        action_record.hunger_after = float(self.self_state.get('hunger', {}).get('value', 0.0))
-                        action_record.fatigue_after = float(self.self_state.get('fatigue', {}).get('value', 0.0))
-                        action_record.thirst_after = float(self.self_state.get('thirst', {}).get('value', 0.0))
-                    except Exception:
-                        action_record.thirst_after = None
+                    self._snapshot_physiology(action_record)
+                    action_record.outcome_status = 'success'
+                    action_record.failure_code = None
                 # Request situation/map update for UI immediately after move
                 try:
                     self.map_update_request_publisher.put(json.dumps({'type': 'step_look'}))
@@ -1503,14 +1483,10 @@ end your response with </end>
             else:
                 logger.error(f'❌ Cannot move toward "{move_target}" - target not resolved or visible, choosing random direction')
                 self.move(random.choice(cardinal_directions))
-                try:
-                    self.map_update_request_publisher.put(json.dumps({'type': 'step_look'}))
-                except Exception:
-                    pass
-                try:
-                    self._snapshot_physiology(action_record)
-                except Exception:
-                    pass
+                self.map_update_request_publisher.put(json.dumps({'type': 'step_look'}))
+                self._snapshot_physiology(action_record)
+                action_record.outcome_status = 'success'
+                action_record.failure_code = None
                 return True
         elif action['type'].lower() == "say":
             # Check if we can acquire conversation lock
@@ -1526,10 +1502,9 @@ end your response with </end>
                 pass
             if resolved_target and self._acquire_conversation_lock(resolved_target):
                 self.generate_speech(action['value'], resolved_target, mode='say')
-                try:
-                    self._snapshot_physiology(action_record)
-                except Exception:
-                    pass
+                self._snapshot_physiology(action_record)
+                action_record.outcome_status = 'success'
+                action_record.failure_code = None
             else:
                 # Lock acquisition failed, publish failure action
                 action_data = {
@@ -1627,6 +1602,12 @@ end your response with </end>
                 self._snapshot_physiology(action_record)
             except Exception:
                 pass
+            if ok:
+                action_record.outcome_status = 'success'
+                action_record.failure_code = None
+            else:
+                action_record.outcome_status = 'failure'
+                action_record.failure_code = 'execution:failed'
             self.action_counter += 1
         elif action['type'].lower() == "place":
             # Precondition: must have item in inventory (has_item)
@@ -1707,6 +1688,12 @@ end your response with </end>
                     action_record.thirst_after = float(self.self_state.get('thirst', {}).get('value', 0.0))
                 except Exception:
                     action_record.thirst_after = None
+            if ok:
+                action_record.outcome_status = 'success'
+                action_record.failure_code = None
+            else:
+                action_record.outcome_status = 'failure'
+                action_record.failure_code = 'execution:failed'
             self.action_counter += 1
             return ok
         elif action['type'].lower() == "inspect":
@@ -1779,6 +1766,8 @@ end your response with </end>
                         self.action_publisher.put(json.dumps(result_action))
                 except Exception:
                     pass
+                action_record.outcome_status = 'success'
+                action_record.failure_code = None
         elif action['type'].lower() == "use":
             # Create action - include requested vs resolved
             cond_action = action.copy()
@@ -1851,6 +1840,12 @@ end your response with </end>
                                 action_data['status'] = 'failed'
                             break
                     self.action_publisher.put(json.dumps(action_data))
+                    if action_data.get('status') == 'success':
+                        action_record.outcome_status = 'success'
+                        action_record.failure_code = None
+                    else:
+                        action_record.outcome_status = 'failure'
+                        action_record.failure_code = 'execution:failed'
                     try:
                         self._snapshot_physiology(action_record)
                     except Exception:
@@ -1860,6 +1855,8 @@ end your response with </end>
                 # Resource/other use path
                 self.use(action, resolved, action_data)
                 action_data['result'] = self.action_history[-1].result
+                action_record.outcome_status = 'success'
+                action_record.failure_code = None
                 # Apply rules-driven physiological effects based on resource type
                 try:
                     if isinstance(resolved, str) and resolved:
@@ -1935,7 +1932,7 @@ end your response with </end>
             self.action_counter += 1
             return True
         elif action['type'].lower() == "scan":
-            scan_result = self._execute_scan_action(action)
+            scan_result, distance = self._execute_scan_action(action)
             action_record.result = scan_result
             # Record bindings_after and simple binding evidence
             try:
@@ -1945,26 +1942,25 @@ end your response with </end>
                     # If distance is available in situation, include minimal evidence
                     try:
                         # Prefer the cached scan distance if available; fallback to recompute
-                        best_dist = None
-                        try:
-                            if hasattr(self, '_last_scan_distance') and self._last_scan_distance is not None:
-                                best_dist = float(self._last_scan_distance)
-                        except Exception:
-                            best_dist = None
-
+                        best_dist = distance
                         if best_dist is not None:
                             action_record.binding_evidence = {"criterion":"nearest","distance": best_dist}
                     except Exception:
                         pass
             except Exception:
                 pass
+            if scan_result:
+                action_record.outcome_status = 'success'
+                action_record.failure_code = None
+            else:
+                action_record.outcome_status = 'failure'
+                action_record.failure_code = 'execution:failed'
             # Telemetry snapshot after action
-            try:
-                action_record.hunger_after = float(self.self_state.get('hunger', {}).get('value', 0.0))
-                action_record.fatigue_after = float(self.self_state.get('fatigue', {}).get('value', 0.0))
-                action_record.thirst_after = float(self.self_state.get('thirst', {}).get('value', 0.0))
-            except Exception:
-                action_record.thirst_after = None
+
+            action_record.hunger_after = float(self.self_state.get('hunger', {}).get('value', 0.0))
+            action_record.fatigue_after = float(self.self_state.get('fatigue', {}).get('value', 0.0))
+            action_record.thirst_after = float(self.self_state.get('thirst', {}).get('value', 0.0))
+
             
             # Publish scan action result to FastAPI
             action_data = {
@@ -1979,7 +1975,7 @@ end your response with </end>
                 'bound_value': scan_result if scan_result else ''
             }
             self.action_publisher.put(json.dumps(action_data))
-            logger.info(f'📤 Published action: scan ({"success" if scan_result else "failed"})')
+            logger.info(f'Action: scan {action.get("target", "")}: {"success" if scan_result else "failed"}')
             self.action_counter += 1
             
             return True if scan_result else False
@@ -1990,6 +1986,8 @@ end your response with </end>
                 self._snapshot_physiology(action_record)
             except Exception:
                 pass
+            action_record.outcome_status = 'failure'
+            action_record.failure_code = 'error:unknown_action'
             return False
 
         # Request situation/map update for UI after non-move actions that may affect visibility/adjacency
@@ -2113,57 +2111,42 @@ end your response with </end>
         percepts_json = json.dumps(self.percepts_at_plan, indent=2) if self.percepts_at_plan else "[]"
         telemetry_json = json.dumps({"actions": telemetry_actions}, indent=2)
 
-        summary_prompt = f"""
-        Goal: {goal_text}
+        summary_prompt = """
+        #Goal: 
+        {{$goal_text}}
         
-        Plan (JSON):
-        {plan_text}
+        #Plan (JSON):
+        {{$plan_text}}
         
-        Actions Taken (text):
-        {actions_summary}
+        #Actions Taken (text):
+        {{$actions_summary}}
         
-        Percepts at plan start (JSON):
-        {percepts_json}
+        #Percepts at plan start (JSON):
+        {{$percepts_json}}
         
-        Structured telemetry (selected fields; JSON):
-        {telemetry_json}
+        #Structured telemetry (selected fields; JSON):
+        {{$telemetry_json}}
         
-        Please provide a concise paragraph summarizing this plan execution, including the goal, actions taken, and observed results.
-        Conclude with a hash-formatted assessment of the plan's success or failure in meeting the goal, in the following format:
-        
-        #why concise (8-10 words) explanation how this plan intends to achieve the goal
-        #outcome concise (20-28 words) explanation of the outcome - did it achieve the goal? If not, where did it fail and why?
-        #plan_score nn (0-100)
-        #goal_score nn (0-100) - how well the goal was met as measured by goal termination condition
-        ##
-        
+        Please provide JSON object with:
+        1. 
+        2. a JSON formatted assessment of the plan's success or failure in meeting the goal, in the following format:
+            {
+                "Summary": str "a concise paragraph summarizing this plan execution, including the goal, actions taken, and observed results",
+                "How": str "concise (8-10 words) explanation how this plan intended to achieve the goal",
+                "outcome": str "concise (20-28 words) explanation of the outcome - did it achieve the goal? If not, where did it fail and why?",
+                "plan_score": int (0-100) "did the plan execute as expected?"
+                "goal_score": int (0-100) "how well the goal was met as measured by goal termination condition"
+            }
+
         Do not include any other introductory, explanatory, discursive, or formatting text in your response.
-        End your text with: </end>
+
         """
-        response = self.llm_client.generate([summary_prompt], max_tokens=1000, stops=['</end>'])
-        summary_text = response.text if hasattr(response, 'text') else str(response)
-        why_text = hash_utils.find('why', summary_text)
-        outcome_text = hash_utils.find('outcome', summary_text)
-        plan_score_text = hash_utils.find('plan_score', summary_text)
-        goal_score_text = hash_utils.find('goal_score', summary_text)
-        plan_score = None
-        if plan_score_text:
-            try:
-                plan_score = int(plan_score_text)
-            except Exception:
-                plan_score = 0
-        goal_score = None
-        if goal_score_text:
-            try:
-                goal_score = int(goal_score_text)
-            except Exception:
-                goal_score = 0
-        else:
-            logger.error(f'❌ No goal score found in summary: {summary_text}')
-        summary = {"rationale": why_text, "outcome": outcome_text, "plan_score": plan_score, "goal_satisfaction": goal_score}
-        self.plan_summary = f'{summary_text}\n{json.dumps(summary, indent=2)}'
-
-
+        response = self.llm_client.generate([summary_prompt], bindings={"goal_text": goal_text, "plan_text": plan_text, "actions_summary": actions_summary, "percepts_json": percepts_json, "telemetry_json": telemetry_json}, max_tokens=1000, is_json=True)
+        summary = response.text if isinstance(response.text, dict) else None
+        self.plan_summary = summary
+        if not summary:
+            logger.error(f'❌ No summary found in response: {response}')
+            summary = {}
         logger.info(f'📝 Plan post-mortem prepared for {self.character_name}\n{self.plan_summary}\n')
         
         # Mark as completed to prevent redundant calls
@@ -2276,8 +2259,8 @@ end your response with </end>
             pass
 
         # Add goal satisfaction score to metrics for reflection scoring
-        if 'goal_satisfaction' in summary and summary['goal_satisfaction'] is not None:
-            metrics['goal_satisfaction'] = summary['goal_satisfaction']/100.0
+        if 'goal_score' in summary and summary['goal_score'] is not None:
+            metrics['goal_satisfaction'] = summary['goal_score']/100.0
         else:
             metrics['goal_satisfaction'] = 0.0
 
@@ -2697,7 +2680,10 @@ End your text with: </end>"""
         # Resolve noun target to one or more concrete map_types (if indices exist)
         candidates = []
         try:
-            noun_mappings = self.ontology.get('noun_mappings', {})
+            if self.ontology:
+                noun_mappings = self.ontology.get('noun_mappings', {})
+            else:
+                noun_mappings = {}
             mapped = noun_mappings.get(target)
             if isinstance(mapped, list) and mapped:
                 candidates = [c for c in mapped if isinstance(c, str) and c]
@@ -2754,13 +2740,10 @@ End your text with: </end>"""
             logger.error(f'🔍 {self.character_name} scan found target "{target}" but no variable to bind')
         
         # Cache chosen scan distance for evidence use
-        try:
-            if not hasattr(self, '_last_scan_distance'):
-                self._last_scan_distance = None
-            self._last_scan_distance = chosen_dist if found_target else None
-        except Exception:
-            pass
-        return found_target if found_target else ''
+        if found_target:
+            return found_target, chosen_dist
+        else:
+            return '', sys.maxsize
 
     def _find_target_in_situation(self, target: str) -> tuple[str, float | None]:
         """Search last_situation_data for target, return (nearest_name, distance).

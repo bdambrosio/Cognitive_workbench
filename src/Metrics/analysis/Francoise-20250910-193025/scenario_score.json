@@ -1,0 +1,89 @@
+{
+  "file": "../data/Francoise-plans.jsonl",
+  "used_digest_jq": false,
+  "total_plans": 6,
+  "total_minutes": 11.0,
+  "drive_dimensions": 4,
+  "weights_last_fraction": 0.5,
+  "survival_params": {
+    "soft_start": 70.0,
+    "danger": 80.0,
+    "hard": 100.0
+  },
+  "goal_sat_weight": 0.25,
+  "avg_goal_satisfaction": 0.2727,
+  "avg_drive_fulfillment": 0.053,
+  "scenario_score_base": 0.053,
+  "scenario_score_final": 0.0434,
+  "avg_plan_score": null,
+  "avg_state_geomean": 0.0393,
+  "avg_failure_rate": null,
+  "per_plan": [
+    {
+      "minutes": 0.0,
+      "drive_weighted": 0.0,
+      "drive_fulfillment": 0.0,
+      "survival_penalty": 1.0,
+      "contribution": 0.0,
+      "goal_satisfaction": 1.0,
+      "plan_score": null,
+      "state_geomean": 0.0,
+      "max_state": 0.0
+    },
+    {
+      "minutes": 2.0,
+      "drive_weighted": 0.0444,
+      "drive_fulfillment": 0.0444,
+      "survival_penalty": 1.0,
+      "contribution": 0.0444,
+      "goal_satisfaction": 1.0,
+      "plan_score": null,
+      "state_geomean": 0.0325,
+      "max_state": 6.75
+    },
+    {
+      "minutes": 1.0,
+      "drive_weighted": 0.1389,
+      "drive_fulfillment": 0.1389,
+      "survival_penalty": 1.0,
+      "contribution": 0.1389,
+      "goal_satisfaction": 1.0,
+      "plan_score": null,
+      "state_geomean": 0.0361,
+      "max_state": 7.5
+    },
+    {
+      "minutes": 8.0,
+      "drive_weighted": 0.0444,
+      "drive_fulfillment": 0.0444,
+      "survival_penalty": 1.0,
+      "contribution": 0.0444,
+      "goal_satisfaction": 0.0,
+      "plan_score": null,
+      "state_geomean": 0.0497,
+      "max_state": 10.5
+    },
+    {
+      "minutes": 0.0,
+      "drive_weighted": 0.0,
+      "drive_fulfillment": 0.0,
+      "survival_penalty": 1.0,
+      "contribution": 0.0,
+      "goal_satisfaction": 1.0,
+      "plan_score": null,
+      "state_geomean": 0.0566,
+      "max_state": 16.5
+    },
+    {
+      "minutes": 0.0,
+      "drive_weighted": 0.0,
+      "drive_fulfillment": 0.0,
+      "survival_penalty": 1.0,
+      "contribution": 0.0,
+      "goal_satisfaction": 0.0,
+      "plan_score": null,
+      "state_geomean": 0.0607,
+      "max_state": 17.25
+    }
+  ]
+}

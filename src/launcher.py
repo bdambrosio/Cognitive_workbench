@@ -176,6 +176,8 @@ class CharacterLauncher:
     def launch_character(self, character: CharacterInstance):
         """Launch all nodes for a specific character."""
         self.logger.info(f'Launching character: {character.name}')
+
+    
         
         # Launch memory_node for this character (1st - provides storage)
         try:
@@ -400,17 +402,27 @@ def main():
 
         # Extract characters configuration
         characters_config = config_data.get('characters', [])
+        ontology = config_data.get('Ontology', False)
+        activities = config_data.get('Activities', False)
         if isinstance(characters_config, dict):
             # Handle dict format: character_name: config
             for name, config in characters_config.items():
-                launcher.add_character(name, config)
+                new_config = config.copy()
+                new_config['ontology'] = ontology
+                new_config['activities'] = activities
+                new_config['characters'] = characters_config.copy()
+                launcher.add_character(name, new_config)
         elif isinstance(characters_config, list):
             # Handle list format: [{'name': 'Alice', ...}, ...]
             for char_config in characters_config:
+                new_config = char_config.copy()
                 if isinstance(char_config, dict):
                     name = char_config.get('name', f'character_{len(launcher.characters)}')
-                    config = {k: v for k, v in char_config.items() if k != 'name'}
-                    launcher.add_character(name, config)
+                    new_config = {k: v for k, v in char_config.items() if k != 'name'}
+                    new_config['ontology'] = ontology
+                    new_config['activities'] = activities
+                    new_config['characters'] = characters_config
+                    launcher.add_character(name, new_config)
         
     except Exception as e:
         print(f"Error loading config file '{config_path}': {e}")

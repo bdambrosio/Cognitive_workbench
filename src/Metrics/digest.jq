@@ -134,7 +134,7 @@ def _digest:
           }
       ),
       goal_satisfaction: (.metrics.goal_satisfaction // null),
-      summary_score: ($sj.plan_score // $sj.score // null),
+      summary_score: (.plan_score // .metrics.plan_score // $sj.plan_score // $sj.score // null),
       summary_outcome: ($sj.outcome // null),
       summary_rationale: ($sj.rationale // null),
       actions: (_actions_compact),
