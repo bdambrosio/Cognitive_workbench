@@ -22,21 +22,21 @@ A more Socratic approach might be to attempt to *ask* what they already know and
 
 Claim 2: A simple worldsim is 'near-natural', ie, is an instance of the 'sorts' of ontologies / universes-of-discourse an LLM has encountered in its training corpus.
 	As a result, they have formed an 'innate' 'ontology' of natural worlds.<br>
-	Innate - It is not necessarily explicitly represented in the LLM<br>
-	Ontology - High dimensional multi-valent relationship model among ...<br>
-Observations: 
+	**Innate** - It is not necessarily explicitly represented in the LLM<br>
+	**Ontology** - High dimensional multi-valent relationship model among ...<br>
+**Observation**: 
 	Most interesting problems in near-natural worlds are hard.
 	That doesn't seem to bother my cat.
 	
-Claim 3: Part of an LLMs 'knowledge' is the ability to generate excellent near-optimal solutions to many hard problems, including the hardest of all, framing, and the second-hardest, reflection.
+**Claim 3**: Part of an LLMs 'knowledge' is the ability to generate excellent near-optimal solutions to many hard problems, including the hardest of all, framing, and the second-hardest, reflection.
 
-Claim 4: To work with them in applications related to natural worlds, it is advantageous to speak their language.
+**Claim 4**: To work with them in applications related to natural worlds, it is advantageous to speak their language.
 
-Claim 5: This even works for reflective tasks like case selection and policy optimization.
+**Claim 5**: This even works for reflective tasks like case selection and policy optimization.
 
 # 9/12
 
-
+Giving a talk at the end of the month, so I've spent much of the last few weeks testing, instrumenting, running evaluations, even though the base system is incomplete and completely undocumented. Sorry. I'll get back to development (including SLAM fun) and documentation after Oct 3. 
 
 ### 8/17 - A huge commit, including:
 
