@@ -19,6 +19,7 @@ class RuralInfrastructure(Enum):
 class RuralResources(Enum):
     Market = auto()
     Farmhouse = auto()
+    Church = auto()
     Well = auto()
     Mill = auto()
     Hoe = auto()
@@ -107,6 +108,19 @@ resource_rules = {
             'remove_on_take': False,
             'requires_property': True,
             'use': [{"need": 'fatigue', "effect": -50}],
+            'terrain_weights': {
+                terrain_types.Grassland: 1.0,
+                terrain_types.Field: 1.0
+            }
+        },
+        {
+            'resource_type': resource_types.Church,
+            'description': 'A church for religious services',
+            'count': 1,
+            'has_npc': False,
+            'remove_on_take': False,
+            'requires_property': True,
+            'use': [{"need": 'fatigue', "effect": -20}],
             'terrain_weights': {
                 terrain_types.Grassland: 1.0,
                 terrain_types.Field: 1.0

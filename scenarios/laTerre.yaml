@@ -4,16 +4,14 @@ llm_config:
   server_name: "vllm"
   model_name: "llama3.3-70b-instruct"
 
-max_turns: 200
+max_turns: 100
 Ontology: True
 Activities: True
 
 setting: |
-  Summer morning in rural france, 19th century, a small village in the countryside.
-  The village is a small farming community with a few farms and a church.
-  The village is located in a valley with a river running through it.
+  Summer morning in rural france in the mid-19th century, a small village in the countryside.
   The village is a small farming community with a few farms, a market square, and a church.
-
+  The village is located in a valley with a river running through it.
 
 characters:
   Jean:

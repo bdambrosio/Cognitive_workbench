@@ -1311,7 +1311,7 @@ Do not include any other text, reasoning, introductory, expository, or markdown.
         try:
             # Extract character name from query key
             key_parts = str(query.key_expr).split('/')
-            character_name = key_parts[-3] if len(key_parts) > 2 else None
+            character_name = key_parts[3] if len(key_parts) > 3 else None
             if not character_name:
                 raise ValueError("No character name provided")
 

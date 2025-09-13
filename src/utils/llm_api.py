@@ -92,7 +92,7 @@ class LLM():
 
         return substituted_prompt
 
-    def run_request(self, substituted_prompt, top_p=1.0, temperature=0.7, max_tokens=400, stops=[], log=False, trace=False):
+    def run_request(self, substituted_prompt, top_p=1.0, temperature=0.7, max_tokens=400, stops=[], log=True, trace=False):
         global vllm_model
         #
         ### first substitute for {{$var-name}} in prompt
