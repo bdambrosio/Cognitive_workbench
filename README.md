@@ -7,7 +7,33 @@ Multiple characters can be defined in a simple 2 1/2 grid world. you define pers
 
 System even has a minimal UI that allows stepping, manual input of simple plans, etc.
 
-## 8/17 - A huge commit, including: ##
+#Background
+
+One goal of current work on LLMs is coherent long-term behavior.
+
+In coding, one measure is length of time of productive engagement.
+Techniques include SFT / DPO / GPRL / ... embed policies/... into weights.
+
+A more Socratic approach might be to attempt to *extract* what they already know.
+**Claim**: LLM base models 'know' more about 'natural' and 'near-natural' worlds than you do.
+	Evidence: they have been trained on Trillions of tokens of text about natural and near-natural worlds: textbooks, scholarly works, fiction, ...
+**Observation**: 
+	Near-natural worlds are Turing complete (mod infinity)
+
+Claim 2: A simple worldsim is 'near-natural', ie, is an instance of the 'sorts' of ontologies / universes-of-discourse an LLM has encountered in its training corpus.
+	As a result, they have formed an 'innate' 'ontology' of natural worlds.
+	Innate - It is not necessarily explicitly represented in the LLM
+	Ontology - High dimensional multi-valent relationship model among ...
+Observations: 
+	Most interesting problems in near-natural worlds are hard.
+	That doesn't seem to bother my cat.
+	
+Claim 3: Part of an LLMs 'knowledge' is the ability to generate excellent near-optimal solutions to many hard problems, including the hardest of all, framing, and the second-hardest, reflection.
+
+Claim 4: To work with them in applications related to natural worlds, it is advantageous to speak their language.
+
+### 8/17 - A huge commit, including:
+
 1. activity generation and management - Claim: Planning from scratch is a very rare event. Given a new situation, we adopt remembered roles and activities. 
 The new activity system 'remembers' offline, and generates a set of activity templates.
 Right now only instantiated for the lost.yaml scenario - see scenarios/Joe-activities.json and scenarios/Samantha-activities.json.
