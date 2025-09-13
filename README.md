@@ -18,6 +18,7 @@ A more Socratic approach might be to attempt to *ask* what they already know and
 
 **Claim**: LLM base models 'know' more about 'natural' and 'near-natural' worlds than you do.
 	Evidence: they have been trained on Trillions of tokens of text about natural and near-natural worlds: textbooks, scholarly works, fiction, ...
+ 
 **Observation**: 
 	Near-natural worlds are Turing complete (mod infinity)
 
@@ -25,6 +26,7 @@ Claim 2: A simple worldsim is 'near-natural', ie, is an instance of the 'sorts' 
 	As a result, they have formed an 'innate' 'ontology' of natural worlds.
 	Innate - It is not necessarily explicitly represented in the LLM
 	Ontology - High dimensional multi-valent relationship model among ...
+ 
 Observations: 
 	Most interesting problems in near-natural worlds are hard.
 	That doesn't seem to bother my cat.
