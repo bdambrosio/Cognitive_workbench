@@ -7,12 +7,12 @@ Multiple characters can be defined in a simple 2 1/2 grid world. you define pers
 
 System even has a minimal UI that allows stepping, manual input of simple plans, etc.
 
-#Background
+# Background
 
 One goal of current work on LLMs is coherent long-term behavior.
 
 In coding, one measure is length of time of productive engagement.
-Techniques include SFT / DPO / GPRL / ... embed policies/... into weights.
+Techniques include SFT / DPO / GPRO / ... embed policies/... into weights.
 
 A more Socratic approach might be to attempt to *extract* what they already know.
 **Claim**: LLM base models 'know' more about 'natural' and 'near-natural' worlds than you do.
@@ -31,6 +31,10 @@ Observations:
 Claim 3: Part of an LLMs 'knowledge' is the ability to generate excellent near-optimal solutions to many hard problems, including the hardest of all, framing, and the second-hardest, reflection.
 
 Claim 4: To work with them in applications related to natural worlds, it is advantageous to speak their language.
+
+# 9/12
+
+
 
 ### 8/17 - A huge commit, including:
 
