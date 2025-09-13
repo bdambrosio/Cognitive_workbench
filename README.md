@@ -14,7 +14,8 @@ One goal of current work on LLMs is coherent long-term behavior.
 In coding, one measure is length of time of productive engagement.
 Techniques include SFT / DPO / GPRO / ... embed policies/... into weights.
 
-A more Socratic approach might be to attempt to *extract* what they already know.
+A more Socratic approach might be to attempt to *ask* what they already know and how they prefer to say it.
+
 **Claim**: LLM base models 'know' more about 'natural' and 'near-natural' worlds than you do.
 	Evidence: they have been trained on Trillions of tokens of text about natural and near-natural worlds: textbooks, scholarly works, fiction, ...
 **Observation**: 
