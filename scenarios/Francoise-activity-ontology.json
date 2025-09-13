@@ -19,8 +19,8 @@
     },
     {
       "axis": [
-        "Low-Status",
-        "High-Status"
+        "LowStatus",
+        "HighStatus"
       ],
       "drive": "find a good husband to marry, gain status and security",
       "activity_itemclass": {
@@ -36,46 +36,20 @@
     },
     {
       "axis": [
-        "Low-Status",
-        "High-Status"
+        "LowStatus",
+        "HighStatus"
       ],
       "drive": "find a good husband to marry, gain status and security",
       "activity_itemclass": {
-        "activity": "Acquire",
-        "itemclass": "Dwelling",
-        "subtypes_included": [
-          "Farmhouse"
-        ]
-      }
-    },
-    {
-      "axis": [
-        "Low-Status",
-        "High-Status"
-      ],
-      "drive": "find a good husband to marry, gain status and security",
-      "activity_itemclass": {
-        "activity": "Acquire",
-        "itemclass": "WealthResource",
+        "activity": "Possess",
+        "itemclass": "Property",
         "subtypes_included": [
           "Farm",
+          "Farmhouse",
           "Market",
           "Blacksmith",
-          "Mill"
-        ]
-      }
-    },
-    {
-      "axis": [
-        "Insecure",
-        "Secure"
-      ],
-      "drive": "find a good husband to marry, gain status and security",
-      "activity_itemclass": {
-        "activity": "Secure",
-        "itemclass": "Dwelling",
-        "subtypes_included": [
-          "Farmhouse"
+          "Mill",
+          "Field"
         ]
       }
     },
@@ -87,112 +61,21 @@
       "drive": "find a good husband to marry, gain status and security",
       "activity_itemclass": {
         "activity": "Acquire",
-        "itemclass": "Sustenance",
+        "itemclass": "Shelter",
         "subtypes_included": [
-          "Bread",
-          "Apple",
-          "Chicken",
-          "Egg",
-          "Milk",
-          "Cheese",
-          "Butter"
+          "Farmhouse",
+          "Church"
         ]
       }
     },
     {
       "axis": [
-        "Disgraced",
-        "Respected"
+        "Insecure",
+        "Secure"
       ],
-      "drive": "avoid scandal and protecting your reputation",
+      "drive": "find a good husband to marry, gain status and security",
       "activity_itemclass": {
-        "activity": "Contribute",
-        "itemclass": "CommunityResource",
-        "subtypes_included": [
-          "Bread",
-          "Apple",
-          "Chicken",
-          "Egg",
-          "Milk",
-          "Cheese",
-          "Butter"
-        ]
-      }
-    },
-    {
-      "axis": [
-        "Disgraced",
-        "Respected"
-      ],
-      "drive": "avoid scandal and protecting your reputation",
-      "activity_itemclass": {
-        "activity": "Assist",
-        "itemclass": "Neighbor",
-        "subtypes_included": [
-          "Jean",
-          "Francoise",
-          "FatherMarquart",
-          "MotherMarquart"
-        ]
-      }
-    },
-    {
-      "axis": [
-        "Disgraced",
-        "Respected"
-      ],
-      "drive": "avoid scandal and protecting your reputation",
-      "activity_itemclass": {
-        "activity": "Maintain",
-        "itemclass": "Dwelling",
-        "subtypes_included": [
-          "Farmhouse"
-        ]
-      }
-    },
-    {
-      "axis": [
-        "GossipedAbout",
-        "Private"
-      ],
-      "drive": "avoid scandal and protecting your reputation",
-      "activity_itemclass": {
-        "activity": "Limit",
-        "itemclass": "PublicInteraction",
-        "subtypes_included": [
-          "Market",
-          "Village",
-          "Path",
-          "Farm",
-          "Blacksmith"
-        ]
-      }
-    },
-    {
-      "axis": [
-        "Neglected",
-        "Responsible"
-      ],
-      "drive": "avoid scandal and protecting your reputation",
-      "activity_itemclass": {
-        "activity": "Tend",
-        "itemclass": "FarmTask",
-        "subtypes_included": [
-          "Hoe",
-          "Plow",
-          "Scythe",
-          "Farm"
-        ]
-      }
-    },
-    {
-      "axis": [
-        "Hungry",
-        "Not-Hungry"
-      ],
-      "drive": "help your family with the endless chores",
-      "activity_itemclass": {
-        "activity": "Provide",
+        "activity": "Acquire",
         "itemclass": "Food",
         "subtypes_included": [
           "Bread",
@@ -207,42 +90,95 @@
     },
     {
       "axis": [
-        "Thirsty",
-        "Not-Thirsty"
+        "Insecure",
+        "Secure"
       ],
-      "drive": "help your family with the endless chores",
+      "drive": "find a good husband to marry, gain status and security",
       "activity_itemclass": {
-        "activity": "Supply",
-        "itemclass": "Drink",
+        "activity": "Acquire",
+        "itemclass": "WaterSource",
         "subtypes_included": [
-          "Water",
-          "Milk"
+          "Well",
+          "Spring"
         ]
       }
     },
     {
       "axis": [
-        "Fatigued",
-        "Rested"
+        "Exposed",
+        "Not-Exposed"
       ],
-      "drive": "help your family with the endless chores",
+      "drive": "avoid scandal and protecting your reputation",
       "activity_itemclass": {
-        "activity": "Facilitate Rest",
-        "itemclass": "Resting Place",
+        "activity": "Conceal",
+        "itemclass": "Location",
         "subtypes_included": [
+          "Farmhouse",
+          "Church",
+          "Blacksmith",
+          "Mill",
+          "Well",
+          "Market",
+          "Village",
+          "Farm"
+        ]
+      }
+    },
+    {
+      "axis": [
+        "Suspected",
+        "Not-Suspected"
+      ],
+      "drive": "avoid scandal and protecting your reputation",
+      "activity_itemclass": {
+        "activity": "Associate",
+        "itemclass": "RespectedPerson",
+        "subtypes_included": [
+          "FatherMarquart",
+          "MotherMarquart"
+        ]
+      }
+    },
+    {
+      "axis": [
+        "Gossiped-About",
+        "Ignored"
+      ],
+      "drive": "avoid scandal and protecting your reputation",
+      "activity_itemclass": {
+        "activity": "Avoid",
+        "itemclass": "GatheringPlace",
+        "subtypes_included": [
+          "Market",
+          "Church",
+          "Village",
           "Farmhouse"
         ]
       }
     },
     {
       "axis": [
-        "Fields Untended",
-        "Fields Tended"
+        "Impious",
+        "Pious"
+      ],
+      "drive": "avoid scandal and protecting your reputation",
+      "activity_itemclass": {
+        "activity": "Attend",
+        "itemclass": "PlaceOfWorship",
+        "subtypes_included": [
+          "Church"
+        ]
+      }
+    },
+    {
+      "axis": [
+        "Dirty Farm",
+        "Clean Farm"
       ],
       "drive": "help your family with the endless chores",
       "activity_itemclass": {
         "activity": "Tend",
-        "itemclass": "Farm Tool",
+        "itemclass": "Field Tool",
         "subtypes_included": [
           "Hoe",
           "Plow",
@@ -252,15 +188,14 @@
     },
     {
       "axis": [
-        "Resources Absent",
-        "Resources Available"
+        "Unfed Family",
+        "Fed Family"
       ],
       "drive": "help your family with the endless chores",
       "activity_itemclass": {
-        "activity": "Obtain",
-        "itemclass": "Resource",
+        "activity": "Prepare",
+        "itemclass": "Food",
         "subtypes_included": [
-          "Water",
           "Bread",
           "Apple",
           "Chicken",
@@ -273,15 +208,32 @@
     },
     {
       "axis": [
-        "Fatigued",
-        "Rested"
+        "Thirsty Family",
+        "Hydrated Family"
       ],
-      "drive": "brief moments of rest and simple joys amid the hardships",
+      "drive": "help your family with the endless chores",
       "activity_itemclass": {
-        "activity": "Recover",
-        "itemclass": "Shelter",
+        "activity": "Fetch",
+        "itemclass": "Water Source",
         "subtypes_included": [
-          "Farmhouse"
+          "Well",
+          "Spring",
+          "Milk"
+        ]
+      }
+    },
+    {
+      "axis": [
+        "Fatigued Family",
+        "Rested Family"
+      ],
+      "drive": "help your family with the endless chores",
+      "activity_itemclass": {
+        "activity": "Enable Rest",
+        "itemclass": "Place of Rest",
+        "subtypes_included": [
+          "Farmhouse",
+          "Church"
         ]
       }
     },
@@ -292,7 +244,22 @@
       ],
       "drive": "brief moments of rest and simple joys amid the hardships",
       "activity_itemclass": {
-        "activity": "Refresh",
+        "activity": "Rest",
+        "itemclass": "Shelter",
+        "subtypes_included": [
+          "Farmhouse",
+          "Church"
+        ]
+      }
+    },
+    {
+      "axis": [
+        "Fatigued",
+        "Rested"
+      ],
+      "drive": "brief moments of rest and simple joys amid the hardships",
+      "activity_itemclass": {
+        "activity": "Recover",
         "itemclass": "WaterSource",
         "subtypes_included": [
           "Well",
@@ -302,10 +269,135 @@
     },
     {
       "axis": [
+        "Joyless",
+        "Joyful"
+      ],
+      "drive": "brief moments of rest and simple joys amid the hardships",
+      "activity_itemclass": {
+        "activity": "Enjoy",
+        "itemclass": "Food",
+        "subtypes_included": [
+          "Bread",
+          "Apple",
+          "Chicken",
+          "Egg",
+          "Milk",
+          "Cheese",
+          "Butter"
+        ]
+      }
+    },
+    {
+      "axis": [
+        "Joyless",
+        "Joyful"
+      ],
+      "drive": "brief moments of rest and simple joys amid the hardships",
+      "activity_itemclass": {
+        "activity": "Relax",
+        "itemclass": "NaturalSetting",
+        "subtypes_included": [
+          "Mountain",
+          "Forest",
+          "Grassland",
+          "Field",
+          "Path",
+          "Spring"
+        ]
+      }
+    },
+    {
+      "axis": [
+        "Thirsty",
+        "Not-Thirsty"
+      ],
+      "drive": "Maintain hydration \u2014 avoid thirst and keep the body supplied with fluids.",
+      "activity_itemclass": {
+        "activity": "Consume",
+        "itemclass": "Drink",
+        "subtypes_included": [
+          "Water",
+          "Milk"
+        ]
+      }
+    },
+    {
+      "axis": [
+        "Thirsty",
+        "Not-Thirsty"
+      ],
+      "drive": "Maintain hydration \u2014 avoid thirst and keep the body supplied with fluids.",
+      "activity_itemclass": {
+        "activity": "Consume",
+        "itemclass": "Moist_Food",
+        "subtypes_included": [
+          "Milk"
+        ]
+      }
+    },
+    {
+      "axis": [
+        "Has_No_Water_Source",
+        "Has_Water_Source"
+      ],
+      "drive": "Maintain hydration \u2014 avoid thirst and keep the body supplied with fluids.",
+      "activity_itemclass": {
+        "activity": "Access",
+        "itemclass": "Natural_Water_Source",
+        "subtypes_included": [
+          "Spring"
+        ]
+      }
+    },
+    {
+      "axis": [
+        "Has_No_Water_Source",
+        "Has_Water_Source"
+      ],
+      "drive": "Maintain hydration \u2014 avoid thirst and keep the body supplied with fluids.",
+      "activity_itemclass": {
+        "activity": "Access",
+        "itemclass": "Artificial_Water_Source",
+        "subtypes_included": [
+          "Well"
+        ]
+      }
+    },
+    {
+      "axis": [
+        "Fatigued",
+        "Rested"
+      ],
+      "drive": "Maintain alertness \u2014 avoid fatigue and keep the body rested.",
+      "activity_itemclass": {
+        "activity": "Rest",
+        "itemclass": "Shelter",
+        "subtypes_included": [
+          "Farmhouse",
+          "Church"
+        ]
+      }
+    },
+    {
+      "axis": [
+        "Fatigued",
+        "Rested"
+      ],
+      "drive": "Maintain alertness \u2014 avoid fatigue and keep the body rested.",
+      "activity_itemclass": {
+        "activity": "Relax",
+        "itemclass": "WaterSource",
+        "subtypes_included": [
+          "Well"
+        ]
+      }
+    },
+    {
+      "axis": [
         "Hungry",
         "Not-Hungry"
       ],
-      "drive": "brief moments of rest and simple joys amid the hardships",
+      "drive": "Maintain energy \u2014 avoid hunger and keep the body supplied with nutrients.",
       "activity_itemclass": {
         "activity": "Eat",
         "itemclass": "Food",
@@ -325,172 +417,14 @@
         "Thirsty",
         "Not-Thirsty"
       ],
-      "drive": "brief moments of rest and simple joys amid the hardships",
-      "activity_itemclass": {
-        "activity": "Drink",
-        "itemclass": "Beverage",
-        "subtypes_included": [
-          "Water",
-          "Milk",
-          "Well",
-          "Spring"
-        ]
-      }
-    },
-    {
-      "axis": [
-        "Joyless",
-        "Joyful"
-      ],
-      "drive": "brief moments of rest and simple joys amid the hardships",
-      "activity_itemclass": {
-        "activity": "Experience",
-        "itemclass": "SimplePleasure",
-        "subtypes_included": [
-          "Apple",
-          "Milk",
-          "Cheese",
-          "Butter",
-          "Chicken",
-          "Egg"
-        ]
-      }
-    },
-    {
-      "axis": [
-        "Thirsty",
-        "Not-Thirsty"
-      ],
-      "drive": "Maintain hydration \u2014 avoid thirst and keep the body supplied with fluids.",
-      "activity_itemclass": {
-        "activity": "Consume",
-        "itemclass": "Fluid",
-        "subtypes_included": [
-          "Water",
-          "Milk"
-        ]
-      }
-    },
-    {
-      "axis": [
-        "Thirsty",
-        "Not-Thirsty"
-      ],
-      "drive": "Maintain hydration \u2014 avoid thirst and keep the body supplied with fluids.",
-      "activity_itemclass": {
-        "activity": "Consume",
-        "itemclass": "Moist Food",
-        "subtypes_included": [
-          "Milk"
-        ]
-      }
-    },
-    {
-      "axis": [
-        "Thirsty",
-        "Not-Thirsty"
-      ],
-      "drive": "Maintain hydration \u2014 avoid thirst and keep the body supplied with fluids.",
-      "activity_itemclass": {
-        "activity": "Utilize",
-        "itemclass": "Water Source",
-        "subtypes_included": [
-          "Well",
-          "Spring"
-        ]
-      }
-    },
-    {
-      "axis": [
-        "Dehydrated",
-        "Hydrated"
-      ],
-      "drive": "Maintain hydration \u2014 avoid thirst and keep the body supplied with fluids.",
-      "activity_itemclass": {
-        "activity": "Access",
-        "itemclass": "Water Source",
-        "subtypes_included": [
-          "Well",
-          "Spring"
-        ]
-      }
-    },
-    {
-      "axis": [
-        "Dehydrated",
-        "Hydrated"
-      ],
-      "drive": "Maintain hydration \u2014 avoid thirst and keep the body supplied with fluids.",
-      "activity_itemclass": {
-        "activity": "Purchase",
-        "itemclass": "Drinkable Item",
-        "subtypes_included": [
-          "Milk",
-          "Water"
-        ]
-      }
-    },
-    {
-      "axis": [
-        "Fatigued",
-        "Rested"
-      ],
-      "drive": "Maintain alertness \u2014 avoid fatigue and keep the body rested.",
-      "activity_itemclass": {
-        "activity": "Recover",
-        "itemclass": "Shelter",
-        "subtypes_included": [
-          "Farmhouse"
-        ]
-      }
-    },
-    {
-      "axis": [
-        "Fatigued",
-        "Rested"
-      ],
-      "drive": "Maintain alertness \u2014 avoid fatigue and keep the body rested.",
-      "activity_itemclass": {
-        "activity": "Rejuvenate",
-        "itemclass": "Water source",
-        "subtypes_included": [
-          "Well",
-          "Spring"
-        ]
-      }
-    },
-    {
-      "axis": [
-        "Hungry",
-        "Not-Hungry"
-      ],
-      "drive": "Maintain energy \u2014 avoid hunger and keep the body supplied with nutrients.",
-      "activity_itemclass": {
-        "activity": "Ingest",
-        "itemclass": "Food",
-        "subtypes_included": [
-          "Bread",
-          "Apple",
-          "Chicken",
-          "Egg",
-          "Milk",
-          "Cheese",
-          "Butter"
-        ]
-      }
-    },
-    {
-      "axis": [
-        "Thirsty",
-        "Not-Thirsty"
-      ],
       "drive": "Maintain energy \u2014 avoid hunger and keep the body supplied with nutrients.",
       "activity_itemclass": {
         "activity": "Drink",
-        "itemclass": "Liquid",
+        "itemclass": "Drinkable",
         "subtypes_included": [
           "Water",
-          "Milk"
+          "Milk",
+          "Spring"
         ]
       }
     }
@@ -498,53 +432,44 @@
   "verbs": [
     "FormUnion",
     "AssociateWith",
+    "Possess",
     "Acquire",
-    "Secure",
-    "Contribute",
-    "Assist",
-    "Maintain",
-    "Limit",
+    "Conceal",
+    "Associate",
+    "Avoid",
+    "Attend",
     "Tend",
-    "Provide",
-    "Supply",
-    "Facilitate Rest",
-    "Obtain",
+    "Prepare",
+    "Fetch",
+    "Enable Rest",
+    "Rest",
     "Recover",
-    "Refresh",
-    "Eat",
-    "Drink",
-    "Experience",
+    "Enjoy",
+    "Relax",
     "Consume",
-    "Utilize",
     "Access",
-    "Purchase",
-    "Rejuvenate",
-    "Ingest"
+    "Eat",
+    "Drink"
   ],
   "nouns": [
     "Person",
-    "Dwelling",
-    "WealthResource",
-    "Sustenance",
-    "CommunityResource",
-    "Neighbor",
-    "PublicInteraction",
-    "FarmTask",
-    "Food",
-    "Drink",
-    "Resting Place",
-    "Farm Tool",
-    "Resource",
+    "Property",
     "Shelter",
+    "Food",
     "WaterSource",
-    "Beverage",
-    "SimplePleasure",
-    "Fluid",
-    "Moist Food",
+    "Location",
+    "RespectedPerson",
+    "GatheringPlace",
+    "PlaceOfWorship",
+    "Field Tool",
     "Water Source",
-    "Drinkable Item",
-    "Water source",
-    "Liquid"
+    "Place of Rest",
+    "NaturalSetting",
+    "Drink",
+    "Moist_Food",
+    "Natural_Water_Source",
+    "Artificial_Water_Source",
+    "Drinkable"
   ],
   "noun_mappings": {
     "Person": [
@@ -553,51 +478,17 @@
       "FatherMarquart",
       "MotherMarquart"
     ],
-    "Dwelling": [
-      "Farmhouse"
-    ],
-    "WealthResource": [
+    "Property": [
       "Farm",
+      "Farmhouse",
       "Market",
       "Blacksmith",
-      "Mill"
+      "Mill",
+      "Field"
     ],
-    "Sustenance": [
-      "Bread",
-      "Apple",
-      "Chicken",
-      "Egg",
-      "Milk",
-      "Cheese",
-      "Butter"
-    ],
-    "CommunityResource": [
-      "Bread",
-      "Apple",
-      "Chicken",
-      "Egg",
-      "Milk",
-      "Cheese",
-      "Butter"
-    ],
-    "Neighbor": [
-      "Jean",
-      "Francoise",
-      "FatherMarquart",
-      "MotherMarquart"
-    ],
-    "PublicInteraction": [
-      "Market",
-      "Village",
-      "Path",
-      "Farm",
-      "Blacksmith"
-    ],
-    "FarmTask": [
-      "Hoe",
-      "Plow",
-      "Scythe",
-      "Farm"
+    "Shelter": [
+      "Farmhouse",
+      "Church"
     ],
     "Food": [
       "Bread",
@@ -608,71 +499,72 @@
       "Cheese",
       "Butter"
     ],
-    "Drink": [
-      "Water",
-      "Milk"
-    ],
-    "Resting Place": [
-      "Farmhouse"
-    ],
-    "Farm Tool": [
-      "Hoe",
-      "Plow",
-      "Scythe"
-    ],
-    "Resource": [
-      "Water",
-      "Bread",
-      "Apple",
-      "Chicken",
-      "Egg",
-      "Milk",
-      "Cheese",
-      "Butter"
-    ],
-    "Shelter": [
-      "Farmhouse"
-    ],
     "WaterSource": [
       "Well",
       "Spring"
     ],
-    "Beverage": [
-      "Water",
-      "Milk",
+    "Location": [
+      "Farmhouse",
+      "Church",
+      "Blacksmith",
+      "Mill",
       "Well",
-      "Spring"
+      "Market",
+      "Village",
+      "Farm"
     ],
-    "SimplePleasure": [
-      "Apple",
-      "Milk",
-      "Cheese",
-      "Butter",
-      "Chicken",
-      "Egg"
+    "RespectedPerson": [
+      "FatherMarquart",
+      "MotherMarquart"
     ],
-    "Fluid": [
-      "Water",
-      "Milk"
+    "GatheringPlace": [
+      "Market",
+      "Church",
+      "Village",
+      "Farmhouse"
     ],
-    "Moist Food": [
-      "Milk"
+    "PlaceOfWorship": [
+      "Church"
+    ],
+    "Field Tool": [
+      "Hoe",
+      "Plow",
+      "Scythe"
     ],
     "Water Source": [
       "Well",
+      "Spring",
+      "Milk"
+    ],
+    "Place of Rest": [
+      "Farmhouse",
+      "Church"
+    ],
+    "NaturalSetting": [
+      "Mountain",
+      "Forest",
+      "Grassland",
+      "Field",
+      "Path",
       "Spring"
     ],
-    "Drinkable Item": [
-      "Milk",
-      "Water"
-    ],
-    "Water source": [
-      "Well",
-      "Spring"
-    ],
-    "Liquid": [
+    "Drink": [
       "Water",
       "Milk"
+    ],
+    "Moist_Food": [
+      "Milk"
+    ],
+    "Natural_Water_Source": [
+      "Spring"
+    ],
+    "Artificial_Water_Source": [
+      "Well"
+    ],
+    "Drinkable": [
+      "Water",
+      "Milk",
+      "Spring"
     ]
   }
 }

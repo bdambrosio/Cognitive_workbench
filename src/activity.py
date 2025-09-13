@@ -289,6 +289,7 @@ class ActivityManager:
         self.current_activity = None
         self.current_activity_state = None
         self.current_activity_next_step = None
+        self.current_plan = None
         self.activity_history = []
         self.activity_state_deltas = []
         self.previous_activity = None

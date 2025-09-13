@@ -39,14 +39,45 @@ if [[ "$IDX" -gt "$TOTAL" ]]; then IDX="$TOTAL"; fi
 render() {
   clear
   echo "[${IDX}/${TOTAL}] file: ${FILE} · mode: ${MODE}"
-  # Brief metrics header (goal_satisfaction, plan_score)
+  # Brief metrics header (goal_satisfaction, plan_score, drive_score)
   if [[ "$MODE" == "text" ]]; then
-    GS=$(sed -n "${IDX}p" "$FILE" | jq -r -f "$DIGEST" --arg mode json 2>/dev/null | jq -r '.goal_satisfaction // "n/a"' 2>/dev/null || echo "n/a")
-    PS=$(sed -n "${IDX}p" "$FILE" | jq -r -f "$DIGEST" --arg mode json 2>/dev/null | jq -r '.summary_score // "n/a"' 2>/dev/null || echo "n/a")
-    echo "goal_satisfaction: ${GS} | plan_score: ${PS}"
+    # Read directly from raw JSON as a robust fallback
+    GS=$(sed -n "${IDX}p" "$FILE" | jq -r '.metrics.goal_satisfaction // "n/a"' 2>/dev/null || echo "n/a")
+    PS=$(sed -n "${IDX}p" "$FILE" | jq -r '(.metrics.plan_score // .plan_score) // "n/a"' 2>/dev/null || echo "n/a")
+    DS=$(sed -n "${IDX}p" "$FILE" | jq -r '
+      (.metrics.drive_fulfillment.drives // []) as $dr
+      | ($dr|length) as $n
+      | ($n == 0) as $empty
+      | (.metrics.goal_satisfaction // null) as $gs
+      | if $empty or ($gs==null) then null else
+          ( (1 - 0.5) / ( ($n - 1) // 1 ) ) as $alpha
+          | [ range(0; $n) as $i | 1 - ($alpha * $i) ] as $raw
+          | ($raw | add) as $sum
+          | (if $sum == 0 then [ range(0; $n) | (1.0 / (($n // 1) // 1)) ] else [ $raw[] / $sum ] end) as $w
+          | reduce range(0; $n) as $i (0; . + ( ( ($dr[$i].plan_score // $dr[$i].score // 0) * $gs ) * $w[$i] ) )
+        end // "n/a"' 2>/dev/null || echo "n/a")
+    echo "goal_satisfaction: ${GS} | plan_score: ${PS} | drive_score: ${DS}"
   fi
   echo "────────────────────────────────────────────────────────────"
-  sed -n "${IDX}p" "$FILE" | jq -r -f "$DIGEST" --arg mode "$MODE" || echo "(parse error)"
+  BODY=$(sed -n "${IDX}p" "$FILE" | jq -r -f "$DIGEST" --arg mode "$MODE" 2>/dev/null || true)
+  # If text mode, inject activity (if present) just above the line that starts with "goal: "
+  if [[ "$MODE" == "text" ]]; then
+    ACT=$(sed -n "${IDX}p" "$FILE" | jq -r '.activity // empty' 2>/dev/null || true)
+    # Treat None/null/false as no activity
+    if [[ -n "$ACT" ]]; then
+      low_act="${ACT,,}"
+      if [[ "$low_act" != "none" && "$low_act" != "false" ]]; then
+        if [[ -n "$BODY" ]]; then
+          BODY=$(printf "%s\n" "$BODY" | awk -v act="$ACT" 'BEGIN{ins=0} { if(ins==0 && $0 ~ /^goal: /){ print "activity: " act; ins=1 } print }')
+        fi
+      fi
+    fi
+  fi
+  if [[ -n "$BODY" ]]; then
+    printf "%s\n" "$BODY"
+  else
+    echo "(no digest data)"
+  fi
   echo "────────────────────────────────────────────────────────────"
   echo "(n)ext (p)rev (j)ump (t)oggle json/text (q)uit"
 }

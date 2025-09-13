@@ -84,7 +84,9 @@ Step 1: Identify AXES
 
 Step 2: For each AXIS, generate 1-3 ACTIVITY–ITEMCLASS pairs. Choose a set of pairs that covers the widest range of possible activities consistent with the drive and axis. 
 - **Activity**: A verb consistent with the axis that, when combined with the ItemClass, would move the agent from the negative to the positive state. 
-  Verbs should not be drawn from the primitive verbs, but rather should express a general action that is consistent with the axis, e.g. Acquire rather than Take.
+      Verbs should not be drawn from the primitive verbs, but rather should express a general action that is consistent with the axis, e.g. Acquire rather than Take.
+  Having said that, when introducing a new verb, test it by attempting to perform a decomposition into steps that can be performed using primitive verbs. 
+  Prefer verbs where you can find such a decomposition.
 - **ItemClass**: a general category noun. The noun should be as general as possible consistent with the activity, and must include at least one base noun from the ontology as a subtype.
 - **Subtypes included**: base nouns that instantiate or function as sources of this ItemClass. When ambiguous, err on the side of inclusivity.     
 
@@ -218,7 +220,7 @@ You may use them as a guide to generate activities that are more specific to the
 ##
 
 **Use only ONTOLOGY NOUNS, ONTOLOGY VERBS, BASE NOUNS, and BASE VERBS to fill in the where and needs fields. Do not invent new nouns or verbs.**
-Include self-care actions that remediate flagging physiological states (e.g. eating reduces hunger, rest reduces fatigue, injury or sickness). 
+Include self-care actions that remediate flagging physiological states (e.g. eating reduces hunger, rest reduces fatigue, injury or sickness), but again the nouns and verbs must be from the ontology or base types and actions. 
 Make sure to specify which states each activity addresses in the "states_addressed" field.
 
 #Characters you might encounter or interact with (if any):
@@ -298,7 +300,7 @@ Consider in addition to the information above:
 #You MUST use ONLY verbs and nouns from the ONTOLOGY below. Use the exact 'id' strings (case-sensitive). 
  - Do NOT introduce synonyms (e.g., use 'Acquire' not 'Find'). If a needed concept is absent, pick the closest available ONTOLOGY term rather than inventing a new one.
  - Outside ONTOLOGY terms, you may use only non-content words and connectors, e.g.:
-{a, an, the, this, that, these, those, of, to, from, for, with, near, toward, by, and, or, if, until, then}.
+  {a, an, the, this, that, these, those, of, to, from, for, with, near, toward, by, and, or, if, until, then}.
 You may also use concrete instance IDs visible in the situation (e.g., Appletree7, Spring3) and numerals.
  - No other content words are allowed.
 
@@ -482,41 +484,41 @@ PLAN_TEMPLATE_C = """
 PLAN_TEMPLATE = PLAN_TEMPLATE_A + PLAN_TEMPLATE_B + PLAN_TEMPLATE_C
 
 DRIVE_ASSESSMENT_TEMPLATE = """TASK:
-Assess how well the following Drive was aligned with the following Goal and Plan (0.0 worst to 1.0 best) based on the provided context. 
+Assess how well  the following Goal and Plan were aligned with (supportive of) the following Drive (0.0 worst to 1.0 best) based on the provided context. 
 Be strict and conservative. 
 Return ONLY a JSON object: {score": float, "rationale": a terse string}]}
 
-Drive:
+#Drive:
 {{$drive}}
 
-Goal:
+#Goal:
 {{$goal}}
 
-Plan:
+#Plan:
 {{$plan}}
 
-Physiological state (0=best,100=worst):
+#Physiological state (0=best,100=worst):
 {{$state}}
 
-Inventory (ids):
+#Inventory (ids):
 {{$inventory}}
 
-Recent conversations (last 10):
+#Recent conversations (last 10):
 {{$chats}}
 
-Knowledge gained - thoughts:
+#Knowledge gained - thoughts:
 {{$thoughts}}
 
-Knowledge gained - inspections:
+#Knowledge gained - inspections:
 {{$inspects_map}}
 
-Knowledge gained - uses:
+#Knowledge gained - uses:
 {{$uses_map}}
 
-Recent actions (last 20):
+#Recent actions (last 20):
 {{$actions}}
 
 Instructions:
 Generate a score in [0.0,1.0] where 1.0 means perfectly aligned, 0.0 means completely unrelated. Use very concise rationales.
-Return ONLY a JSON object: {"score": float, "rationale": a terse string}]}"""
+Return ONLY a JSON object: {"score": float, "rationale": a terse string}"""
 

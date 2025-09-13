@@ -31,7 +31,7 @@ logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     datefmt='%Y-%m-%d %H:%M:%S',
-    handlers=[console_handler, file_handler],
+    handlers=[file_handler],
     force=True
 )
 logger = logging.getLogger('llm_service_node')
@@ -195,7 +195,7 @@ class ZenohLLMServiceNode:
             
             # Log the first message as a preview
             preview_text = str(llm_request.messages[0])[:50] if llm_request.messages else "empty"
-            logger.info(f'📥 Received LLM request {request_id}: "{preview_text}..."')
+            logger.info(f'\n📥 Received LLM request {request_id}:\n "{'\n'.join(llm_request.messages)}..."\n')
             
             # Check if thread pool is still active before submitting
             if self.thread_pool._shutdown:
@@ -268,7 +268,7 @@ class ZenohLLMServiceNode:
                     success=True,
                     request_id=request_id
                 )
-                
+                logger.info(f'\n📤 Completed LLM request {request_id} in {time.time() - start_time:.2f}s\n{response_text}\n')
                 self.request_stats['successful_requests'] += 1
                 
             else:

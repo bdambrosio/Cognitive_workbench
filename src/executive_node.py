@@ -562,6 +562,28 @@ class ZenohExecutiveNode:
             # Non-fatal; continue OODA
             pass
 
+    def check_physiological_overrides(self):
+        physiological_drives = {"thirst": """Maintain hydration — avoid thirst and keep the body supplied with fluids.""", 
+            "fatigue":"""Maintain alertness — avoid fatigue and keep the body rested.""", 
+            "hunger":"""Maintain energy — avoid hunger and keep the body supplied with nutrients."""}
+        if self.self_state:
+            worst_state_value = 0
+            worst_state_key = None
+            for key, item in self.self_state.items():
+                if item['value'] > 75:
+                    logger.warning(f'{self.character_name} is in danger of death')
+                    if item['value'] > worst_state_value:
+                        worst_state_value = item['value']
+                        worst_state_key = key
+            if worst_state_key and self.current_goal and worst_state_key not in self.current_goal.name:
+                self.current_goal = plan_module.Goal(physiological_drives[worst_state_key], actors=[self.character_name], termination=f'{worst_state_key} below 50')
+                self.current_activity = None
+                self.current_step = None
+                self._plan_completed(reason='physiological override')
+                return self.current_goal
+        return None
+
+
     def _run_ooda_loop(self):
         """Execute the OODA loop: Observe, Orient, Decide, Act."""
         try:
@@ -582,69 +604,89 @@ class ZenohExecutiveNode:
                 return
             
             # Check for active activity and get current step
+            previous_step = self.current_step
+            previous_goal = self.current_goal
+            previous_plan = self.current_plan
+
+            if self.current_plan:
+                action, status = self._plan_step(self.current_plan)
+                if action is not None:
+                    return
+                
+            physiological_override = self.check_physiological_overrides()
+            if physiological_override:
+                self.current_goal = physiological_override
+                self._publish_goal(self.current_goal)
+                logger.info(f'🎯 {self.character_name} oriented to goal: {self.current_goal.to_string()}')
+                action, status = self.plan_and_initiate_execution(physiological_override)
+                self.activity_manager.current_plan = self.current_plan
+                return
+
             if self.activity_manager and self.activity_manager.has_active_activity():
                 should_continue, reason = self.activity_manager.continue_activity()
                 if should_continue:
                     self.current_step = self.activity_manager.activity_step()  # Get current step without advancing
-                    logger.info(f'🎯 {self.character_name} continuing activity: {self.current_activity["name"]}')
+                    logger.info(f'🎯 {self.character_name} continuing activity: {self.current_activity["name"]} step: {self.current_step["name"]}')
+                    self.current_goal = plan_module.Goal(self.current_step['name'], self.current_step['actors'], self.current_step['description'], self.current_step['termination'])
+                    logger.info(f'🎯 {self.character_name} oriented to goal: {self.current_goal.to_string()}')
+                    action, status = self.plan_and_initiate_execution(self.current_goal)
+                    self.activity_manager.current_plan = self.current_plan
+                    return
                 else:
-                    # Abandon current activity
-                    self.activity_manager.step_completion('failure', reason)
+                    # Abandon current activity - this will cause next block to select new activity
+                    self.activity_manager._complete_activity()
                     self.current_step = None
                     self.current_activity = None
                     self.current_goal = None
                     self.current_plan = None
-                    self._publish_current_activity()
-                    logger.info(f'🚫 {self.character_name} abandoned activity: {reason}')
-                    # Fall through to select new activity
-            else:
-                logger.info(f'🚫 {self.character_name} Activities not active')
+
+
             # No active activity or current one was abandoned - select new one
             if self.activity_manager and not self.activity_manager.has_active_activity():
                 self.current_step, self.current_activity = self.activity_manager.select_activity()
-                self.current_goal = None
+                if self.current_activity:
+                    self.current_goal = None
                 self._publish_current_activity()
                 if self.current_step and self.current_activity:
                     logger.info(f'🎯 {self.character_name} starting new activity: {self.current_activity["name"]}')
                 else:
                     logger.warning(f'🚫 {self.character_name} no activity selected')
-            
 
-            # Convert step to goal or use existing goal/orient
-            new_goal = self.current_goal # this should only be if we have a new step
             if self.current_step:
-                # Only create new goal if we don't have the right one already
-                if not self.current_goal or self.current_goal.name != self.current_step['name']:
-                    new_goal = plan_module.Goal(self.current_step['name'], self.current_step['actors'], self.current_step['description'], self.current_step['termination'])
-
-            prev_goal = self.current_goal
-            self.current_goal = self._orient(observations, new_goal)
-            if self.current_goal != prev_goal:
+                self.current_goal = plan_module.Goal(self.current_step['name'], self.current_step['actors'], self.current_step['description'], self.current_step['termination'])
                 self._publish_goal(self.current_goal)
-                self._plan_completed(reason='goal changed')
-            logger.info(f'🎯 {self.character_name} oriented to goal: {self.current_goal.to_string()}')
-
-            # Plan: Return existing plan or create single-action plan
-            plan = self._plan(self.current_goal)
-            if not plan:
-                logger.warning(f'🚫 {self.character_name} no plan found for goal: {self.current_goal.to_string()}')
+                logger.info(f'🎯 {self.character_name} oriented to goal: {self.current_goal.to_string()}')
+                action, status = self.plan_and_initiate_execution(self.current_goal)
                 return
 
-            # Plan Step: Execute current step of plan
-            action = self._plan_step(plan)
+            self.current_goal = self._orient(observations)
+            if self.current_goal:
+                self._publish_goal(self.current_goal)
+                logger.info(f'🎯 {self.character_name} oriented to goal: {self.current_goal.to_string()}')
+                action, status = self.plan_and_initiate_execution(self.current_goal)
+                return
 
-            # Act: Execute the chosen action (if we have one)
-            if action is not None:
-                action_succeeded = self._act(action)
-                if not action_succeeded:
-                    # Action failed (e.g., conversation lock unavailable)
-                    logger.info(f'Action failed for {self.character_name}')
-                    return
-            
         except Exception as e:
             logger.error(f'Error in OODA loop: {e}')
             traceback.format_exc()
         return
+
+
+    def plan_and_initiate_execution(self, goal):
+        """Plan and execute a goal."""
+        # Plan: Return existing plan or create single-action plan
+        plan = self._plan(self.current_goal)
+        self.current_plan = plan
+        if not plan:
+            logger.warning(f'🚫 {self.character_name} no plan found for goal: {self.current_goal.to_string()}')
+            return
+
+        # Plan Step: Execute current step of plan
+        action, action_succeeded = self._plan_step(self.current_plan)
+        if not action_succeeded:
+            # Action failed (e.g., conversation lock unavailable)
+            logger.warning(f'Action {action} failed for {self.character_name}')
+        return action, action_succeeded
 
     def format_situation(self):
         """Format the situation data for the LLM."""
@@ -787,21 +829,6 @@ class ZenohExecutiveNode:
         """Orient: Assess current state and drives"""
         """{'static': system_prompt, 'dynamic': user_prompt}"""
         # If we have a real goal (not placeholder), return it
-        physiological_drives = {"thirst": """Maintain hydration — avoid thirst and keep the body supplied with fluids.""", 
-        "fatigue":"""Maintain alertness — avoid fatigue and keep the body rested.""", 
-        "hunger":"""Maintain energy — avoid hunger and keep the body supplied with nutrients."""}
-        if self.self_state:
-            worst_state_value = 0
-            worst_state_key = None
-            for key, item in self.self_state.items():
-                if item['value'] > 75:
-                    logger.warning(f'{self.character_name} is in danger of death')
-                    if item['value'] > worst_state_value:
-                        worst_state_value = item['value']
-                        worst_state_key = key
-            if worst_state_key and self.current_goal and worst_state_key not in self.current_goal.name:
-                    self.current_goal = plan_module.Goal(physiological_drives[worst_state_key], actors=[self.character_name], termination=f'{worst_state_key} below 50')
-                    return self.current_goal
             
         if self.current_goal:
             return self.current_goal
@@ -1111,23 +1138,21 @@ end your response with </end>
             self._publish_goal(self.current_goal)
         return self.current_goal
         
-    def _plan_completed(self, reason='done'):
+    def _plan_completed(self, reason='plan completed'):
         """Handle successful plan completion."""
         # Existing telemetry and cleanup
-        if reason != 'goal changed':
+        if reason == 'plan completed':
             self._summarize_plan_execution()
         self.current_plan = None
-        if self.plan_bindings:
-            logger.info(f'🔄 {self.character_name} cleared plan_bindings (plan completed)')
-            self.plan_bindings = {}
+        self.plan_bindings = {}
         self.plan_bindings_cache = {}
         self.action_history = []
         self.plan_state = None
-        if reason == 'goal changed':
+        if reason == 'physiological override' or reason == 'manual goal override' or reason == 'manual plan override':
             return
         
-        # Handle activity advancement
-        if self.activity_manager and self.activity_manager.has_active_activity():
+        # Handle activity advancement if this plan is for the activity - assume a single plan per activity step
+        if self.activity_manager and self.activity_manager.has_active_activity() and self.activity_manager.current_plan == self.current_plan:
             # Advance to next activity step
             next_step, activity = self.activity_manager.step_completion('success')
             self._publish_current_activity()
@@ -1167,7 +1192,7 @@ end your response with </end>
             self.current_plan = None
             self._publish_current_plan()
             logger.error(f'🚫 {self.character_name} no plan steps found')
-            return None # how did we get here?
+            return None, False # how did we get here?
         
         step_stack = self.plan_state['step_stack']
 
@@ -1189,7 +1214,7 @@ end your response with </end>
                         if self.activity_manager and self.activity_manager.has_active_activity():
                             self.activity_manager.step_completion('failure', 'state_threshold')
                             self._publish_current_activity()
-                        return None
+                        return None, False
         except Exception:
             pass
         
@@ -1205,19 +1230,21 @@ end your response with </end>
         # Execute next step
         try:
             action = self._execute_next_step(step_stack)
+            action_succeeded = False
             if action:
                 self.current_action = action
                 self._publish_decided_action(action)
-            return action
+                action_succeeded = self._act(action)
+                if not action_succeeded:
+                    logger.info(f'Action failed for {self.character_name}: {action}')
+            return action, action_succeeded
         except Exception as e:
             logger.error(f'Error in plan execution: {e}')
             traceback.print_exc()
             # Clear plan state on error
-            self.plan_state = {
-                'step_stack': plan_module.Stack()
-            }
+            self.plan_state = {'step_stack': plan_module.Stack()}
             self._plan_completed()
-            return None
+            return None, False
     
     def _execute_next_step(self, step_stack):
         """Execute next step using frame-based stack."""
@@ -1364,7 +1391,7 @@ end your response with </end>
                 if wait_state['turns'] >= 15:
                     logger.warning("⏳ wait exceeded 15 turns; advancing with warning")
                     current['idx'] = idx + 1
-                return None
+                return self._execute_next_step(step_stack)
 
         else:
             # Unknown or non-executable type: skip
@@ -2141,7 +2168,13 @@ end your response with </end>
         Do not include any other introductory, explanatory, discursive, or formatting text in your response.
 
         """
-        response = self.llm_client.generate([summary_prompt], bindings={"goal_text": goal_text, "plan_text": plan_text, "actions_summary": actions_summary, "percepts_json": percepts_json, "telemetry_json": telemetry_json}, max_tokens=1000, is_json=True)
+        response = self.llm_client.generate([summary_prompt], 
+                                            bindings={"goal_text": goal_text, 
+                                                    "plan_text": plan_text, 
+                                                    "actions_summary": actions_summary, 
+                                                    "percepts_json": percepts_json, 
+                                                    "telemetry_json": telemetry_json}, 
+        max_tokens=1000, is_json=True)
         summary = response.text if isinstance(response.text, dict) else None
         self.plan_summary = summary
         if not summary:
@@ -2501,7 +2534,7 @@ End your response with </end>
             if self.manual:
                 self._publish_goal(self.current_goal)
             else:
-                self._plan_completed()
+                self._plan_completed("manual goal override")
             return
         except Exception as e:
             logger.error(f"Goal parsing failed for {self.character_name}: {e}")
@@ -2512,7 +2545,7 @@ End your response with </end>
         """Parse plan input from UI and set current plan."""
         try:
             parsed_plan = plan_module.parse_plan_text(plan_text)
-            self._plan_completed()  # Clear any existing plan
+            self._plan_completed("manual plan override")  # Clear any existing plan
             self.current_plan = parsed_plan
             self.plan_bindings = {}  # Clear scan variables for new plan
             logger.info(f'🔄 {self.character_name} cleared plan_bindings for UI-assigned plan')

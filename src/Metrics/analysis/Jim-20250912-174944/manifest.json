@@ -1,0 +1,16 @@
+{
+  "character_name": "Jim",
+  "input_path": "/home/bruce/Downloads/Cognitive_workbench/src/data/Jim-plans.jsonl",
+  "input_basename": "Jim-plans.jsonl",
+  "input_mtime_utc": "2025-09-12T17:49:44.858327+00:00",
+  "input_sha256": "6a591c1a4d3d8118c7eb97055fa874a8f0e49c147d25d3026d5e46308599afdd",
+  "analysis_dir": "/home/bruce/Downloads/Cognitive_workbench/src/Metrics/analysis/Jim-20250912-174944",
+  "scenario_score_path": "/home/bruce/Downloads/Cognitive_workbench/src/Metrics/analysis/Jim-20250912-174944/scenario_score.json",
+  "used_digest_jq": false,
+  "digest_cli": null,
+  "compute_cli": [
+    "compute_scenario_score.py",
+    "--character",
+    "Jim"
+  ]
+}

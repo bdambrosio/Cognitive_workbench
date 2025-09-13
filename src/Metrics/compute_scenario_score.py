@@ -81,6 +81,42 @@ def extract_from_raw(line_obj: Dict[str, Any]) -> Dict[str, Any]:
     fatigue = (metrics.get("fatigue") or {})
     thirst  = (metrics.get("thirst")  or {})
 
+    # Counts: prefer metrics.steps if present, otherwise derive from actions
+    steps_m = metrics.get("steps", {}) if isinstance(metrics, dict) else {}
+    actions = line_obj.get("actions", []) if isinstance(line_obj, dict) else []
+
+    # Initialize counts from metrics if available
+    steps_total = steps_m.get("total") if isinstance(steps_m, dict) else None
+    moves = steps_m.get("moves") if isinstance(steps_m, dict) else None
+    takes = steps_m.get("takes") if isinstance(steps_m, dict) else None
+    uses = steps_m.get("uses") if isinstance(steps_m, dict) else None
+    inspects = steps_m.get("inspects") if isinstance(steps_m, dict) else None
+    scans = steps_m.get("scans") if isinstance(steps_m, dict) else None
+    failures = steps_m.get("failures") if isinstance(steps_m, dict) else None
+
+    # Derive from actions where missing
+    if (steps_total is None) and isinstance(actions, list):
+        steps_total = len(actions)
+    def _count_type(t: str) -> int:
+        if not isinstance(actions, list):
+            return 0
+        return sum(1 for a in actions if isinstance(a, dict) and isinstance(a.get("action"), dict) and str(a.get("action", {}).get("type", "")).lower() == t)
+    if moves is None:
+        moves = _count_type("move")
+    if takes is None:
+        takes = _count_type("take")
+    if uses is None:
+        uses = _count_type("use")
+    if inspects is None:
+        inspects = _count_type("inspect")
+    if scans is None:
+        scans = _count_type("scan")
+    if failures is None:
+        if not isinstance(actions, list):
+            failures = 0
+        else:
+            failures = sum(1 for a in actions if isinstance(a, dict) and (a.get("failure_code") is not None))
+
     return {
         "time": {"actual_minutes": time_m.get("actual_minutes", time_m.get("minutes_advanced"))},
         "drive_fulfillment": {"drives": drives},
@@ -90,6 +126,15 @@ def extract_from_raw(line_obj: Dict[str, Any]) -> Dict[str, Any]:
             (line_obj.get("plan_score") if isinstance(line_obj, dict) else None)
             or (metrics.get("plan_score") if isinstance(metrics, dict) else None)
         ),
+        "counts": {
+            "steps_total": steps_total or 0,
+            "moves": moves or 0,
+            "takes": takes or 0,
+            "uses": uses or 0,
+            "inspects": inspects or 0,
+            "scans": scans or 0,
+            "failures": failures or 0,
+        },
         "hunger": {"max": hunger.get("max"), "end": hunger.get("end")},
         "fatigue": {"max": fatigue.get("max"), "end": fatigue.get("end")},
         "thirst": {"max": thirst.get("max"), "end": thirst.get("end")},
@@ -179,10 +224,14 @@ def scenario_score_for_file(
     avg_drive_num = 0.0  # NEW: time-weighted sum of drive-only (pre-survival)
     plan_score_sum = 0.0
     plan_score_den = 0.0
+    drive_score_sum = 0.0
+    drive_score_den = 0.0
     state_gm_sum = 0.0
     state_gm_den = 0.0
     failure_rate_sum = 0.0
     failure_rate_den = 0.0
+    activity_present_count = 0
+    activity_total_count = 0
 
     with open(jsonl_path, "r", encoding="utf-8") as f:
         for raw in f:
@@ -199,6 +248,21 @@ def scenario_score_for_file(
                     d = extract_from_raw(json.loads(raw))
                 except Exception:
                     continue
+
+            # Accumulate activity presence (treat None, False, and "None" string as no activity)
+            try:
+                raw_obj = json.loads(raw)
+                activity_total_count += 1
+                activity_val = raw_obj.get("activity") if isinstance(raw_obj, dict) else None
+                is_present = not (
+                    activity_val is None
+                    or activity_val is False
+                    or (isinstance(activity_val, str) and activity_val.strip().lower() == "none")
+                )
+                if is_present:
+                    activity_present_count += 1
+            except Exception:
+                pass
 
             tmin = d.get("time", {}).get("actual_minutes")
             wt = time_weight(tmin, fallback=1.0)
@@ -223,26 +287,38 @@ def scenario_score_for_file(
             mstate = max_state_from_entry(d)
             pen = survival_penalty(mstate, soft_start=soft_start, danger=danger, hard=hard)
 
-            contrib = dv_weighted * pen
-            accum += contrib * wt
-            total_time += wt
 
             gs = d.get("goal_satisfaction", None)
             if isinstance(gs, (int, float)):
                 avg_goal_sat_num += float(gs) * wt
                 avg_goal_sat_den += wt
 
+            # Per-plan drive_score: prefer digest-provided drive_score, else dv_weighted * goal_satisfaction
+            ds_val = d.get("drive_score")
+            if ds_val is None and isinstance(gs, (int, float)):
+                try:
+                    ds_val = float(dv_weighted) * float(gs)
+                except Exception:
+                    ds_val = None
+            if isinstance(ds_val, (int, float)):
+                drive_score_sum += float(ds_val)
+                drive_score_den += 1.0
+
             # Per-plan extras
-            # plan_score from digest summary_score (0..100) scaled to 0..1
+            # plan_score from digest summary_score (already 0..1)
             ps_raw = d.get("summary_score")
             ps_scaled = None
             try:
                 if ps_raw is not None:
-                    ps_scaled = clamp(float(ps_raw) / 100.0, 0.0, 1.0)
+                    ps_scaled = clamp(float(ps_raw), 0.0, 1.0)
                     plan_score_sum += ps_scaled
                     plan_score_den += 1.0
             except Exception:
                 ps_scaled = None
+
+            contrib = dv_weighted * (ps_scaled + gs)/2 * pen
+            accum += contrib * wt
+            total_time += wt
 
             # State geomean (0..1)
             st_gm = state_geomean_from_entry(d)
@@ -272,8 +348,10 @@ def scenario_score_for_file(
                 "contribution": round(contrib, 4),
                 "goal_satisfaction": gs if gs is None else round(float(gs), 4),
                 "plan_score": (None if ps_scaled is None else round(float(ps_scaled), 4)),
+                "drive_score": (None if ds_val is None else round(float(ds_val), 4)),
                 "state_geomean": (None if st_gm is None else round(float(st_gm), 4)),
                 "max_state": mstate if mstate is None else round(float(mstate), 2),
+                "failure_rate": fr if fr is None else round(float(fr), 4),
             })
 
     base = (accum / total_time) if total_time > 0 else 0.0
@@ -291,6 +369,7 @@ def scenario_score_for_file(
 
     # Scenario-level new aggregates (unweighted means over plans with values)
     avg_plan_score = (plan_score_sum / plan_score_den) if plan_score_den > 0 else None
+    avg_drive_score = (drive_score_sum / drive_score_den) if drive_score_den > 0 else None
     avg_state_geomean = (state_gm_sum / state_gm_den) if state_gm_den > 0 else None
     avg_failure_rate = (failure_rate_sum / failure_rate_den) if failure_rate_den > 0 else None
 
@@ -298,16 +377,18 @@ def scenario_score_for_file(
         "file": jsonl_path,
         "used_digest_jq": bool(use_jq),
         "total_plans": n_lines,
+        "activity_present_percent": (None if activity_total_count == 0 else round(100.0 * activity_present_count / activity_total_count, 1)),
         "total_minutes": total_time,
         "drive_dimensions": drive_dim or 0,
         "weights_last_fraction": last_fraction,
         "survival_params": {"soft_start": soft_start, "danger": danger, "hard": hard},
         "goal_sat_weight": goal_sat_weight,
         "avg_goal_satisfaction": avg_gs if avg_gs is None else round(float(avg_gs), 4),
-        "avg_drive_fulfillment": round(avg_drive, 4),
+        "avg_drive_alignment": round(avg_drive, 4),
         "scenario_score_base": round(base, 4),
         "scenario_score_final": round(blended, 4),
         "avg_plan_score": (None if avg_plan_score is None else round(float(avg_plan_score), 4)),
+        "avg_drive_score": (None if avg_drive_score is None else round(float(avg_drive_score), 4)),
         "avg_state_geomean": (None if avg_state_geomean is None else round(float(avg_state_geomean), 4)),
         "avg_failure_rate": (None if avg_failure_rate is None else round(float(avg_failure_rate), 4)),
         "per_plan": per_plan,
