@@ -14,19 +14,16 @@ One goal of current work on LLMs is coherent long-term behavior.
 In coding, one measure is length of time of productive engagement.
 Techniques include SFT / DPO / GPRO / ... embed policies/... into weights.
 
-A more Socratic approach might be to attempt to *ask* what they already know and how they prefer to say it.
-
+A more Socratic approach might be to attempt to *ask* what they already know and how they prefer to say it.<br>
 **Claim**: LLM base models 'know' more about 'natural' and 'near-natural' worlds than you do.
-	Evidence: they have been trained on Trillions of tokens of text about natural and near-natural worlds: textbooks, scholarly works, fiction, ...
- 
+	Evidence: they have been trained on Trillions of tokens of text about natural and near-natural worlds: textbooks, scholarly works, fiction, ...<br>
 **Observation**: 
 	Near-natural worlds are Turing complete (mod infinity)
 
 Claim 2: A simple worldsim is 'near-natural', ie, is an instance of the 'sorts' of ontologies / universes-of-discourse an LLM has encountered in its training corpus.
-	As a result, they have formed an 'innate' 'ontology' of natural worlds.
-	Innate - It is not necessarily explicitly represented in the LLM
-	Ontology - High dimensional multi-valent relationship model among ...
- 
+	As a result, they have formed an 'innate' 'ontology' of natural worlds.<br>
+	Innate - It is not necessarily explicitly represented in the LLM<br>
+	Ontology - High dimensional multi-valent relationship model among ...<br>
 Observations: 
 	Most interesting problems in near-natural worlds are hard.
 	That doesn't seem to bother my cat.
@@ -34,6 +31,8 @@ Observations:
 Claim 3: Part of an LLMs 'knowledge' is the ability to generate excellent near-optimal solutions to many hard problems, including the hardest of all, framing, and the second-hardest, reflection.
 
 Claim 4: To work with them in applications related to natural worlds, it is advantageous to speak their language.
+
+Claim 5: This even works for reflective tasks like case selection and policy optimization.
 
 # 9/12
 
