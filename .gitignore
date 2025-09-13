@@ -43,3 +43,4 @@ src/data
 src/logs/
 *.log
 src/logs/*.log
+src/Metrics/analysis/*
