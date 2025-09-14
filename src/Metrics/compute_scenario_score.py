@@ -232,6 +232,7 @@ def scenario_score_for_file(
     failure_rate_den = 0.0
     activity_present_count = 0
     activity_total_count = 0
+    total_actions = 0
 
     with open(jsonl_path, "r", encoding="utf-8") as f:
         for raw in f:
@@ -340,6 +341,14 @@ def scenario_score_for_file(
             except Exception:
                 fr = None
 
+            # Actions per plan and total (steps_total)
+            actions_val = None
+            counts2 = d.get("counts", {}) or {}
+            st = counts2.get("steps_total")
+            if isinstance(st, (int, float)):
+                actions_val = int(st)
+                total_actions += int(st)
+
             per_plan.append({
                 "minutes": wt,
                 "drive_weighted": round(dv_weighted, 4),
@@ -352,6 +361,7 @@ def scenario_score_for_file(
                 "state_geomean": (None if st_gm is None else round(float(st_gm), 4)),
                 "max_state": mstate if mstate is None else round(float(mstate), 2),
                 "failure_rate": fr if fr is None else round(float(fr), 4),
+                "actions": actions_val,
             })
 
     base = (accum / total_time) if total_time > 0 else 0.0
@@ -391,6 +401,7 @@ def scenario_score_for_file(
         "avg_drive_score": (None if avg_drive_score is None else round(float(avg_drive_score), 4)),
         "avg_state_geomean": (None if avg_state_geomean is None else round(float(avg_state_geomean), 4)),
         "avg_failure_rate": (None if avg_failure_rate is None else round(float(avg_failure_rate), 4)),
+        "total_actions": int(total_actions),
         "per_plan": per_plan,
     }
 
@@ -407,6 +418,7 @@ def main():
     ap.add_argument("--goal-sat-weight", type=float, default=0.25, help="Blend factor [0..1] to include avg goal satisfaction multiplicatively")
     ap.add_argument("--out", default=None, help="Write JSON report to this file (overrides analysis dir write)")
     ap.add_argument("--yes", action="store_true", help="Overwrite scenario_score.json without prompting if it exists")
+    ap.add_argument("-m", "--manifest-note", dest="manifest_note", default=None, help="Freeform note stored in manifest.json (non --out mode)")
     args = ap.parse_args()
 
     # Resolve input path and character
@@ -498,6 +510,7 @@ def main():
             "used_digest_jq": bool(args.digest and shutil.which("jq") and os.path.exists(args.digest)),
             "digest_cli": (["jq", "-f", args.digest] if args.digest else None),
             "compute_cli": sys.argv,
+            "note": args.manifest_note,
         }
         with open(os.path.join(run_dir, "manifest.json"), "w", encoding="utf-8") as mf:
             json.dump(manifest, mf, indent=2)

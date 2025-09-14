@@ -6,7 +6,7 @@ llm_config:
 
 max_turns: 100
 Ontology: True
-Activities: True
+Activities: False
 
 setting: |
   Summer morning in rural france in the mid-19th century, a small village in the countryside.

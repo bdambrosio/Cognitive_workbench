@@ -28,7 +28,7 @@ import os
 logger = logging.getLogger(__name__)
 console_handler = logging.StreamHandler()
 file_handler = logging.FileHandler('logs/fastapi_action_display.log')
-console_handler.setLevel(logging.INFO)
+console_handler.setLevel(logging.WARNING)
 file_handler.setLevel(logging.DEBUG)
 
 # Raise console verbosity when CWB_DEBUG is set

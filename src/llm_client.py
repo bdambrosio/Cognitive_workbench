@@ -43,11 +43,11 @@ class ZenohLLMClient:
     - Thread-safe operations
     """
     
-    def __init__(self, service_timeout: float = 600.0):
+    def __init__(self, server_name='openai', model_name='gpt-4.1', service_timeout: float = 600.0):
         # Initialize Zenoh session
         config = zenoh.Config()
         self.session = zenoh.open(config)
-        self.llm = LLM(server_name='openai', model_name='gpt-4.1')
+        self.llm = LLM(server_name=server_name, model_name=model_name)
         
         # Publisher for LLM requests
         self.request_publisher = self.session.declare_publisher("cognitive/llm_request")

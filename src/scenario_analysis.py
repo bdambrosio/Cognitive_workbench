@@ -145,7 +145,7 @@ def main():
     if not _activity_llm_global:
         try:
             from activity import llm_client as _mut_llm
-            _mut_llm = ZenohLLMClient(service_timeout=240.0)
+            _mut_llm = ZenohLLMClient(server_name=args.server, model_name=args.model, service_timeout=240.0)
             # assign into activity module global
             import activity as _act_mod
             _act_mod.llm_client = _mut_llm

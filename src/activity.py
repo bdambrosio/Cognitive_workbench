@@ -167,9 +167,9 @@ def create_ontology(context, map_types, resource_type_str, character_name, chara
                 logger.info(f"Axis {axis['axis']}: Activity: {axis['activity_itemclasses'][0]['activity']}, ItemClass: {axis['activity_itemclasses'][0]['itemclass']}")
                 for activity_itemclass in axis['activity_itemclasses']:                
                     if not activity_itemclass['subtypes_included']:
-                        logger.info(f"No base nouns usable for this activity in the closed world")
+                        logger.warning(f"*No base nouns usable for this activity in the closed world {str(activity_itemclass)}")
                     else:
-                        logger.info(f"Base nouns usable for this activity in the closed world: {activity_itemclass['subtypes_included']}")
+                        logger.info(f"Base nouns usable for this activity in the closed world: {str(activity_itemclass)}")
                         activity = {}
                         activity['axis'] = axis['axis']
                         activity['drive'] = drive

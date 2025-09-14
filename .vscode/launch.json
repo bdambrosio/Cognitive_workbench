@@ -52,6 +52,22 @@
             "preLaunchTask": "setup-zenoh-environment"
         },
         {
+            "name": "Scenario Analysis (CountryLife)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/scenario_analysis.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/src",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src"
+            },
+            "args": ["--scenario", "../scenarios/CountryLife.yaml", "--character", "all", "--ontology", "create", "--middle", "skip", "--activities", "create"],
+            "justMyCode": false,
+            "stopOnEntry": false,
+            "preLaunchTask": "setup-zenoh-environment"
+        },
+
+        {
             "name": "Scenario Analysis (Jim)",
             "type": "debugpy",
             "request": "launch",
@@ -77,6 +93,36 @@
                 "PYTHONPATH": "${workspaceFolder}/src"
             },
             "args": ["--scenario", "../scenarios/lost.yaml", "--character", "all", "--ontology", "create", "--middle", "skip", "--activities", "create"],
+            "justMyCode": false,
+            "stopOnEntry": false,
+            "preLaunchTask": "setup-zenoh-environment"
+        },
+        {
+            "name": "Debug Launcher (laTerre)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/launcher.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/src",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src"
+            },
+            "args": ["laTerre.yaml", "--ui"],
+            "justMyCode": false,
+            "stopOnEntry": false,
+            "preLaunchTask": "setup-zenoh-environment"
+        },
+        {
+            "name": "Debug Launcher (CountryLife)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/launcher.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/src",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src"
+            },
+            "args": ["CountryLife.yaml", "--ui"],
             "justMyCode": false,
             "stopOnEntry": false,
             "preLaunchTask": "setup-zenoh-environment"
@@ -139,21 +185,6 @@
                 "PYTHONPATH": "${workspaceFolder}/src"
             },
             "args": ["sage.yaml", "--ui", "--map-file", "sageForest.py"],
-            "justMyCode": false,
-            "stopOnEntry": false,
-            "preLaunchTask": "setup-zenoh-environment"
-        },
-        {
-            "name": "Debug Launcher (laTerre)",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${workspaceFolder}/src/launcher.py",
-            "console": "integratedTerminal",
-            "cwd": "${workspaceFolder}/src",
-            "env": {
-                "PYTHONPATH": "${workspaceFolder}/src"
-            },
-            "args": ["laTerre.yaml", "--ui"],
             "justMyCode": false,
             "stopOnEntry": false,
             "preLaunchTask": "setup-zenoh-environment"
