@@ -194,8 +194,15 @@ class ZenohLLMServiceNode:
             )
             
             # Log the first message as a preview
-            preview_text = str(llm_request.messages[0])[:50] if llm_request.messages else "empty"
-            logger.info(f'\n📥 Received LLM request {request_id}:\n "{'\n'.join(llm_request.messages)}..."\n')
+            messages = []
+            for n, message in enumerate(llm_request.messages):
+                if n == 0:
+                    messages.append(SystemMessage(content=message))
+                else:
+                    messages.append(UserMessage(content=message))
+            expanded_prompt = self.llm.substitute_bindings(messages, llm_request.bindings)
+            text = '\n'.join([msg['content'] for msg in expanded_prompt])
+            logger.info(f'\n📥 Received LLM request {request_id}:\n{text}\n')
             
             # Check if thread pool is still active before submitting
             if self.thread_pool._shutdown:

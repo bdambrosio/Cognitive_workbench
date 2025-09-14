@@ -27,7 +27,7 @@ from utils.zenoh_utils import datetime_handler
 import plan as plan_module
 from dataclasses import dataclass, asdict
 import os
-from templates import DRIVE_ASSESSMENT_TEMPLATE, GOAL_TEMPLATE, PLAN_TEMPLATE, PHYSIOLOGICAL_STATES, PLAN_VERBS
+from templates import DRIVE_ASSESSMENT_TEMPLATE, GOAL_TEMPLATE, PLAN_TEMPLATE, PHYSIOLOGICAL_STATES, PLAN_VERBS, REWRITE_TEMPLATE
 from plan import generate_plan_with_context
 from utils.format_utils import format_map_types, format_views_compact
 from utils.state_utils import tick_state, apply_restore, initialize_character_states
@@ -619,7 +619,6 @@ class ZenohExecutiveNode:
                 self._publish_goal(self.current_goal)
                 logger.info(f'🎯 {self.character_name} oriented to goal: {self.current_goal.to_string()}')
                 action, status = self.plan_and_initiate_execution(physiological_override)
-                self.activity_manager.current_plan = self.current_plan
                 return
 
             if self.activity_manager and self.activity_manager.has_active_activity():
@@ -629,8 +628,7 @@ class ZenohExecutiveNode:
                     logger.info(f'🎯 {self.character_name} continuing activity: {self.current_activity["name"]} step: {self.current_step["name"]}')
                     self.current_goal = plan_module.Goal(self.current_step['name'], self.current_step['actors'], self.current_step['description'], self.current_step['termination'])
                     logger.info(f'🎯 {self.character_name} oriented to goal: {self.current_goal.to_string()}')
-                    action, status = self.plan_and_initiate_execution(self.current_goal)
-                    self.activity_manager.current_plan = self.current_plan
+                    action, status = self.plan_and_initiate_execution(self.current_goal, activity_manager=self.activity_manager)
                     return
                 else:
                     # Abandon current activity - this will cause next block to select new activity
@@ -653,13 +651,13 @@ class ZenohExecutiveNode:
                     logger.warning(f'🚫 {self.character_name} no activity selected')
 
             if self.current_step:
-                self.current_goal = plan_module.Goal(self.current_step['name'], self.current_step['actors'], self.current_step['description'], self.current_step['termination'])
+                self.current_goal = self._orient(observations, step_rewrite=True)
                 self._publish_goal(self.current_goal)
                 logger.info(f'🎯 {self.character_name} oriented to goal: {self.current_goal.to_string()}')
-                action, status = self.plan_and_initiate_execution(self.current_goal)
+                action, status = self.plan_and_initiate_execution(self.current_goal, activity_manager=self.activity_manager)
                 return
 
-            self.current_goal = self._orient(observations)
+            self.current_goal = self._orient(observations, step_rewrite=False)
             if self.current_goal:
                 self._publish_goal(self.current_goal)
                 logger.info(f'🎯 {self.character_name} oriented to goal: {self.current_goal.to_string()}')
@@ -672,11 +670,13 @@ class ZenohExecutiveNode:
         return
 
 
-    def plan_and_initiate_execution(self, goal):
+    def plan_and_initiate_execution(self, goal, activity_manager=None):
         """Plan and execute a goal."""
         # Plan: Return existing plan or create single-action plan
         plan = self._plan(self.current_goal)
         self.current_plan = plan
+        if activity_manager:
+            activity_manager.current_plan = plan
         if not plan:
             logger.warning(f'🚫 {self.character_name} no plan found for goal: {self.current_goal.to_string()}')
             return
@@ -770,7 +770,7 @@ class ZenohExecutiveNode:
                             self.map_types = data
                             break
             if self.map_types:
-                system_prompt += format_map_types(self.map_types)
+                system_prompt += f"\n#The following are the types primary types in the scenario:\n{format_map_types(self.map_types)}"
             # Build user prompt with context
             user_prompt += self.format_situation()
             # Include current self state (e.g., hunger)
@@ -825,21 +825,8 @@ class ZenohExecutiveNode:
         def_str = 'DEFINITIONS:\n'+'+\n'.join(str(need) for need in PHYSIOLOGICAL_STATES)
         return def_str+'\n'+'CURRENT_STATE:\n'+'\n'.join([f'{key.capitalize()}: {item["value"]:.1f}' for key, item in self.self_state.items()])
 
-    def _orient(self, observations: Dict[str, Any], new_goal: plan_module.Goal = None):
+    def _orient(self, observations: Dict[str, Any], step_rewrite: bool = False):
         """Orient: Assess current state and drives"""
-        """{'static': system_prompt, 'dynamic': user_prompt}"""
-        # If we have a real goal (not placeholder), return it
-            
-        if self.current_goal:
-            return self.current_goal
-
-        if new_goal and new_goal.name != 'GOAL_NEEDED':
-            self.current_goal = new_goal
-            return self.current_goal
-        
-        # We have placeholder goal or no goal - create a real goal
-        if new_goal and new_goal.name == 'GOAL_NEEDED':
-            logger.info(f'🤔 {self.character_name} received placeholder goal, creating situated goal')
 
         # Create a new goal based on current situation
         other_characters_str = ''
@@ -851,8 +838,8 @@ class ZenohExecutiveNode:
         self.map_update_request_publisher.put(json.dumps({'type': 'goal_look'}))
         map_types_str = format_map_types(self.map_types)
         if self.ontology:
-            ontology_nouns_str = '\n'.join(self.ontology['nouns'])
-            ontology_verbs_str = '\n'.join(self.ontology['verbs'])
+            ontology_nouns_str = f"#ABSTRACT NOUNS:\n{'\n'.join(self.ontology['nouns'])}\n"
+            ontology_verbs_str = f"#ABSTRACT VERBS:\n{'\n'.join(self.ontology['verbs'])}\n"
         else:
             ontology_nouns_str = ''
             ontology_verbs_str = ''
@@ -871,7 +858,7 @@ class ZenohExecutiveNode:
             # Use shorter timeout during shutdown
             timeout = 200.0 if self.shutdown_requested else None
             response = self.llm_client.generate(
-                messages=[GOAL_TEMPLATE],
+                messages=[GOAL_TEMPLATE if not step_rewrite else REWRITE_TEMPLATE],
                 bindings={
                     "physiological_states": self.format_current_physiological_state(),
                     "character_drives": character_drives_str,
@@ -879,8 +866,14 @@ class ZenohExecutiveNode:
                     "primitive_verbs": PLAN_VERBS,
                     "abstract_nouns": ontology_nouns_str,
                     "abstract_verbs": ontology_verbs_str,
-                    "character_names": character_names,
+                    "character_names": '\n'.join(character_names),
                     "other_characters": other_characters_str,
+                    "static_information": self.observations['static'],
+                    "current_information": self.observations['dynamic'],
+                    "current_percepts": self.percepts_at_plan,
+                    "activity_name": self.current_activity.get('name', '') if self.current_activity else '',
+                    "activity_steps": self.current_activity.get('steps', '') if self.current_activity else '',
+                    "step_to_rewrite": self.current_step if self.current_step else '',
                 },
                 max_tokens=400,
                 temperature=0.5,
@@ -1143,6 +1136,7 @@ end your response with </end>
         # Existing telemetry and cleanup
         if reason == 'plan completed':
             self._summarize_plan_execution()
+        completed_plan = self.current_plan
         self.current_plan = None
         self.plan_bindings = {}
         self.plan_bindings_cache = {}
@@ -1152,24 +1146,17 @@ end your response with </end>
             return
         
         # Handle activity advancement if this plan is for the activity - assume a single plan per activity step
-        if self.activity_manager and self.activity_manager.has_active_activity() and self.activity_manager.current_plan == self.current_plan:
+        if self.activity_manager and self.activity_manager.has_active_activity() and self.activity_manager.current_plan == completed_plan:
             # Advance to next activity step
             next_step, activity = self.activity_manager.step_completion('success')
             self._publish_current_activity()
+            self.current_goal = None
             if next_step:
-                # Continue with next step - set new goal to trigger planning
-                self.current_goal = plan_module.Goal(
-                    next_step['name'], 
-                    next_step['actors'], 
-                    next_step['description'], 
-                    next_step['termination']
-                )
-                self._publish_goal(self.current_goal)   
                 logger.info(f'🎯 Activity step completed, advancing to: {next_step["name"]}')
             else:
                 # Activity completed - clear goal
-                self.current_goal = None
                 self._publish_goal(self.current_goal)
+                self.current_activity = None
                 logger.info(f'✅ Activity completed for {self.character_name}')
         else:
             # No activity - clear goal (existing behavior)

@@ -20,15 +20,19 @@ class RuralResources(Enum):
     Market = auto()
     Farmhouse = auto()
     Church = auto()
+    Will = auto()
+    Deed = auto()
     Well = auto()
     Mill = auto()
     Hoe = auto()
     Plow = auto()
     Scythe = auto()
     Spring = auto()
+    Hay = auto()
     Bread = auto()
     Apple = auto()
     Chicken = auto()
+    Cow = auto()
     Egg = auto()
     Milk = auto()
     Cheese = auto()
@@ -87,6 +91,32 @@ required_resource_name = "Mill"  # or "Market", etc.
 resource_rules = {
 
     'allocations': [
+        {
+            'resource_type': resource_types.Will,
+            'description': 'A will for land ownership',
+            'count': 1,
+            'has_npc': True,
+            'remove_on_take': False,
+            'requires_property': False,
+            'use': [],
+            'terrain_weights': {
+                terrain_types.Grassland: 1.0,
+                terrain_types.Field: 1.0
+            }
+        },
+        {
+            'resource_type': resource_types.Deed,
+            'description': 'A deed for land ownership',
+            'count': 1,
+            'has_npc': True,
+            'remove_on_take': True,
+            'requires_property': False,
+            'use': [],
+            'terrain_weights': {
+                terrain_types.Grassland: 1.0,
+                terrain_types.Field: 1.0
+            }
+        },
         {
             'resource_type': resource_types.Well,
             'description': 'A deep well for water',
@@ -192,6 +222,18 @@ resource_rules = {
             },
         },
                 {
+            'resource_type': resource_types.Hay,
+            'description': 'A bale of hay',
+            'count': 60,
+            'remove_on_take': True,
+            'requires_property': True,
+            'use': [{"need": 'hunger', "effect": 10}],
+            'terrain_weights': {
+                terrain_types.Field: 1.0,
+                terrain_types.Grassland: 1.0
+            },
+        },
+        {
             'resource_type': resource_types.Bread,
             'description': 'A loaf of bread',
             'count': 20,
@@ -223,6 +265,18 @@ resource_rules = {
             'remove_on_take': True,
             'requires_property': True,
             'use': [{"need": 'hunger', "effect": -30}],
+            'terrain_weights': {
+                terrain_types.Field: 1.0,
+                terrain_types.Grassland: 1.0
+            },
+        },
+        {
+            'resource_type': resource_types.Cow,
+            'description': 'A cow for miling',
+            'count': 10,
+            'remove_on_take': True,
+            'requires_property': True,
+            'use': [{"need": 'hunger', "effect": -5}, {"need": 'thirst', "effect": -20}],
             'terrain_weights': {
                 terrain_types.Field: 1.0,
                 terrain_types.Grassland: 1.0

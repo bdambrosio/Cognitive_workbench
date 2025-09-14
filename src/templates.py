@@ -174,22 +174,22 @@ You are generating a comprehensive activity list for a character.
 
 TASK: Generate 24-40 activities as a JSON object, with the keys being the activity names. Distribute across these categories:
 #CATEGORIES
-- Physiological ADLs (eating, drinking, sleeping) - 3-4 activities situated in the setting and your available roles
-- Instrumental ADLs/Logistics (planning, preparing) - 2-3 activities  situated in the setting and your available roles
-- Mobility & Transport  - 2-3 activities situated in the setting and your available roles
-- Role/Production - 3-4 activities situated in the setting and your available roles
-- Learning & Practice - 1-2 activities situated in the setting and your available roles
-- Cognitive/Inner - 1-2 activities situated in the setting and your available roles
-- Recreation & Leisure - 2-3 activities situated in the setting and your available roles
-- Safety/Emergency - 2-3 activities, pro-active or reactive, situated in the setting and your available roles
-- Health Management (self-care) - 2-3 activities situated in the setting and your available roles
-- Maintenance & Repair - 2-3 activities situated in the setting and your available roles
+- Physiological ADLs (eating, drinking, sleeping) - activities situated in the setting and your available roles
+- Instrumental ADLs/Logistics (planning, preparing) - activities  situated in the setting and your available roles
+- Mobility & Transport  - activities situated in the setting and your available roles
+- Role/Production - activities situated in the setting and your available roles
+- Learning & Practice - activities situated in the setting and your available roles
+- Cognitive/Inner - activities situated in the setting and your available roles
+- Recreation & Leisure - activities situated in the setting and your available roles
+- Safety/Emergency - activities, pro-active or reactive, situated in the setting and your available roles
+- Health Management (self-care) - activities situated in the setting and your available roles
+- Maintenance & Repair - activities situated in the setting and your available roles
 ##
 
 #GUIDANCE
 # 1. Generate activities consistent with the character, their drives, and the setting.
 # 2. A significant number of the activities should simply be activities of daily living (ADLs) and should be located in the setting and your available roles.
-# 3. At least 50% of the activities should be support one or more character drives.
+# 3. At least 75% of the activities should support one or more character drives. Note drives are in priority order, highest first, higher priority drives should be supported by more activities.
 
 In the following schema: 
 <period> is one of: dawn, morning, afternoon, dusk, evening, night, day
@@ -254,6 +254,23 @@ Output: a goal statement text string. Do not include any other text, introductor
 
 INPUTS
 ------
+Consider the following information:
+
+#Setting
+{{$static_information}}
+
+#Character Basic Physiological States 
+{{$physiological_states}}
+
+#Character Names in Scenario
+{{$character_names}}
+
+#Other Characters
+{{$other_characters}}
+
+#Current Information
+{{$current_information}}
+
 #Activity name:
 {{$activity_name}}
 
@@ -263,43 +280,64 @@ INPUTS
 #Activity step to rewrite:
 {{$step_to_rewrite}}
 
-#Allowed nouns:
-{{$allowed_nouns}}
+------ ONTOLOGY ------
+BASE NOUNS
+{{$primitive_nouns}}
 
-#Allowed verbs:
-{{$allowed_verbs}}
+BASE VERBS
+{{$primitive_verbs}}
+
+{{$abstract_nouns}}
+
+{{$abstract_verbs}}
+----- END ONTOLOGY -----
 
 TASK
 ----
 Rewrite the given activity step to rewrite into a goal statement using allowed nouns and verbs. Be concise and specific. 
 This may involve approximation or interpretation in the context of the setting if there are no exact match nouns or verbs.
 The object is not single-word substitution, but rather to re-express the statement in more specific terms, as an objective or goal.
-Despite the use of the phrase 'step', the rewritten statement need not contain only a single verb or a single sentence.
-The rewrite may be longer that the original step statement, but should be more specific in terms of the ontology provided.
-- Only use allowed nouns, verbs and common connectives. Do not generalize or invent.
-- Produce exactly one rewritten step statement.
+Respond using the following hash-formatted text, where each tag is preceded by a # and followed by a single space, followed by its content.
+Each goal should begin with a #goal tag, and should end with ## on a separate line as shown below:
+be careful to insert line breaks only where shown, separating a value from the next tag:
 
-Output ONLY the concise, specific, rewritten goal statement. Do not include any reasoning, introduction, explanation, markdown, code fences, etc.
+#goal: 5–8 words; MUST begin with one ONTOLOGY verb id; include ≥1 ONTOLOGY noun id or a visible instance ID (e.g., “Acquire Edible from Appletree7” or “Survey ForestEdge for Landmark”).
+#description: 8–14 words; MUST include ≥1 ONTOLOGY verb id and ≥1 ONTOLOGY noun id; only allowed function words (e.g. connectives like 'and', 'or', 'but', 'if', 'then', 'else', 'while', 'until', 'for', 'with', 'near', 'toward', 'by', 'and', 'or', 'if', 'until', 'then') in addition to ONTOLOGY terms.
+#otherCharacterName: a name of another character involved in this goal, if any, or “None”.
+#termination: 5–6 words; MUST be a checkable condition phrased with ONTOLOGY terms (e.g., “Reached ForestEdge within visibility” or “Acquired Edible from Appletree7”).
+##
+
+Respond ONLY with the above hash-formatted text.
 end your response with </end>
 """
 
 GOAL_TEMPLATE = """What is the most relevant thing you should work on next? 
-Consider in addition to the information above:
+Consider the following information:
+
+#Setting
+{{$static_information}}
 
 #Character Basic Physiological States 
 {{$physiological_states}}
 
-#Character Drives
-{{$character_drives}}
+#Character Names in Scenario
+{{$character_names}}
+
+#Other Characters
+{{$other_characters}}
+
+#Current Information
+{{$current_information}}
+
 
 #What is the central issue / opportunity / obligation demanding the character's attention?
 1. If any physiological state value rised to 95, the character dies. State values below 40 are desirable.
    Consider your current state (e.g., hunger, fatigue, thirst, injury); a survival-critical state (e.g., value above 70) should bias goals toward remediation.
 2. Otherwise, Drives should be main priority, in the context of the current situation. Drives above are listed in priority order, highest first.
 
-#You MUST use ONLY verbs and nouns from the ONTOLOGY below. Use the exact 'id' strings (case-sensitive). 
- - Do NOT introduce synonyms (e.g., use 'Acquire' not 'Find'). If a needed concept is absent, pick the closest available ONTOLOGY term rather than inventing a new one.
- - Outside ONTOLOGY terms, you may use only non-content words and connectors, e.g.:
+#Prefer verbs and nouns from the ABSTRACT VERBS and ABSTRACT NOUNS sections of the ONTOLOGY below, if present. Use the exact strings (case-sensitive). 
+ - Do NOT introduce synonyms (e.g., use 'Acquire' not 'Find'). If a needed concept is absent, prefer using the closest available ONTOLOGY term to inventing a new one.
+ - In addition to verbs and nouns from the ONTOLOGY, you may use non-content words and connectors as needed, e.g.:
   {a, an, the, this, that, these, those, of, to, from, for, with, near, toward, by, and, or, if, until, then}.
 You may also use concrete instance IDs visible in the situation (e.g., Appletree7, Spring3) and numerals.
  - No other content words are allowed.
@@ -311,10 +349,8 @@ BASE NOUNS
 BASE VERBS
 {{$primitive_verbs}}
 
-ABSTRACT NOUNS
 {{$abstract_nouns}}
 
-ABSTRACT VERBS
 {{$abstract_verbs}}
 ----- END ONTOLOGY -----
 
@@ -324,8 +360,8 @@ Respond using the following hash-formatted text, where each tag is preceded by a
 Each goal should begin with a #goal tag, and should end with ## on a separate line as shown below:
 be careful to insert line breaks only where shown, separating a value from the next tag:
 
-#goal: 5–8 words; MUST begin with one MANIFEST verb id; include ≥1 MANIFEST noun id or a visible instance ID (e.g., “Acquire Edible from Appletree7” or “Survey ForestEdge for Landmark”).
-#description: 8–14 words; MUST include ≥1 MANIFEST verb id and ≥1 MANIFEST noun id; only allowed function words beyond MANIFEST terms.
+#goal: 5–8 words; MUST begin with one ONTOLOGY verb id; include ≥1 ONTOLOGY noun id or a visible instance ID (e.g., “Acquire Edible from Appletree7” or “Survey ForestEdge for Landmark”).
+#description: 8–14 words; MUST include ≥1 ONTOLOGY verb id and ≥1 ONTOLOGY noun id; only allowed function words (e.g. connectives like 'and', 'or', 'but', 'if', 'then', 'else', 'while', 'until', 'for', 'with', 'near', 'toward', 'by', 'and', 'or', 'if', 'until', 'then') in addition to ONTOLOGY  terms.
 #otherCharacterName: a name of another character involved in this goal, if any, or “None”.
 #termination: 5–6 words; MUST be a checkable condition phrased with ONTOLOGY terms (e.g., “Reached ForestEdge within visibility” or “Acquired Edible from Appletree7”).
 ##
