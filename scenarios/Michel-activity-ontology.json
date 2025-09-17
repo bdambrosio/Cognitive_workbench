@@ -2,27 +2,41 @@
   "activities": [
     {
       "axis": [
-        "Unproductive",
-        "Productive"
+        "UnmaintainedFarm",
+        "MaintainedFarm"
       ],
       "drive": "maintain and work the family farm",
       "activity_itemclass": {
-        "activity": "Cultivate",
-        "itemclass": "Field",
+        "activity": "Tend",
+        "itemclass": "Farm",
         "subtypes_included": [
-          "Field"
+          "Farm"
         ]
       }
     },
     {
       "axis": [
-        "Unproductive",
-        "Productive"
+        "UnmaintainedFarm",
+        "MaintainedFarm"
       ],
       "drive": "maintain and work the family farm",
       "activity_itemclass": {
-        "activity": "Operate",
-        "itemclass": "Farm Tool",
+        "activity": "Repair",
+        "itemclass": "Farmhouse",
+        "subtypes_included": [
+          "Farmhouse"
+        ]
+      }
+    },
+    {
+      "axis": [
+        "UnworkedField",
+        "WorkedField"
+      ],
+      "drive": "maintain and work the family farm",
+      "activity_itemclass": {
+        "activity": "Cultivate",
+        "itemclass": "Field Tool",
         "subtypes_included": [
           "Hoe",
           "Plow",
@@ -32,13 +46,13 @@
     },
     {
       "axis": [
-        "Hungry",
-        "Not-Hungry"
+        "UnderstockedFood",
+        "StockedFood"
       ],
       "drive": "maintain and work the family farm",
       "activity_itemclass": {
-        "activity": "Consume",
-        "itemclass": "Food",
+        "activity": "Produce",
+        "itemclass": "Farm Product",
         "subtypes_included": [
           "Bread",
           "Apple",
@@ -46,24 +60,25 @@
           "Egg",
           "Milk",
           "Cheese",
-          "Butter"
+          "Butter",
+          "Cow",
+          "Hay"
         ]
       }
     },
     {
       "axis": [
-        "Thirsty",
-        "Not-Thirsty"
+        "Unwatered",
+        "Watered"
       ],
       "drive": "maintain and work the family farm",
       "activity_itemclass": {
-        "activity": "Drink",
-        "itemclass": "Drinkable",
+        "activity": "Secure",
+        "itemclass": "Water Source",
         "subtypes_included": [
-          "Water",
-          "Milk",
           "Well",
           "Spring",
+          "Milk",
           "Cow"
         ]
       }
@@ -71,126 +86,86 @@
     {
       "axis": [
         "Fatigued",
-        "Not-Fatigued"
+        "Rested"
       ],
       "drive": "maintain and work the family farm",
       "activity_itemclass": {
         "activity": "Rest",
-        "itemclass": "Shelter",
+        "itemclass": "Rest Location",
         "subtypes_included": [
-          "Farmhouse",
-          "Church"
-        ]
-      }
-    },
-    {
-      "axis": [
-        "Dispossessed",
-        "Possessed"
-      ],
-      "drive": "maintain and work the family farm",
-      "activity_itemclass": {
-        "activity": "Secure",
-        "itemclass": "Land Ownership Document",
-        "subtypes_included": [
-          "Will",
-          "Deed"
-        ]
-      }
-    },
-    {
-      "axis": [
-        "Alone",
-        "With-Marie"
-      ],
-      "drive": "spend time with Marie",
-      "activity_itemclass": {
-        "activity": "Meet",
-        "itemclass": "Person",
-        "subtypes_included": [
-          "Marie"
-        ]
-      }
-    },
-    {
-      "axis": [
-        "Alone",
-        "With-Marie"
-      ],
-      "drive": "spend time with Marie",
-      "activity_itemclass": {
-        "activity": "Accompany",
-        "itemclass": "Person",
-        "subtypes_included": [
-          "Marie"
-        ]
-      }
-    },
-    {
-      "axis": [
-        "Alone",
-        "With-Marie"
-      ],
-      "drive": "spend time with Marie",
-      "activity_itemclass": {
-        "activity": "Converse",
-        "itemclass": "Person",
-        "subtypes_included": [
-          "Marie"
-        ]
-      }
-    },
-    {
-      "axis": [
-        "InactiveWithMarie",
-        "ActiveWithMarie"
-      ],
-      "drive": "spend time with Marie",
-      "activity_itemclass": {
-        "activity": "Walk",
-        "itemclass": "Place",
-        "subtypes_included": [
-          "Mountain",
-          "Forest",
-          "Grassland",
-          "Field",
-          "Path",
-          "Farm",
-          "Village",
-          "Blacksmith",
-          "Market",
           "Farmhouse",
           "Church",
-          "Well",
-          "Mill",
-          "Spring"
+          "Well"
         ]
       }
     },
     {
       "axis": [
-        "InactiveWithMarie",
-        "ActiveWithMarie"
+        "Alone",
+        "With-Marie"
       ],
       "drive": "spend time with Marie",
       "activity_itemclass": {
-        "activity": "Visit",
-        "itemclass": "Location",
+        "activity": "meet",
+        "itemclass": "person",
         "subtypes_included": [
-          "Mountain",
-          "Forest",
-          "Grassland",
-          "Field",
-          "Path",
-          "Farm",
-          "Village",
-          "Blacksmith",
-          "Market",
-          "Farmhouse",
-          "Church",
-          "Well",
-          "Mill",
-          "Spring"
+          "Marie"
+        ]
+      }
+    },
+    {
+      "axis": [
+        "Alone",
+        "With-Marie"
+      ],
+      "drive": "spend time with Marie",
+      "activity_itemclass": {
+        "activity": "accompany",
+        "itemclass": "person",
+        "subtypes_included": [
+          "Marie"
+        ]
+      }
+    },
+    {
+      "axis": [
+        "Not-Communicating-with-Marie",
+        "Communicating-with-Marie"
+      ],
+      "drive": "spend time with Marie",
+      "activity_itemclass": {
+        "activity": "converse",
+        "itemclass": "person",
+        "subtypes_included": [
+          "Marie"
+        ]
+      }
+    },
+    {
+      "axis": [
+        "Inactive-with-Marie",
+        "Engaged-in-Activity-with-Marie"
+      ],
+      "drive": "spend time with Marie",
+      "activity_itemclass": {
+        "activity": "walk",
+        "itemclass": "person",
+        "subtypes_included": [
+          "Marie"
+        ]
+      }
+    },
+    {
+      "axis": [
+        "Inactive-with-Marie",
+        "Engaged-in-Activity-with-Marie"
+      ],
+      "drive": "spend time with Marie",
+      "activity_itemclass": {
+        "activity": "share-meal",
+        "itemclass": "person",
+        "subtypes_included": [
+          "Marie"
         ]
       }
     },
@@ -201,7 +176,7 @@
       ],
       "drive": "immediate needs of survival - food, shelter, health, rest from backbreaking labor",
       "activity_itemclass": {
-        "activity": "Consume",
+        "activity": "Eat",
         "itemclass": "Food",
         "subtypes_included": [
           "Bread",
@@ -222,7 +197,7 @@
       "drive": "immediate needs of survival - food, shelter, health, rest from backbreaking labor",
       "activity_itemclass": {
         "activity": "Drink",
-        "itemclass": "Drink",
+        "itemclass": "Drinkable",
         "subtypes_included": [
           "Water",
           "Well",
@@ -239,7 +214,7 @@
       ],
       "drive": "immediate needs of survival - food, shelter, health, rest from backbreaking labor",
       "activity_itemclass": {
-        "activity": "Rest",
+        "activity": "Sleep",
         "itemclass": "Shelter",
         "subtypes_included": [
           "Farmhouse",
@@ -255,10 +230,11 @@
       "drive": "immediate needs of survival - food, shelter, health, rest from backbreaking labor",
       "activity_itemclass": {
         "activity": "Recover",
-        "itemclass": "WaterSource",
+        "itemclass": "Rest-Source",
         "subtypes_included": [
           "Well",
-          "Spring"
+          "Farmhouse",
+          "Church"
         ]
       }
     },
@@ -270,7 +246,7 @@
       "drive": "Maintain hydration \u2014 avoid thirst and keep the body supplied with fluids.",
       "activity_itemclass": {
         "activity": "Consume",
-        "itemclass": "Drinkable",
+        "itemclass": "Drinkable Liquid",
         "subtypes_included": [
           "Water",
           "Milk"
@@ -285,7 +261,7 @@
       "drive": "Maintain hydration \u2014 avoid thirst and keep the body supplied with fluids.",
       "activity_itemclass": {
         "activity": "Consume",
-        "itemclass": "EdibleWithHydration",
+        "itemclass": "Moist Food",
         "subtypes_included": [
           "Cow"
         ]
@@ -293,30 +269,16 @@
     },
     {
       "axis": [
-        "LackAccessToFluids",
-        "AccessToFluids"
+        "Lacking_Water_Source_Access",
+        "Has_Water_Source_Access"
       ],
       "drive": "Maintain hydration \u2014 avoid thirst and keep the body supplied with fluids.",
       "activity_itemclass": {
-        "activity": "Acquire",
-        "itemclass": "WaterSource",
+        "activity": "Access",
+        "itemclass": "Water Source",
         "subtypes_included": [
           "Well",
           "Spring"
-        ]
-      }
-    },
-    {
-      "axis": [
-        "LackAccessToFluids",
-        "AccessToFluids"
-      ],
-      "drive": "Maintain hydration \u2014 avoid thirst and keep the body supplied with fluids.",
-      "activity_itemclass": {
-        "activity": "Acquire",
-        "itemclass": "VillageCommodity",
-        "subtypes_included": [
-          "Milk"
         ]
       }
     },
@@ -327,7 +289,7 @@
       ],
       "drive": "Maintain alertness \u2014 avoid fatigue and keep the body rested.",
       "activity_itemclass": {
-        "activity": "Rest",
+        "activity": "RestAt",
         "itemclass": "Shelter",
         "subtypes_included": [
           "Farmhouse",
@@ -342,11 +304,10 @@
       ],
       "drive": "Maintain alertness \u2014 avoid fatigue and keep the body rested.",
       "activity_itemclass": {
-        "activity": "Refresh",
-        "itemclass": "WaterSource",
+        "activity": "RecoverAt",
+        "itemclass": "WellnessResource",
         "subtypes_included": [
-          "Well",
-          "Spring"
+          "Well"
         ]
       }
     },
@@ -372,18 +333,14 @@
     },
     {
       "axis": [
-        "Undernourished",
-        "Nourished"
+        "Nutrient-Deficient",
+        "Nutrient-Supplied"
       ],
       "drive": "Maintain energy \u2014 avoid hunger and keep the body supplied with nutrients.",
       "activity_itemclass": {
-        "activity": "Ingest",
-        "itemclass": "Nutrient-Providing Item",
+        "activity": "Consume",
+        "itemclass": "Dairy",
         "subtypes_included": [
-          "Bread",
-          "Apple",
-          "Chicken",
-          "Egg",
           "Milk",
           "Cheese",
           "Butter"
@@ -392,62 +349,95 @@
     },
     {
       "axis": [
-        "Thirsty",
-        "Not-Thirsty"
+        "Nutrient-Deficient",
+        "Nutrient-Supplied"
       ],
       "drive": "Maintain energy \u2014 avoid hunger and keep the body supplied with nutrients.",
       "activity_itemclass": {
-        "activity": "Drink",
-        "itemclass": "Drinkable Liquid",
+        "activity": "Consume",
+        "itemclass": "Protein Source",
         "subtypes_included": [
-          "Water",
-          "Milk"
+          "Egg",
+          "Chicken"
         ]
       }
     }
   ],
   "verbs": [
+    "Tend",
+    "Repair",
     "Cultivate",
-    "Operate",
-    "Consume",
-    "Drink",
-    "Rest",
+    "Produce",
     "Secure",
-    "Meet",
-    "Accompany",
-    "Converse",
-    "Walk",
-    "Visit",
+    "Rest",
+    "meet",
+    "accompany",
+    "converse",
+    "walk",
+    "share-meal",
+    "Eat",
+    "Drink",
+    "Sleep",
     "Recover",
-    "Acquire",
-    "Refresh",
-    "Ingest"
+    "Consume",
+    "Access",
+    "RestAt",
+    "RecoverAt"
   ],
   "nouns": [
-    "Field",
-    "Farm Tool",
+    "Farm",
+    "Farmhouse",
+    "Field Tool",
+    "Farm Product",
+    "Water Source",
+    "Rest Location",
+    "person",
     "Food",
     "Drinkable",
     "Shelter",
-    "Land Ownership Document",
-    "Person",
-    "Place",
-    "Location",
-    "Drink",
-    "WaterSource",
-    "EdibleWithHydration",
-    "VillageCommodity",
-    "Nutrient-Providing Item",
-    "Drinkable Liquid"
+    "Rest-Source",
+    "Drinkable Liquid",
+    "Moist Food",
+    "WellnessResource",
+    "Dairy",
+    "Protein Source"
   ],
   "noun_mappings": {
-    "Field": [
-      "Field"
+    "Farm": [
+      "Farm"
     ],
-    "Farm Tool": [
+    "Farmhouse": [
+      "Farmhouse"
+    ],
+    "Field Tool": [
       "Hoe",
       "Plow",
       "Scythe"
+    ],
+    "Farm Product": [
+      "Bread",
+      "Apple",
+      "Chicken",
+      "Egg",
+      "Milk",
+      "Cheese",
+      "Butter",
+      "Cow",
+      "Hay"
+    ],
+    "Water Source": [
+      "Well",
+      "Spring",
+      "Milk",
+      "Cow"
+    ],
+    "Rest Location": [
+      "Farmhouse",
+      "Church",
+      "Well"
+    ],
+    "person": [
+      "Marie"
     ],
     "Food": [
       "Bread",
@@ -460,83 +450,38 @@
     ],
     "Drinkable": [
       "Water",
-      "Milk",
       "Well",
       "Spring",
+      "Milk",
       "Cow"
     ],
     "Shelter": [
       "Farmhouse",
       "Church"
     ],
-    "Land Ownership Document": [
-      "Will",
-      "Deed"
-    ],
-    "Person": [
-      "Marie"
-    ],
-    "Place": [
-      "Mountain",
-      "Forest",
-      "Grassland",
-      "Field",
-      "Path",
-      "Farm",
-      "Village",
-      "Blacksmith",
-      "Market",
+    "Rest-Source": [
+      "Well",
       "Farmhouse",
-      "Church",
-      "Well",
-      "Mill",
-      "Spring"
-    ],
-    "Location": [
-      "Mountain",
-      "Forest",
-      "Grassland",
-      "Field",
-      "Path",
-      "Farm",
-      "Village",
-      "Blacksmith",
-      "Market",
-      "Farmhouse",
-      "Church",
-      "Well",
-      "Mill",
-      "Spring"
-    ],
-    "Drink": [
-      "Water",
-      "Well",
-      "Spring",
-      "Milk",
-      "Cow"
-    ],
-    "WaterSource": [
-      "Well",
-      "Spring"
-    ],
-    "EdibleWithHydration": [
-      "Cow"
-    ],
-    "VillageCommodity": [
-      "Milk"
-    ],
-    "Nutrient-Providing Item": [
-      "Bread",
-      "Apple",
-      "Chicken",
-      "Egg",
-      "Milk",
-      "Cheese",
-      "Butter"
+      "Church"
     ],
     "Drinkable Liquid": [
       "Water",
       "Milk"
+    ],
+    "Moist Food": [
+      "Cow"
+    ],
+    "WellnessResource": [
+      "Well"
+    ],
+    "Dairy": [
+      "Milk",
+      "Cheese",
+      "Butter"
+    ],
+    "Protein Source": [
+      "Egg",
+      "Chicken"
     ]
   }
 }

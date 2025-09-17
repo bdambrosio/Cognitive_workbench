@@ -159,10 +159,12 @@ You are generating a comprehensive activity list for a character.
 #OTHER CHARACTERS:
 {{$other_characters}}
 ##
-#ONTOLOGY NOUNS:
+
+------------- ONTOLOGY ------------
+#ABSTRACT NOUNS:
 {{$ontology_nouns}}
 ##
-#ONTOLOGY VERBS:
+#ABSTRACT VERBS:
 {{$ontology_verbs}}
 ##
 #BASE NOUNS:
@@ -171,6 +173,7 @@ You are generating a comprehensive activity list for a character.
 #BASE VERBS:
 {{$primitive_verbs}}
 ##
+------------- END ONTOLOGY ------------
 
 TASK: Generate 24-40 activities as a JSON object, with the keys being the activity names. Distribute across these categories:
 #CATEGORIES
@@ -200,8 +203,7 @@ Each Activity should conform to this schema:
   "name": "string", ** even though the activity name is also the object key, also include it inside the object.
   "category": <category from above>,
   "tags": ["physical","mental","social","solo","outdoors","survival","routine"],
-  "steps": ["step", "step", ...] - 3–5 terse steps that will serve as planning goals.
-    **These must be stated using only nouns and verbs from the ontology nouns, ontology verbs, base nouns, base verbs and common connectives**."],
+  "steps": ["step", "step", ...] - 3–5 terse steps that will serve as planning goals. **These must be stated using nouns and verbs only from the ONTOLOGY and common connectives**."],
   "when": "daily@<period> | opportunistic | seasonal@<season>", 
   "where": ["place ids"], - constraint on initial location. Often empty, e.g. if activity starts with 'move to'. include ONLY nouns from the ontology nounsor base nouns
   "duration": [min_minutes, max_minutes],
@@ -219,7 +221,7 @@ Note the activities listed in the ontology above are *examples* and are not exha
 You may use them as a guide to generate activities that are more specific to the character and setting.
 ##
 
-**Use only ONTOLOGY NOUNS, ONTOLOGY VERBS, BASE NOUNS, and BASE VERBS to fill in the where and needs fields. Do not invent new nouns or verbs.**
+**Use only ONTOLOGY NOUNS, ONTOLOGY VERBS, BASE NOUNS, and BASE VERBS in the steps,where and needs fields. Do not invent new nouns or verbs.**
 Include self-care actions that remediate flagging physiological states (e.g. eating reduces hunger, rest reduces fatigue, injury or sickness), but again the nouns and verbs must be from the ontology or base types and actions. 
 Make sure to specify which states each activity addresses in the "states_addressed" field.
 
@@ -228,7 +230,7 @@ Make sure to specify which states each activity addresses in the "states_address
 ##
 
 #Step Guidelines:
-Generate steps that can serve as achievable planning goals. Each step should be a single verb or verb phrase, and all nouns and verbs must be drawn from the middle ontology or BASE TYPES or BASE ACTIONS.
+Generate steps that can serve as achievable planning goals. Each step should be a single verb or verb phrase, and all nouns and verbs must be drawn from the ONTOLOGY and common connectives.
 Each step should:
 
 - Be outcome-focused rather than method-focused: "acquire drinkable water" rather than "purify water using specific method"
@@ -244,7 +246,7 @@ Each step should:
 - Consider the character's current state when designing activities - hungry characters should have access to hunger-reducing activities
 
 #CONSTRAINTS:
-- Use only ONTOLOGY NOUNS, ONTOLOGY VERBS, BASE NOUNS, and BASE VERBS to fill in the "steps", "where" and "needs" fields. Do not invent new nouns or verbs.
+- Use only nouns and verbs from the ONTOLOGY and common connectives to fill in the "steps", "where" and "needs" fields. Do not invent new nouns or verbs.
 
 Do not include any other text, introductory, explanatory, markdown, code fences, etc.
 """
@@ -335,7 +337,7 @@ Consider the following information:
    Consider your current state (e.g., hunger, fatigue, thirst, injury); a survival-critical state (e.g., value above 70) should bias goals toward remediation.
 2. Otherwise, Drives should be main priority, in the context of the current situation. Drives above are listed in priority order, highest first.
 
-#Prefer verbs and nouns from the ABSTRACT VERBS and ABSTRACT NOUNS sections of the ONTOLOGY below, if present. Use the exact strings (case-sensitive). 
+#Use ONLY verbs and nouns from the  ONTOLOGY below. Use the exact strings (case-sensitive). 
  - Do NOT introduce synonyms (e.g., use 'Acquire' not 'Find'). If a needed concept is absent, prefer using the closest available ONTOLOGY term to inventing a new one.
  - In addition to verbs and nouns from the ONTOLOGY, you may use non-content words and connectors as needed, e.g.:
   {a, an, the, this, that, these, those, of, to, from, for, with, near, toward, by, and, or, if, until, then}.

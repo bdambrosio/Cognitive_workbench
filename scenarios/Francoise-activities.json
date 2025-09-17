@@ -1,21 +1,21 @@
 {
-  "EatBreadAtFarmhouse": {
-    "name": "EatBreadAtFarmhouse",
+  "EatBreakfastBreadAndMilk": {
+    "name": "EatBreakfastBreadAndMilk",
     "category": "Physiological ADLs",
     "tags": [
       "physical",
       "routine",
       "solo",
-      "indoors",
-      "survival"
+      "indoors"
     ],
     "steps": [
       "move to Farmhouse",
-      "take Bread",
+      "acquire Bread",
+      "acquire Milk",
       "consume Bread",
-      "rest at Farmhouse"
+      "consume Milk"
     ],
-    "when": "daily@morning",
+    "when": "daily@dawn",
     "where": [
       "Farmhouse"
     ],
@@ -24,29 +24,29 @@
       20
     ],
     "needs": [
-      "Bread"
+      "Bread",
+      "Milk"
     ],
     "states_addressed": [
       "hunger"
     ],
-    "importance": 0.9,
-    "habit": 0.8
+    "importance": 0.8,
+    "habit": 0.95
   },
-  "DrinkFromWell": {
-    "name": "DrinkFromWell",
-    "category": "Physiological ADLs",
+  "DrawWaterFromWell": {
+    "name": "DrawWaterFromWell",
+    "category": "Instrumental ADLs/Logistics",
     "tags": [
       "physical",
       "routine",
-      "solo",
       "outdoors",
       "survival"
     ],
     "steps": [
       "move to Well",
-      "access Well",
-      "consume Water",
-      "rest at Well"
+      "use Well",
+      "obtain Water",
+      "return to Farmhouse"
     ],
     "when": "daily@morning",
     "where": [
@@ -54,7 +54,7 @@
     ],
     "duration": [
       10,
-      15
+      20
     ],
     "needs": [
       "Well"
@@ -62,86 +62,115 @@
     "states_addressed": [
       "thirst"
     ],
-    "importance": 0.8,
-    "habit": 0.8
+    "importance": 0.7,
+    "habit": 0.9
+  },
+  "FetchEggsFromChickenCoop": {
+    "name": "FetchEggsFromChickenCoop",
+    "category": "Instrumental ADLs/Logistics",
+    "tags": [
+      "physical",
+      "routine",
+      "outdoors",
+      "solo"
+    ],
+    "steps": [
+      "move to Chicken",
+      "obtain Egg",
+      "return to Farmhouse"
+    ],
+    "when": "daily@morning",
+    "where": [
+      "Chicken"
+    ],
+    "duration": [
+      10,
+      15
+    ],
+    "needs": [
+      "Chicken"
+    ],
+    "states_addressed": [],
+    "importance": 0.6,
+    "habit": 0.85
   },
   "MilkCow": {
     "name": "MilkCow",
-    "category": "Role/Production",
+    "category": "Instrumental ADLs/Logistics",
     "tags": [
       "physical",
       "routine",
       "solo",
-      "outdoors",
-      "production"
+      "outdoors"
     ],
     "steps": [
       "move to Cow",
-      "inspect Cow",
-      "take Milk",
-      "provide Milk"
+      "use Cow",
+      "acquire Milk",
+      "return to Farmhouse"
     ],
     "when": "daily@morning",
     "where": [
-      "Farm"
+      "Cow"
     ],
     "duration": [
       15,
-      30
+      25
     ],
     "needs": [
       "Cow"
     ],
     "states_addressed": [],
-    "importance": 0.7,
-    "habit": 0.6
+    "importance": 0.65,
+    "habit": 0.85
   },
-  "GatherEggs": {
-    "name": "GatherEggs",
-    "category": "Role/Production",
+  "PrepareSimpleMeal": {
+    "name": "PrepareSimpleMeal",
+    "category": "Instrumental ADLs/Logistics",
     "tags": [
       "physical",
-      "routine",
       "solo",
-      "outdoors",
-      "production"
+      "indoors",
+      "routine"
     ],
     "steps": [
-      "move to Chicken",
-      "inspect Chicken",
-      "take Egg",
-      "provide Egg"
+      "acquire Bread",
+      "acquire Butter",
+      "arrange Bread",
+      "apply Butter",
+      "present SimpleFood"
     ],
-    "when": "daily@morning",
+    "when": "opportunistic",
     "where": [
-      "Farm"
+      "Farmhouse"
     ],
     "duration": [
       10,
       20
     ],
     "needs": [
-      "Chicken"
+      "Bread",
+      "Butter"
     ],
     "states_addressed": [],
-    "importance": 0.7,
+    "importance": 0.5,
     "habit": 0.7
   },
-  "TendGarden": {
-    "name": "TendGarden",
+  "TendKitchenGarden": {
+    "name": "TendKitchenGarden",
     "category": "Role/Production",
     "tags": [
       "physical",
+      "outdoors",
       "routine",
       "solo",
-      "outdoors",
-      "production"
+      "survival"
     ],
     "steps": [
       "move to Field",
       "inspect Field",
       "use Hoe",
-      "complete Task"
+      "acquire Apple"
     ],
     "when": "seasonal@summer",
     "where": [
@@ -152,295 +181,27 @@
       60
     ],
     "needs": [
-      "Hoe"
-    ],
-    "states_addressed": [],
-    "importance": 0.8,
-    "habit": 0.7
-  },
-  "PlowField": {
-    "name": "PlowField",
-    "category": "Role/Production",
-    "tags": [
-      "physical",
-      "routine",
-      "solo",
-      "outdoors",
-      "production"
-    ],
-    "steps": [
-      "move to Field",
-      "inspect Field",
-      "use Plow",
-      "complete Task"
-    ],
-    "when": "seasonal@spring",
-    "where": [
+      "Hoe",
       "Field"
     ],
-    "duration": [
-      60,
-      120
-    ],
-    "needs": [
-      "Plow"
-    ],
-    "states_addressed": [
-      "fatigue"
-    ],
-    "importance": 0.8,
-    "habit": 0.6
-  },
-  "AttendMass": {
-    "name": "AttendMass",
-    "category": "Role/Production",
-    "tags": [
-      "social",
-      "routine",
-      "indoors",
-      "community"
-    ],
-    "steps": [
-      "move to Church",
-      "fulfill obligations",
-      "demonstrate virtue",
-      "support community"
-    ],
-    "when": "weekly@morning",
-    "where": [
-      "Church"
-    ],
-    "duration": [
-      60,
-      90
-    ],
-    "needs": [
-      "Church"
-    ],
-    "states_addressed": [],
-    "importance": 0.6,
-    "habit": 0.6
-  },
-  "DrawWaterFromSpring": {
-    "name": "DrawWaterFromSpring",
-    "category": "Logistics",
-    "tags": [
-      "physical",
-      "routine",
-      "outdoors",
-      "survival"
-    ],
-    "steps": [
-      "move to Spring",
-      "access Spring",
-      "take Water",
-      "provide Water"
-    ],
-    "when": "daily@morning",
-    "where": [
-      "Spring"
-    ],
-    "duration": [
-      15,
-      30
-    ],
-    "needs": [
-      "Spring"
-    ],
-    "states_addressed": [
-      "thirst"
-    ],
-    "importance": 0.7,
-    "habit": 0.6
-  },
-  "RestInShade": {
-    "name": "RestInShade",
-    "category": "Recreation & Leisure",
-    "tags": [
-      "physical",
-      "routine",
-      "outdoors",
-      "solo",
-      "recreation"
-    ],
-    "steps": [
-      "move to Grassland",
-      "rest at Grassland",
-      "refresh",
-      "recover at Grassland"
-    ],
-    "when": "opportunistic",
-    "where": [
-      "Grassland"
-    ],
-    "duration": [
-      10,
-      30
-    ],
-    "needs": [],
-    "states_addressed": [
-      "fatigue"
-    ],
-    "importance": 0.6,
-    "habit": 0.4
-  },
-  "VisitMarket": {
-    "name": "VisitMarket",
-    "category": "Mobility & Transport",
-    "tags": [
-      "mobility",
-      "social",
-      "outdoors",
-      "community"
-    ],
-    "steps": [
-      "move to Market",
-      "scan Market",
-      "support community",
-      "provide Food"
-    ],
-    "when": "weekly@morning",
-    "where": [
-      "Market"
-    ],
-    "duration": [
-      60,
-      120
-    ],
-    "needs": [],
-    "states_addressed": [],
-    "importance": 0.6,
-    "habit": 0.4
-  },
-  "PrepareBread": {
-    "name": "PrepareBread",
-    "category": "Instrumental ADLs/Logistics",
-    "tags": [
-      "physical",
-      "routine",
-      "indoors",
-      "production"
-    ],
-    "steps": [
-      "move to Farmhouse",
-      "gather Food",
-      "complete Task",
-      "provide Bread"
-    ],
-    "when": "daily@dawn",
-    "where": [
-      "Farmhouse"
-    ],
-    "duration": [
-      30,
-      60
-    ],
-    "needs": [
-      "Bread"
-    ],
     "states_addressed": [],
     "importance": 0.7,
-    "habit": 0.6
+    "habit": 0.77
   },
-  "CleanFarmhouse": {
-    "name": "CleanFarmhouse",
+  "SweepFarmyard": {
+    "name": "SweepFarmyard",
     "category": "Maintenance & Repair",
     "tags": [
       "physical",
-      "routine",
-      "indoors",
-      "solo"
-    ],
-    "steps": [
-      "move to Farmhouse",
-      "inspect Farmhouse",
-      "complete Task",
-      "rest at Farmhouse"
-    ],
-    "when": "daily@afternoon",
-    "where": [
-      "Farmhouse"
-    ],
-    "duration": [
-      20,
-      40
-    ],
-    "needs": [],
-    "states_addressed": [],
-    "importance": 0.5,
-    "habit": 0.5
-  },
-  "RepairClothes": {
-    "name": "RepairClothes",
-    "category": "Maintenance & Repair",
-    "tags": [
-      "physical",
-      "routine",
-      "indoors",
-      "solo"
-    ],
-    "steps": [
-      "move to Farmhouse",
-      "inspect Clothes",
-      "complete Task",
-      "rest at Farmhouse"
-    ],
-    "when": "opportunistic",
-    "where": [
-      "Farmhouse"
-    ],
-    "duration": [
-      30,
-      60
-    ],
-    "needs": [],
-    "states_addressed": [],
-    "importance": 0.5,
-    "habit": 0.3
-  },
-  "FetchFirewood": {
-    "name": "FetchFirewood",
-    "category": "Maintenance & Repair",
-    "tags": [
-      "physical",
-      "routine",
-      "outdoors"
-    ],
-    "steps": [
-      "move to Forest",
-      "take Wood",
-      "carry Wood",
-      "provide Firewood"
-    ],
-    "when": "daily@afternoon",
-    "where": [
-      "Forest"
-    ],
-    "duration": [
-      20,
-      40
-    ],
-    "needs": [],
-    "states_addressed": [
-      "fatigue"
-    ],
-    "importance": 0.7,
-    "habit": 0.5
-  },
-  "SweepingYard": {
-    "name": "SweepingYard",
-    "category": "Maintenance & Repair",
-    "tags": [
-      "physical",
-      "routine",
       "outdoors",
+      "routine",
       "solo"
     ],
     "steps": [
       "move to Farm",
-      "inspect Farm",
-      "complete Task",
-      "rest at Farm"
+      "scan Farm",
+      "arrange Hay",
+      "inspect Farm"
     ],
     "when": "daily@morning",
     "where": [
@@ -448,29 +209,252 @@
     ],
     "duration": [
       15,
-      30
+      25
     ],
-    "needs": [],
+    "needs": [
+      "Hay",
+      "Farm"
+    ],
     "states_addressed": [],
-    "importance": 0.4,
-    "habit": 0.6
+    "importance": 0.65,
+    "habit": 0.8
   },
-  "TalkWithMother": {
-    "name": "TalkWithMother",
-    "category": "Learning & Practice",
+  "FeedChickensAndCows": {
+    "name": "FeedChickensAndCows",
+    "category": "Role/Production",
+    "tags": [
+      "physical",
+      "routine",
+      "solo",
+      "outdoors"
+    ],
+    "steps": [
+      "move to Chicken",
+      "provide Hay",
+      "move to Cow",
+      "provide Hay"
+    ],
+    "when": "daily@morning",
+    "where": [
+      "Farm"
+    ],
+    "duration": [
+      15,
+      25
+    ],
+    "needs": [
+      "Hay",
+      "Chicken",
+      "Cow"
+    ],
+    "states_addressed": [],
+    "importance": 0.7,
+    "habit": 0.85
+  },
+  "DeliverEggsToMarket": {
+    "name": "DeliverEggsToMarket",
+    "category": "Mobility & Transport",
+    "tags": [
+      "physical",
+      "social",
+      "outdoors",
+      "routine"
+    ],
+    "steps": [
+      "move to Market",
+      "acquire Market",
+      "deliver Egg",
+      "associate-with Market"
+    ],
+    "when": "seasonal@summer",
+    "where": [
+      "Village"
+    ],
+    "duration": [
+      30,
+      60
+    ],
+    "needs": [
+      "Egg",
+      "Market"
+    ],
+    "states_addressed": [],
+    "importance": 0.55,
+    "habit": 0.5
+  },
+  "AttendChurch": {
+    "name": "AttendChurch",
+    "category": "Role/Production",
     "tags": [
       "social",
+      "public",
+      "routine",
+      "mental"
+    ],
+    "steps": [
+      "move to Church",
+      "attend Church",
+      "join CommunityPlace",
+      "associate-with Respected-Person"
+    ],
+    "when": "weekly@morning",
+    "where": [
+      "Church"
+    ],
+    "duration": [
+      40,
+      80
+    ],
+    "needs": [
+      "Church"
+    ],
+    "states_addressed": [],
+    "importance": 0.8,
+    "habit": 0.75
+  },
+  "ShareNewsWithNeighbor": {
+    "name": "ShareNewsWithNeighbor",
+    "category": "Recreation & Leisure",
+    "tags": [
+      "social",
+      "routine",
       "mental",
-      "indoors",
+      "outdoors"
+    ],
+    "steps": [
+      "move to Village",
+      "join Person",
+      "say CommunityPlace",
+      "associate-with Person"
+    ],
+    "when": "opportunistic",
+    "where": [
+      "Village"
+    ],
+    "duration": [
+      10,
+      25
+    ],
+    "needs": [
+      "Village"
+    ],
+    "states_addressed": [],
+    "importance": 0.6,
+    "habit": 0.6
+  },
+  "HelpFamilyWithFieldWork": {
+    "name": "HelpFamilyWithFieldWork",
+    "category": "Role/Production",
+    "tags": [
+      "physical",
+      "routine",
+      "outdoors",
       "family"
     ],
     "steps": [
-      "move to Farmhouse",
-      "say to MotherMarquart",
-      "scan response",
-      "think"
+      "move to Field",
+      "use Scythe",
+      "scan Hay",
+      "gather Hay"
+    ],
+    "when": "seasonal@summer",
+    "where": [
+      "Field"
+    ],
+    "duration": [
+      60,
+      120
+    ],
+    "needs": [
+      "Scythe",
+      "Field"
+    ],
+    "states_addressed": [
+      "fatigue"
+    ],
+    "importance": 0.9,
+    "habit": 0.85
+  },
+  "DrinkCoolWaterFromSpring": {
+    "name": "DrinkCoolWaterFromSpring",
+    "category": "Physiological ADLs",
+    "tags": [
+      "physical",
+      "outdoors",
+      "solo",
+      "survival"
+    ],
+    "steps": [
+      "move to Spring",
+      "use Spring",
+      "drink Water",
+      "recover Well"
+    ],
+    "when": "daily@afternoon",
+    "where": [
+      "Spring"
+    ],
+    "duration": [
+      5,
+      10
+    ],
+    "needs": [
+      "Spring"
+    ],
+    "states_addressed": [
+      "thirst"
+    ],
+    "importance": 0.8,
+    "habit": 0.85
+  },
+  "PauseForRestUnderTree": {
+    "name": "PauseForRestUnderTree",
+    "category": "Recreation & Leisure",
+    "tags": [
+      "physical",
+      "outdoors",
+      "solo",
+      "routine"
+    ],
+    "steps": [
+      "move to Grassland",
+      "pause Grassland",
+      "repose Field",
+      "rest Farm"
     ],
     "when": "opportunistic",
+    "where": [
+      "Grassland"
+    ],
+    "duration": [
+      10,
+      20
+    ],
+    "needs": [
+      "Grassland"
+    ],
+    "states_addressed": [
+      "fatigue"
+    ],
+    "importance": 0.7,
+    "habit": 0.7
+  },
+  "ArrangeSleepingPlace": {
+    "name": "ArrangeSleepingPlace",
+    "category": "Physiological ADLs",
+    "tags": [
+      "physical",
+      "indoors",
+      "solo",
+      "routine"
+    ],
+    "steps": [
+      "move to Farmhouse",
+      "arrange RestingPlace",
+      "inspect Farmhouse",
+      "repose Farmhouse"
+    ],
+    "when": "daily@dusk",
     "where": [
       "Farmhouse"
     ],
@@ -478,375 +462,431 @@
       10,
       20
     ],
-    "needs": [],
-    "states_addressed": [],
-    "importance": 0.5,
-    "habit": 0.4
-  },
-  "ObserveJeanWorking": {
-    "name": "ObserveJeanWorking",
-    "category": "Learning & Practice",
-    "tags": [
-      "mental",
-      "social",
-      "outdoors"
-    ],
-    "steps": [
-      "move to Field",
-      "scan Jean",
-      "think",
-      "wait"
-    ],
-    "when": "opportunistic",
-    "where": [
-      "Field"
-    ],
-    "duration": [
-      15,
-      30
-    ],
-    "needs": [],
-    "states_addressed": [],
-    "importance": 0.6,
-    "habit": 0.3
-  },
-  "HidePersonalFeelings": {
-    "name": "HidePersonalFeelings",
-    "category": "Cognitive/Inner",
-    "tags": [
-      "mental",
-      "routine",
-      "social",
-      "solo"
-    ],
-    "steps": [
-      "think",
-      "withhold information",
-      "wait",
-      "scan"
-    ],
-    "when": "daily@day",
-    "where": [],
-    "duration": [
-      1,
-      5
-    ],
-    "needs": [],
-    "states_addressed": [],
-    "importance": 0.9,
-    "habit": 0.9
-  },
-  "CheckForGossip": {
-    "name": "CheckForGossip",
-    "category": "Cognitive/Inner",
-    "tags": [
-      "mental",
-      "routine",
-      "social",
-      "community"
-    ],
-    "steps": [
-      "scan Market",
-      "listen",
-      "think",
-      "withhold information"
-    ],
-    "when": "weekly@morning",
-    "where": [
-      "Market"
-    ],
-    "duration": [
-      15,
-      45
-    ],
-    "needs": [],
-    "states_addressed": [],
-    "importance": 0.8,
-    "habit": 0.7
-  },
-  "EatAppleInField": {
-    "name": "EatAppleInField",
-    "category": "Physiological ADLs",
-    "tags": [
-      "physical",
-      "routine",
-      "solo",
-      "outdoors",
-      "survival"
-    ],
-    "steps": [
-      "move to Field",
-      "take Apple",
-      "consume Apple",
-      "rest at Field"
-    ],
-    "when": "opportunistic",
-    "where": [
-      "Field"
-    ],
-    "duration": [
-      5,
-      10
-    ],
     "needs": [
-      "Apple"
+      "Farmhouse"
     ],
     "states_addressed": [
-      "hunger"
+      "fatigue"
     ],
-    "importance": 0.7,
-    "habit": 0.5
+    "importance": 0.9,
+    "habit": 0.98
   },
-  "SleepInFarmhouse": {
-    "name": "SleepInFarmhouse",
+  "NightSleepFarmhouse": {
+    "name": "NightSleepFarmhouse",
     "category": "Physiological ADLs",
     "tags": [
       "physical",
       "routine",
       "indoors",
-      "solo",
-      "survival"
+      "solo"
     ],
     "steps": [
       "move to Farmhouse",
-      "rest at Farmhouse",
-      "enableRest",
-      "recover at Farmhouse"
+      "repose RestingPlace",
+      "rest Farmhouse",
+      "recover Farmhouse"
     ],
     "when": "daily@night",
     "where": [
       "Farmhouse"
     ],
     "duration": [
-      300,
+      360,
       420
     ],
-    "needs": [],
+    "needs": [
+      "Farmhouse"
+    ],
     "states_addressed": [
       "fatigue"
     ],
     "importance": 1.0,
-    "habit": 0.95
+    "habit": 1.0
   },
-  "InspectFamilyWill": {
-    "name": "InspectFamilyWill",
-    "category": "Learning & Practice",
-    "tags": [
-      "mental",
-      "routine",
-      "indoors",
-      "family"
-    ],
-    "steps": [
-      "move to Farmhouse",
-      "inspect Will",
-      "think",
-      "withhold information"
-    ],
-    "when": "opportunistic",
-    "where": [
-      "Farmhouse"
-    ],
-    "duration": [
-      10,
-      20
-    ],
-    "needs": [
-      "Will"
-    ],
-    "states_addressed": [],
-    "importance": 0.8,
-    "habit": 0.1
-  },
-  "PrayInChurch": {
-    "name": "PrayInChurch",
-    "category": "Cognitive/Inner",
-    "tags": [
-      "mental",
-      "routine",
-      "indoors",
-      "solo"
-    ],
-    "steps": [
-      "move to Church",
-      "rest at Church",
-      "think",
-      "demonstrate virtue"
-    ],
-    "when": "opportunistic",
-    "where": [
-      "Church"
-    ],
-    "duration": [
-      10,
-      20
-    ],
-    "needs": [
-      "Church"
-    ],
-    "states_addressed": [],
-    "importance": 0.7,
-    "habit": 0.5
-  },
-  "SupportNeighborInNeed": {
-    "name": "SupportNeighborInNeed",
-    "category": "Role/Production",
-    "tags": [
-      "social",
-      "community",
-      "routine",
-      "outdoors"
-    ],
-    "steps": [
-      "move to Village",
-      "support community",
-      "provide Food",
-      "complete Task"
-    ],
-    "when": "opportunistic",
-    "where": [
-      "Village"
-    ],
-    "duration": [
-      30,
-      60
-    ],
-    "needs": [
-      "Food"
-    ],
-    "states_addressed": [],
-    "importance": 0.6,
-    "habit": 0.2
-  },
-  "HelpMotherWithChores": {
-    "name": "HelpMotherWithChores",
-    "category": "Role/Production",
+  "TendWoundsIfInjured": {
+    "name": "TendWoundsIfInjured",
+    "category": "Health Management (self-care)",
     "tags": [
       "physical",
-      "routine",
-      "indoors",
-      "family"
+      "solo",
+      "routine"
     ],
     "steps": [
-      "move to Farmhouse",
-      "inspect Farmhouse",
-      "complete Task",
-      "support community"
-    ],
-    "when": "daily@morning",
-    "where": [
-      "Farmhouse"
-    ],
-    "duration": [
-      30,
-      60
-    ],
-    "needs": [],
-    "states_addressed": [],
-    "importance": 0.8,
-    "habit": 0.6
-  },
-  "PlanMarriageProspects": {
-    "name": "PlanMarriageProspects",
-    "category": "Cognitive/Inner",
-    "tags": [
-      "mental",
-      "routine",
-      "social",
-      "solo"
-    ],
-    "steps": [
-      "think",
-      "scan Village",
       "inspect Person",
-      "withhold information"
+      "use Well",
+      "clean Injury",
+      "rest Farmhouse"
     ],
     "when": "opportunistic",
     "where": [
-      "Village"
+      "Farmhouse"
     ],
     "duration": [
       15,
+      40
+    ],
+    "needs": [
+      "Well",
+      "Farmhouse"
+    ],
+    "states_addressed": [
+      "injury"
+    ],
+    "importance": 0.9,
+    "habit": 0.3
+  },
+  "MaintainHoeAndTools": {
+    "name": "MaintainHoeAndTools",
+    "category": "Maintenance & Repair",
+    "tags": [
+      "physical",
+      "routine",
+      "solo",
+      "indoors"
+    ],
+    "steps": [
+      "inspect Hoe",
+      "use Hoe",
+      "clean Hoe",
+      "arrange Hoe"
+    ],
+    "when": "weekly@evening",
+    "where": [
+      "Farmhouse"
+    ],
+    "duration": [
+      20,
+      30
+    ],
+    "needs": [
+      "Hoe"
+    ],
+    "states_addressed": [],
+    "importance": 0.6,
+    "habit": 0.4
+  },
+  "ShareMealWithFamily": {
+    "name": "ShareMealWithFamily",
+    "category": "Recreation & Leisure",
+    "tags": [
+      "social",
+      "indoors",
+      "family",
+      "routine"
+    ],
+    "steps": [
+      "move to Farmhouse",
+      "join Person",
+      "consume Bread",
+      "consume Cheese"
+    ],
+    "when": "daily@evening",
+    "where": [
+      "Farmhouse"
+    ],
+    "duration": [
+      30,
       45
     ],
     "needs": [
-      "Person"
+      "Bread",
+      "Cheese",
+      "Farmhouse"
     ],
-    "states_addressed": [],
-    "importance": 0.9,
-    "habit": 0.2
+    "states_addressed": [
+      "hunger"
+    ],
+    "importance": 0.8,
+    "habit": 0.85
   },
-  "SpeakWithJeanBriefly": {
-    "name": "SpeakWithJeanBriefly",
-    "category": "Learning & Practice",
+  "AttendVillageMarket": {
+    "name": "AttendVillageMarket",
+    "category": "Role/Production",
     "tags": [
       "social",
-      "mental",
-      "outdoors"
+      "public",
+      "routine",
+      "mental"
     ],
     "steps": [
-      "move to Field",
-      "say to Jean",
-      "scan response",
-      "think"
+      "move to Market",
+      "attend Market",
+      "join CommunityPlace",
+      "scan Market"
+    ],
+    "when": "weekly@morning",
+    "where": [
+      "Market"
+    ],
+    "duration": [
+      60,
+      120
+    ],
+    "needs": [
+      "Market"
+    ],
+    "states_addressed": [],
+    "importance": 0.7,
+    "habit": 0.6
+  },
+  "LearnNewChurnMilk": {
+    "name": "LearnNewChurnMilk",
+    "category": "Learning & Practice",
+    "tags": [
+      "mental",
+      "routine",
+      "indoors",
+      "family"
+    ],
+    "steps": [
+      "acquire Milk",
+      "use Butter",
+      "scan Cheese",
+      "inspect Butter"
+    ],
+    "when": "seasonal@summer",
+    "where": [
+      "Farmhouse"
+    ],
+    "duration": [
+      30,
+      50
+    ],
+    "needs": [
+      "Milk",
+      "Butter"
+    ],
+    "states_addressed": [],
+    "importance": 0.5,
+    "habit": 0.2
+  },
+  "ReflectOnDreams": {
+    "name": "ReflectOnDreams",
+    "category": "Cognitive/Inner",
+    "tags": [
+      "mental",
+      "solo",
+      "routine",
+      "indoors"
+    ],
+    "steps": [
+      "pause RestingPlace",
+      "think Farm",
+      "believes Farm",
+      "appreciate Farmhouse"
     ],
     "when": "opportunistic",
     "where": [
-      "Field"
+      "Farmhouse"
     ],
     "duration": [
       5,
       15
     ],
     "needs": [
-      "Jean"
+      "Farmhouse"
     ],
     "states_addressed": [],
-    "importance": 0.4,
-    "habit": 0.4
+    "importance": 0.7,
+    "habit": 0.5
   },
-  "GuardReputation": {
-    "name": "GuardReputation",
-    "category": "Cognitive/Inner",
+  "AvoidVillageGossip": {
+    "name": "AvoidVillageGossip",
+    "category": "Safety/Emergency",
     "tags": [
       "mental",
-      "routine",
       "social",
-      "community"
+      "routine"
     ],
     "steps": [
-      "withhold information",
-      "demonstrate virtue",
-      "think",
-      "wait"
+      "move to Village",
+      "scan Person",
+      "say carefully",
+      "visit CommunityPlace"
     ],
-    "when": "daily@day",
-    "where": [],
+    "when": "opportunistic",
+    "where": [
+      "Village"
+    ],
     "duration": [
-      1,
-      5
+      5,
+      15
     ],
-    "needs": [],
+    "needs": [
+      "Village"
+    ],
     "states_addressed": [],
-    "importance": 1.0,
-    "habit": 0.95
+    "importance": 0.7,
+    "habit": 0.7
   },
-  "TidySleepingArea": {
-    "name": "TidySleepingArea",
-    "category": "Maintenance & Repair",
+  "WalkToJeanFarm": {
+    "name": "WalkToJeanFarm",
+    "category": "Mobility & Transport",
     "tags": [
       "physical",
+      "outdoors",
+      "solo",
+      "routine"
+    ],
+    "steps": [
+      "move to Field",
+      "move to Farmhouse1",
+      "scan Farmhouse1",
+      "join Person"
+    ],
+    "when": "opportunistic",
+    "where": [
+      "Field"
+    ],
+    "duration": [
+      10,
+      20
+    ],
+    "needs": [
+      "Path"
+    ],
+    "states_addressed": [],
+    "importance": 0.5,
+    "habit": 0.3
+  },
+  "InspectFieldsForHarvest": {
+    "name": "InspectFieldsForHarvest",
+    "category": "Role/Production",
+    "tags": [
+      "physical",
+      "outdoors",
       "routine",
-      "indoors",
       "solo"
     ],
     "steps": [
-      "move to Farmhouse",
-      "inspect Farmhouse",
-      "complete Task",
-      "rest at Farmhouse"
+      "move to Field",
+      "scan Field",
+      "inspect Hay",
+      "scan Crop"
     ],
-    "when": "daily@morning",
+    "when": "seasonal@summer",
+    "where": [
+      "Field"
+    ],
+    "duration": [
+      20,
+      40
+    ],
+    "needs": [
+      "Field"
+    ],
+    "states_addressed": [],
+    "importance": 0.7,
+    "habit": 0.65
+  },
+  "SavorRipeAppleByRiver": {
+    "name": "SavorRipeAppleByRiver",
+    "category": "Recreation & Leisure",
+    "tags": [
+      "physical",
+      "outdoors",
+      "solo",
+      "joyful"
+    ],
+    "steps": [
+      "move to River",
+      "acquire Apple",
+      "savor Apple",
+      "appreciate River"
+    ],
+    "when": "seasonal@summer",
+    "where": [
+      "River"
+    ],
+    "duration": [
+      10,
+      20
+    ],
+    "needs": [
+      "Apple",
+      "River"
+    ],
+    "states_addressed": [
+      "hunger"
+    ],
+    "importance": 0.6,
+    "habit": 0.4
+  },
+  "HideTearsInQuietSpot": {
+    "name": "HideTearsInQuietSpot",
+    "category": "Cognitive/Inner",
+    "tags": [
+      "mental",
+      "solo",
+      "outdoors"
+    ],
+    "steps": [
+      "move to Forest",
+      "pause Forest",
+      "repose Forest",
+      "think Person"
+    ],
+    "when": "opportunistic",
+    "where": [
+      "Forest"
+    ],
+    "duration": [
+      5,
+      15
+    ],
+    "needs": [
+      "Forest"
+    ],
+    "states_addressed": [],
+    "importance": 0.6,
+    "habit": 0.2
+  },
+  "CleanClothesBySpring": {
+    "name": "CleanClothesBySpring",
+    "category": "Health Management (self-care)",
+    "tags": [
+      "physical",
+      "routine",
+      "outdoors",
+      "solo"
+    ],
+    "steps": [
+      "move to Spring",
+      "use Spring",
+      "arrange Clothes",
+      "recover Spring"
+    ],
+    "when": "weekly@day",
+    "where": [
+      "Spring"
+    ],
+    "duration": [
+      30,
+      60
+    ],
+    "needs": [
+      "Spring"
+    ],
+    "states_addressed": [],
+    "importance": 0.5,
+    "habit": 0.55
+  },
+  "KeepFireSafeInFarmhouse": {
+    "name": "KeepFireSafeInFarmhouse",
+    "category": "Safety/Emergency",
+    "tags": [
+      "physical",
+      "routine",
+      "solo",
+      "indoors"
+    ],
+    "steps": [
+      "inspect Farmhouse",
+      "use Water",
+      "arrange Fire",
+      "scan Farmhouse"
+    ],
+    "when": "opportunistic",
     "where": [
       "Farmhouse"
     ],
@@ -854,71 +894,12 @@
       10,
       20
     ],
-    "needs": [],
-    "states_addressed": [],
-    "importance": 0.5,
-    "habit": 0.6
-  },
-  "SavorFreshButter": {
-    "name": "SavorFreshButter",
-    "category": "Recreation & Leisure",
-    "tags": [
-      "physical",
-      "routine",
-      "indoors",
-      "solo",
-      "recreation"
-    ],
-    "steps": [
-      "move to Farmhouse",
-      "take Butter",
-      "savor Butter",
-      "think"
-    ],
-    "when": "opportunistic",
-    "where": [
-      "Farmhouse"
-    ],
-    "duration": [
-      5,
-      10
-    ],
     "needs": [
-      "Butter"
+      "Farmhouse",
+      "Water"
     ],
-    "states_addressed": [
-      "hunger"
-    ],
-    "importance": 0.3,
-    "habit": 0.3
-  },
-  "RespondToInjury": {
-    "name": "RespondToInjury",
-    "category": "Safety/Emergency",
-    "tags": [
-      "physical",
-      "routine",
-      "solo"
-    ],
-    "steps": [
-      "inspect Injury",
-      "move to Farmhouse",
-      "recover at Farmhouse",
-      "rest at Farmhouse"
-    ],
-    "when": "opportunistic",
-    "where": [
-      "Farmhouse"
-    ],
-    "duration": [
-      15,
-      60
-    ],
-    "needs": [],
-    "states_addressed": [
-      "injury"
-    ],
-    "importance": 1.0,
-    "habit": 0.1
+    "states_addressed": [],
+    "importance": 0.7,
+    "habit": 0.5
   }
 }

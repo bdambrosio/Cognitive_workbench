@@ -477,6 +477,22 @@ def main():
         # Fallback to copy without metadata
         shutil.copy(plans_path, dst_plans)
 
+    # After successful copy: if source is in data/ and matches <character>-plans.jsonl, rename to .bak
+    src_dir = os.path.dirname(plans_path)
+    src_base = os.path.basename(plans_path)
+    expected_base = f"{character}-plans.jsonl"
+    if os.path.basename(src_dir) == "data" and src_base == expected_base:
+        backup_path = os.path.join(src_dir, expected_base + ".bak")
+        if os.path.exists(backup_path):
+            try:
+                os.remove(backup_path)
+            except Exception:
+                pass
+        try:
+            os.replace(plans_path, backup_path)
+        except Exception:
+            pass
+
     # Prepare output path
     score_path = os.path.join(run_dir, "scenario_score.json")
     if os.path.exists(score_path) and not args.yes:
@@ -494,15 +510,15 @@ def main():
 
     # Write manifest.json
     try:
-        # Compute SHA256 of input
+        # Compute SHA256 of input (use copied file to avoid issues after renaming source)
         sha256 = hashlib.sha256()
-        with open(plans_path, "rb") as pf:
+        with open(dst_plans, "rb") as pf:
             for chunk in iter(lambda: pf.read(8192), b""):
                 sha256.update(chunk)
         manifest = {
             "character_name": character,
-            "input_path": os.path.abspath(plans_path),
-            "input_basename": os.path.basename(plans_path),
+            "input_path": os.path.abspath(dst_plans),
+            "input_basename": os.path.basename(dst_plans),
             "input_mtime_utc": mtime.isoformat(),
             "input_sha256": sha256.hexdigest(),
             "analysis_dir": os.path.abspath(run_dir),
