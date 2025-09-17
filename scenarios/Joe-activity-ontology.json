@@ -2,13 +2,13 @@
   "activities": [
     {
       "axis": [
-        "Inside-Forest",
-        "Outside-Forest"
+        "InForest",
+        "OutOfForest"
       ],
       "drive": "Find a way out of the forest.",
       "activity_itemclass": {
-        "activity": "Navigate",
-        "itemclass": "Pathway",
+        "activity": "Follow",
+        "itemclass": "Path",
         "subtypes_included": [
           "Path"
         ]
@@ -16,26 +16,27 @@
     },
     {
       "axis": [
-        "Inside-Forest",
-        "Outside-Forest"
+        "InForest",
+        "OutOfForest"
       ],
       "drive": "Find a way out of the forest.",
       "activity_itemclass": {
-        "activity": "Arrive",
+        "activity": "Enter",
         "itemclass": "Settlement",
         "subtypes_included": [
-          "Village"
+          "Village",
+          "Hut"
         ]
       }
     },
     {
       "axis": [
-        "Inside-Forest",
-        "Outside-Forest"
+        "InForest",
+        "OutOfForest"
       ],
       "drive": "Find a way out of the forest.",
       "activity_itemclass": {
-        "activity": "Enter",
+        "activity": "MoveTo",
         "itemclass": "OpenArea",
         "subtypes_included": [
           "Clearing",
@@ -45,47 +46,30 @@
     },
     {
       "axis": [
-        "Lost",
+        "Unoriented",
         "Oriented"
       ],
       "drive": "Find a way out of the forest.",
       "activity_itemclass": {
-        "activity": "Scout",
+        "activity": "Inspect",
         "itemclass": "Landmark",
         "subtypes_included": [
           "Mountain",
           "Appletree",
           "Spring",
           "Cave",
-          "Hut",
-          "Village"
+          "Thicket"
         ]
       }
     },
     {
       "axis": [
-        "Obstructed",
-        "Unobstructed"
-      ],
-      "drive": "Find a way out of the forest.",
-      "activity_itemclass": {
-        "activity": "Access",
-        "itemclass": "Passage",
-        "subtypes_included": [
-          "Path",
-          "Clearing",
-          "Meadow"
-        ]
-      }
-    },
-    {
-      "axis": [
-        "Not-Located-At-Hut1",
-        "Located-At-Hut1"
+        "Not-Located-at-Hut1",
+        "Located-at-Hut1"
       ],
       "drive": "Find Hut1.",
       "activity_itemclass": {
-        "activity": "Navigate",
+        "activity": "Travel",
         "itemclass": "Shelter",
         "subtypes_included": [
           "Hut",
@@ -95,8 +79,8 @@
     },
     {
       "axis": [
-        "Not-Located-At-Hut1",
-        "Located-At-Hut1"
+        "Not-Located-at-Hut1",
+        "Located-at-Hut1"
       ],
       "drive": "Find Hut1.",
       "activity_itemclass": {
@@ -110,8 +94,8 @@
     },
     {
       "axis": [
-        "Unaware-of-Hut1",
-        "Aware-of-Hut1"
+        "Unaware-of-Hut1-Location",
+        "Aware-of-Hut1-Location"
       ],
       "drive": "Find Hut1.",
       "activity_itemclass": {
@@ -125,8 +109,8 @@
     },
     {
       "axis": [
-        "Unaware-of-Hut1",
-        "Aware-of-Hut1"
+        "Unaware-of-Hut1-Location",
+        "Aware-of-Hut1-Location"
       ],
       "drive": "Find Hut1.",
       "activity_itemclass": {
@@ -146,7 +130,7 @@
       "drive": "Live and survive safely while finding a way out of the forest or waiting for rescue.",
       "activity_itemclass": {
         "activity": "Consume",
-        "itemclass": "Edible Resource",
+        "itemclass": "Food Source",
         "subtypes_included": [
           "Berries",
           "Mushrooms",
@@ -164,8 +148,7 @@
         "activity": "Drink",
         "itemclass": "Water Source",
         "subtypes_included": [
-          "Spring",
-          "Water"
+          "Spring"
         ]
       }
     },
@@ -176,7 +159,7 @@
       ],
       "drive": "Live and survive safely while finding a way out of the forest or waiting for rescue.",
       "activity_itemclass": {
-        "activity": "Shelter In",
+        "activity": "Rest",
         "itemclass": "Shelter",
         "subtypes_included": [
           "Hut",
@@ -187,14 +170,30 @@
     {
       "axis": [
         "Lost",
-        "Found/Oriented"
+        "Found/Out"
       ],
       "drive": "Live and survive safely while finding a way out of the forest or waiting for rescue.",
       "activity_itemclass": {
         "activity": "Navigate",
-        "itemclass": "Navigable Path/Location",
+        "itemclass": "Exit Path",
         "subtypes_included": [
           "Path",
+          "Village"
+        ]
+      }
+    },
+    {
+      "axis": [
+        "Unsafe",
+        "Safe"
+      ],
+      "drive": "Live and survive safely while finding a way out of the forest or waiting for rescue.",
+      "activity_itemclass": {
+        "activity": "Shelter",
+        "itemclass": "Safe Location",
+        "subtypes_included": [
+          "Hut",
+          "Cave",
           "Clearing",
           "Meadow",
           "Village"
@@ -203,44 +202,41 @@
     },
     {
       "axis": [
-        "In Danger",
+        "Unsafe",
         "Safe"
       ],
       "drive": "Live and survive safely while finding a way out of the forest or waiting for rescue.",
       "activity_itemclass": {
-        "activity": "Seek Safety In",
-        "itemclass": "Safe Location",
+        "activity": "Wait",
+        "itemclass": "Open Area",
         "subtypes_included": [
-          "Hut",
-          "Cave",
-          "Village",
-          "Clearing"
+          "Clearing",
+          "Meadow"
         ]
       }
     },
     {
       "axis": [
-        "Alone",
-        "Together"
+        "Isolated",
+        "Connected"
       ],
       "drive": "companionship, community, family, acceptance, trust, intimacy.",
       "activity_itemclass": {
         "activity": "Join",
         "itemclass": "Group",
         "subtypes_included": [
-          "Village",
-          "Hut"
+          "Village"
         ]
       }
     },
     {
       "axis": [
-        "Alone",
-        "Together"
+        "Isolated",
+        "Connected"
       ],
       "drive": "companionship, community, family, acceptance, trust, intimacy.",
       "activity_itemclass": {
-        "activity": "Meet",
+        "activity": "Approach",
         "itemclass": "Person",
         "subtypes_included": [
           "Samantha",
@@ -252,33 +248,18 @@
     },
     {
       "axis": [
-        "Unrecognized",
+        "Rejected",
         "Accepted"
       ],
       "drive": "companionship, community, family, acceptance, trust, intimacy.",
       "activity_itemclass": {
-        "activity": "BeWelcomed",
+        "activity": "Greet",
         "itemclass": "Person",
         "subtypes_included": [
           "Samantha",
           "Joe",
           "Hermit",
           "User"
-        ]
-      }
-    },
-    {
-      "axis": [
-        "Unrecognized",
-        "Accepted"
-      ],
-      "drive": "companionship, community, family, acceptance, trust, intimacy.",
-      "activity_itemclass": {
-        "activity": "Belong",
-        "itemclass": "Group",
-        "subtypes_included": [
-          "Village",
-          "Hut"
         ]
       }
     },
@@ -289,7 +270,24 @@
       ],
       "drive": "companionship, community, family, acceptance, trust, intimacy.",
       "activity_itemclass": {
-        "activity": "BuildTrust",
+        "activity": "Cooperate",
+        "itemclass": "Person",
+        "subtypes_included": [
+          "Samantha",
+          "Joe",
+          "Hermit",
+          "User"
+        ]
+      }
+    },
+    {
+      "axis": [
+        "Unknown",
+        "Intimate"
+      ],
+      "drive": "companionship, community, family, acceptance, trust, intimacy.",
+      "activity_itemclass": {
+        "activity": "Share",
         "itemclass": "Person",
         "subtypes_included": [
           "Samantha",
@@ -309,7 +307,6 @@
         "activity": "Consume",
         "itemclass": "Water Source",
         "subtypes_included": [
-          "Water",
           "Spring"
         ]
       }
@@ -331,13 +328,31 @@
     },
     {
       "axis": [
+        "Fatigued",
+        "Rested"
+      ],
+      "drive": "Maintain alertness \u2014 avoid fatigue and keep the body rested.",
+      "activity_itemclass": {
+        "activity": "Wait",
+        "itemclass": "SafeLocation",
+        "subtypes_included": [
+          "Clearing",
+          "Meadow",
+          "Village",
+          "Hut",
+          "Cave"
+        ]
+      }
+    },
+    {
+      "axis": [
         "Hungry",
         "Not-Hungry"
       ],
       "drive": "Maintain energy \u2014 avoid hunger and keep the body supplied with nutrients.",
       "activity_itemclass": {
         "activity": "Consume",
-        "itemclass": "Food",
+        "itemclass": "EdiblePlant",
         "subtypes_included": [
           "Berries",
           "Mushrooms",
@@ -353,7 +368,7 @@
       "drive": "Maintain energy \u2014 avoid hunger and keep the body supplied with nutrients.",
       "activity_itemclass": {
         "activity": "Drink",
-        "itemclass": "Water Source",
+        "itemclass": "FreshWaterSource",
         "subtypes_included": [
           "Spring"
         ]
@@ -361,46 +376,50 @@
     }
   ],
   "verbs": [
-    "Navigate",
-    "Arrive",
+    "Follow",
     "Enter",
-    "Scout",
-    "Access",
+    "MoveTo",
+    "Inspect",
+    "Travel",
     "Search",
     "Discover",
     "Observe",
     "Consume",
     "Drink",
-    "Shelter In",
-    "Seek Safety In",
+    "Rest",
+    "Navigate",
+    "Shelter",
+    "Wait",
     "Join",
-    "Meet",
-    "BeWelcomed",
-    "Belong",
-    "BuildTrust",
-    "Rest"
+    "Approach",
+    "Greet",
+    "Cooperate",
+    "Share"
   ],
   "nouns": [
-    "Pathway",
+    "Path",
     "Settlement",
     "OpenArea",
     "Landmark",
-    "Passage",
     "Shelter",
-    "Edible Resource",
+    "Food Source",
     "Water Source",
-    "Navigable Path/Location",
+    "Exit Path",
     "Safe Location",
+    "Open Area",
     "Group",
     "Person",
-    "Food"
+    "SafeLocation",
+    "EdiblePlant",
+    "FreshWaterSource"
   ],
   "noun_mappings": {
-    "Pathway": [
+    "Path": [
       "Path"
     ],
     "Settlement": [
-      "Village"
+      "Village",
+      "Hut"
     ],
     "OpenArea": [
       "Clearing",
@@ -411,42 +430,37 @@
       "Appletree",
       "Spring",
       "Cave",
-      "Hut",
-      "Village"
-    ],
-    "Passage": [
-      "Path",
-      "Clearing",
-      "Meadow"
+      "Thicket"
     ],
     "Shelter": [
       "Hut",
       "Cave"
     ],
-    "Edible Resource": [
+    "Food Source": [
       "Berries",
       "Mushrooms",
       "Appletree"
     ],
     "Water Source": [
-      "Spring",
-      "Water"
+      "Spring"
     ],
-    "Navigable Path/Location": [
+    "Exit Path": [
       "Path",
-      "Clearing",
-      "Meadow",
       "Village"
     ],
     "Safe Location": [
       "Hut",
       "Cave",
-      "Village",
-      "Clearing"
+      "Clearing",
+      "Meadow",
+      "Village"
+    ],
+    "Open Area": [
+      "Clearing",
+      "Meadow"
     ],
     "Group": [
-      "Village",
-      "Hut"
+      "Village"
     ],
     "Person": [
       "Samantha",
@@ -454,10 +468,20 @@
       "Hermit",
       "User"
     ],
-    "Food": [
+    "SafeLocation": [
+      "Clearing",
+      "Meadow",
+      "Village",
+      "Hut",
+      "Cave"
+    ],
+    "EdiblePlant": [
       "Berries",
       "Mushrooms",
       "Appletree"
+    ],
+    "FreshWaterSource": [
+      "Spring"
     ]
   }
 }

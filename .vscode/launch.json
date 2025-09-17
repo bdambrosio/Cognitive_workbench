@@ -278,22 +278,22 @@
             "env": {
                 "PYTHONPATH": "${workspaceFolder}/src"
             },
-            "args": ["--v2", "--microbatch", "5", "--plans", "data/Francoise-plans.jsonl", "--seed", "42", "--s1_out", "data/reflection_stage1.json"],
+            "args": ["--v2", "--microbatch", "5", "--plans", "data/Michel-plans.jsonl", "--seed", "42", "--s1_out", "data/reflection_stage1.json"],
             "justMyCode": false,
             "stopOnEntry": false,
             "preLaunchTask": "setup-zenoh-environment"
         },
         {
-            "name": "Reflection Replan",
+            "name": "Trace Evaluation",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/src/reflection.py",
+            "program": "${workspaceFolder}/src/Metrics/trace-evaluation.py",
             "console": "integratedTerminal",
-            "cwd": "${workspaceFolder}/src",
+            "cwd": "${workspaceFolder}/src/Metrics",
             "env": {
                 "PYTHONPATH": "${workspaceFolder}/src"
             },
-            "args": ["--replan", "--replan_mode", "random", "--plans", "data/plans.jsonl", "--server", "vllm", "--model", "llama3.1-8b-instruct"],
+            "args": ["--trace", "analysis/Joe-20250915-162859/Joe-plans.jsonl", "--scenario", "../../scenarios/lost.yaml", "--character", "Joe", "--server", "openai", "--model", "gpt-4.1"],
             "justMyCode": false,
             "stopOnEntry": false,
             "preLaunchTask": "setup-zenoh-environment"

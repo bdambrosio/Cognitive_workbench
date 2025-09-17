@@ -1,19 +1,19 @@
 {
-  "Eat Bread and Cheese Breakfast": {
-    "name": "Eat Bread and Cheese Breakfast",
+  "Eat Farm Breakfast": {
+    "name": "Eat Farm Breakfast",
     "category": "Physiological ADLs",
     "tags": [
       "physical",
-      "solo",
       "routine",
+      "solo",
       "survival"
     ],
     "steps": [
       "move to Farmhouse",
-      "take Bread",
-      "take Cheese",
+      "take Food",
       "consume Bread",
-      "consume Cheese"
+      "consume Egg",
+      "consume Milk"
     ],
     "when": "daily@dawn",
     "where": [
@@ -25,28 +25,28 @@
     ],
     "needs": [
       "Bread",
-      "Cheese"
+      "Egg",
+      "Milk"
     ],
     "states_addressed": [
       "hunger"
     ],
-    "importance": 0.9,
+    "importance": 0.95,
     "habit": 0.8
   },
-  "Draw Water From Well": {
-    "name": "Draw Water From Well",
+  "Drink from Well": {
+    "name": "Drink from Well",
     "category": "Physiological ADLs",
     "tags": [
       "physical",
       "routine",
       "solo",
-      "survival",
-      "outdoors"
+      "outdoors",
+      "survival"
     ],
     "steps": [
       "move to Well",
-      "inspect Well",
-      "acquire Water",
+      "take Water",
       "drink Water"
     ],
     "when": "daily@morning",
@@ -54,8 +54,8 @@
       "Well"
     ],
     "duration": [
-      10,
-      15
+      5,
+      10
     ],
     "needs": [
       "Well",
@@ -64,23 +64,113 @@
     "states_addressed": [
       "thirst"
     ],
-    "importance": 0.9,
+    "importance": 0.99,
     "habit": 0.8
   },
-  "Harvest Hay Field": {
-    "name": "Harvest Hay Field",
-    "category": "Role/Production",
+  "Rest after Fieldwork": {
+    "name": "Rest after Fieldwork",
+    "category": "Physiological ADLs",
     "tags": [
       "physical",
       "routine",
       "solo",
-      "outdoors"
+      "survival"
+    ],
+    "steps": [
+      "move to Farmhouse",
+      "rest in Farmhouse",
+      "recover in Farmhouse"
+    ],
+    "when": "daily@afternoon",
+    "where": [
+      "Farmhouse"
+    ],
+    "duration": [
+      20,
+      40
+    ],
+    "needs": [
+      "Farmhouse"
+    ],
+    "states_addressed": [
+      "fatigue"
+    ],
+    "importance": 0.9,
+    "habit": 0.6
+  },
+  "Inspect Landholding Boundaries": {
+    "name": "Inspect Landholding Boundaries",
+    "category": "Instrumental ADLs/Logistics",
+    "tags": [
+      "mental",
+      "outdoors",
+      "routine",
+      "solo"
+    ],
+    "steps": [
+      "move to Field",
+      "inspect Field",
+      "scan Field",
+      "think about Landholding"
+    ],
+    "when": "seasonal@spring",
+    "where": [
+      "Field"
+    ],
+    "duration": [
+      20,
+      40
+    ],
+    "needs": [
+      "Field"
+    ],
+    "states_addressed": [],
+    "importance": 0.8,
+    "habit": 0.4
+  },
+  "Plan Day's Fieldwork": {
+    "name": "Plan Day's Fieldwork",
+    "category": "Instrumental ADLs/Logistics",
+    "tags": [
+      "mental",
+      "routine",
+      "solo"
+    ],
+    "steps": [
+      "think about Field",
+      "inspect Tool",
+      "place priorities"
+    ],
+    "when": "daily@morning",
+    "where": [
+      "Farmhouse"
+    ],
+    "duration": [
+      10,
+      15
+    ],
+    "needs": [
+      "Field",
+      "Tool"
+    ],
+    "states_addressed": [],
+    "importance": 0.8,
+    "habit": 0.8
+  },
+  "Gather Harvest from Field": {
+    "name": "Gather Harvest from Field",
+    "category": "Role/Production",
+    "tags": [
+      "physical",
+      "outdoors",
+      "routine",
+      "solo"
     ],
     "steps": [
       "move to Field",
       "use Scythe",
-      "harvest Hay",
-      "place Hay in Farmhouse"
+      "acquire Hay",
+      "produce Hay"
     ],
     "when": "seasonal@summer",
     "where": [
@@ -95,53 +185,21 @@
       "Field"
     ],
     "states_addressed": [],
-    "importance": 0.85,
+    "importance": 1.0,
     "habit": 0.7
   },
-  "Plow New Furrows": {
-    "name": "Plow New Furrows",
+  "Milk Cow": {
+    "name": "Milk Cow",
     "category": "Role/Production",
     "tags": [
       "physical",
       "routine",
       "solo",
-      "outdoors"
+      "survival"
     ],
     "steps": [
-      "move to Field",
-      "use Plow",
-      "till Field",
-      "inspect Furrows"
-    ],
-    "when": "seasonal@spring",
-    "where": [
-      "Field"
-    ],
-    "duration": [
-      60,
-      180
-    ],
-    "needs": [
-      "Plow",
-      "Field"
-    ],
-    "states_addressed": [],
-    "importance": 0.8,
-    "habit": 0.6
-  },
-  "Tend to Cows and Milk": {
-    "name": "Tend to Cows and Milk",
-    "category": "Role/Production",
-    "tags": [
-      "physical",
-      "routine",
-      "solo",
-      "outdoors"
-    ],
-    "steps": [
-      "move to Farm",
+      "move to Cow",
       "inspect Cow",
-      "milk Cow",
       "acquire Milk"
     ],
     "when": "daily@morning",
@@ -149,206 +207,55 @@
       "Farm"
     ],
     "duration": [
-      20,
-      40
+      10,
+      20
     ],
     "needs": [
       "Cow"
     ],
     "states_addressed": [],
-    "importance": 0.85,
+    "importance": 0.93,
     "habit": 0.7
   },
-  "Rest in Farmhouse Noon": {
-    "name": "Rest in Farmhouse Noon",
-    "category": "Physiological ADLs",
-    "tags": [
-      "physical",
-      "solo",
-      "routine"
-    ],
-    "steps": [
-      "move to Farmhouse",
-      "rest at RestingPlace",
-      "restore energy"
-    ],
-    "when": "daily@afternoon",
-    "where": [
-      "Farmhouse"
-    ],
-    "duration": [
-      20,
-      45
-    ],
-    "needs": [
-      "Farmhouse"
-    ],
-    "states_addressed": [
-      "fatigue"
-    ],
-    "importance": 0.8,
-    "habit": 0.7
-  },
-  "Meet Francoise at Market": {
-    "name": "Meet Francoise at Market",
+  "Tend Chickens": {
+    "name": "Tend Chickens",
     "category": "Role/Production",
     "tags": [
-      "social",
+      "physical",
       "routine",
+      "solo",
       "outdoors"
     ],
     "steps": [
-      "move to Market",
-      "scan for Francoise",
-      "meet Francoise",
-      "say greeting"
+      "move to Chicken",
+      "inspect Chicken",
+      "acquire Egg"
     ],
-    "when": "opportunistic",
+    "when": "daily@dawn",
     "where": [
-      "Market"
+      "Farm"
     ],
     "duration": [
-      15,
-      30
+      10,
+      20
     ],
     "needs": [
-      "Market",
-      "Francoise"
+      "Chicken"
     ],
     "states_addressed": [],
-    "importance": 0.7,
-    "habit": 0.5
+    "importance": 0.86,
+    "habit": 0.7
   },
-  "Consume Milk for Hydration": {
-    "name": "Consume Milk for Hydration",
-    "category": "Physiological ADLs",
+  "Inspect Deed and Will": {
+    "name": "Inspect Deed and Will",
+    "category": "Instrumental ADLs/Logistics",
     "tags": [
-      "physical",
+      "mental",
       "solo",
-      "routine",
       "survival"
     ],
     "steps": [
       "move to Farmhouse",
-      "acquire Milk",
-      "drink Milk"
-    ],
-    "when": "daily@afternoon",
-    "where": [
-      "Farmhouse"
-    ],
-    "duration": [
-      5,
-      10
-    ],
-    "needs": [
-      "Milk"
-    ],
-    "states_addressed": [
-      "thirst"
-    ],
-    "importance": 0.8,
-    "habit": 0.7
-  },
-  "Inspect Plow for Damages": {
-    "name": "Inspect Plow for Damages",
-    "category": "Maintenance & Repair",
-    "tags": [
-      "physical",
-      "solo",
-      "routine"
-    ],
-    "steps": [
-      "move to Farm",
-      "inspect Plow",
-      "place damaged Plow aside if needed"
-    ],
-    "when": "weekly@morning",
-    "where": [
-      "Farm"
-    ],
-    "duration": [
-      10,
-      20
-    ],
-    "needs": [
-      "Plow"
-    ],
-    "states_addressed": [],
-    "importance": 0.7,
-    "habit": 0.7
-  },
-  "Repair Broken Gate": {
-    "name": "Repair Broken Gate",
-    "category": "Maintenance & Repair",
-    "tags": [
-      "physical",
-      "solo",
-      "routine",
-      "outdoors"
-    ],
-    "steps": [
-      "move to Farm",
-      "inspect Gate",
-      "use FieldTool",
-      "repair Gate"
-    ],
-    "when": "opportunistic",
-    "where": [
-      "Farm"
-    ],
-    "duration": [
-      20,
-      40
-    ],
-    "needs": [
-      "FieldTool"
-    ],
-    "states_addressed": [],
-    "importance": 0.6,
-    "habit": 0.5
-  },
-  "Receive Will Advice from FatherMarquart": {
-    "name": "Receive Will Advice from FatherMarquart",
-    "category": "Instrumental ADLs/Logistics",
-    "tags": [
-      "social",
-      "mental",
-      "routine"
-    ],
-    "steps": [
-      "move to Farmhouse",
-      "meet FatherMarquart",
-      "say request",
-      "scan for advice"
-    ],
-    "when": "opportunistic",
-    "where": [
-      "Farmhouse"
-    ],
-    "duration": [
-      10,
-      20
-    ],
-    "needs": [
-      "FatherMarquart"
-    ],
-    "states_addressed": [],
-    "importance": 0.9,
-    "habit": 0.3
-  },
-  "Inspect Will and Deed": {
-    "name": "Inspect Will and Deed",
-    "category": "Instrumental ADLs/Logistics",
-    "tags": [
-      "mental",
-      "solo",
-      "routine"
-    ],
-    "steps": [
-      "move to Farmhouse",
-      "scan for Will",
-      "scan for Deed",
       "inspect Will",
       "inspect Deed"
     ],
@@ -357,94 +264,90 @@
       "Farmhouse"
     ],
     "duration": [
-      15,
-      30
+      10,
+      15
     ],
     "needs": [
       "Will",
       "Deed"
     ],
     "states_addressed": [],
-    "importance": 0.8,
-    "habit": 0.4
+    "importance": 0.92,
+    "habit": 0.2
   },
-  "Negotiate Share with Family": {
-    "name": "Negotiate Share with Family",
+  "Discuss Inheritance with FatherMarquart": {
+    "name": "Discuss Inheritance with FatherMarquart",
     "category": "Cognitive/Inner",
     "tags": [
-      "mental",
       "social",
+      "mental",
+      "family",
       "routine"
     ],
     "steps": [
       "move to Farmhouse",
-      "meet FatherMarquart",
-      "meet MotherMarquart",
-      "say intention",
-      "discuss Will"
+      "say Inheritance",
+      "think about Landholding"
     ],
     "when": "opportunistic",
     "where": [
       "Farmhouse"
     ],
     "duration": [
-      20,
-      40
+      10,
+      30
     ],
     "needs": [
-      "FatherMarquart",
-      "MotherMarquart"
+      "Will",
+      "Farmhouse"
     ],
     "states_addressed": [],
     "importance": 1.0,
     "habit": 0.2
   },
-  "Rest at Dusk After Labor": {
-    "name": "Rest at Dusk After Labor",
-    "category": "Physiological ADLs",
+  "Repair Farmhouse Roof": {
+    "name": "Repair Farmhouse Roof",
+    "category": "Maintenance & Repair",
     "tags": [
       "physical",
-      "solo",
-      "routine"
+      "routine",
+      "solo"
     ],
     "steps": [
       "move to Farmhouse",
-      "rest at RestingPlace",
-      "restore energy"
+      "inspect Farmhouse",
+      "repair Farmhouse"
     ],
-    "when": "daily@dusk",
+    "when": "opportunistic",
     "where": [
       "Farmhouse"
     ],
     "duration": [
-      30,
-      120
+      60,
+      180
     ],
     "needs": [
-      "Farmhouse"
+      "Farmhouse",
+      "Tool"
     ],
-    "states_addressed": [
-      "fatigue"
-    ],
-    "importance": 0.85,
-    "habit": 0.8
+    "states_addressed": [],
+    "importance": 0.7,
+    "habit": 0.2
   },
-  "Eat Supper With Family": {
-    "name": "Eat Supper With Family",
-    "category": "Physiological ADLs",
+  "Sharpen Plow Blade": {
+    "name": "Sharpen Plow Blade",
+    "category": "Maintenance & Repair",
     "tags": [
       "physical",
-      "social",
       "routine",
-      "survival"
+      "solo"
     ],
     "steps": [
       "move to Farmhouse",
-      "meet Family",
-      "consume Food",
-      "say thanks"
+      "use Plow",
+      "repair Plow"
     ],
-    "when": "daily@evening",
+    "when": "seasonal@spring",
     "where": [
       "Farmhouse"
     ],
@@ -453,70 +356,278 @@
       40
     ],
     "needs": [
-      "Bread",
-      "Butter",
-      "Egg",
-      "Family"
+      "Plow"
+    ],
+    "states_addressed": [],
+    "importance": 0.75,
+    "habit": 0.3
+  },
+  "Gather Water from Spring": {
+    "name": "Gather Water from Spring",
+    "category": "Mobility & Transport",
+    "tags": [
+      "physical",
+      "routine",
+      "solo",
+      "outdoors",
+      "survival"
+    ],
+    "steps": [
+      "move to Spring",
+      "take Water",
+      "carry Water to Farmhouse"
+    ],
+    "when": "daily@morning",
+    "where": [
+      "Spring"
+    ],
+    "duration": [
+      20,
+      40
+    ],
+    "needs": [
+      "Spring",
+      "Water"
+    ],
+    "states_addressed": [
+      "thirst"
+    ],
+    "importance": 0.97,
+    "habit": 0.5
+  },
+  "Move Livestock to New Pasture": {
+    "name": "Move Livestock to New Pasture",
+    "category": "Mobility & Transport",
+    "tags": [
+      "physical",
+      "routine",
+      "outdoors",
+      "solo"
+    ],
+    "steps": [
+      "move to Cow",
+      "move to Grassland",
+      "place Cow on Grassland"
+    ],
+    "when": "seasonal@summer",
+    "where": [
+      "Farm"
+    ],
+    "duration": [
+      30,
+      60
+    ],
+    "needs": [
+      "Cow",
+      "Grassland"
+    ],
+    "states_addressed": [],
+    "importance": 0.82,
+    "habit": 0.3
+  },
+  "Gather Apples from Orchard": {
+    "name": "Gather Apples from Orchard",
+    "category": "Role/Production",
+    "tags": [
+      "physical",
+      "routine",
+      "solo",
+      "outdoors"
+    ],
+    "steps": [
+      "move to Field",
+      "scan Apple",
+      "take Apple"
+    ],
+    "when": "seasonal@autumn",
+    "where": [
+      "Field"
+    ],
+    "duration": [
+      30,
+      60
+    ],
+    "needs": [
+      "Apple",
+      "Field"
     ],
     "states_addressed": [
       "hunger"
     ],
-    "importance": 0.9,
-    "habit": 0.8
+    "importance": 0.75,
+    "habit": 0.25
   },
-  "Fetch Apple from Orchard": {
-    "name": "Fetch Apple from Orchard",
-    "category": "Instrumental ADLs/Logistics",
+  "Prepare Simple Lunch in Field": {
+    "name": "Prepare Simple Lunch in Field",
+    "category": "Physiological ADLs",
     "tags": [
       "physical",
-      "solo",
       "routine",
-      "outdoors"
+      "solo",
+      "outdoors",
+      "survival"
     ],
     "steps": [
-      "move to Farm",
-      "scan for Apple",
-      "acquire Apple",
-      "consume Apple"
+      "move to Field",
+      "take Food",
+      "consume Bread",
+      "consume Cheese"
     ],
-    "when": "seasonal@autumn",
+    "when": "daily@afternoon",
     "where": [
-      "Farm"
+      "Field"
     ],
     "duration": [
       10,
       20
     ],
     "needs": [
-      "Apple"
+      "Bread",
+      "Cheese"
     ],
     "states_addressed": [
-      "hunger",
-      "thirst"
+      "hunger"
     ],
-    "importance": 0.6,
+    "importance": 0.88,
     "habit": 0.5
   },
-  "Go to Church on Sunday": {
-    "name": "Go to Church on Sunday",
+  "Wash Face at Well": {
+    "name": "Wash Face at Well",
+    "category": "Health Management (self-care)",
+    "tags": [
+      "physical",
+      "routine",
+      "solo"
+    ],
+    "steps": [
+      "move to Well",
+      "take Water",
+      "refresh self at Well"
+    ],
+    "when": "daily@morning",
+    "where": [
+      "Well"
+    ],
+    "duration": [
+      5,
+      10
+    ],
+    "needs": [
+      "Well",
+      "Water"
+    ],
+    "states_addressed": [],
+    "importance": 0.75,
+    "habit": 0.6
+  },
+  "Inspect Self for Injury": {
+    "name": "Inspect Self for Injury",
+    "category": "Health Management (self-care)",
+    "tags": [
+      "mental",
+      "routine",
+      "solo"
+    ],
+    "steps": [
+      "move to Farmhouse",
+      "inspect self",
+      "recover in Farmhouse"
+    ],
+    "when": "daily@evening",
+    "where": [
+      "Farmhouse"
+    ],
+    "duration": [
+      5,
+      10
+    ],
+    "needs": [
+      "Farmhouse"
+    ],
+    "states_addressed": [
+      "injury"
+    ],
+    "importance": 0.73,
+    "habit": 0.5
+  },
+  "Tend Small Garden": {
+    "name": "Tend Small Garden",
+    "category": "Role/Production",
+    "tags": [
+      "physical",
+      "routine",
+      "outdoors",
+      "solo"
+    ],
+    "steps": [
+      "move to Field",
+      "use Hoe",
+      "cultivate Grassland"
+    ],
+    "when": "seasonal@spring",
+    "where": [
+      "Field"
+    ],
+    "duration": [
+      20,
+      40
+    ],
+    "needs": [
+      "Hoe",
+      "Field",
+      "Grassland"
+    ],
+    "states_addressed": [],
+    "importance": 0.65,
+    "habit": 0.4
+  },
+  "Visit Francoise's Farm": {
+    "name": "Visit Francoise's Farm",
+    "category": "Role/Production",
+    "tags": [
+      "social",
+      "mobility",
+      "outdoors"
+    ],
+    "steps": [
+      "move to Farm",
+      "say greeting to Francoise",
+      "formrelationship with Francoise"
+    ],
+    "when": "opportunistic",
+    "where": [
+      "Farm"
+    ],
+    "duration": [
+      30,
+      60
+    ],
+    "needs": [
+      "Farm"
+    ],
+    "states_addressed": [],
+    "importance": 0.8,
+    "habit": 0.2
+  },
+  "Attend Church Service": {
+    "name": "Attend Church Service",
     "category": "Recreation & Leisure",
     "tags": [
       "social",
-      "routine"
+      "routine",
+      "restful"
     ],
     "steps": [
       "move to Church",
-      "scan for People",
-      "meet People",
-      "rest at Church"
+      "rest in Church"
     ],
     "when": "weekly@morning",
     "where": [
-      "Village"
+      "Church"
     ],
     "duration": [
-      60,
-      120
+      30,
+      60
     ],
     "needs": [
       "Church"
@@ -524,84 +635,179 @@
     "states_addressed": [
       "fatigue"
     ],
-    "importance": 0.5,
+    "importance": 0.7,
     "habit": 0.5
   },
-  "Bond with Francoise": {
-    "name": "Bond with Francoise",
-    "category": "Role/Production",
+  "Inspect Plow and Hoe": {
+    "name": "Inspect Plow and Hoe",
+    "category": "Maintenance & Repair",
+    "tags": [
+      "physical",
+      "routine",
+      "solo"
+    ],
+    "steps": [
+      "move to Farmhouse",
+      "inspect Plow",
+      "inspect Hoe"
+    ],
+    "when": "seasonal@spring",
+    "where": [
+      "Farmhouse"
+    ],
+    "duration": [
+      10,
+      20
+    ],
+    "needs": [
+      "Plow",
+      "Hoe"
+    ],
+    "states_addressed": [],
+    "importance": 0.7,
+    "habit": 0.3
+  },
+  "Share Meal with Family": {
+    "name": "Share Meal with Family",
+    "category": "Recreation & Leisure",
     "tags": [
       "social",
       "routine",
-      "mental"
+      "family"
     ],
     "steps": [
-      "move to Farmhouse2",
-      "meet Francoise",
-      "say compliment",
-      "bond Francoise"
+      "move to Farmhouse",
+      "take Food",
+      "consume Bread",
+      "consume Cheese",
+      "say to Family"
     ],
-    "when": "opportunistic",
+    "when": "daily@evening",
     "where": [
-      "Farmhouse2"
+      "Farmhouse"
+    ],
+    "duration": [
+      30,
+      50
+    ],
+    "needs": [
+      "Bread",
+      "Cheese",
+      "Farmhouse"
+    ],
+    "states_addressed": [
+      "hunger",
+      "fatigue"
+    ],
+    "importance": 0.9,
+    "habit": 0.5
+  },
+  "Reflect on Day's Work": {
+    "name": "Reflect on Day's Work",
+    "category": "Cognitive/Inner",
+    "tags": [
+      "mental",
+      "routine",
+      "solo"
+    ],
+    "steps": [
+      "move to Shelter",
+      "think about Work",
+      "think about Landholding"
+    ],
+    "when": "daily@evening",
+    "where": [
+      "Farmhouse"
+    ],
+    "duration": [
+      10,
+      20
+    ],
+    "needs": [
+      "Shelter"
+    ],
+    "states_addressed": [
+      "fatigue"
+    ],
+    "importance": 0.75,
+    "habit": 0.3
+  },
+  "Rest in Church on Hot Day": {
+    "name": "Rest in Church on Hot Day",
+    "category": "Health Management (self-care)",
+    "tags": [
+      "physical",
+      "routine",
+      "solo",
+      "rest"
+    ],
+    "steps": [
+      "move to Church",
+      "rest in Church",
+      "recover in Church"
+    ],
+    "when": "seasonal@summer",
+    "where": [
+      "Church"
     ],
     "duration": [
       20,
       40
     ],
     "needs": [
-      "Francoise"
-    ],
-    "states_addressed": [],
-    "importance": 0.7,
-    "habit": 0.3
-  },
-  "Sleep in Farmhouse Night": {
-    "name": "Sleep in Farmhouse Night",
-    "category": "Physiological ADLs",
-    "tags": [
-      "physical",
-      "routine",
-      "solo",
-      "survival"
-    ],
-    "steps": [
-      "move to Farmhouse",
-      "rest at Farmhouse",
-      "restore health"
-    ],
-    "when": "daily@night",
-    "where": [
-      "Farmhouse"
-    ],
-    "duration": [
-      360,
-      480
-    ],
-    "needs": [
-      "Farmhouse"
+      "Church"
     ],
     "states_addressed": [
       "fatigue"
     ],
-    "importance": 1.0,
-    "habit": 1.0
+    "importance": 0.65,
+    "habit": 0.1
   },
-  "Help MotherMarquart with Chores": {
-    "name": "Help MotherMarquart with Chores",
+  "Prepare Cheese from Milk": {
+    "name": "Prepare Cheese from Milk",
     "category": "Role/Production",
     "tags": [
       "physical",
       "routine",
-      "social"
+      "solo"
     ],
     "steps": [
       "move to Farmhouse",
-      "meet MotherMarquart",
-      "say intention",
-      "use FieldTool"
+      "take Milk",
+      "produce Cheese"
     ],
-    "when": "daily@morning",
+    "when": "seasonal@year-round",
+    "where": [
+      "Farmhouse"
+    ],
+    "duration": [
+      20,
+      40
+    ],
+    "needs": [
+      "Milk",
+      "Cheese"
+    ],
+    "states_addressed": [
+      "hunger"
+    ],
+    "importance": 0.5,
+    "habit": 0.15
+  },
+  "Escort Family to Market": {
+    "name": "Escort Family to Market",
+    "category": "Mobility & Transport",
+    "tags": [
+      "social",
+      "routine",
+      "family"
+    ],
+    "steps": [
+      "move to Farmhouse",
+      "move to Market",
+      "scan Market"
+    ],
+    "when": "weekly@morning",
     "where": [
       "Farmhouse"
     ],
@@ -610,16 +816,104 @@
       60
     ],
     "needs": [
-      "MotherMarquart",
-      "FieldTool"
+      "Farmhouse",
+      "Market"
     ],
     "states_addressed": [],
-    "importance": 0.8,
-    "habit": 0.6
+    "importance": 0.55,
+    "habit": 0.2
   },
-  "Wash at Spring": {
-    "name": "Wash at Spring",
-    "category": "Health Management (self-care)",
+  "Negotiate Sale of Surplus Hay": {
+    "name": "Negotiate Sale of Surplus Hay",
+    "category": "Role/Production",
+    "tags": [
+      "mental",
+      "social",
+      "outdoors"
+    ],
+    "steps": [
+      "move to Market",
+      "scan Hay",
+      "say offer to Person"
+    ],
+    "when": "seasonal@summer",
+    "where": [
+      "Market"
+    ],
+    "duration": [
+      20,
+      40
+    ],
+    "needs": [
+      "Hay",
+      "Market"
+    ],
+    "states_addressed": [],
+    "importance": 0.7,
+    "habit": 0.2
+  },
+  "Prepare to Defend Farm in Emergency": {
+    "name": "Prepare to Defend Farm in Emergency",
+    "category": "Safety/Emergency",
+    "tags": [
+      "mental",
+      "physical",
+      "solo",
+      "family"
+    ],
+    "steps": [
+      "scan Field",
+      "inspect Tool",
+      "place Family in Shelter"
+    ],
+    "when": "opportunistic",
+    "where": [
+      "Farm"
+    ],
+    "duration": [
+      15,
+      30
+    ],
+    "needs": [
+      "Tool",
+      "Shelter"
+    ],
+    "states_addressed": [],
+    "importance": 1.0,
+    "habit": 0.02
+  },
+  "Learn from FatherMarquart": {
+    "name": "Learn from FatherMarquart",
+    "category": "Learning & Practice",
+    "tags": [
+      "mental",
+      "social",
+      "routine",
+      "family"
+    ],
+    "steps": [
+      "move to Farmhouse",
+      "say question to FatherMarquart",
+      "think about answer"
+    ],
+    "when": "opportunistic",
+    "where": [
+      "Farmhouse"
+    ],
+    "duration": [
+      15,
+      30
+    ],
+    "needs": [
+      "Farmhouse"
+    ],
+    "states_addressed": [],
+    "importance": 0.65,
+    "habit": 0.2
+  },
+  "Practice Using Scythe": {
+    "name": "Practice Using Scythe",
+    "category": "Learning & Practice",
     "tags": [
       "physical",
       "solo",
@@ -627,164 +921,71 @@
       "outdoors"
     ],
     "steps": [
-      "move to Spring",
-      "acquire Water",
-      "use Water",
-      "restore health"
+      "move to Field",
+      "use Scythe",
+      "scan Hay"
     ],
-    "when": "daily@morning",
+    "when": "seasonal@spring",
     "where": [
-      "Spring"
+      "Field"
     ],
     "duration": [
       10,
-      20
+      30
     ],
     "needs": [
-      "Water",
-      "Spring"
+      "Scythe",
+      "Field"
     ],
-    "states_addressed": [
-      "injury"
-    ],
-    "importance": 0.6,
-    "habit": 0.6
+    "states_addressed": [],
+    "importance": 0.45,
+    "habit": 0.1
   },
-  "Bandage Minor Injury": {
-    "name": "Bandage Minor Injury",
-    "category": "Health Management (self-care)",
+  "Rest by River": {
+    "name": "Rest by River",
+    "category": "Recreation & Leisure",
     "tags": [
       "physical",
+      "rest",
+      "routine",
       "solo",
-      "routine"
+      "outdoors"
     ],
     "steps": [
-      "move to Farmhouse",
-      "inspect injury",
-      "acquire Water",
-      "recover"
+      "move to River",
+      "rest by Water",
+      "recover by Water"
     ],
-    "when": "opportunistic",
-    "where": [
-      "Farmhouse"
-    ],
+    "when": "seasonal@summer",
+    "where": [],
     "duration": [
-      10,
-      15
+      15,
+      30
     ],
     "needs": [
       "Water"
     ],
     "states_addressed": [
-      "injury"
+      "fatigue"
     ],
-    "importance": 0.75,
-    "habit": 0.2
+    "importance": 0.45,
+    "habit": 0.05
   },
-  "Plan Workday before Dawn": {
-    "name": "Plan Workday before Dawn",
-    "category": "Instrumental ADLs/Logistics",
-    "tags": [
-      "mental",
-      "solo",
-      "routine"
-    ],
-    "steps": [
-      "rest at Farmhouse",
-      "think about Field",
-      "scan for urgent chores",
-      "place priorities"
-    ],
-    "when": "daily@dawn",
-    "where": [
-      "Farmhouse"
-    ],
-    "duration": [
-      10,
-      15
-    ],
-    "needs": [
-      "Farmhouse"
-    ],
-    "states_addressed": [],
-    "importance": 0.8,
-    "habit": 0.6
-  },
-  "Travel Path to Pasture": {
-    "name": "Travel Path to Pasture",
-    "category": "Mobility & Transport",
+  "Inspect Grassland for Fodder": {
+    "name": "Inspect Grassland for Fodder",
+    "category": "Role/Production",
     "tags": [
       "physical",
-      "solo",
-      "outdoors",
-      "routine"
-    ],
-    "steps": [
-      "move to Path",
-      "move to Grassland",
-      "inspect Cow"
-    ],
-    "when": "daily@morning",
-    "where": [
-      "Path"
-    ],
-    "duration": [
-      15,
-      25
-    ],
-    "needs": [
-      "Path"
-    ],
-    "states_addressed": [],
-    "importance": 0.5,
-    "habit": 0.5
-  },
-  "Inspect Wheat Field Growth": {
-    "name": "Inspect Wheat Field Growth",
-    "category": "Learning & Practice",
-    "tags": [
-      "physical",
-      "solo",
       "routine",
-      "outdoors",
-      "mental"
-    ],
-    "steps": [
-      "move to Field",
-      "inspect Wheat",
-      "think on progress"
-    ],
-    "when": "weekly@afternoon",
-    "where": [
-      "Field"
-    ],
-    "duration": [
-      10,
-      20
-    ],
-    "needs": [
-      "Field"
-    ],
-    "states_addressed": [],
-    "importance": 0.6,
-    "habit": 0.5
-  },
-  "Guard Flock at Dusk": {
-    "name": "Guard Flock at Dusk",
-    "category": "Safety/Emergency",
-    "tags": [
-      "physical",
       "solo",
-      "outdoors",
-      "routine"
+      "outdoors"
     ],
     "steps": [
       "move to Grassland",
-      "scan for Chicken",
-      "inspect for predator",
-      "recover lost Animal if needed"
+      "scan Grassland",
+      "take Hay"
     ],
-    "when": "daily@dusk",
+    "when": "seasonal@summer",
     "where": [
       "Grassland"
     ],
@@ -793,43 +994,11 @@
       40
     ],
     "needs": [
-      "Chicken"
+      "Grassland",
+      "Hay"
     ],
     "states_addressed": [],
-    "importance": 0.75,
-    "habit": 0.6
-  },
-  "Fetch Grain at Market": {
-    "name": "Fetch Grain at Market",
-    "category": "Instrumental ADLs/Logistics",
-    "tags": [
-      "physical",
-      "solo",
-      "routine",
-      "outdoors"
-    ],
-    "steps": [
-      "move to Market",
-      "acquire Food",
-      "move to Farmhouse",
-      "store Food"
-    ],
-    "when": "weekly@morning",
-    "where": [
-      "Market"
-    ],
-    "duration": [
-      30,
-      60
-    ],
-    "needs": [
-      "Market",
-      "Food"
-    ],
-    "states_addressed": [
-      "hunger"
-    ],
-    "importance": 0.7,
-    "habit": 0.5
+    "importance": 0.5,
+    "habit": 0.25
   }
 }

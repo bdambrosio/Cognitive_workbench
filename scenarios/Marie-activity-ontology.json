@@ -16,7 +16,29 @@
           "Egg",
           "Milk",
           "Cheese",
-          "Butter"
+          "Butter",
+          "Cow"
+        ]
+      }
+    },
+    {
+      "axis": [
+        "Hungry",
+        "Not-Hungry"
+      ],
+      "drive": "help your family with the endless chores",
+      "activity_itemclass": {
+        "activity": "Prepare",
+        "itemclass": "Food",
+        "subtypes_included": [
+          "Bread",
+          "Apple",
+          "Chicken",
+          "Egg",
+          "Milk",
+          "Cheese",
+          "Butter",
+          "Cow"
         ]
       }
     },
@@ -27,11 +49,14 @@
       ],
       "drive": "help your family with the endless chores",
       "activity_itemclass": {
-        "activity": "Supply",
+        "activity": "Provide",
         "itemclass": "Drink",
         "subtypes_included": [
           "Water",
-          "Milk"
+          "Well",
+          "Spring",
+          "Milk",
+          "Cow"
         ]
       }
     },
@@ -43,10 +68,13 @@
       "drive": "help your family with the endless chores",
       "activity_itemclass": {
         "activity": "Fetch",
-        "itemclass": "Water Source",
+        "itemclass": "Drink",
         "subtypes_included": [
+          "Water",
           "Well",
-          "Spring"
+          "Spring",
+          "Milk",
+          "Cow"
         ]
       }
     },
@@ -58,41 +86,45 @@
       "drive": "help your family with the endless chores",
       "activity_itemclass": {
         "activity": "Arrange",
-        "itemclass": "Resting Place",
+        "itemclass": "RestSpot",
         "subtypes_included": [
           "Farmhouse",
-          "Church"
+          "Church",
+          "Well"
         ]
       }
     },
     {
       "axis": [
-        "Untidy Farm",
-        "Tidy Farm"
+        "Tasks-Unfinished",
+        "Tasks-Completed"
       ],
       "drive": "help your family with the endless chores",
       "activity_itemclass": {
-        "activity": "Organize",
-        "itemclass": "Field Tools",
+        "activity": "Complete",
+        "itemclass": "Chore",
         "subtypes_included": [
           "Hoe",
           "Plow",
-          "Scythe"
+          "Scythe",
+          "Mill"
         ]
       }
     },
     {
       "axis": [
-        "Unmaintained Livestock",
-        "Maintained Livestock"
+        "Tasks-Unfinished",
+        "Tasks-Completed"
       ],
       "drive": "help your family with the endless chores",
       "activity_itemclass": {
-        "activity": "Care For",
-        "itemclass": "Farm Animals",
+        "activity": "Assist",
+        "itemclass": "Chore",
         "subtypes_included": [
-          "Chicken",
-          "Cow"
+          "Hoe",
+          "Plow",
+          "Scythe",
+          "Mill"
         ]
       }
     },
@@ -103,7 +135,7 @@
       ],
       "drive": "brief moments of rest and simple joys amid the hardships",
       "activity_itemclass": {
-        "activity": "Recover",
+        "activity": "Rest",
         "itemclass": "Shelter",
         "subtypes_included": [
           "Farmhouse",
@@ -118,11 +150,29 @@
       ],
       "drive": "brief moments of rest and simple joys amid the hardships",
       "activity_itemclass": {
-        "activity": "Refresh",
-        "itemclass": "Water Source",
+        "activity": "Pause",
+        "itemclass": "NaturalWaterSource",
         "subtypes_included": [
           "Well",
           "Spring"
+        ]
+      }
+    },
+    {
+      "axis": [
+        "Unrefreshed",
+        "Refreshed"
+      ],
+      "drive": "brief moments of rest and simple joys amid the hardships",
+      "activity_itemclass": {
+        "activity": "Refresh",
+        "itemclass": "Drink",
+        "subtypes_included": [
+          "Water",
+          "Well",
+          "Spring",
+          "Milk",
+          "Cow"
         ]
       }
     },
@@ -134,14 +184,15 @@
       "drive": "brief moments of rest and simple joys amid the hardships",
       "activity_itemclass": {
         "activity": "Enjoy",
-        "itemclass": "Simple Food",
+        "itemclass": "Food",
         "subtypes_included": [
           "Bread",
           "Apple",
           "Egg",
-          "Butter",
           "Cheese",
-          "Milk"
+          "Butter",
+          "Milk",
+          "Chicken"
         ]
       }
     },
@@ -152,46 +203,43 @@
       ],
       "drive": "brief moments of rest and simple joys amid the hardships",
       "activity_itemclass": {
-        "activity": "Savor",
-        "itemclass": "Fresh Produce",
+        "activity": "Appreciate",
+        "itemclass": "Nature",
         "subtypes_included": [
-          "Apple",
-          "Egg",
-          "Milk",
-          "Butter",
-          "Cheese",
-          "Bread",
-          "Chicken",
-          "Cow"
+          "Mountain",
+          "Forest",
+          "Grassland",
+          "Field",
+          "Path",
+          "Spring"
         ]
       }
     },
     {
       "axis": [
-        "Alone",
+        "Isolated",
         "Connected"
       ],
       "drive": "brief moments of rest and simple joys amid the hardships",
       "activity_itemclass": {
-        "activity": "Visit",
-        "itemclass": "Community Space",
+        "activity": "Converse",
+        "itemclass": "Community",
         "subtypes_included": [
           "Village",
-          "Church",
           "Market",
-          "Blacksmith",
+          "Church",
           "Farm"
         ]
       }
     },
     {
       "axis": [
-        "Alone",
-        "With-Michel"
+        "Isolated-from-Michel",
+        "Together-with-Michel"
       ],
       "drive": "Spend time with Michel",
       "activity_itemclass": {
-        "activity": "Join",
+        "activity": "Meet",
         "itemclass": "Person",
         "subtypes_included": [
           "Michel"
@@ -200,8 +248,22 @@
     },
     {
       "axis": [
-        "Idle",
-        "Engaged-with-Michel"
+        "Isolated-from-Michel",
+        "Together-with-Michel"
+      ],
+      "drive": "Spend time with Michel",
+      "activity_itemclass": {
+        "activity": "Accompany",
+        "itemclass": "Person",
+        "subtypes_included": [
+          "Michel"
+        ]
+      }
+    },
+    {
+      "axis": [
+        "Not-Communicating-with-Michel",
+        "Communicating-with-Michel"
       ],
       "drive": "Spend time with Michel",
       "activity_itemclass": {
@@ -214,12 +276,26 @@
     },
     {
       "axis": [
-        "Idle",
-        "Engaged-with-Michel"
+        "Not-Communicating-with-Michel",
+        "Communicating-with-Michel"
       ],
       "drive": "Spend time with Michel",
       "activity_itemclass": {
-        "activity": "Accompany",
+        "activity": "Listen",
+        "itemclass": "Person",
+        "subtypes_included": [
+          "Michel"
+        ]
+      }
+    },
+    {
+      "axis": [
+        "Not-Sharing-Activity-with-Michel",
+        "Sharing-Activity-with-Michel"
+      ],
+      "drive": "Spend time with Michel",
+      "activity_itemclass": {
+        "activity": "Participate",
         "itemclass": "Person",
         "subtypes_included": [
           "Michel"
@@ -234,7 +310,7 @@
       "drive": "Maintain hydration \u2014 avoid thirst and keep the body supplied with fluids.",
       "activity_itemclass": {
         "activity": "Drink",
-        "itemclass": "Potable Liquid",
+        "itemclass": "Beverage",
         "subtypes_included": [
           "Water",
           "Milk"
@@ -248,27 +324,38 @@
       ],
       "drive": "Maintain hydration \u2014 avoid thirst and keep the body supplied with fluids.",
       "activity_itemclass": {
-        "activity": "Consume",
-        "itemclass": "Moist Food",
+        "activity": "Drink",
+        "itemclass": "Liquid Food",
         "subtypes_included": [
-          "Apple",
-          "Egg",
-          "Cow"
+          "Milk"
         ]
       }
     },
     {
       "axis": [
-        "Lacking Access to Fluids",
-        "Has Access to Fluids"
+        "Lack-of-Fluid-Sources",
+        "Access-to-Fluid-Sources"
       ],
       "drive": "Maintain hydration \u2014 avoid thirst and keep the body supplied with fluids.",
       "activity_itemclass": {
-        "activity": "Obtain",
-        "itemclass": "Fluid Source",
+        "activity": "Acquire",
+        "itemclass": "Water Source",
         "subtypes_included": [
           "Well",
-          "Spring",
+          "Spring"
+        ]
+      }
+    },
+    {
+      "axis": [
+        "Lack-of-Fluid-Sources",
+        "Access-to-Fluid-Sources"
+      ],
+      "drive": "Maintain hydration \u2014 avoid thirst and keep the body supplied with fluids.",
+      "activity_itemclass": {
+        "activity": "Acquire",
+        "itemclass": "Animal Source",
+        "subtypes_included": [
           "Cow"
         ]
       }
@@ -291,12 +378,12 @@
     {
       "axis": [
         "Fatigued",
-        "Not-Fatigued"
+        "Rested"
       ],
       "drive": "Maintain alertness \u2014 avoid fatigue and keep the body rested.",
       "activity_itemclass": {
         "activity": "Recover",
-        "itemclass": "Water Source",
+        "itemclass": "WaterSource",
         "subtypes_included": [
           "Well",
           "Spring"
@@ -305,83 +392,50 @@
     },
     {
       "axis": [
-        "Hungry",
-        "Not-Hungry"
-      ],
-      "drive": "Maintain energy \u2014 avoid hunger and keep the body supplied with nutrients.",
-      "activity_itemclass": {
-        "activity": "Consume",
-        "itemclass": "Food",
-        "subtypes_included": [
-          "Bread",
-          "Apple",
-          "Chicken",
-          "Egg",
-          "Milk",
-          "Cheese",
-          "Butter"
-        ]
-      }
-    },
-    {
-      "axis": [
-        "Hungry",
-        "Not-Hungry"
-      ],
-      "drive": "Maintain energy \u2014 avoid hunger and keep the body supplied with nutrients.",
-      "activity_itemclass": {
-        "activity": "Acquire",
-        "itemclass": "Food",
-        "subtypes_included": [
-          "Bread",
-          "Apple",
-          "Chicken",
-          "Egg",
-          "Milk",
-          "Cheese",
-          "Butter"
-        ]
-      }
-    },
-    {
-      "axis": [
         "Thirsty",
         "Not-Thirsty"
       ],
-      "drive": "Maintain energy \u2014 avoid hunger and keep the body supplied with nutrients.",
+      "drive": "Maintain alertness \u2014 avoid fatigue and keep the body rested.",
       "activity_itemclass": {
         "activity": "Drink",
-        "itemclass": "Drinkable Liquid",
+        "itemclass": "DrinkableResource",
         "subtypes_included": [
-          "Water",
-          "Milk"
+          "Well",
+          "Spring",
+          "Milk",
+          "Cow"
         ]
       }
     },
     {
       "axis": [
-        "Thirsty",
-        "Not-Thirsty"
+        "Hungry",
+        "Not-Hungry"
       ],
       "drive": "Maintain energy \u2014 avoid hunger and keep the body supplied with nutrients.",
       "activity_itemclass": {
-        "activity": "Acquire",
-        "itemclass": "Drinkable Liquid",
+        "activity": "Eat",
+        "itemclass": "Food",
         "subtypes_included": [
-          "Water",
-          "Milk"
+          "Bread",
+          "Apple",
+          "Chicken",
+          "Egg",
+          "Milk",
+          "Cheese",
+          "Butter"
         ]
       }
     },
     {
       "axis": [
         "Undernourished",
-        "Well-Nourished"
+        "Nourished"
       ],
       "drive": "Maintain energy \u2014 avoid hunger and keep the body supplied with nutrients.",
       "activity_itemclass": {
-        "activity": "Ingest",
-        "itemclass": "Nutritive Substance",
+        "activity": "Consume",
+        "itemclass": "Nutrient Source",
         "subtypes_included": [
           "Bread",
           "Apple",
@@ -396,43 +450,44 @@
   ],
   "verbs": [
     "Provide",
-    "Supply",
+    "Prepare",
     "Fetch",
     "Arrange",
-    "Organize",
-    "Care For",
-    "Recover",
+    "Complete",
+    "Assist",
+    "Rest",
+    "Pause",
     "Refresh",
     "Enjoy",
-    "Savor",
-    "Visit",
-    "Join",
+    "Appreciate",
     "Converse",
+    "Meet",
     "Accompany",
+    "Listen",
+    "Participate",
     "Drink",
-    "Consume",
-    "Obtain",
-    "Rest",
     "Acquire",
-    "Ingest"
+    "Recover",
+    "Eat",
+    "Consume"
   ],
   "nouns": [
     "Food",
     "Drink",
-    "Water Source",
-    "Resting Place",
-    "Field Tools",
-    "Farm Animals",
+    "RestSpot",
+    "Chore",
     "Shelter",
-    "Simple Food",
-    "Fresh Produce",
-    "Community Space",
+    "NaturalWaterSource",
+    "Nature",
+    "Community",
     "Person",
-    "Potable Liquid",
-    "Moist Food",
-    "Fluid Source",
-    "Drinkable Liquid",
-    "Nutritive Substance"
+    "Beverage",
+    "Liquid Food",
+    "Water Source",
+    "Animal Source",
+    "WaterSource",
+    "DrinkableResource",
+    "Nutrient Source"
   ],
   "noun_mappings": {
     "Food": [
@@ -442,80 +497,77 @@
       "Egg",
       "Milk",
       "Cheese",
-      "Butter"
+      "Butter",
+      "Cow"
     ],
     "Drink": [
       "Water",
+      "Well",
+      "Spring",
+      "Milk",
+      "Cow"
+    ],
+    "RestSpot": [
+      "Farmhouse",
+      "Church",
+      "Well"
+    ],
+    "Chore": [
+      "Hoe",
+      "Plow",
+      "Scythe",
+      "Mill"
+    ],
+    "Shelter": [
+      "Farmhouse",
+      "Church"
+    ],
+    "NaturalWaterSource": [
+      "Well",
+      "Spring"
+    ],
+    "Nature": [
+      "Mountain",
+      "Forest",
+      "Grassland",
+      "Field",
+      "Path",
+      "Spring"
+    ],
+    "Community": [
+      "Village",
+      "Market",
+      "Church",
+      "Farm"
+    ],
+    "Person": [
+      "Michel"
+    ],
+    "Beverage": [
+      "Water",
+      "Milk"
+    ],
+    "Liquid Food": [
       "Milk"
     ],
     "Water Source": [
       "Well",
       "Spring"
     ],
-    "Resting Place": [
-      "Farmhouse",
-      "Church"
-    ],
-    "Field Tools": [
-      "Hoe",
-      "Plow",
-      "Scythe"
-    ],
-    "Farm Animals": [
-      "Chicken",
+    "Animal Source": [
       "Cow"
     ],
-    "Shelter": [
-      "Farmhouse",
-      "Church"
+    "WaterSource": [
+      "Well",
+      "Spring"
     ],
-    "Simple Food": [
-      "Bread",
-      "Apple",
-      "Egg",
-      "Butter",
-      "Cheese",
-      "Milk"
-    ],
-    "Fresh Produce": [
-      "Apple",
-      "Egg",
-      "Milk",
-      "Butter",
-      "Cheese",
-      "Bread",
-      "Chicken",
-      "Cow"
-    ],
-    "Community Space": [
-      "Village",
-      "Church",
-      "Market",
-      "Blacksmith",
-      "Farm"
-    ],
-    "Person": [
-      "Michel"
-    ],
-    "Potable Liquid": [
-      "Water",
-      "Milk"
-    ],
-    "Moist Food": [
-      "Apple",
-      "Egg",
-      "Cow"
-    ],
-    "Fluid Source": [
+    "DrinkableResource": [
       "Well",
       "Spring",
+      "Milk",
       "Cow"
     ],
-    "Drinkable Liquid": [
-      "Water",
-      "Milk"
-    ],
-    "Nutritive Substance": [
+    "Nutrient Source": [
       "Bread",
       "Apple",
       "Chicken",
