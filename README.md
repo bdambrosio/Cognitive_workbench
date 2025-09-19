@@ -7,6 +7,9 @@ Multiple characters can be defined in a simple 2 1/2 grid world. you define pers
 
 System even has a minimal UI that allows stepping, manual input of simple plans, etc.
 
+## This is my sketchpad, it is always in motion and rarely in a working state
+ DM or post issue for a stable release
+
 # Background
 
 One goal of current work on LLMs is coherent long-term behavior.
