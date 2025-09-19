@@ -139,6 +139,127 @@ If an ItemClass has no base nouns usable for this activity in the closed world, 
 
 """
 
+DRIVE_DISCOURSE_TEMPLATE = """TASK
+You are analyzing a CONVERSATIONAL DRIVE in the context of a CLOSED-WORLD DISCOURSE ONTOLOGY.  
+The ontology lists all available base nouns (discourse content) and base speech verbs (primitive speechacts).  
+Return a JSON object describing how this drive decomposes into orthogonal state axes and speechact–itemclass pairs.
+Era/Setting Constraint: Use only itemclasses and base nouns that plausibly exist in the setting.. 
+
+---
+
+### PROCESS
+
+Step 1. Categorize the drive  
+- Classify the drive as one of: 
+  • Epistemic (self reduces uncertainty)  
+  • Persuasive (speaker moves target)  
+  • Cooperative/Deliberative (all parties converge)  
+  • Relational/Affective (relationship maintenance/change)
+
+Step 2. Identify AXES  
+- Return 1–4 orthogonal state–antonym pairs for the drive.  
+- State names should be concise, agent-centered.  
+- For Cooperative drives: define axes that apply across participants (e.g., proposal → consensus).  
+- For Relational drives: define axes about the relationship (e.g., suspicious ↔ trusting).
+
+Step 3. Generate SPEECHACT–ITEMCLASS pairs  
+- For each axis, propose 1–3 pairs.  
+- **speechact**: a general verb (e.g., Ask, Assert, Propose, Appeal, Joke, Apologize).  
+  - Each speechact must be decomposable into primitive verbs from the ontology.  
+- **itemclass**: a general discourse noun (e.g., Claim, Proposal, Evidence, Precedent, Norm, Incentive, Narrative, Person).  
+  - must include at least one base noun subtype from the ontology.
+  - itemclass may include an optional facets object with up to three keys: owner (string), about (list of nouns), dimensions (list of short strings). Keep facets concise; omit if not needed.”  
+- For Cooperative drives, allow pairs that involve multiple participants.
+
+Example:
+{
+  "speechact": "propose",
+  "itemclass": "Proposal",
+  "facets": {
+    "owner": "Jean",             // optional, when agent-specific
+    "about": ["Share/Entitlement","Field"],  // link to domain things
+    "dimensions": ["ratio","boundary","witnesses"]  // multidimensional, optional, for cognitive itemclasses like agreements
+  }
+}
+
+
+Step 4. Closed-world mapping  
+- For each itemclass, specify INCLUDED and EXCLUDED base nouns.
+- Era/Setting Constraint: Use only itemclasses and base nouns that plausibly exist in the setting.
+
+Step 5. Anticipated effect (optional but preferred)  
+- For each pair, estimate an `anticipated_effect` with:  
+  {axis, delta (−1.0 to +1.0), target(s), confidence (0–1)}  
+
+---
+
+### INPUTS
+
+# DRIVE  
+{{$drive_statement}}  
+
+# PARTICIPANTS  
+{{$character_names}}  
+
+# BASE ONTOLOGY (closed world)  
+
+# BASE DOMAIN ONTOLOGY (closed world)  
+
+#Primitive Nouns
+{{$primitive_nouns}}
+##
+
+#Primitive Verbs
+{{$primitive_verbs}}
+##
+
+#Primitive place types:
+{{$primitive_places}}
+##
+
+#Primitive tool and resource types:
+{{$primitive_tools}}
+##
+
+#Character names:
+{{$character_names}}
+##
+
+#Primitive speech verbs: 
+assert
+ask_if
+ask_why
+cite
+propose
+offer
+promise
+threaten
+concede
+retract
+challenge
+clarify
+summarize
+reframe
+request
+accept
+refuse
+invite
+apologize
+
+Discourse itemclasses (content types):
+Evidence(Document, Testimony, Measurement), 
+Precedent(Custom, CaseLaw), 
+Norm(Statute, Tradition, ReligiousRule), 
+Incentive(Reward, Support, Labor), 
+Sanction(LegalAction, Withholding), 
+Narrative(Analogy, Exemplum), 
+Commitment(Contract, Oath), 
+Emotion(AppealToCare, AppealToFairness)
+
+
+----------------------- end primitives ----------------------------
+
+"""
 ACTIVITIES_TEMPLATE = """TASK: 
 You are generating a comprehensive activity list for a character. 
 #CHARACTER: 
