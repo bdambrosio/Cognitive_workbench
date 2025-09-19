@@ -46,7 +46,7 @@
             "env": {
                 "PYTHONPATH": "${workspaceFolder}/src"
             },
-            "args": ["--scenario", "../scenarios/laTerre.yaml", "--character", "all", "--ontology", "create", "--middle", "skip", "--activities", "create"],
+            "args": ["--scenario", "../scenarios/laTerre.yaml", "--character", "all", "--ontology", "load", "--middle", "skip", "--activities", "create"],
             "justMyCode": false,
             "stopOnEntry": false,
             "preLaunchTask": "setup-zenoh-environment"

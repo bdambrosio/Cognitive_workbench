@@ -19,7 +19,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from Messages import SystemMessage
 from utils import hash_utils
 from utils.state_utils import calculate_state_activity_alignment, get_known_states
-from templates import ACTIVITIES_TEMPLATE, DRIVE_ACTIVITY_TEMPLATE, PLAN_TEMPLATE, PLAN_VERBS
+from templates import ACTIVITIES_TEMPLATE, DRIVE_ACTIVITY_TEMPLATE, DRIVE_DISCOURSE_TEMPLATE, PLAN_TEMPLATE, PLAN_VERBS
 from utils.format_utils import format_middle_nouns, format_middle_verbs
 # Type checking imports
 from typing import TYPE_CHECKING
@@ -201,6 +201,72 @@ def create_ontology(context, map_types, resource_type_str, character_name, chara
         return None
 
 
+def create_discourse_ontology(context, map_types, resource_type_str, character_name, character, character_drives, characters):
+    global llm_client
+    """Get the discourse ontology for a given setting and character from Zenoh.
+    As with the activity ontology, this is a closed-world ontology.
+    Unlike activity ontology, the 'axes' are state axes of each participant in the discourse.
+    Unlike activity ontology, the itemclasses are classes of discourse content. 
+    Instances of these itemclasses are generated at execution time from character state (including knowledge) and situation state.
+    Does that mean a separate prompt for each? Should we generate them here?"""
+
+    # Initialize Zenoh session
+
+    try:  
+        map_types_str = format_map_types(map_types)
+        map_places_str = format_map_places(map_types)
+        map_tools_str = format_map_tools(map_types)
+        other_characters_str = ''
+        for other_character_name, other_character_desc in characters.items():
+            if other_character_name != character_name:
+                other_characters_str += f"\n\t{other_character_name}: {other_character_desc}"
+        
+        character_drives_str = '\n'.join(character_drives)   
+        character_names = list(characters.keys())
+        drives = character_drives.copy()
+        physiological_drives = ["""Maintain hydration — avoid thirst and keep the body supplied with fluids.""", 
+        """Maintain alertness — avoid fatigue and keep the body rested.""", 
+        """Maintain energy — avoid hunger and keep the body supplied with nutrients."""]
+        drives.extend(physiological_drives)
+        # Static, scenario-invariant physiological needs block
+
+        analyses = []
+        for drive in drives:
+            analysis = llm_client.llm.ask({"setting": context, 
+                                   "character_name": character_name,
+                                   "character": character, 
+                                   "drive_statement": drive.strip(), 
+                                   "states": get_known_states(),
+                                   "other_characters": other_characters_str, 
+                                   "character_names": '\n'.join(character_names),
+                                   "primitive_nouns": map_types_str.strip(),
+                                   "primitive_verbs": PLAN_VERBS.strip(),
+                                   "primitive_places": map_places_str.strip(),
+                                   "primitive_tools": resource_type_str.strip()},
+                   [SystemMessage(content=DRIVE_DISCOURSE_TEMPLATE)],
+                    max_tokens=1000,
+                    temp=0.7,
+                    stops=['</end>'],
+                    is_json=True,
+                    trace=True
+                    #log=True
+
+                )
+
+            logger.info(f"{json.dumps(analysis, indent=2)}")
+           
+        
+            ontology = {"drive": drive, "analysis": analysis}
+            analyses.append(ontology)
+        return analyses
+
+    except Exception as e:
+        traceback.print_exc()
+        print(f'❌ Failed to get discourse ontology: {e}')
+        return None
+
+
+
 def create_activities(context, map_types, character_name, character, character_drives, characters, ontology):
 
     other_characters_str = ''
@@ -271,6 +337,17 @@ def save_ontology(character_name, ontology, scenario_dir):
         print(f"✅ Saved ontology for {character_name} to {filepath}")
     except Exception as e:
         print(f"❌ Error saving ontology for {character_name}: {e}")
+
+def save_discourse_ontology(character_name, ontology, scenario_dir):
+    """Save activities to a JSON file in the scenarios directory."""
+    filename = f"{character_name}-discourse-ontology.json"
+    filepath = os.path.join(scenario_dir, filename)
+    try:
+        with open(filepath, 'w') as file:
+            json.dump(ontology, file, indent=2)
+        print(f"✅ Saved discourse ontology for {character_name} to {filepath}")
+    except Exception as e:
+        print(f"❌ Error saving discourse ontology for {character_name}: {e}")
 
 def save_activities(character_name, activities, scenario_dir):
     """Save activities to a JSON file in the scenarios directory."""

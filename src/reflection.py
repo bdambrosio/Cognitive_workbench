@@ -977,7 +977,8 @@ def run_reflection_pipeline_v2(
     s2 = stage2_cluster(aggregated_problems, output_path=s2_output_path)
     s3 = stage3_coverage(s2, max_updates=s3_max_updates, output_path=s3_output_path)
     s4 = stage4_draft_updates(s2, s3, output_path=s4_output_path)
-    s5 = stage5_validate_and_repair(s2, s3, s4, output_path=s5_output_path)
+    s5 = stage5_validate_and_repair(s4, s2, s3, output_path=s5_output_path)
+    
     return {"s1": s1, "s2": s2, "s3": s3, "s4": s4, "s5": s5}
 
 def main():
