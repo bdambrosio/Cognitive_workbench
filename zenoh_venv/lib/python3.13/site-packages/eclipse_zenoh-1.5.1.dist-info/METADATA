@@ -1,0 +1,26 @@
+Metadata-Version: 2.4
+Name: eclipse-zenoh
+Version: 1.5.1
+Classifier: Programming Language :: Python :: 3 :: Only
+Classifier: Programming Language :: Python :: 3.8
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Classifier: Programming Language :: Rust
+Classifier: Intended Audience :: Developers
+Classifier: Development Status :: 4 - Beta
+Classifier: Topic :: System :: Networking
+Classifier: License :: OSI Approved :: Apache Software License
+Classifier: License :: OSI Approved :: Eclipse Public License 2.0 (EPL-2.0)
+Classifier: Operating System :: POSIX :: Linux
+Classifier: Operating System :: MacOS :: MacOS X
+Classifier: Operating System :: Microsoft :: Windows
+License-File: LICENSE
+License-File: NOTICE.md
+Summary: The python API for Eclipse zenoh
+Author-email: ZettaScale Zenoh team <zenoh@zettascale.tech>
+Requires-Python: >=3.8
+Project-URL: Bug Tracker, https://github.com/eclipse-zenoh/zenoh-python/issues
+Project-URL: Source Code, https://github.com/eclipse-zenoh/zenoh-python
+Project-URL: Documentation, https://readthedocs.org/projects/zenoh-python/

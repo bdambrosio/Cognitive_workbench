@@ -219,7 +219,7 @@ def create_discourse_ontology(context, map_types, resource_type_str, character_n
         other_characters_str = ''
         for other_character_name, other_character_desc in characters.items():
             if other_character_name != character_name:
-                other_characters_str += f"\n\t{other_character_name}: {other_character_desc}"
+                other_characters_str += f"\n\t{other_character_name}:\n {other_character_desc}"
         
         character_drives_str = '\n'.join(character_drives)   
         character_names = list(characters.keys())
@@ -237,7 +237,7 @@ def create_discourse_ontology(context, map_types, resource_type_str, character_n
                                    "character": character, 
                                    "drive_statement": drive.strip(), 
                                    "states": get_known_states(),
-                                   "other_characters": other_characters_str, 
+                                   "characters": other_characters_str, 
                                    "character_names": '\n'.join(character_names),
                                    "primitive_nouns": map_types_str.strip(),
                                    "primitive_verbs": PLAN_VERBS.strip(),

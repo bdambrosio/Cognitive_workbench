@@ -2,884 +2,861 @@
   {
     "drive": "gain your rightful inheritance - justice and fairness in how the land is divided",
     "analysis": {
-      "drive_classification": "Persuasive",
-      "axes": [
-        {
-          "name": "rightfulness",
-          "states": [
-            "unjust",
-            "just"
-          ]
-        },
-        {
-          "name": "ownership",
-          "states": [
-            "disputed",
-            "clear"
-          ]
-        },
-        {
-          "name": "entitlement_feeling",
-          "states": [
-            "resentful",
-            "satisfied"
-          ]
-        }
-      ],
-      "speechact_itemclass_pairs": [
-        {
-          "speechact": "assert",
-          "itemclass": "Claim",
-          "facets": {
-            "owner": "Jean",
-            "about": [
-              "Will",
-              "Deed",
-              "Field",
-              "Farm"
-            ]
-          },
-          "axis": "ownership"
-        },
-        {
-          "speechact": "cite",
-          "itemclass": "Evidence",
-          "facets": {
-            "owner": "Jean",
-            "about": [
-              "Will",
-              "Deed"
-            ],
-            "dimensions": [
-              "Document"
-            ]
-          },
-          "axis": "ownership"
-        },
-        {
-          "speechact": "propose",
-          "itemclass": "Proposal",
-          "facets": {
-            "owner": "Jean",
-            "about": [
-              "Field",
-              "Farm"
-            ],
-            "dimensions": [
-              "division",
-              "boundary"
-            ]
-          },
-          "axis": "rightfulness"
-        },
-        {
-          "speechact": "appeal",
-          "itemclass": "Norm",
-          "facets": {
-            "owner": "Jean",
-            "about": [
-              "Tradition",
-              "Statute",
-              "ReligiousRule"
-            ]
-          },
-          "axis": "rightfulness"
-        },
-        {
-          "speechact": "appeal",
-          "itemclass": "Emotion",
-          "facets": {
-            "owner": "Jean",
-            "about": [
-              "AppealToFairness"
-            ]
-          },
-          "axis": "entitlement_feeling"
-        },
-        {
-          "speechact": "challenge",
-          "itemclass": "Claim",
-          "facets": {
-            "owner": "Francoise",
-            "about": [
-              "Will",
-              "Deed",
-              "Field"
-            ]
-          },
-          "axis": "ownership"
-        },
-        {
-          "speechact": "request",
-          "itemclass": "Commitment",
-          "facets": {
-            "owner": "Jean",
-            "about": [
-              "Promise"
-            ],
-            "dimensions": [
-              "respect division"
-            ]
-          },
-          "axis": "rightfulness"
-        }
-      ],
-      "itemclass_inclusions_exclusions": {
-        "Claim": {
-          "INCLUDED": [
-            "Will",
-            "Deed",
-            "Field",
-            "Farm",
-            "Village"
-          ],
-          "EXCLUDED": [
-            "Water",
-            "Mountain",
-            "Forest",
-            "Blacksmith",
-            "Church",
-            "Hoe",
-            "Plow"
-          ]
-        },
-        "Evidence": {
-          "INCLUDED": [
-            "Will",
-            "Deed"
-          ],
-          "EXCLUDED": [
-            "Market",
-            "Church",
-            "Cow"
-          ]
-        },
-        "Proposal": {
-          "INCLUDED": [
-            "Field",
-            "Farm"
-          ],
-          "EXCLUDED": [
-            "Mountain",
-            "Well",
-            "Plow"
-          ]
-        },
-        "Norm": {
-          "INCLUDED": [
-            "Statute",
-            "Tradition",
-            "ReligiousRule"
-          ],
-          "EXCLUDED": [
-            "Apple",
-            "Cheese",
-            "Spring"
-          ]
-        },
-        "Emotion": {
-          "INCLUDED": [
-            "AppealToFairness"
-          ],
-          "EXCLUDED": [
-            "Egg",
-            "Hay",
-            "Butter"
-          ]
-        },
-        "Commitment": {
-          "INCLUDED": [
-            "Promise"
-          ],
-          "EXCLUDED": [
-            "Oath",
-            "Contract"
-          ]
-        }
-      },
-      "anticipated_effects": [
-        {
-          "axis": "ownership",
-          "delta": 0.7,
-          "targets": [
-            "Francoise",
-            "FatherMarquart",
-            "MotherMarquart"
-          ],
-          "confidence": 0.7
-        },
-        {
-          "axis": "rightfulness",
-          "delta": 0.6,
-          "targets": [
-            "Francoise",
-            "FatherMarquart",
-            "MotherMarquart"
-          ],
-          "confidence": 0.6
-        },
-        {
-          "axis": "entitlement_feeling",
-          "delta": 0.5,
-          "targets": [
-            "Jean"
-          ],
-          "confidence": 0.8
-        }
-      ]
-    }
-  },
-  {
-    "drive": "maintain and work the family farm",
-    "analysis": {
-      "drive_category": "Cooperative/Deliberative",
-      "axes": [
-        {
-          "axis": "commitment",
-          "antonyms": [
-            "disengaged",
-            "committed"
-          ]
-        },
-        {
-          "axis": "resource_sufficiency",
-          "antonyms": [
-            "insufficient",
-            "sufficient"
-          ]
-        },
-        {
-          "axis": "role_clarity",
-          "antonyms": [
-            "unclear",
-            "clear"
-          ]
-        }
-      ],
-      "speechact_itemclass_pairs": [
-        {
-          "speechact": "propose",
-          "itemclass": "Commitment",
-          "facets": {
-            "owner": "Jean",
-            "about": [
-              "Farm",
-              "Field",
-              "Hoe",
-              "Plow",
-              "Scythe"
-            ],
-            "dimensions": [
-              "labor",
-              "responsibility"
-            ]
-          },
-          "closed_world_mapping": {
-            "INCLUDED": [
-              "Farm",
-              "Field",
-              "Hoe",
-              "Plow",
-              "Scythe",
-              "Jean",
-              "Francoise",
-              "FatherMarquart",
-              "MotherMarquart"
-            ],
-            "EXCLUDED": [
-              "Church",
-              "Blacksmith",
-              "Market",
-              "Will",
-              "Deed",
-              "Hay",
-              "Bread",
-              "Apple",
-              "Chicken",
-              "Egg",
-              "Milk",
-              "Cheese",
-              "Butter",
-              "Mountain",
-              "Forest",
-              "Grassland",
-              "Path",
-              "Village",
-              "Water",
-              "Spring",
-              "Well",
-              "Mill",
-              "Cow"
-            ]
-          },
-          "anticipated_effect": {
-            "axis": "commitment",
-            "delta": 0.8,
-            "target": [
-              "Jean",
-              "Francoise",
-              "FatherMarquart",
-              "MotherMarquart"
-            ],
-            "confidence": 0.9
-          }
-        },
-        {
-          "speechact": "assert",
-          "itemclass": "Evidence",
-          "facets": {
-            "owner": "FatherMarquart",
-            "about": [
-              "Harvest",
-              "Hay",
-              "Bread",
-              "Milk"
-            ],
-            "dimensions": [
-              "recent",
-              "expected"
-            ]
-          },
-          "closed_world_mapping": {
-            "INCLUDED": [
-              "Hay",
-              "Bread",
-              "Milk",
-              "Apple",
-              "Egg",
-              "Cheese",
-              "Butter",
-              "Chicken",
-              "Cow"
-            ],
-            "EXCLUDED": [
-              "Will",
-              "Deed",
-              "Hoe",
-              "Plow",
-              "Scythe",
-              "Church",
-              "Farmhouse",
-              "Market",
-              "Blacksmith",
-              "Field",
-              "Farm",
-              "Spring",
-              "Well",
-              "Mill",
-              "Village",
-              "Mountain",
-              "Forest",
-              "Grassland",
-              "Path",
-              "Water"
-            ]
-          },
-          "anticipated_effect": {
-            "axis": "resource_sufficiency",
-            "delta": 0.6,
-            "target": [
-              "Francoise",
-              "MotherMarquart"
-            ],
-            "confidence": 0.8
-          }
-        },
-        {
-          "speechact": "clarify",
-          "itemclass": "Role",
-          "facets": {
-            "about": [
-              "Farm",
-              "Field",
-              "Hoe",
-              "Plow",
-              "Scythe"
-            ],
-            "dimensions": [
-              "assigned_to"
-            ]
-          },
-          "closed_world_mapping": {
-            "INCLUDED": [
-              "Jean",
-              "Francoise",
-              "FatherMarquart",
-              "MotherMarquart"
-            ],
-            "EXCLUDED": [
-              "Will",
-              "Deed",
-              "Church",
-              "Market",
-              "Farmhouse",
-              "Hay",
-              "Bread",
-              "Apple",
-              "Chicken",
-              "Egg",
-              "Milk",
-              "Cheese",
-              "Butter",
-              "Cow",
-              "Field",
-              "Farm",
-              "Spring",
-              "Well",
-              "Mill",
-              "Village",
-              "Mountain",
-              "Forest",
-              "Grassland",
-              "Path",
-              "Blacksmith",
-              "Water"
-            ]
-          },
-          "anticipated_effect": {
-            "axis": "role_clarity",
-            "delta": 0.9,
-            "target": [
-              "all"
-            ],
-            "confidence": 0.95
-          }
-        },
-        {
-          "speechact": "offer",
-          "itemclass": "Incentive",
-          "facets": {
-            "owner": "MotherMarquart",
-            "about": [
-              "Bread",
-              "Apple",
-              "Butter"
-            ],
-            "dimensions": [
-              "food",
-              "reward"
-            ]
-          },
-          "closed_world_mapping": {
-            "INCLUDED": [
-              "Bread",
-              "Apple",
-              "Butter",
-              "Egg",
-              "Milk",
-              "Cheese",
-              "Chicken",
-              "Cow"
-            ],
-            "EXCLUDED": [
-              "Will",
-              "Deed",
-              "Field",
-              "Hoe",
-              "Plow",
-              "Scythe",
-              "Hay",
-              "Church",
-              "Farmhouse",
-              "Farm",
-              "Village",
-              "Market",
-              "Blacksmith",
-              "Mountain",
-              "Forest",
-              "Grassland",
-              "Path",
-              "Spring",
-              "Well",
-              "Mill",
-              "Water"
-            ]
-          },
-          "anticipated_effect": {
-            "axis": "commitment",
-            "delta": 0.7,
-            "target": [
-              "Jean",
-              "Francoise"
-            ],
-            "confidence": 0.85
-          }
-        }
-      ]
-    }
-  },
-  {
-    "drive": "find love and a wife to build a family with",
-    "analysis": {
-      "step_1_drive_category": "Relational/Affective",
+      "step_1_drive_categorization": "Persuasive",
       "step_2_axes": [
         {
-          "axis": "attraction",
-          "antonyms": [
-            "distant",
-            "close"
-          ]
+          "axis": "entitled \u2194 disinherited",
+          "description": "Whether Jean is recognized as rightfully entitled to a fair portion of the land/inheritance"
         },
         {
-          "axis": "commitment",
-          "antonyms": [
-            "noncommittal",
-            "devoted"
-          ]
+          "axis": "fair_division \u2194 unfair_division",
+          "description": "Whether the proposed or actual division of land and resources is perceived as just or unjust"
         },
         {
-          "axis": "family_intent",
-          "antonyms": [
-            "disinterested",
-            "intentional"
-          ]
+          "axis": "recognized_claim \u2194 disputed_claim",
+          "description": "Whether Jean's inheritance claim is recognized and supported, or disputed and opposed by others"
         }
       ],
       "step_3_speechact_itemclass_pairs": [
         {
           "speechact": "assert",
-          "itemclass": "Emotion",
+          "itemclass": "Evidence",
           "facets": {
             "owner": "Jean",
             "about": [
-              "Francoise"
+              "Will",
+              "Deed",
+              "Field",
+              "Farm"
             ],
             "dimensions": [
-              "AppealToCare"
+              "testament",
+              "ownership",
+              "portion"
             ]
-          }
+          },
+          "character": "Jean"
+        },
+        {
+          "speechact": "cite",
+          "itemclass": "Norm",
+          "facets": {
+            "about": [
+              "Statute",
+              "Tradition",
+              "ReligiousRule"
+            ]
+          },
+          "character": "Jean"
         },
         {
           "speechact": "propose",
+          "itemclass": "Proposal",
+          "facets": {
+            "owner": "Jean",
+            "about": [
+              "Field",
+              "Farm",
+              "Farmhouse",
+              "Cow"
+            ],
+            "dimensions": [
+              "division",
+              "share",
+              "fairness"
+            ]
+          },
+          "character": "Jean"
+        },
+        {
+          "speechact": "challenge",
+          "itemclass": "Evidence",
+          "facets": {
+            "about": [
+              "Will",
+              "Deed"
+            ],
+            "dimensions": [
+              "validity"
+            ]
+          },
+          "character": "FatherMarquart"
+        },
+        {
+          "speechact": "appeal",
+          "itemclass": "Emotion",
+          "facets": {
+            "about": [
+              "AppealToFairness",
+              "AppealToCare"
+            ]
+          },
+          "character": "Jean"
+        }
+      ],
+      "step_4_closed_world_mapping": {
+        "itemclasses": {
+          "Evidence": {
+            "INCLUDED": [
+              "Will",
+              "Deed",
+              "Testimony (from FatherMarquart, MotherMarquart, Francoise)",
+              "Field",
+              "Farm"
+            ],
+            "EXCLUDED": [
+              "Market",
+              "Blacksmith",
+              "Bread",
+              "Apple",
+              "Mill",
+              "Church",
+              "Hay",
+              "Chicken",
+              "Cow",
+              "Egg",
+              "Milk",
+              "Cheese",
+              "Butter",
+              "Spring",
+              "Well",
+              "Scythe",
+              "Hoe",
+              "Plow",
+              "Water",
+              "Mountain",
+              "Forest",
+              "Grassland",
+              "Path",
+              "Village"
+            ]
+          },
+          "Norm": {
+            "INCLUDED": [
+              "Statute",
+              "Tradition",
+              "ReligiousRule"
+            ],
+            "EXCLUDED": [
+              "Deed",
+              "Will",
+              "Market",
+              "Farmhouse",
+              "Village",
+              "Church",
+              "Bread",
+              "Hay",
+              "Butter"
+            ]
+          },
+          "Proposal": {
+            "INCLUDED": [
+              "Field",
+              "Farm",
+              "Farmhouse",
+              "Cow"
+            ],
+            "EXCLUDED": [
+              "Market",
+              "Blacksmith",
+              "Path",
+              "Village",
+              "Hay",
+              "Bread"
+            ]
+          },
+          "Emotion": {
+            "INCLUDED": [
+              "AppealToFairness",
+              "AppealToCare"
+            ],
+            "EXCLUDED": []
+          }
+        },
+        "targets": {
+          "Jean": {
+            "INCLUDED": [
+              "Jean"
+            ],
+            "EXCLUDED": [
+              "Francoise",
+              "FatherMarquart",
+              "MotherMarquart"
+            ]
+          },
+          "FatherMarquart": {
+            "INCLUDED": [
+              "FatherMarquart"
+            ],
+            "EXCLUDED": [
+              "Jean",
+              "Francoise",
+              "MotherMarquart"
+            ]
+          },
+          "MotherMarquart": {
+            "INCLUDED": [
+              "MotherMarquart"
+            ],
+            "EXCLUDED": [
+              "Jean",
+              "Francoise",
+              "FatherMarquart"
+            ]
+          },
+          "Francoise": {
+            "INCLUDED": [
+              "Francoise"
+            ],
+            "EXCLUDED": [
+              "Jean",
+              "MotherMarquart",
+              "FatherMarquart"
+            ]
+          }
+        }
+      }
+    }
+  },
+  {
+    "drive": "maintain and work the family farm",
+    "analysis": {
+      "Step 1 - Categorize the drive": "Cooperative/Deliberative (all parties converge)",
+      "Step 2 - AXES": [
+        {
+          "axis": "committed \u2194 disengaged",
+          "description": "Level of collective commitment among family members to maintaining and working the family farm"
+        },
+        {
+          "axis": "resourceful \u2194 depleted",
+          "description": "State of resources required to maintain the farm"
+        },
+        {
+          "axis": "harmonious \u2194 conflicted",
+          "description": "Quality of cooperation and relational harmony among farm participants"
+        }
+      ],
+      "Step 3 - SPEECHACT\u2013ITEMCLASS pairs": [
+        {
+          "speechact": "propose",
+          "itemclass": "Incentive",
+          "facets": {
+            "owner": "FatherMarquart",
+            "about": [
+              "Labor",
+              "Field",
+              "Farm",
+              "Hay",
+              "Plow"
+            ],
+            "dimensions": [
+              "division of labor"
+            ]
+          },
+          "character": "FatherMarquart"
+        },
+        {
+          "speechact": "request",
+          "itemclass": "Support",
+          "facets": {
+            "owner": "MotherMarquart",
+            "about": [
+              "Water",
+              "Well",
+              "Spring",
+              "Field"
+            ],
+            "dimensions": [
+              "duration"
+            ]
+          },
+          "character": "MotherMarquart"
+        },
+        {
+          "speechact": "assert",
+          "itemclass": "Norm",
+          "facets": {
+            "about": [
+              "Tradition",
+              "Farm",
+              "Family"
+            ],
+            "dimensions": [
+              "obligation"
+            ]
+          },
+          "character": "FatherMarquart"
+        },
+        {
+          "speechact": "offer",
           "itemclass": "Commitment",
+          "facets": {
+            "owner": "Jean",
+            "about": [
+              "Farm",
+              "Hay",
+              "Plow",
+              "Cow"
+            ],
+            "dimensions": [
+              "time",
+              "scope"
+            ]
+          },
+          "character": "Jean"
+        },
+        {
+          "speechact": "appeal",
+          "itemclass": "Emotion",
+          "facets": {
+            "about": [
+              "AppealToCare",
+              "Farm",
+              "Family"
+            ]
+          },
+          "character": "MotherMarquart"
+        },
+        {
+          "speechact": "challenge",
+          "itemclass": "Evidence",
+          "facets": {
+            "about": [
+              "Testimony",
+              "Measurement",
+              "Field",
+              "Hay"
+            ],
+            "dimensions": [
+              "output"
+            ]
+          },
+          "character": "Francoise"
+        }
+      ],
+      "Step 4 - Closed-world mapping": {
+        "itemclass_mappings": [
+          {
+            "itemclass": "Incentive",
+            "INCLUDED_base_nouns": [
+              "Labor",
+              "Support",
+              "Hay",
+              "Plow",
+              "Field",
+              "Farm"
+            ],
+            "EXCLUDED_base_nouns": [
+              "Market",
+              "Deed",
+              "Will",
+              "Church"
+            ]
+          },
+          {
+            "itemclass": "Support",
+            "INCLUDED_base_nouns": [
+              "Water",
+              "Well",
+              "Spring",
+              "Field",
+              "Farmhouse"
+            ],
+            "EXCLUDED_base_nouns": [
+              "Church",
+              "Market",
+              "Deed",
+              "Will"
+            ]
+          },
+          {
+            "itemclass": "Norm",
+            "INCLUDED_base_nouns": [
+              "Tradition",
+              "Farm",
+              "Family"
+            ],
+            "EXCLUDED_base_nouns": [
+              "LegalAction",
+              "Statute",
+              "CaseLaw"
+            ]
+          },
+          {
+            "itemclass": "Commitment",
+            "INCLUDED_base_nouns": [
+              "Farm",
+              "Hay",
+              "Plow",
+              "Cow"
+            ],
+            "EXCLUDED_base_nouns": [
+              "Deed",
+              "Will"
+            ]
+          },
+          {
+            "itemclass": "Emotion",
+            "INCLUDED_base_nouns": [
+              "AppealToCare",
+              "Farm",
+              "Family"
+            ],
+            "EXCLUDED_base_nouns": [
+              "LegalAction",
+              "Withholding",
+              "CaseLaw"
+            ]
+          },
+          {
+            "itemclass": "Evidence",
+            "INCLUDED_base_nouns": [
+              "Testimony",
+              "Measurement",
+              "Field",
+              "Hay"
+            ],
+            "EXCLUDED_base_nouns": [
+              "Statute",
+              "CaseLaw",
+              "Deed",
+              "Will"
+            ]
+          }
+        ],
+        "character_mappings": [
+          {
+            "target": "FatherMarquart",
+            "INCLUDED_base_character_names": [
+              "FatherMarquart"
+            ],
+            "EXCLUDED_base_character_names": [
+              "MotherMarquart",
+              "Jean",
+              "Francoise"
+            ]
+          },
+          {
+            "target": "MotherMarquart",
+            "INCLUDED_base_character_names": [
+              "MotherMarquart"
+            ],
+            "EXCLUDED_base_character_names": [
+              "FatherMarquart",
+              "Jean",
+              "Francoise"
+            ]
+          },
+          {
+            "target": "Jean",
+            "INCLUDED_base_character_names": [
+              "Jean"
+            ],
+            "EXCLUDED_base_character_names": [
+              "FatherMarquart",
+              "MotherMarquart",
+              "Francoise"
+            ]
+          },
+          {
+            "target": "Francoise",
+            "INCLUDED_base_character_names": [
+              "Francoise"
+            ],
+            "EXCLUDED_base_character_names": [
+              "FatherMarquart",
+              "MotherMarquart",
+              "Jean"
+            ]
+          }
+        ]
+      }
+    }
+  },
+  {
+    "drive": "find love and a wife to build a family with",
+    "analysis": {
+      "step1_drive_category": "Relational/Affective",
+      "step2_axes": [
+        {
+          "axis": "unattached \u2194 attached (relationship status)"
+        },
+        {
+          "axis": "unknown \u2194 known (mutual understanding/intimacy)"
+        },
+        {
+          "axis": "isolated \u2194 family-bonded (family creation/acceptance)"
+        }
+      ],
+      "step3_speechact_itemclass_pairs": [
+        {
+          "speechact": "propose",
+          "itemclass": "Proposal",
           "facets": {
             "owner": "Jean",
             "about": [
               "Marriage",
               "Family"
+            ],
+            "target": "Francoise"
+          },
+          "character": "Jean"
+        },
+        {
+          "speechact": "assert",
+          "itemclass": "Norm",
+          "facets": {
+            "about": [
+              "Tradition",
+              "Marriage"
+            ],
+            "dimensions": [
+              "properness"
             ]
-          }
+          },
+          "character": "MotherMarquart"
         },
         {
           "speechact": "invite",
-          "itemclass": "Norm",
+          "itemclass": "Narrative",
           "facets": {
             "owner": "Jean",
             "about": [
+              "Farmhouse",
+              "Family"
+            ],
+            "dimensions": [
+              "future vision"
+            ]
+          },
+          "character": "Jean"
+        },
+        {
+          "speechact": "accept",
+          "itemclass": "Commitment",
+          "facets": {
+            "about": [
+              "Marriage",
+              "Oath"
+            ],
+            "dimensions": [
+              "lifetime"
+            ]
+          },
+          "character": "Francoise"
+        },
+        {
+          "speechact": "ask_if",
+          "itemclass": "Norm",
+          "facets": {
+            "about": [
               "Tradition",
               "ReligiousRule"
+            ],
+            "dimensions": [
+              "family opinion",
+              "church approval"
             ]
-          }
+          },
+          "character": "FatherMarquart"
         }
       ],
-      "step_4_closed_world_mapping": [
-        {
-          "itemclass": "Emotion",
+      "step4_closed_world_mapping": {
+        "Proposal": {
           "INCLUDED_base_nouns": [
-            "AppealToCare"
-          ],
-          "EXCLUDED_base_nouns": [
-            "Statute",
-            "Custom",
-            "Field",
-            "Cow",
-            "Apple"
-          ]
-        },
-        {
-          "itemclass": "Commitment",
-          "INCLUDED_base_nouns": [
-            "Oath",
-            "Marriage (as Commitment)",
-            "Contract"
-          ],
-          "EXCLUDED_base_nouns": [
-            "Market",
-            "Hoe",
-            "Deed",
-            "Hay"
-          ]
-        },
-        {
-          "itemclass": "Norm",
-          "INCLUDED_base_nouns": [
-            "Tradition",
-            "ReligiousRule"
+            "Marriage",
+            "Family",
+            "Farmhouse"
           ],
           "EXCLUDED_base_nouns": [
             "Water",
+            "Mountain",
             "Well",
-            "Scythe",
-            "Bread"
+            "Hoe",
+            "Apple",
+            "Bread",
+            "Chicken",
+            "Scythe"
           ]
-        }
-      ],
-      "step_5_anticipated_effects": [
-        {
-          "axis": "attraction",
-          "delta": 0.7,
-          "target": [
-            "Francoise"
-          ],
-          "confidence": 0.9
         },
-        {
-          "axis": "commitment",
-          "delta": 1.0,
-          "target": [
-            "Francoise",
-            "Jean"
+        "Norm": {
+          "INCLUDED_base_nouns": [
+            "Tradition",
+            "Marriage",
+            "ReligiousRule"
           ],
-          "confidence": 0.95
+          "EXCLUDED_base_nouns": [
+            "Will",
+            "Deed",
+            "Egg",
+            "Milk",
+            "Butter",
+            "Field"
+          ]
         },
-        {
-          "axis": "family_intent",
-          "delta": 0.8,
-          "target": [
-            "Francoise",
-            "Jean",
-            "FatherMarquart",
-            "MotherMarquart"
+        "Narrative": {
+          "INCLUDED_base_nouns": [
+            "Farmhouse",
+            "Family"
           ],
-          "confidence": 0.85
-        }
-      ]
+          "EXCLUDED_base_nouns": [
+            "Mill",
+            "Hay",
+            "Market"
+          ]
+        },
+        "Commitment": {
+          "INCLUDED_base_nouns": [
+            "Marriage",
+            "Oath"
+          ],
+          "EXCLUDED_base_nouns": [
+            "Plow",
+            "Bread",
+            "Spring",
+            "Grassland"
+          ]
+        },
+        "INCLUDED_characters": [
+          "Jean",
+          "Francoise",
+          "FatherMarquart",
+          "MotherMarquart"
+        ],
+        "EXCLUDED_characters": [
+          "Blacksmith",
+          "Market",
+          "Cow"
+        ]
+      }
     }
   },
   {
     "drive": "immediate needs of survival - food, shelter, health, rest from backbreaking labor",
     "analysis": {
-      "step1_drive_categorization": "Cooperative/Deliberative",
-      "step2_axes": [
+      "Step1_DriveCategory": "Epistemic",
+      "Explanation": "The drive relates to meeting immediate needs of survival: food, shelter, health, and rest. This suggests states of characters (Jean, Francoise, etc.) reducing uncertainty about or taking action towards fulfilling these needs. The discourse likely revolves around recognizing, managing, and resolving urgent deficits (hunger, thirst, fatigue), thus the drive is primarily epistemic with some elements of deliberation regarding practical solutions.",
+      "Step2_Axes": [
         {
-          "axis": "need_satisfied \u2194 need_unmet",
-          "description": "Degree to which immediate basic needs (hunger, thirst, shelter, rest) of the group are being or will be met"
+          "axis": "hungry \u2194 satiated",
+          "antonyms": [
+            "hungry",
+            "satiated"
+          ]
         },
         {
-          "axis": "resource_accessible \u2194 resource_blocked",
-          "description": "Extent to which a needed resource (e.g., food, shelter, rest, water) is available or attainable by a participant"
+          "axis": "tired \u2194 rested",
+          "antonyms": [
+            "tired",
+            "rested"
+          ]
+        },
+        {
+          "axis": "exposed \u2194 sheltered",
+          "antonyms": [
+            "exposed",
+            "sheltered"
+          ]
         }
       ],
-      "step3_speechact_itemclass_pairs": [
+      "Step3_SpeechAct_Itemclass_Pairs": [
         {
-          "speechact": "request",
-          "itemclass": "Incentive",
+          "speechact": "assert",
+          "itemclass": "Claim",
           "facets": {
             "owner": "Jean",
             "about": [
-              "Bread",
-              "Milk",
-              "Rest"
-            ],
-            "dimensions": [
-              "amount",
-              "urgency"
+              "hunger",
+              "thirst",
+              "fatigue"
             ]
-          }
+          },
+          "character": "Jean"
+        },
+        {
+          "speechact": "ask_if",
+          "itemclass": "NeedsAssessment",
+          "facets": {
+            "owner": "Francoise",
+            "about": [
+              "hunger",
+              "fatigue",
+              "shelter"
+            ]
+          },
+          "character": "Francoise"
         },
         {
           "speechact": "propose",
           "itemclass": "Proposal",
           "facets": {
-            "owner": "Francoise",
-            "about": [
-              "Shelter",
-              "Farmhouse"
-            ],
-            "dimensions": [
-              "duration",
-              "who"
-            ]
-          }
-        },
-        {
-          "speechact": "offer",
-          "itemclass": "Support",
-          "facets": {
             "owner": "FatherMarquart",
             "about": [
-              "Egg",
-              "Water",
-              "Rest"
+              "Bread",
+              "Well",
+              "Farmhouse"
             ],
             "dimensions": [
               "quantity",
-              "cost"
+              "location",
+              "timing"
             ]
-          }
+          },
+          "character": "FatherMarquart"
         },
         {
-          "speechact": "assert",
-          "itemclass": "Evidence",
+          "speechact": "offer",
+          "itemclass": "Incentive",
           "facets": {
             "owner": "MotherMarquart",
             "about": [
-              "hunger",
-              "fatigue"
-            ],
-            "dimensions": [
-              "intensity",
-              "cause"
-            ]
-          }
-        },
-        {
-          "speechact": "concede",
-          "itemclass": "Commitment",
-          "facets": {
-            "owner": "Jean",
-            "about": [
-              "Rest",
+              "Bread",
+              "Milk",
               "Farmhouse"
             ],
             "dimensions": [
-              "duration",
-              "exclusivity"
+              "exchange",
+              "aid"
             ]
-          }
+          },
+          "character": "MotherMarquart"
+        },
+        {
+          "speechact": "request",
+          "itemclass": "Support",
+          "facets": {
+            "owner": "Jean",
+            "about": [
+              "rest",
+              "food",
+              "shelter"
+            ],
+            "dimensions": [
+              "urgency"
+            ]
+          },
+          "character": "Jean"
         }
       ],
-      "step4_closed_world_mapping": [
+      "Step4_ClosedWorldMapping": [
         {
-          "itemclass": "Incentive",
-          "INCLUDED": [
-            "Bread",
-            "Apple",
-            "Chicken",
-            "Egg",
-            "Milk",
-            "Cheese",
-            "Butter",
-            "Water",
-            "Rest",
-            "Farmhouse"
+          "itemclass": "Claim",
+          "INCLUDED_base_nouns": [
+            "hunger",
+            "thirst",
+            "fatigue",
+            "rest"
           ],
-          "EXCLUDED": [
+          "EXCLUDED_base_nouns": [
             "Will",
             "Deed",
-            "Church",
-            "ToolNouns (Hoe, Plow, Scythe)",
-            "Blacksmith",
             "Market",
-            "Custom",
-            "CaseLaw",
-            "Statute",
-            "Tradition",
-            "ReligiousRule"
+            "Church",
+            "Hay"
+          ],
+          "character_INCLUDED": [
+            "Jean",
+            "Francoise"
+          ],
+          "character_EXCLUDED": [
+            "FatherMarquart",
+            "MotherMarquart"
+          ]
+        },
+        {
+          "itemclass": "NeedsAssessment",
+          "INCLUDED_base_nouns": [
+            "hunger",
+            "fatigue",
+            "shelter",
+            "Bread",
+            "Well",
+            "Farmhouse"
+          ],
+          "EXCLUDED_base_nouns": [
+            "Scythe",
+            "Will",
+            "Deed",
+            "Mill"
+          ],
+          "character_INCLUDED": [
+            "Francoise",
+            "Jean"
+          ],
+          "character_EXCLUDED": [
+            "FatherMarquart",
+            "MotherMarquart"
           ]
         },
         {
           "itemclass": "Proposal",
-          "INCLUDED": [
-            "Shelter",
+          "INCLUDED_base_nouns": [
+            "Bread",
+            "Well",
             "Farmhouse",
             "Rest",
-            "Bread",
-            "Water",
-            "Field"
+            "Milk",
+            "Apple"
           ],
-          "EXCLUDED": [
+          "EXCLUDED_base_nouns": [
             "Will",
             "Deed",
-            "Mill",
-            "Church",
-            "Document",
-            "Testimony",
-            "Analogy",
-            "Rule"
+            "Hoe",
+            "Plow"
+          ],
+          "character_INCLUDED": [
+            "FatherMarquart"
+          ],
+          "character_EXCLUDED": [
+            "Francoise",
+            "Jean",
+            "MotherMarquart"
+          ]
+        },
+        {
+          "itemclass": "Incentive",
+          "INCLUDED_base_nouns": [
+            "Bread",
+            "Milk",
+            "Farmhouse",
+            "Apple",
+            "Cheese"
+          ],
+          "EXCLUDED_base_nouns": [
+            "Scythe",
+            "Plow",
+            "Mill"
+          ],
+          "character_INCLUDED": [
+            "MotherMarquart"
+          ],
+          "character_EXCLUDED": [
+            "Jean",
+            "Francoise"
           ]
         },
         {
           "itemclass": "Support",
-          "INCLUDED": [
-            "Egg",
-            "Water",
-            "Rest",
-            "Milk",
-            "Apple",
-            "Cheese",
-            "Bread"
+          "INCLUDED_base_nouns": [
+            "rest",
+            "food",
+            "shelter",
+            "Well",
+            "Farmhouse"
           ],
-          "EXCLUDED": [
-            "Hay",
-            "Scythe",
-            "Hoe",
+          "EXCLUDED_base_nouns": [
             "Deed",
             "Will",
-            "Norm",
-            "Custom",
-            "CaseLaw",
-            "Sanction"
-          ]
-        },
-        {
-          "itemclass": "Evidence",
-          "INCLUDED": [
-            "hunger",
-            "fatigue",
-            "thirst"
+            "Market",
+            "Church"
           ],
-          "EXCLUDED": [
-            "Farmhouse",
-            "Field",
-            "Water",
-            "Bread",
-            "Apple",
-            "Contract"
-          ]
-        },
-        {
-          "itemclass": "Commitment",
-          "INCLUDED": [
-            "Rest",
-            "Farmhouse",
-            "Bread",
-            "Water"
-          ],
-          "EXCLUDED": [
-            "Church",
-            "Will",
-            "Deed",
-            "Law",
-            "Document",
-            "Norm"
-          ]
-        }
-      ],
-      "step5_anticipated_effects": [
-        {
-          "axis": "need_satisfied \u2194 need_unmet",
-          "delta": 0.6,
-          "target(s)": [
+          "character_INCLUDED": [
             "Jean"
           ],
-          "confidence": 0.9
-        },
-        {
-          "axis": "resource_accessible \u2194 resource_blocked",
-          "delta": 0.7,
-          "target(s)": [
-            "Francoise",
-            "Jean"
-          ],
-          "confidence": 0.8
-        },
-        {
-          "axis": "need_satisfied \u2194 need_unmet",
-          "delta": 0.5,
-          "target(s)": [
+          "character_EXCLUDED": [
             "FatherMarquart",
-            "Jean"
-          ],
-          "confidence": 0.7
-        },
-        {
-          "axis": "need_satisfied \u2194 need_unmet",
-          "delta": 0.4,
-          "target(s)": [
             "MotherMarquart"
-          ],
-          "confidence": 0.6
+          ]
         }
       ]
     }
@@ -887,83 +864,126 @@
   {
     "drive": "Maintain hydration \u2014 avoid thirst and keep the body supplied with fluids.",
     "analysis": {
-      "step1_drive_category": "Cooperative/Deliberative",
-      "step2_axes": [
+      "drive_category": "Epistemic",
+      "axes": [
         {
-          "axis": "HydrationStatus",
-          "states": [
-            "thirsty",
-            "hydrated"
+          "name": "hydration_status",
+          "antonyms": [
+            "hydrated",
+            "thirsty"
           ]
         },
         {
-          "axis": "ResourceAccess",
-          "states": [
-            "no_water_access",
-            "has_water_access"
+          "name": "resource_access",
+          "antonyms": [
+            "accessible",
+            "inaccessible"
+          ]
+        },
+        {
+          "name": "agent_intention",
+          "antonyms": [
+            "initiating",
+            "withholding"
           ]
         }
       ],
-      "step3_speechact_itemclass_pairs": [
+      "speechact_itemclass_pairs": [
+        {
+          "speechact": "assert",
+          "itemclass": "Evidence",
+          "facets": {
+            "about": [
+              "Water",
+              "Well",
+              "Spring",
+              "Milk"
+            ],
+            "owner": "Jean"
+          },
+          "character": "Jean"
+        },
+        {
+          "speechact": "ask_if",
+          "itemclass": "Evidence",
+          "facets": {
+            "about": [
+              "Water",
+              "Well",
+              "Spring",
+              "Milk"
+            ]
+          },
+          "character": "Francoise"
+        },
         {
           "speechact": "propose",
           "itemclass": "Proposal",
           "facets": {
-            "owner": "Jean",
+            "owner": "MotherMarquart",
             "about": [
               "Well",
               "Spring",
-              "Milk",
-              "Water"
+              "Milk"
             ],
             "dimensions": [
-              "location",
-              "usage"
+              "quantity",
+              "location"
             ]
-          }
+          },
+          "character": "MotherMarquart"
         },
         {
           "speechact": "request",
           "itemclass": "Incentive",
           "facets": {
-            "owner": "Francoise",
+            "owner": "Jean",
             "about": [
               "Water",
               "Milk"
             ],
             "dimensions": [
-              "share",
-              "quantity"
+              "urgency"
             ]
-          }
+          },
+          "character": "Jean"
         },
         {
-          "speechact": "assert",
-          "itemclass": "Evidence",
+          "speechact": "offer",
+          "itemclass": "Incentive",
           "facets": {
             "owner": "FatherMarquart",
             "about": [
-              "Well",
-              "Spring",
-              "thirst"
+              "Milk",
+              "Water"
+            ]
+          },
+          "character": "FatherMarquart"
+        },
+        {
+          "speechact": "assert",
+          "itemclass": "Norm",
+          "facets": {
+            "about": [
+              "Tradition"
             ],
             "dimensions": [
-              "availability",
-              "effect"
+              "mealtime",
+              "sharing"
             ]
-          }
+          },
+          "character": "MotherMarquart"
         }
       ],
-      "step4_itemclass_mappings": [
-        {
-          "itemclass": "Proposal",
-          "INCLUDED": [
+      "base_noun_mapping": {
+        "Evidence": {
+          "included": [
+            "Water",
             "Well",
             "Spring",
-            "Milk",
-            "Water"
+            "Milk"
           ],
-          "EXCLUDED": [
+          "excluded": [
             "Mountain",
             "Forest",
             "Grassland",
@@ -993,13 +1013,49 @@
             "fatigue"
           ]
         },
-        {
-          "itemclass": "Incentive",
-          "INCLUDED": [
+        "Proposal": {
+          "included": [
+            "Well",
+            "Spring",
+            "Milk"
+          ],
+          "excluded": [
+            "Mountain",
+            "Forest",
+            "Grassland",
+            "Field",
+            "Path",
+            "Farm",
+            "Village",
+            "Blacksmith",
+            "Market",
+            "Farmhouse",
+            "Church",
+            "Will",
+            "Deed",
+            "Mill",
+            "Hoe",
+            "Plow",
+            "Scythe",
+            "Hay",
+            "Bread",
+            "Apple",
+            "Chicken",
+            "Cow",
+            "Egg",
+            "Cheese",
+            "Butter",
+            "hunger",
+            "fatigue",
+            "Water"
+          ]
+        },
+        "Incentive": {
+          "included": [
             "Water",
             "Milk"
           ],
-          "EXCLUDED": [
+          "excluded": [
             "Mountain",
             "Forest",
             "Grassland",
@@ -1027,222 +1083,90 @@
             "Egg",
             "Cheese",
             "Butter",
-            "thirst",
             "hunger",
             "fatigue"
           ]
         },
-        {
-          "itemclass": "Evidence",
-          "INCLUDED": [
-            "Well",
-            "Spring",
-            "thirst"
+        "Norm": {
+          "included": [
+            "Tradition"
           ],
-          "EXCLUDED": [
-            "Mountain",
-            "Forest",
-            "Grassland",
-            "Field",
-            "Path",
-            "Farm",
-            "Village",
-            "Blacksmith",
-            "Market",
-            "Farmhouse",
-            "Church",
-            "Will",
-            "Deed",
-            "Mill",
-            "Hoe",
-            "Plow",
-            "Scythe",
-            "Hay",
-            "Bread",
-            "Apple",
-            "Chicken",
-            "Cow",
-            "Egg",
-            "Milk",
-            "Cheese",
-            "Butter",
-            "Water",
-            "hunger",
-            "fatigue"
+          "excluded": [
+            "Statute",
+            "ReligiousRule",
+            "Document",
+            "Testimony",
+            "Measurement",
+            "Custom",
+            "CaseLaw",
+            "Contract",
+            "Oath",
+            "Reward",
+            "Support",
+            "Labor",
+            "LegalAction",
+            "Withholding",
+            "Analogy",
+            "Exemplum",
+            "AppealToCare",
+            "AppealToFairness"
           ]
         }
-      ],
-      "step5_anticipated_effects": [
-        {
-          "axis": "HydrationStatus",
-          "delta": 0.8,
-          "target": [
-            "All"
+      },
+      "character_mapping": {
+        "Jean": {
+          "included": [
+            "Jean"
           ],
-          "confidence": 0.9
+          "excluded": [
+            "Francoise",
+            "FatherMarquart",
+            "MotherMarquart"
+          ]
         },
-        {
-          "axis": "ResourceAccess",
-          "delta": 0.7,
-          "target": [
-            "All"
+        "Francoise": {
+          "included": [
+            "Francoise"
           ],
-          "confidence": 0.85
+          "excluded": [
+            "Jean",
+            "FatherMarquart",
+            "MotherMarquart"
+          ]
+        },
+        "FatherMarquart": {
+          "included": [
+            "FatherMarquart"
+          ],
+          "excluded": [
+            "Jean",
+            "Francoise",
+            "MotherMarquart"
+          ]
+        },
+        "MotherMarquart": {
+          "included": [
+            "MotherMarquart"
+          ],
+          "excluded": [
+            "Jean",
+            "Francoise",
+            "FatherMarquart"
+          ]
         }
-      ]
+      }
     }
   },
   {
     "drive": "Maintain alertness \u2014 avoid fatigue and keep the body rested.",
     "analysis": {
-      "step_1_drive_category": "Cooperative/Deliberative",
-      "step_2_axes": [
+      "drive_category": "Relational/Affective",
+      "axes": [
         {
           "axis": "alert \u2194 fatigued"
         },
         {
-          "axis": "rested \u2194 unrested"
-        }
-      ],
-      "step_3_speechact_itemclass_pairs": [
-        {
-          "speechact": "propose",
-          "itemclass": "Incentive",
-          "facets": {
-            "owner": "Jean",
-            "about": [
-              "Farmhouse",
-              "Well",
-              "rest"
-            ]
-          }
-        },
-        {
-          "speechact": "request",
-          "itemclass": "Support",
-          "facets": {
-            "owner": "Francoise",
-            "about": [
-              "Labor",
-              "rest"
-            ],
-            "dimensions": [
-              "relief",
-              "rotation"
-            ]
-          }
-        },
-        {
-          "speechact": "assert",
-          "itemclass": "Evidence",
-          "facets": {
-            "about": [
-              "fatigue",
-              "rest"
-            ],
-            "dimensions": [
-              "Testimony"
-            ]
-          }
-        }
-      ],
-      "step_4_included_excluded": {
-        "Incentive": {
-          "included": [
-            "Farmhouse",
-            "Well",
-            "Market",
-            "Bread",
-            "Milk",
-            "Cheese",
-            "Butter",
-            "rest",
-            "fatigue"
-          ],
-          "excluded": [
-            "Will",
-            "Deed",
-            "LegalAction",
-            "Oath",
-            "Statute",
-            "ReligiousRule"
-          ]
-        },
-        "Support": {
-          "included": [
-            "Labor",
-            "rest",
-            "Farm",
-            "Field"
-          ],
-          "excluded": [
-            "CaseLaw",
-            "Custom",
-            "LegalAction",
-            "Reward"
-          ]
-        },
-        "Evidence": {
-          "included": [
-            "fatigue",
-            "rest",
-            "Testimony",
-            "Measurement"
-          ],
-          "excluded": [
-            "Norm",
-            "Precedent",
-            "Contract"
-          ]
-        }
-      },
-      "step_5_anticipated_effects": [
-        {
-          "axis": "alert \u2194 fatigued",
-          "delta": 0.7,
-          "target": [
-            "all"
-          ],
-          "confidence": 0.8
-        },
-        {
-          "axis": "rested \u2194 unrested",
-          "delta": 0.6,
-          "target": [
-            "Francoise",
-            "Jean"
-          ],
-          "confidence": 0.7
-        },
-        {
-          "axis": "alert \u2194 fatigued",
-          "delta": 0.2,
-          "target": [
-            "all"
-          ],
-          "confidence": 0.6
-        }
-      ]
-    }
-  },
-  {
-    "drive": "Maintain energy \u2014 avoid hunger and keep the body supplied with nutrients.",
-    "analysis": {
-      "drive_category": "Cooperative/Deliberative",
-      "axes": [
-        {
-          "axis": "nutrition_sufficiency",
-          "antonyms": [
-            "hungry",
-            "well_nourished"
-          ]
-        },
-        {
-          "axis": "energy_level",
-          "antonyms": [
-            "fatigued",
-            "energized"
-          ]
+          "axis": "rested \u2194 overworked"
         }
       ],
       "speechact_itemclass_pairs": [
@@ -1252,146 +1176,374 @@
           "facets": {
             "owner": "Jean",
             "about": [
+              "rest",
+              "fatigue"
+            ],
+            "dimensions": [
+              "duration",
+              "location"
+            ]
+          },
+          "character": "Jean"
+        },
+        {
+          "speechact": "assert",
+          "itemclass": "Evidence(Testimony)",
+          "facets": {
+            "owner": "MotherMarquart",
+            "about": [
+              "fatigue",
+              "farmhouse"
+            ]
+          },
+          "character": "MotherMarquart"
+        },
+        {
+          "speechact": "request",
+          "itemclass": "Incentive(Support)",
+          "facets": {
+            "owner": "Francoise",
+            "about": [
+              "rest"
+            ],
+            "dimensions": [
+              "permission"
+            ]
+          },
+          "character": "Francoise"
+        },
+        {
+          "speechact": "cite",
+          "itemclass": "Norm(Tradition)",
+          "facets": {
+            "about": [
+              "rest",
+              "farm",
+              "fatigue"
+            ]
+          },
+          "character": "FatherMarquart"
+        },
+        {
+          "speechact": "offer",
+          "itemclass": "Incentive(Labor)",
+          "facets": {
+            "owner": "Jean",
+            "about": [
+              "rest",
+              "support"
+            ],
+            "dimensions": [
+              "exchange"
+            ]
+          },
+          "character": "Jean"
+        }
+      ],
+      "closed_world_mapping": {
+        "Proposal": {
+          "INCLUDED_base_nouns": [
+            "rest",
+            "fatigue",
+            "farmhouse"
+          ],
+          "EXCLUDED_base_nouns": [
+            "Water",
+            "Well",
+            "Market",
+            "Bread",
+            "Cow",
+            "Cheese",
+            "Butter"
+          ]
+        },
+        "Evidence(Testimony)": {
+          "INCLUDED_base_nouns": [
+            "fatigue",
+            "farmhouse"
+          ],
+          "EXCLUDED_base_nouns": [
+            "Will",
+            "Deed",
+            "Reward",
+            "LegalAction"
+          ]
+        },
+        "Incentive(Support)": {
+          "INCLUDED_base_nouns": [
+            "rest"
+          ],
+          "EXCLUDED_base_nouns": [
+            "thirst",
+            "hunger",
+            "Field",
+            "Hoe",
+            "Scythe",
+            "Butter"
+          ]
+        },
+        "Norm(Tradition)": {
+          "INCLUDED_base_nouns": [
+            "rest",
+            "farm",
+            "fatigue"
+          ],
+          "EXCLUDED_base_nouns": [
+            "Document",
+            "Statute",
+            "ReligiousRule"
+          ]
+        },
+        "Incentive(Labor)": {
+          "INCLUDED_base_nouns": [
+            "rest",
+            "support"
+          ],
+          "EXCLUDED_base_nouns": [
+            "Bread",
+            "Apple",
+            "Will",
+            "Deed"
+          ]
+        },
+        "characters": {
+          "INCLUDED": [
+            "Jean",
+            "Francoise",
+            "FatherMarquart",
+            "MotherMarquart"
+          ],
+          "EXCLUDED": [
+            "Blacksmith",
+            "Market",
+            "Church",
+            "Unknown"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "drive": "Maintain energy \u2014 avoid hunger and keep the body supplied with nutrients.",
+    "analysis": {
+      "drive_category": "Epistemic",
+      "axes": [
+        {
+          "name": "Sated \u2194 Hungry",
+          "description": "Degree to which bodily hunger is satisfied."
+        },
+        {
+          "name": "Supplied \u2194 Lacking Nutrients",
+          "description": "Degree to which body receives necessary nutrients (from food and drink)."
+        }
+      ],
+      "speechact_itemclass_pairs": [
+        {
+          "speechact": "assert",
+          "itemclass": "Evidence(Measurement)",
+          "facets": {
+            "about": [
+              "hunger",
+              "fatigue"
+            ],
+            "owner": "Jean"
+          },
+          "character": "Jean"
+        },
+        {
+          "speechact": "ask_if",
+          "itemclass": "Evidence(Testimony)",
+          "facets": {
+            "about": [
+              "Bread",
+              "Apple",
+              "Egg",
+              "Milk",
+              "Cheese",
+              "Butter"
+            ],
+            "owner": "Francoise"
+          },
+          "character": "Francoise"
+        },
+        {
+          "speechact": "propose",
+          "itemclass": "Incentive(Reward)",
+          "facets": {
+            "about": [
+              "Bread",
+              "Egg",
+              "Apple",
+              "Milk"
+            ],
+            "owner": "FatherMarquart"
+          },
+          "character": "FatherMarquart"
+        },
+        {
+          "speechact": "offer",
+          "itemclass": "Incentive(Support)",
+          "facets": {
+            "about": [
+              "Cheese",
+              "Butter",
+              "Egg"
+            ],
+            "owner": "MotherMarquart"
+          },
+          "character": "MotherMarquart"
+        },
+        {
+          "speechact": "request",
+          "itemclass": "Incentive(Support)",
+          "facets": {
+            "about": [
+              "Food",
+              "Bread",
+              "Apple",
+              "Egg",
+              "Milk"
+            ],
+            "owner": "Jean"
+          },
+          "character": "Jean"
+        },
+        {
+          "speechact": "cite",
+          "itemclass": "Norm(Tradition)",
+          "facets": {
+            "about": [
+              "customary meal",
+              "farm work",
+              "sharing food"
+            ],
+            "dimensions": [
+              "obligation",
+              "frequency"
+            ]
+          },
+          "character": "MotherMarquart"
+        }
+      ],
+      "closed_world_mapping": {
+        "itemclass_inclusions": {
+          "Evidence(Measurement)": {
+            "INCLUDED": [
+              "hunger",
+              "fatigue"
+            ],
+            "EXCLUDED": [
+              "Will",
+              "Deed",
+              "Well",
+              "Plow",
+              "Path",
+              "Market",
+              "Church"
+            ]
+          },
+          "Evidence(Testimony)": {
+            "INCLUDED": [
               "Bread",
               "Apple",
               "Egg",
               "Milk",
               "Cheese",
               "Butter",
-              "Chicken"
+              "hunger"
             ],
-            "dimensions": [
-              "allocation",
-              "timing",
-              "method"
+            "EXCLUDED": [
+              "Will",
+              "Deed",
+              "Tool",
+              "Document",
+              "Testimony (unrelated)"
             ]
-          }
-        },
-        {
-          "speechact": "request",
-          "itemclass": "Incentive",
-          "facets": {
-            "owner": "Francoise",
-            "about": [
-              "Reward",
-              "Support",
-              "Labor"
-            ]
-          }
-        },
-        {
-          "speechact": "assert",
-          "itemclass": "Evidence",
-          "facets": {
-            "about": [
-              "hunger",
-              "fatigue",
+          },
+          "Incentive(Reward)": {
+            "INCLUDED": [
               "Bread",
               "Apple",
               "Egg",
               "Milk"
+            ],
+            "EXCLUDED": [
+              "Will",
+              "Deed",
+              "Path",
+              "Market"
             ]
-          }
-        },
-        {
-          "speechact": "offer",
-          "itemclass": "Incentive",
-          "facets": {
-            "owner": "FatherMarquart",
-            "about": [
-              "Bread",
-              "Apple",
+          },
+          "Incentive(Support)": {
+            "INCLUDED": [
               "Cheese",
+              "Butter",
               "Egg",
-              "Butter"
+              "Milk",
+              "Bread",
+              "Apple"
+            ],
+            "EXCLUDED": [
+              "Well",
+              "Spring",
+              "Plow"
+            ]
+          },
+          "Norm(Tradition)": {
+            "INCLUDED": [
+              "customary meal",
+              "farm work",
+              "sharing food"
+            ],
+            "EXCLUDED": [
+              "Statute",
+              "LegalAction"
             ]
           }
         },
-        {
-          "speechact": "accept",
-          "itemclass": "Proposal"
+        "character_inclusions": {
+          "Jean": {
+            "INCLUDED": [
+              "Jean"
+            ],
+            "EXCLUDED": [
+              "Francoise",
+              "FatherMarquart",
+              "MotherMarquart"
+            ]
+          },
+          "Francoise": {
+            "INCLUDED": [
+              "Francoise"
+            ],
+            "EXCLUDED": [
+              "Jean",
+              "FatherMarquart",
+              "MotherMarquart"
+            ]
+          },
+          "FatherMarquart": {
+            "INCLUDED": [
+              "FatherMarquart"
+            ],
+            "EXCLUDED": [
+              "Jean",
+              "Francoise",
+              "MotherMarquart"
+            ]
+          },
+          "MotherMarquart": {
+            "INCLUDED": [
+              "MotherMarquart"
+            ],
+            "EXCLUDED": [
+              "Jean",
+              "Francoise",
+              "FatherMarquart"
+            ]
+          }
         }
-      ],
-      "itemclass_closedworld_mapping": {
-        "Proposal": {
-          "INCLUDED": [
-            "Bread",
-            "Apple",
-            "Egg",
-            "Milk",
-            "Cheese",
-            "Butter",
-            "Chicken",
-            "Cow"
-          ],
-          "EXCLUDED": [
-            "Will",
-            "Deed",
-            "Norm",
-            "Statute",
-            "Precedent"
-          ]
-        },
-        "Incentive": {
-          "INCLUDED": [
-            "Reward",
-            "Support",
-            "Labor",
-            "Bread",
-            "Apple",
-            "Cheese",
-            "Egg",
-            "Butter"
-          ],
-          "EXCLUDED": [
-            "Sanction",
-            "LegalAction",
-            "Withholding",
-            "Norm"
-          ]
-        },
-        "Evidence": {
-          "INCLUDED": [
-            "hunger",
-            "fatigue",
-            "Bread",
-            "Apple",
-            "Egg",
-            "Milk",
-            "Cheese",
-            "Butter"
-          ],
-          "EXCLUDED": [
-            "Precedent",
-            "Norm",
-            "Church",
-            "Well",
-            "Mill"
-          ]
-        }
-      },
-      "anticipated_effects": [
-        {
-          "axis": "nutrition_sufficiency",
-          "delta": 0.7,
-          "target": [
-            "Jean",
-            "Francoise",
-            "FatherMarquart",
-            "MotherMarquart"
-          ],
-          "confidence": 0.9
-        },
-        {
-          "axis": "energy_level",
-          "delta": 0.5,
-          "target": [
-            "Jean",
-            "Francoise"
-          ],
-          "confidence": 0.85
-        }
-      ]
+      }
     }
   }
 ]

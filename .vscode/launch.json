@@ -46,8 +46,8 @@
             "env": {
                 "PYTHONPATH": "${workspaceFolder}/src"
             },
-            "args": ["--scenario", "../scenarios/laTerre.yaml", "--character", "all", "--ontology", "load", "--middle", "skip", "--activities", "create"],
             "justMyCode": false,
+            "args": ["--scenario", "../scenarios/laTerre.yaml", "--character", "all", "--ontology", "load", "--discourse", "create", "--activities", "load"],
             "stopOnEntry": false,
             "preLaunchTask": "setup-zenoh-environment"
         },
@@ -228,6 +228,21 @@
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/src/test_plan.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/src",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src"
+            },
+            "args": [],
+            "justMyCode": false,
+            "stopOnEntry": false,
+            "preLaunchTask": "setup-zenoh-environment"
+        },
+        {
+            "name": "Test Discourse Tracker",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/discourse.py",
             "console": "integratedTerminal",
             "cwd": "${workspaceFolder}/src",
             "env": {

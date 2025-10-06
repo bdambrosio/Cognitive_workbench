@@ -139,11 +139,15 @@ If an ItemClass has no base nouns usable for this activity in the closed world, 
 
 """
 
+# Note the below is quite prescriptive, in violation of one core tenet. Oh well. 
+# This is preliminary offline analysis, will be revised (or at least revisited)in the future.
 DRIVE_DISCOURSE_TEMPLATE = """TASK
-You are analyzing a CONVERSATIONAL DRIVE in the context of a CLOSED-WORLD DISCOURSE ONTOLOGY.  
-The ontology lists all available base nouns (discourse content) and base speech verbs (primitive speechacts).  
+You are analyzing a DISCOURSE DRIVE in the context of a CLOSED-WORLD DISCOURSE-PRIMITIVE ONTOLOGY.  
+The discourse-primitive ontology lists all available base nouns (discourse content), known Characters, andbase speech verbs (primitive speechacts).  
 Return a JSON object describing how this drive decomposes into orthogonal state axes and speechact–itemclass pairs.
-Era/Setting Constraint: Use only itemclasses and base nouns that plausibly exist in the setting.. 
+Era/Setting Constraints: 
+- Use only itemclasses and base nouns that plausibly exist in the setting.
+- Generate only speechact verbs that plausibly are appropriate for the character in the setting, in discourse with the target.
 
 ---
 
@@ -166,9 +170,11 @@ Step 3. Generate SPEECHACT–ITEMCLASS pairs
 - For each axis, propose 1–3 pairs.  
 - **speechact**: a general verb (e.g., Ask, Assert, Propose, Appeal, Joke, Apologize).  
   - Each speechact must be decomposable into primitive verbs from the ontology.  
-- **itemclass**: a general discourse noun (e.g., Claim, Proposal, Evidence, Precedent, Norm, Incentive, Narrative, Person).  
+- **itemclass**: a general discourse content type (e.g., Claim, Proposal, Evidence, Precedent, Norm, Incentive, Narrative).  
   - must include at least one base noun subtype from the ontology.
   - itemclass may include an optional facets object with up to three keys: owner (string), about (list of nouns), dimensions (list of short strings). Keep facets concise; omit if not needed.”  
+- **character**: a general character noun (e.g., a specific character name or a role name).  
+  - 
 - For Cooperative drives, allow pairs that involve multiple participants.
 
 Example:
@@ -178,18 +184,18 @@ Example:
   "facets": {
     "owner": "Jean",             // optional, when agent-specific
     "about": ["Share/Entitlement","Field"],  // link to domain things
-    "dimensions": ["ratio","boundary","witnesses"]  // multidimensional, optional, for cognitive itemclasses like agreements
+    "dimensions": ["ratio","boundary","witnesses"],  // multidimensional, optional, for cognitive itemclasses like agreements
+    "target": "Authority"  // optional, when agent-specific
   }
 }
 
 
 Step 4. Closed-world mapping  
 - For each itemclass, specify INCLUDED and EXCLUDED base nouns.
-- Era/Setting Constraint: Use only itemclasses and base nouns that plausibly exist in the setting.
+- For each target, specify INCLUDED and EXCLUDED base character names.
+- Era/Setting Constraint: Use only itemclasses, base nouns, that plausibly exist in the setting.
+- Era/Setting Constraint: Use only character types that plausibly exist in the setting.
 
-Step 5. Anticipated effect (optional but preferred)  
-- For each pair, estimate an `anticipated_effect` with:  
-  {axis, delta (−1.0 to +1.0), target(s), confidence (0–1)}  
 
 ---
 
@@ -221,8 +227,8 @@ Step 5. Anticipated effect (optional but preferred)
 {{$primitive_tools}}
 ##
 
-#Character names:
-{{$character_names}}
+#Characters:
+{{$characters}}
 ##
 
 #Primitive speech verbs: 
@@ -246,7 +252,7 @@ refuse
 invite
 apologize
 
-Discourse itemclasses (content types):
+Primitive Discourse itemclasses (content types):
 Evidence(Document, Testimony, Measurement), 
 Precedent(Custom, CaseLaw), 
 Norm(Statute, Tradition, ReligiousRule), 
