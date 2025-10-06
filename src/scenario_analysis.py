@@ -112,7 +112,7 @@ def main():
     parser.add_argument('--scenario', required=True, help='Path to scenario YAML file')
     parser.add_argument('--character', default='all', help="Character name or 'all'")
     parser.add_argument('--ontology', choices=['load', 'create'], default='load', help='Load or create ontology')
-    parser.add_argument('--middle', choices=['load', 'create', 'skip'], default='load', help='Load or create middle ontology')
+    parser.add_argument('--discourse', choices=['load', 'create', 'skip'], default='load', help='Load or create discourse ontology')
     parser.add_argument('--activities', choices=['load', 'create'], default='create', help='Load or create activities')
     parser.add_argument('--server', default='openai', help='LLM server name (for middle ontology/planner)')
     parser.add_argument('--model', default='gpt-4.1', help='LLM model name (for middle ontology/planner)')

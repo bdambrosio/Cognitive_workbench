@@ -44,3 +44,4 @@ src/logs/
 *.log
 src/logs/*.log
 src/Metrics/analysis/*
+zenoh_venv/bin/pip3

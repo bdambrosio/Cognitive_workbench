@@ -71,10 +71,10 @@ class ZenohLLMClient:
     def substitute_bindings(self, prompt, bindings):
         return self.llm.substitute_bindings(prompt, bindings)
 
-    def ask(self, bindings: Dict[str, Any] = None, prompt: str = None, max_tokens: int = 150, temp: float = 0.7, stops: List[str] = ['</end>'], is_json: bool = False, log: bool = False) -> LLMResponse:
+    def ask(self, bindings: Dict[str, Any] = None, prompt: str = None, max_tokens: int = 150, temp: float = 0.7, stops: List[str] = ['</end>'], is_json: bool = False, log: bool = False, trace: bool = False) -> LLMResponse:
         #substituted_prompt = self.substitute_bindings(prompt, bindings)
         #logger.info(f'📤 Sent LLM request {substituted_prompt}')
-        response = self.llm.ask(bindings, prompt, max_tokens=max_tokens, temp=temp, stops=stops, is_json=is_json, log=log)
+        response = self.llm.ask(bindings, prompt, max_tokens=max_tokens, temp=temp, stops=stops, is_json=is_json, log=log, trace=trace)
         #logger.info(f'📤 Received LLM response {response}')
         return response
     
