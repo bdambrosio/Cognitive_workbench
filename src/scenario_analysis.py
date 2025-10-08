@@ -191,21 +191,6 @@ def main():
                 raise RuntimeError("create_ontology failed")
             save_ontology(name, ontology, scenario_dir)
 
-        # Ontology
-        if False: #args.ontology == 'load':
-            if not os.path.exists(ontology_path):
-                raise FileNotFoundError(f"Missing ontology: {ontology_path}")
-            with open(ontology_path, 'r') as f:
-                ontology = json.load(f)
-        else:
-            if not map_types:
-                logger.error("map/types unavailable; cannot create ontology")
-                raise RuntimeError("missing map types")
-            ontology = create_discourse_ontology(setting, map_types, resource_type_str, name, character_desc, character_drives, characters)
-            if not ontology:
-                raise RuntimeError("create_ontology failed")
-            save_discourse_ontology(name, ontology, scenario_dir)
-
         # Activities
         if args.activities == 'load':
             if not os.path.exists(activities_path):

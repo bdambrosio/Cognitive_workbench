@@ -337,9 +337,9 @@ You are {{$context}}
 {{$transcript}}
 ##
                               
-For example, if the last entry in the transcript is a question that expects an answer (as opposed to merely musing), ending at this point is likely not expected.
-On the other hand, if the last entry is an agreement to an earlier suggestion, this is a natural end.
-Dialogs may be short or tend to be longer depending on the characters involved.
+For example, if the last entry in the transcript contains a question that expects an answer (as opposed to merely musing), ending at this point is likely not expected.
+On the other hand, if the last entry is an agreement to an earlier suggestion, this may be a natural end.
+Dialogs may be short or longer depending on the characters involved and their personalities, conversational styles, and relationship.
 Respond only with a rating between 0 and 10, where
 0 expects continuation of the dialog (i.e., termination at this point would be unnatural)
 10 expects termination at this point (i.e., continuation is highly unexpected, unnatural, or repetitious).   
@@ -362,7 +362,7 @@ My rating is:
                     rating = 7
             
             # Determine if dialog should end based on rating and some randomness
-            should_end = rating > 7 or (random.randint(4, 10) < rating) or ((rating + len(transcript_text.split('\n'))) > random.randint(8,10))
+            should_end = rating > 7 or (random.randint(4, 10) < rating) or ((rating + len(transcript_text.split('\n'))) > random.randint(12,14))
             self.logger.info(f'{self.entity_name} natural_dialog_end: rating: {rating}, should_end: {should_end}')
             if should_end:
                 self.close_dialog()

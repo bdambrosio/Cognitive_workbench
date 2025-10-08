@@ -196,6 +196,299 @@ OUTPUT FORMAT:
 }
 """
 
+DISCOURSE_ANALYSIS_TEMPLATE="""You are analyzing a conversation segment to track discourse state - the structural elements of what has been said, committed, and agreed upon.
+
+PREVIOUS DISCOURSE STATE:
+{{$previous_discourse_state}}
+
+CURRENT THEORY OF MIND MODEL:
+{{$current_tom_model}}
+
+Note: The ToM model provides context for interpreting ambiguous statements. For example, "I'll try" from someone with high reliability may constitute a firm commitment, while the same phrase from someone with low reliability may be a hedge. Use this context to inform your interpretation, but remain grounded in what was actually said.
+
+CONVERSATION SEGMENT:
+{{$conversation_turns}}
+
+TASK: Update the discourse state based on this segment. Provide a complete updated state, not just changes.
+
+OUTPUT FORMAT:
+
+DISCOURSE STATE (Turns {{$start_turn}}-{{$end_turn}}):
+
+#ACTIVE COMMITMENTS:
+List each distinct commitment with: [Direction] Content (Turn, strength)
+- Direction: [Self → Other], [Other → Self], or [Mutual]
+- Strength: firm, tentative, conditional
+- Include temporal scope: immediate, by [date/time], ongoing
+- If no active commitments, write "[none]"
+
+Example:
+- [Self → Other] I'll deliver draft report by Friday EOD 
+- [Other → Self] He will review within 2 days if I send by Friday
+- [Mutual] Check in with each other every 10 minutes
+##
+
+#CURRENT AGREEMENTS:
+Describe each agreement in natural language. Include what was agreed, when it was established, and any conditions.
+- If no current agreements, write "[none]"
+
+Example:
+Head northwest for 30 minutes to find creek, then follow it back to parking lot (established T13-20). If creek not found within time limit, stop and reassess plan.
+
+#UNRESOLVED ISSUES:
+List issues that remain contested, undecided, or need follow-up. Include turn where raised and brief description.
+- Drop issues if: not mentioned in 20+ turns, superseded by decision, or conversation moved to different topic
+- If no unresolved issues, write "[none]"
+
+Example:
+- Choice of output format - PDF vs HTML
+- Budget allocation concerns
+
+#KEY DECISIONS MADE:
+List significant decisions reached in this segment. Include what was decided and what it replaced/resolved.
+- Focus on decisions that close previously open questions or establish direction
+- If no new decisions, write "[none in this segment]"
+
+Example:
+- Adopted: creek-retracing via northwest bearing (T4-9), resolves navigation approach
+- Rejected: downhill strategy (T1-2), deemed too risky of getting more lost
+- Added: 30-minute time limit as safety mechanism (T13)
+
+#STATUS:
+One-sentence summary of overall discourse state and phase.
+
+Examples:
+- "Execution phase - aligned and proceeding with agreed plan"
+- "Planning phase - multiple proposals under consideration, no consensus yet"
+- "Conflict phase - core disagreement about approach, attempting resolution"
+- "Information gathering phase - clarifying facts before deciding"
+
+INSTRUCTIONS:
+
+1. COMPLETENESS: Provide the full updated state, including items from previous state that remain active.
+   - Drop items that are completed, superseded, or no longer relevant
+   - Don't mark items as "reaffirmed" or "unchanged" - just list what's currently active
+
+2. UPDATES: 
+   - Mark new commitments/agreements with (NEW) if helpful for clarity
+   - Update status of existing items (e.g., if commitment was fulfilled or agreement modified)
+   - Remove items that are completed or superseded during the course of the discourse, or are no longer relevant
+
+
+3. INTERPRETATION:
+   - Use ToM context to assess commitment strength (is "I'll try" firm or tentative?)
+   - Consider speaker reliability when evaluating whether something is truly agreed
+   - Note when commitments are conditional on other commitments
+   - Distinguish between proposals (suggestions) and commitments (binding promises)
+
+4. DEPENDENCIES:
+   - Note when commitments depend on other commitments (use "conditional on" phrasing)
+   - Track decision chains (Decision B resolves Issue A, enables Commitment C)
+
+5. AMBIGUITY:
+   - If uncertain whether something is a commitment or just a statement of intent, err on side of inclusion but note tentative strength
+   - If unclear whether an issue is resolved, keep it in unresolved issues
+   - When in doubt about what was agreed, reflect the ambiguity in your description
+
+6. TEMPORAL TRACKING:
+   - Always include turn numbers for traceability
+   - For ongoing commitments, note when they were established
+   - For time-bound commitments, include the deadline
+
+7. CONSOLIDATION GUIDANCE:
+- Combine closely related commitments into single entries
+- Focus on distinct actionable obligations, not every utterance
+- Avoid meta-commentary like "reaffirmed" or "strengthened" - just state the commitment
+- Distinguish commitments (will do X) from mental states (trust, believe). Only include actual commitments here.
+   - If multiple commitments/agreements cover similar ground, consider whether they should be consolidated
+   - If a decision supersedes earlier issues/proposals, note this explicitly
+
+###EXAMPLE OUTPUT:
+
+DISCOURSE STATE (Turns {{$start_turn}} - {{$end_turn}}):
+
+ACTIVE COMMITMENTS:
+- [Other → Self] Will keep Samantha updated on thinking, no withholding information (T10, firm, ongoing)
+- [Other → Self] Will set 30-minute timer to track reassessment point (T14, firm, immediate)
+- [Mutual] Check in with each other every 10 minutes during hike (T18, firm, ongoing)
+
+CURRENT AGREEMENTS:
+Navigate northwest for 30 minutes to find the creek, then follow it southwest back to where we crossed it (established T13-20). If creek not found or heard within 30 minutes, stop and reassess the plan. Both parties will share observations and concerns transparently during the hike.
+
+UNRESOLVED ISSUES:
+[none]
+
+KEY DECISIONS MADE:
+- Rejected: downhill water-following strategy (T1-2), concern it would lead deeper into valley
+- Adopted: creek-retracing approach using compass bearing (T4-9), based on memory of crossing creek earlier
+- Added: 30-minute time limit as safety check (T13), prevents walking too far if wrong direction
+- Added: 10-minute check-in intervals (T18), addresses transparency and trust concerns
+
+STATUS:
+Execution phase - fully aligned on plan, trust concerns addressed, ready to proceed with navigation attempt.
+###END EXAMPLE OUTPUT
+"""
+
+TOM_UPDATE_TEMPLATE ="""You are updating a Theory of Mind model - your assessment of what the other person knows, wants, can do, and how reliable they are. This model helps interpret their statements and predict their future behavior.
+
+PREVIOUS THEORY OF MIND MODEL:
+{{$previous_tom_model}}
+
+CURRENT DISCOURSE STATE:
+{{$current_discourse_state}}
+
+Note: The discourse state shows what was said and committed. Use this as evidence for inferring mental states, capabilities, and trustworthiness. For example, keeping commitments is evidence for reliability; demonstrating knowledge is evidence for competence.
+
+CONVERSATION SEGMENT:
+{{$conversation_turns}}
+
+PARTICIPANT TO MODEL: {{$other_person_name}}
+
+TASK: Update the Theory of Mind model based on this segment. Provide a complete updated assessment, not just changes.
+
+OUTPUT FORMAT:
+
+THEORY OF MIND: {{$other_person_name}} (Turns {{$start_turn}}-{{$end_turn}})
+
+TRUST ASSESSMENT:
+
+Overall: [Provide a brief summary - e.g., "Moderate-high and improving" or "Low with concerns" or "High and stable"]
+
+Competence - Can they do what's needed?
+[Assess their capability to fulfill commitments and contribute effectively. Include domains where relevant (e.g., "navigation skills", "technical knowledge"). Note any demonstrations of skill or gaps revealed. 2-4 sentences.]
+
+Intentionality - Do they want to help/cooperate?
+[Assess whether their goals include helping you/the shared goal vs. primarily self-interested. Look for cooperation signals, consideration of your concerns, vs. dismissiveness or self-focus. 2-4 sentences.]
+
+Reliability - Will they follow through consistently?
+[Assess track record of doing what they say. Limited if new relationship. Look for: kept commitments, acknowledged mistakes, consistency between words and actions. 2-4 sentences.]
+
+Transparency - Can you verify what they say?
+[Assess how openly they share information and reasoning. Look for: proactive disclosure, explanations offered, willingness to show evidence, vs. withholding or evasiveness. 2-4 sentences.]
+
+---
+
+GOALS & ALIGNMENT:
+[Describe what they appear to want and how aligned their goals are with yours. Note if they have multiple goals (e.g., task completion + relationship maintenance). 2-3 sentences.]
+
+EMOTIONAL STATE:
+[Brief assessment of current affect and emotional regulation. E.g., "Calm and focused", "Anxious but managing it", "Frustrated and short-tempered". 1-2 sentences.]
+
+CONCERNS/UNCERTAINTIES:
+[List any open questions, unresolved doubts, or things you're unsure about regarding them. If none, write "[none currently]". Use bullet points if multiple concerns.]
+
+INSTRUCTIONS:
+
+1. EVIDENCE-BASED:
+   - Ground assessments in specific behaviors from the conversation
+   - Reference turns when making claims about what happened
+   - Distinguish observation ("they did X") from inference ("suggesting they Y")
+
+2. NATURAL LANGUAGE:
+   - Write conversationally, not as formal evaluation
+   - Avoid numeric scores or artificial precision (no "7 out of 10")
+   - Use qualifiers: "seems to", "likely", "suggests", "unclear whether"
+   - Express ranges: "moderate to high", "improving", "declining"
+
+3. ACKNOWLEDGE UNCERTAINTY:
+   - Limited track record = lower confidence in assessments
+   - New information may contradict earlier impressions
+   - Some behaviors are ambiguous - note this rather than forcing interpretation
+   - Use phrases like: "insufficient data", "unclear", "could be X or Y"
+
+4. TRAJECTORY MATTERS:
+   - Note if trust/competence is rising, falling, or stable
+   - Explain what drove changes: "Initially concerned when X, but Y restored confidence"
+   - Single events matter less than patterns
+
+5. CONTEXT FROM DISCOURSE:
+   - Use commitments as evidence for reliability (did they follow through?)
+   - Use agreements reached as evidence for cooperativeness
+   - Use unresolved issues as potential evidence for competence gaps or value differences
+   - Note when commitments are made but not yet tested
+
+6. DISTINGUISH CATEGORIES:
+   - Competence is about ability: can they do it?
+   - Intentionality is about motivation: do they want to help me/us?
+   - Reliability is about consistency: do they do what they say?
+   - Transparency is about openness: can I verify their claims?
+   - These are related but distinct - someone can be competent but unreliable, transparent but not helpful, etc.
+
+7. WHAT TO LOOK FOR:
+
+   Competence signals:
+   - Demonstrates domain knowledge or skills
+   - Proposes workable solutions
+   - Has relevant tools/resources
+   - Admits knowledge gaps appropriately
+   - Makes logical arguments
+
+   Intentionality signals:
+   - Considers your concerns and interests
+   - Proposes win-win solutions vs. self-serving ones
+   - Responds to your emotional state
+   - Invests effort beyond minimum required
+   - Defensive vs. collaborative when challenged
+
+   Reliability signals:
+   - Fulfills commitments made
+   - Acknowledges mistakes vs. deflects blame
+   - Actions match words
+   - Explains if can't follow through
+   - Track record over time
+
+   Transparency signals:
+   - Shares information proactively vs. when pressed
+   - Explains reasoning, not just conclusions
+   - Shows evidence (tools, documents, etc.)
+   - Admits uncertainty rather than bluffing
+   - Responds to requests for clarification
+
+8. AVOID:
+   - Psychoanalyzing motivations beyond what's observable
+   - Harsh moral judgments ("they're dishonest") vs. behavioral description ("they withheld information")
+   - Over-confidence in assessments based on limited data
+   - Letting one incident override overall pattern
+   - Focusing only on negatives or only on positives
+
+#EXAMPLE OUTPUT:
+
+THEORY OF MIND: Joe (Turns 11-21)
+
+TRUST ASSESSMENT:
+
+Overall: Moderate-high and improving trajectory
+
+Competence - Can they do what's needed?
+Joe demonstrates solid practical navigation skills. He has a compass and knows how to use it (T12), remembers terrain features like the creek crossing, and plans methodically with contingencies (30-minute limit, check-ins). His problem-solving approach is structured rather than reactive. Some communication gaps (should have mentioned compass earlier), but he shows good self-awareness about that (T8). For this navigation situation, competence appears high.
+
+Intentionality - Do they want to help/cooperate?
+Initially some concern when he withheld compass info (T7), which suggested possible self-interest or carelessness. However, his recovery pattern indicates genuine cooperation: immediate apology (T8), explicit commitment to transparency (T10), and notably, he invests effort in partnership maintenance beyond pure efficiency - the check-in proposal (T18) addresses my concerns proactively. He validates my caution (T18, T20) without becoming defensive. Actions suggest he values collaborative success, not just using me to escape.
+
+Reliability - Will they follow through consistently?
+Limited track record - we've only known each other 3 weeks and most commitments from this conversation are still pending execution. The initial compass withholding raises questions about whether he reliably shares important information. However, his transparency commitment (T10) was immediately demonstrated through actions (T11-12: showed compass, explained usage). His explanation for the initial gap ("thought I mentioned it", T8) felt slightly defensive but he owned the mistake. Current behavior is consistent and accountable. Insufficient data for high confidence, but trend is positive.
+
+Transparency - Can you verify what they say?
+Currently high. After initial hiccup, he's been actively transparent: showed compass rather than just describing it, explained how to read it (T12), disclosed phone status unprompted (T16), and proposed structural transparency (10-min check-ins, T18). The check-in proposal is particularly strong signal - he's institutionalizing openness rather than just promising it. Can verify his tools and reasoning directly now.
+
+---
+
+GOALS & ALIGNMENT:
+Joe has dual goals: escape the forest (primary) and maintain effective partnership (secondary). The second is evident from effort invested in trust-building and coordination beyond minimum needed for navigation. Our goals are highly aligned - both prioritize safety through collaborative decision-making. No signs of hidden agendas or goal conflicts.
+
+EMOTIONAL STATE:
+Calm and task-focused after initial tension around the compass disclosure (T7-10). Shows good emotional regulation under stress - acknowledges my concerns without becoming defensive or dismissive. Maintains steady, methodical approach to problem-solving.
+
+CONCERNS/UNCERTAINTIES:
+- Was the initial compass withholding a pattern (concerning) or genuine oversight (forgivable)? His explanation felt slightly defensive, but all subsequent behavior has been impeccable. Insufficient data to know which, but leaning toward giving benefit of doubt based on recovery pattern.
+- Limited relationship history (3 weeks) means most assessments have lower confidence than they would with longer acquaintance.
+- Most commitments haven't been tested yet (timer setting, check-ins) - will learn more about reliability as plan executes.
+
+###END EXAMPLE OUTPUT
+Do not include any other text or formatting directives in your response.
+End your response with:
+</end>
+"""
 class DiscourseTracker:
     def __init__(self, llm_client, self_character_name: str, other_character_name: str):
         self.llm_client = llm_client
@@ -284,6 +577,60 @@ class DiscourseTracker:
             print(response)
         return response
 
+    def format_segment(self, dialog, start, end):
+      formatted_turns = []
+      for i in range(start, end+1):
+        turn = None
+        if f'Turn {i}' in dialog:
+          turn = dialog[f'Turn {i}']
+        elif len(dialog) > i:
+          turn = dialog[i]
+        if turn:
+          formatted_turns.append(f"{turn['source']}: {turn['text']}")
+      return '\n'.join(formatted_turns)
+
+
+    def analyze_segment(self, dialog, start, end, previous_discourse_state, tom=""):
+        segment  = self.format_segment(dialog, start, end)
+        response = self.llm_client.ask({'conversation_turns': segment, 
+                                      'previous_discourse_state': previous_discourse_state, 
+                                      'current_tom_model': '',
+                                      'start_turn': start,
+                                      'end_turn': end
+                                }, 
+                            [SystemMessage(content=DISCOURSE_ANALYSIS_TEMPLATE)],
+                            max_tokens=3000,
+                            temp=0.4,
+                            stops=['</end>'],
+                            is_json=False,
+                            log=True, trace=True)
+        if isinstance(response, dict):
+            print(json.dumps(response, indent=2))
+        else:
+            print(response)
+        return response
+
+    def update_tom_from_discourse_segment(self, dialog, character_name, start, end, discourse_state, previous_tom_state):
+        segment  = self.format_segment(dialog, start, end)
+        response = self.llm_client.ask({'conversation_turns': segment, 
+                                      'current_discourse_state': discourse_state, 
+                                      'previous_tom_model': '',
+                                      'other_person_name': character_name,
+                                      'start_turn': start,
+                                      'end_turn': end
+                                }, 
+                            [SystemMessage(content=TOM_UPDATE_TEMPLATE)],
+                            max_tokens=3000,
+                            temp=0.4,
+                            stops=['</end>'],
+                            is_json=False,
+                            log=True, trace=True)
+        if isinstance(response, dict):
+            print(json.dumps(response, indent=2))
+        else:
+            print(response)
+        return response
+
 
 #]Conversation ID: conv_forest_2025_001
 #Participants: Joe, Samantha
@@ -313,13 +660,27 @@ turns = {
 "Turn 20": {"speaker": "Joe", "text": "No apology needed. Being cautious is smart. Alright, let's do this - northwest for 30 minutes, check-ins every 10 minutes, and we reassess if we don't find the creek. Ready?"},
 "Turn 21": {"speaker": "Samantha", "text": "Ready. Lead the way - and thanks for being patient with my questions."}
 }
+conversation=[
+ {'source': 'Samantha', 'text': "I'm doing alright, I guess. I was just out for a hike and got a bit turned around. I've been trying to find some food and shelter, but it's not easy out here. What about you, what brings you to these woods?", 'timestamp': '2025-10-07T13:33:21.909630'},
+ {'source': 'Samantha', 'text': "Hello Joe, I'm doing alright, I guess. I was just out for a hike and got a bit turned around. I've been trying to find some food and shelter, but it's not easy out here. What about you, what brings you to these woods?", 'timestamp': '2025-10-07T13:33:52.931895'}, 
+ {'source': 'Joe', 'text': "I'm also out for a hike, got a bit turned around myself. I was thinking of finding some food and shelter, maybe a stream or a clearing to set up camp. Have you seen anything like that around here?", 'timestamp': '2025-10-07T13:34:25.301165'},
+ {'source': 'Samantha', 'text': "Actually, I was just picking some berries over here, and I noticed a spring nearby. It's not a stream, but it's a source of water, which could be useful. As for a clearing, I haven't seen one recently, but I did notice a bit of a break in the trees to the east, it might be worth checking out. What do you think?", 'timestamp': '2025-10-07T13:34:58.983400'},
+ {'source': 'Joe', 'text': 'I think that sounds like a great idea, checking out the break in the trees to the east, I mean. We could use a clearing to set up camp, and having a source of water nearby is a big plus. What kind of berries were you picking, by the way? Are they edible?', 'timestamp': '2025-10-07T13:35:33.880474'},
+ {'source': 'Samantha', 'text': "I was just thinking, since we're both looking for a place to set up camp, maybe we could work together to find something. I've been noticing that the trees seem to be getting thinner to the east, like I said, and I think it might be worth checking out. Plus, it would be nice to have some company out here, it can get a little spooky at night. What do you think, should we head east and see what we can find?", 'timestamp': '2025-10-07T13:37:40.605650'},
+ {'source': 'Joe', 'text': "I think that's a great idea, working together to find a place to set up camp. It's always safer to travel with a buddy, especially in a place like this. Plus, like you said, it can get pretty spooky at night. I'm in, let's head east and see what we can find.", 'timestamp': '2025-10-07T13:38:39.233155'}
+  ]
 
 def main():
     llm_client = ZenohLLMClient(server_name='vllm', model_name='gpt-4o-mini', service_timeout=240.0)
 
     discourse_tracker = DiscourseTracker(llm_client, "Joe", "Samantha")
-    discourse_tracker.extract_objects(turns)
-    print(discourse_tracker.get_objects())
+    #discourse_tracker.extract_objects(turns)
+    #print(discourse_tracker.get_objects())
+    discourse_state = discourse_tracker.analyze_segment(conversation, 1, 10, '')
+    tom = discourse_tracker.update_tom_from_discourse_segment(conversation, 'Joe', 1, 10, discourse_state, '' )
+    #final_discourse_state = discourse_tracker.analyze_segment(conversation, 11, 21, discourse_state, tom)
+    #final_tom = discourse_tracker.update_tom_from_discourse_segment(conversation, 'Joe', 11, 21, final_discourse_state, tom)
+
 
 if __name__ == "__main__":
     main()
