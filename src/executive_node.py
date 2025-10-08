@@ -373,7 +373,7 @@ class ZenohExecutiveNode:
                     self._run_ooda_loop()
                     # Complete turn after OODA loop
                     self._complete_turn()
-                time.sleep(1.0)  # Small delay to prevent busy waiting
+                time.sleep(0.2)  # Small delay to prevent busy waiting
                 
         except KeyboardInterrupt:
             logger.info('Executive Node shutting down...')
@@ -1482,12 +1482,27 @@ end your response with </end>
                         move_direction = self._find_target_direction(resolved)
                     else:
                         move_direction = None
+                # Publish move action for UI display
+                action_data = {
+                    'type': 'move',
+                    'action_id': self.action_counter,
+                    'timestamp': datetime.now().isoformat(),
+                    'target': raw_target,
+                    'status': 'success' if move_direction else 'failed',
+                    'error': 'target not visible/resolvable' if not move_direction else None
+                }
+                self.action_publisher.put(json.dumps(action_data))
+                self.action_counter += 1
+                
                 if move_direction:
                     self.move(move_direction)
                     # Telemetry snapshot after action
                     self._snapshot_physiology(action_record)
                     action_record.outcome_status = 'success'
                     action_record.failure_code = None
+                else:
+                    action_record.outcome_status = 'failure'
+                    action_record.failure_code = 'target_not_visible or 0 distance'
                 # Request situation/map update for UI immediately after move
                 try:
                     self.map_update_request_publisher.put(json.dumps({'type': 'step_look'}))
@@ -2631,11 +2646,12 @@ you are:
             if dialog_history:
                 user_prompt += f"{dialog_history}\n"
 
-            user_prompt +=  """Speak in a conversational manner in your own voice. 
+            user_prompt +=  """\nSpeak in a conversational manner in your own voice. 
 Do not invent knowledge not contained in the data of the current situation. 
-For example if a resource is listed (e.g. mushroom29), do not invent knowledge about it beyond general knowledge of mushroomsnot contained above.
+For example if a resource is listed (e.g. mushroom29), do not invent knowledge about it beyond general knowledge of mushrooms not contained above.
 Do not include any other introductory, explanatory, discursive, or formatting text in your response.
-End your text with: </end>"""
+End your text with: </end>
+"""+'speech:' if mode == 'say' else 'response:' 
                     
             # Make LLM call
             if self.llm_client and not self.shutdown_requested:

@@ -23,7 +23,8 @@ characters:
     status: |
       You have no idea where you are or how you got here or who that other person is. You have a backpack with some food, water, and a few other items. Maybe the forest is a place of safety.
     drives:
-      - "Live safely and survivein the forest."
+      - "Figure out about this guy Joe and whether I can trust him"
+      - "Live safely and survive in the forest."
       - "Learn about the forest and the animals, plants, and resources in the forest. Adventure, excitement, and the thrill of the unknown."
       - "love and belonging, including home, acceptance, friendship, trust, intimacy."
 
@@ -39,6 +40,7 @@ characters:
       You have no idea where you are or how you got here or who that other person is. You have a backpack with some food, water, and a few other items.
     drives:
       - "Find a way out of the forest."
+      - "Find out about this woman Samantha, what she knows, and whether she can help."
       - "Find Hut1."
       - "Live and survive safely while finding a way out of the forest or waiting for rescue."
       - "companionship, community, family, acceptance, trust, intimacy."

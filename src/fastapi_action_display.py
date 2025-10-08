@@ -133,6 +133,12 @@ class FastAPIActionDisplayNode:
             self.turn_control_callback
         )
         
+        # NEW: Subscriber for unified turn state updates from map node
+        self.turn_state_update_subscriber = self.session.declare_subscriber(
+            "cognitive/map/turn_state_update",
+            self.turn_state_update_callback
+        )
+        
         # Subscriber for character goals
         self.goal_subscriber = self.session.declare_subscriber(
             "cognitive/*/goal",
@@ -1068,12 +1074,7 @@ class FastAPIActionDisplayNode:
         // Remember last ready state payload for gating
         let lastReadyData = null;
         let activeCharacter = null;
-        let currentTurnMode = 'step';
         let commandInProgress = false; // Prevent rapid button clicks
-        
-        // Turn progress tracking
-        let turnActiveCharacters = 0;
-        let turnCompletedCharacters = 0;
         
         // Sidebar resizer state
         let isResizing = false;
@@ -1187,22 +1188,9 @@ class FastAPIActionDisplayNode:
                     handleReadyState(data);
                 } else if (data.type === 'time_update') {
                     handleTimeUpdate(data);
-                } else if (data.type === 'step_complete') {
-                    // Reset turn progress tracking - turn is complete
-                    turnActiveCharacters = 0;
-                    turnCompletedCharacters = 0;
-                    console.log('Step complete - turn progress reset');
-                    
-                    // Re-enable the Step button when step is complete, but only if not in run mode
-                    const stepButton = document.getElementById('stepButton');
-                    if (currentTurnMode !== 'run') {
-                        stepButton.disabled = false;
-                        stepButton.style.background = '#4ecdc4';
-                        stepButton.title = 'Click to advance to next turn';
-                        console.log('Step complete - re-enabled Step button (not in run mode)');
-                    } else {
-                        console.log('Step complete - keeping Step button disabled (in run mode)');
-                    }
+                } else if (data.type === 'turn_state_update') {
+                    // Handle unified turn state update (replaces step_complete)
+                    handleTurnStateUpdate(data);
                 } else if (data.type === 'test') {
                     console.log('Test message received:', data.message);
                     // Add a test entry to the action log
@@ -1866,154 +1854,106 @@ class FastAPIActionDisplayNode:
             actionLog.scrollTop = actionLog.scrollHeight;
         }
         
-        function isTurnInProgress() {
-            // Check if a turn is currently active using global turn progress tracking
-            const result = turnActiveCharacters > 0 && turnCompletedCharacters < turnActiveCharacters;
-            console.log(`🔍 DEBUG: isTurnInProgress() called - active: ${turnActiveCharacters}, completed: ${turnCompletedCharacters}, result: ${result}`);
-            return result;
-        }
+        // REMOVED: isTurnInProgress() - button states now come from backend via turn_state_update
         
         function updateTurnMode(turnModeData) {
+            // DEPRECATED: State management now handled by handleTurnStateUpdate()
             // Clear command lock - backend has confirmed the state change
             commandInProgress = false;
-            
-            const stepButton = document.getElementById('stepButton');
-            const runButton = document.getElementById('runButton');
-            const stopButton = document.querySelector('button[onclick="stopTurns()"]');
-            
-            console.log(`🔍 DEBUG: updateTurnMode() called with mode=${turnModeData.mode}, commandInProgress was reset to false`);
-
-            // Update global mode for other handlers
-            currentTurnMode = turnModeData.mode;
-
-            // Check if a turn is currently in progress
-            const turnInProgress = isTurnInProgress();
-            console.log(`🔍 DEBUG: Turn in progress: ${turnInProgress}, active: ${turnActiveCharacters}, completed: ${turnCompletedCharacters}`);
-
-            // Shade/enable buttons according to mode AND turn state
-            if (currentTurnMode === 'run') {
-                console.log('🔄 Setting buttons to RUN mode - disabling Step and Run');
-                // Disable Step
-                if (stepButton) {
-                    stepButton.disabled = true;
-                    stepButton.style.background = '#555';
-                    stepButton.title = 'Disabled while running';
-                }
-                // Disable Run
-                if (runButton) {
-                    runButton.disabled = true;
-                    runButton.style.background = '#555';
-                    runButton.style.color = '#888';
-                    runButton.title = 'Already running';
-                }
-                // Keep Stop enabled
-                if (stopButton) {
-                    stopButton.disabled = false;
-                    stopButton.style.background = '#ff6b6b';
-                }
-            } else {
-                // STEP mode - only enable buttons if no turn is in progress
-                if (turnInProgress) {
-                    console.log('🛑 STEP mode but turn in progress - keeping buttons disabled');
-                    // Keep buttons disabled during turn execution
-                    if (stepButton) {
-                        stepButton.disabled = true;
-                        stepButton.style.background = '#555';
-                        stepButton.title = 'Turn in progress - wait for completion';
-                        console.log('🔍 DEBUG: Step button kept disabled due to turn in progress');
-                    }
-                    if (runButton) {
-                        runButton.disabled = true;
-                        runButton.style.background = '#555';
-                        runButton.style.color = '#888';
-                        runButton.title = 'Turn in progress - wait for completion';
-                    }
-                } else {
-                    // FIXED: Don't automatically re-enable Step button when no turn is active
-                    // The Step button should only be enabled when the user explicitly requests it
-                    // This prevents the premature re-enabling that was causing the "instant unshade" problem
-                    console.log('🛑 STEP mode with no turn active - Step button remains disabled until user clicks it');
-                    
-                    // Keep Step button disabled - user must manually click to advance
-                    if (stepButton) {
-                        stepButton.disabled = true;
-                        stepButton.style.background = '#555';
-                        stepButton.title = 'Click Step button to advance to next turn';
-                    }
-                    
-                    // Enable Run button (this is still appropriate)
-                    if (runButton) {
-                        runButton.disabled = false;
-                        runButton.style.background = '#4ecdc4';
-                        runButton.style.color = '#1a1a1a';
-                        runButton.title = 'Start automatic turns';
-                    }
-                }
-                // Stop remains enabled
-                if (stopButton) {
-                    stopButton.disabled = false;
-                    stopButton.style.background = '#ff6b6b';
-                }
-            }
+            console.log(`updateTurnMode() called with mode=${turnModeData.mode} - button states handled by turn_state_update`);
         }
         
         function updateTurnState(turnData) {
+            // DEPRECATED: Display updates now handled by handleTurnStateUpdate()
+            // Kept for backward compatibility during transition
             const turnMode = document.getElementById('turnMode');
             const turnNumber = document.getElementById('turnNumber');
             const turnProgress = document.getElementById('turnProgress');
             
-            // Update global turn progress tracking
-            turnActiveCharacters = turnData.active_characters.length;
-            turnCompletedCharacters = turnData.completed_characters.length;
+            // Update display only (if turn_state_update hasn't already done it)
+            if (turnMode) turnMode.textContent = `Mode: ${turnData.mode.charAt(0).toUpperCase() + turnData.mode.slice(1)}`;
+            if (turnNumber) turnNumber.textContent = `Turn: ${turnData.turn_number}`;
+            if (turnProgress) turnProgress.textContent = `Progress: ${turnData.completed_characters.length}/${turnData.active_characters.length}`;
+        }
+        
+        function handleTurnStateUpdate(stateData) {
+            /**
+             * NEW: Handle unified turn state update.
+             * 
+             * This receives all state in one message:
+             * - Button states (computed by Python)
+             * - Turn information
+             * - Progress tracking
+             * 
+             * Just apply what the backend tells us - no complex logic needed!
+             */
+            console.log(`🆕 Turn state update: turn=${stateData.turn.number}, mode=${stateData.turn.mode}, ` +
+                       `step_enabled=${stateData.buttons.step.enabled}, ` +
+                       `progress=${stateData.turn.completed_count}/${stateData.turn.active_count}`);
             
-            console.log(`🔍 DEBUG: updateTurnState() called - active: ${turnActiveCharacters}, completed: ${turnCompletedCharacters}`);
+            // Clear command lock when backend sends state update
+            commandInProgress = false;
             
-            // Update display only
-            turnMode.textContent = `Mode: ${turnData.mode.charAt(0).toUpperCase() + turnData.mode.slice(1)}`;
-            turnNumber.textContent = `Turn: ${turnData.turn_number}`;
-            turnProgress.textContent = `Progress: ${turnData.completed_characters.length}/${turnData.active_characters.length}`;
+            // Apply button states directly from backend computation
+            const stepButton = document.getElementById('stepButton');
+            const runButton = document.getElementById('runButton');
+            const stopButton = document.getElementById('stopButton');
             
-            console.log(`🔍 DEBUG: Turn state update: mode=${turnData.mode}, active=${turnActiveCharacters}, completed=${turnCompletedCharacters}`);
-
-            // Update global mode for other handlers
-            currentTurnMode = turnData.mode;
-            console.log(`🔍 DEBUG: Updated currentTurnMode to: ${currentTurnMode}`);
+            if (stepButton) {
+                const shouldBeEnabled = stateData.buttons.step.enabled;
+                stepButton.disabled = !shouldBeEnabled;
+                stepButton.style.background = shouldBeEnabled ? '#4ecdc4' : '#555';
+                stepButton.title = stateData.buttons.step.tooltip;
+                console.log(`🔘 Step button: enabled=${shouldBeEnabled}, disabled=${stepButton.disabled}, background=${stepButton.style.background}, commandInProgress=${commandInProgress}`);
+            }
+            
+            if (runButton) {
+                runButton.disabled = !stateData.buttons.run.enabled;
+                runButton.style.background = stateData.buttons.run.enabled ? '#ffe66d' : '#555';
+                runButton.style.color = stateData.buttons.run.enabled ? '#1a1a1a' : '#888';
+                runButton.title = stateData.buttons.run.tooltip;
+            }
+            
+            if (stopButton) {
+                stopButton.disabled = !stateData.buttons.stop.enabled;
+                stopButton.title = stateData.buttons.stop.tooltip;
+            }
+            
+            // Update turn progress tracking
+            turnActiveCharacters = stateData.turn.active_count;
+            turnCompletedCharacters = stateData.turn.completed_count;
+            
+            // Update mode tracking
+            currentTurnMode = stateData.turn.mode;
+            
+            console.log(`✅ Applied button states: step=${stateData.buttons.step.enabled}, ` +
+                       `run=${stateData.buttons.run.enabled}, stop=${stateData.buttons.stop.enabled}`);
         }
         
         function handleTurnStart(turnData) {
+            // DEPRECATED: Button state management now handled by handleTurnStateUpdate()
             console.log(`Turn start: turn=${turnData.turn_number}, active=${turnData.active_characters.length}`);
-            
-            // Update global turn progress tracking
-            turnActiveCharacters = turnData.active_characters.length;
-            turnCompletedCharacters = 0; // Reset completed count for new turn
-            
-            // Shade the Step button during turn execution
-            const stepButton = document.getElementById('stepButton');
-            if (stepButton && currentTurnMode !== 'run') {
-                stepButton.disabled = true;
-                stepButton.style.background = '#555';
-                stepButton.title = 'Turn in progress - waiting for characters to complete actions...';
-                console.log('Step button shaded during turn execution');
-            } else if (stepButton && currentTurnMode === 'run') {
-                console.log('Turn start in run mode - Step button already disabled');
-            }
         }
         
         function handleReadyState(readyData) {
+            /**
+             * Handle system ready signal from launcher.
+             * 
+             * NOTE: Button states are now managed entirely by the backend via turn_state_update.
+             * This handler ONLY updates the system status text.
+             */
             const systemStatusText = document.getElementById('systemStatusText');
-            const stepButton = document.getElementById('stepButton');
-            const runButton = document.querySelector('button[onclick="runTurns()"]');
-            // Remember last ready payload
+            
+            // Remember last ready payload for character tab creation
             try { lastReadyData = readyData; } catch (e) {}
             
             if (readyData.system_ready) {
-                // System is ready - enable buttons and update status
-                systemStatusText.textContent = `Ready - ${readyData.character_count} characters active`;
+                // Update status text only
+                systemStatusText.textContent = `Ready - ${readyData.character_count} characters launching`;
                 systemStatusText.style.color = '#4ecdc4'; // Green color for ready
 
                 // Auto-select first character if none selected yet
                 try {
-                    // Gate on both ready and announced count
                     const expected = Array.isArray(readyData.characters_active) ? readyData.characters_active.length : (readyData.character_count || 0);
                     const allAnnounced = (expected > 0) && (announcedCharacters.size >= expected);
                     if (!activeCharacter && allAnnounced && Array.isArray(readyData.characters_active) && readyData.characters_active.length > 0) {
@@ -2025,61 +1965,11 @@ class FastAPIActionDisplayNode:
                     }
                 } catch (e) { /* no-op */ }
                 
-                // Enable step and run buttons, but respect current turn mode AND turn state
-                if (currentTurnMode !== 'run') {
-                    // Only enable when at least one character has announced and is selected
-                    const canEnable = activeCharacter && announcedCharacters.size > 0;
-                    // Check if a turn is currently in progress
-                    const turnInProgress = isTurnInProgress();
-                    if (turnInProgress) {
-                        console.log('System ready but turn in progress - keeping buttons disabled');
-                        // Keep buttons disabled during turn execution
-                        stepButton.disabled = true;
-                        stepButton.style.background = '#555';
-                        stepButton.title = 'Turn in progress - wait for completion';
-                        
-                        runButton.disabled = true;
-                        runButton.style.background = '#555';
-                        runButton.style.color = '#888';
-                        runButton.title = 'Turn in progress - wait for completion';
-                    } else {
-                        // No turn active - enable buttons
-                        stepButton.disabled = !canEnable;
-                        stepButton.style.background = canEnable ? '#4ecdc4' : '#555';
-                        stepButton.title = canEnable ? 'Click to advance to next turn' : 'Waiting for character to appear...';
-                        
-                        runButton.disabled = !canEnable;
-                        runButton.style.background = canEnable ? '#ffe66d' : '#555';
-                        runButton.style.color = canEnable ? '#1a1a1a' : '#888';
-                        runButton.title = canEnable ? 'Click to run multiple turns' : 'Waiting for character to appear...';
-                    }
-                } else {
-                    // In run mode, keep buttons disabled
-                    stepButton.disabled = true;
-                    stepButton.style.background = '#555';
-                    stepButton.title = 'Disabled while running';
-                    
-                    runButton.disabled = true;
-                    runButton.style.background = '#555';
-                    runButton.style.color = '#888';
-                    runButton.title = 'Already running';
-                }
-                
-                console.log(`System ready: ${readyData.character_count} characters active, turn mode: ${currentTurnMode}`);
+                console.log(`System ready signal: ${readyData.character_count} characters expected`);
             } else {
-                // System not ready - disable buttons and update status
+                // System not ready - update status
                 systemStatusText.textContent = 'Starting...';
                 systemStatusText.style.color = '#888';
-                
-                // Disable step and run buttons
-                stepButton.disabled = true;
-                stepButton.style.background = '#555';
-                stepButton.title = 'Waiting for system startup...';
-                
-                runButton.disabled = true;
-                runButton.style.background = '#555';
-                runButton.style.color = '#888';
-                runButton.title = 'Waiting for system startup...';
             }
         }
         
@@ -2155,19 +2045,19 @@ class FastAPIActionDisplayNode:
                 
                 if (result.success) {
                     resultDiv.innerHTML = `<span class="success">${result.message}</span>`;
-                    console.log('🔍 DEBUG: Step API call succeeded - button should stay disabled');
-                    console.log('🔍 DEBUG: Current turn progress - active:', turnActiveCharacters, 'completed:', turnCompletedCharacters);
-                    // Button stays disabled until step_complete event
+                    // Button state will be updated by backend via turn_state_update message
                 } else {
                     resultDiv.innerHTML = `<span class="error">Error: ${result.message}</span>`;
-                    // Re-enable button if API call failed
+                    // Clear command lock on error so user can retry
+                    commandInProgress = false;
                     stepButton.disabled = false;
                     stepButton.style.background = '#4ecdc4';
                     stepButton.title = 'Click to advance to next turn';
                 }
             } catch (error) {
                 resultDiv.innerHTML = `<span class="error">Error: ${error.message}</span>`;
-                // Re-enable button if API call failed
+                // Clear command lock on error so user can retry
+                commandInProgress = false;
                 stepButton.disabled = false;
                 stepButton.style.background = '#4ecdc4';
                 stepButton.title = 'Click to advance to next turn';
@@ -2191,11 +2081,16 @@ class FastAPIActionDisplayNode:
                 
                 if (result.success) {
                     resultDiv.innerHTML = `<span class="success">${result.message}</span>`;
+                    // Button state will be updated by backend via turn_state_update message
                 } else {
                     resultDiv.innerHTML = `<span class="error">Error: ${result.message}</span>`;
+                    // Clear command lock on error so user can retry
+                    commandInProgress = false;
                 }
             } catch (error) {
                 resultDiv.innerHTML = `<span class="error">Error: ${error.message}</span>`;
+                // Clear command lock on error so user can retry
+                commandInProgress = false;
             }
         }
         
@@ -2216,11 +2111,16 @@ class FastAPIActionDisplayNode:
                 
                 if (result.success) {
                     resultDiv.innerHTML = `<span class="success">${result.message}</span>`;
+                    // Button state will be updated by backend via turn_state_update message
                 } else {
                     resultDiv.innerHTML = `<span class="error">Error: ${result.message}</span>`;
+                    // Clear command lock on error so user can retry
+                    commandInProgress = false;
                 }
             } catch (error) {
                 resultDiv.innerHTML = `<span class="error">Error: ${error.message}</span>`;
+                // Clear command lock on error so user can retry
+                commandInProgress = false;
             }
         }
         
@@ -2618,6 +2518,35 @@ class FastAPIActionDisplayNode:
             self._send_turn_mode_update()
             
         except Exception as e:
+            import traceback
+            traceback.print_exc()
+    
+    def turn_state_update_callback(self, sample):
+        """
+        Handle unified turn state updates from map node (NEW).
+        
+        This receives comprehensive state including:
+        - Turn information (number, mode, progress)
+        - Computed button states (enabled/disabled with tooltips)
+        - All state in one message - no race conditions
+        """
+        try:
+            state_data = json.loads(sample.payload.to_bytes().decode('utf-8'))
+            
+            logger.info(f"🆕 Received turn_state_update: turn={state_data['turn']['number']}, "
+                       f"mode={state_data['turn']['mode']}, "
+                       f"step_enabled={state_data['buttons']['step']['enabled']}")
+            
+            # Forward complete state to websockets for UI rendering (broadcast to all)
+            with self.websocket_lock:
+                for ws in self.websocket_connections:
+                    try:
+                        asyncio.run(ws.send_json(state_data))
+                    except Exception as e:
+                        logger.error(f"Error sending turn_state_update to websocket: {e}")
+            
+        except Exception as e:
+            logger.error(f"Error in turn_state_update_callback: {e}")
             import traceback
             traceback.print_exc()
     

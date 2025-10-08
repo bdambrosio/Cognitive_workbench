@@ -94,6 +94,10 @@ class MapNode:
         }
         # Debug mode: allow launcher to disable turn timeouts via env var
         self.debug_disable_timeout = str(os.getenv('CWB_DEBUG', '')).lower() in ('1', 'true', 'yes', 'on')
+        
+        # Character initialization tracking
+        self.expected_character_count = 0  # Set by launcher ready signal
+        self.system_ready = False  # True when launcher signals ready
         self.turn_publisher = None
         self.turn_complete_subscriber = None
         
@@ -339,6 +343,12 @@ Do not include any other text, reasoning, introductory, expository, or markdown.
             self.handle_character_shutdown
         )
         
+        # Subscriber for launcher ready signal (to know expected character count)
+        self.launcher_ready_subscriber = self.session.declare_subscriber(
+            "cognitive/launcher/ready",
+            self.handle_launcher_ready
+        )
+        
         logger.info("Map queryables and subscribers set up successfully")
     
     def setup_turn_management(self):
@@ -347,11 +357,8 @@ Do not include any other text, reasoning, introductory, expository, or markdown.
             # Publisher for turn "GO" signals
             self.turn_publisher = self.session.declare_publisher("cognitive/map/turn/go")
             
-            # Publisher for step complete signals (for FastAPI UI)
-            self.step_complete_publisher = self.session.declare_publisher("cognitive/map/step_complete")
-            
-            # Publisher for turn control status updates (for FastAPI UI)
-            self.turn_control_publisher = self.session.declare_publisher("cognitive/map/turn_status")
+            # Publisher for unified turn state updates (comprehensive UI state - replaces step_complete and turn_status)
+            self.turn_state_update_publisher = self.session.declare_publisher("cognitive/map/turn_state_update")
             
             # Subscriber for turn completion signals
             self.turn_complete_subscriber = self.session.declare_subscriber(
@@ -410,8 +417,8 @@ Do not include any other text, reasoning, introductory, expository, or markdown.
             logger.info("Manual turn control enabled - starting in STEP mode")
             logger.info("Time advancement system initialized")
             
-            # Publish initial turn control status
-            self._publish_turn_control_status()
+            # Publish initial turn state
+            self._publish_turn_state_update()
             
         except Exception as e:
             logger.error(f"Failed to set up turn management: {e}")
@@ -420,6 +427,74 @@ Do not include any other text, reasoning, introductory, expository, or markdown.
     def get_active_characters(self):
         """Get list of active characters from agent registry"""
         return list(self.agent_registry.keys())
+    
+    def _compute_ui_button_states(self) -> dict:
+        """
+        Single source of truth for UI button states.
+        
+        This centralizes all button state logic in one place, making it:
+        - Testable (can verify logic without UI)
+        - Debuggable (one place to check state)
+        - Consistent (no race conditions from distributed state)
+        
+        Returns:
+            dict: Button states with enabled flags and human-readable reasons
+        """
+        turn_active = len(self.turn_state['active_characters']) > 0
+        turn_complete = (len(self.turn_state['completed_characters']) >= 
+                        len(self.turn_state['active_characters']) and 
+                        len(self.turn_state['active_characters']) > 0)
+        
+        # Check if all expected characters have initialized
+        all_characters_ready = (self.expected_character_count > 0 and 
+                               len(self.agent_registry) >= self.expected_character_count)
+        
+        button_states = {
+            'step': {
+                'enabled': (self.turn_control_mode == 'step' and 
+                           not turn_active and 
+                           all_characters_ready),
+                'reason': self._get_step_button_reason(turn_active, all_characters_ready)
+            },
+            'run': {
+                'enabled': (self.turn_control_mode == 'step' and 
+                           not turn_active and 
+                           all_characters_ready),
+                'reason': self._get_run_button_reason(turn_active, all_characters_ready)
+            },
+            'stop': {
+                'enabled': self.turn_control_mode == 'run',
+                'reason': 'In run mode' if self.turn_control_mode == 'run' else 'Not running'
+            }
+        }
+        
+        return button_states
+    
+    def _get_step_button_reason(self, turn_active: bool, all_characters_ready: bool) -> str:
+        """Get human-readable reason for step button state"""
+        if self.turn_control_mode == 'run':
+            return 'Disabled while in run mode'
+        elif not all_characters_ready:
+            announced = len(self.agent_registry)
+            expected = self.expected_character_count
+            return f'Waiting for characters to initialize ({announced}/{expected} ready)'
+        elif turn_active:
+            return f'Turn {self.turn_state["turn_number"]} in progress ({len(self.turn_state["completed_characters"])}/{len(self.turn_state["active_characters"])} complete)'
+        else:
+            return 'Ready - click to advance turn'
+    
+    def _get_run_button_reason(self, turn_active: bool, all_characters_ready: bool) -> str:
+        """Get human-readable reason for run button state"""
+        if self.turn_control_mode == 'run':
+            return 'Already in run mode'
+        elif not all_characters_ready:
+            announced = len(self.agent_registry)
+            expected = self.expected_character_count
+            return f'Waiting for characters to initialize ({announced}/{expected} ready)'
+        elif turn_active:
+            return 'Turn in progress - wait for completion'
+        else:
+            return 'Ready - click to run continuously'
     
     def start_new_turn(self):
         """Start a new turn for all active characters"""
@@ -537,19 +612,13 @@ Do not include any other text, reasoning, introductory, expository, or markdown.
                 # In Step mode, never auto-progress - always wait for manual step
                 if self.turn_control_mode == "step":
                     logger.info("Step mode - waiting for manual step command")
-                    # Publish step complete message for FastAPI UI
-                    step_complete_data = {
-                        'turn_number': self.turn_state['turn_number'],
-                        'active_characters': self.turn_state['active_characters'],
-                        'completed_characters': self.turn_state['completed_characters'],
-                        'timestamp': time.time()
-                    }
-                    self.step_complete_publisher.put(json.dumps(step_complete_data).encode('utf-8'))
-                    logger.info("📢 Published step_complete message for FastAPI UI")
                     # Reset turn state so next step command starts a new turn
                     self.turn_state['active_characters'] = []
                     self.turn_state['completed_characters'] = []
                     self.turn_state['turn_start_time'] = None
+                    
+                    # Publish unified turn state update (replaces old step_complete message)
+                    self._publish_turn_state_update()
                 # In Run mode, auto-progress to next turn
                 elif self.auto_progression_enabled:
                     logger.info("Run mode - auto-progressing to next turn")
@@ -634,15 +703,16 @@ Do not include any other text, reasoning, introductory, expository, or markdown.
             self.turn_control_mode = "step"
             self.auto_progression_enabled = False
             
-            # Publish turn control status update
-            self._publish_turn_control_status()
-            
             # If no turn is currently active, start one
             if not self.turn_state['active_characters']:
                 logger.info("Starting new turn for step command")
                 self.start_new_turn()
+                # Publish state update AFTER starting turn so button reflects active state
+                self._publish_turn_state_update()
             else:
                 logger.info("Turn already in progress - will complete normally")
+                # Publish state update to confirm mode
+                self._publish_turn_state_update()
                 
         except Exception as e:
             logger.error(f"Error handling turn step command: {e}")
@@ -654,12 +724,14 @@ Do not include any other text, reasoning, introductory, expository, or markdown.
             self.turn_control_mode = "run"
             self.auto_progression_enabled = True
             
-            # Publish turn control status update
-            self._publish_turn_control_status()
+            # Publish state update first (mode change to 'run' disables step/run buttons)
+            self._publish_turn_state_update()
             
             # If no turn is currently active, start one
             if not self.turn_state['active_characters']:
                 self.start_new_turn()
+                # Publish again after turn starts to update progress
+                self._publish_turn_state_update()
             else:
                 logger.info("Turn already in progress - will auto-progress after completion")
                 
@@ -673,26 +745,72 @@ Do not include any other text, reasoning, introductory, expository, or markdown.
             self.turn_control_mode = "step"
             self.auto_progression_enabled = False
             
-            # Publish turn control status update
-            self._publish_turn_control_status()
+            # Publish unified turn state update (includes mode change)
+            self._publish_turn_state_update()
             
             logger.info("Auto-progression disabled - waiting for manual step")
                 
         except Exception as e:
             logger.error(f"Error handling turn stop command: {e}")
     
-    def _publish_turn_control_status(self):
-        """Publish current turn control status for UI updates"""
+    # REMOVED: _publish_turn_control_status() - replaced by _publish_turn_state_update()
+    
+    def _publish_turn_state_update(self):
+        """
+        Publish comprehensive turn state update for UI.
+        
+        This is the NEW unified message that replaces multiple separate messages:
+        - Includes complete turn information
+        - Includes computed button states (from _compute_ui_button_states)
+        - Includes progress information
+        - Single message = no race conditions
+        """
         try:
-            turn_control_data = {
-                'mode': self.turn_control_mode,
-                'auto_progression': self.auto_progression_enabled,
+            # Get computed button states
+            button_states = self._compute_ui_button_states()
+            
+            # Build comprehensive state update
+            state_update = {
+                'type': 'turn_state_update',
+                'turn': {
+                    'number': self.turn_state['turn_number'],
+                    'mode': self.turn_control_mode,
+                    'auto_progression': self.auto_progression_enabled,
+                    'active_count': len(self.turn_state['active_characters']),
+                    'completed_count': len(self.turn_state['completed_characters']),
+                    'active_characters': self.turn_state['active_characters'].copy(),
+                    'completed_characters': self.turn_state['completed_characters'].copy(),
+                    'is_active': len(self.turn_state['active_characters']) > 0
+                },
+                'buttons': {
+                    'step': {
+                        'enabled': button_states['step']['enabled'],
+                        'label': '🎯 Step Turn',
+                        'tooltip': button_states['step']['reason']
+                    },
+                    'run': {
+                        'enabled': button_states['run']['enabled'],
+                        'label': '🏃 Run',
+                        'tooltip': button_states['run']['reason']
+                    },
+                    'stop': {
+                        'enabled': button_states['stop']['enabled'],
+                        'label': '⏹️ Stop',
+                        'tooltip': button_states['stop']['reason']
+                    }
+                },
                 'timestamp': time.time()
             }
-            self.turn_control_publisher.put(json.dumps(turn_control_data).encode())
-            logger.info(f"📤 Published turn control status: mode={self.turn_control_mode}, auto_progression={self.auto_progression_enabled}")
+            
+            # Publish unified message
+            self.turn_state_update_publisher.put(json.dumps(state_update).encode())
+            logger.info(f"📤 Published turn_state_update: turn={state_update['turn']['number']}, "
+                       f"mode={state_update['turn']['mode']}, "
+                       f"step_enabled={state_update['buttons']['step']['enabled']}, "
+                       f"progress={state_update['turn']['completed_count']}/{state_update['turn']['active_count']}")
+            
         except Exception as e:
-            logger.error(f"Error publishing turn control status: {e}")
+            logger.error(f"Error publishing turn state update: {e}")
     
     def handle_map_summary(self, query):
         """Handle map summary queries"""
@@ -1740,6 +1858,9 @@ Do not include any other text, reasoning, introductory, expository, or markdown.
                         
                         logger.info(f"Agent created for character '{canonical_character_name}' at ({agent.x},{agent.y})")
                         
+                        # Publish updated button states (character count changed)
+                        self._publish_turn_state_update()
+                        
                         # Start first turn if this is the first character and auto-progression is enabled
                         if len(self.agent_registry) == 1:
                             logger.info("First character added - turn management ready")
@@ -1882,6 +2003,23 @@ Do not include any other text, reasoning, introductory, expository, or markdown.
             }
             query.reply(query.key_expr, json.dumps(error_response).encode('utf-8'))
     
+    def handle_launcher_ready(self, sample):
+        """Handle launcher ready signal to learn expected character count."""
+        try:
+            data = json.loads(sample.payload.to_bytes().decode('utf-8'))
+            
+            if data.get('status') == 'ready':
+                self.expected_character_count = data.get('character_count', 0)
+                self.system_ready = True
+                
+                logger.info(f"🚀 Launcher ready signal: expecting {self.expected_character_count} characters")
+                
+                # Publish updated button states now that we know the expected count
+                self._publish_turn_state_update()
+                
+        except Exception as e:
+            logger.error(f"Error handling launcher ready signal: {e}")
+    
     def handle_character_shutdown(self, sample):
         """Handle character shutdown events to cleanup conversation locks."""
         try:
@@ -1929,8 +2067,9 @@ Do not include any other text, reasoning, introductory, expository, or markdown.
         try:
             # Keep the node running
             while not self.shutdown_requested:
-                # Check for turn timeouts
-                self.check_turn_timeout()
+                # Check for turn timeouts (skip entirely in debug mode)
+                if not self.debug_disable_timeout:
+                    self.check_turn_timeout()
                 time.sleep(1)
                 
         except KeyboardInterrupt:
@@ -2069,6 +2208,12 @@ Do not include any other text, reasoning, introductory, expository, or markdown.
             requester_locked_with = self.conversation_locks.get(requester_canon, set())
             target_locked_with = self.conversation_locks.get(target_canon, set())
             
+            # If they're already locked together, grant the lock (same conversation)
+            if (target_canon in requester_locked_with and 
+                requester_canon in target_locked_with):
+                return True
+            
+            # If either is locked with someone else, deny
             if (target_canon in requester_locked_with or 
                 requester_canon in target_locked_with):
                 
