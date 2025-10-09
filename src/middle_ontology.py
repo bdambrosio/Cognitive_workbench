@@ -49,6 +49,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger('middle_ontology')
 
+_debug = str(os.getenv('CWB_DEBUG', '')).lower() in ('1', 'true', 'yes', 'on')
+
 # Add dedicated handler for llm_api logger
 llm_api_logger = logging.getLogger('llm_api')
 llm_api_file_handler = logging.FileHandler('logs/llm_api.log', mode='a')
@@ -1014,7 +1016,7 @@ def main(llm):
         logger.error(f'❌ Failed to launch Map Node: {e}')
 
     while not map_types:
-        for reply in session.get("cognitive/map/types", timeout=25.0):
+        for reply in session.get("cognitive/map/types", timeout=25.0 if not _debug else 300.0):
             if reply.ok:
                 data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
                 if data.get('success'):

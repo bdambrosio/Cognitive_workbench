@@ -492,7 +492,7 @@ def verify_plan(plan_json: Any) -> bool:
         if valid:
             logger.info(f'✅ Plan validation passed')
         else:
-            logger.warning(f'❌ Plan validation failed')
+            logger.error(f'❌ Plan validation failed')
         return valid
     except Exception as e:
         logger.error(f'❌ Plan validation error: {e}')
@@ -597,6 +597,7 @@ def _validate_step(step: Any) -> bool:
         return _validate_steps(step)
     step_type = step.get("type", None)
     if step_type not in _ALLOWED_TYPES and not isinstance(step, list):
+        logger.error(f'Invalid step type: {step_type}')
         return False
 
     # --- key checks --------------------------------------------------------
@@ -604,8 +605,10 @@ def _validate_step(step: Any) -> bool:
     opt = OPTIONAL_KEYS[step_type]
     keys = set(step.keys())
     if not req.issubset(keys):
+        logger.error(f'Missing required keys for step type: {step_type}')
         return False
     if not keys.issubset(req | opt):
+        logger.error(f'Extra keys for step type: {step_type}')
         return False
 
     # --- per‑type structural checks ----------------------------------------
@@ -620,8 +623,10 @@ def _validate_step(step: Any) -> bool:
 
     if step_type == "if":
         if not (isinstance(step["condition"], dict)) or not _validate_condition(step["condition"]) or not isinstance(step["then"], list):
+            logger.error(f'Invalid condition for step type: {step_type}')
             return False
         if "else" in step and not isinstance(step["else"], list):
+            logger.error(f'Invalid else for step type: {step_type}')
             return False
         return _validate_steps(step["then"]) and _validate_steps(step.get("else", []))
 
@@ -640,11 +645,14 @@ def _validate_step(step: Any) -> bool:
 
 def _validate_condition(condition: Any) -> bool:
     if not isinstance(condition, dict):
+        logger.error(f'Invalid condition for step type: {condition}')
         return False
-    if condition.get("type", None) not in _ALLOWED_CONDITION_TYPES:
+    if condition.get("type", None) not in _ALLOWED_CONDITION_TYPES: 
+        logger.error(f'Invalid condition type: {condition.get("type", None)}')
         return False
     keys = set(condition.keys())
     if not REQ_CONDITION_KEYS[condition.get("type", None)].issubset(keys):
+        logger.error(f'Missing required keys for condition type: {condition.get("type", None)}')    
         return False
     return True
 
@@ -793,7 +801,7 @@ def is_near(character, target: str, negated: bool) -> bool:
     """Check if a target (resource or character) is near this character."""
     try:
         character_name = character.character_name
-        for reply in character.session.get(f"cognitive/{character_name}/situation/proximity?target={target}&negated={negated}", timeout=6.0 if not character.debug else 600.0):
+        for reply in character.session.get(f"cognitive/{character_name}/situation/proximity?target={target}&negated={negated}", timeout=6.0 if not character.debug else 300.0):
             if reply.ok:
                 data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
                 if data['success']:
@@ -962,7 +970,7 @@ def _evaluate_condition(character: ZenohExecutiveNode, condition: dict, observat
                 if binding is not None:
                     return {'value': (not negated), 'binding': binding} if not negated else {'value': False, 'binding': None}
                 # Fallback to distributed query
-                for reply in character.session.get(f"cognitive/{character_name}/situation/proximity?target={target}&negated={negated}", timeout=6.0 if not character.debug else 600.0):
+                for reply in character.session.get(f"cognitive/{character_name}/situation/proximity?target={target}&negated={negated}", timeout=6.0 if not character.debug else 300.0):
                     if reply.ok:
                         data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
                         if data['success']:
@@ -976,7 +984,7 @@ def _evaluate_condition(character: ZenohExecutiveNode, condition: dict, observat
                 if binding is not None:
                     return {'value': (not negated), 'binding': binding} if not negated else {'value': False, 'binding': None}
                 # Fallback
-                for reply in character.session.get(f"cognitive/{character_name}/situation/visibility?target={target}&negated={negated}", timeout=6.0 if not character.debug else 600.0):
+                for reply in character.session.get(f"cognitive/{character_name}/situation/visibility?target={target}&negated={negated}", timeout=6.0 if not character.debug else 300.0):
                     if reply.ok:
                         data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
                         if data['success']:
@@ -986,7 +994,7 @@ def _evaluate_condition(character: ZenohExecutiveNode, condition: dict, observat
             
             elif normalized_type == 'has_item':
                 # Prefer distributed memory_node for authoritative inventory
-                for reply in character.session.get(f"cognitive/{character_name}/memory/inventory?item={target}&negated={negated}", timeout=6.0 if not character.debug else 600.0):
+                for reply in character.session.get(f"cognitive/{character_name}/memory/inventory?item={target}&negated={negated}", timeout=6.0 if not character.debug else 300.0):
                     if reply.ok:
                         data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
                         if data['success']:
@@ -1001,7 +1009,7 @@ def _evaluate_condition(character: ZenohExecutiveNode, condition: dict, observat
                 if binding is not None:
                     return {'value': (not negated), 'binding': binding} if not negated else {'value': False, 'binding': None}
                 # Fallback
-                for reply in character.session.get(f"cognitive/{character_name}/situation/location?target={target}&negated={negated}", timeout=6.0 if not character.debug else 600.0):
+                for reply in character.session.get(f"cognitive/{character_name}/situation/location?target={target}&negated={negated}", timeout=6.0 if not character.debug else 300.0):
                     if reply.ok:
                         data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
                         if data['success']:

@@ -159,7 +159,7 @@ class ZenohSituationNode:
         self._shutting_down = False
         self.update_map_retries = 0
         self.map_types = {}
-        for reply in self.session.get("cognitive/map/types", timeout=2.0 if not self.debug else 600.0):
+        for reply in self.session.get("cognitive/map/types", timeout=2.0 if not self.debug else 300.0):
             if reply.ok:
                 data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
                 if data.get('success'):
@@ -259,7 +259,7 @@ class ZenohSituationNode:
         try:
             # Query map node for agent look data with timeout
             logger.info(f'Updating map data for {self.character_name}')
-            for reply in self.session.get(f"cognitive/map/agent/{self.character_name}/look", timeout=4.0 if not self.debug else 600.0):
+            for reply in self.session.get(f"cognitive/map/agent/{self.character_name}/look", timeout=4.0 if not self.debug else 300.0):
                 try:
                     if reply.ok:
                         map_look_data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))

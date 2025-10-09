@@ -507,7 +507,7 @@ class FastAPIActionDisplayNode:
                     
                     # Otherwise, try to query map_node for current time
                     try:
-                        replies = self.session.get("cognitive/map/simulation_time", timeout=5.0)
+                        replies = self.session.get("cognitive/map/simulation_time", timeout=5.0 if not self.debug else 300.0)
                         for reply in replies:
                             response = json.loads(reply.payload.to_bytes().decode('utf-8'))
                             if response.get('success'):
@@ -525,6 +525,65 @@ class FastAPIActionDisplayNode:
             except Exception as e:
                 return {"success": False, "message": f"Error: {str(e)}"}
         
+        @self.app.get("/api/relation/{character_name}/{target_character}")
+        async def get_relation_data(character_name: str, target_character: str):
+            """Get relation data (discourse_state and tom_model) for a character pair."""
+            try:
+                if not hasattr(self, 'session'):
+                    return {"success": False, "message": "Zenoh session not available", "no_interaction": False}
+                
+                # Query memory_node for relation data
+                query_key = f"cognitive/{character_name}/memory/entity/{target_character}?query=relation"
+                
+                try:
+                    replies = self.session.get(query_key, timeout=5.0 if not self.debug else 300.0)
+                    for reply in replies:
+                        try:
+                            # Handle different Zenoh reply object types
+                            if hasattr(reply, 'ok') and reply.ok is not None:
+                                payload_bytes = reply.ok.payload.to_bytes()
+                            elif hasattr(reply, 'payload'):
+                                payload_bytes = reply.payload.to_bytes()
+                            else:
+                                continue
+                            
+                            response = json.loads(payload_bytes.decode('utf-8'))
+                            
+                            if response.get('success'):
+                                return {
+                                    "success": True,
+                                    "discourse_state": response.get('discourse_state', ''),
+                                    "tom_model": response.get('tom_model', ''),
+                                    "no_interaction": False
+                                }
+                            else:
+                                # Check if entity not found (no interaction yet)
+                                error_msg = response.get('error', '')
+                                if 'not found' in error_msg.lower():
+                                    return {
+                                        "success": True,
+                                        "discourse_state": '',
+                                        "tom_model": '',
+                                        "no_interaction": True
+                                    }
+                                return {"success": False, "message": error_msg, "no_interaction": False}
+                        except Exception as parse_error:
+                            logger.warning(f"Failed to parse reply for {character_name}->{target_character}: {parse_error}")
+                            continue
+                    
+                    # No valid response means entity doesn't exist yet (no interaction)
+                    return {
+                        "success": True,
+                        "discourse_state": '',
+                        "tom_model": '',
+                        "no_interaction": True
+                    }
+                except Exception as query_error:
+                    logger.warning(f"Failed to query relation data for {character_name}->{target_character}: {query_error}")
+                    return {"success": False, "message": f"Query error: {str(query_error)}", "no_interaction": False}
+                    
+            except Exception as e:
+                return {"success": False, "message": f"Error: {str(e)}", "no_interaction": False}
 
     
     async def _initiate_shutdown(self):
@@ -961,6 +1020,7 @@ class FastAPIActionDisplayNode:
                     <div class="character-data-tab" data-tab="plan">Plan</div>
                     <div class="character-data-tab" data-tab="view">View</div>
                     <div class="character-data-tab" data-tab="state">State</div>
+                    <div class="character-data-tab" data-tab="relations">Relations</div>
                 </div>
                 
                 <!-- Character data content -->
@@ -992,6 +1052,13 @@ class FastAPIActionDisplayNode:
                     <div class="character-data-panel" id="statePanel">
                         <div id="stateData" style="color: #888; font-style: italic; text-align: center; padding: 20px;">
                             No state data available
+                        </div>
+                    </div>
+                    
+                    <!-- Relations tab content -->
+                    <div class="character-data-panel" id="relationsPanel">
+                        <div id="relationsData" style="color: #888; font-style: italic; text-align: center; padding: 20px;">
+                            No relations data available
                         </div>
                     </div>
                 </div>
@@ -1322,6 +1389,11 @@ class FastAPIActionDisplayNode:
                 document.getElementById('statePanel').classList.add('active');
                 if (activeCharacter) {
                     updateStateDataDisplay(activeCharacter);
+                }
+            } else if (tabName === 'relations') {
+                document.getElementById('relationsPanel').classList.add('active');
+                if (activeCharacter) {
+                    updateRelationsDataDisplay(activeCharacter);
                 }
             }
         }
@@ -1758,6 +1830,105 @@ class FastAPIActionDisplayNode:
             // Format the situation data as JSON
             const formattedData = JSON.stringify(tabData.situationData, null, 2);
             situationDataDiv.innerHTML = `<pre style="white-space: pre-wrap; font-family: 'Courier New', monospace; font-size: 11px; margin: 0; color: #e0e0e0; text-align: left;">${formattedData}</pre>`;
+        }
+        
+        function updateRelationsDataDisplay(characterName) {
+            const relationsDataDiv = document.getElementById('relationsData');
+            
+            if (!relationsDataDiv) return;
+            
+            // Get all other characters
+            const otherCharacters = Array.from(characterTabs.keys()).filter(c => c !== characterName);
+            
+            if (otherCharacters.length === 0) {
+                relationsDataDiv.innerHTML = '<div style="color: #888; font-style: italic; text-align: center; padding: 20px;">No other characters available</div>';
+                return;
+            }
+            
+            // Build accordion HTML
+            let html = '<div style="padding: 10px;">';
+            otherCharacters.forEach(otherChar => {
+                html += `
+                    <div class="relation-accordion-item" style="margin-bottom: 5px; border: 1px solid #444; border-radius: 4px; overflow: hidden;">
+                        <div class="relation-accordion-header" 
+                             onclick="toggleRelationAccordion('${characterName}', '${otherChar}')"
+                             style="padding: 10px; background: #333; cursor: pointer; user-select: none; display: flex; justify-content: space-between; align-items: center;">
+                            <span style="font-weight: bold;">${otherChar}</span>
+                            <span id="accordion-arrow-${otherChar}" style="transition: transform 0.3s;">▶</span>
+                        </div>
+                        <div id="relation-content-${otherChar}" 
+                             style="display: none; padding: 15px; background: #2a2a2a; max-height: 400px; overflow-y: auto;">
+                            <div style="color: #888; font-style: italic;">Click to load relation data...</div>
+                        </div>
+                    </div>
+                `;
+            });
+            html += '</div>';
+            relationsDataDiv.innerHTML = html;
+        }
+        
+        async function toggleRelationAccordion(characterName, targetCharacter) {
+            const contentDiv = document.getElementById(`relation-content-${targetCharacter}`);
+            const arrowSpan = document.getElementById(`accordion-arrow-${targetCharacter}`);
+            
+            if (!contentDiv) return;
+            
+            // Toggle visibility
+            if (contentDiv.style.display === 'none') {
+                // Opening - fetch data
+                contentDiv.style.display = 'block';
+                arrowSpan.style.transform = 'rotate(90deg)';
+                
+                // Show loading message
+                contentDiv.innerHTML = '<div style="color: #888; font-style: italic;">Loading...</div>';
+                
+                // Fetch relation data
+                try {
+                    const response = await fetch(`/api/relation/${characterName}/${targetCharacter}`);
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        // Check if no interaction has occurred yet
+                        if (data.no_interaction) {
+                            contentDiv.innerHTML = `
+                                <div style="text-align: center; padding: 20px; color: #888;">
+                                    <div style="font-size: 18px; margin-bottom: 10px;">👥</div>
+                                    <div style="font-style: italic;">No interaction history yet</div>
+                                    <div style="font-size: 11px; margin-top: 8px; color: #666;">
+                                        ${characterName} and ${targetCharacter} haven't interacted
+                                    </div>
+                                </div>
+                            `;
+                        } else {
+                            let html = '';
+                            
+                            // Display discourse_state
+                            html += '<div style="margin-bottom: 15px;">';
+                            html += '<div style="font-weight: bold; color: #95e1d3; margin-bottom: 5px;">Discourse State:</div>';
+                            html += '<div style="padding: 10px; background: #1a1a1a; border-radius: 4px; white-space: pre-wrap; font-family: monospace; font-size: 12px;">';
+                            html += data.discourse_state || '<span style="color: #888; font-style: italic;">No discourse state</span>';
+                            html += '</div></div>';
+                            
+                            // Display tom_model
+                            html += '<div>';
+                            html += '<div style="font-weight: bold; color: #95e1d3; margin-bottom: 5px;">Theory of Mind:</div>';
+                            html += '<div style="padding: 10px; background: #1a1a1a; border-radius: 4px; white-space: pre-wrap; font-family: monospace; font-size: 12px;">';
+                            html += data.tom_model || '<span style="color: #888; font-style: italic;">No ToM model</span>';
+                            html += '</div></div>';
+                            
+                            contentDiv.innerHTML = html;
+                        }
+                    } else {
+                        contentDiv.innerHTML = `<div style="color: #ff6b6b;">Error: ${data.message || 'Failed to load data'}</div>`;
+                    }
+                } catch (error) {
+                    contentDiv.innerHTML = `<div style="color: #ff6b6b;">Error: ${error.message}</div>`;
+                }
+            } else {
+                // Closing
+                contentDiv.style.display = 'none';
+                arrowSpan.style.transform = 'rotate(0deg)';
+            }
         }
         
         function addActionEntry(actionData) {
@@ -2648,7 +2819,7 @@ class FastAPIActionDisplayNode:
                         websocket.send_text(json.dumps(web_data)), 
                         self.event_loop
                     )
-                    future.result(timeout=5.0 if not self.debug else 600.0)
+                    future.result(timeout=5.0 if not self.debug else 300.0)
                 except Exception as e:
                     # Don't remove client on timeout - just log the error
                     if not isinstance(e, TimeoutError):
@@ -2686,7 +2857,7 @@ class FastAPIActionDisplayNode:
                         websocket.send_text(json.dumps(web_data)), 
                         self.event_loop
                     )
-                    future.result(timeout=5.0 if not self.debug else 600.0)
+                    future.result(timeout=5.0 if not self.debug else 300.0)
                 except Exception as e:
                     # Don't remove client on timeout - just log the error
                     if not isinstance(e, TimeoutError):
@@ -2724,7 +2895,7 @@ class FastAPIActionDisplayNode:
                         websocket.send_text(json.dumps(web_data)), 
                         self.event_loop
                     )
-                    future.result(timeout=5.0 if not self.debug else 600.0)
+                    future.result(timeout=5.0 if not self.debug else 300.0)
                 except Exception as e:
                     # Don't remove client on timeout - just log the error
                     if not isinstance(e, TimeoutError):
@@ -2762,7 +2933,7 @@ class FastAPIActionDisplayNode:
                         websocket.send_text(json.dumps(web_data)), 
                         self.event_loop
                     )
-                    future.result(timeout=5.0 if not self.debug else 600.0)
+                    future.result(timeout=5.0 if not self.debug else 300.0)
                 except Exception as e:
                     # Don't remove client on timeout - just log the error
                     if not isinstance(e, TimeoutError):
@@ -2803,7 +2974,7 @@ class FastAPIActionDisplayNode:
                         websocket.send_text(json.dumps(web_data)), 
                         self.event_loop
                     )
-                    future.result(timeout=5.0 if not self.debug else 600.0)
+                    future.result(timeout=5.0 if not self.debug else 300.0)
                 except Exception as e:
                     # Don't remove client on timeout - just log the error
                     if not isinstance(e, TimeoutError):
@@ -2835,7 +3006,7 @@ class FastAPIActionDisplayNode:
                         websocket.send_text(json.dumps(web_data)),
                         self.event_loop
                     )
-                    future.result(timeout=5.0 if not self.debug else 600.0)
+                    future.result(timeout=5.0 if not self.debug else 300.0)
                 except Exception as e:
                     if not isinstance(e, TimeoutError):
                         disconnected.append(websocket)
@@ -2870,7 +3041,7 @@ class FastAPIActionDisplayNode:
                         websocket.send_text(json.dumps(web_data)), 
                         self.event_loop
                     )
-                    future.result(timeout=5.0 if not self.debug else 600.0)
+                    future.result(timeout=5.0 if not self.debug else 300.0)
                 except Exception as e:
                     # Don't remove client on timeout - just log the error
                     if not isinstance(e, TimeoutError):
@@ -2907,7 +3078,7 @@ class FastAPIActionDisplayNode:
                         websocket.send_text(json.dumps(web_data)), 
                         self.event_loop
                     )
-                    future.result(timeout=5.0 if not self.debug else 600.0)
+                    future.result(timeout=5.0 if not self.debug else 300.0)
                 except Exception as e:
                     # Don't remove client on timeout - just log the error
                     if not isinstance(e, TimeoutError):
@@ -3072,7 +3243,7 @@ class FastAPIActionDisplayNode:
                         websocket.send_text(json.dumps(step_complete_data)),
                         self.event_loop
                     )
-                    future.result(timeout=5.0 if not self.debug else 600.0)
+                    future.result(timeout=5.0 if not self.debug else 300.0)
                 except Exception as e:
                     # Don't remove client on timeout - just log the error
                     if not isinstance(e, TimeoutError):
@@ -3109,7 +3280,7 @@ class FastAPIActionDisplayNode:
                         websocket.send_text(json.dumps(turn_start_data)),
                         self.event_loop
                     )
-                    future.result(timeout=5.0 if not self.debug else 600.0)
+                    future.result(timeout=5.0 if not self.debug else 300.0)
                 except Exception as e:
                     # Don't remove client on timeout - just log the error
                     if not isinstance(e, TimeoutError):
