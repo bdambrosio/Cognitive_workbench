@@ -183,7 +183,7 @@ class ZenohExecutiveNode:
         # LLM client
         self.llm_client = None
         if LLM_CLIENT_AVAILABLE:
-            self.llm_client = ZenohLLMClient(service_timeout=200.0 if not self.debug else 600.0)
+            self.llm_client = ZenohLLMClient(service_timeout=200.0 if not self.debug else 300.0)
         self.llm = LLM(server_name="openai", model_name="gpt-4.1")
         # Internal state
         self.action_counter = 0
@@ -234,7 +234,7 @@ class ZenohExecutiveNode:
             if not self.manual:
                 logger.warning(f"No activity ontology for {self.character_name}: {e}")
         self.map_types = {}
-        for reply in self.session.get("cognitive/map/types", timeout=2.0 if not self.debug else 600.0):
+        for reply in self.session.get("cognitive/map/types", timeout=2.0 if not self.debug else 300.0):
             if reply.ok:
                 data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
                 if data.get('success'):
@@ -666,7 +666,7 @@ class ZenohExecutiveNode:
 
         except Exception as e:
             logger.error(f'Error in OODA loop: {e}')
-            traceback.format_exc()
+            logger.error(traceback.format_exc())
         return
 
 
@@ -710,10 +710,10 @@ class ZenohExecutiveNode:
             for character_name in self.last_situation_data['characters']:
                 entity_context = self.get_entity_context(character_name, 10)
                 if entity_context:
-                    formatted_situation += f"\n#You can see {character_name}, with whom you have had the following conversation history:\n"
-                    for memory in entity_context['conversation_history']: 
-                        formatted_situation += f"\n\t{memory['source']}: {memory['text']}"
-                    formatted_situation += '\n'
+                    formatted_situation += f"\n#You can see {character_name}"#, with whom you have had the following conversation history:\n"
+                    #for memory in entity_context['conversation_history']: 
+                        #formatted_situation += f"\n\t{memory['source']}: {memory['text']}"
+                    #formatted_situation += '\n'
 
         if self.last_situation_data and self.last_situation_data.get('views'):
             compact_views = format_views_compact(self.last_situation_data['views'])
@@ -763,7 +763,7 @@ class ZenohExecutiveNode:
             if self.character_config.get('drives', None):
                 system_prompt += f"\n#Your drives are:\n\t{'\n\t'.join(self.character_config['drives'])}\n"
             if not self.map_types:
-                for reply in self.session.get("cognitive/map/types", timeout=2.0 if not self.debug else 600.0):
+                for reply in self.session.get("cognitive/map/types", timeout=2.0 if not self.debug else 300.0):
                     if reply.ok:
                         data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
                         if data.get('success'):
@@ -788,7 +788,7 @@ class ZenohExecutiveNode:
                 user_prompt += '\n'
             # get inventory and cache exact ids
             inventory = []
-            for reply in self.session.get(f"cognitive/{self.character_name}/memory/inventory", timeout=2.0 if not self.debug else 600.0):
+            for reply in self.session.get(f"cognitive/{self.character_name}/memory/inventory", timeout=2.0 if not self.debug else 300.0):
                 if reply.ok:
                     data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
                     if data.get('success'):
@@ -822,7 +822,7 @@ class ZenohExecutiveNode:
 
     def format_current_physiological_state(self):
         """Format the current physiological state for the LLM."""
-        def_str = 'DEFINITIONS:\n'+'+\n'.join(str(need) for need in PHYSIOLOGICAL_STATES)
+        def_str = '\nPHYSIOLOGICAL STATE DEFINITIONS:\n'+'+\n'.join(str(need) for need in PHYSIOLOGICAL_STATES)
         return def_str+'\n'+'CURRENT_STATE:\n'+'\n'.join([f'{key.capitalize()}: {item["value"]:.1f}' for key, item in self.self_state.items()])
 
     def _orient(self, observations: Dict[str, Any], step_rewrite: bool = False):
@@ -988,7 +988,7 @@ class ZenohExecutiveNode:
                     self.step_counter = 0
                     # Capture simulation time at plan start
                     try:
-                        for time_reply in self.session.get("cognitive/map/simulation_time", timeout=2.0 if not self.debug else 600.0):
+                        for time_reply in self.session.get("cognitive/map/simulation_time", timeout=2.0 if not self.debug else 300.0):
                             if time_reply.ok:
                                 time_data = json.loads(time_reply.ok.payload.to_bytes().decode('utf-8'))
                                 if time_data.get('success'):
@@ -1022,7 +1022,7 @@ class ZenohExecutiveNode:
             self.percepts_at_plan = None
         # Capture simulation time at plan start (single-action plans)
         try:
-            for time_reply in self.session.get("cognitive/map/simulation_time", timeout=2.0 if not self.debug else 600.0):
+            for time_reply in self.session.get("cognitive/map/simulation_time", timeout=2.0 if not self.debug else 300.0):
                 if time_reply.ok:
                     time_data = json.loads(time_reply.ok.payload.to_bytes().decode('utf-8'))
                     if time_data.get('success'):
@@ -1438,7 +1438,7 @@ end your response with </end>
             action_record.outcome_status = 'success'
             action_record.failure_code = None
             try:
-                for time_reply in self.session.get("cognitive/map/simulation_time", timeout=2.0 if not self.debug else 600.0):
+                for time_reply in self.session.get("cognitive/map/simulation_time", timeout=2.0 if not self.debug else 300.0):
                     if time_reply.ok:
                         time_data = json.loads(time_reply.ok.payload.to_bytes().decode('utf-8'))
                         if time_data.get('success'):
@@ -1857,7 +1857,7 @@ end your response with </end>
                         payload = json.dumps({'path_id': resolved}).encode('utf-8')
                     except Exception:
                         payload = None
-                    for reply in self.session.get(f"cognitive/map/agent/{self.character_name}/use_path", payload=payload, timeout=5.0 if not self.debug else 600.0):
+                    for reply in self.session.get(f"cognitive/map/agent/{self.character_name}/use_path", payload=payload, timeout=5.0 if not self.debug else 300.0):
                         if reply.ok:
                             data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
                             ok = data.get('success', False)
@@ -1891,7 +1891,7 @@ end your response with </end>
                     if isinstance(resolved, str) and resolved:
                         # Query resource rules using instance name (handler strips numeric suffix)
                         rules_response = None
-                        for reply in self.session.get(f"cognitive/map/resource_rules/{resolved}", timeout=3.0 if not self.debug else 600.0):
+                        for reply in self.session.get(f"cognitive/map/resource_rules/{resolved}", timeout=3.0 if not self.debug else 300.0):
                             if reply.ok:
                                 rules_response = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
                                 break
@@ -2225,7 +2225,7 @@ end your response with </end>
             try:
                 plan_start = self.current_plan_start_sim_iso
                 plan_end = None
-                for time_reply in self.session.get("cognitive/map/simulation_time", timeout=2.0 if not self.debug else 600.0):
+                for time_reply in self.session.get("cognitive/map/simulation_time", timeout=2.0 if not self.debug else 300.0):
                     if time_reply.ok:
                         time_data = json.loads(time_reply.ok.payload.to_bytes().decode('utf-8'))
                         if time_data.get('success'):
@@ -2506,7 +2506,9 @@ End your response with </end>
             reason = f'\nDialog end detected with {other_name}, dialog_history:\n{dialog_history}\n'
             # In manual mode, do not replan due to dialog
             if not self.manual and self.current_plan:
-                self._replan(self.current_goal, reason)
+                new_goal = self._replan(self.current_goal, reason)
+                if new_goal:
+                    self._plan(new_goal)
             return
         except Exception as e:
             logger.error(f'Error in end dialog callback: {e}')
@@ -2610,7 +2612,9 @@ End your response with </end>
                     reason = f'Dialog end detected with {source}, dialog_history:\n{dialog_history}'
                     self.publish_dialog_end(source)
                     if not self.manual:
-                        self._replan(self.current_goal, reason)
+                        new_goal = self._replan(self.current_goal, reason)
+                        if new_goal:
+                            self._plan(new_goal)
                     action_data = {'type': 'dialog_end','action_id': f'action_{self.action_counter}','timestamp': datetime.now().isoformat(),'input': text_input,'text': 'Done','source': source}
                     self.action_publisher.put(json.dumps(action_data))
                     logger.info(f'📤 Published action: {action_data["action_id"]}')
@@ -2646,12 +2650,15 @@ you are:
             if dialog_history:
                 user_prompt += f"{dialog_history}\n"
 
-            user_prompt +=  """\nSpeak in a conversational manner in your own voice. 
-Do not invent knowledge not contained in the data of the current situation. 
-For example if a resource is listed (e.g. mushroom29), do not invent knowledge about it beyond general knowledge of mushrooms not contained above.
-Do not include any other introductory, explanatory, discursive, or formatting text in your response.
-End your text with: </end>
-"""+'speech:' if mode == 'say' else 'response:' 
+            user_prompt +=  f"""\nAgain, you are rewriting a text to be spoken within a conversation:
+            
+            {text_input}
+
+Output ONLY the updated text to be spoken within a conversation, Speak in a conversational manner in your own voice. 
+Do not include any introductory, explanatory, discursive, or formatting text in your response, only the text of the response.
+End your response with:
+</end>
+"""
                     
             # Make LLM call
             if self.llm_client and not self.shutdown_requested:
@@ -2847,7 +2854,7 @@ End your text with: </end>
         """Find which direction a target (character or resource) is visible in."""
         try:
             # Query situation node for current situation data
-            for reply in self.session.get(f"cognitive/{self.character_name}/situation/current_situation", timeout=5.0 if not self.debug else 600.0):
+            for reply in self.session.get(f"cognitive/{self.character_name}/situation/current_situation", timeout=5.0 if not self.debug else 300.0):
                 if reply.ok:
                     situation_data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
                     if not situation_data.get('success'):
@@ -2913,7 +2920,7 @@ End your text with: </end>
         snapshot: List[Dict[str, Any]] = []
         try:
             situation = None
-            for reply in self.session.get(f"cognitive/{self.character_name}/situation/current_situation", timeout=3.0 if not self.debug else 600.0):
+            for reply in self.session.get(f"cognitive/{self.character_name}/situation/current_situation", timeout=3.0 if not self.debug else 300.0):
                 if reply.ok:
                     situation_data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
                     if situation_data.get('success'):
@@ -2954,7 +2961,7 @@ End your text with: </end>
         try:
             # Query map node to move the agent
             move_data = {'direction': move_direction}
-            for reply in self.session.get(f"cognitive/map/agent/{self.character_name}/move", payload=json.dumps(move_data).encode('utf-8'), timeout=5.0 if not self.debug else 600.0):
+            for reply in self.session.get(f"cognitive/map/agent/{self.character_name}/move", payload=json.dumps(move_data).encode('utf-8'), timeout=5.0 if not self.debug else 300.0):
                 try:
                     if reply.ok:
                         move_result = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
@@ -3000,7 +3007,7 @@ End your text with: </end>
             # Remove the resource from the map
             removed = False
             last_error = ''
-            for reply in self.session.get(f"cognitive/map/resource/remove/{target}", timeout=2.0 if not self.debug else 600.0):
+            for reply in self.session.get(f"cognitive/map/resource/remove/{target}", timeout=2.0 if not self.debug else 300.0):
                 if reply.ok:
                     data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
                     if data.get('success'):
@@ -3066,7 +3073,7 @@ End your text with: </end>
                 payload = json.dumps({'character_name': self.character_name}).encode('utf-8')
             except Exception:
                 payload = None
-            for reply in self.session.get(f"cognitive/map/resource/place/{target}", payload=payload, timeout=2.0 if not self.debug else 600.0):
+            for reply in self.session.get(f"cognitive/map/resource/place/{target}", payload=payload, timeout=2.0 if not self.debug else 300.0):
                 if reply.ok:
                     data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
                     if data.get('success'):
@@ -3290,7 +3297,7 @@ End your response with:
         try:
             # Query short-term memory
             entries = []
-            for reply in self.session.get(f"cognitive/{self.character_name}/memory/chat/*", timeout=3.0 if not self.debug else 600.0):
+            for reply in self.session.get(f"cognitive/{self.character_name}/memory/chat/*", timeout=3.0 if not self.debug else 300.0):
                 try:
                     if reply.ok:
                         content = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
@@ -3430,7 +3437,7 @@ End your response with:
         entity_name = entity_name.replace('$', '')
         try:
             # Query entity data from memory node with query and limit parameters
-            for reply in self.session.get(f"cognitive/{self.character_name}/memory/entity/{entity_name}?query=dialog&limit={limit}&scope={scope}", timeout=3.0 if not self.debug else 600.0):
+            for reply in self.session.get(f"cognitive/{self.character_name}/memory/entity/{entity_name}?query=dialog&limit={limit}&scope={scope}", timeout=3.0 if not self.debug else 300.0):
                 try:
                     if reply.ok:
                         data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
@@ -3467,7 +3474,7 @@ End your response with:
             encoded_text = urllib.parse.quote(input_text)
             query_url = f"cognitive/{self.character_name}/memory/entity/{entity_name}?query=natural_dialog_end&input_text={encoded_text}&context={self.observations['static']}"
             
-            for reply in self.session.get(query_url, timeout=10.0 if not self.debug else 600.0):
+            for reply in self.session.get(query_url, timeout=10.0 if not self.debug else 300.0):
                 try:
                     if reply.ok:
                         data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))

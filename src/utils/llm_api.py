@@ -112,9 +112,11 @@ class LLM():
             headers = {"Content-Type": "application/json"}
             url = 'http://localhost:5000/v1/completions'
             content = '\n'.join([msg['content'] for msg in substituted_prompt])
+            if self.model.startswith('models/Qwen3-Next'):
+                temperature = temperature / 2.0
             response =  requests.post(url, headers= headers,
                                           json={"model":self.model, 
-                                                "prompt":content, "temperature":0.0,
+                                                "prompt":content, "temperature":temperature,
                                                "top_p":top_p, "max_tokens":max_tokens, "stop":stops})
         elif 'llama.cpp' in self.server_name:
             url = 'http://localhost:5000/v1/chat/completions'

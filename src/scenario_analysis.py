@@ -26,6 +26,7 @@ from utils.llm_api import LLM
 logger = logging.getLogger("scenario_analysis")
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
+_debug = str(os.getenv('CWB_DEBUG', '')).lower() in ('1', 'true', 'yes', 'on')
 
 def _ensure_map_types(session, scenario: dict):
     """Ensure map/types are available.
@@ -37,7 +38,7 @@ def _ensure_map_types(session, scenario: dict):
     """
     # First attempt
     try:
-        for reply in session.get("cognitive/map/types", timeout=10.0):
+        for reply in session.get("cognitive/map/types", timeout=10.0 if not _debug else 300.0):
             if reply.ok:
                 data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
                 if data.get('success'):
@@ -65,7 +66,7 @@ def _ensure_map_types(session, scenario: dict):
 
     try:
         types = {}
-        for reply in session.get("cognitive/map/types", timeout=60.0):
+        for reply in session.get("cognitive/map/types", timeout=60.0 if not _debug else 300.0):
             if reply.ok:
                 data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
                 if data.get('success'):
@@ -74,7 +75,7 @@ def _ensure_map_types(session, scenario: dict):
 
         if not types:
             return {}, '', map_process
-        for reply in session.get("cognitive/map/types", timeout=10.0):
+        for reply in session.get("cognitive/map/types", timeout=10.0 if not _debug else 300.0):
             if reply.ok:
                 data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
                 if data.get('success'):
@@ -84,7 +85,7 @@ def _ensure_map_types(session, scenario: dict):
         if types.get('resource_types'):
             for resource_type in types['resource_types']:
                 resource_type_str += f"\n{resource_type}"
-                for reply in session.get(f"cognitive/map/resource_rules/{resource_type}", timeout=5):
+                for reply in session.get(f"cognitive/map/resource_rules/{resource_type}", timeout=5 if not _debug else 300.0):
                     if reply.ok:
                         rules_response = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
                         break

@@ -86,7 +86,7 @@ class ZenohMemoryNode:
         # LLM client for entity model functionality
         self.llm_client = None
         if LLM_CLIENT_AVAILABLE:
-            self.llm_client = ZenohLLMClient(service_timeout=60.0 if not self.debug else 600.0)
+            self.llm_client = ZenohLLMClient(service_timeout=60.0 if not self.debug else 300.0)
         
         # Subscriber for incoming data to store (character-specific)
         self.data_subscriber = self.session.declare_subscriber(
@@ -378,7 +378,7 @@ class ZenohMemoryNode:
                     pass
             
             if not query_type:
-                raise ValueError("Missing required 'query' parameter. Use query=dialog or query=natural_dialog_end")
+                raise ValueError("Missing required 'query' parameter. Use query=dialog, query=natural_dialog_end, or query=relation")
             
             # Check if entity exists (case-insensitive)
             canonical_entity_name = entity_name.capitalize()
@@ -450,8 +450,16 @@ class ZenohMemoryNode:
                         'should_end': should_end
                     }
                     
+                elif query_type == 'relation':
+                    # Handle relation data retrieval (discourse_state and tom_model)
+                    response = {
+                        'success': True,
+                        'discourse_state': entity.discourse_state,
+                        'tom_model': entity.tom_model
+                    }
+                    
                 else:
-                    raise ValueError(f"Unknown query type: {query_type}. Use 'dialog' or 'natural_dialog_end'")
+                    raise ValueError(f"Unknown query type: {query_type}. Use 'dialog', 'natural_dialog_end', or 'relation'")
             
             query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
             logger.info(f'👥 Entity {query_type} query for {entity_name}: completed')

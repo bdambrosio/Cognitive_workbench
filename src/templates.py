@@ -162,7 +162,7 @@ Step 1. Categorize the drive
 
 Step 2. Identify AXES  
 - Return 1–4 orthogonal state–antonym pairs for the drive.  
-- State names should be concise, agent-centered.  
+- State names should be concise, agent-centered.  defini
 - For Cooperative drives: define axes that apply across participants (e.g., proposal → consensus).  
 - For Relational drives: define axes about the relationship (e.g., suspicious ↔ trusting).
 
@@ -182,7 +182,7 @@ Example:
   "speechact": "propose",
   "itemclass": "Proposal",
   "facets": {
-    "owner": "Jean",             // optional, when agent-specific
+    "owner": "Jean",             // optional, when agent-specificdefini
     "about": ["Share/Entitlement","Field"],  // link to domain things
     "dimensions": ["ratio","boundary","witnesses"],  // multidimensional, optional, for cognitive itemclasses like agreements
     "target": "Authority"  // optional, when agent-specific
@@ -377,6 +377,37 @@ Each step should:
 
 Do not include any other text, introductory, explanatory, markdown, code fences, etc.
 """
+
+AGENDA_TEMPLATE="""
+You are selecting the next focus for an agent.
+
+AGENDA ITEMS:
+{format_agenda(state.agenda)}
+
+DISCOURSE STATE:
+{state.discourse_text}
+
+CURRENT TIME: {state.current_time}
+
+TASK:
+1. Select which agenda item should be the focus now
+2. List which commitments/agreements constrain this focus
+3. Explain your reasoning
+
+Consider:
+- Items with approaching deadlines (urgent)
+- Items not executed recently (starved)
+- Items that block others (dependencies)
+- Which constraints semantically apply to the selected focus
+
+OUTPUT (use exactly this format):
+SELECTED_FOCUS: [agenda item description]
+APPLICABLE_CONSTRAINTS:
+- [constraint 1 text]
+- [constraint 2 text]
+REASONING: [explanation]
+"""
+
 
 REWRITE_TEMPLATE = """Task: rewrite an activity step into a concise goal statement using only allowed nouns and verbs.
 Output: a goal statement text string. Do not include any other text, introductory, explanatory, markdown, code fences, etc.

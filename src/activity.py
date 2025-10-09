@@ -471,7 +471,7 @@ class ActivityManager:
                 situation['thoughts'] = thoughts
             # get inventory
             situation['inventory'] = []
-            for reply in self.executive_node.session.get(f"cognitive/{self.executive_node.character_name}/memory/inventory", timeout=2.0 if not self.executive_node.debug else 600.0):
+            for reply in self.executive_node.session.get(f"cognitive/{self.executive_node.character_name}/memory/inventory", timeout=2.0 if not self.executive_node.debug else 300.0):
                 if reply.ok:
                     data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
                     if data.get('success'):
@@ -493,7 +493,7 @@ class ActivityManager:
         
         # Get simulation time from map_node
         try:
-            for time_reply in self.executive_node.session.get("cognitive/map/simulation_time", timeout=70.0):
+            for time_reply in self.executive_node.session.get("cognitive/map/simulation_time", timeout=70.0 if not self.executive_node.debug else 300.0):
                 if time_reply.ok:
                     time_data = json.loads(time_reply.ok.payload.to_bytes().decode('utf-8'))
                     if time_data.get('success'):

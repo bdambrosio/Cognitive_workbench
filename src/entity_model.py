@@ -4,10 +4,11 @@ Entity Model for tracking character interactions and conversations.
 """
 
 from datetime import datetime
+import traceback
 from typing import List, Dict, Any, Optional
 import json
 import random
-
+import discourse
 from utils import hash_utils
 try:
     from llm_client import ZenohLLMClient
@@ -29,6 +30,9 @@ class EntityModel:
         self.last_seen: Optional[datetime] = None
         self.llm_client = llm_client
         self.logger = logger
+        self.discourse = discourse.DiscourseTracker(llm_client, character_name, entity_name)
+        self.discourse_state = ""
+        self.tom_model = ""
         
         # Dialog system - list of dialogs, each dialog is a list of conversation entries
         self.dialogs: List[List[Dict[str, Any]]] = []
@@ -78,7 +82,10 @@ class EntityModel:
         Close the current dialog. Next conversation entry will start a new dialog.
         """
         self.active = False
-        # Consolidate dialogs if they are too long
+        # Consolidate dialogs if there are more than 6
+        dialog = self.dialogs[-1]
+        self.discourse_state = self.discourse.analyze_segment(dialog, previous_discourse_state=self.discourse_state, tom=self.tom_model)
+        self.tom_model = self.discourse.update_tom_from_discourse_segment(dialog, self.character_name, discourse_state=self.discourse_state, previous_tom_state=self.tom_model)
         if len(self.dialogs) <= 6:
             return
         dialog_to_consolidate = self.dialogs[-6]
@@ -370,6 +377,7 @@ My rating is:
             
         except Exception as e:
             self.logger.error(f'Error in natural_dialog_end for {self.entity_name}: {e}')
+            traceback.print_exc()
             self.close_dialog()
             return True
     

@@ -21,7 +21,7 @@ from utils import hash_utils
 from utils.state_utils import calculate_state_activity_alignment, get_known_states
 from utils.format_utils import format_middle_nouns, format_middle_verbs
 # Type checking imports
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, List
 if TYPE_CHECKING:
     from executive_node import ZenohExecutiveNode
 
@@ -515,67 +515,6 @@ class DiscourseTracker:
     def increment_turn(self):
         self.turn += 1
 
-    def get_recent_objects(self):
-        return [obj for obj in self.objects.values() if obj.turn > (self.turn - 10)]
-
-    def get_active_objects(self):
-        return [obj for obj in self.objects.values() if obj.status in ['active', 'pending']]
-
-    def get_recent_turns(self):
-        return [obj for obj in self.objects.values() if obj.turn > (self.turn - 10)]
-
-    def get_active_turns(self):
-        return [obj for obj in self.objects.values() if obj.status in ['active', 'pending']]
-
-    def get_recent_objects(self):
-        return [obj for obj in self.objects.values() if obj.turn > (self.turn - 10)]
-
-    def get_active_objects(self):
-        return [obj for obj in self.objects.values() if obj.status in ['active', 'pending']]
-
-    def get_recent_turns(self):
-        return [obj for obj in self.objects.values() if obj.turn > (self.turn - 10)]
-
-    def get_active_turns(self):
-        return [obj for obj in self.objects.values() if obj.status in ['active', 'pending']]    
-
-    def build_extraction_prompt(self, recent_turns):
-        system_prompt = DISCOURSE_TEMPLATE
-        user_prompt = self.build_extraction_user_prompt(recent_turns)
-        return system_prompt, user_prompt
-
-    def build_extraction_user_prompt(self, recent_turns):
-        # Include only objects from current conversation
-        active_objects = [
-            obj for obj in self.objects.values()
-            if obj.status in ['active', 'pending']
-        ]
-        
-        # Further filter to recently mentioned (last 10 turns)
-        recent_objects = [
-            obj for obj in active_objects
-            if obj.turn > (self.current_turn - 10)
-        ]
-        
-        return json.dumps([obj.to_dict() for obj in recent_objects], indent=2)
-
-    def extract_objects(self, recent_turns):
-        recent_objects  = self.build_extraction_prompt(recent_turns)
-        response = self.llm_client.ask({'recent_turns': recent_turns, 
-                                'current_objects': '', 
-                                'relevant_historical_objects': '',
-                                }, 
-                            [SystemMessage(content=DISCOURSE_TEMPLATE)],
-                            max_tokens=3000,
-                            temp=0.4,
-                            stops=['</end>'],
-                            is_json=True,
-                            log=True, trace=True)
-        if isinstance(response, dict):
-            print(json.dumps(response, indent=2))
-        else:
-            print(response)
-        return response
 
     def format_segment(self, dialog, start, end):
       formatted_turns = []
@@ -589,12 +528,13 @@ class DiscourseTracker:
           formatted_turns.append(f"{turn['source']}: {turn['text']}")
       return '\n'.join(formatted_turns)
 
-
-    def analyze_segment(self, dialog, start, end, previous_discourse_state, tom=""):
+    def analyze_segment(self, dialog, start=0, end=None, previous_discourse_state="", tom=""):
+        if end is None:
+            end = len(dialog) - 1
         segment  = self.format_segment(dialog, start, end)
         response = self.llm_client.ask({'conversation_turns': segment, 
                                       'previous_discourse_state': previous_discourse_state, 
-                                      'current_tom_model': '',
+                                      'current_tom_model': tom,
                                       'start_turn': start,
                                       'end_turn': end
                                 }, 
@@ -603,18 +543,20 @@ class DiscourseTracker:
                             temp=0.4,
                             stops=['</end>'],
                             is_json=False,
-                            log=True, trace=True)
-        if isinstance(response, dict):
-            print(json.dumps(response, indent=2))
-        else:
-            print(response)
+                            log=True)
+        #if isinstance(response, dict):
+        #    logger.info(json.dumps(response, indent=2))
+        #else:
+        #    logger.info(response)
         return response
 
-    def update_tom_from_discourse_segment(self, dialog, character_name, start, end, discourse_state, previous_tom_state):
+    def update_tom_from_discourse_segment(self, dialog, character_name, start=0, end=None, discourse_state="", previous_tom_state=""):
+        if end is None:
+            end = len(dialog) - 1
         segment  = self.format_segment(dialog, start, end)
         response = self.llm_client.ask({'conversation_turns': segment, 
                                       'current_discourse_state': discourse_state, 
-                                      'previous_tom_model': '',
+                                      'previous_tom_model': previous_tom_state,
                                       'other_person_name': character_name,
                                       'start_turn': start,
                                       'end_turn': end
@@ -624,13 +566,58 @@ class DiscourseTracker:
                             temp=0.4,
                             stops=['</end>'],
                             is_json=False,
-                            log=True, trace=True)
-        if isinstance(response, dict):
-            print(json.dumps(response, indent=2))
-        else:
-            print(response)
+                            log=True)
+        #if isinstance(response, dict):
+        #    print(json.dumps(response, indent=2))
+        #else:
+        #    print(response)
         return response
+# Extraction functions (LLM-based, clearly defined)
+def extract_agenda_items(llm_client, discourse_state: str, my_name: str) -> List[dict]:
+    """
+    Extract all items competing for my attention.
+    """
+    
+    prompt = """
+Extract agenda items from this discourse state for {{$my_name}}.
 
+DISCOURSE STATE:
+{{$discourse_state}}
+
+Create agenda items for:
+1. [Self → Other] commitments - things {{$my_name}} committed to DO
+2. [Other → Self] commitments - things others committed to do that {{$my_name}} should MONITOR
+3. Mutual agreements - joint ACTIVITIES both parties will pursue
+
+Skip vague cooperation statements. Focus on concrete, actionable items.
+
+Output format (one per line):
+TYPE|ACTION_DESCRIPTION
+
+Where TYPE is: commitment, monitoring, or activity
+
+Examples:
+commitment|Give Joe water from the spring
+activity|Explore surroundings with Joe to find way out  
+monitoring|Check that Joe is participating in exploration
+
+Output:"""
+    
+    response = llm_client.ask({'discourse_state': discourse_state, 'my_name': my_name}, [SystemMessage(content=prompt)], 
+                                max_tokens=500, temp=0.4, stops=['</end>'], is_json=False, log=True)
+    
+    items = []
+    for line in response.strip().split('\n'):
+        if '|' not in line:
+            continue
+        type_, action = line.split('|', 1)
+        items.append({
+            "type": type_.strip(),
+            "action": action.strip()
+        })
+    
+    return items
+    
 
 #]Conversation ID: conv_forest_2025_001
 #Participants: Joe, Samantha
@@ -678,6 +665,8 @@ def main():
     #print(discourse_tracker.get_objects())
     discourse_state = discourse_tracker.analyze_segment(conversation, 1, 10, '')
     tom = discourse_tracker.update_tom_from_discourse_segment(conversation, 'Joe', 1, 10, discourse_state, '' )
+    agenda_items = extract_agenda_items(llm_client,discourse_state, "Joe")
+    print(agenda_items)
     #final_discourse_state = discourse_tracker.analyze_segment(conversation, 11, 21, discourse_state, tom)
     #final_tom = discourse_tracker.update_tom_from_discourse_segment(conversation, 'Joe', 11, 21, final_discourse_state, tom)
 

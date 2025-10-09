@@ -93,45 +93,58 @@ def format_map_tools(map_types: Dict[str, List[str]]) -> str:
     return type_str.replace('\n\n','\n')
 
 def _format_dict_clean(data):
-    """Format a dict with clean, unescaped quotes for better readability."""
-    if not isinstance(data, dict):
-        return str(data)
-    
-    items = []
-    for key, value in data.items():
-        if isinstance(value, str):
-            items.append(f"'{key}': '{value}'")
-        elif isinstance(value, list):
-            if value and isinstance(value[0], dict):
-                # Handle list of dicts (like resources)
-                formatted_items = []
-                for item in value:
-                    if isinstance(item, dict):
-                        formatted_items.append(_format_dict_clean(item))
-                    else:
-                        formatted_items.append(_format_value_clean(item))
-                items.append(f"'{key}': [{', '.join(formatted_items)}]")
+    """Format dict without braces or quotes, more natural for LLM prompts."""
+    try:
+        if not isinstance(data, dict):
+            return str(data)
+        
+        items = []
+        for key, value in data.items():
+            if isinstance(value, list):
+                if value and isinstance(value[0], dict):
+                    # Handle list of dicts (resources/paths with 'name' and other fields)
+                    formatted_items = []
+                    for item in value:
+                        if isinstance(item, dict):
+                            # Extract 'name' field, format others as "key: value"
+                            name = item.get('name', '')
+                            other_fields = []
+                            for k, v in item.items():
+                                if k != 'name':
+                                    other_fields.append(f"{k}: {v}")
+                            if name and other_fields:
+                                formatted_items.append(f"{name} at {', '.join(other_fields)}")
+                            elif name:
+                                formatted_items.append(name)
+                            else:
+                                # Fallback: format all fields
+                                formatted_items.append(', '.join(f"{k}: {v}" for k, v in item.items()))
+                        else:
+                            formatted_items.append(str(item))
+                    items.append(f"{key}: [{', '.join(formatted_items)}]")
+                else:
+                    # Simple list
+                    items.append(f"{key}: [{', '.join(str(v) for v in value)}]")
             else:
-                # Handle simple lists
-                formatted_values = [_format_value_clean(v) for v in value]
-                items.append(f"'{key}': [{', '.join(formatted_values)}]")
-        else:
-            items.append(f"'{key}': {_format_value_clean(value)}")
-    
-    return '{' + ', '.join(items) + '}'
+                # Simple value
+                items.append(f"{key}: {value}")
+        
+        return ', '.join(items)
+    except Exception:
+        # Fallback to string representation
+        return str(data)
 
 
 def _format_value_clean(value):
-    """Format a value with clean, unescaped quotes for better readability."""
-    if isinstance(value, str):
-        return f"'{value}'"
-    elif isinstance(value, dict):
-        return _format_dict_clean(value)
-    elif isinstance(value, list):
-        formatted_items = [_format_value_clean(item) for item in value]
-        return '[' + ', '.join(formatted_items) + ']'
-    else:
-        # For numbers, booleans, None, etc., use str() for clean output
+    """Format value without quotes for natural LLM prompts."""
+    try:
+        if isinstance(value, dict):
+            return _format_dict_clean(value)
+        elif isinstance(value, list):
+            return '[' + ', '.join(str(v) for v in value) + ']'
+        else:
+            return str(value)
+    except Exception:
         return str(value)
 
 def format_middle_nouns(middle_ontology):
