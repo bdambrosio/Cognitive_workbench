@@ -152,8 +152,6 @@ class ZenohExecutiveNode:
         # Publisher for memory storage (character-specific)
         self.memory_publisher = self.session.declare_publisher(f"cognitive/{character_name}/memory/store")
         
-        # Publisher for text input to other characters (character-specific)
-        self.text_input_publisher = self.session.declare_publisher(f"cognitive/{character_name}/text_input")
         
         # Publisher for goals (character-specific)
         self.goal_publisher = self.session.declare_publisher(f"cognitive/{character_name}/goal")
@@ -194,7 +192,7 @@ class ZenohExecutiveNode:
         self.current_goal = None
         self.observations = None
         self.interrupt_pending = False
-        self.text_input_pending = False
+        self.text_input_queue = []
         self.action_history = []  # List of ActionRecord instances
         
         # Plan execution state
@@ -234,12 +232,15 @@ class ZenohExecutiveNode:
             if not self.manual:
                 logger.warning(f"No activity ontology for {self.character_name}: {e}")
         self.map_types = {}
-        for reply in self.session.get("cognitive/map/types", timeout=2.0 if not self.debug else 300.0):
-            if reply.ok:
-                data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
-                if data.get('success'):
-                    self.map_types = data
-                    break
+        try:
+            for reply in self.session.get("cognitive/map/types", timeout=2.0 if not self.debug else 300.0):
+                if reply.ok:
+                    data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
+                    if data.get('success'):
+                        self.map_types = data
+                        break
+        except Exception as e:
+            logger.error(f'Error querying map types in __init__: {e}')
 
         # Publish initial state snapshot so UI has data before first time advance
         try:
@@ -306,7 +307,6 @@ class ZenohExecutiveNode:
         logger.info(f'   - Publishing to: cognitive/{character_name}/action')
         logger.info(f'   - Publishing to: cognitive/{character_name}/situation/request_update')
         logger.info(f'   - Publishing to: cognitive/{character_name}/memory/store')
-        logger.info(f'   - Publishing to: cognitive/{character_name}/text_input')
         logger.info(f'   - Publishing to: cognitive/{character_name}/goal')
         logger.info(f'   - Publishing to: cognitive/{character_name}/decided_action')
         logger.info(f'   - Publishing to: cognitive/map/turn/complete/{character_name}')
@@ -351,29 +351,17 @@ class ZenohExecutiveNode:
             # Start OODA loop
             while not self.shutdown_requested:
                 if self.waiting_for_turn:
-                    # Wait for turn signal
-                    if self.text_input_pending and self.last_sense_data:
-                        content = self.last_sense_data['content']
-                        try:
-                            content_data = json.loads(content)
-                            text_input = content_data.get('text', '')
-                            source = content_data.get('source', 'unknown')
-                            #if source == 'User': # other text inputs must be handled by OODA to observe dialog turn taking
-                            self.generate_speech(text_input, source, mode='respond')
-                            self.text_input_pending = False
-                            self.last_sense_data = None
-                        except (json.JSONDecodeError, TypeError):
-                            logger.error(f'Error parsing text input: {content}')
-                            self.text_input_pending = False
-                            self.last_sense_data = None
-                            continue
-                    else:
-                        time.sleep(0.1)
+                    time.sleep(0.2)
                 else:
-                    self._run_ooda_loop()
-                    # Complete turn after OODA loop
+                    try:
+                        if self.text_input_queue:
+                            self._process_text_input()
+                        else:
+                            self._run_ooda_loop()
+                    except Exception as e:
+                        logger.error(f'Error in OODA loop: {e}')
                     self._complete_turn()
-                time.sleep(0.2)  # Small delay to prevent busy waiting
+                time.sleep(0.2)
                 
         except KeyboardInterrupt:
             logger.info('Executive Node shutting down...')
@@ -402,15 +390,20 @@ class ZenohExecutiveNode:
     def send_text_input(self, target_character: str, message: str):
         """Send text input to another character."""
         try:
-            # Create text input data in JSON format
-            text_input_data = {
-                'source': self.character_name,
-                'text': message
+            # Create sense data format
+            sense_data = {
+                'timestamp': datetime.now().isoformat(),
+                'sequence_id': 0,
+                'mode': 'text',
+                'content': json.dumps({
+                    'source': self.character_name,
+                    'text': message
+                })
             }
             
-            # Publish to the target character's text_input topic
-            target_publisher = self.session.declare_publisher(f"cognitive/{target_character}/text_input")
-            target_publisher.put(json.dumps(text_input_data))
+            # Publish directly to target character's sense_data topic
+            target_publisher = self.session.declare_publisher(f"cognitive/{target_character}/sense_data")
+            target_publisher.put(json.dumps(sense_data))
             
             logger.info(f'📤 {self.character_name} Sent text input to {target_character}: "{message}" (source: {self.character_name})')
             
@@ -584,6 +577,21 @@ class ZenohExecutiveNode:
         return None
 
 
+    def _process_text_input(self):
+        """Process one queued text input."""
+        sense_data = self.text_input_queue.pop(0)
+        content = sense_data['content']
+        try:
+            content_data = json.loads(content)
+            text_input = content_data.get('text', '')
+            source = content_data.get('source', 'unknown')
+        except (json.JSONDecodeError, TypeError):
+            text_input = content
+            source = 'console'
+        if text_input and text_input.strip():
+            logger.info(f'📥 {self.character_name} Processing text input: "{text_input}" (source: {source})')
+            self.generate_speech(text_input, source, mode='respond')
+        
     def _run_ooda_loop(self):
         """Execute the OODA loop: Observe, Orient, Decide, Act."""
         try:
@@ -708,9 +716,9 @@ class ZenohExecutiveNode:
 
         if self.last_situation_data and self.last_situation_data.get('characters'):
             for character_name in self.last_situation_data['characters']:
-                entity_context = self.get_entity_context(character_name, 10)
-                if entity_context:
-                    formatted_situation += f"\n#You can see {character_name}"#, with whom you have had the following conversation history:\n"
+                #entity_context = self.get_entity_context(character_name, 10)
+                #if entity_context:
+                formatted_situation += f"\n#You can see {character_name}"#, with whom you have had the following conversation history:\n"
                     #for memory in entity_context['conversation_history']: 
                         #formatted_situation += f"\n\t{memory['source']}: {memory['text']}"
                     #formatted_situation += '\n'
@@ -763,12 +771,15 @@ class ZenohExecutiveNode:
             if self.character_config.get('drives', None):
                 system_prompt += f"\n#Your drives are:\n\t{'\n\t'.join(self.character_config['drives'])}\n"
             if not self.map_types:
-                for reply in self.session.get("cognitive/map/types", timeout=2.0 if not self.debug else 300.0):
-                    if reply.ok:
-                        data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
-                        if data.get('success'):
-                            self.map_types = data
-                            break
+                try:
+                    for reply in self.session.get("cognitive/map/types", timeout=2.0 if not self.debug else 300.0):
+                        if reply.ok:
+                            data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
+                            if data.get('success'):
+                                self.map_types = data
+                                break
+                except Exception as e:
+                    logger.error(f'Error querying map types in _build_user_prompt: {e}')
             if self.map_types:
                 system_prompt += f"\n#The following are the types primary types in the scenario:\n{format_map_types(self.map_types)}"
             # Build user prompt with context
@@ -788,15 +799,18 @@ class ZenohExecutiveNode:
                 user_prompt += '\n'
             # get inventory and cache exact ids
             inventory = []
-            for reply in self.session.get(f"cognitive/{self.character_name}/memory/inventory", timeout=2.0 if not self.debug else 300.0):
-                if reply.ok:
-                    data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
-                    if data.get('success'):
-                        value = data.get('value', [])
-                        if isinstance(value, list):
-                            inventory.extend(value)
-                        elif value:
-                            inventory.append(value)
+            try:
+                for reply in self.session.get(f"cognitive/{self.character_name}/memory/inventory", timeout=2.0 if not self.debug else 300.0):
+                    if reply.ok:
+                        data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
+                        if data.get('success'):
+                            value = data.get('value', [])
+                            if isinstance(value, list):
+                                inventory.extend(value)
+                            elif value:
+                                inventory.append(value)
+            except Exception as e:
+                logger.error(f'Error querying inventory in _build_user_prompt: {e}')
             # update local cache
             try:
                 self.inventory_cache = [str(v) for v in inventory]
@@ -995,6 +1009,7 @@ class ZenohExecutiveNode:
                                     self.current_plan_start_sim_iso = time_data.get('time_info', {}).get('datetime')
                                     break
                     except Exception:
+                        logger.error(traceback.format_exc())
                         self.current_plan_start_sim_iso = None
                     self._publish_current_plan()
                     self.plan_state = {'step_stack': plan_module.Stack()}
@@ -1019,6 +1034,7 @@ class ZenohExecutiveNode:
         try:
             self.percepts_at_plan = self._capture_percepts_at_plan()
         except Exception:
+            logger.error(traceback.format_exc())
             self.percepts_at_plan = None
         # Capture simulation time at plan start (single-action plans)
         try:
@@ -1029,6 +1045,7 @@ class ZenohExecutiveNode:
                         self.current_plan_start_sim_iso = time_data.get('time_info', {}).get('datetime')
                         break
         except Exception:
+            logger.error(traceback.format_exc())
             self.current_plan_start_sim_iso = None
         self._publish_current_plan()
         # Initialize plan state for new plan
@@ -1091,7 +1108,7 @@ end your response with </end>
 """
 
         # Make LLM call
-        if self.llm_client and not self.shutdown_requested:
+        try:
             response = self.llm_client.generate(
                 messages=[system_prompt, user_prompt, PLAN_TEMPLATE, directive],
                 max_tokens=200,
@@ -1123,7 +1140,17 @@ end your response with </end>
                 self.current_plan = None  # Clear plan so _plan creates new one for this goal
                 logger.info(f'🔄 {self.character_name} cleared plan_bindings for sleep goal (replan failed)')
                 self._publish_goal(self.current_goal)
-        else:   
+        except Exception as e:
+            logger.error(f'Error in LLM processing: {e}')
+            logger.error(traceback.format_exc())
+            self.current_goal = plan_module.Goal('sleep', actors=[self.character_name])
+            self.current_plan = None  # Clear plan so _plan creates new one for this goal
+            logger.info(f'🔄 {self.character_name} cleared plan_bindings for sleep goal (LLM unavailable)')
+            self._publish_goal(self.current_goal)
+        return self.current_goal
+        
+    def _plan_completed(self, reason='plan completed'):
+        if self.llm_client and not self.shutdown_requested:
             logger.error('LLM client not available')
             self.current_goal = plan_module.Goal('sleep', actors=[self.character_name])
             self.current_plan = None  # Clear plan so _plan creates new one for this goal
@@ -1380,6 +1407,12 @@ end your response with </end>
                     current['idx'] = idx + 1
                 return self._execute_next_step(step_stack)
 
+        elif stype == 'sleep':
+            # Evaluate wait condition; if true, advance; else publish turn complete and re-evaluate next turn.
+            logger.info(f"slept for 1 minute; advancing")
+            current['idx'] = idx + 1
+            return self._execute_next_step(step_stack)
+
         else:
             # Unknown or non-executable type: skip
             logger.error(f'Unknown or non-executable step type: {stype}')
@@ -1445,7 +1478,7 @@ end your response with </end>
                             action_record.simulation_time = time_data.get('time_info', {}).get('datetime')
                             break
             except Exception:
-                pass
+                logger.error(traceback.format_exc())
             time.sleep(1)  # Sleep for 1 second
             return True
         if action['type'].lower() == 'think':
@@ -1543,6 +1576,7 @@ end your response with </end>
                     'target': resolved_target if resolved_target else '',                    
                     'requested_target': requested_target,
                     'resolved_target': resolved_target if resolved_target else '',
+                    'source': self.character_name,
                     'text': action.get('value', ''),
                     'status': 'failed',
                     'error': 'conversation lock unavailable'
@@ -1857,17 +1891,20 @@ end your response with </end>
                         payload = json.dumps({'path_id': resolved}).encode('utf-8')
                     except Exception:
                         payload = None
-                    for reply in self.session.get(f"cognitive/map/agent/{self.character_name}/use_path", payload=payload, timeout=5.0 if not self.debug else 300.0):
-                        if reply.ok:
-                            data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
-                            ok = data.get('success', False)
-                            if ok:
-                                self.action_history[-1].result = f'traversed {resolved}'
-                                action_data['status'] = 'success'
-                            else:
-                                self.action_history[-1].result = 'use path failed'
-                                action_data['status'] = 'failed'
-                            break
+                    try:
+                        for reply in self.session.get(f"cognitive/map/agent/{self.character_name}/use_path", payload=payload, timeout=5.0 if not self.debug else 300.0):
+                            if reply.ok:
+                                data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
+                                ok = data.get('success', False)
+                                if ok:
+                                    self.action_history[-1].result = f'traversed {resolved}'
+                                    action_data['status'] = 'success'
+                                else:
+                                    self.action_history[-1].result = 'use path failed'
+                                    action_data['status'] = 'failed'
+                                break
+                    except Exception as e:
+                        logger.error(f'Error querying use_path: {e}')
                     self.action_publisher.put(json.dumps(action_data))
                     if action_data.get('status') == 'success':
                         action_record.outcome_status = 'success'
@@ -1891,10 +1928,13 @@ end your response with </end>
                     if isinstance(resolved, str) and resolved:
                         # Query resource rules using instance name (handler strips numeric suffix)
                         rules_response = None
-                        for reply in self.session.get(f"cognitive/map/resource_rules/{resolved}", timeout=3.0 if not self.debug else 300.0):
-                            if reply.ok:
-                                rules_response = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
-                                break
+                        try:
+                            for reply in self.session.get(f"cognitive/map/resource_rules/{resolved}", timeout=3.0 if not self.debug else 300.0):
+                                if reply.ok:
+                                    rules_response = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
+                                    break
+                        except Exception as e:
+                            logger.error(f'Error querying resource_rules: {e}')
                         if rules_response and rules_response.get('success'):
                             rr = rules_response.get('resource_rules') or {}
                             use_effects = rr.get('use') or []
@@ -2076,9 +2116,6 @@ end your response with </end>
     def _complete_turn(self):
         """Complete the current turn and prepare for the next one."""
         logger.info(f'🔄 {self.character_name} completing turn')
-        # Reset turn-specific state
-        #self.text_input_pending = False
-        #self.interrupt_pending = False
         
         # Publish turn completion
         turn_data = {
@@ -2225,12 +2262,15 @@ end your response with </end>
             try:
                 plan_start = self.current_plan_start_sim_iso
                 plan_end = None
-                for time_reply in self.session.get("cognitive/map/simulation_time", timeout=2.0 if not self.debug else 300.0):
-                    if time_reply.ok:
-                        time_data = json.loads(time_reply.ok.payload.to_bytes().decode('utf-8'))
-                        if time_data.get('success'):
-                            plan_end = time_data.get('time_info', {}).get('datetime')
-                            break
+                try:
+                    for time_reply in self.session.get("cognitive/map/simulation_time", timeout=2.0 if not self.debug else 300.0):
+                        if time_reply.ok:
+                            time_data = json.loads(time_reply.ok.payload.to_bytes().decode('utf-8'))
+                            if time_data.get('success'):
+                                plan_end = time_data.get('time_info', {}).get('datetime')
+                                break
+                except Exception as e:
+                    logger.error(f'Error querying simulation_time in plan digest: {e}')
                 if plan_start and plan_end:
                     from datetime import datetime as _dt
                     start_dt = _dt.fromisoformat(plan_start)
@@ -2413,8 +2453,11 @@ End your response with </end>
                 source = 'console'
             # Process if we have text input
             if text_input and text_input.strip():
-                self.text_input_pending = True
-                logger.info(f'📥 {self.character_name} Received text input: "{text_input}" (source: {source})')
+                self.text_input_queue.append(sense_data)
+                logger.info(f'📥 {self.character_name} Queued text input: "{text_input}" (source: {source}, queue size: {len(self.text_input_queue)})')
+                if len(self.text_input_queue) > 3:
+                    logger.warning(f'⚠️ Text input queue size {len(self.text_input_queue)} > 3, dropping oldest')
+                    self.text_input_queue.pop(0)
                 
         except Exception as e:
             logger.error(f'Error processing sense data: {e}')
@@ -2440,6 +2483,9 @@ End your response with </end>
             active_characters = data.get('active_characters', [])
             
             if self.character_name in active_characters:
+                if not self.waiting_for_turn:
+                    logger.error(f'⚠️ Turn {turn_number} arrived but {self.character_name} still processing turn {self.current_turn_number}!')
+                    return
                 self.current_turn_number = turn_number
                 self.waiting_for_turn = False
                 logger.info(f'🚦 Turn {turn_number} started for {self.character_name}')
@@ -2522,6 +2568,9 @@ End your response with </end>
             
             # Release conversation lock with this character
             self._release_conversation_lock(source)
+            key = f"cognitive/{source}/memory/close_dialog"
+            payload = json.dumps({'entity_name': self.character_name})
+            self.session.put(key, payload)
             
         except Exception as e:
             logger.error(f'Error publishing dialog end to {source}: {e}')
@@ -2604,6 +2653,11 @@ End your response with </end>
                         if isinstance(memory, dict) and 'source' in memory and 'text' in memory:
                             dialog_history += f"\t{memory['source']}: {memory['text']}\n"
 
+            if entity_context:
+                discourse_tom_models = self.get_entity_discourse_tom_models(source)
+                dialog_history += f"\nBeliefs about {source}:\n\n{discourse_tom_models['tom_model']}\n"
+                dialog_history += f"\nDiscourse state with {source}:\n\n{discourse_tom_models['discourse_state']}\n"
+
             # Check if dialog should naturally end
             if mode == 'respond':
                 are_we_done = self.check_natural_dialog_end(source, text_input)
@@ -2655,6 +2709,11 @@ you are:
             {text_input}
 
 Output ONLY the updated text to be spoken within a conversation, Speak in a conversational manner in your own voice. 
+Use the following hash-formatted text to report your response:
+
+#text <your response here>
+##
+
 Do not include any introductory, explanatory, discursive, or formatting text in your response, only the text of the response.
 End your response with:
 </end>
@@ -2673,7 +2732,7 @@ End your response with:
                 )
 
                 if response.success:
-                    text_to_send = response.text.strip()
+                    text_to_send = hash_utils.find('text', response.text)
                     if not text_to_send.lower().startswith('done'):
                         self.send_text_input(source, text_to_send)
                         logger.info(f'Responding to: "{text_input}" from {source}: {text_to_send}')
@@ -2693,7 +2752,7 @@ End your response with:
                         'action_id': f'action_{self.action_counter}',
                         'timestamp': datetime.now().isoformat(),
                         'input': text_input,
-                        'text': response.text.strip() if (response and response.success) else text_to_send,
+                        'text': text_to_send,
                         'source': self.character_name if mode == 'say' else source,
                         'target': source if mode == 'say' else None
         }
@@ -2920,12 +2979,15 @@ End your response with:
         snapshot: List[Dict[str, Any]] = []
         try:
             situation = None
-            for reply in self.session.get(f"cognitive/{self.character_name}/situation/current_situation", timeout=3.0 if not self.debug else 300.0):
-                if reply.ok:
-                    situation_data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
-                    if situation_data.get('success'):
-                        situation = situation_data.get('situation', {})
-                        break
+            try:
+                for reply in self.session.get(f"cognitive/{self.character_name}/situation/current_situation", timeout=3.0 if not self.debug else 300.0):
+                    if reply.ok:
+                        situation_data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
+                        if situation_data.get('success'):
+                            situation = situation_data.get('situation', {})
+                            break
+            except Exception as e:
+                logger.error(f'Error querying current_situation in format_situation: {e}')
             views = situation.get('views', []) if isinstance(situation, dict) else []
             # Cap number of views
             for view in views[:9]:
@@ -2961,19 +3023,22 @@ End your response with:
         try:
             # Query map node to move the agent
             move_data = {'direction': move_direction}
-            for reply in self.session.get(f"cognitive/map/agent/{self.character_name}/move", payload=json.dumps(move_data).encode('utf-8'), timeout=5.0 if not self.debug else 300.0):
-                try:
-                    if reply.ok:
-                        move_result = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
-                        if move_result.get('success'):
-                            logger.info(f'✅ Move successful: {move_direction}')
+            try:
+                for reply in self.session.get(f"cognitive/map/agent/{self.character_name}/move", payload=json.dumps(move_data).encode('utf-8'), timeout=5.0 if not self.debug else 300.0):
+                    try:
+                        if reply.ok:
+                            move_result = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
+                            if move_result.get('success'):
+                                logger.info(f'✅ Move successful: {move_direction}')
+                            else:
+                                logger.error(f'❌ Move failed: {move_result.get("error", "Unknown error")}')
                         else:
-                            logger.error(f'❌ Move failed: {move_result.get("error", "Unknown error")}')
-                    else:
-                        logger.error(f'❌ Move query failed for {self.character_name}')
-                except Exception as e:
-                    logger.error(f'Error parsing move response: {e}')
-                    break
+                            logger.error(f'❌ Move query failed for {self.character_name}')
+                    except Exception as e:
+                        logger.error(f'Error parsing move response: {e}')
+                        break
+            except Exception as e:
+                logger.error(f'Error querying move: {e}')
             
             # Update the most recent action record with the result
             if self.action_history:
@@ -3007,19 +3072,22 @@ End your response with:
             # Remove the resource from the map
             removed = False
             last_error = ''
-            for reply in self.session.get(f"cognitive/map/resource/remove/{target}", timeout=2.0 if not self.debug else 300.0):
-                if reply.ok:
-                    data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
-                    if data.get('success'):
-                        logger.info(f'🗑️ Removed {target} from map')
-                        removed = True
+            try:
+                for reply in self.session.get(f"cognitive/map/resource/remove/{target}", timeout=2.0 if not self.debug else 300.0):
+                    if reply.ok:
+                        data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
+                        if data.get('success'):
+                            logger.info(f'🗑️ Removed {target} from map')
+                            removed = True
+                        else:
+                            last_error = data.get('error', 'Unknown error')
+                            logger.error(f'⚠️ Failed to remove {target} from map: {last_error}')
                     else:
-                        last_error = data.get('error', 'Unknown error')
-                        logger.error(f'⚠️ Failed to remove {target} from map: {last_error}')
-                else:
-                    last_error = 'No response from map_node'
-                    logger.error(f'⚠️ Failed to remove {target} from map - no response')
-                break
+                        last_error = 'No response from map_node'
+                        logger.error(f'⚠️ Failed to remove {target} from map - no response')
+                    break
+            except Exception as e:
+                logger.error(f'Error querying resource/remove: {e}')
 
             return removed
 
@@ -3073,19 +3141,22 @@ End your response with:
                 payload = json.dumps({'character_name': self.character_name}).encode('utf-8')
             except Exception:
                 payload = None
-            for reply in self.session.get(f"cognitive/map/resource/place/{target}", payload=payload, timeout=2.0 if not self.debug else 300.0):
-                if reply.ok:
-                    data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
-                    if data.get('success'):
-                        logger.info(f'🧺 Placed {target} onto map')
-                        placed = True
+            try:
+                for reply in self.session.get(f"cognitive/map/resource/place/{target}", payload=payload, timeout=2.0 if not self.debug else 300.0):
+                    if reply.ok:
+                        data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
+                        if data.get('success'):
+                            logger.info(f'🧺 Placed {target} onto map')
+                            placed = True
+                        else:
+                            last_error = data.get('error', 'Unknown error')
+                            logger.error(f'⚠️ Failed to place {target} on map: {last_error}')
                     else:
-                        last_error = data.get('error', 'Unknown error')
-                        logger.error(f'⚠️ Failed to place {target} on map: {last_error}')
-                else:
-                    last_error = 'No response from map_node'
-                    logger.error(f'⚠️ Failed to place {target} on map - no response')
-                break
+                        last_error = 'No response from map_node'
+                        logger.error(f'⚠️ Failed to place {target} on map - no response')
+                    break
+            except Exception as e:
+                logger.error(f'Error querying resource/place: {e}')
 
             return placed
 
@@ -3458,6 +3529,40 @@ End your response with:
             logger.error(f'Error querying entity context for {entity_name}: {e}')
             return None
     
+    def get_entity_discourse_tom_models(self, entity_name: str, limit: int = 20, scope='all') -> Dict[str, Any]:
+        """
+        Query entity data from memory node for discourse analysis and tom_model.
+        Args:
+            entity_name: Name of the entity to query
+            limit: Number of recent conversation entries to include (default 20)
+        Returns:
+            Dictionary with entity data or None if query failed
+        """
+        # safeguard - don't allow variables in query
+        entity_name = entity_name.replace('$', '')
+        try:
+            # Query entity data from memory node with query and limit parameters
+            for reply in self.session.get(f"cognitive/{self.character_name}/memory/entity/{entity_name}?query=relation", timeout=3.0 if not self.debug else 300.0):
+                try:
+                    if reply.ok:
+                        data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
+                        if data['success']:
+                            logger.info(f'👥 Retrieved entity context for {entity_name}')
+                            return data # { 'discourse_state': 'discourse_state', 'tom_model': 'tom_model' }
+                        else:
+                            logger.warning(f'Entity query failed for {entity_name}: {data.get("error", "Unknown error")}')
+                            return None
+                except Exception as e:
+                    logger.error(f'Error parsing entity query response for {entity_name}: {e}')
+                    return None
+            
+            logger.debug(f'No response received for entity query: {entity_name}')
+            return None
+            
+        except Exception as e:
+            logger.error(f'Error querying entity context for {entity_name}: {e}')
+            return None
+   
     def check_natural_dialog_end(self, entity_name: str, input_text: str) -> bool:
         """
         Check if dialog should naturally end after the given input via memory node.
@@ -3488,11 +3593,12 @@ End your response with:
                     logger.error(f'Error parsing natural dialog end response for {entity_name}: {e}')
                     return True
             
-            logger.debug(f'No response received for natural dialog end query: {entity_name}')
+            logger.error(f'Timeout: No response received for natural dialog end query: {entity_name}')
             return True
             
         except Exception as e:
             logger.error(f'Error querying natural dialog end for {entity_name}: {e}')
+            logger.error(traceback.format_exc())
             return True
     
     def _acquire_conversation_lock(self, target_character: str) -> bool:

@@ -239,7 +239,7 @@ class ZenohMemoryNode:
             if action_type == 'announcement':
                 # Store announcement in short-term memory
                 self.short_term_memory.append(data)
-                logger.info(f'📢 Stored character announcement: {data.get("character_name", "unknown")}')
+                logger.info(f'Stored character announcement: {data.get("character_name", "unknown")}')
             elif action_type == 'say' or action_type == 'response' or action_type == 'think':
                 source = data.get('source', 'unknown')
                 text = data['text']
@@ -248,10 +248,10 @@ class ZenohMemoryNode:
                 self.chat_memory.append(input+': '+text)
                     
                 # Add the character's response to entity conversation history
-                if source and text:
+                if source and text is not None and type(text) == str:
                     # Add conversation entry: this character sent a response to the source
                     self.add_conversation_entry(source, 'sent', text.strip(), self.character_name)
-                    logger.info(f'💬 Added response to entity {source}: {self.character_name} -> "{text[:50]}..."')
+                    logger.info(f'Added response to entity {source}: {self.character_name} -> "{text[:50]}..."')
                 else:
                     logger.error(f'Missing input or text in cognitive_response action: {data.get("action_id", "unknown")}')
             elif action_type == 'take':
@@ -274,7 +274,7 @@ class ZenohMemoryNode:
             else:
                 # Store other action types in short-term memory
                 self.short_term_memory.append(data)
-                logger.info(f'📝 Stored action: {action_type} - {data.get("action_id", "unknown")}')
+                logger.info(f'Stored action: {action_type} - {data.get("action_id", "unknown")}')
                 
         except Exception as e:
             logger.error(f'Error storing data: {e}')

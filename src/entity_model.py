@@ -85,7 +85,7 @@ class EntityModel:
         # Consolidate dialogs if there are more than 6
         dialog = self.dialogs[-1]
         self.discourse_state = self.discourse.analyze_segment(dialog, previous_discourse_state=self.discourse_state, tom=self.tom_model)
-        self.tom_model = self.discourse.update_tom_from_discourse_segment(dialog, self.character_name, discourse_state=self.discourse_state, previous_tom_state=self.tom_model)
+        self.tom_model = self.discourse.update_tom_from_discourse_segment(dialog, self.entity_name, discourse_state=self.discourse_state, previous_tom_state=self.tom_model)
         if len(self.dialogs) <= 6:
             return
         dialog_to_consolidate = self.dialogs[-6]

@@ -4,7 +4,7 @@ llm_config:
   server_name: "vllm"
   model_name: "llama3.3-70b-instruct"
 
-max_turns: 100
+
 Ontology: True
 Activities: True
 setting: |

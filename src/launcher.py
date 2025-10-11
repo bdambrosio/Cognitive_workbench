@@ -3,8 +3,7 @@
 Zenoh Character Launcher
 
 This script launches multiple character instances with their respective nodes.
-Each character gets its own sense_node, memory_node, and executive_node.
-The LLM service node is shared across all characters.
+Each character gets its own memory_node, situation_node, and executive_node.
 """
 
 import subprocess
@@ -114,20 +113,8 @@ class CharacterLauncher:
         self.logger.info(f'Added character: {canonical_name}')
     
     def launch_shared_services(self, map_file: str = None, launch_ui: bool = False, server_name: str = 'vllm', model_name: str = None, ui_port: int = 3000, setting: str = None):
-        """Launch shared services (LLM service node and map node)."""
+        """Launch shared services (map node and optional UI)."""
         self.logger.info('Launching shared services...')
-        
-        # Launch LLM service node (shared across all characters)
-        try:
-            llm_cmd = [sys.executable, 'llm_service_node.py', '--server-name', server_name]
-            if model_name:
-                llm_cmd.extend(['--model-name', model_name])
-            
-            llm_process = subprocess.Popen(llm_cmd)
-            self.shared_processes.append(llm_process)
-            self.logger.info(f'✅ LLM Service Node launched with server: {server_name}, model: {model_name or "default"}')
-        except Exception as e:
-            self.logger.error(f'❌ Failed to launch LLM Service Node: {e}')
         
         # Launch FastAPI Action Display Node (optional UI)
         if launch_ui:
@@ -142,7 +129,6 @@ class CharacterLauncher:
                 self.logger.error(f'❌ Failed to launch FastAPI Action Display Node: {e}')
                 
         
-        time.sleep(2) # give llm node time to start up
         # Launch map node (required for situation awareness)
         try:
             map_args = [sys.executable, 'map_node.py']
@@ -209,22 +195,7 @@ class CharacterLauncher:
         # Small delay to ensure situation_node initializes
         time.sleep(0.5)
         
-        # Launch sense_node for this character (3rd - provides input)
-        try:
-            sense_process = subprocess.Popen([
-                sys.executable, 'sense_node.py', 
-                '-c', character.name, 
-                '-config', json.dumps(character.config)
-            ], env=os.environ.copy())
-            character.processes.append(sense_process)
-            self.logger.info(f'✅ {character.name} sense_node launched')
-        except Exception as e:
-            self.logger.error(f'❌ Failed to launch {character.name} sense_node: {e}')
-        
-        # Small delay to ensure sense_node initializes
-        time.sleep(0.5)
-        
-        # Launch executive_node for this character (4th - needs memory and sense)
+        # Launch executive_node for this character (3rd - needs memory and situation)
         try:
             executive_process = subprocess.Popen([
                 sys.executable, 'executive_node.py', 
