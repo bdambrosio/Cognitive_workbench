@@ -6,6 +6,7 @@ This module provides a simple client interface for making LLM requests via Zenoh
 Replaces ROS2 client complexity with direct Zenoh pub/sub.
 """
 
+import traceback
 import zenoh
 import json
 import time
@@ -15,6 +16,7 @@ import logging
 import sys
 from datetime import datetime
 from typing import Dict, List, Any, Optional
+from Messages import SystemMessage, UserMessage
 from utils.llm_api import LLM
 from concurrent.futures import Future, ThreadPoolExecutor
 
@@ -71,12 +73,17 @@ class ZenohLLMClient:
     def substitute_bindings(self, prompt, bindings):
         return self.llm.substitute_bindings(prompt, bindings)
 
-    def ask(self, bindings: Dict[str, Any] = None, prompt: str = None, max_tokens: int = 150, temp: float = 0.7, stops: List[str] = ['</end>'], is_json: bool = False, log: bool = False, trace: bool = False) -> LLMResponse:
-        #substituted_prompt = self.substitute_bindings(prompt, bindings)
-        #logger.info(f'📤 Sent LLM request {substituted_prompt}')
-        response = self.llm.ask(bindings, prompt, max_tokens=max_tokens, temp=temp, stops=stops, is_json=is_json, log=log, trace=trace)
-        #logger.info(f'📤 Received LLM response {response}')
-        return response
+    def ask(self, bindings: Dict[str, Any] = None, prompt: str = None, max_tokens: int = 150, temp: float = 0.7, stops: List[str] = ['</end>'], is_json: bool = False, log: bool = False, trace: bool = False, timeout: float = 60.0) -> LLMResponse:
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(self.llm.ask, bindings, prompt, max_tokens=max_tokens, temp=temp, stops=stops, is_json=is_json, log=log, trace=trace)
+            try:
+                response = future.result(timeout=timeout)
+                return response
+            except TimeoutError:
+                logger.error(f'⏱️ LLM request timeout after {timeout}s')
+                logger.error(traceback.format_exc())
+                future.cancel()
+                raise
     
     def generate(self, 
                 messages: List[str], 
@@ -100,18 +107,32 @@ class ZenohLLMClient:
         Returns:
             LLMResponse object with the result
         """
-        future = self.generate_async(messages, bindings, max_tokens, temperature, stops, is_json)
-        
         try:
+            message_objects = []
+            for n, message in enumerate(messages):
+                if n == 0:
+                    message_objects.append(SystemMessage(content=message))
+                else:
+                    message_objects.append(UserMessage(content=message))
+ 
+            result = self.ask(bindings, message_objects, max_tokens=max_tokens, temp=temperature, stops=stops, is_json=is_json, log=True, trace=False)
+            """future = self.generate_async(messages, bindings, max_tokens, temperature, stops, is_json))
             timeout_value = timeout or self.service_timeout
             result = future.result(timeout=max(timeout_value, 200.0))
-            return result
+        """
+            return LLMResponse(
+                text=result,
+                success=True,
+                error=None,
+                request_id=-1
+            )
         except Exception as e:
+            logger.error(f'Error in generate: {e}')
             return LLMResponse(
                 text="",
                 success=False,
                 error=f"Request failed: {str(e)}",
-                request_id=future.request_id
+                #request_id=future.request_id
             )
     
     def generate_async(self,

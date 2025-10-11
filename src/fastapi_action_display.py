@@ -246,7 +246,7 @@ class FastAPIActionDisplayNode:
         print('   - Subscribing to: cognitive/*/current_state (character current state)')
         print('   - Subscribing to: cognitive/map/step_complete (step completion)')
         print('   - Subscribing to: cognitive/map/turn (turn start)')
-        print('   - Publishing to: cognitive/{character}/text_input (dynamic)')
+        print('   - Publishing to: cognitive/{character}/sense_data (dynamic)')
         print('   - Publishing to: cognitive/memory/store')
         print(f'   - Web UI available at: http://localhost:{port}')
     
@@ -350,15 +350,20 @@ class FastAPIActionDisplayNode:
             # Get or create publisher for this character
             if actual_character_name not in self.character_publishers:
                 self.character_publishers[actual_character_name] = self.session.declare_publisher(
-                    f"cognitive/{actual_character_name}/text_input"
+                    f"cognitive/{actual_character_name}/sense_data"
                 )
             
-            # Publish text input
-            text_input_data = {
-                'source': 'User',
-                'text': message
+            # Publish sense data directly
+            sense_data = {
+                'timestamp': datetime.now().isoformat(),
+                'sequence_id': 0,
+                'mode': 'text',
+                'content': json.dumps({
+                    'source': 'User',
+                    'text': message
+                })
             }
-            self.character_publishers[actual_character_name].put(json.dumps(text_input_data))
+            self.character_publishers[actual_character_name].put(json.dumps(sense_data))
             
             # Store in memory
             self._store_text_input_in_memory(message, actual_character_name)

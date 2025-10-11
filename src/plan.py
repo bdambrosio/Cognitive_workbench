@@ -970,11 +970,14 @@ def _evaluate_condition(character: ZenohExecutiveNode, condition: dict, observat
                 if binding is not None:
                     return {'value': (not negated), 'binding': binding} if not negated else {'value': False, 'binding': None}
                 # Fallback to distributed query
-                for reply in character.session.get(f"cognitive/{character_name}/situation/proximity?target={target}&negated={negated}", timeout=6.0 if not character.debug else 300.0):
-                    if reply.ok:
-                        data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
-                        if data['success']:
-                            return {'value': data['value'], 'binding': data['binding']}
+                try:
+                    for reply in character.session.get(f"cognitive/{character_name}/situation/proximity?target={target}&negated={negated}", timeout=6.0 if not character.debug else 300.0):
+                        if reply.ok:
+                            data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
+                            if data['success']:
+                                return {'value': data['value'], 'binding': data['binding']}
+                except Exception as e:
+                    logger.error(f'Error querying proximity for {target}: {e}')
                 # If no local match and negated, treat as True; otherwise False
                 return {'value': True, 'binding': None} if negated else {'value': False, 'binding': None}
                     
@@ -984,23 +987,29 @@ def _evaluate_condition(character: ZenohExecutiveNode, condition: dict, observat
                 if binding is not None:
                     return {'value': (not negated), 'binding': binding} if not negated else {'value': False, 'binding': None}
                 # Fallback
-                for reply in character.session.get(f"cognitive/{character_name}/situation/visibility?target={target}&negated={negated}", timeout=6.0 if not character.debug else 300.0):
-                    if reply.ok:
-                        data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
-                        if data['success']:
-                            logger.info(f'Visibility query for {target}: {result}')
-                            return {'value': data['value'], 'binding': data['binding']}
+                try:
+                    for reply in character.session.get(f"cognitive/{character_name}/situation/visibility?target={target}&negated={negated}", timeout=6.0 if not character.debug else 300.0):
+                        if reply.ok:
+                            data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
+                            if data['success']:
+                                logger.info(f'Visibility query for {target}: {result}')
+                                return {'value': data['value'], 'binding': data['binding']}
+                except Exception as e:
+                    logger.error(f'Error querying visibility for {target}: {e}')
                 return {'value': True, 'binding': None} if negated else {'value': False, 'binding': None}
             
             elif normalized_type == 'has_item':
                 # Prefer distributed memory_node for authoritative inventory
-                for reply in character.session.get(f"cognitive/{character_name}/memory/inventory?item={target}&negated={negated}", timeout=6.0 if not character.debug else 300.0):
-                    if reply.ok:
-                        data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
-                        if data['success']:
-                            result = {'value': data['value'], 'binding': data['binding']}
-                            logger.info(f'Inventory query for {target}: {result}')
-                            return result
+                try:
+                    for reply in character.session.get(f"cognitive/{character_name}/memory/inventory?item={target}&negated={negated}", timeout=6.0 if not character.debug else 300.0):
+                        if reply.ok:
+                            data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
+                            if data['success']:
+                                result = {'value': data['value'], 'binding': data['binding']}
+                                logger.info(f'Inventory query for {target}: {result}')
+                                return result
+                except Exception as e:
+                    logger.error(f'Error querying inventory for {target}: {e}')
                 return {'value': False, 'binding': None}
                     
             elif normalized_type == 'at_location':
@@ -1009,13 +1018,16 @@ def _evaluate_condition(character: ZenohExecutiveNode, condition: dict, observat
                 if binding is not None:
                     return {'value': (not negated), 'binding': binding} if not negated else {'value': False, 'binding': None}
                 # Fallback
-                for reply in character.session.get(f"cognitive/{character_name}/situation/location?target={target}&negated={negated}", timeout=6.0 if not character.debug else 300.0):
-                    if reply.ok:
-                        data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
-                        if data['success']:
-                            result = {'value': data['value'], 'binding': data['binding']}
-                            logger.info(f'Location query for {target}: {target}')
-                            return result
+                try:
+                    for reply in character.session.get(f"cognitive/{character_name}/situation/location?target={target}&negated={negated}", timeout=6.0 if not character.debug else 300.0):
+                        if reply.ok:
+                            data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
+                            if data['success']:
+                                result = {'value': data['value'], 'binding': data['binding']}
+                                logger.info(f'Location query for {target}: {target}')
+                                return result
+                except Exception as e:
+                    logger.error(f'Error querying location for {target}: {e}')
                 return {'value': True, 'binding': None} if negated else {'value': False, 'binding': None}
                     
             elif normalized_type in ('believes', 'notbelieves'):

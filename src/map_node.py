@@ -682,7 +682,7 @@ Do not include any other text, reasoning, introductory, expository, or markdown.
             unresponsive = active - completed
             
             if unresponsive:
-                logger.warning(f"⏰ Turn timeout - removing unresponsive characters: {', '.join(unresponsive)}")
+                logger.error(f"⏰ Turn timeout - removing unresponsive characters: {', '.join(unresponsive)}")
                 # Remove unresponsive characters from agent registry
                 for char in unresponsive:
                     if char in self.agent_registry:

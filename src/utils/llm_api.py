@@ -201,6 +201,7 @@ class LLM():
                         response = response.strip()
                     response = json.loads(response)
                 except Exception as e:
+                    logger.error(f'Error parsing JSON, attempting repair:\n {e}')
                     response = self.repair_json(substituted_prompt, response, e)
             if log:
                 logger.debug(f'Response:\n{response}\n')
@@ -248,6 +249,7 @@ class LLM():
         try:
             return json.loads(response)
         except Exception as e:
+            logger.error(f'  Simple JSON repair failed:\n {e}')
             error = e
 
         # Ok, ask llm
@@ -271,5 +273,5 @@ Respond with the repaired JSON string. Make sure the string is in a format that 
         try:
             return json.loads(response.replace("```json", "").replace("```", "").strip())
         except Exception as e:
-            print(f'Error parsing JSON: {e}')
+            print(f'Failed to repair JSON: {e}')
             return None
