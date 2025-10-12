@@ -121,7 +121,20 @@ End your response with:
             response=response.text
             me = hash_utils.find(f'{self.character_name}', response)
             other = hash_utils.find(f'{self.entity_name}', response)
-            self.dialogs[-6] = [me, other]
+            # Wrap summaries in proper entry dicts to maintain consistent structure
+            self.dialogs[-6] = [
+                {
+                    'source': self.character_name,
+                    'text': me,
+                    'timestamp': datetime.now().isoformat(),
+                    'summary': True
+                },
+                {
+                    'source': self.entity_name,
+                    'text': other,
+                    'timestamp': datetime.now().isoformat(),                    'summary': True
+                }
+            ]
         else:
             self.logger.error(f'Error in consolidate_dialog for {self.character_name} and {self.entity_name}: {response}')
 
@@ -263,7 +276,9 @@ End your response with:
             'first_seen': self.first_seen.isoformat() if self.first_seen else None,
             'last_seen': self.last_seen.isoformat() if self.last_seen else None,
             'dialogs': self.dialogs,
-            'active': self.active
+            'active': self.active,
+            'discourse_state': self.discourse_state,
+            'tom_model': self.tom_model
         }
     
     @classmethod
@@ -302,6 +317,45 @@ End your response with:
             # New format
             entity.dialogs = data.get('dialogs', [])
             entity.active = data.get('active', False)
+        
+        # Migrate malformed dialog entries (bare strings instead of dicts)
+        # This can happen from old consolidation code that didn't wrap summaries properly
+        for dialog_idx, dialog in enumerate(entity.dialogs):
+            if not isinstance(dialog, list):
+                if logger:
+                    logger.error(f'Dialog {dialog_idx} for {entity.entity_name} is not a list: {type(dialog)} - skipping')
+                continue
+                
+            normalized_dialog = []
+            for entry_idx, entry in enumerate(dialog):
+                if isinstance(entry, str):
+                    # Malformed entry: bare string instead of dict (likely from old summary consolidation)
+                    if logger:
+                        logger.warning(f'Migrating malformed dialog entry for {entity.entity_name}, dialog {dialog_idx}, entry {entry_idx}')
+                    # Infer source based on position (summaries alternate: character, entity)
+                    inferred_source = character_name if entry_idx % 2 == 0 else entity.entity_name
+                    normalized_entry = {
+                        'source': inferred_source,
+                        'text': entry,
+                        'timestamp': datetime.now().isoformat(),
+                        'migrated': True,  # Mark for tracking
+                        'summary': True    # Assume it was a summary
+                    }
+                    normalized_dialog.append(normalized_entry)
+                elif isinstance(entry, dict):
+                    # Already correct format
+                    normalized_dialog.append(entry)
+                else:
+                    # Completely broken, skip with warning
+                    if logger:
+                        logger.error(f'Skipping unrecognizable dialog entry for {entity.entity_name}: type={type(entry)}, value={entry}')
+                    # Don't append - skip corrupted entries
+            
+            entity.dialogs[dialog_idx] = normalized_dialog
+        
+        # Load discourse and ToM state (backward compatible with defaults)
+        entity.discourse_state = data.get('discourse_state', '')
+        entity.tom_model = data.get('tom_model', '')
         
         return entity 
     

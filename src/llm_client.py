@@ -73,7 +73,7 @@ class ZenohLLMClient:
     def substitute_bindings(self, prompt, bindings):
         return self.llm.substitute_bindings(prompt, bindings)
 
-    def ask(self, bindings: Dict[str, Any] = None, prompt: str = None, max_tokens: int = 150, temp: float = 0.7, stops: List[str] = ['</end>'], is_json: bool = False, log: bool = False, trace: bool = False, timeout: float = 60.0) -> LLMResponse:
+    def ask(self, bindings: Dict[str, Any] = None, prompt: str = None, max_tokens: int = 150, temp: float = 0.7, stops: List[str] = ['</end>'], is_json: bool = False, log: bool = False, trace: bool = False, timeout: float = 120.0) -> LLMResponse:
         with ThreadPoolExecutor(max_workers=1) as executor:
             future = executor.submit(self.llm.ask, bindings, prompt, max_tokens=max_tokens, temp=temp, stops=stops, is_json=is_json, log=log, trace=trace)
             try:

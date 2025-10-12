@@ -5,6 +5,7 @@ log/
 
 # Python virtual environment
 ros_venv/
+zenoh_venv/
 
 # Python cache files
 __pycache__/

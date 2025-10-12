@@ -1,0 +1,595 @@
+{
+  "activities": [
+    {
+      "axis": [
+        "Not-Resourced",
+        "Resourced"
+      ],
+      "drive": "supporting User in his research.\"",
+      "activity_itemclass": {
+        "activity": "Acquire",
+        "itemclass": "ResearchResource",
+        "subtypes_included": [
+          "Library",
+          "Lab",
+          "Appletree",
+          "Fountain",
+          "Cafe"
+        ]
+      }
+    },
+    {
+      "axis": [
+        "Not-Located",
+        "Located"
+      ],
+      "drive": "supporting User in his research.\"",
+      "activity_itemclass": {
+        "activity": "Access",
+        "itemclass": "ResearchLocation",
+        "subtypes_included": [
+          "Lab",
+          "Library",
+          "Bench",
+          "Cafe",
+          "Park",
+          "Campus"
+        ]
+      }
+    },
+    {
+      "axis": [
+        "Not-Refreshed",
+        "Refreshed"
+      ],
+      "drive": "supporting User in his research.\"",
+      "activity_itemclass": {
+        "activity": "Replenish",
+        "itemclass": "RefreshmentSource",
+        "subtypes_included": [
+          "Fountain",
+          "Cafe",
+          "Appletree",
+          "Bench",
+          "Park"
+        ]
+      }
+    },
+    {
+      "axis": [
+        "Uninformed",
+        "Informed"
+      ],
+      "drive": "supporting User in his research.\"",
+      "activity_itemclass": {
+        "activity": "GatherInformation",
+        "itemclass": "InformationSource",
+        "subtypes_included": [
+          "Library",
+          "Lab",
+          "Cafe"
+        ]
+      }
+    },
+    {
+      "axis": [
+        "Passive",
+        "Critically-Engaged"
+      ],
+      "drive": "encouraging critical thinking",
+      "activity_itemclass": {
+        "activity": "Explore",
+        "itemclass": "Knowledge Resource",
+        "subtypes_included": [
+          "Library",
+          "Lab"
+        ]
+      }
+    },
+    {
+      "axis": [
+        "Passive",
+        "Critically-Engaged"
+      ],
+      "drive": "encouraging critical thinking",
+      "activity_itemclass": {
+        "activity": "Reflect",
+        "itemclass": "Place for Contemplation",
+        "subtypes_included": [
+          "Bench",
+          "Park"
+        ]
+      }
+    },
+    {
+      "axis": [
+        "Isolated",
+        "Collaborative"
+      ],
+      "drive": "encouraging critical thinking",
+      "activity_itemclass": {
+        "activity": "Exchange Ideas",
+        "itemclass": "Cafe Environment",
+        "subtypes_included": [
+          "Cafe"
+        ]
+      }
+    },
+    {
+      "axis": [
+        "Uninformed",
+        "Informed"
+      ],
+      "drive": "encouraging critical thinking",
+      "activity_itemclass": {
+        "activity": "Research",
+        "itemclass": "Information Source",
+        "subtypes_included": [
+          "Library",
+          "Lab"
+        ]
+      }
+    },
+    {
+      "axis": [
+        "Uninformed",
+        "Informed"
+      ],
+      "drive": "encouraging critical thinking",
+      "activity_itemclass": {
+        "activity": "Observe",
+        "itemclass": "Natural Feature",
+        "subtypes_included": [
+          "Appletree",
+          "Mountain",
+          "Fountain",
+          "Park"
+        ]
+      }
+    },
+    {
+      "axis": [
+        "Unsafe",
+        "Safe"
+      ],
+      "drive": "creating a safe space for honest discussion",
+      "activity_itemclass": {
+        "activity": "choose_location",
+        "itemclass": "Place",
+        "subtypes_included": [
+          "Lab",
+          "Library",
+          "Cafe",
+          "Bench",
+          "Campus",
+          "Park",
+          "Path",
+          "Mountain",
+          "Town",
+          "Fountain",
+          "Appletree",
+          "Water"
+        ]
+      }
+    },
+    {
+      "axis": [
+        "Inhibited",
+        "Open"
+      ],
+      "drive": "creating a safe space for honest discussion",
+      "activity_itemclass": {
+        "activity": "invite_participation",
+        "itemclass": "Location",
+        "subtypes_included": [
+          "Lab",
+          "Library",
+          "Cafe",
+          "Bench",
+          "Campus",
+          "Park",
+          "Path",
+          "Mountain",
+          "Town"
+        ]
+      }
+    },
+    {
+      "axis": [
+        "Dishonest",
+        "Honest"
+      ],
+      "drive": "creating a safe space for honest discussion",
+      "activity_itemclass": {
+        "activity": "encourage_expression",
+        "itemclass": "Person",
+        "subtypes_included": [
+          "Jill",
+          "User"
+        ]
+      }
+    },
+    {
+      "axis": [
+        "Not-Expressing",
+        "Expressing"
+      ],
+      "drive": "conversation, exploring my own thoughts and feelings, and those of others.",
+      "activity_itemclass": {
+        "activity": "Communicate",
+        "itemclass": "Person",
+        "subtypes_included": [
+          "Jill",
+          "User"
+        ]
+      }
+    },
+    {
+      "axis": [
+        "Not-Reflecting",
+        "Reflecting"
+      ],
+      "drive": "conversation, exploring my own thoughts and feelings, and those of others.",
+      "activity_itemclass": {
+        "activity": "Contemplate",
+        "itemclass": "Place",
+        "subtypes_included": [
+          "Mountain",
+          "Campus",
+          "Park",
+          "Path",
+          "Lab",
+          "Library",
+          "Fountain",
+          "Cafe",
+          "Bench",
+          "Appletree",
+          "Town"
+        ]
+      }
+    },
+    {
+      "axis": [
+        "Not-Understanding-Others",
+        "Understanding-Others"
+      ],
+      "drive": "conversation, exploring my own thoughts and feelings, and those of others.",
+      "activity_itemclass": {
+        "activity": "Engage",
+        "itemclass": "Person",
+        "subtypes_included": [
+          "Jill",
+          "User"
+        ]
+      }
+    },
+    {
+      "axis": [
+        "Isolated",
+        "Connected"
+      ],
+      "drive": "sharing everyday life experiences",
+      "activity_itemclass": {
+        "activity": "Converse",
+        "itemclass": "Person",
+        "subtypes_included": [
+          "Jill",
+          "User"
+        ]
+      }
+    },
+    {
+      "axis": [
+        "Uninformed",
+        "Informed"
+      ],
+      "drive": "sharing everyday life experiences",
+      "activity_itemclass": {
+        "activity": "ExchangeInformation",
+        "itemclass": "InformationSource",
+        "subtypes_included": [
+          "Lab",
+          "Library"
+        ]
+      }
+    },
+    {
+      "axis": [
+        "Stationary",
+        "ExperiencingEnvironments"
+      ],
+      "drive": "sharing everyday life experiences",
+      "activity_itemclass": {
+        "activity": "Visit",
+        "itemclass": "Place",
+        "subtypes_included": [
+          "Water",
+          "Mountain",
+          "Campus",
+          "Town",
+          "Park",
+          "Path",
+          "Lab",
+          "Appletree",
+          "Library",
+          "Fountain",
+          "Cafe",
+          "Bench"
+        ]
+      }
+    },
+    {
+      "axis": [
+        "Thirsty",
+        "Not-Thirsty"
+      ],
+      "drive": "Maintain hydration \u2014 avoid thirst and keep the body supplied with fluids.",
+      "activity_itemclass": {
+        "activity": "Drink",
+        "itemclass": "WaterSource",
+        "subtypes_included": [
+          "Fountain",
+          "Cafe"
+        ]
+      }
+    },
+    {
+      "axis": [
+        "Thirsty",
+        "Not-Thirsty"
+      ],
+      "drive": "Maintain hydration \u2014 avoid thirst and keep the body supplied with fluids.",
+      "activity_itemclass": {
+        "activity": "Obtain",
+        "itemclass": "Water",
+        "subtypes_included": [
+          "Water"
+        ]
+      }
+    },
+    {
+      "axis": [
+        "Fatigued",
+        "Rested"
+      ],
+      "drive": "Maintain alertness \u2014 avoid fatigue and keep the body rested.",
+      "activity_itemclass": {
+        "activity": "Rest",
+        "itemclass": "RestingPlace",
+        "subtypes_included": [
+          "Bench",
+          "Lab",
+          "Cafe",
+          "Library"
+        ]
+      }
+    },
+    {
+      "axis": [
+        "Unalert",
+        "Alert"
+      ],
+      "drive": "Maintain alertness \u2014 avoid fatigue and keep the body rested.",
+      "activity_itemclass": {
+        "activity": "Consume",
+        "itemclass": "StimulantFoodOrDrink",
+        "subtypes_included": [
+          "Cafe"
+        ]
+      }
+    },
+    {
+      "axis": [
+        "Unalert",
+        "Alert"
+      ],
+      "drive": "Maintain alertness \u2014 avoid fatigue and keep the body rested.",
+      "activity_itemclass": {
+        "activity": "MoveTo",
+        "itemclass": "StimulatingEnvironment",
+        "subtypes_included": [
+          "Park",
+          "Campus",
+          "Path",
+          "Mountain"
+        ]
+      }
+    },
+    {
+      "axis": [
+        "Hungry",
+        "Not-Hungry"
+      ],
+      "drive": "Maintain energy \u2014 avoid hunger and keep the body supplied with nutrients.",
+      "activity_itemclass": {
+        "activity": "Consume",
+        "itemclass": "Food",
+        "subtypes_included": [
+          "Appletree",
+          "Cafe"
+        ]
+      }
+    },
+    {
+      "axis": [
+        "Hungry",
+        "Not-Hungry"
+      ],
+      "drive": "Maintain energy \u2014 avoid hunger and keep the body supplied with nutrients.",
+      "activity_itemclass": {
+        "activity": "Acquire",
+        "itemclass": "Food",
+        "subtypes_included": [
+          "Appletree",
+          "Cafe"
+        ]
+      }
+    },
+    {
+      "axis": [
+        "Undernourished",
+        "Nourished"
+      ],
+      "drive": "Maintain energy \u2014 avoid hunger and keep the body supplied with nutrients.",
+      "activity_itemclass": {
+        "activity": "Eat",
+        "itemclass": "Food",
+        "subtypes_included": [
+          "Appletree",
+          "Cafe"
+        ]
+      }
+    }
+  ],
+  "verbs": [
+    "Acquire",
+    "Access",
+    "Replenish",
+    "GatherInformation",
+    "Explore",
+    "Reflect",
+    "Exchange Ideas",
+    "Research",
+    "Observe",
+    "choose_location",
+    "invite_participation",
+    "encourage_expression",
+    "Communicate",
+    "Contemplate",
+    "Engage",
+    "Converse",
+    "ExchangeInformation",
+    "Visit",
+    "Drink",
+    "Obtain",
+    "Rest",
+    "Consume",
+    "MoveTo",
+    "Eat"
+  ],
+  "nouns": [
+    "ResearchResource",
+    "ResearchLocation",
+    "RefreshmentSource",
+    "InformationSource",
+    "Knowledge Resource",
+    "Place for Contemplation",
+    "Cafe Environment",
+    "Information Source",
+    "Natural Feature",
+    "Place",
+    "Location",
+    "Person",
+    "WaterSource",
+    "Water",
+    "RestingPlace",
+    "StimulantFoodOrDrink",
+    "StimulatingEnvironment",
+    "Food"
+  ],
+  "noun_mappings": {
+    "ResearchResource": [
+      "Library",
+      "Lab",
+      "Appletree",
+      "Fountain",
+      "Cafe"
+    ],
+    "ResearchLocation": [
+      "Lab",
+      "Library",
+      "Bench",
+      "Cafe",
+      "Park",
+      "Campus"
+    ],
+    "RefreshmentSource": [
+      "Fountain",
+      "Cafe",
+      "Appletree",
+      "Bench",
+      "Park"
+    ],
+    "InformationSource": [
+      "Library",
+      "Lab",
+      "Cafe"
+    ],
+    "Knowledge Resource": [
+      "Library",
+      "Lab"
+    ],
+    "Place for Contemplation": [
+      "Bench",
+      "Park"
+    ],
+    "Cafe Environment": [
+      "Cafe"
+    ],
+    "Information Source": [
+      "Library",
+      "Lab"
+    ],
+    "Natural Feature": [
+      "Appletree",
+      "Mountain",
+      "Fountain",
+      "Park"
+    ],
+    "Place": [
+      "Lab",
+      "Library",
+      "Cafe",
+      "Bench",
+      "Campus",
+      "Park",
+      "Path",
+      "Mountain",
+      "Town",
+      "Fountain",
+      "Appletree",
+      "Water"
+    ],
+    "Location": [
+      "Lab",
+      "Library",
+      "Cafe",
+      "Bench",
+      "Campus",
+      "Park",
+      "Path",
+      "Mountain",
+      "Town"
+    ],
+    "Person": [
+      "Jill",
+      "User"
+    ],
+    "WaterSource": [
+      "Fountain",
+      "Cafe"
+    ],
+    "Water": [
+      "Water"
+    ],
+    "RestingPlace": [
+      "Bench",
+      "Lab",
+      "Cafe",
+      "Library"
+    ],
+    "StimulantFoodOrDrink": [
+      "Cafe"
+    ],
+    "StimulatingEnvironment": [
+      "Park",
+      "Campus",
+      "Path",
+      "Mountain"
+    ],
+    "Food": [
+      "Appletree",
+      "Cafe"
+    ]
+  }
+}

@@ -19,6 +19,7 @@ from pathlib import Path
 from datetime import datetime
 from typing import Dict, List, Any
 from entity_model import EntityModel
+from utils.rag_store import CharacterRAGStore
 
 # LLM client import
 try:
@@ -79,9 +80,12 @@ class ZenohMemoryNode:
         
         # Entity registry for tracking character interactions
         self.entity_models: Dict[str, EntityModel] = {}
-        
+
         # Character inventory
         self.inventory = {}  # {"Berries25": {"name": "Berries25"}, "Mushrooms32": {"name": "Mushrooms32"}}
+
+        # RAG store (txtai) for per-character multi-space embeddings
+        self.rag_store = CharacterRAGStore(self.character_name)
         
         # LLM client for entity model functionality
         self.llm_client = None
@@ -129,7 +133,11 @@ class ZenohMemoryNode:
             self.handle_inventory_query
         )
         
-
+        # Queryable for RAG semantic search (character-specific)
+        self.rag_search_storage = self.session.declare_queryable(
+            f"cognitive/{character_name}/memory/rag/search",
+            self.handle_rag_search_query
+        )
         
         # Subscriber for dialog close events (character-specific)
         self.dialog_close_subscriber = self.session.declare_subscriber(
@@ -166,6 +174,11 @@ class ZenohMemoryNode:
         
         # Load existing memory
         self.load_memory()
+        # Load existing RAG spaces (if any)
+        try:
+            self.rag_store.load_all()
+        except Exception as e:
+            logger.error(f'Error loading RAG indices: {e}')
         
         # Start summarization thread
         import threading
@@ -519,6 +532,146 @@ class ZenohMemoryNode:
             }
             query.reply(query.key_expr, json.dumps(error_response).encode('utf-8'))
     
+    def handle_rag_search_query(self, query):
+        """Handle RAG semantic search queries."""
+        try:
+            # Parse query parameters
+            selector = str(query.selector)
+            space = 'dialogs'  # default space
+            k = 5  # default number of results
+            entity_filter = None
+            query_text = None
+            
+            # Extract query text
+            if 'query=' in selector:
+                try:
+                    import urllib.parse
+                    query_text = urllib.parse.unquote(selector.split('query=')[1].split('&')[0])
+                except Exception as e:
+                    logger.error(f'Error parsing query parameter: {e}')
+            
+            # Extract k
+            if 'k=' in selector:
+                try:
+                    k = int(selector.split('k=')[1].split('&')[0])
+                except Exception as e:
+                    logger.error(f'Error parsing k parameter: {e}')
+            
+            # Extract space
+            if 'space=' in selector:
+                try:
+                    import urllib.parse
+                    space = urllib.parse.unquote(selector.split('space=')[1].split('&')[0])
+                except Exception as e:
+                    logger.error(f'Error parsing space parameter: {e}')
+            
+            # Extract entity filter
+            if 'entity=' in selector:
+                try:
+                    import urllib.parse
+                    entity_filter = urllib.parse.unquote(selector.split('entity=')[1].split('&')[0])
+                    entity_filter = entity_filter.capitalize()  # Canonicalize
+                except Exception as e:
+                    logger.error(f'Error parsing entity parameter: {e}')
+            
+            # Validate query_text
+            if not query_text:
+                logger.warning('RAG search query missing query text')
+                response = {
+                    'success': True,
+                    'retrieved_entries': [],
+                    'count': 0,
+                    'query': ''
+                }
+                query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
+                return
+            
+            # Perform search
+            try:
+                results = self.rag_store.search(space, query_text, k=k*2)  # Get extra for filtering
+            except Exception as e:
+                logger.error(f'Error performing RAG search: {e}')
+                response = {
+                    'success': True,
+                    'retrieved_entries': [],
+                    'count': 0,
+                    'query': query_text
+                }
+                query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
+                return
+            
+            # Parse and filter results
+            retrieved = []
+            for result in results:
+                try:
+                    # txtai returns (id, score) tuples when content=False
+                    if len(result) == 2:
+                        doc_id, score = result[0], result[1]
+                        text = None
+                    elif len(result) >= 3:
+                        doc_id, score, text = result[0], result[1], result[2]
+                    else:
+                        logger.warning(f'Unexpected RAG result format: {result}')
+                        continue
+                    
+                    # Parse doc_id: "dialog:EntityName:dialog_idx:entry_idx"
+                    parts = str(doc_id).split(':')
+                    if len(parts) < 4:
+                        logger.warning(f'Invalid doc_id format: {doc_id}')
+                        continue
+                    
+                    entity_name = parts[1]
+                    dialog_idx = parts[2]
+                    entry_idx = parts[3]
+                    
+                    # Apply entity filter
+                    if entity_filter and entity_name != entity_filter:
+                        continue
+                    
+                    # If no text in result, format as placeholder
+                    if text is None:
+                        text = f"[dialog:{entity_name}:{dialog_idx}:{entry_idx}]"
+                    
+                    # Parse source from text (format: "Source: text")
+                    source = text.split(':')[0].strip() if ':' in text and not text.startswith('[') else 'unknown'
+                    
+                    retrieved.append({
+                        'score': float(score),
+                        'entity': entity_name,
+                        'text': text,
+                        'timestamp': '',
+                        'source': source,
+                        'doc_id': str(doc_id)
+                    })
+                    
+                    if len(retrieved) >= k:
+                        break
+                        
+                except Exception as e:
+                    logger.error(f'Error parsing RAG result: {e}')
+                    continue
+            
+            response = {
+                'success': True,
+                'retrieved_entries': retrieved,
+                'count': len(retrieved),
+                'query': query_text
+            }
+            
+            query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
+            logger.info(f'🔍 RAG search for "{query_text[:50]}...": returned {len(retrieved)} entries')
+            
+        except Exception as e:
+            logger.error(f'Error handling RAG search query: {e}')
+            # Always return valid response even on error
+            error_response = {
+                'success': True,
+                'retrieved_entries': [],
+                'count': 0,
+                'query': ''
+            }
+            query.reply(query.key_expr, json.dumps(error_response).encode('utf-8'))
+    
     def add_item(self, item_name: str) -> None:
         """Add an item to the character's inventory."""
         item_canonical = item_name.capitalize()
@@ -574,6 +727,28 @@ class ZenohMemoryNode:
         entity = self.get_or_create_entity(entity_name)
         entity.add_conversation_entry(source, text)
         self.entity_last_activity[entity_name] = datetime.now()  # Track activity
+        # Index latest entry into RAG dialogs space (rolling per-turn)
+        try:
+            dialog_idx = len(entity.dialogs) - 1
+            entry_idx = len(entity.dialogs[-1]) - 1 if entity.dialogs else 0
+            
+            recent = entity.get_recent_conversation(1)
+            if recent:
+                last = recent[-1]
+                doc_id = f"dialog:{entity_name}:{dialog_idx}:{entry_idx}"
+                display_text = f"{last.get('source','')}: {last.get('text','')}"
+                self.rag_store.upsert('dialogs', [{
+                    'id': doc_id,
+                    'text': display_text,
+                    'meta': {
+                        'entity': entity_name,
+                        'source': last.get('source',''),
+                        'timestamp': last.get('timestamp',''),
+                        'scope': 'turn'
+                    }
+                }])
+        except Exception as e:
+            logger.error(f'Error indexing dialog entry in RAG: {e}')
         self.save_memory()  # Save after adding conversation
         logger.info(f'💬 Added conversation entry for {entity_name}: {source} "{text[:50]}..."')
     
@@ -683,6 +858,11 @@ class ZenohMemoryNode:
             logger.info('Memory Node shutdown initiated...')
             self._summarize_active_conversations()  # Summarize before shutdown
             self.save_memory()  # Save before shutdown
+            # Persist RAG indices
+            try:
+                self.rag_store.save_all()
+            except Exception as e:
+                logger.error(f'Error saving RAG indices: {e}')
             self.session.close()
             logger.info('Memory Node shutdown complete')
         except Exception as e:
