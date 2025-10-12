@@ -1,0 +1,522 @@
+{
+  "activities": [
+    {
+      "axis": [
+        "Unexpressed",
+        "Expressed"
+      ],
+      "drive": "conversation, exploring my own thoughts and feelings, and those of others.",
+      "activity_itemclass": {
+        "activity": "Communicate",
+        "itemclass": "Person",
+        "subtypes_included": [
+          "Sage",
+          "Jill"
+        ]
+      }
+    },
+    {
+      "axis": [
+        "Unrelated",
+        "Related"
+      ],
+      "drive": "conversation, exploring my own thoughts and feelings, and those of others.",
+      "activity_itemclass": {
+        "activity": "Connect",
+        "itemclass": "Person",
+        "subtypes_included": [
+          "Sage",
+          "Jill"
+        ]
+      }
+    },
+    {
+      "axis": [
+        "Passive",
+        "Engaged"
+      ],
+      "drive": "encouraging critical thinking",
+      "activity_itemclass": {
+        "activity": "Prompt reflection",
+        "itemclass": "Location",
+        "subtypes_included": [
+          "Mountain",
+          "Forest",
+          "Clearing",
+          "Meadow",
+          "Path",
+          "Lab",
+          "Appletree",
+          "Spring",
+          "Cave",
+          "Thicket",
+          "Hut"
+        ]
+      }
+    },
+    {
+      "axis": [
+        "Passive",
+        "Engaged"
+      ],
+      "drive": "encouraging critical thinking",
+      "activity_itemclass": {
+        "activity": "Present challenge",
+        "itemclass": "Resource",
+        "subtypes_included": [
+          "Appletree",
+          "Fallenbranch",
+          "Spring",
+          "Cave",
+          "Thicket",
+          "Hut"
+        ]
+      }
+    },
+    {
+      "axis": [
+        "Unquestioning",
+        "Skeptical"
+      ],
+      "drive": "encouraging critical thinking",
+      "activity_itemclass": {
+        "activity": "Pose question",
+        "itemclass": "Agent",
+        "subtypes_included": [
+          "Sage",
+          "Jill"
+        ]
+      }
+    },
+    {
+      "axis": [
+        "Unquestioning",
+        "Skeptical"
+      ],
+      "drive": "encouraging critical thinking",
+      "activity_itemclass": {
+        "activity": "Suggest inspection",
+        "itemclass": "Object",
+        "subtypes_included": [
+          "Appletree",
+          "Fallenbranch",
+          "Spring",
+          "Cave",
+          "Thicket",
+          "Hut",
+          "Mountain",
+          "Forest",
+          "Clearing",
+          "Meadow",
+          "Path",
+          "Lab"
+        ]
+      }
+    },
+    {
+      "axis": [
+        "Single-perspective",
+        "Multiple-perspective"
+      ],
+      "drive": "encouraging critical thinking",
+      "activity_itemclass": {
+        "activity": "Encourage discussion",
+        "itemclass": "Agent",
+        "subtypes_included": [
+          "Sage",
+          "Jill"
+        ]
+      }
+    },
+    {
+      "axis": [
+        "Single-perspective",
+        "Multiple-perspective"
+      ],
+      "drive": "encouraging critical thinking",
+      "activity_itemclass": {
+        "activity": "Facilitate exploration",
+        "itemclass": "Location",
+        "subtypes_included": [
+          "Mountain",
+          "Forest",
+          "Clearing",
+          "Meadow",
+          "Path",
+          "Lab",
+          "Appletree",
+          "Spring",
+          "Cave",
+          "Thicket",
+          "Hut"
+        ]
+      }
+    },
+    {
+      "axis": [
+        "Unsafe",
+        "Safe"
+      ],
+      "drive": "creating a safe space for honest discussion",
+      "activity_itemclass": {
+        "activity": "Establish",
+        "itemclass": "Shelter",
+        "subtypes_included": [
+          "Hut",
+          "Cave"
+        ]
+      }
+    },
+    {
+      "axis": [
+        "Unsafe",
+        "Safe"
+      ],
+      "drive": "creating a safe space for honest discussion",
+      "activity_itemclass": {
+        "activity": "Clear",
+        "itemclass": "Space",
+        "subtypes_included": [
+          "Clearing",
+          "Meadow"
+        ]
+      }
+    },
+    {
+      "axis": [
+        "Concealed",
+        "Open"
+      ],
+      "drive": "creating a safe space for honest discussion",
+      "activity_itemclass": {
+        "activity": "MoveTo",
+        "itemclass": "OpenArea",
+        "subtypes_included": [
+          "Clearing",
+          "Meadow",
+          "Path"
+        ]
+      }
+    },
+    {
+      "axis": [
+        "Isolated",
+        "Connected"
+      ],
+      "drive": "sharing everyday life experiences",
+      "activity_itemclass": {
+        "activity": "Communicate",
+        "itemclass": "Person",
+        "subtypes_included": [
+          "Sage",
+          "Jill"
+        ]
+      }
+    },
+    {
+      "axis": [
+        "Inexperienced",
+        "Experienced"
+      ],
+      "drive": "sharing everyday life experiences",
+      "activity_itemclass": {
+        "activity": "Explore",
+        "itemclass": "Place",
+        "subtypes_included": [
+          "Mountain",
+          "Forest",
+          "Clearing",
+          "Meadow",
+          "Path",
+          "Lab",
+          "Appletree",
+          "Spring",
+          "Cave",
+          "Thicket",
+          "Hut"
+        ]
+      }
+    },
+    {
+      "axis": [
+        "Unprovided",
+        "Provided"
+      ],
+      "drive": "sharing everyday life experiences",
+      "activity_itemclass": {
+        "activity": "Share",
+        "itemclass": "Resource",
+        "subtypes_included": [
+          "Appletree",
+          "Fallenbranch",
+          "Spring",
+          "Cave",
+          "Thicket",
+          "Hut"
+        ]
+      }
+    },
+    {
+      "axis": [
+        "Thirsty",
+        "Not-Thirsty"
+      ],
+      "drive": "Maintain hydration \u2014 avoid thirst and keep the body supplied with fluids.",
+      "activity_itemclass": {
+        "activity": "Drink",
+        "itemclass": "Water Source",
+        "subtypes_included": [
+          "Water",
+          "Spring"
+        ]
+      }
+    },
+    {
+      "axis": [
+        "Low-Fluid-Supply",
+        "Adequate-Fluid-Supply"
+      ],
+      "drive": "Maintain hydration \u2014 avoid thirst and keep the body supplied with fluids.",
+      "activity_itemclass": {
+        "activity": "Acquire",
+        "itemclass": "Water",
+        "subtypes_included": [
+          "Water"
+        ]
+      }
+    },
+    {
+      "axis": [
+        "Low-Fluid-Supply",
+        "Adequate-Fluid-Supply"
+      ],
+      "drive": "Maintain hydration \u2014 avoid thirst and keep the body supplied with fluids.",
+      "activity_itemclass": {
+        "activity": "Collect",
+        "itemclass": "Water Source",
+        "subtypes_included": [
+          "Spring"
+        ]
+      }
+    },
+    {
+      "axis": [
+        "Fatigued",
+        "Rested"
+      ],
+      "drive": "Maintain alertness \u2014 avoid fatigue and keep the body rested.",
+      "activity_itemclass": {
+        "activity": "Sleep",
+        "itemclass": "Shelter",
+        "subtypes_included": [
+          "Cave",
+          "Hut"
+        ]
+      }
+    },
+    {
+      "axis": [
+        "Fatigued",
+        "Rested"
+      ],
+      "drive": "Maintain alertness \u2014 avoid fatigue and keep the body rested.",
+      "activity_itemclass": {
+        "activity": "Rest",
+        "itemclass": "NaturalShelter",
+        "subtypes_included": [
+          "Forest",
+          "Thicket"
+        ]
+      }
+    },
+    {
+      "axis": [
+        "Unalert",
+        "Alert"
+      ],
+      "drive": "Maintain alertness \u2014 avoid fatigue and keep the body rested.",
+      "activity_itemclass": {
+        "activity": "Refresh",
+        "itemclass": "WaterSource",
+        "subtypes_included": [
+          "Spring"
+        ]
+      }
+    },
+    {
+      "axis": [
+        "Unalert",
+        "Alert"
+      ],
+      "drive": "Maintain alertness \u2014 avoid fatigue and keep the body rested.",
+      "activity_itemclass": {
+        "activity": "Regenerate",
+        "itemclass": "OpenArea",
+        "subtypes_included": [
+          "Clearing",
+          "Meadow"
+        ]
+      }
+    },
+    {
+      "axis": [
+        "Hungry",
+        "Not-Hungry"
+      ],
+      "drive": "Maintain energy \u2014 avoid hunger and keep the body supplied with nutrients.",
+      "activity_itemclass": {
+        "activity": "Consume",
+        "itemclass": "Food",
+        "subtypes_included": [
+          "Appletree"
+        ]
+      }
+    },
+    {
+      "axis": [
+        "Undernourished",
+        "Nourished"
+      ],
+      "drive": "Maintain energy \u2014 avoid hunger and keep the body supplied with nutrients.",
+      "activity_itemclass": {
+        "activity": "Ingest",
+        "itemclass": "Edible Resource",
+        "subtypes_included": [
+          "Appletree"
+        ]
+      }
+    }
+  ],
+  "verbs": [
+    "Communicate",
+    "Connect",
+    "Prompt reflection",
+    "Present challenge",
+    "Pose question",
+    "Suggest inspection",
+    "Encourage discussion",
+    "Facilitate exploration",
+    "Establish",
+    "Clear",
+    "MoveTo",
+    "Explore",
+    "Share",
+    "Drink",
+    "Acquire",
+    "Collect",
+    "Sleep",
+    "Rest",
+    "Refresh",
+    "Regenerate",
+    "Consume",
+    "Ingest"
+  ],
+  "nouns": [
+    "Person",
+    "Location",
+    "Resource",
+    "Agent",
+    "Object",
+    "Shelter",
+    "Space",
+    "OpenArea",
+    "Place",
+    "Water Source",
+    "Water",
+    "NaturalShelter",
+    "WaterSource",
+    "Food",
+    "Edible Resource"
+  ],
+  "noun_mappings": {
+    "Person": [
+      "Sage",
+      "Jill"
+    ],
+    "Location": [
+      "Mountain",
+      "Forest",
+      "Clearing",
+      "Meadow",
+      "Path",
+      "Lab",
+      "Appletree",
+      "Spring",
+      "Cave",
+      "Thicket",
+      "Hut"
+    ],
+    "Resource": [
+      "Appletree",
+      "Fallenbranch",
+      "Spring",
+      "Cave",
+      "Thicket",
+      "Hut"
+    ],
+    "Agent": [
+      "Sage",
+      "Jill"
+    ],
+    "Object": [
+      "Appletree",
+      "Fallenbranch",
+      "Spring",
+      "Cave",
+      "Thicket",
+      "Hut",
+      "Mountain",
+      "Forest",
+      "Clearing",
+      "Meadow",
+      "Path",
+      "Lab"
+    ],
+    "Shelter": [
+      "Hut",
+      "Cave"
+    ],
+    "Space": [
+      "Clearing",
+      "Meadow"
+    ],
+    "OpenArea": [
+      "Clearing",
+      "Meadow",
+      "Path"
+    ],
+    "Place": [
+      "Mountain",
+      "Forest",
+      "Clearing",
+      "Meadow",
+      "Path",
+      "Lab",
+      "Appletree",
+      "Spring",
+      "Cave",
+      "Thicket",
+      "Hut"
+    ],
+    "Water Source": [
+      "Water",
+      "Spring"
+    ],
+    "Water": [
+      "Water"
+    ],
+    "NaturalShelter": [
+      "Forest",
+      "Thicket"
+    ],
+    "WaterSource": [
+      "Spring"
+    ],
+    "Food": [
+      "Appletree"
+    ],
+    "Edible Resource": [
+      "Appletree"
+    ]
+  }
+}

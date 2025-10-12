@@ -68,7 +68,7 @@
         },
 
         {
-            "name": "Scenario Analysis (Jim)",
+            "name": "Scenario Analysis (Jill)",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/src/scenario_analysis.py",
@@ -77,12 +77,12 @@
             "env": {
                 "PYTHONPATH": "${workspaceFolder}/src"
             },
-            "args": ["--scenario", "../scenarios/jim.yaml", "--character", "all", "--ontology", "create", "--middle", "skip", "--activities", "create"],
+            "args": ["--scenario", "../scenarios/jill.yaml", "--character", "all", "--ontology", "create", "--discourse", "skip", "--activities", "create"],
             "justMyCode": false,
             "stopOnEntry": false,
             "preLaunchTask": "setup-zenoh-environment"
         },
-        {
+         {
             "name": "Scenario Analysis (lost)",
             "type": "debugpy",
             "request": "launch",
@@ -98,6 +98,21 @@
             "preLaunchTask": "setup-zenoh-environment"
         },
         {
+            "name": "Scenario Analysis (sage)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/scenario_analysis.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/src",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src"
+            },
+            "args": ["--scenario", "../scenarios/sage.yaml", "--character", "all", "--ontology", "create", "--discourse", "skip", "--activities", "create"],
+            "justMyCode": false,
+            "stopOnEntry": false,
+            "preLaunchTask": "setup-zenoh-environment"
+        },
+      {
             "name": "Debug Launcher (laTerre)",
             "type": "debugpy",
             "request": "launch",
@@ -175,7 +190,7 @@
                 "preLaunchTask": "setup-zenoh-environment"
             },
         {
-            "name": "Debug Launcher (sage)",
+            "name": "Debug Launcher (jill)",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/src/launcher.py",
@@ -184,7 +199,7 @@
             "env": {
                 "PYTHONPATH": "${workspaceFolder}/src"
             },
-            "args": ["sage.yaml", "--ui", "--map-file", "sageForest.py"],
+            "args": ["jill.yaml", "--ui", "--map-file", "lab.py"],
             "justMyCode": false,
             "stopOnEntry": false,
             "preLaunchTask": "setup-zenoh-environment"

@@ -5,15 +5,6 @@ llm_config:
   model_name: "qwen/qwen3-235b-a22b-2507"
 
 characters:
-  Sam:
-    character: |
-      Sam, a 22-year-old female herbalist who wears soft grey clothes.
-      I'm lonely and a romantic and hope to find someone to talk with.
-    drives:
-      - "conversation, exploring my own thoughts and feelings, and those of others."
-      - "encouraging critical thinking"
-      - "sharing everyday life experiences"
-
   Jill: 
     manual: true
     manual_response: false

@@ -944,8 +944,12 @@ class ZenohExecutiveNode:
                 entity_context = self.get_entity_context(target, 10)
                 if entity_context and len(entity_context['conversation_history']) > 0:
                     goal_prompt += f'your recent dialog with {target} has been:\n'
-                    for i, memory in enumerate(entity_context['conversation_history']):  # Use last 2 memories
-                        goal_prompt += f"\t{memory['source']}: {memory['text']}\n"
+                    for i, memory in enumerate(entity_context['conversation_history']):  
+                        if isinstance(memory, dict) and 'source' in memory and 'text' in memory: # Use last 2 memories
+                            goal_prompt += f"\t{memory['source']}: {memory['text']}\n"
+                        else:
+                            logger.error(f'Invalid memory format in conversation history: {memory}')
+                            goal_prompt += f"\t{memory}\n"
 
             if self.action_history and (self.action_history[-1].action['type'].lower() == 'say' or self.action_history[-1].action['type'].lower() == 'response'):
                 directive = f"""\nrespond only with the JSON plan, no other text.\nend your response with </end>"""
@@ -1111,7 +1115,7 @@ end your response with </end>
         try:
             response = self.llm_client.generate(
                 messages=[system_prompt, user_prompt, PLAN_TEMPLATE, directive],
-                max_tokens=200,
+                max_tokens=300,
                 temperature=0.7,
                 stops=['</end>']
             )
@@ -2635,7 +2639,7 @@ End your response with </end>
         # In manual mode with manual_response disabled, do not auto-respond
         if self.manual and self.manual_response:
             return ''
-        text_to_send = ''
+        text_to_send = 'failure to generate response'
         try:
             if mode == 'respond':
                 logger.info(f'Responding to: "{text_input}" from {source}')
@@ -2643,6 +2647,12 @@ End your response with </end>
                 logger.info(f'Saying intent: "{text_input}" to {source}')
             
             entity_context = self.get_entity_context(source, 10)
+            
+            # Get RAG context for semantic retrieval
+            rag_context = self.get_rag_context(text_input, entity_name=source, k=5)
+            rag_entries = rag_context.get('retrieved_entries', [])
+            logger.info(f'🔍 Retrieved {len(rag_entries)} RAG entries for query: "{text_input[:50]}..."')
+            
             # Build user prompt with context
             dialog_history = '' 
             if entity_context and isinstance(entity_context, dict):
@@ -2657,9 +2667,19 @@ End your response with </end>
                 discourse_tom_models = self.get_entity_discourse_tom_models(source)
                 dialog_history += f"\nBeliefs about {source}:\n\n{discourse_tom_models['tom_model']}\n"
                 dialog_history += f"\nDiscourse state with {source}:\n\n{discourse_tom_models['discourse_state']}\n"
+            
+            # Add RAG retrieved entries with context
+            if rag_entries:
+                dialog_history += f"\n\nRelevant past conversations:\n"
+                for entry in rag_entries[:5]:
+                    expanded = self.expand_rag_context(entry, window_before=3)
+                    dialog_history += f"{expanded}\n---\n"
 
             # Check if dialog should naturally end
             if mode == 'respond':
+                # Ensure observations are available for context
+                if not self.observations:
+                    self._observe()
                 are_we_done = self.check_natural_dialog_end(source, text_input)
                 logger.info(f'🤖 {self.character_name} Dialog end check: {are_we_done}')
                 if are_we_done:
@@ -2704,12 +2724,16 @@ you are:
             if dialog_history:
                 user_prompt += f"{dialog_history}\n"
 
-            user_prompt +=  f"""\nAgain, you are rewriting a text to be spoken within a conversation:
+            if mode == 'say':
+                user_prompt +=  f"""\nAgain, you are rewriting a text to be spoken within a conversation:\n\n"""
+            else:
+                user_prompt += """\nAgain, you are responding to the following:\n\n"""
+                
+            user_prompt += f"""{text_input}
             
-            {text_input}
-
 Output ONLY the updated text to be spoken within a conversation, Speak in a conversational manner in your own voice. 
-Use the following hash-formatted text to report your response:
+Use the following hash-formatted text using the text tag to report your response, where the text tag is preceded by a # and followed by a single space, followed by its content.
+Follow your response with a ## marker. Do not insert and '\n' in your response.
 
 #text <your response here>
 ##
@@ -2733,7 +2757,11 @@ End your response with:
 
                 if response.success:
                     text_to_send = hash_utils.find('text', response.text)
-                    if not text_to_send.lower().startswith('done'):
+                    
+                    if not text_to_send or not text_to_send.strip():
+                        logger.error(f'LLM returned empty or malformed response. Raw response: {response.text[:200]}')
+                        text_to_send = response.text if response.text and len(response.text.strip()) > 0 else 'failure to generate response'
+                    elif not text_to_send.lower().startswith('done'):
                         self.send_text_input(source, text_to_send)
                         logger.info(f'Responding to: "{text_input}" from {source}: {text_to_send}')
 
@@ -3308,7 +3336,8 @@ End your response with:
 
             directive = f"""You are thinking about: {action['value']}.\n\n Derive new information, insights, goals, or conclusions based on your memories, drives, and the current situation.
     This new information should be a short statement (10 words max) not explicit in the information provided that will guide your future thoughts and actions.
-    Respond with the new information in the following hash-formatted syntax:
+    Respond with the new information in the following hash-formatted syntax using the thought tag, where the thought tag is preceded by a # and followed by a single space, followed by its content.
+    Follow your response with a ## marker. Do not insert and '\n' in your response.
 
     #thought <new information>
     ##
@@ -3529,6 +3558,104 @@ End your response with:
             logger.error(f'Error querying entity context for {entity_name}: {e}')
             return None
     
+    def get_rag_context(self, query_text: str, entity_name: str = None, k: int = 5) -> Dict[str, Any]:
+        """
+        Query memory_node for RAG semantic search results.
+        
+        Args:
+            query_text: The text to search for semantically
+            entity_name: Optional entity to filter results (default: None for all entities)
+            k: Number of results to retrieve (default: 5)
+            
+        Returns:
+            Dictionary with retrieved_entries list and count, always returns even if empty
+        """
+        import urllib.parse
+        
+        try:
+            # Build query parameters
+            params = [f"query={urllib.parse.quote(query_text)}", f"k={k}"]
+            if entity_name:
+                params.append(f"entity={urllib.parse.quote(entity_name.capitalize())}")
+            
+            key_expr = f"cognitive/{self.character_name}/memory/rag/search?{'&'.join(params)}"
+            
+            for reply in self.session.get(key_expr, timeout=3.0 if not self.debug else 300.0):
+                try:
+                    if reply.ok:
+                        data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
+                        if data['success']:
+                            logger.debug(f'🔍 Retrieved {data.get("count", 0)} RAG entries for query: "{query_text[:50]}..."')
+                            return data
+                except Exception as e:
+                    logger.error(f'Error parsing RAG query response: {e}')
+                    return {'success': True, 'retrieved_entries': [], 'count': 0, 'query': query_text}
+            
+            logger.debug(f'No response received for RAG query: "{query_text[:50]}..."')
+            return {'success': True, 'retrieved_entries': [], 'count': 0, 'query': query_text}
+            
+        except Exception as e:
+            logger.error(f'Error querying RAG context for "{query_text[:50]}...": {e}')
+            return {'success': True, 'retrieved_entries': [], 'count': 0, 'query': query_text}
+    
+    def expand_rag_context(self, rag_entry: Dict[str, Any], window_before: int = 3) -> str:
+        """
+        Expand a RAG retrieved entry with preceding context from the dialog.
+        
+        Args:
+            rag_entry: Dictionary with doc_id, entity, text from RAG retrieval
+            window_before: Number of preceding turns to include (default: 3)
+            
+        Returns:
+            String with context window or just the retrieved text if verification fails
+        """
+        try:
+            doc_id = rag_entry.get('doc_id', '')
+            parts = doc_id.split(':')
+            if len(parts) < 4:
+                return rag_entry.get('text', '')
+            
+            entity_name = parts[1]
+            dialog_idx = int(parts[2])
+            entry_idx = int(parts[3])
+            
+            entity_context = self.get_entity_context(entity_name)
+            if not entity_context or 'dialogs' not in entity_context:
+                return rag_entry.get('text', '')
+            
+            dialogs = entity_context.get('dialogs', [])
+            if dialog_idx >= len(dialogs):
+                return rag_entry.get('text', '')
+            
+            dialog = dialogs[dialog_idx]
+            if not isinstance(dialog, list) or entry_idx >= len(dialog):
+                return rag_entry.get('text', '')
+            
+            # Verify the entry matches
+            entry = dialog[entry_idx]
+            if isinstance(entry, dict):
+                entry_text = f"{entry.get('source', '')}: {entry.get('text', '')}"
+            else:
+                entry_text = str(entry)
+            
+            if rag_entry.get('text', '') not in entry_text:
+                return rag_entry.get('text', '')
+            
+            # Build context window
+            start_idx = max(0, entry_idx - window_before)
+            context_lines = []
+            for i in range(start_idx, entry_idx + 1):
+                if isinstance(dialog[i], dict):
+                    context_lines.append(f"{dialog[i].get('source', '')}: {dialog[i].get('text', '')}")
+                else:
+                    context_lines.append(str(dialog[i]))
+            
+            return '\n'.join(context_lines)
+            
+        except Exception as e:
+            logger.error(f'Error expanding RAG context: {e}')
+            return rag_entry.get('text', '')
+    
     def get_entity_discourse_tom_models(self, entity_name: str, limit: int = 20, scope='all') -> Dict[str, Any]:
         """
         Query entity data from memory node for discourse analysis and tom_model.
@@ -3577,7 +3704,9 @@ End your response with:
         try:
             import urllib.parse
             encoded_text = urllib.parse.quote(input_text)
-            query_url = f"cognitive/{self.character_name}/memory/entity/{entity_name}?query=natural_dialog_end&input_text={encoded_text}&context={self.observations['static']}"
+            # Use observations if available, otherwise use empty context
+            context = self.observations['static'] if self.observations else ""
+            query_url = f"cognitive/{self.character_name}/memory/entity/{entity_name}?query=natural_dialog_end&input_text={encoded_text}&context={context}"
             
             for reply in self.session.get(query_url, timeout=10.0 if not self.debug else 300.0):
                 try:

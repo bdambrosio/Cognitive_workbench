@@ -13,6 +13,7 @@ import time
 import threading
 from pathlib import Path
 from datetime import datetime, timedelta
+import traceback
 from typing import Dict, Any, Optional
 from utils.zenoh_utils import datetime_handler
 
@@ -153,6 +154,7 @@ class MapNode:
             self.load_world_data()
             
         except Exception as e:
+            logger.error(traceback.format_exc())
             logger.error(f"Failed to load map module: {e}")
             raise
     
@@ -2014,6 +2016,9 @@ Do not include any other text, reasoning, introductory, expository, or markdown.
                 
                 logger.info(f"🚀 Launcher ready signal: expecting {self.expected_character_count} characters")
                 
+                # Don't auto-start turns even after restore - wait for user to click Step/Run
+                # This matches the behavior of fresh initialization
+                
                 # Publish updated button states now that we know the expected count
                 self._publish_turn_state_update()
                 
@@ -2125,9 +2130,9 @@ Do not include any other text, reasoning, introductory, expository, or markdown.
                     
                     # Start turn management if agents were restored
                     if len(self.agent_registry) > 0:
-                        logger.info(f"📂 {len(self.agent_registry)} agents restored - starting turn management")
-                        # Give characters time to initialize before starting turns
-                        threading.Timer(5.0, self.start_new_turn).start()
+                        logger.info(f"📂 {len(self.agent_registry)} agents restored - will start turns after launcher ready signal")
+                        # Don't start turns immediately - wait for launcher_ready signal
+                        # This ensures all character nodes have time to fully initialize
                         
                         # Trigger character announcements for restored agents
                         # This ensures the map node knows about them for turn management

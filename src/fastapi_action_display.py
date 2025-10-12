@@ -514,11 +514,12 @@ class FastAPIActionDisplayNode:
                     try:
                         replies = self.session.get("cognitive/map/simulation_time", timeout=5.0 if not self.debug else 300.0)
                         for reply in replies:
-                            response = json.loads(reply.payload.to_bytes().decode('utf-8'))
-                            if response.get('success'):
-                                # Cache the time for future requests
-                                self.current_simulation_time = response
-                                return {"success": True, "time_info": response}
+                            if reply.ok:
+                                response = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
+                                if response.get('success'):
+                                    # Cache the time for future requests
+                                    self.current_simulation_time = response
+                                    return {"success": True, "time_info": response}
                         
                         return {"success": False, "message": "No response from map_node"}
                     except Exception as query_error:
