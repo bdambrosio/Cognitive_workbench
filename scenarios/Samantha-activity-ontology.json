@@ -36,8 +36,8 @@
     },
     {
       "axis": [
-        "UnsureTrustJoe",
-        "SureTrustJoe"
+        "DistrustfulOfJoe",
+        "TrustfulOfJoe"
       ],
       "drive": "Figure out about this guy Joe and whether I can trust him",
       "activity_itemclass": {
@@ -56,7 +56,7 @@
       "drive": "Live safely and survive in the forest.",
       "activity_itemclass": {
         "activity": "Eat",
-        "itemclass": "EdiblePlant",
+        "itemclass": "Food",
         "subtypes_included": [
           "Berries",
           "Mushrooms",
@@ -72,7 +72,7 @@
       "drive": "Live safely and survive in the forest.",
       "activity_itemclass": {
         "activity": "Drink",
-        "itemclass": "WaterSource",
+        "itemclass": "Water Source",
         "subtypes_included": [
           "Spring"
         ]
@@ -100,8 +100,8 @@
       ],
       "drive": "Live safely and survive in the forest.",
       "activity_itemclass": {
-        "activity": "ShelterIn",
-        "itemclass": "Shelter",
+        "activity": "Take Shelter",
+        "itemclass": "Protected Place",
         "subtypes_included": [
           "Hut",
           "Cave"
@@ -115,15 +115,14 @@
       ],
       "drive": "Learn about the forest and the animals, plants, and resources in the forest. Adventure, excitement, and the thrill of the unknown.",
       "activity_itemclass": {
-        "activity": "Investigate",
-        "itemclass": "NaturalFeature",
+        "activity": "Explore",
+        "itemclass": "Location",
         "subtypes_included": [
           "Forest",
           "Clearing",
           "Meadow",
           "Path",
-          "Mountain",
-          "Spring",
+          "Village",
           "Cave",
           "Thicket"
         ]
@@ -136,107 +135,52 @@
       ],
       "drive": "Learn about the forest and the animals, plants, and resources in the forest. Adventure, excitement, and the thrill of the unknown.",
       "activity_itemclass": {
-        "activity": "Study",
+        "activity": "Examine",
         "itemclass": "Resource",
         "subtypes_included": [
           "Berries",
           "Mushrooms",
           "Appletree",
+          "Spring",
           "Fallenbranch",
-          "Spring"
+          "Hut"
         ]
       }
     },
     {
       "axis": [
-        "Disconnected",
-        "Connected"
+        "Unfulfilled-Curiosity",
+        "Fulfilled-Curiosity"
       ],
       "drive": "Learn about the forest and the animals, plants, and resources in the forest. Adventure, excitement, and the thrill of the unknown.",
       "activity_itemclass": {
-        "activity": "Explore",
-        "itemclass": "Place",
+        "activity": "Discover",
+        "itemclass": "PointOfInterest",
         "subtypes_included": [
-          "Mountain",
-          "Forest",
-          "Clearing",
-          "Meadow",
-          "Path",
+          "Cave",
+          "Spring",
+          "Appletree",
           "Village",
           "Hut",
-          "Spring",
-          "Cave",
-          "Thicket"
-        ]
-      }
-    },
-    {
-      "axis": [
-        "Bored",
-        "Excited"
-      ],
-      "drive": "Learn about the forest and the animals, plants, and resources in the forest. Adventure, excitement, and the thrill of the unknown.",
-      "activity_itemclass": {
-        "activity": "Adventure",
-        "itemclass": "UnknownLocation",
-        "subtypes_included": [
-          "Mountain",
-          "Forest",
           "Clearing",
-          "Meadow",
-          "Path",
-          "Village",
-          "Cave",
-          "Thicket"
+          "Meadow"
         ]
       }
     },
     {
       "axis": [
-        "Unprepared",
-        "Prepared"
+        "Unadventurous",
+        "Adventurous"
       ],
       "drive": "Learn about the forest and the animals, plants, and resources in the forest. Adventure, excitement, and the thrill of the unknown.",
       "activity_itemclass": {
-        "activity": "Gather",
-        "itemclass": "Resource",
+        "activity": "Venture",
+        "itemclass": "WildArea",
         "subtypes_included": [
-          "Berries",
-          "Mushrooms",
-          "Appletree",
-          "Fallenbranch",
-          "Spring"
-        ]
-      }
-    },
-    {
-      "axis": [
-        "Isolated",
-        "Connected"
-      ],
-      "drive": "love and belonging, including home, acceptance, friendship, trust, intimacy.",
-      "activity_itemclass": {
-        "activity": "Communicate",
-        "itemclass": "Person",
-        "subtypes_included": [
-          "Samantha",
-          "Joe",
-          "Hermit",
-          "User"
-        ]
-      }
-    },
-    {
-      "axis": [
-        "Isolated",
-        "Connected"
-      ],
-      "drive": "love and belonging, including home, acceptance, friendship, trust, intimacy.",
-      "activity_itemclass": {
-        "activity": "Join",
-        "itemclass": "Community",
-        "subtypes_included": [
-          "Village"
+          "Forest",
+          "Cave",
+          "Thicket",
+          "Meadow"
         ]
       }
     },
@@ -247,7 +191,7 @@
       ],
       "drive": "love and belonging, including home, acceptance, friendship, trust, intimacy.",
       "activity_itemclass": {
-        "activity": "Seek Shelter",
+        "activity": "Shelter-In",
         "itemclass": "Shelter",
         "subtypes_included": [
           "Hut",
@@ -257,26 +201,12 @@
     },
     {
       "axis": [
-        "Unaccepted",
-        "Accepted"
+        "Isolated",
+        "Connected"
       ],
       "drive": "love and belonging, including home, acceptance, friendship, trust, intimacy.",
       "activity_itemclass": {
-        "activity": "Be Welcomed",
-        "itemclass": "Group",
-        "subtypes_included": [
-          "Village"
-        ]
-      }
-    },
-    {
-      "axis": [
-        "Untrusted",
-        "Trusted"
-      ],
-      "drive": "love and belonging, including home, acceptance, friendship, trust, intimacy.",
-      "activity_itemclass": {
-        "activity": "Build Trust",
+        "activity": "Gather-With",
         "itemclass": "Person",
         "subtypes_included": [
           "Samantha",
@@ -288,12 +218,29 @@
     },
     {
       "axis": [
-        "Distant",
+        "Unaccepted",
+        "Accepted"
+      ],
+      "drive": "love and belonging, including home, acceptance, friendship, trust, intimacy.",
+      "activity_itemclass": {
+        "activity": "Communicate-With",
+        "itemclass": "Person",
+        "subtypes_included": [
+          "Samantha",
+          "Joe",
+          "Hermit",
+          "User"
+        ]
+      }
+    },
+    {
+      "axis": [
+        "Non-Intimate",
         "Intimate"
       ],
       "drive": "love and belonging, including home, acceptance, friendship, trust, intimacy.",
       "activity_itemclass": {
-        "activity": "Share",
+        "activity": "Share-With",
         "itemclass": "Person",
         "subtypes_included": [
           "Samantha",
@@ -310,7 +257,7 @@
       ],
       "drive": "Maintain hydration \u2014 avoid thirst and keep the body supplied with fluids.",
       "activity_itemclass": {
-        "activity": "Drink",
+        "activity": "Consume",
         "itemclass": "Water Source",
         "subtypes_included": [
           "Spring"
@@ -356,9 +303,24 @@
       "drive": "Maintain energy \u2014 avoid hunger and keep the body supplied with nutrients.",
       "activity_itemclass": {
         "activity": "Drink",
-        "itemclass": "Water Source",
+        "itemclass": "WaterSource",
         "subtypes_included": [
           "Spring"
+        ]
+      }
+    },
+    {
+      "axis": [
+        "Fatigued",
+        "Rested"
+      ],
+      "drive": "Maintain energy \u2014 avoid hunger and keep the body supplied with nutrients.",
+      "activity_itemclass": {
+        "activity": "Rest",
+        "itemclass": "Shelter",
+        "subtypes_included": [
+          "Hut",
+          "Cave"
         ]
       }
     }
@@ -370,33 +332,28 @@
     "Eat",
     "Drink",
     "Rest",
-    "ShelterIn",
-    "Investigate",
-    "Study",
+    "Take Shelter",
     "Explore",
-    "Adventure",
-    "Gather",
-    "Communicate",
-    "Join",
-    "Seek Shelter",
-    "Be Welcomed",
-    "Build Trust",
-    "Share",
+    "Examine",
+    "Discover",
+    "Venture",
+    "Shelter-In",
+    "Gather-With",
+    "Communicate-With",
+    "Share-With",
     "Consume"
   ],
   "nouns": [
     "Person",
-    "EdiblePlant",
-    "WaterSource",
-    "Shelter",
-    "NaturalFeature",
-    "Resource",
-    "Place",
-    "UnknownLocation",
-    "Community",
-    "Group",
+    "Food",
     "Water Source",
-    "Food"
+    "Shelter",
+    "Protected Place",
+    "Location",
+    "Resource",
+    "PointOfInterest",
+    "WildArea",
+    "WaterSource"
   ],
   "noun_mappings": {
     "Person": [
@@ -405,25 +362,28 @@
       "Hermit",
       "User"
     ],
-    "EdiblePlant": [
+    "Food": [
       "Berries",
       "Mushrooms",
       "Appletree"
     ],
-    "WaterSource": [
+    "Water Source": [
       "Spring"
     ],
     "Shelter": [
       "Hut",
       "Cave"
     ],
-    "NaturalFeature": [
+    "Protected Place": [
+      "Hut",
+      "Cave"
+    ],
+    "Location": [
       "Forest",
       "Clearing",
       "Meadow",
       "Path",
-      "Mountain",
-      "Spring",
+      "Village",
       "Cave",
       "Thicket"
     ],
@@ -431,44 +391,27 @@
       "Berries",
       "Mushrooms",
       "Appletree",
+      "Spring",
       "Fallenbranch",
-      "Spring"
+      "Hut"
     ],
-    "Place": [
-      "Mountain",
-      "Forest",
-      "Clearing",
-      "Meadow",
-      "Path",
+    "PointOfInterest": [
+      "Cave",
+      "Spring",
+      "Appletree",
       "Village",
       "Hut",
-      "Spring",
-      "Cave",
-      "Thicket"
-    ],
-    "UnknownLocation": [
-      "Mountain",
-      "Forest",
       "Clearing",
-      "Meadow",
-      "Path",
-      "Village",
+      "Meadow"
+    ],
+    "WildArea": [
+      "Forest",
       "Cave",
-      "Thicket"
+      "Thicket",
+      "Meadow"
     ],
-    "Community": [
-      "Village"
-    ],
-    "Group": [
-      "Village"
-    ],
-    "Water Source": [
+    "WaterSource": [
       "Spring"
-    ],
-    "Food": [
-      "Berries",
-      "Mushrooms",
-      "Appletree"
     ]
   }
 }

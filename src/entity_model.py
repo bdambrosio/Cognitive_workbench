@@ -223,6 +223,7 @@ End your response with:
             'first_seen': self.first_seen.isoformat() if self.first_seen else None,
             'last_seen': self.last_seen.isoformat() if self.last_seen else None,
             'conversation_history': recent_history,  # Current or all dialogs based on scope
+            'dialogs': self.dialogs,  # Full nested dialog structure for RAG context expansion
             'full_history_count': total_entries,
             'dialog_count': len(self.dialogs),
             'active_dialog': self.active,

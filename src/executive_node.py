@@ -354,11 +354,23 @@ class ZenohExecutiveNode:
                     time.sleep(0.2)
                 else:
                     try:
-                        if self.text_input_queue:
+                        # Priority order: Physiological overrides → Text input → Normal OODA
+                        goal, key = self.check_physiological_overrides()
+                        if key:
+                            # Send canned response to any queued text (no turn cost)
+                            if self.text_input_queue:
+                                self._send_canned_physiological_response(key)
+                            
+                            if goal: # new goal! plan for it.
+                                self.current_goal = goal
+                                self._publish_goal(self.current_goal)
+                                logger.info(f'🎯 {self.character_name} oriented to goal: {self.current_goal.to_string()}')
+                                action, status = self.plan_and_initiate_execution(goal)
+                        elif self.text_input_queue:
                             self._process_text_input()
-                        else:
-                            self._run_ooda_loop()
+                        self._run_ooda_loop()
                     except Exception as e:
+                        traceback.print_exc()
                         logger.error(f'Error in OODA loop: {e}')
                     self._complete_turn()
                 time.sleep(0.2)
@@ -387,6 +399,31 @@ class ZenohExecutiveNode:
         except Exception as e:
             logger.error(f'Error announcing character: {e}')
     
+    def _send_canned_physiological_response(self, goal_type: str):
+        """Send automatic response when physiological need interrupts conversation."""
+        if not self.text_input_queue:
+            return
+        
+        # Pop one text from queue
+        sense_data = self.text_input_queue.pop(0)
+        content = sense_data['content']
+        try:
+            content_data = json.loads(content)
+            source = content_data.get('source', 'someone')
+        except (json.JSONDecodeError, TypeError):
+            source = 'someone'
+        
+        # Simple template responses
+        canned_responses = {
+            'eat': f"Sorry {source}, I really need to eat!",
+            'drink': f"Excuse me {source}, I'm very thirsty!",
+            'rest': f"Sorry {source}, I need to rest!"
+        }
+        response = canned_responses.get(goal_type, f"Sorry {source}, I'm busy right now!")
+        
+        self.send_text_input(source, response)
+        logger.info(f'🏃 {self.character_name} auto-responded to {source} (physiological priority: {goal_type})')
+
     def send_text_input(self, target_character: str, message: str):
         """Send text input to another character."""
         try:
@@ -569,12 +606,16 @@ class ZenohExecutiveNode:
                         worst_state_value = item['value']
                         worst_state_key = key
             if worst_state_key and self.current_goal and worst_state_key not in self.current_goal.name:
+                logger.warning(f'{self.character_name} is in danger of death, overriding current goal with physiological override: {physiological_drives[worst_state_key]}')
                 self.current_goal = plan_module.Goal(physiological_drives[worst_state_key], actors=[self.character_name], termination=f'{worst_state_key} below 50')
+                if self.activity_manager:
+                    self.activity_manager._complete_activity()
                 self.current_activity = None
                 self.current_step = None
                 self._plan_completed(reason='physiological override')
-                return self.current_goal
-        return None
+                return self.current_goal, worst_state_key
+            return None, worst_state_key
+        return None, None
 
 
     def _process_text_input(self):
@@ -621,14 +662,8 @@ class ZenohExecutiveNode:
                 if action is not None:
                     return
                 
-            physiological_override = self.check_physiological_overrides()
-            if physiological_override:
-                self.current_goal = physiological_override
-                self._publish_goal(self.current_goal)
-                logger.info(f'🎯 {self.character_name} oriented to goal: {self.current_goal.to_string()}')
-                action, status = self.plan_and_initiate_execution(physiological_override)
-                return
-
+            # Physiological overrides are now checked at top level (line ~358) before entering OODA loop
+            
             if self.activity_manager and self.activity_manager.has_active_activity():
                 should_continue, reason = self.activity_manager.continue_activity()
                 if should_continue:
@@ -1153,14 +1188,6 @@ end your response with </end>
             self._publish_goal(self.current_goal)
         return self.current_goal
         
-    def _plan_completed(self, reason='plan completed'):
-        if self.llm_client and not self.shutdown_requested:
-            logger.error('LLM client not available')
-            self.current_goal = plan_module.Goal('sleep', actors=[self.character_name])
-            self.current_plan = None  # Clear plan so _plan creates new one for this goal
-            logger.info(f'🔄 {self.character_name} cleared plan_bindings for sleep goal (LLM unavailable)')
-            self._publish_goal(self.current_goal)
-        return self.current_goal
         
     def _plan_completed(self, reason='plan completed'):
         """Handle successful plan completion."""
@@ -1498,6 +1525,12 @@ end your response with </end>
                 move_direction = None
                 # Dereference variable targets (e.g., $var -> bound value)
                 raw_target = deref_plan_target(self.plan_bindings, action.get('target', ''))
+                if raw_target and isinstance(raw_target, str) and raw_target.startswith('$'):
+                    logger.error(f'Plan aborted: unbound variable {raw_target}')
+                    action_record.outcome_status = 'failure'
+                    action_record.failure_code = 'unbound_variable'
+                    self._plan_completed(reason='unbound_variable')
+                    return False
                 move_target = raw_target.strip().lower()
                 # Telemetry: store resolved target string if available
                 try:
@@ -1560,6 +1593,13 @@ end your response with </end>
             requested_target = action.get('target', '')
             raw_target = deref_plan_target(self.plan_bindings, requested_target)
             resolved_target = deref_plan_target(self.plan_bindings, raw_target)
+            
+            if resolved_target and isinstance(resolved_target, str) and resolved_target.startswith('$'):
+                logger.error(f'Plan aborted: unbound variable {resolved_target}')
+                action_record.outcome_status = 'failure'
+                action_record.failure_code = 'unbound_variable'
+                self._plan_completed(reason='unbound_variable')
+                return False
 
             # Telemetry: store resolved target
             try:
@@ -1601,6 +1641,14 @@ end your response with </end>
             # If resolution failed, publish a failure action with requested_target
             cond_action = action.copy()
             cond_action['target'] = deref_plan_target(self.plan_bindings, cond_action.get('target', ''))
+            
+            if cond_action['target'] and isinstance(cond_action['target'], str) and cond_action['target'].startswith('$'):
+                logger.error(f'Plan aborted: unbound variable {cond_action["target"]}')
+                action_record.outcome_status = 'failure'
+                action_record.failure_code = 'unbound_variable'
+                self._plan_completed(reason='unbound_variable')
+                return False
+            
             cond_action['type'] = 'near'
             cond_action['target'] = cond_action['target'].strip().capitalize()
             binding = plan_module._evaluate_condition(self, cond_action, self.observations)
@@ -1767,6 +1815,14 @@ end your response with </end>
             # Publish inspect action including requested vs resolved target
             cond_action = action.copy()
             cond_action['target'] = deref_plan_target(self.plan_bindings, cond_action.get('target', ''))
+            
+            if cond_action['target'] and isinstance(cond_action['target'], str) and cond_action['target'].startswith('$'):
+                logger.error(f'Plan aborted: unbound variable {cond_action["target"]}')
+                action_record.outcome_status = 'failure'
+                action_record.failure_code = 'unbound_variable'
+                self._plan_completed(reason='unbound_variable')
+                return False
+            
             cond_action['type'] = 'near'
             cond_action['target'] = cond_action['target'].strip().capitalize()
             binding = plan_module._evaluate_condition(self, cond_action, self.observations)
@@ -1847,6 +1903,14 @@ end your response with </end>
                         cond_action['target'] = self.plan_bindings[vn]
             except Exception:
                 pass
+            
+            if cond_action.get('target', '') and isinstance(cond_action['target'], str) and cond_action['target'].startswith('$'):
+                logger.error(f'Plan aborted: unbound variable {cond_action["target"]}')
+                action_record.outcome_status = 'failure'
+                action_record.failure_code = 'unbound_variable'
+                self._plan_completed(reason='unbound_variable')
+                return False
+            
             cond_action['type'] = 'near'
             cond_action['target'] = cond_action['target'].strip().capitalize()
             binding = plan_module._evaluate_condition(self, cond_action, self.observations)
@@ -2665,11 +2729,13 @@ End your response with </end>
 
             if entity_context:
                 discourse_tom_models = self.get_entity_discourse_tom_models(source)
-                dialog_history += f"\nBeliefs about {source}:\n\n{discourse_tom_models['tom_model']}\n"
-                dialog_history += f"\nDiscourse state with {source}:\n\n{discourse_tom_models['discourse_state']}\n"
+                if discourse_tom_models:
+                    dialog_history += f"\nBeliefs about {source}:\n\n{discourse_tom_models.get('tom_model', '')}\n"
+                    dialog_history += f"\nDiscourse state with {source}:\n\n{discourse_tom_models.get('discourse_state', '')}\n"
             
             # Add RAG retrieved entries with context
             if rag_entries:
+                logger.info(f'RAG: Adding {len(rag_entries[:5])} retrieved conversation snippets')
                 dialog_history += f"\n\nRelevant past conversations:\n"
                 for entry in rag_entries[:5]:
                     expanded = self.expand_rag_context(entry, window_before=3)
@@ -3533,29 +3599,32 @@ End your response with:
         Returns:
             Dictionary with entity data or None if query failed
         """
+        from utils.zenoh_utils import zenoh_get_with_retry
         # safeguard - don't allow variables in query
         entity_name = entity_name.replace('$', '')
         try:
-            # Query entity data from memory node with query and limit parameters
-            for reply in self.session.get(f"cognitive/{self.character_name}/memory/entity/{entity_name}?query=dialog&limit={limit}&scope={scope}", timeout=3.0 if not self.debug else 300.0):
-                try:
-                    if reply.ok:
-                        data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
-                        if data['success']:
-                            logger.info(f'👥 Retrieved entity context for {entity_name}')
-                            return data['entity_data']
-                        else:
-                            logger.debug(f'Entity query failed for {entity_name}: {data.get("error", "Unknown error")}')
-                            return None
-                except Exception as e:
-                    logger.error(f'Error parsing entity query response for {entity_name}: {e}')
-                    return None
-            
-            logger.debug(f'No response received for entity query: {entity_name}')
+            key_expr = f"cognitive/{self.character_name}/memory/entity/{entity_name}?query=dialog&limit={limit}&scope={scope}"
+            data = zenoh_get_with_retry(
+                session=self.session,
+                key_expr=key_expr,
+                payload=None,
+                base_timeout=1.0,
+                retries=3,
+                backoff_factor=2.0,
+                jitter=0.1,
+                block_mode=False
+            )
+            if data and data.get('success'):
+                logger.info(f'👥 Retrieved entity context for {entity_name}')
+                return data.get('entity_data')
+            logger.warning(f'Entity query failed or no response for {entity_name}')
+            for handler in logger.handlers:
+                handler.flush()
             return None
-            
         except Exception as e:
             logger.error(f'Error querying entity context for {entity_name}: {e}')
+            for handler in logger.handlers:
+                handler.flush()
             return None
     
     def get_rag_context(self, query_text: str, entity_name: str = None, k: int = 5) -> Dict[str, Any]:
@@ -3571,6 +3640,7 @@ End your response with:
             Dictionary with retrieved_entries list and count, always returns even if empty
         """
         import urllib.parse
+        from utils.zenoh_utils import zenoh_get_with_retry
         
         try:
             # Build query parameters
@@ -3580,22 +3650,28 @@ End your response with:
             
             key_expr = f"cognitive/{self.character_name}/memory/rag/search?{'&'.join(params)}"
             
-            for reply in self.session.get(key_expr, timeout=3.0 if not self.debug else 300.0):
-                try:
-                    if reply.ok:
-                        data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
-                        if data['success']:
-                            logger.debug(f'🔍 Retrieved {data.get("count", 0)} RAG entries for query: "{query_text[:50]}..."')
-                            return data
-                except Exception as e:
-                    logger.error(f'Error parsing RAG query response: {e}')
-                    return {'success': True, 'retrieved_entries': [], 'count': 0, 'query': query_text}
-            
-            logger.debug(f'No response received for RAG query: "{query_text[:50]}..."')
+            # Use retry wrapper; in debug still prefer retries over single 300s block.
+            block_mode = False
+            data = zenoh_get_with_retry(
+                session=self.session,
+                key_expr=key_expr,
+                payload=None,
+                base_timeout=1.0,
+                retries=3,
+                backoff_factor=2.0,
+                jitter=0.1,
+                block_mode=block_mode,
+                block_timeout=300.0
+            )
+            if data and isinstance(data, dict) and data.get('success') is True:
+                return data
+            logger.debug(f'RAG query returned no results for "{query_text[:50]}..."')
             return {'success': True, 'retrieved_entries': [], 'count': 0, 'query': query_text}
             
         except Exception as e:
             logger.error(f'Error querying RAG context for "{query_text[:50]}...": {e}')
+            for handler in logger.handlers:
+                handler.flush()
             return {'success': True, 'retrieved_entries': [], 'count': 0, 'query': query_text}
     
     def expand_rag_context(self, rag_entry: Dict[str, Any], window_before: int = 3) -> str:
@@ -3611,24 +3687,67 @@ End your response with:
         """
         try:
             doc_id = rag_entry.get('doc_id', '')
+            if not doc_id:
+                logger.warning(f'RAG expand: missing doc_id in RAG entry, returning text only')
+                for handler in logger.handlers:
+                    handler.flush()
+                return rag_entry.get('text', '')
+            
             parts = doc_id.split(':')
             if len(parts) < 4:
+                logger.warning(f'RAG expand: doc_id malformed ({doc_id}), returning text only')
+                for handler in logger.handlers:
+                    handler.flush()
                 return rag_entry.get('text', '')
             
-            entity_name = parts[1]
-            dialog_idx = int(parts[2])
-            entry_idx = int(parts[3])
+            try:
+                entity_name = parts[1]
+                dialog_idx = int(parts[2])
+                entry_idx = int(parts[3])
+            except (ValueError, IndexError) as e:
+                logger.warning(f'RAG expand: failed to parse doc_id {doc_id}: {e}')
+                for handler in logger.handlers:
+                    handler.flush()
+                return rag_entry.get('text', '')
             
             entity_context = self.get_entity_context(entity_name)
-            if not entity_context or 'dialogs' not in entity_context:
+            if not entity_context:
+                logger.warning(f'RAG expand: no entity_context retrieved for {entity_name}')
+                for handler in logger.handlers:
+                    handler.flush()
                 return rag_entry.get('text', '')
             
-            dialogs = entity_context.get('dialogs', [])
+            # get_entity_data now includes 'dialogs' for RAG context expansion
+            dialogs = entity_context.get('dialogs')
+            if not dialogs:
+                logger.warning(f'RAG expand: no dialogs field in entity_context for {entity_name}')
+                for handler in logger.handlers:
+                    handler.flush()
+                return rag_entry.get('text', '')
+            
+            if not isinstance(dialogs, list):
+                logger.warning(f'RAG expand: dialogs not a list for {entity_name}, type={type(dialogs)}')
+                for handler in logger.handlers:
+                    handler.flush()
+                return rag_entry.get('text', '')
+            
             if dialog_idx >= len(dialogs):
+                logger.warning(f'RAG expand: dialog_idx {dialog_idx} >= len(dialogs) {len(dialogs)} for {entity_name} - data mismatch')
+                for handler in logger.handlers:
+                    handler.flush()
                 return rag_entry.get('text', '')
             
             dialog = dialogs[dialog_idx]
-            if not isinstance(dialog, list) or entry_idx >= len(dialog):
+            if not isinstance(dialog, list):
+                logger.warning(f'RAG expand: dialog {dialog_idx} not a list for {entity_name}, type={type(dialog)}')
+                for handler in logger.handlers:
+                    handler.flush()
+                return rag_entry.get('text', '')
+            
+            if entry_idx >= len(dialog):
+                logger.warning(f'RAG expand: entry_idx {entry_idx} >= len(dialog) {len(dialog)} for {entity_name} - data mismatch')
+                for handler in logger.handlers:
+                    handler.flush()
                 return rag_entry.get('text', '')
             
             # Verify the entry matches
@@ -3638,22 +3757,29 @@ End your response with:
             else:
                 entry_text = str(entry)
             
-            if rag_entry.get('text', '') not in entry_text:
-                return rag_entry.get('text', '')
+            rag_text = rag_entry.get('text', '')
+            if rag_text and rag_text not in entry_text:
+                logger.warning(f'RAG expand: entry mismatch for {entity_name} dialog {dialog_idx} entry {entry_idx}, RAG text not found in dialog entry')
+                for handler in logger.handlers:
+                    handler.flush()
+                return rag_text
             
             # Build context window
             start_idx = max(0, entry_idx - window_before)
             context_lines = []
             for i in range(start_idx, entry_idx + 1):
-                if isinstance(dialog[i], dict):
-                    context_lines.append(f"{dialog[i].get('source', '')}: {dialog[i].get('text', '')}")
-                else:
-                    context_lines.append(str(dialog[i]))
+                if i < len(dialog):
+                    if isinstance(dialog[i], dict):
+                        context_lines.append(f"{dialog[i].get('source', '')}: {dialog[i].get('text', '')}")
+                    else:
+                        context_lines.append(str(dialog[i]))
             
-            return '\n'.join(context_lines)
+            return '\n'.join(context_lines) if context_lines else rag_entry.get('text', '')
             
         except Exception as e:
-            logger.error(f'Error expanding RAG context: {e}')
+            logger.error(f'Error expanding RAG context for doc_id {rag_entry.get("doc_id", "")}: {e}')
+            for handler in logger.handlers:
+                handler.flush()
             return rag_entry.get('text', '')
     
     def get_entity_discourse_tom_models(self, entity_name: str, limit: int = 20, scope='all') -> Dict[str, Any]:
@@ -3665,29 +3791,32 @@ End your response with:
         Returns:
             Dictionary with entity data or None if query failed
         """
+        from utils.zenoh_utils import zenoh_get_with_retry
         # safeguard - don't allow variables in query
         entity_name = entity_name.replace('$', '')
         try:
-            # Query entity data from memory node with query and limit parameters
-            for reply in self.session.get(f"cognitive/{self.character_name}/memory/entity/{entity_name}?query=relation", timeout=3.0 if not self.debug else 300.0):
-                try:
-                    if reply.ok:
-                        data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
-                        if data['success']:
-                            logger.info(f'👥 Retrieved entity context for {entity_name}')
-                            return data # { 'discourse_state': 'discourse_state', 'tom_model': 'tom_model' }
-                        else:
-                            logger.warning(f'Entity query failed for {entity_name}: {data.get("error", "Unknown error")}')
-                            return None
-                except Exception as e:
-                    logger.error(f'Error parsing entity query response for {entity_name}: {e}')
-                    return None
-            
-            logger.debug(f'No response received for entity query: {entity_name}')
+            key_expr = f"cognitive/{self.character_name}/memory/entity/{entity_name}?query=relation"
+            data = zenoh_get_with_retry(
+                session=self.session,
+                key_expr=key_expr,
+                payload=None,
+                base_timeout=1.0,
+                retries=3,
+                backoff_factor=2.0,
+                jitter=0.1,
+                block_mode=False
+            )
+            if data and data.get('success'):
+                logger.info(f'👥 Retrieved entity discourse/tom for {entity_name}')
+                return data
+            logger.warning(f'Entity discourse/tom query failed or no response for {entity_name}')
+            for handler in logger.handlers:
+                handler.flush()
             return None
-            
         except Exception as e:
-            logger.error(f'Error querying entity context for {entity_name}: {e}')
+            logger.error(f'Error querying entity discourse/tom for {entity_name}: {e}')
+            for handler in logger.handlers:
+                handler.flush()
             return None
    
     def check_natural_dialog_end(self, entity_name: str, input_text: str) -> bool:
@@ -3701,6 +3830,7 @@ End your response with:
         Returns:
             bool: True if dialog should end, False if it should continue
         """
+        from utils.zenoh_utils import zenoh_get_with_retry
         try:
             import urllib.parse
             encoded_text = urllib.parse.quote(input_text)
@@ -3708,26 +3838,30 @@ End your response with:
             context = self.observations['static'] if self.observations else ""
             query_url = f"cognitive/{self.character_name}/memory/entity/{entity_name}?query=natural_dialog_end&input_text={encoded_text}&context={context}"
             
-            for reply in self.session.get(query_url, timeout=10.0 if not self.debug else 300.0):
-                try:
-                    if reply.ok:
-                        data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
-                        if data['success']:
-                            logger.info(f'🤔 Natural dialog end check for {entity_name}: {data.get("should_end", True)}')
-                            return data.get("should_end", True)
-                        else:
-                            logger.debug(f'Natural dialog end query failed for {entity_name}: {data.get("error", "Unknown error")}')
-                            return True
-                except Exception as e:
-                    logger.error(f'Error parsing natural dialog end response for {entity_name}: {e}')
-                    return True
+            data = zenoh_get_with_retry(
+                session=self.session,
+                key_expr=query_url,
+                payload=None,
+                base_timeout=2.0,  # Slightly longer for LLM-based check
+                retries=3,
+                backoff_factor=2.0,
+                jitter=0.1,
+                block_mode=False
+            )
+            if data and data.get('success'):
+                logger.info(f'🤔 Natural dialog end check for {entity_name}: {data.get("should_end", True)}')
+                return data.get("should_end", True)
             
-            logger.error(f'Timeout: No response received for natural dialog end query: {entity_name}')
+            logger.warning(f'Natural dialog end query failed or no response for {entity_name}, assuming should end')
+            for handler in logger.handlers:
+                handler.flush()
             return True
             
         except Exception as e:
             logger.error(f'Error querying natural dialog end for {entity_name}: {e}')
             logger.error(traceback.format_exc())
+            for handler in logger.handlers:
+                handler.flush()
             return True
     
     def _acquire_conversation_lock(self, target_character: str) -> bool:

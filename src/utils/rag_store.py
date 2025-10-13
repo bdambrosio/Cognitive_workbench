@@ -32,21 +32,38 @@ class CharacterRAGStore:
 
     def get_space(self, space: str) -> Embeddings:
         """Get or create a space Embeddings index."""
+        import time
+        import logging
+        logger = logging.getLogger('rag_store')
+        
         if space in self.spaces:
             return self.spaces[space]
-        # Initialize embeddings
+        
+        logger.warning(f'🔍 RAG: Initializing new space "{space}" for {self.character_name} (FIRST TIME - may be slow)')
+        init_start = time.time()
+        
+        # Initialize embeddings with content storage enabled
         embeddings = Embeddings({
-            "path": self.model_path
+            "path": self.model_path,
+            "content": True
         })
+        init_elapsed = time.time() - init_start
+        logger.warning(f'🔍 RAG: Embeddings object created in {init_elapsed:.2f}s')
+        
         # Try to load existing index
         space_path = self._space_path(space)
         try:
             if space_path.exists():
+                load_start = time.time()
                 embeddings.load(str(space_path))
-        except Exception:
-            # If load fails, create fresh index
-            pass
+                load_elapsed = time.time() - load_start
+                logger.warning(f'🔍 RAG: Index loaded from {space_path} in {load_elapsed:.2f}s')
+        except Exception as e:
+            logger.warning(f'🔍 RAG: Failed to load index: {e}, creating fresh')
+        
         self.spaces[space] = embeddings
+        total_elapsed = time.time() - init_start
+        logger.warning(f'🔍 RAG: Space "{space}" ready in {total_elapsed:.2f}s total')
         return embeddings
 
     def upsert(self, space: str, docs: List[Dict]) -> None:

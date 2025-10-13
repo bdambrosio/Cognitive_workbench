@@ -48,6 +48,128 @@ logging.basicConfig(
 )
 
 
+class ActionTracer:
+    """Records actions to a markdown trace file for analysis."""
+    
+    def __init__(self, scenario_name: str = None):
+        self.scenario_name = scenario_name or "unknown"
+        self.trace_file = None
+        self.start_time = datetime.now()
+        self._init_trace_file()
+    
+    def _init_trace_file(self):
+        """Initialize trace file with header."""
+        trace_dir = Path('logs')
+        trace_dir.mkdir(exist_ok=True)
+        
+        trace_path = trace_dir / f"action_trace_{self.scenario_name}.md"
+        self.trace_file = open(trace_path, 'w')
+        
+        # Write header
+        self.trace_file.write(f"# Action Trace: {self.scenario_name}\n")
+        self.trace_file.write(f"Started: {self.start_time.strftime('%Y-%m-%d %H:%M:%S')}\n\n")
+        self.trace_file.flush()
+        
+        logger.info(f"Action trace initialized: {trace_path}")
+    
+    def log_action(self, action_data: dict, character_name: str):
+        """Log an action to the trace file."""
+        if not self.trace_file:
+            return
+        
+        try:
+            # Extract timestamp (HH:MM:SS format)
+            timestamp_str = action_data.get('timestamp', '')
+            if timestamp_str:
+                try:
+                    ts = datetime.fromisoformat(timestamp_str)
+                    time_str = ts.strftime('%H:%M:%S')
+                except:
+                    time_str = datetime.now().strftime('%H:%M:%S')
+            else:
+                time_str = datetime.now().strftime('%H:%M:%S')
+            
+            # Extract action type
+            action_type = action_data.get('type', 'unknown')
+            
+            # Skip announcements
+            if action_type == 'announcement':
+                return
+            
+            # Build action description
+            parts = [f"{time_str} **{character_name}** {action_type}"]
+            
+            # Add action-specific details
+            if action_type == 'say' or action_type == 'response':
+                target = action_data.get('target', '')
+                text = action_data.get('text', '')
+                if target:
+                    parts.append(f" to {target}:")
+                else:
+                    parts.append(":")
+                parts.append(f' "{text}"')
+            elif action_type == 'think':
+                thought = action_data.get('thought', action_data.get('text', ''))
+                parts.append(f': "{thought}"')
+            elif action_type == 'move':
+                target = action_data.get('target', action_data.get('location', ''))
+                if target:
+                    parts.append(f" to {target}")
+            elif action_type == 'scan':
+                target = action_data.get('target', '')
+                result = action_data.get('result', '')
+                out_var = action_data.get('out', '')
+                if target:
+                    parts.append(f" {target}")
+                if out_var and result:
+                    parts.append(f" -> {out_var}={result}")
+            elif action_type in ('take', 'inspect', 'use', 'place'):
+                # These use 'target', 'resolved_target', or 'requested_target'
+                target = action_data.get('target', '') or action_data.get('resolved_target', '') or action_data.get('requested_target', '')
+                if target:
+                    parts.append(f" {target}")
+            
+            # Add goal if present
+            goal = action_data.get('goal', '')
+            if goal and isinstance(goal, str):
+                parts.append(f" (goal: {goal})")
+            
+            # Add status/error if present
+            status = action_data.get('status', '')
+            error = action_data.get('error', '')
+            
+            if status and status.lower() in ('failure', 'failed', 'error'):
+                if error:
+                    parts.append(f" (failed, {error})")
+                else:
+                    parts.append(" (failed)")
+            elif error:
+                # Error present even without explicit failure status
+                parts.append(f" (failed, {error})")
+            
+            # Build final line and skip if truly empty (just action type, no details)
+            line = ''.join(parts)
+            # Check if line has any content beyond timestamp + character + action_type
+            minimal_line = f"{time_str} **{character_name}** {action_type}"
+            if line.strip() == minimal_line.strip():
+                # No details whatsoever - skip duplicate/empty
+                logger.debug(f"Skipping empty action entry: {line}")
+                return
+            
+            # Write to file
+            self.trace_file.write(line + '\n')
+            self.trace_file.flush()
+            
+        except Exception as e:
+            logger.error(f"Error logging action to trace: {e}")
+    
+    def close(self):
+        """Close the trace file."""
+        if self.trace_file:
+            self.trace_file.close()
+            self.trace_file = None
+
+
 class FastAPIActionDisplayNode:
     """
     The FastAPI Action Display node provides:
@@ -56,7 +178,7 @@ class FastAPIActionDisplayNode:
     - Action history and statistics
     """
     
-    def __init__(self, port: int = 3000):
+    def __init__(self, port: int = 3000, scenario_name: str = None):
         # Initialize FastAPI app
         self.app = FastAPI(title="Zenoh Action Display")
         self.port = port
@@ -65,6 +187,9 @@ class FastAPIActionDisplayNode:
         self.debug = str(os.getenv('CWB_DEBUG', '')).lower() in ('1', 'true', 'yes', 'on')
         if self.debug:
             logger.info(f'🔧 Debug mode enabled for FastAPI Action Display')
+        
+        # Initialize action tracer
+        self.tracer = ActionTracer(scenario_name=scenario_name)
         
         # Initialize Zenoh session
         config = zenoh.Config()
@@ -2515,6 +2640,9 @@ class FastAPIActionDisplayNode:
                 self._send_to_websockets(action_data, character_name)
                 return
             
+            # Log action to trace file
+            self.tracer.log_action(action_data, character_name)
+            
             # Store action in memory
             self._store_action_in_memory(action_data, character_name)
             
@@ -3348,6 +3476,11 @@ class FastAPIActionDisplayNode:
                     except:
                         pass
             
+            # Close action tracer
+            if hasattr(self, 'tracer'):
+                self.tracer.close()
+                print('Action trace file closed')
+            
             # Close Zenoh session
             if hasattr(self, 'session'):
                 time.sleep(1.0)  # Give time for cleanup
@@ -3362,9 +3495,10 @@ def main():
     """Main entry point."""
     parser = argparse.ArgumentParser(description='FastAPI Action Display Node')
     parser.add_argument('--port', type=int, default=3000, help='Port for FastAPI server (default: 3000)')
+    parser.add_argument('--scenario', type=str, default=None, help='Scenario name for trace file')
     args = parser.parse_args()
     
-    node = FastAPIActionDisplayNode(port=args.port)
+    node = FastAPIActionDisplayNode(port=args.port, scenario_name=args.scenario)
     node.run()
 
 
