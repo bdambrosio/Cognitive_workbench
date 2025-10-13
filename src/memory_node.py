@@ -396,10 +396,35 @@ class ZenohMemoryNode:
             # Check if entity exists (case-insensitive)
             canonical_entity_name = entity_name.capitalize()
             if canonical_entity_name not in self.entity_models:
-                response = {
-                    'success': False,
-                    'error': f"Entity '{entity_name}' not found"
-                }
+                # Entity not found is not an error - return success with empty data
+                if query_type == 'dialog':
+                    response = {
+                        'success': True,
+                        'entity_data': {
+                            'entity_name': entity_name,
+                            'first_seen': None,
+                            'last_seen': None,
+                            'conversation_history': [],
+                            'dialogs': [],
+                            'full_history_count': 0,
+                            'dialog_count': 0,
+                            'active_dialog': False,
+                            'last_interaction_type': 'none',
+                            'scope': 'current'
+                        }
+                    }
+                elif query_type == 'relation':
+                    response = {
+                        'success': True,
+                        'discourse_state': '',
+                        'tom_model': ''
+                    }
+                else:
+                    # For other query types (like natural_dialog_end), entity not found is an error
+                    response = {
+                        'success': False,
+                        'error': f"Entity '{entity_name}' not found"
+                    }
             else:
                 entity = self.entity_models[canonical_entity_name]
                 
@@ -534,7 +559,9 @@ class ZenohMemoryNode:
     
     def handle_rag_search_query(self, query):
         """Handle RAG semantic search queries."""
+        import time
         try:
+            start_time = time.time()
             # Parse query parameters
             selector = str(query.selector)
             space = 'dialogs'  # default space
@@ -604,14 +631,23 @@ class ZenohMemoryNode:
             retrieved = []
             for result in results:
                 try:
-                    # txtai returns (id, score) tuples when content=False
-                    if len(result) == 2:
-                        doc_id, score = result[0], result[1]
-                        text = None
-                    elif len(result) >= 3:
-                        doc_id, score, text = result[0], result[1], result[2]
+                    # txtai with content=True returns dicts: {'id': ..., 'text': ..., 'score': ...}
+                    # txtai with content=False returns tuples: (id, score) or (id, score, text)
+                    if isinstance(result, dict):
+                        doc_id = result.get('id')
+                        score = result.get('score', 0.0)
+                        text = result.get('text')
+                    elif isinstance(result, (tuple, list)):
+                        if len(result) == 2:
+                            doc_id, score = result[0], result[1]
+                            text = None
+                        elif len(result) >= 3:
+                            doc_id, score, text = result[0], result[1], result[2]
+                        else:
+                            logger.warning(f'Unexpected RAG tuple format (len={len(result)}): {result}')
+                            continue
                     else:
-                        logger.warning(f'Unexpected RAG result format: {result}')
+                        logger.warning(f'Unexpected RAG result type {type(result)}: {result}')
                         continue
                     
                     # Parse doc_id: "dialog:EntityName:dialog_idx:entry_idx"
@@ -659,7 +695,7 @@ class ZenohMemoryNode:
             }
             
             query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
-            logger.info(f'🔍 RAG search for "{query_text[:50]}...": returned {len(retrieved)} entries')
+            logger.debug(f'RAG search returned {len(retrieved)} entries for "{query_text[:50]}..."')
             
         except Exception as e:
             logger.error(f'Error handling RAG search query: {e}')

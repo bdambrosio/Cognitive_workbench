@@ -112,16 +112,17 @@ class CharacterLauncher:
         self.characters.append(character)
         self.logger.info(f'Added character: {canonical_name}')
     
-    def launch_shared_services(self, map_file: str = None, launch_ui: bool = False, server_name: str = 'vllm', model_name: str = None, ui_port: int = 3000, setting: str = None):
+    def launch_shared_services(self, map_file: str = None, launch_ui: bool = False, server_name: str = 'vllm', model_name: str = None, ui_port: int = 3000, setting: str = None, scenario_name: str = None):
         """Launch shared services (map node and optional UI)."""
         self.logger.info('Launching shared services...')
         
         # Launch FastAPI Action Display Node (optional UI)
         if launch_ui:
             try:
-                ui_process = subprocess.Popen([
-                    sys.executable, 'fastapi_action_display.py', '--port', str(ui_port)
-                ])
+                ui_args = [sys.executable, 'fastapi_action_display.py', '--port', str(ui_port)]
+                if scenario_name:
+                    ui_args.extend(['--scenario', scenario_name])
+                ui_process = subprocess.Popen(ui_args)
                 self.shared_processes.append(ui_process)
                 self.logger.info(f'✅ FastAPI Action Display Node launched on port {ui_port}')
                 self.logger.info(f'   - Web UI available at: http://localhost:{ui_port}')
@@ -207,12 +208,12 @@ class CharacterLauncher:
         except Exception as e:
             self.logger.error(f'❌ Failed to launch {character.name} executive_node: {e}')
     
-    def launch_all_characters(self, map_file: str = None, launch_ui: bool = False, server_name: str = 'vllm', model_name: str = None, ui_port: int = 3000, setting: str = None):
+    def launch_all_characters(self, map_file: str = None, launch_ui: bool = False, server_name: str = 'vllm', model_name: str = None, ui_port: int = 3000, setting: str = None, scenario_name: str = None):
         """Launch all character instances."""
         self.logger.info(f'Launching {len(self.characters)} characters...')
         
         # Launch shared services first
-        self.launch_shared_services(map_file, launch_ui, server_name, model_name, ui_port, setting)
+        self.launch_shared_services(map_file, launch_ui, server_name, model_name, ui_port, setting, scenario_name)
         time.sleep(2)  # Give shared services time to start
         
         # Launch each character
@@ -355,6 +356,9 @@ def main():
         with open(config_path, 'r') as f:
             config_data = yaml.safe_load(f)
         
+        # Extract scenario name from config filename (e.g., "laTerre.yaml" -> "laTerre")
+        scenario_name = Path(args.config_file).stem
+        
         # Extract LLM configuration
         llm_config = config_data.get('llm_config', {})
         server_name = llm_config.get('server_name', 'vllm')
@@ -461,9 +465,22 @@ def main():
                                         print(f"Removed existing situation data: {sit_file.name}")
                                     except Exception:
                                         pass
+                        
+                        # Remove RAG stores for characters in current config
+                        rag_stores_dir = data_dir / "rag_stores"
+                        if rag_stores_dir.exists():
+                            for char_name in character_names:
+                                char_rag_dir = rag_stores_dir / char_name
+                                if char_rag_dir.exists():
+                                    try:
+                                        import shutil
+                                        shutil.rmtree(char_rag_dir)
+                                        print(f"Removed existing RAG store: {char_name}")
+                                    except Exception as e:
+                                        print(f"Failed to remove RAG store for {char_name}: {e}")
                 else:
                     print(f"Reusing existing world '{world_name}'")
-        launcher.launch_all_characters(effective_map_file, args.ui, server_name, model_name, ui_port=args.ui_port, setting=setting)
+        launcher.launch_all_characters(effective_map_file, args.ui, server_name, model_name, ui_port=args.ui_port, setting=setting, scenario_name=scenario_name)
         
         # Monitor processes
         launcher.monitor_processes()

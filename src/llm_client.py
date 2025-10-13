@@ -75,15 +75,29 @@ class ZenohLLMClient:
 
     def ask(self, bindings: Dict[str, Any] = None, prompt: str = None, max_tokens: int = 150, temp: float = 0.7, stops: List[str] = ['</end>'], is_json: bool = False, log: bool = False, trace: bool = False, timeout: float = 120.0) -> LLMResponse:
         with ThreadPoolExecutor(max_workers=1) as executor:
+            # First attempt
             future = executor.submit(self.llm.ask, bindings, prompt, max_tokens=max_tokens, temp=temp, stops=stops, is_json=is_json, log=log, trace=trace)
             try:
                 response = future.result(timeout=timeout)
                 return response
             except TimeoutError:
-                logger.error(f'⏱️ LLM request timeout after {timeout}s')
-                logger.error(traceback.format_exc())
+                logger.warning(f'⏱️ LLM request timeout after {timeout}s, retrying once...')
                 future.cancel()
-                raise
+                
+                # Brief backoff to let server clear
+                time.sleep(1.0)
+                
+                # Single retry with same timeout
+                future2 = executor.submit(self.llm.ask, bindings, prompt, max_tokens=max_tokens, temp=temp, stops=stops, is_json=is_json, log=log, trace=trace)
+                try:
+                    response = future2.result(timeout=timeout)
+                    logger.info(f'✅ LLM request succeeded on retry')
+                    return response
+                except TimeoutError:
+                    logger.error(f'⏱️ LLM request timeout after retry, giving up')
+                    logger.error(traceback.format_exc())
+                    future2.cancel()
+                    raise
     
     def generate(self, 
                 messages: List[str], 
