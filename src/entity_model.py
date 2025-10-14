@@ -101,7 +101,7 @@ Each summary should be a single sentence accurately conveying the essence of tha
 Each summary Should accurately reflect both the content and tone of that character's part of the conversation.
 """
 
-        user_prompt = f"""#Dialog transcript
+        user_prompt = """#Dialog transcript
 {{$transcript}}
 ##
 
@@ -116,7 +116,7 @@ End your response with:
 </end>"""
 
         response = self.llm_client.generate([system_prompt, user_prompt], bindings={'transcript': dialog_history, 'name': self.entity_name, 'other_name': self.entity_name}, 
-                                            stops=['</end>'], max_tokens=20)
+                                            stops=['</end>'], max_tokens=60)
         if response.success:
             response=response.text
             me = hash_utils.find(f'{self.character_name}', response)
