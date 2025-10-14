@@ -15,6 +15,7 @@ import webbrowser
 import asyncio
 import signal
 import logging
+import shutil
 from datetime import datetime
 from typing import Dict, List, Any, Set
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request
@@ -178,7 +179,7 @@ class FastAPIActionDisplayNode:
     - Action history and statistics
     """
     
-    def __init__(self, port: int = 3000, scenario_name: str = None):
+    def __init__(self, port: int = 3000, scenario_name: str = None, obsidian_vault: str = None):
         # Initialize FastAPI app
         self.app = FastAPI(title="Zenoh Action Display")
         self.port = port
@@ -191,9 +192,24 @@ class FastAPIActionDisplayNode:
         # Initialize action tracer
         self.tracer = ActionTracer(scenario_name=scenario_name)
         
+        # Store Obsidian vault path if provided
+        self.obsidian_vault = obsidian_vault
+        if self.obsidian_vault:
+            vault_path = Path(self.obsidian_vault)
+            if vault_path.exists():
+                logger.info(f'📓 Obsidian vault configured: {self.obsidian_vault}')
+            else:
+                logger.warning(f'⚠️  Obsidian vault path does not exist: {self.obsidian_vault}')
+        
+        # Store scenario name for export
+        self.scenario_name = scenario_name or "unknown"
+        
         # Initialize Zenoh session
         config = zenoh.Config()
         self.session = zenoh.open(config)
+        
+        # Publisher for User actions (so User text appears in UI/trace)
+        self.user_action_publisher = self.session.declare_publisher("cognitive/User/action")
         
         # Track active characters
         self.active_characters: Set[str] = set()
@@ -374,6 +390,8 @@ class FastAPIActionDisplayNode:
         print('   - Publishing to: cognitive/{character}/sense_data (dynamic)')
         print('   - Publishing to: cognitive/memory/store')
         print(f'   - Web UI available at: http://localhost:{port}')
+        if self.obsidian_vault and Path(self.obsidian_vault).exists():
+            print(f'   - 📓 Obsidian export enabled: {self.obsidian_vault}')
     
     def _signal_handler(self, signum, frame):
         """Handle shutdown signals gracefully."""
@@ -490,6 +508,17 @@ class FastAPIActionDisplayNode:
             }
             self.character_publishers[actual_character_name].put(json.dumps(sense_data))
             
+            # Publish User's action so it appears in UI/trace
+            user_action = {
+                'type': 'say',
+                'action_id': f'user_say_{int(time.time() * 1000)}',
+                'timestamp': datetime.now().isoformat(),
+                'text': message,
+                'source': 'User',
+                'target': actual_character_name
+            }
+            self.user_action_publisher.put(json.dumps(user_action))
+            
             # Store in memory
             self._store_text_input_in_memory(message, actual_character_name)
             
@@ -551,6 +580,56 @@ class FastAPIActionDisplayNode:
                 
                 return {"success": True, "message": "Save command sent to all nodes"}
             except Exception as e:
+                return {"success": False, "message": f"Error: {str(e)}"}
+        
+        @self.app.post("/api/export_to_obsidian")
+        async def export_to_obsidian():
+            """Export current trace file to Obsidian vault."""
+            try:
+                # Check if Obsidian vault is configured
+                if not self.obsidian_vault:
+                    return {"success": False, "message": "Obsidian vault not configured. Use --obsidian-vault argument."}
+                
+                # Verify vault path exists
+                vault_path = Path(self.obsidian_vault)
+                if not vault_path.exists():
+                    return {"success": False, "message": f"Obsidian vault path does not exist: {self.obsidian_vault}"}
+                
+                # Check if trace file exists
+                if not self.tracer.trace_file:
+                    return {"success": False, "message": "No trace file is currently open"}
+                
+                # Flush the trace file to ensure all data is written
+                self.tracer.trace_file.flush()
+                
+                # Create target directory
+                target_dir = vault_path / "Cognitive_Workbench_Traces"
+                target_dir.mkdir(exist_ok=True)
+                
+                # Generate timestamped filename
+                timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+                target_filename = f"action_trace_{self.scenario_name}_{timestamp}.md"
+                target_path = target_dir / target_filename
+                
+                # Get source trace file path
+                source_path = Path('logs') / f"action_trace_{self.scenario_name}.md"
+                
+                if not source_path.exists():
+                    return {"success": False, "message": f"Source trace file not found: {source_path}"}
+                
+                # Copy the file
+                shutil.copy2(source_path, target_path)
+                
+                logger.info(f"📓 Exported trace to Obsidian: {target_path}")
+                
+                return {
+                    "success": True, 
+                    "message": f"Exported to Obsidian: {target_filename}",
+                    "path": str(target_path)
+                }
+                
+            except Exception as e:
+                logger.error(f"Error exporting to Obsidian: {e}")
                 return {"success": False, "message": f"Error: {str(e)}"}
         
         @self.app.post("/api/save_and_shutdown")
@@ -1222,11 +1301,12 @@ class FastAPIActionDisplayNode:
                 <div class="input-section">
                     <h3>Turn Control</h3>
                     <div style="margin-bottom: 15px;">
-                        <button id="stepButton" onclick="stepTurn()" style="background: #555; margin-right: 10px;" disabled>🎯 Step Turn</button>
-                        <button id="runButton" onclick="runTurns()" style="background: #555; color: #888; margin-right: 10px;" disabled>🏃 Run</button>
-                        <button onclick="stopTurns()" style="background: #ff6b6b; margin-right: 10px;">⏹️ Stop</button>
-                        <button onclick="saveAll()" style="background: #95e1d3; color: #1a1a1a; margin-right: 10px;">💾 Save</button>
-                        <button onclick="showShutdownDialog()" style="background: #ff4757; color: white;">🔌 Shutdown</button>
+                        <button id="stepButton" onclick="stepTurn()" style="background: #555; margin-right: 10px;" disabled>Step Turn</button>
+                        <button id="runButton" onclick="runTurns()" style="background: #555; color: #888; margin-right: 10px;" disabled>Run</button>
+                        <button onclick="stopTurns()" style="background: #ff6b6b; margin-right: 10px;">Stop</button>
+                        <button onclick="saveAll()" style="background: #95e1d3; color: #1a1a1a; margin-right: 10px;">Save</button>
+                        <button onclick="exportToObsidian()" style="background: #7c3aed; color: white; margin-right: 10px;">Obsidian</button>
+                        <button onclick="showShutdownDialog()" style="background: #ff4757; color: white;">Shutdown</button>
                     </div>
                     <div style="margin-bottom: 15px; padding: 10px; background: #333; border-radius: 5px;">
                         <label for="timeSlider" style="display: block; margin-bottom: 5px; font-size: 14px; color: #ccc;">
@@ -2448,6 +2528,31 @@ class FastAPIActionDisplayNode:
             }
         }
         
+        async function exportToObsidian() {
+            const resultDiv = document.getElementById('turnResult');
+            try {
+                resultDiv.innerHTML = '<span style="color: #7c3aed;">📓 Exporting to Obsidian...</span>';
+                
+                const response = await fetch('/api/export_to_obsidian', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    resultDiv.innerHTML = `<span class="success">📓 ${result.message}</span>`;
+                    console.log('Exported to:', result.path);
+                } else {
+                    resultDiv.innerHTML = `<span class="error">Export failed: ${result.message}</span>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<span class="error">Export error: ${error.message}</span>`;
+            }
+        }
+        
         function showShutdownDialog() {
             const choice = confirm("Save data before shutdown?\\n\\nOK = Save & Shutdown\\nCancel = Shutdown without saving\\n\\n(Press ESC or close dialog to cancel shutdown)");
             
@@ -3496,9 +3601,12 @@ def main():
     parser = argparse.ArgumentParser(description='FastAPI Action Display Node')
     parser.add_argument('--port', type=int, default=3000, help='Port for FastAPI server (default: 3000)')
     parser.add_argument('--scenario', type=str, default=None, help='Scenario name for trace file')
+    parser.add_argument('--obsidian-vault', type=str, 
+                       default=os.getenv('OBSIDIAN_VAULT_PATH', '/home/bruce/Documents/Obsidian Vault'),
+                       help='Path to Obsidian vault for trace exports (default: /home/bruce/Documents/Obsidian Vault)')
     args = parser.parse_args()
     
-    node = FastAPIActionDisplayNode(port=args.port, scenario_name=args.scenario)
+    node = FastAPIActionDisplayNode(port=args.port, scenario_name=args.scenario, obsidian_vault=args.obsidian_vault)
     node.run()
 
 

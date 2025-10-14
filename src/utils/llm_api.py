@@ -102,7 +102,7 @@ class LLM():
         if trace:
             print(f'\n{json.dumps(substituted_prompt)}\n')      
         if log:
-            logger.debug(f'Prompt: {substituted_prompt}\n')
+            logger.info(f'Prompt: {substituted_prompt}\n')
         if 'openai' in self.server_name:
             response = self.openai_client.executeRequest(prompt=substituted_prompt, temperature=temperature, top_p=top_p, max_tokens=max_tokens, stops=stops, model=self.model)
             return response
@@ -195,6 +195,8 @@ class LLM():
                             response=response[:eos_index]
             if is_json:
                 if type(response) == dict:
+                    if log:
+                        logger.info(response)
                     return response
                 try:
                     if type(response) == str:
@@ -204,7 +206,7 @@ class LLM():
                     logger.error(f'Error parsing JSON, attempting repair:\n {e}')
                     response = self.repair_json(substituted_prompt, response, e)
             if log:
-                logger.debug(f'Response:\n{response}\n')
+                logger.info(f'Response:\n{response}\n')
             return response
         except Exception as e:
             traceback.print_exc()
