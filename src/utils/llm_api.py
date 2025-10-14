@@ -13,8 +13,22 @@ import utils.OpenRouterClient as OpenRouterClient
 
 MODEL = '' # set by simulation from config.py
 
-# Create logger that inherits from parent app's logging configuration
+# Create logger that only logs to file, not console
 logger = logging.getLogger('llm_api')
+logger.propagate = False
+logger.setLevel(logging.INFO)
+
+# Add file handler
+try:
+    _log_dir = os.path.join(os.path.dirname(__file__), '..', 'logs')
+    os.makedirs(_log_dir, exist_ok=True)
+    _log_path = os.path.join(_log_dir, 'llm_api.log')
+    _file_handler = logging.FileHandler(_log_path, mode='a')
+    _file_handler.setLevel(logging.INFO)
+    _file_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+    logger.addHandler(_file_handler)
+except Exception:
+    pass
 
 api_key = None
 try:

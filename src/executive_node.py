@@ -263,6 +263,9 @@ class ZenohExecutiveNode:
         self.time_proposal_publisher = self.session.declare_publisher(
             "cognitive/map/time_proposal"
         )
+        self.world_state_update_publisher = self.session.declare_publisher(
+            "cognitive/map/world_state/update"
+        )
         self.waiting_for_turn = True
         self.current_turn_number = 0
         
@@ -762,6 +765,14 @@ class ZenohExecutiveNode:
             compact_views = format_views_compact(self.last_situation_data['views'])
             if compact_views:
                 formatted_situation += f"\n#You can see the following:\n" + compact_views
+
+        for reply in self.session.get("cognitive/map/world_state", timeout=2.0 if not self.debug else 300.0):
+            if reply.ok:
+                data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
+                world_state = data.get('world_state', '')
+                if world_state:
+                    formatted_situation += f"\n#World state: \n{world_state}\n"
+                break
 
         if self.inspections:
             formatted_situation += f"\n#You have inspected the following:\n"
@@ -2822,7 +2833,10 @@ End your response with:
                 )
 
                 if response.success:
-                    text_to_send = hash_utils.find('text', response.text)
+                    if '#text' in response.text:
+                        text_to_send = response.text[response.text.index('#text')+5:].strip()
+                    else:
+                        text_to_send = response.text.strip()
                     
                     if not text_to_send or not text_to_send.strip():
                         logger.error(f'LLM returned empty or malformed response. Raw response: {response.text[:200]}')
@@ -3374,6 +3388,7 @@ End your response with:
                     if self.action_history:
                         self.action_history[-1].result = response.text
                     self.uses[target] = response.text
+                    self.world_state_update_publisher.put(json.dumps({'update_text': response.text}))
                     action_data['response'] = response.text
                     return True
                 else:

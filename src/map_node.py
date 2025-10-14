@@ -11,10 +11,12 @@ import importlib.util
 import signal
 import time
 import threading
+import queue
 from pathlib import Path
 from datetime import datetime, timedelta
 import traceback
 from typing import Dict, Any, Optional
+from templates import WORLD_STATE_UPDATE_TEMPLATE
 from utils.zenoh_utils import datetime_handler
 
 # Add current directory to path for imports
@@ -109,6 +111,11 @@ class MapNode:
         self.time_delay_setting_subscriber = None
         self.time_advanced_publisher = None
         
+        # World state tracking and updates
+        self.world_state = ''
+        self.world_state_update_queue = queue.Queue(maxsize=10)
+        self.world_state_worker = None
+        
         # Optional scenario cap on turns
         try:
             self.max_turns = int(max_turns) if max_turns is not None else None
@@ -126,6 +133,9 @@ class MapNode:
         self.llm_client = None
         if LLM_CLIENT_AVAILABLE:
             self.llm_client = ZenohLLMClient(service_timeout=60.0)
+        
+        # Start world state worker thread
+        self.start_world_state_worker()
         
         self.initialize_setting()
         
@@ -349,6 +359,18 @@ Do not include any other text, reasoning, introductory, expository, or markdown.
         self.launcher_ready_subscriber = self.session.declare_subscriber(
             "cognitive/launcher/ready",
             self.handle_launcher_ready
+        )
+        
+        # World state queryable
+        self.world_state_queryable = self.session.declare_queryable(
+            "cognitive/map/world_state",
+            self.handle_world_state_query
+        )
+        
+        # World state update subscriber
+        self.world_state_update_subscriber = self.session.declare_subscriber(
+            "cognitive/map/world_state/update",
+            self.handle_world_state_update
         )
         
         logger.info("Map queryables and subscribers set up successfully")
@@ -2065,6 +2087,53 @@ Do not include any other text, reasoning, introductory, expository, or markdown.
         except Exception as e:
             logger.error(f"Error handling character shutdown for cleanup: {e}")
     
+    def handle_world_state_query(self, query):
+        """Handle world state query"""
+        response = {'world_state': self.world_state}
+        query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
+    
+    def handle_world_state_update(self, sample):
+        """Handle world state update request by queuing it"""
+        update_text = sample.payload.to_bytes().decode('utf-8')
+        if self.world_state_update_queue.full():
+            logger.warning("World state update queue is full, dropping oldest update")
+            self.world_state_update_queue.get()
+        self.world_state_update_queue.put(update_text)
+        logger.info("World state update queued")
+    
+    def start_world_state_worker(self):
+        """Start the world state worker thread"""
+        self.world_state_worker = threading.Thread(target=self._world_state_worker, daemon=True)
+        self.world_state_worker.start()
+        logger.info("World state worker thread started")
+    
+    def _world_state_worker(self):
+        """Worker thread that processes world state updates serially"""
+        while not self.shutdown_requested:
+            if self.world_state_update_queue.empty():
+                time.sleep(1.0)
+                continue
+            update_text = self.world_state_update_queue.get()
+            if not self.llm_client:
+                logger.warning("LLM client not available for world state update")
+                continue
+            logger.info(f"Processing world state update: {update_text[:50]}...")
+            bindings = {
+                'current_world_state': self.world_state,
+                'update_text': update_text,
+                'simulation_time': self.world_map.datetime.isoformat() if self.world_map else '',
+                'setting': self.setting or ''
+            }
+            response = self.llm_client.generate(
+                messages=[WORLD_STATE_UPDATE_TEMPLATE],
+                bindings=bindings,
+                max_tokens=240,
+                temperature=0.7
+            )
+            if response and hasattr(response, 'text'):
+                self.world_state = response.text
+                logger.info(f"World state updated: {self.world_state[:100]}...")
+    
     def run(self):
         """Run the map node"""
         logger.info(f"Map node started with map file: {self.map_file}")
@@ -2126,6 +2195,13 @@ Do not include any other text, reasoning, introductory, expository, or markdown.
                         default_time = datetime(2024, 6, 15, 12, 0, 0)  # Midday, summer
                         self.world_map.datetime = default_time
                     
+                    # Restore world state if available
+                    if 'world_state' in world_data:
+                        self.world_state = world_data['world_state']
+                        logger.info(f"📂 World state restored: {self.world_state[:50]}...")
+                    else:
+                        logger.info("📂 No world state in saved data")
+                    
                     logger.info(f"📂 Loaded world data for '{self.world_name}'")
                     
                     # Start turn management if agents were restored
@@ -2151,6 +2227,7 @@ Do not include any other text, reasoning, introductory, expository, or markdown.
                 'map_file': self.map_file,
                 'timestamp': datetime.now().isoformat(),
                 'simulation_time': self.world_map.datetime.isoformat(),
+                'world_state': self.world_state,
                 'agents': []
             }
             
