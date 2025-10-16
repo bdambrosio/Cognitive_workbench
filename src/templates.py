@@ -567,12 +567,12 @@ Meta-spec (strictly observe these rules in your output):
     "move": ["type","target"],
     "say": ["type","target","value"],
     "think": ["type","value"],
-    "take": ["type","target"],
-    "place": ["type","target"],
+    "take": ["type","target","prediction"],
+    "place": ["type","target","prediction"],
     "wait": ["type","condition"],
-    "inspect": ["type","target","reason"],
-    "use": ["type","target","reason"],
-    "scan": ["type","target","out"],
+    "inspect": ["type","target","reason","prediction"],
+    "use": ["type","target","reason","prediction"],
+    "scan": ["type","target","out","prediction"],
     "while": ["type","condition","body"],
     "if": ["type","condition","then"]
   },
@@ -586,13 +586,13 @@ Meta-spec (strictly observe these rules in your output):
   "plan": [
     { "type": "move", "target": "…"},
     { "type": "say", "target": "…", "value": "…" },
-    { "type": "scan", "target": "type_name - must be one of ALLOWED SCAN TARGETS", "out": "variable_name to assign the scan result to" },
+    { "type": "scan", "target": "type_name - must be one of ALLOWED SCAN TARGETS", "out": "variable_name to assign the scan result to", "prediction": "…" },
     { "type": "wait", "condition": "..." },
     { "type": "think", "value": "…" },
-    { "type": "take", "target": "…"},
-    { "type": "inspect", "target": "…", "reason": "…"},
-    { "type": "use", "target": "…", "reason": "…"},
-    { "type": "place", "target": "…"},
+    { "type": "take", "target": "…", "prediction": "…"},
+    { "type": "inspect", "target": "…", "reason": "…", "prediction": "…"},
+    { "type": "use", "target": "…", "reason": "…", "prediction": "…"},
+    { "type": "place", "target": "…", "prediction": "…"},
     { "type": "while", "condition": "…" , "body": [ /* steps */ ]},
     { "type": "if", "condition": "…", "then": [ /* steps */ ], "else": [ /* steps */ ] }
   ]
@@ -603,10 +603,10 @@ PLAN_TEMPLATE_B = """
 Example workflow using scan and variables:
 {
   "plan": [
-    { "type": "scan", "target": "Berries", "out": "found_berries" },
+    { "type": "scan", "target": "Berries", "out": "found_berries", "prediction": "will find nearby berries" },
     { "type": "move", "target": "$found_berries" },
-    { "type": "take", "target": "$found_berries" },
-    { "type": "use", "target": "$found_berries", "reason": "eat to reduce hunger" }
+    { "type": "take", "target": "$found_berries", "prediction": "will obtain berries for consumption" },
+    { "type": "use", "target": "$found_berries", "reason": "eat to reduce hunger", "prediction": "hunger will decrease" }
   ]
 }
 
@@ -620,12 +620,12 @@ Do not output macros; always expand patterns into primitive steps in the final J
 Worked example using a loop to approach a distant target:
 {
   "plan": [
-    { "type": "scan", "target": "Berries", "out": "found_berries" },
+    { "type": "scan", "target": "Berries", "out": "found_berries", "prediction": "will locate berries in area" },
     { "type": "while", "condition": { "type": "notnear", "target": "$found_berries" }, "body": [
       { "type": "move", "target": "$found_berries" }
     ]},
-    { "type": "take", "target": "$found_berries" },
-    { "type": "use", "target": "$found_berries", "reason": "eat to reduce hunger" }
+    { "type": "take", "target": "$found_berries", "prediction": "will add berries to inventory" },
+    { "type": "use", "target": "$found_berries", "reason": "eat to reduce hunger", "prediction": "will reduce hunger" }
   ]
 }
 
@@ -646,7 +646,8 @@ Only dicts of the types below are allowed for the condition of while and if. Con
  - "bound": {"type": "bound", "target": "$variable_name"} is true when the variable has a binding (not None/empty) in the current plan.
  - "notbound": {"type": "notbound", "target": "$variable_name"} is true when the variable has no binding in the current plan.
 
-outside a while, if, or wait condition, "type" can take the values "say", "move", "think", "take", "place", "inspect", "use", or "scan":
+outside a while, if, or wait condition, "type" can take the values "say", "move", "think", "take", "place", "inspect", "use", or "scan".
+prediction, where needed, should be a very terse (4-8 words) description of the expected outcome:
  - "move": { "type": "move", "target": "cardinal_direction" or 'resource, infrastructure, or character name'} 
      Move one step in one of the 8 cardinal directions or in the direction of a resource, infrastructure, or character. 
      Move with an infrastructure target will move you towards the infrastructure. Choose "use" to move along the infrastructure.
@@ -654,19 +655,19 @@ outside a while, if, or wait condition, "type" can take the values "say", "move"
  - "say": { "type": "say", "target": "character_name", "value": "text to speak" } 
      for speaking to another character you can see. Use this to seek information, respond, inform the other character, or to maintain 'social chatter' to stay aligned.
      For a 'say' act, speak only for yourself, and do not include any other introductory, explanatory, discursive, or formatting text in your response.
- - "scan": { "type": "scan", "target": "type_name", "out": "variable_name to assign the scan result to" }
+ - "scan": { "type": "scan", "target": "type_name", "out": "variable_name to assign the scan result to", "prediction": "expected outcome" }
      Scan for the nearest matching instance of a type. The scan target must be one of the ALLOWED SCAN TARGETS above. Only scan may use these  names; other actions should target instances or $variables.
  - "wait": { "type": "wait", "condition": "..." }
      Wait for a condition to be true. The condition must be one of the Condition actions listed earlier.
  - "think": { "type": "think", "value": "text to think about" } 
      Think about a topic or question, attempting to derive new information, conclusions, or decisions from who you are and what you already explicitly know
- - "take": { "type": "take", "target": "resource_name" } 
+ - "take": { "type": "take", "target": "resource_name", "prediction": "expected outcome" } 
      Add a resource you to your personal inventory. you must be near the resource to take it.
- - "place": { "type": "place", "target": "resource_name" } 
+ - "place": { "type": "place", "target": "resource_name", "prediction": "expected outcome" } 
      Remove a resource from your personal inventory and place it in the setting at your current location.
- - "inspect": { "type": "inspect", "target": "resource_name", "reason": "what is it you are hoping to learn? - 5 words max"} 
+ - "inspect": { "type": "inspect", "target": "resource_name", "reason": "what is it you are hoping to learn? - 5 words max", "prediction": "expected outcome" } 
      Inspect a resource or character to learn something about it. Must be 'near' the resource or character to inspect it. reason focuses the inspection on some specific aspect of the resource or character.
- - "use": { "type": "use", "target": "resource_name", "reason": "what outcome do you hope to achieve? - 5 words max"} 
+ - "use": { "type": "use", "target": "resource_name", "reason": "what outcome do you hope to achieve? - 5 words max", "prediction": "expected outcome" } 
      Using a resource or infrastructure. You must be 'near' the resource or infrastructure to use it. 
      "use" on a path will move you one step along it to a new location.
      You may want to inspect a resource first to learn the effect of using it. Some resources are consumables; using edible resources (e.g., Berries) can reduce hunger.
@@ -723,6 +724,9 @@ WORLD_STATE_UPDATE_TEMPLATE = """The task is to update the world state based on 
 #World state:
 {{$current_world_state}}
 
+#Action:
+{{$action}}
+
 #Update:
 {{$update_text}}
 
@@ -734,6 +738,28 @@ WORLD_STATE_UPDATE_TEMPLATE = """The task is to update the world state based on 
 
 DIRECTIVE:
 Respond with a complete updated world state consistent with the update.
+Do not include any changes to the individual performing the action.
+Limit your response to 150 words.
+Respond only in text, with no JSON, formatting, or introductory or explanatory text.
+Return ONLY the updated world state.
+"""
+WORLD_STATE_UPDATE_TEMPLATE = """The task is to update the world state based on the following update.
+
+#World state:
+{{$current_world_state}}
+
+#Update:
+{{$update_text}}
+
+#Simulation time:
+{{$simulation_time}}
+
+#Setting:
+{{$setting}}
+
+DIRECTIVE:
+Respond with a complete updated world state consistent with the update.
+Do not include any changes to the individual performing the action.
 Limit your response to 150 words.
 Respond only in text, with no JSON, formatting, or introductory or explanatory text.
 Return ONLY the updated world state.

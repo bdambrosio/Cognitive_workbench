@@ -196,7 +196,37 @@ class CharacterLauncher:
         # Small delay to ensure situation_node initializes
         time.sleep(0.5)
         
-        # Launch executive_node for this character (3rd - needs memory and situation)
+        # Launch perception_node for this character (3rd - processes sensory input)
+        try:
+            perception_process = subprocess.Popen([
+                sys.executable, 'perception_node.py', 
+                '-c', character.name, 
+                '-config', json.dumps(character.config)
+            ], env=os.environ.copy())
+            character.processes.append(perception_process)
+            self.logger.info(f'✅ {character.name} perception_node launched')
+        except Exception as e:
+            self.logger.error(f'❌ Failed to launch {character.name} perception_node: {e}')
+        
+        # Small delay to ensure perception_node initializes
+        time.sleep(0.5)
+        
+        # Launch agenda_node for this character (4th - manages commitments and activities)
+        try:
+            agenda_process = subprocess.Popen([
+                sys.executable, 'agenda_node.py', 
+                '-c', character.name, 
+                '-config', json.dumps(character.config)
+            ], env=os.environ.copy())
+            character.processes.append(agenda_process)
+            self.logger.info(f'✅ {character.name} agenda_node launched')
+        except Exception as e:
+            self.logger.error(f'❌ Failed to launch {character.name} agenda_node: {e}')
+        
+        # Small delay to ensure agenda_node initializes
+        time.sleep(0.5)
+        
+        # Launch executive_node for this character (5th - needs memory, situation, perception, and agenda)
         try:
             executive_process = subprocess.Popen([
                 sys.executable, 'executive_node.py', 

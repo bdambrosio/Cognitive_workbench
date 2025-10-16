@@ -737,6 +737,8 @@ class ActivityManager:
         try:
             noun_ids_lc = {str(k).lower() for k in (noun_mappings.keys() if isinstance(noun_mappings, dict) else [])}
             mt_sets = []
+            if not self.map_types:
+                self.map_types = self.executive_node.map_types
             if isinstance(self.map_types, dict):
                 for key in ('resource_types', 'terrain_types', 'infrastructure_types', 'property_types'):
                     vals = self.map_types.get(key, [])
@@ -776,7 +778,10 @@ class ActivityManager:
         needs = activity['needs']
         # Basic needs like 'hands', 'feet', 'brain', 'eyes' always available
         basic_capabilities = {'hands', 'feet', 'brain', 'eyes'}
-        resource_types = self.map_types.get('resource_types', [])
+        if not self.map_types:
+            self.map_types = self.executive_node.map_types
+
+        resource_types = self.map_types.get('resource_types', []) if self.map_types else []
         
         for need in needs:
             if need in basic_capabilities:

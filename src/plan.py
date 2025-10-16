@@ -436,7 +436,8 @@ def _parse_action_line(line, line_number):
                 return {
                     'type': action,
                     'target': target,
-                    'out': out_var
+                    'out': out_var,
+                    'prediction': ''  # Empty prediction for text format
                 }
             else:
                 # Split arguments - handle commas in quoted strings
@@ -451,8 +452,12 @@ def _parse_action_line(line, line_number):
                     # think only needs value, not target
                     value = args[0] if len(args) > 0 else ''
                     target = ''
-                elif action in ['move', 'take', 'place', 'inspect', 'use']:
+                elif action in ['move']:
                     # These actions only need target, not value
+                    target = args[0] if len(args) > 0 else ''
+                    value = ''
+                elif action in ['take', 'place', 'inspect', 'use']:
+                    # These actions need target and prediction (empty string for text format)
                     target = args[0] if len(args) > 0 else ''
                     value = ''
                 else:
@@ -466,6 +471,9 @@ def _parse_action_line(line, line_number):
                     result['target'] = target
                 if value:
                     result['value'] = value
+                # Add empty prediction for actions that require it (text format)
+                if action in ['take', 'place', 'inspect', 'use']:
+                    result['prediction'] = ''
                 
                 return result
         else:
@@ -511,11 +519,11 @@ REQ_KEYS = {
     "move": {"type", "target"},
     "think": {"type", "value"},
     "look": {"type", "target"},
-    "take": {"type", "target"},
-    "place": {"type", "target"},
-    "inspect": {"type", "target"},
-    "use": {"type", "target"},
-    "scan": {"type", "target", "out"},
+    "take": {"type", "target", "prediction"},
+    "place": {"type", "target", "prediction"},
+    "inspect": {"type", "target", "reason", "prediction"},
+    "use": {"type", "target", "reason", "prediction"},
+    "scan": {"type", "target", "out", "prediction"},
     "while": {"type", "body", "condition"},
     "wait": {"type", "condition"},
     "if": {"type", "condition", "then"},          # "else" is optional
@@ -695,6 +703,7 @@ Respond only with a JSON plan according to the provided PLAN_TEMPLATE. No prose 
         #allowed_types.extend(character.map_types.get('terrain_types', []))
         allowed_types.extend(character.map_types.get('infrastructure_types', []))
         allowed_types.extend(character.map_types.get('property_types', []))
+        allowed_types.extend(character.map_types.get('character_names', []))
 
         parts.append("\n#ALLOWED SCAN TARGETS (types)\n" + "\n".join(allowed_types)+"\n##")
         parts.append("\n#Plan syntax specification:\n" + str(PLAN_TEMPLATE))

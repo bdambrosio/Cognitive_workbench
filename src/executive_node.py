@@ -231,16 +231,7 @@ class ZenohExecutiveNode:
             self.ontology = {}
             if not self.manual:
                 logger.warning(f"No activity ontology for {self.character_name}: {e}")
-        self.map_types = {}
-        try:
-            for reply in self.session.get("cognitive/map/types", timeout=2.0 if not self.debug else 300.0):
-                if reply.ok:
-                    data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
-                    if data.get('success'):
-                        self.map_types = data
-                        break
-        except Exception as e:
-            logger.error(f'Error querying map types in __init__: {e}')
+        self.map_types = None # wait to initialize untill all characters have registered
 
         # Publish initial state snapshot so UI has data before first time advance
         try:
@@ -265,6 +256,9 @@ class ZenohExecutiveNode:
         )
         self.world_state_update_publisher = self.session.declare_publisher(
             "cognitive/map/world_state/update"
+        )
+        self.perception_action_result_publisher = self.session.declare_publisher(
+            f"cognitive/{character_name}/perception/action_result"
         )
         self.waiting_for_turn = True
         self.current_turn_number = 0
@@ -1717,7 +1711,7 @@ end your response with </end>
                     pass
                 self.action_counter += 1
                 return False
-            ok = self.take(resolved)
+            ok = self.take(action, resolved)
             # Set final outcome string for summaries
             try:
                 if self.action_history:
@@ -1805,7 +1799,7 @@ end your response with </end>
                 self.action_counter += 1
                 return False
             # Perform place on map
-            ok = self.place(resolved)
+            ok = self.place(action, resolved)
             # Telemetry snapshot after action
             if ok:
                 try:
@@ -2124,6 +2118,15 @@ end your response with </end>
             }
             self.action_publisher.put(json.dumps(action_data))
             logger.info(f'Action: scan {action.get("target", "")}: {"success" if scan_result else "failed"}')
+            
+            # Publish to perception_node
+            if scan_result:
+                self.perception_action_result_publisher.put(json.dumps({
+                    'action': action,
+                    'update_text': f'scanned and found {scan_result}',
+                    'prediction': action.get('prediction', '')
+                }))
+            
             self.action_counter += 1
             
             return True if scan_result else False
@@ -2292,7 +2295,7 @@ end your response with </end>
                                                     "actions_summary": actions_summary, 
                                                     "percepts_json": percepts_json, 
                                                     "telemetry_json": telemetry_json}, 
-        max_tokens=1000, is_json=True)
+        max_tokens=500, is_json=True)
         summary = response.text if isinstance(response.text, dict) else None
         self.plan_summary = summary
         if not summary:
@@ -3166,7 +3169,7 @@ End your response with:
             }
         self.action_publisher.put(json.dumps(action_data).encode('utf-8'))
     
-    def take(self, target: str):
+    def take(self, action: dict, target: str):
         """Take a resource and add it to inventory."""
         # Update the most recent action record with the result
         if self.action_history:
@@ -3212,6 +3215,15 @@ End your response with:
             }
             self.action_publisher.put(json.dumps(action_data))
             logger.info(f'📤 Published take action: {target} ({action_data["status"]})')
+            
+            # Publish to perception_node
+            if result:
+                self.perception_action_result_publisher.put(json.dumps({
+                    'action': action,
+                    'update_text': f'took {target}',
+                    'prediction': action.get('prediction', '')
+                }))
+            
             return result
 
         except Exception as e:
@@ -3232,7 +3244,7 @@ End your response with:
         logger.info(f'📤 Published take action: {target} (failed)')
         return False
 
-    def place(self, target: str):
+    def place(self, action: dict, target: str):
         """Place a resource from inventory onto the current map square."""
         # Update the most recent action record with the result
         if self.action_history:
@@ -3281,6 +3293,15 @@ End your response with:
             }
             self.action_publisher.put(json.dumps(action_data))
             logger.info(f'📤 Published place action: {target} ({action_data["status"]})')
+            
+            # Publish to perception_node
+            if result:
+                self.perception_action_result_publisher.put(json.dumps({
+                    'action': action,
+                    'update_text': f'placed {target}',
+                    'prediction': action.get('prediction', '')
+                }))
+            
             return result
 
         except Exception as e:
@@ -3339,6 +3360,11 @@ End your response with:
                     if self.action_history:
                         self.action_history[-1].result = response.text
                     self.inspections[target] = response.text
+                    self.perception_action_result_publisher.put(json.dumps({
+                        'action': action,
+                        'update_text': response.text,
+                        'prediction': action.get('prediction', '')
+                    }))
                     return True
                 else:
                     logger.error(f'LLM call failed: {response.error}')
@@ -3388,7 +3414,12 @@ End your response with:
                     if self.action_history:
                         self.action_history[-1].result = response.text
                     self.uses[target] = response.text
-                    self.world_state_update_publisher.put(json.dumps({'update_text': response.text}))
+                    self.world_state_update_publisher.put(json.dumps({'action': action, 'update_text': response.text}))
+                    self.perception_action_result_publisher.put(json.dumps({
+                        'action': action,
+                        'update_text': response.text,
+                        'prediction': action.get('prediction', '')
+                    }))
                     action_data['response'] = response.text
                     return True
                 else:
