@@ -63,6 +63,8 @@ def format_map_types(map_types: Dict[str, List[str]]) -> str:
         type_str += '\n'.join(map_types['property_types'])+'\n'
     if map_types.get('resource_types'):
         type_str += '\n'.join(map_types['resource_types'])+'\n'
+    if map_types.get('character_names'):
+        type_str += '\n'.join(map_types['character_names'])+'\n'
     type_str += '\n'.join([need['name'] for need in PHYSIOLOGICAL_STATES])
     map_types_str += '\n'
 

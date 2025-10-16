@@ -893,7 +893,7 @@ class FastAPIActionDisplayNode:
         
         .sidebar-header {
             background: #2d2d2d;
-            padding: 15px;
+            padding: 8px;
             border-bottom: 1px solid #404040;
             font-weight: bold;
             color: #00d4ff;
@@ -909,7 +909,7 @@ class FastAPIActionDisplayNode:
         /* Character data area */
         .character-data-area {
             flex: 1;
-            padding: 15px;
+            padding: 8px;
             border-top: 1px solid #404040;
             overflow-y: auto;
         }
@@ -922,8 +922,8 @@ class FastAPIActionDisplayNode:
         }
         
         .character-data-item {
-            margin-bottom: 8px;
-            padding: 6px 8px;
+            margin-bottom: 4px;
+            padding: 4px 6px;
             background: #1a1a1a;
             border-radius: 4px;
             border-left: 3px solid #404040;
@@ -951,7 +951,7 @@ class FastAPIActionDisplayNode:
         }
         
         .character-data-tab {
-            padding: 8px 12px;
+            padding: 6px 10px;
             cursor: pointer;
             border-bottom: 2px solid transparent;
             color: #888;
@@ -984,7 +984,7 @@ class FastAPIActionDisplayNode:
         }
         
         .character-tab {
-            padding: 12px 15px;
+            padding: 8px 10px;
             border-bottom: 1px solid #333;
             cursor: pointer;
             transition: background-color 0.2s;
@@ -1019,7 +1019,7 @@ class FastAPIActionDisplayNode:
         .character-content {
             background: #2d2d2d;
             border-bottom: 1px solid #404040;
-            padding: 15px 20px;
+            padding: 10px;
             min-height: 60px;
             max-height: 150px;
             overflow-y: auto;
@@ -1047,14 +1047,14 @@ class FastAPIActionDisplayNode:
         .scrollable-content {
             flex: 1;
             overflow-y: auto;
-            padding: 20px;
+            padding: 10px;
         }
         
         .header { 
             background: #2d2d2d; 
-            padding: 20px; 
+            padding: 10px; 
             border-radius: 8px; 
-            margin-bottom: 20px; 
+            margin-bottom: 10px; 
             border: 1px solid #404040;
         }
         .header h1 { 
@@ -1069,7 +1069,7 @@ class FastAPIActionDisplayNode:
             background: #2d2d2d; 
             border: 1px solid #404040; 
             border-radius: 8px; 
-            padding: 15px; 
+            padding: 10px; 
             height: 400px; 
             overflow-y: auto; 
             font-family: 'Consolas', 'Monaco', 'Courier New', monospace; 
@@ -1078,9 +1078,9 @@ class FastAPIActionDisplayNode:
         }
         .input-section { 
             background: #2d2d2d; 
-            padding: 20px; 
+            padding: 10px; 
             border-radius: 8px; 
-            margin-top: 20px; 
+            margin-top: 10px; 
             border: 1px solid #404040;
         }
         .input-section h3 { 
@@ -1121,8 +1121,8 @@ class FastAPIActionDisplayNode:
             cursor: not-allowed; 
         }
         .action-entry { 
-            margin: 8px 0; 
-            padding: 10px; 
+            margin: 4px 0; 
+            padding: 5px; 
             border-left: 3px solid #00d4ff; 
             background: #1a1a1a; 
             border-radius: 4px;

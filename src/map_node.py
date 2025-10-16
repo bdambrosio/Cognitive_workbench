@@ -1529,11 +1529,12 @@ Do not include any other text, reasoning, introductory, expository, or markdown.
                 'terrain_types': terrain_types,
                 'infrastructure_types': infrastructure_types,
                 'property_types': property_types,
-                'resource_types': resource_types
+                'resource_types': resource_types,
+                'character_names': list(self.agent_registry.keys())
             }
             
             query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
-            logger.info(f'🗺️ Map types query: returned {len(terrain_types)} terrain, {len(infrastructure_types)} infrastructure, {len(property_types)} property, {len(resource_types)} resource types')
+            logger.info(f'🗺️ Map types query: returned {len(terrain_types)} terrain, {len(infrastructure_types)} infrastructure, {len(property_types)} property, {len(resource_types)} resource types, {len(self.agent_registry)} characters')
             
         except Exception as e:
             logger.error(f'Error handling map types query: {e}')
@@ -1543,7 +1544,8 @@ Do not include any other text, reasoning, introductory, expository, or markdown.
                 'terrain_types': [],
                 'infrastructure_types': [],
                 'property_types': [],
-                'resource_types': []
+                'resource_types': [],
+                'character_names': []
             }
             query.reply(query.key_expr, json.dumps(error_response).encode('utf-8'))
     
@@ -2113,17 +2115,28 @@ Do not include any other text, reasoning, introductory, expository, or markdown.
             if self.world_state_update_queue.empty():
                 time.sleep(1.0)
                 continue
-            update_text = self.world_state_update_queue.get()
+            
+            update_json = self.world_state_update_queue.get()
+            
             if not self.llm_client:
                 logger.warning("LLM client not available for world state update")
                 continue
+            
+            # Parse the JSON to extract fields
+            update_data = json.loads(update_json)
+            action = update_data.get('action', {})
+            update_text = update_data.get('update_text', '')
+            
             logger.info(f"Processing world state update: {update_text[:50]}...")
+            
             bindings = {
                 'current_world_state': self.world_state,
+                'action': json.dumps(action, indent=2) if action else '',
                 'update_text': update_text,
                 'simulation_time': self.world_map.datetime.isoformat() if self.world_map else '',
                 'setting': self.setting or ''
             }
+            
             response = self.llm_client.generate(
                 messages=[WORLD_STATE_UPDATE_TEMPLATE],
                 bindings=bindings,

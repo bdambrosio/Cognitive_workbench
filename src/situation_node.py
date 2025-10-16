@@ -158,16 +158,6 @@ class ZenohSituationNode:
         self.shutdown_requested = False
         self._shutting_down = False
         self.update_map_retries = 0
-        self.map_types = {}
-        try:
-            for reply in self.session.get("cognitive/map/types", timeout=2.0 if not self.debug else 300.0):
-                if reply.ok:
-                    data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
-                    if data.get('success'):
-                        self.map_types = data
-                        break
-        except Exception as e:
-            logger.error(f'Error querying map types in situation_node __init__: {e}')
         # Register signal handlers for graceful shutdown
         signal.signal(signal.SIGTERM, self._signal_handler)
         signal.signal(signal.SIGINT, self._signal_handler)
