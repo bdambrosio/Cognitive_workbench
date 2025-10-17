@@ -22,97 +22,6 @@
             "preLaunchTask": "setup-zenoh-environment"
         },
         {
-            "name": "Scenario Analysis (ABetterLife)",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${workspaceFolder}/src/scenario_analysis.py",
-            "console": "integratedTerminal",
-            "cwd": "${workspaceFolder}/src",
-            "env": {
-                "PYTHONPATH": "${workspaceFolder}/src"
-            },
-            "args": ["--scenario", "../scenarios/ABetterLife.yaml", "--character", "all", "--ontology", "create", "--middle", "skip", "--activities", "create"],
-            "justMyCode": false,
-            "stopOnEntry": false,
-            "preLaunchTask": "setup-zenoh-environment"
-        },
-        {
-            "name": "Scenario Analysis (laTerre)",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${workspaceFolder}/src/scenario_analysis.py",
-            "console": "integratedTerminal",
-            "cwd": "${workspaceFolder}/src",
-            "env": {
-                "PYTHONPATH": "${workspaceFolder}/src"
-            },
-            "justMyCode": false,
-            "args": ["--scenario", "../scenarios/laTerre.yaml", "--character", "all", "--ontology", "load", "--discourse", "create", "--activities", "load"],
-            "stopOnEntry": false,
-            "preLaunchTask": "setup-zenoh-environment"
-        },
-        {
-            "name": "Scenario Analysis (CountryLife)",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${workspaceFolder}/src/scenario_analysis.py",
-            "console": "integratedTerminal",
-            "cwd": "${workspaceFolder}/src",
-            "env": {
-                "PYTHONPATH": "${workspaceFolder}/src"
-            },
-            "args": ["--scenario", "../scenarios/CountryLife.yaml", "--character", "all", "--ontology", "create", "--middle", "skip", "--activities", "create"],
-            "justMyCode": false,
-            "stopOnEntry": false,
-            "preLaunchTask": "setup-zenoh-environment"
-        },
-
-        {
-            "name": "Scenario Analysis (Jill)",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${workspaceFolder}/src/scenario_analysis.py",
-            "console": "integratedTerminal",
-            "cwd": "${workspaceFolder}/src",
-            "env": {
-                "PYTHONPATH": "${workspaceFolder}/src"
-            },
-            "args": ["--scenario", "../scenarios/jill.yaml", "--character", "all", "--ontology", "create", "--discourse", "skip", "--activities", "create"],
-            "justMyCode": false,
-            "stopOnEntry": false,
-            "preLaunchTask": "setup-zenoh-environment"
-        },
-         {
-            "name": "Scenario Analysis (lost)",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${workspaceFolder}/src/scenario_analysis.py",
-            "console": "integratedTerminal",
-            "cwd": "${workspaceFolder}/src",
-            "env": {
-                "PYTHONPATH": "${workspaceFolder}/src"
-            },
-            "args": ["--scenario", "../scenarios/lost.yaml", "--character", "all", "--ontology", "create", "--discourse", "skip", "--activities", "create"],
-            "justMyCode": false,
-            "stopOnEntry": false,
-            "preLaunchTask": "setup-zenoh-environment"
-        },
-        {
-            "name": "Scenario Analysis (sage)",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${workspaceFolder}/src/scenario_analysis.py",
-            "console": "integratedTerminal",
-            "cwd": "${workspaceFolder}/src",
-            "env": {
-                "PYTHONPATH": "${workspaceFolder}/src"
-            },
-            "args": ["--scenario", "../scenarios/sage.yaml", "--character", "all", "--ontology", "create", "--discourse", "skip", "--activities", "create"],
-            "justMyCode": false,
-            "stopOnEntry": false,
-            "preLaunchTask": "setup-zenoh-environment"
-        },
-      {
             "name": "Debug Launcher (laTerre)",
             "type": "debugpy",
             "request": "launch",
@@ -324,6 +233,96 @@
                 "PYTHONPATH": "${workspaceFolder}/src"
             },
             "args": ["--trace", "analysis/Joe-20250915-162859/Joe-plans.jsonl", "--scenario", "../../scenarios/lost.yaml", "--character", "Joe", "--server", "openai", "--model", "gpt-4.1"],
+            "justMyCode": false,
+            "stopOnEntry": false,
+            "preLaunchTask": "setup-zenoh-environment"
+        },
+        {
+            "name": "Scenario Analysis (ABetterLife)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/scenario_analysis.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/src",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src"
+            },
+            "args": ["--scenario", "../scenarios/ABetterLife.yaml", "--character", "all", "--ontology", "create", "--middle", "skip", "--activities", "create"],
+            "justMyCode": false,
+            "stopOnEntry": false,
+            "preLaunchTask": "setup-zenoh-environment"
+        },
+        {
+            "name": "Scenario Analysis (laTerre)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/scenario_analysis.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/src",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src"
+            },
+            "justMyCode": false,
+            "args": ["--scenario", "../scenarios/laTerre.yaml", "--character", "all", "--ontology", "load", "--discourse", "create", "--activities", "load"],
+            "stopOnEntry": false,
+            "preLaunchTask": "setup-zenoh-environment"
+        },
+        {
+            "name": "Scenario Analysis (CountryLife)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/scenario_analysis.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/src",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src"
+            },
+            "args": ["--scenario", "../scenarios/CountryLife.yaml", "--character", "all", "--ontology", "create", "--middle", "skip", "--activities", "create"],
+            "justMyCode": false,
+            "stopOnEntry": false,
+            "preLaunchTask": "setup-zenoh-environment"
+        },
+        {
+            "name": "Scenario Analysis (Jill)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/scenario_analysis.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/src",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src"
+            },
+            "args": ["--scenario", "../scenarios/jill.yaml", "--character", "all", "--ontology", "create", "--discourse", "skip", "--activities", "create"],
+            "justMyCode": false,
+            "stopOnEntry": false,
+            "preLaunchTask": "setup-zenoh-environment"
+        },
+        {
+            "name": "Scenario Analysis (lost)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/scenario_analysis.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/src",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src"
+            },
+            "args": ["--scenario", "../scenarios/lost.yaml", "--character", "all", "--ontology", "create", "--discourse", "skip", "--activities", "create"],
+            "justMyCode": false,
+            "stopOnEntry": false,
+            "preLaunchTask": "setup-zenoh-environment"
+        },
+        {
+            "name": "Scenario Analysis (sage)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/scenario_analysis.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/src",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src"
+            },
+            "args": ["--scenario", "../scenarios/sage.yaml", "--character", "all", "--ontology", "create", "--discourse", "skip", "--activities", "create"],
             "justMyCode": false,
             "stopOnEntry": false,
             "preLaunchTask": "setup-zenoh-environment"

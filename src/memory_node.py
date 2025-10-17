@@ -21,18 +21,12 @@ from typing import Dict, List, Any
 from entity_model import EntityModel
 from utils.rag_store import CharacterRAGStore
 
-# LLM client import
-try:
-    from llm_client import ZenohLLMClient
-    LLM_CLIENT_AVAILABLE = True
-except ImportError as e:
-    print(f"⚠️  LLM Client not available: {e}")
-    LLM_CLIENT_AVAILABLE = False
+from llm_client import ZenohLLMClient
 
 # Configure logging with unbuffered output
 # Console handler with WARNING level (less verbose)
 console_handler = logging.StreamHandler(sys.stdout)
-console_handler.setLevel(logging.WARNING)
+console_handler.setLevel(logging.INFO)
 
 # File handler with INFO level (full logging)
 file_handler = logging.FileHandler('logs/memory_node.log', mode='w')
@@ -88,9 +82,12 @@ class ZenohMemoryNode:
         self.rag_store = CharacterRAGStore(self.character_name)
         
         # LLM client for entity model functionality
-        self.llm_client = None
-        if LLM_CLIENT_AVAILABLE:
-            self.llm_client = ZenohLLMClient(service_timeout=60.0 if not self.debug else 300.0)
+        llm_config = self.character_config.get('llm_config', {})
+        server_name = llm_config.get('server_name', 'openai')
+        model_name = llm_config.get('model_name', 'gpt-4.1')
+        
+        self.llm_client = ZenohLLMClient(server_name=server_name, model_name=model_name, service_timeout=60.0 if not self.debug else 300.0)
+        logger.info(f'🤖 LLM client initialized (server={server_name}, model={model_name})')
         
         # Subscriber for incoming data to store (character-specific)
         self.data_subscriber = self.session.declare_subscriber(
@@ -135,7 +132,7 @@ class ZenohMemoryNode:
         
         # Queryable for RAG semantic search (character-specific)
         self.rag_search_storage = self.session.declare_queryable(
-            f"cognitive/{character_name}/memory/rag/search",
+            f"cognitive/{character_name}/memory/rag/search/*",
             self.handle_rag_search_query
         )
         
@@ -179,6 +176,14 @@ class ZenohMemoryNode:
             self.rag_store.load_all()
         except Exception as e:
             logger.error(f'Error loading RAG indices: {e}')
+        
+        # Pre-warm RAG dialogs space to avoid first-query delay
+        try:
+            logger.info(f'Pre-warming RAG dialogs space for {self.character_name}...')
+            self.rag_store.get_space('dialogs')
+            logger.info(f'RAG dialogs space ready for {self.character_name}')
+        except Exception as e:
+            logger.error(f'Error pre-warming RAG space: {e}')
         
         # Start summarization thread
         import threading
@@ -427,8 +432,13 @@ class ZenohMemoryNode:
                     }
             else:
                 entity = self.entity_models[canonical_entity_name]
-                
-                if query_type == 'dialog':
+                if not entity:
+                    logger.error(f'Entity {entity_name} not found')
+                    response = {
+                        'success': False,
+                        'error': f"Entity '{entity_name}' not found"
+                    }
+                elif query_type == 'dialog':
                     # Handle dialog data retrieval
                     limit = 20  # default limit
                     scope = 'current'  # default scope
@@ -467,6 +477,7 @@ class ZenohMemoryNode:
                             pass
                     
                     if not input_text:
+                        logger.error(f'Missing required "input_text" parameter for natural_dialog_end query')
                         raise ValueError("Missing required 'input_text' parameter for natural_dialog_end query")
                     
                     context = None
@@ -476,9 +487,11 @@ class ZenohMemoryNode:
                             import urllib.parse
                             context = urllib.parse.unquote(selector.split('context=')[1].split('&')[0])
                         except:
+                            logger.error(f'Error parsing context parameter for natural_dialog_end query')
                             pass
                     
                     if not context:
+                        logger.error(f'Missing required "context" parameter for natural_dialog_end query')
                         raise ValueError("Missing required 'context' parameter for natural_dialog_end query")
                     
                     # Call natural_dialog_end method
@@ -561,8 +574,9 @@ class ZenohMemoryNode:
         """Handle RAG semantic search queries."""
         import time
         try:
-            start_time = time.time()
             # Parse query parameters
+            logger.info(f'RAG: Handling query - query.key_expr={query.key_expr}, query.selector={query.selector}')
+            for handler in logger.handlers: handler.flush()
             selector = str(query.selector)
             space = 'dialogs'  # default space
             k = 5  # default number of results
@@ -576,14 +590,14 @@ class ZenohMemoryNode:
                     query_text = urllib.parse.unquote(selector.split('query=')[1].split('&')[0])
                 except Exception as e:
                     logger.error(f'Error parsing query parameter: {e}')
-            
+                    for handler in logger.handlers: handler.flush()
             # Extract k
             if 'k=' in selector:
                 try:
                     k = int(selector.split('k=')[1].split('&')[0])
                 except Exception as e:
                     logger.error(f'Error parsing k parameter: {e}')
-            
+                    for handler in logger.handlers: handler.flush()
             # Extract space
             if 'space=' in selector:
                 try:
@@ -591,7 +605,7 @@ class ZenohMemoryNode:
                     space = urllib.parse.unquote(selector.split('space=')[1].split('&')[0])
                 except Exception as e:
                     logger.error(f'Error parsing space parameter: {e}')
-            
+                    for handler in logger.handlers: handler.flush()
             # Extract entity filter
             if 'entity=' in selector:
                 try:
@@ -600,10 +614,11 @@ class ZenohMemoryNode:
                     entity_filter = entity_filter.capitalize()  # Canonicalize
                 except Exception as e:
                     logger.error(f'Error parsing entity parameter: {e}')
-            
+                    for handler in logger.handlers: handler.flush()
             # Validate query_text
             if not query_text:
                 logger.warning('RAG search query missing query text')
+                for handler in logger.handlers: handler.flush()
                 response = {
                     'success': True,
                     'retrieved_entries': [],
@@ -618,6 +633,7 @@ class ZenohMemoryNode:
                 results = self.rag_store.search(space, query_text, k=k*2)  # Get extra for filtering
             except Exception as e:
                 logger.error(f'Error performing RAG search: {e}')
+                for handler in logger.handlers: handler.flush()
                 response = {
                     'success': True,
                     'retrieved_entries': [],
@@ -625,6 +641,7 @@ class ZenohMemoryNode:
                     'query': query_text
                 }
                 query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
+                for handler in logger.handlers: handler.flush()
                 return
             
             # Parse and filter results
@@ -645,15 +662,18 @@ class ZenohMemoryNode:
                             doc_id, score, text = result[0], result[1], result[2]
                         else:
                             logger.warning(f'Unexpected RAG tuple format (len={len(result)}): {result}')
+                            for handler in logger.handlers: handler.flush()
                             continue
                     else:
                         logger.warning(f'Unexpected RAG result type {type(result)}: {result}')
+                        for handler in logger.handlers: handler.flush()
                         continue
                     
                     # Parse doc_id: "dialog:EntityName:dialog_idx:entry_idx"
                     parts = str(doc_id).split(':')
                     if len(parts) < 4:
                         logger.warning(f'Invalid doc_id format: {doc_id}')
+                        for handler in logger.handlers: handler.flush()
                         continue
                     
                     entity_name = parts[1]
@@ -685,6 +705,7 @@ class ZenohMemoryNode:
                         
                 except Exception as e:
                     logger.error(f'Error parsing RAG result: {e}')
+                    for handler in logger.handlers: handler.flush()
                     continue
             
             response = {
@@ -694,12 +715,21 @@ class ZenohMemoryNode:
                 'query': query_text
             }
             
-            query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
-            logger.debug(f'RAG search returned {len(retrieved)} entries for "{query_text[:50]}..."')
+            logger.info(f'RAG: About to reply - query.key_expr={query.key_expr}, query.selector={query.selector}')
+            logger.info(f'RAG: Response payload size: {len(json.dumps(response))} bytes')
+            for handler in logger.handlers: handler.flush()
+            try:
+                query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
+                logger.info(f'RAG search returned {len(retrieved)} entries for "{query_text[:50]}..." and reply() call completed successfully')
+            except Exception as e:
+                logger.error(f'RAG reply() call raised exception: {e}')
+                import traceback
+                traceback.print_exc()
+            for handler in logger.handlers: handler.flush()
             
         except Exception as e:
             logger.error(f'Error handling RAG search query: {e}')
-            # Always return valid response even on error
+            for handler in logger.handlers: handler.flush()
             error_response = {
                 'success': True,
                 'retrieved_entries': [],
@@ -707,6 +737,7 @@ class ZenohMemoryNode:
                 'query': ''
             }
             query.reply(query.key_expr, json.dumps(error_response).encode('utf-8'))
+            for handler in logger.handlers: handler.flush()
     
     def add_item(self, item_name: str) -> None:
         """Add an item to the character's inventory."""

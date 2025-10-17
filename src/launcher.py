@@ -139,6 +139,11 @@ class CharacterLauncher:
                 map_args.extend(['-m', map_file, '-w', world_name])
             if setting:
                 map_args.extend(['-s', setting])   
+            # Pass LLM configuration to map_node
+            if server_name:
+                map_args.extend(['--server', server_name])
+            if model_name:
+                map_args.extend(['--model', model_name])
             # Optional max_turns from env (set via YAML or externally)
             try:
                 max_turns = os.environ.get('CWB_MAX_TURNS')
@@ -416,6 +421,7 @@ def main():
                 new_config['ontology'] = ontology
                 new_config['activities'] = activities
                 new_config['characters'] = characters_config.copy()
+                new_config['llm_config'] = llm_config
                 launcher.add_character(name, new_config)
         elif isinstance(characters_config, list):
             # Handle list format: [{'name': 'Alice', ...}, ...]
@@ -427,6 +433,7 @@ def main():
                     new_config['ontology'] = ontology
                     new_config['activities'] = activities
                     new_config['characters'] = characters_config
+                    new_config['llm_config'] = llm_config
                     launcher.add_character(name, new_config)
         
     except Exception as e:

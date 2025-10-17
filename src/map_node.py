@@ -50,16 +50,11 @@ if _debug_env:
     logger.info('🔧 Debug mode enabled for MapNode (console INFO)')
 
 # LLM client import
-try:
-    from llm_client import ZenohLLMClient
-    LLM_CLIENT_AVAILABLE = True
-except ImportError as e:
-    print(f"⚠️  LLM Client not available: {e}")
-    LLM_CLIENT_AVAILABLE = False
+from llm_client import ZenohLLMClient
 
 
 class MapNode:
-    def __init__(self, map_file: str, world_name: str = None, setting: str = None, max_turns: int = None):
+    def __init__(self, map_file: str, world_name: str = None, setting: str = None, max_turns: int = None, server_name: str = 'openai', model_name: str = 'gpt-4.1'):
         self.map_file = map_file
         self.world_name = world_name or map_file.replace('.py', '')
         self.world_map = None
@@ -67,6 +62,8 @@ class MapNode:
         self.shutdown_requested = False
         self._shutting_down = False
         self.setting = setting
+        self.server_name = server_name
+        self.model_name = model_name
         # Agent registry: character_name -> Agent instance
         self.agent_registry = {}
         
@@ -130,9 +127,7 @@ class MapNode:
         
         # Start persistence thread
         self.start_persistence_thread()
-        self.llm_client = None
-        if LLM_CLIENT_AVAILABLE:
-            self.llm_client = ZenohLLMClient(service_timeout=60.0)
+        self.llm_client = ZenohLLMClient(server_name=self.server_name, model_name=self.model_name, service_timeout=60.0)
         
         # Start world state worker thread
         self.start_world_state_worker()
@@ -2515,6 +2510,10 @@ def main():
                        help='Setting text string (defaults to None)')
     parser.add_argument('--max-turns', type=int, default=None,
                        help='Maximum number of turns before stopping (optional)')
+    parser.add_argument('--server', default='openai',
+                       help='LLM server name (default: openai)')
+    parser.add_argument('--model', default='gpt-4.1',
+                       help='LLM model name (default: gpt-4.1)')
     
     args = parser.parse_args()
     
@@ -2524,7 +2523,7 @@ def main():
         signal.signal(signal.SIGINT, signal_handler)
         
         # Create and run map node
-        map_node = MapNode(args.map_file, args.world_name, setting=args.setting, max_turns=args.max_turns)
+        map_node = MapNode(args.map_file, args.world_name, setting=args.setting, max_turns=args.max_turns, server_name=args.server, model_name=args.model)
         signal_handler.map_node = map_node  # Store reference for signal handler
         
         map_node.run()

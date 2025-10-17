@@ -29,6 +29,7 @@ import argparse
 import os
 from pathlib import Path
 from typing import Dict, Any
+from llm_client import ZenohLLMClient
 
 # Configure logging with unbuffered output
 # Console handler with WARNING level (less verbose)
@@ -49,6 +50,9 @@ logging.basicConfig(
     force=True
 )
 logger = logging.getLogger('perception_node')
+
+# Prompt template for comparing predictions against actual results
+
 
 
 class ZenohPerceptionNode:
@@ -77,6 +81,17 @@ class ZenohPerceptionNode:
         
         # Shutdown flag
         self.shutdown_requested = False
+        
+        # Initialize LLM client for prediction comparison (optional feature)
+        compare_predictions = True
+        if compare_predictions:
+            llm_config = self.character_config.get('llm_config', {})
+            server_name = llm_config.get('server_name', 'openai')
+            model_name = llm_config.get('model_name', 'gpt-4.1')
+            self.llm_client = ZenohLLMClient(server_name=server_name, model_name=model_name)
+            logger.info(f'🤖 LLM prediction comparison enabled for {self.character_name} (server={server_name}, model={model_name})')
+        else:
+            self.llm_client = None
         
         logger.info(f'🎯 Perception Node initialized for {self.character_name}')
         
@@ -125,8 +140,33 @@ class ZenohPerceptionNode:
                 logger.info(f'Received action_result: type={action_type}, '
                            f'prediction={prediction[:50]}..., result={update_text[:50]}...')
             
-            # TODO: Process action results and predictions
-            # For now, this is a stub - processing will be added in future iterations
+            # Compare prediction against actual result using LLM
+            if self.llm_client and prediction and update_text:
+                prompt_text = f"""Compare the predicted outcome against the actual result for an action.
+#Action:
+{{$action_text}}
+
+#Prediction: 
+{{$prediction_text}}
+
+#Actual Result:
+{{$update_text}}
+
+Are these significantly different? Answer 'yes' or 'no', followed by a brief explanation (max 20 words).
+"""
+                response = self.llm_client.generate(
+                    [prompt_text],
+                    bindings={
+                        "action_text": action,
+                        "prediction_text": prediction,
+                        "update_text": update_text
+                    },
+                    max_tokens=100,
+                    temperature=0.3,
+                    timeout=30.0
+                )
+                if response.success:
+                    logger.warning(f'⚠️ Significant prediction mismatch for {action_type}: {response.text}')
             
         except Exception as e:
             logger.error(f'Error processing action_result: {e}')
@@ -135,6 +175,8 @@ class ZenohPerceptionNode:
         """Clean shutdown of the perception node."""
         logger.info(f'Shutting down perception_node for {self.character_name}')
         self.shutdown_requested = True
+        if self.llm_client:
+            self.llm_client.cleanup()
         self.session.close()
 
 

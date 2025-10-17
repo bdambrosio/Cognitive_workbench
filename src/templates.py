@@ -49,12 +49,7 @@ logger = logging.getLogger('executive_node')
 import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__))))
 
-try:
-    from llm_client import ZenohLLMClient
-    LLM_CLIENT_AVAILABLE = True
-except ImportError as e:
-    print(f"⚠️  LLM Client not available: {e}")
-    LLM_CLIENT_AVAILABLE = False
+from llm_client import ZenohLLMClient
 
 PHYSIOLOGICAL_STATES = [
             {"name":"hunger","metric":"hunger","better_when":"decreasing","bands":{"low":[0,30],"mid":[30,70],"high":[70,100]}},

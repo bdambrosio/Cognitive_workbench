@@ -78,7 +78,7 @@ class ZenohLLMClient:
             # First attempt
             future = executor.submit(self.llm.ask, bindings, prompt, max_tokens=max_tokens, temp=temp, stops=stops, is_json=is_json, log=log, trace=trace)
             try:
-                response = future.result(timeout=timeout)
+                response = future.result(timeout=max(timeout, 120.0))
                 return response
             except TimeoutError:
                 logger.warning(f'⏱️ LLM request timeout after {timeout}s, retrying once...')
@@ -90,7 +90,7 @@ class ZenohLLMClient:
                 # Single retry with same timeout
                 future2 = executor.submit(self.llm.ask, bindings, prompt, max_tokens=max_tokens, temp=temp, stops=stops, is_json=is_json, log=log, trace=trace)
                 try:
-                    response = future2.result(timeout=timeout)
+                    response = future2.result(timeout=max(timeout, 60.0))
                     logger.info(f'✅ LLM request succeeded on retry')
                     return response
                 except TimeoutError:

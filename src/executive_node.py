@@ -59,12 +59,7 @@ logger.setLevel(logging.INFO)
 import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__))))
 
-try:
-    from llm_client import ZenohLLMClient
-    LLM_CLIENT_AVAILABLE = True
-except ImportError as e:
-    print(f"⚠️  LLM Client not available: {e}")
-    LLM_CLIENT_AVAILABLE = False
+from llm_client import ZenohLLMClient
 
 @dataclass
 class ActionRecord:
@@ -179,10 +174,13 @@ class ZenohExecutiveNode:
             return self.action_history[-1].result if self.action_history else None
         
         # LLM client
-        self.llm_client = None
-        if LLM_CLIENT_AVAILABLE:
-            self.llm_client = ZenohLLMClient(service_timeout=200.0 if not self.debug else 300.0)
-        self.llm = LLM(server_name="openai", model_name="gpt-4.1")
+        llm_config = self.character_config.get('llm_config', {})
+        server_name = llm_config.get('server_name', 'openai')
+        model_name = llm_config.get('model_name', 'gpt-4.1')
+        
+        self.llm_client = ZenohLLMClient(server_name=server_name, model_name=model_name, service_timeout=200.0 if not self.debug else 300.0)
+        logger.info(f'🤖 LLM client initialized (server={server_name}, model={model_name})')
+        self.llm = LLM(server_name=server_name, model_name=model_name)
         # Internal state
         self.action_counter = 0
         self.last_sense_data = None
@@ -325,7 +323,7 @@ class ZenohExecutiveNode:
             action_record.hunger_after = float(self.self_state.get('hunger', {}).get('value', 0.0))
             action_record.fatigue_after = float(self.self_state.get('fatigue', {}).get('value', 0.0))
             action_record.thirst_after = float(self.self_state.get('thirst', {}).get('value', 0.0))
-        except Exception:
+        except Exception as e:
             logger.error(f'Error capturing physiology: {e}')
             traceback.print_exc()
     
@@ -2725,10 +2723,13 @@ End your response with </end>
                 logger.info(f'Saying intent: "{text_input}" to {source}')
             
             entity_context = self.get_entity_context(source, 10)
+            logger.info(f' Retrieved entity context for {source}: {entity_context}')
             
             # Get RAG context for semantic retrieval
             rag_context = self.get_rag_context(text_input, entity_name=source, k=5)
+            logger.info(f' Retrieved RAG context for {source}: {rag_context}')
             rag_entries = rag_context.get('retrieved_entries', [])
+            #rag_entries = []
             logger.info(f'🔍 Retrieved {len(rag_entries)} RAG entries for query: "{text_input[:50]}..."')
             
             # Build user prompt with context
@@ -2743,17 +2744,18 @@ End your response with </end>
 
             if entity_context:
                 discourse_tom_models = self.get_entity_discourse_tom_models(source)
+                logger.info(f' Retrieved discourse/tom models for {source}: {discourse_tom_models}')
                 if discourse_tom_models:
                     dialog_history += f"\nBeliefs about {source}:\n\n{discourse_tom_models.get('tom_model', '')}\n"
                     dialog_history += f"\nDiscourse state with {source}:\n\n{discourse_tom_models.get('discourse_state', '')}\n"
             
             # Add RAG retrieved entries with context
-            if rag_entries:
-                logger.info(f'RAG: Adding {len(rag_entries[:5])} retrieved conversation snippets')
-                dialog_history += f"\n\nRelevant past conversations:\n"
-                for entry in rag_entries[:5]:
-                    expanded = self.expand_rag_context(entry, window_before=3)
-                    dialog_history += f"{expanded}\n---\n"
+            #if rag_entries:
+            #    logger.info(f'RAG: Adding {len(rag_entries[:5])} retrieved conversation snippets')
+            #    dialog_history += f"\n\nRelevant past conversations:\n"
+            #    for entry in rag_entries[:5]:
+            #        expanded = self.expand_rag_context(entry, window_before=3)
+            #        dialog_history += f"{expanded}\n---\n"
 
             # Check if dialog should naturally end
             if mode == 'respond':
@@ -2826,7 +2828,7 @@ End your response with:
             # Make LLM call
             if self.llm_client and not self.shutdown_requested:
                 # Use shorter timeout during shutdown
-                timeout = 5.0 if self.shutdown_requested else None
+                timeout = 20.0 if self.shutdown_requested else None
                 response = self.llm_client.generate(
                     messages=[system_prompt, user_prompt],
                     max_tokens=200,
@@ -3645,24 +3647,16 @@ End your response with:
         Returns:
             Dictionary with entity data or None if query failed
         """
-        from utils.zenoh_utils import zenoh_get_with_retry
         # safeguard - don't allow variables in query
         entity_name = entity_name.replace('$', '')
         try:
             key_expr = f"cognitive/{self.character_name}/memory/entity/{entity_name}?query=dialog&limit={limit}&scope={scope}"
-            data = zenoh_get_with_retry(
-                session=self.session,
-                key_expr=key_expr,
-                payload=None,
-                base_timeout=1.0,
-                retries=3,
-                backoff_factor=2.0,
-                jitter=0.1,
-                block_mode=False
-            )
-            if data and data.get('success'):
-                logger.info(f'👥 Retrieved entity context for {entity_name}')
-                return data.get('entity_data')
+            for reply in self.session.get(key_expr, timeout=10.0 if not self.debug else 300.0):
+                if reply.ok:
+                    data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
+                    if data and data.get('success'):
+                        logger.info(f'👥 Retrieved entity context for {entity_name}')
+                        return data.get('entity_data')
             logger.warning(f'Entity query failed or no response for {entity_name}')
             for handler in logger.handlers:
                 handler.flush()
@@ -3686,7 +3680,7 @@ End your response with:
             Dictionary with retrieved_entries list and count, always returns even if empty
         """
         import urllib.parse
-        from utils.zenoh_utils import zenoh_get_with_retry
+        import time
         
         try:
             # Build query parameters
@@ -3695,30 +3689,44 @@ End your response with:
                 params.append(f"entity={urllib.parse.quote(entity_name.capitalize())}")
             
             key_expr = f"cognitive/{self.character_name}/memory/rag/search?{'&'.join(params)}"
-            
-            # Use retry wrapper; in debug still prefer retries over single 300s block.
-            block_mode = False
-            data = zenoh_get_with_retry(
-                session=self.session,
-                key_expr=key_expr,
-                payload=None,
-                base_timeout=1.0,
-                retries=3,
-                backoff_factor=2.0,
-                jitter=0.1,
-                block_mode=block_mode,
-                block_timeout=300.0
-            )
-            if data and isinstance(data, dict) and data.get('success') is True:
-                return data
-            logger.debug(f'RAG query returned no results for "{query_text[:50]}..."')
-            return {'success': True, 'retrieved_entries': [], 'count': 0, 'query': query_text}
+            start_ts = time.time()
+            logger.info(f'RAG: Sending query with key_expr={key_expr}')
+            for handler in logger.handlers: handler.flush()
+
+            for reply in self.session.get(key_expr, timeout=20.0 if not self.debug else 300.0):
+                logger.info(f'RAG: Received a reply, checking if ok...')
+                for handler in logger.handlers: handler.flush()
+                if reply.ok:
+                    data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
+                    if data and isinstance(data, dict) and data.get('success') is True:
+                        latency_ms = int((time.time() - start_ts) * 1000)
+                        entries = data.get('retrieved_entries', [])
+                        count = data.get('count', len(entries) if isinstance(entries, list) else 0)
+                        return {
+                            'success': True,
+                            'retrieved_entries': entries if isinstance(entries, list) else [],
+                            'count': int(count) if isinstance(count, int) else 0,
+                            'query': data.get('query', query_text),
+                            'error': '',
+                            'latency_ms': latency_ms
+                        }
+                else:
+                    latency_ms = int((time.time() - start_ts) * 1000)
+                    logger.error(f'RAG query failed {reply.err.payload.to_bytes().decode('utf-8')}')
+                    for handler in logger.handlers: handler.flush()
+                    return {'success': False, 'retrieved_entries': [], 'count': 0, 'query': query_text, 'error': 'timeout_or_no_reply', 'latency_ms': latency_ms}
+
+            latency_ms = int((time.time() - start_ts) * 1000)
+            logger.warning(f'RAG query had no reply or failed for "{query_text[:50]}..."')
+            return {'success': False, 'retrieved_entries': [], 'count': 0, 'query': query_text, 'error': 'timeout_or_no_reply', 'latency_ms': latency_ms}
             
         except Exception as e:
             logger.error(f'Error querying RAG context for "{query_text[:50]}...": {e}')
             for handler in logger.handlers:
                 handler.flush()
-            return {'success': True, 'retrieved_entries': [], 'count': 0, 'query': query_text}
+            # Provide a consistent failure schema
+            latency_ms = int((time.time() - start_ts) * 1000)
+            return {'success': False, 'retrieved_entries': [], 'count': 0, 'query': query_text, 'error': str(e), 'latency_ms': latency_ms}
     
     def expand_rag_context(self, rag_entry: Dict[str, Any], window_before: int = 3) -> str:
         """
@@ -3732,18 +3740,18 @@ End your response with:
             String with context window or just the retrieved text if verification fails
         """
         try:
+            logger.info(f' Expanding RAG context for {rag_entry}')
+            for handler in logger.handlers: handler.flush()
             doc_id = rag_entry.get('doc_id', '')
             if not doc_id:
                 logger.warning(f'RAG expand: missing doc_id in RAG entry, returning text only')
-                for handler in logger.handlers:
-                    handler.flush()
+                for handler in logger.handlers: handler.flush()
                 return rag_entry.get('text', '')
             
             parts = doc_id.split(':')
             if len(parts) < 4:
                 logger.warning(f'RAG expand: doc_id malformed ({doc_id}), returning text only')
-                for handler in logger.handlers:
-                    handler.flush()
+                for handler in logger.handlers: handler.flush()
                 return rag_entry.get('text', '')
             
             try:
@@ -3752,48 +3760,41 @@ End your response with:
                 entry_idx = int(parts[3])
             except (ValueError, IndexError) as e:
                 logger.warning(f'RAG expand: failed to parse doc_id {doc_id}: {e}')
-                for handler in logger.handlers:
-                    handler.flush()
+                for handler in logger.handlers:  handler.flush()
                 return rag_entry.get('text', '')
             
             entity_context = self.get_entity_context(entity_name)
             if not entity_context:
                 logger.warning(f'RAG expand: no entity_context retrieved for {entity_name}')
-                for handler in logger.handlers:
-                    handler.flush()
+                for handler in logger.handlers: handler.flush()
                 return rag_entry.get('text', '')
             
             # get_entity_data now includes 'dialogs' for RAG context expansion
             dialogs = entity_context.get('dialogs')
             if not dialogs:
                 logger.warning(f'RAG expand: no dialogs field in entity_context for {entity_name}')
-                for handler in logger.handlers:
-                    handler.flush()
+                for handler in logger.handlers:  handler.flush()
                 return rag_entry.get('text', '')
             
             if not isinstance(dialogs, list):
                 logger.warning(f'RAG expand: dialogs not a list for {entity_name}, type={type(dialogs)}')
-                for handler in logger.handlers:
-                    handler.flush()
+                for handler in logger.handlers: handler.flush()
                 return rag_entry.get('text', '')
             
             if dialog_idx >= len(dialogs):
                 logger.warning(f'RAG expand: dialog_idx {dialog_idx} >= len(dialogs) {len(dialogs)} for {entity_name} - data mismatch')
-                for handler in logger.handlers:
-                    handler.flush()
+                for handler in logger.handlers: handler.flush()
                 return rag_entry.get('text', '')
             
             dialog = dialogs[dialog_idx]
             if not isinstance(dialog, list):
                 logger.warning(f'RAG expand: dialog {dialog_idx} not a list for {entity_name}, type={type(dialog)}')
-                for handler in logger.handlers:
-                    handler.flush()
+                for handler in logger.handlers: handler.flush()
                 return rag_entry.get('text', '')
             
             if entry_idx >= len(dialog):
                 logger.warning(f'RAG expand: entry_idx {entry_idx} >= len(dialog) {len(dialog)} for {entity_name} - data mismatch')
-                for handler in logger.handlers:
-                    handler.flush()
+                for handler in logger.handlers: handler.flush()
                 return rag_entry.get('text', '')
             
             # Verify the entry matches
@@ -3806,8 +3807,7 @@ End your response with:
             rag_text = rag_entry.get('text', '')
             if rag_text and rag_text not in entry_text:
                 logger.warning(f'RAG expand: entry mismatch for {entity_name} dialog {dialog_idx} entry {entry_idx}, RAG text not found in dialog entry')
-                for handler in logger.handlers:
-                    handler.flush()
+                for handler in logger.handlers: handler.flush()
                 return rag_text
             
             # Build context window
@@ -3820,6 +3820,8 @@ End your response with:
                     else:
                         context_lines.append(str(dialog[i]))
             
+            logger.info(f' Returning expanded RAG context: {context_lines}')
+            for handler in logger.handlers: handler.flush()
             return '\n'.join(context_lines) if context_lines else rag_entry.get('text', '')
             
         except Exception as e:
@@ -3837,32 +3839,24 @@ End your response with:
         Returns:
             Dictionary with entity data or None if query failed
         """
-        from utils.zenoh_utils import zenoh_get_with_retry
         # safeguard - don't allow variables in query
         entity_name = entity_name.replace('$', '')
+        logger.info(f' Getting entity discourse/tom for {entity_name}')
+        for handler in logger.handlers: handler.flush()
         try:
             key_expr = f"cognitive/{self.character_name}/memory/entity/{entity_name}?query=relation"
-            data = zenoh_get_with_retry(
-                session=self.session,
-                key_expr=key_expr,
-                payload=None,
-                base_timeout=1.0,
-                retries=3,
-                backoff_factor=2.0,
-                jitter=0.1,
-                block_mode=False
-            )
-            if data and data.get('success'):
-                logger.info(f'👥 Retrieved entity discourse/tom for {entity_name}')
-                return data
+            for reply in self.session.get(key_expr, timeout=3.0 if not self.debug else 300.0):
+                if reply.ok:
+                    data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
+                    if data and data.get('success'):
+                        logger.info(f'👥 Retrieved entity discourse/tom for {entity_name}')
+                        return data
             logger.warning(f'Entity discourse/tom query failed or no response for {entity_name}')
-            for handler in logger.handlers:
-                handler.flush()
+            for handler in logger.handlers:  handler.flush()
             return None
         except Exception as e:
             logger.error(f'Error querying entity discourse/tom for {entity_name}: {e}')
-            for handler in logger.handlers:
-                handler.flush()
+            for handler in logger.handlers: handler.flush()
             return None
    
     def check_natural_dialog_end(self, entity_name: str, input_text: str) -> bool:
@@ -3876,38 +3870,35 @@ End your response with:
         Returns:
             bool: True if dialog should end, False if it should continue
         """
-        from utils.zenoh_utils import zenoh_get_with_retry
         try:
             import urllib.parse
+            logger.info(f' Checking natural dialog end for {entity_name}: {input_text}')
+            for handler in logger.handlers: handler.flush()
             encoded_text = urllib.parse.quote(input_text)
             # Use observations if available, otherwise use empty context
             context = self.observations['static'] if self.observations else ""
             query_url = f"cognitive/{self.character_name}/memory/entity/{entity_name}?query=natural_dialog_end&input_text={encoded_text}&context={context}"
             
-            data = zenoh_get_with_retry(
-                session=self.session,
-                key_expr=query_url,
-                payload=None,
-                base_timeout=2.0,  # Slightly longer for LLM-based check
-                retries=3,
-                backoff_factor=2.0,
-                jitter=0.1,
-                block_mode=False
-            )
-            if data and data.get('success'):
-                logger.info(f'🤔 Natural dialog end check for {entity_name}: {data.get("should_end", True)}')
-                return data.get("should_end", True)
+            for reply in self.session.get(query_url, timeout=20.0 if not self.debug else 300.0):
+                if reply.ok:
+                    data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
+                    if data and data.get('success'):
+                        logger.info(f'🤔 Natural dialog end check for {entity_name}: {data.get("should_end", True)}')
+                        for handler in logger.handlers: handler.flush()
+                        return data.get("should_end", True)
+                else:
+                    logger.error(f'Natural dialog end query failed for {entity_name}!')
+                    for handler in logger.handlers: handler.flush()
+                    return True
             
             logger.warning(f'Natural dialog end query failed or no response for {entity_name}, assuming should end')
-            for handler in logger.handlers:
-                handler.flush()
+            for handler in logger.handlers:  handler.flush()
             return True
             
         except Exception as e:
             logger.error(f'Error querying natural dialog end for {entity_name}: {e}')
             logger.error(traceback.format_exc())
-            for handler in logger.handlers:
-                handler.flush()
+            for handler in logger.handlers:  handler.flush()
             return True
     
     def _acquire_conversation_lock(self, target_character: str) -> bool:

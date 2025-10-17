@@ -10,12 +10,7 @@ import json
 import random
 import discourse
 from utils import hash_utils
-try:
-    from llm_client import ZenohLLMClient
-    LLM_CLIENT_AVAILABLE = True
-except ImportError as e:
-    print(f"⚠️  LLM Client not available: {e}")
-    LLM_CLIENT_AVAILABLE = False
+from llm_client import ZenohLLMClient
 
 class EntityModel:
     """
@@ -371,6 +366,8 @@ End your response with:
             bool: True if dialog should end, False if it should continue
         """
         # Build transcript from recent conversation
+        if input_text.strip().endswith('?'):
+            return False
         transcript_text = ''
         if self.active:
             conversation_entries = self.get_recent_conversation(20)

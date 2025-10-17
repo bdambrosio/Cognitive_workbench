@@ -217,7 +217,7 @@ class LLM():
                         response = response.strip()
                     response = json.loads(response)
                 except Exception as e:
-                    logger.error(f'Error parsing JSON, attempting repair:\n {e}')
+                    #logger.error(f'Error parsing JSON, attempting repair:\n {e}')
                     response = self.repair_json(substituted_prompt, response, e)
             if log:
                 logger.info(f'Response:\n{response}\n')
