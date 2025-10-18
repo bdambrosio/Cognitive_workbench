@@ -129,8 +129,7 @@ class LLM():
             if self.model.startswith('models/Qwen3-Next'):
                 temperature = temperature / 2.0
             response =  requests.post(url, headers= headers,
-                                          json={"model":self.model, 
-                                                "prompt":content, "temperature":temperature,
+                                          json={"model":self.model, "prompt":content, "temperature":temperature,
                                                "top_p":top_p, "max_tokens":max_tokens, "stop":stops})
         elif 'llama.cpp' in self.server_name:
             url = 'http://localhost:5000/v1/chat/completions'
@@ -282,7 +281,8 @@ The reported error was:
 {{$error}}
 
 If it seems the JSON was truncated, it may have exceeded the max_tokens limit. In that case, try shortening some string values and completing the JSON according to the prompt.
-Respond with the repaired JSON string. Make sure the string is in a format that can be parsed by the json.loads function. No commentary, no code fences.
+Respond only with the repaired JSON string. Do not output any reasoning.
+Make sure the string is in a format that can be parsed by the json.loads function. No commentary, no code fences.
 """)]
 
         response = self.ask({"json": response, "error": error, "prompt": prompt}, prompt, tag='repair_json', temp=0.2, max_tokens=3500)

@@ -46,12 +46,7 @@ logging.basicConfig(
 logger = logging.getLogger('activity')
 
 # Add dedicated handler for llm_api logger
-llm_api_logger = logging.getLogger('llm_api')
-llm_api_file_handler = logging.FileHandler('logs/llm_api.log', mode='a')
-llm_api_file_handler.setLevel(logging.INFO)
-llm_api_file_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s', '%Y-%m-%d %H:%M:%S'))
-llm_api_logger.addHandler(llm_api_file_handler)
-llm_api_logger.setLevel(logging.INFO)
+
 
 
 COHERENCE_TEMPLATE = """You are evaluating a sequence of goals and actions taken by a character in a story-like environment.

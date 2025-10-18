@@ -23,7 +23,9 @@ from utils.zenoh_utils import datetime_handler
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import zenoh
-from map import WorldMap, Agent, hash_direction_info, extract_direction_info
+from world_map import WorldMap
+from map_agent import MapAgent
+from infospace_map import InfospaceMap
 
 # Configure logging
 # Console handler with WARNING level (less verbose)
@@ -150,10 +152,11 @@ class MapNode:
             map_module = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(map_module)
             
-            # Create WorldMap instance
-            logger.info("Creating WorldMap instance...")
-            self.world_map = WorldMap(map_module)
-            logger.info(f"WorldMap created successfully: {self.world_map.width}x{self.world_map.height}")
+            # Determine map class from module attribute (defaults to WorldMap for backward compatibility)
+            MapClass = getattr(map_module, 'map_class', WorldMap)
+            logger.info(f"Creating {MapClass.__name__} instance...")
+            self.world_map = MapClass(map_module)
+            logger.info(f"{MapClass.__name__} created successfully: {self.world_map.width}x{self.world_map.height}")
             
             # Load existing world data if available
             self.load_world_data()
@@ -171,10 +174,12 @@ class MapNode:
 #Setting: \n{self.setting}
 ##
 
-Response ONLY with the datetime in isoformat.
+Response with the datetime in isoformat.
 Do not include any other text, reasoning, introductory, expository, or markdown.
+end your response with: 
+</end>
             """
-            response = self.llm_client.generate([prompt], max_tokens=100)
+            response = self.llm_client.generate([prompt], max_tokens=50, stops=['</end>'])
             try:
                 self.world_map.datetime = datetime.fromisoformat(response.text.strip())
                 logger.info(f"Setting datetime to: {self.world_map.datetime}")
@@ -907,8 +912,7 @@ Do not include any other text, reasoning, introductory, expository, or markdown.
         """Return the resource_rules entry for a resource type (JSON-safe).
 
         Topic: cognitive/map/resource_rules/<resource_type_or_instance>
-        If an instance name with numeric suffix is provided (e.g., Farm3), the
-        numeric suffix is stripped to resolve the type (e.g., Farm).
+        If an instance name is provided, the resource is looked up to determine its type.
         """
         try:
             # Extract name from query key
@@ -918,10 +922,15 @@ Do not include any other text, reasoning, introductory, expository, or markdown.
             if not raw_name:
                 raise ValueError("No resource name provided")
 
-            # Strip numeric suffix if present (e.g., Farm3 -> Farm)
+            # Try to resolve as resource instance first to get exact type
             type_name = raw_name
-            while type_name and type_name[-1].isdigit():
-                type_name = type_name[:-1]
+            resource = self.world_map.get_resource_by_name(raw_name)
+            if resource:
+                # Extract type from resource instance
+                rtype = resource.get('type')
+                if rtype:
+                    type_name = getattr(rtype, 'name', str(rtype))
+            # If not found as instance, assume raw_name is the type name itself
 
             rules = getattr(self.world_map, '_resource_rules', None) or {}
             allocations = rules.get('allocations') or []
@@ -1237,11 +1246,11 @@ Do not include any other text, reasoning, introductory, expository, or markdown.
                 # Find a random valid location for the agent
                 location = self.world_map.random_location_by_terrain("Clearing")
                 if not location:
-                    # Fallback to any valid location
-                    location = (25, 25)  # Center of map
+                    # Fallback to center of map using actual map dimensions
+                    location = (self.world_map.width // 2, self.world_map.height // 2)
                 
                 # Create agent instance
-                agent = Agent(location[0], location[1], self.world_map, canonical_character_name)
+                agent = MapAgent(location[0], location[1], self.world_map, canonical_character_name)
                 
                 # Register agent with world map
                 self.world_map.register_agent(agent)
@@ -1290,17 +1299,17 @@ Do not include any other text, reasoning, introductory, expository, or markdown.
                     'error': f"Agent for character '{character_name}' not found"
                 }
             else:
-                agent: Agent = self.agent_registry[canonical_character_name]
+                agent: MapAgent = self.agent_registry[canonical_character_name]
                 
                 # Call agent's look method
                 look_result = agent.look()
                 view = {}
                 for dir in ['Current','North', 'Northeast', 'East', 'Southeast', 
                         'South', 'Southwest', 'West', 'Northwest']:
-                    dir_obs = extract_direction_info(self.world_map, look_result, dir)
+                    dir_obs = self.world_map.extract_direction_info(look_result, dir)
                     view[dir] = dir_obs
 
-                view_text, resources, characters, paths, percept_summary = hash_direction_info(view, distance_threshold=16, world=self.world_map)
+                view_text, resources, characters, paths, percept_summary = self.world_map.hash_direction_info(view, distance_threshold=16)
                 
                 response = {
                     'success': True,
@@ -1315,6 +1324,7 @@ Do not include any other text, reasoning, introductory, expository, or markdown.
             logger.info(f'Agent look command handled for {query.key_expr}')
             
         except Exception as e:
+            traceback.print_exc()
             logger.error(f"Error handling agent look: {e}")
             error_response = {
                 'success': False,
@@ -1350,7 +1360,7 @@ Do not include any other text, reasoning, introductory, expository, or markdown.
                     'error': f"Agent for character '{character_name}' not found"
                 }
             else:
-                agent:Agent = self.agent_registry[canonical_character_name]
+                agent: MapAgent = self.agent_registry[canonical_character_name]
                 
                 # Call agent's move method
                 move_result = agent.move(direction)
@@ -1419,7 +1429,7 @@ Do not include any other text, reasoning, introductory, expository, or markdown.
                 return
 
             resource_id = resource.get('name')
-            agent: Agent = self.agent_registry[canonical_character_name]
+            agent: MapAgent = self.agent_registry[canonical_character_name]
             ok = agent.move_to_resource(resource_id)
 
             if ok:
@@ -1797,11 +1807,9 @@ Do not include any other text, reasoning, introductory, expository, or markdown.
                 x = int(x1 + t * (x2 - x1))
                 y = int(y1 + t * (y2 - y1))
                 
-                # Check if this point is passable terrain
-                if 0 <= x < self.world_map.width and 0 <= y < self.world_map.height:
-                    patch = self.world_map.patches[x][y]
-                    if patch.terrain_type and patch.terrain_type.name in ['Water', 'Mountain']:
-                        return False
+                # Use the map's own visibility logic instead of hardcoded terrain checks
+                if not self.world_map.is_visible(x1, y1, x, y, observer_height=5):
+                    return False
             
             return True
             
@@ -1849,8 +1857,8 @@ Do not include any other text, reasoning, introductory, expository, or markdown.
                     # Check if agent already exists (case-insensitive)
                     canonical_character_name = character_name.capitalize()
                     if canonical_character_name not in self.agent_registry:
-                        # Determine spawn location: default (20,20) or scenario-provided resource instance
-                        spawn_x, spawn_y = 20, 20
+                        # Determine spawn location: default (map center) or scenario-provided resource instance
+                        spawn_x, spawn_y = self.world_map.width // 2, self.world_map.height // 2
                         character_config = data.get('character_config', {})
                         if isinstance(character_config, dict):
                             resource_location_name = character_config.get('location')
@@ -1861,12 +1869,12 @@ Do not include any other text, reasoning, introductory, expository, or markdown.
                                         rx, ry = resource['location']
                                         spawn_x, spawn_y = int(rx), int(ry)
                                     except Exception:
-                                        logger.error(f"Invalid resource location for '{resource_location_name}' - defaulting to (20,20)")
+                                        logger.error(f"Invalid resource location for '{resource_location_name}' - defaulting to map center")
                                 else:
-                                    logger.error(f"Resource instance '{resource_location_name}' not found for '{canonical_character_name}' - defaulting to (20,20)")
+                                    logger.error(f"Resource instance '{resource_location_name}' not found for '{canonical_character_name}' - defaulting to map center")
 
                         # Create agent at resolved spawn point
-                        agent = Agent(spawn_x, spawn_y, self.world_map, canonical_character_name)
+                        agent = MapAgent(spawn_x, spawn_y, self.world_map, canonical_character_name)
                         
                         # Register agent with world map
                         self.world_map.register_agent(agent)
@@ -2175,7 +2183,7 @@ Do not include any other text, reasoning, introductory, expository, or markdown.
                             x, y = agent_data['position']
                             
                             # Create agent at saved position
-                            agent = Agent(x, y, self.world_map, character_name)
+                            agent = MapAgent(x, y, self.world_map, character_name)
                             self.world_map.register_agent(agent)
                             self.agent_registry[character_name] = agent
                             self.agent_visibility[character_name] = set()

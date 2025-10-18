@@ -102,15 +102,15 @@ Each summary Should accurately reflect both the content and tone of that charact
 
 Respond with the two summaries in hash-formatted text using the following format:
 
-#{{$name}} Summary for {{$name}}
-#{{$other_name}} Summary for {{$other_name}}
+#{{$name}} <Summary for {{$name}}>
+#{{$other_name}} <Summary for {{$other_name}}>
 ##
 
 Do not include any other introductory, explanatory, discursive, or formatting text in your response.
 End your response with: 
 </end>"""
 
-        response = self.llm_client.generate([system_prompt, user_prompt], bindings={'transcript': dialog_history, 'name': self.entity_name, 'other_name': self.entity_name}, 
+        response = self.llm_client.generate([system_prompt, user_prompt], bindings={'transcript': dialog_history, 'name': self.character_name, 'other_name': self.entity_name}, 
                                             stops=['</end>'], max_tokens=60)
         if response.success:
             response=response.text

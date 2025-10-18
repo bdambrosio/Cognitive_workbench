@@ -7,6 +7,8 @@ from datetime import timedelta, datetime
 import logging
 import json
 import numpy as np
+import zenoh
+from zenoh import ConsolidationMode, QueryTarget
 #from sentence_transformers import SentenceTransformer
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from utils import hash_utils
@@ -531,10 +533,10 @@ REQ_KEYS = {
 }
 
 OPTIONAL_KEYS = {
-    "say": {"reason", "value"},
-    "move": {"reason", "value"},
-    "think": {"reason", "target"},
-    "look": {"reason", "value"},
+    "say": {"reason", "value", "prediction"},
+    "move": {"reason", "value", "prediction"},
+    "think": {"reason", "target", "prediction"},
+    "look": {"reason", "value", "prediction"},
     "take": {"reason", "value"},
     "place": {"reason", "value"},
     "inspect": {"reason", "value"},
@@ -544,7 +546,7 @@ OPTIONAL_KEYS = {
     "wait": {"reason", "target", "value"},
     "if": {"else"},
     "near": {"reason", "value"},
-    "look": {"reason", "value"},
+    "look": {"reason", "value", "prediction"},
 }
 
 REQ_CONDITION_KEYS = {
@@ -733,7 +735,7 @@ Respond only with a JSON plan according to the provided PLAN_TEMPLATE. No prose 
                 broken_json = str(plan_candidate)
             repair_system = (
                 "You are a strict plan repairer. Given the PLAN_TEMPLATE and a broken plan JSON, "
-                "emit a corrected plan that is valid per the template. Output only JSON. End with </end>."
+                "emit a corrected plan that is valid per the template. Output only JSON. Do not output any reasoning. End with </end>."
             )
             repair_user_parts = []
             repair_user_parts.append("PLAN_TEMPLATE:\n" + str(PLAN_TEMPLATE))
@@ -810,7 +812,7 @@ def is_near(character, target: str, negated: bool) -> bool:
     """Check if a target (resource or character) is near this character."""
     try:
         character_name = character.character_name
-        for reply in character.session.get(f"cognitive/{character_name}/situation/proximity?target={target}&negated={negated}", timeout=6.0 if not character.debug else 300.0):
+        for reply in character.session.get(f"cognitive/{character_name}/situation/proximity?target={target}&negated={negated}", target=QueryTarget.BEST_MATCHING, consolidation=ConsolidationMode.NONE, timeout=6.0 if not character.debug else 300.0):
             if reply.ok:
                 data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
                 if data['success']:
@@ -957,14 +959,6 @@ def _evaluate_condition(character: ZenohExecutiveNode, condition: dict, observat
                 return None
         
         try:
-            # Reject type-level targets (no digits) for non-scan contexts
-            try:
-                if (not normalized_type == 'believes') and isinstance(target, str) and not any(ch.isdigit() for ch in target):
-                    # Only scan accepts resource types; conditions/actions require instance ids
-                    return {'value': False, 'binding': None}
-            except Exception:
-                pass
-
             # Query the appropriate node based on normalized condition type
             if normalized_type == 'near':
                 # Treat exact inventory id as near
@@ -980,11 +974,12 @@ def _evaluate_condition(character: ZenohExecutiveNode, condition: dict, observat
                     return {'value': (not negated), 'binding': binding} if not negated else {'value': False, 'binding': None}
                 # Fallback to distributed query
                 try:
-                    for reply in character.session.get(f"cognitive/{character_name}/situation/proximity?target={target}&negated={negated}", timeout=6.0 if not character.debug else 300.0):
+                    for reply in character.session.get(f"cognitive/{character_name}/situation/proximity?target={target}&negated={negated}", target=QueryTarget.BEST_MATCHING, consolidation=ConsolidationMode.NONE, timeout=6.0 if not character.debug else 300.0):
                         if reply.ok:
                             data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
                             if data['success']:
                                 return {'value': data['value'], 'binding': data['binding']}
+                        break
                 except Exception as e:
                     logger.error(f'Error querying proximity for {target}: {e}')
                 # If no local match and negated, treat as True; otherwise False
@@ -997,12 +992,13 @@ def _evaluate_condition(character: ZenohExecutiveNode, condition: dict, observat
                     return {'value': (not negated), 'binding': binding} if not negated else {'value': False, 'binding': None}
                 # Fallback
                 try:
-                    for reply in character.session.get(f"cognitive/{character_name}/situation/visibility?target={target}&negated={negated}", timeout=6.0 if not character.debug else 300.0):
+                    for reply in character.session.get(f"cognitive/{character_name}/situation/visibility?target={target}&negated={negated}", target=QueryTarget.BEST_MATCHING, consolidation=ConsolidationMode.NONE, timeout=6.0 if not character.debug else 300.0):
                         if reply.ok:
                             data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
                             if data['success']:
                                 logger.info(f'Visibility query for {target}: {result}')
                                 return {'value': data['value'], 'binding': data['binding']}
+                        break
                 except Exception as e:
                     logger.error(f'Error querying visibility for {target}: {e}')
                 return {'value': True, 'binding': None} if negated else {'value': False, 'binding': None}
@@ -1010,13 +1006,14 @@ def _evaluate_condition(character: ZenohExecutiveNode, condition: dict, observat
             elif normalized_type == 'has_item':
                 # Prefer distributed memory_node for authoritative inventory
                 try:
-                    for reply in character.session.get(f"cognitive/{character_name}/memory/inventory?item={target}&negated={negated}", timeout=6.0 if not character.debug else 300.0):
+                    for reply in character.session.get(f"cognitive/{character_name}/memory/inventory?item={target}&negated={negated}", target=QueryTarget.BEST_MATCHING, consolidation=ConsolidationMode.NONE, timeout=6.0 if not character.debug else 300.0):
                         if reply.ok:
                             data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
                             if data['success']:
                                 result = {'value': data['value'], 'binding': data['binding']}
                                 logger.info(f'Inventory query for {target}: {result}')
                                 return result
+                        break
                 except Exception as e:
                     logger.error(f'Error querying inventory for {target}: {e}')
                 return {'value': False, 'binding': None}
@@ -1028,13 +1025,14 @@ def _evaluate_condition(character: ZenohExecutiveNode, condition: dict, observat
                     return {'value': (not negated), 'binding': binding} if not negated else {'value': False, 'binding': None}
                 # Fallback
                 try:
-                    for reply in character.session.get(f"cognitive/{character_name}/situation/location?target={target}&negated={negated}", timeout=6.0 if not character.debug else 300.0):
+                    for reply in character.session.get(f"cognitive/{character_name}/situation/location?target={target}&negated={negated}", target=QueryTarget.BEST_MATCHING, consolidation=ConsolidationMode.NONE, timeout=6.0 if not character.debug else 300.0):
                         if reply.ok:
                             data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
                             if data['success']:
                                 result = {'value': data['value'], 'binding': data['binding']}
                                 logger.info(f'Location query for {target}: {target}')
                                 return result
+                        break
                 except Exception as e:
                     logger.error(f'Error querying location for {target}: {e}')
                 return {'value': True, 'binding': None} if negated else {'value': False, 'binding': None}

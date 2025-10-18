@@ -8,6 +8,7 @@ import time
 import traceback
 
 import zenoh
+from zenoh import ConsolidationMode, QueryTarget
 
 from activity import (
     create_discourse_ontology,
@@ -38,11 +39,12 @@ def _ensure_map_types(session, scenario: dict):
     """
     # First attempt
     try:
-        for reply in session.get("cognitive/map/types", timeout=10.0 if not _debug else 300.0):
+        for reply in session.get("cognitive/map/types", target=QueryTarget.BEST_MATCHING, consolidation=ConsolidationMode.NONE, timeout=10.0 if not _debug else 300.0):
             if reply.ok:
                 data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
                 if data.get('success'):
                     return data, None, None
+            break
     except Exception: # expected if map_node is not running
         pass
 
@@ -66,29 +68,32 @@ def _ensure_map_types(session, scenario: dict):
 
     try:
         types = {}
-        for reply in session.get("cognitive/map/types", timeout=60.0 if not _debug else 300.0):
+        for reply in session.get("cognitive/map/types", target=QueryTarget.BEST_MATCHING, consolidation=ConsolidationMode.NONE, timeout=60.0 if not _debug else 300.0):
             if reply.ok:
                 data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
                 if data.get('success'):
                     types = data
                     break
+            break
 
         if not types:
             return {}, '', map_process
-        for reply in session.get("cognitive/map/types", timeout=10.0 if not _debug else 300.0):
+        for reply in session.get("cognitive/map/types", target=QueryTarget.BEST_MATCHING, consolidation=ConsolidationMode.NONE, timeout=10.0 if not _debug else 300.0):
             if reply.ok:
                 data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
                 if data.get('success'):
                     types = data
                     break
+            break
         resource_type_str = ''
         if types.get('resource_types'):
             for resource_type in types['resource_types']:
                 resource_type_str += f"\n{resource_type}"
-                for reply in session.get(f"cognitive/map/resource_rules/{resource_type}", timeout=5 if not _debug else 300.0):
+                for reply in session.get(f"cognitive/map/resource_rules/{resource_type}", target=QueryTarget.BEST_MATCHING, consolidation=ConsolidationMode.NONE, timeout=5 if not _debug else 300.0):
                     if reply.ok:
                         rules_response = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
                         break
+                    break
                 if rules_response and rules_response.get('success') and 'resource_rules' in rules_response:
                     rules_response = rules_response['resource_rules']
                     if 'description' in rules_response:

@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from typing import Dict, List
 
 # Import the new dynamic resource system
-from map import ResourceTypeRegistry
+from world_map import ResourceTypeRegistry
 
 # All enums for forest scenario
 class LabTerrain(Enum):
@@ -142,4 +142,8 @@ resource_rules = {
         }
 
     ]
-} 
+}
+
+# Specify map class for map_node
+from world_map import WorldMap
+map_class = WorldMap 
