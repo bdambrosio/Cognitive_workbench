@@ -15,6 +15,7 @@ from typing import Dict, Any, Type, List, Tuple
 import numpy as np
 from scipy.ndimage import gaussian_filter
 import re
+from map_agent import Direction, MapAgent
 
 # Initialize colorama
 init()

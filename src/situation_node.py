@@ -8,6 +8,7 @@ Replaces ROS2 complexity with simple Zenoh pub/sub.
 
 import traceback
 import zenoh
+from zenoh import ConsolidationMode, QueryTarget
 import json
 import time
 import logging
@@ -252,7 +253,7 @@ class ZenohSituationNode:
         try:
             # Query map node for agent look data with timeout
             logger.info(f'Updating map data for {self.character_name}')
-            for reply in self.session.get(f"cognitive/map/agent/{self.character_name}/look", timeout=4.0 if not self.debug else 300.0):
+            for reply in self.session.get(f"cognitive/map/agent/{self.character_name}/look", target=QueryTarget.BEST_MATCHING, consolidation=ConsolidationMode.NONE, timeout=4.0 if not self.debug else 300.0):
                 try:
                     if reply.ok:
                         map_look_data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
@@ -303,6 +304,7 @@ class ZenohSituationNode:
                         self.save_situation()
                         self._publish_situation()
                         logger.info(f'Map look data updated for {self.character_name}')
+                        break
                     else:
                         reply_str = str(reply)
                         decoded_error = zenoh_utils.decode_zenoh_error_payload(reply_str)
@@ -312,10 +314,11 @@ class ZenohSituationNode:
                                 self._update_map_data()
                             else:
                                 logger.error(f'Map query timeout for {self.character_name} (map node may be busy)')
+                        break
                 except Exception as e:
                     logger.error(f'Error parsing map look response for {self.character_name}: {e}')
                     traceback.print_exc()
-                    continue
+                    break
             
         except Exception as e:
             if "timeout" in str(e).lower():

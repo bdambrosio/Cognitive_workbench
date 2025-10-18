@@ -1,11 +1,11 @@
-map: lab.py
+map: infolab.py
 # Cognitive Workbench Configuration
 llm_config:
   server_name: "vllm"
   model_name: "qwen/qwen3-235b-a22b-2507"
 
 setting: |
-  A modern Computer Science grad lab space with workplaces for several graduate students and a postdoc research associate, Jill.
+  A modern Computer Science grad lab cyberspace with workplaces for several graduate students and a postdoc research associate, Jill.
 
 characters:
   Jill:

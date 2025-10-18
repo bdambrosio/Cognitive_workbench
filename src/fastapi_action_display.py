@@ -7,6 +7,7 @@ Replaces the console-based action_display_node with a web interface.
 """
 
 import zenoh
+from zenoh import ConsolidationMode, QueryTarget
 import json
 import time
 import threading
@@ -716,7 +717,7 @@ class FastAPIActionDisplayNode:
                     
                     # Otherwise, try to query map_node for current time
                     try:
-                        replies = self.session.get("cognitive/map/simulation_time", timeout=5.0 if not self.debug else 300.0)
+                        replies = self.session.get("cognitive/map/simulation_time", target=QueryTarget.BEST_MATCHING, consolidation=ConsolidationMode.NONE, timeout=5.0 if not self.debug else 300.0)
                         for reply in replies:
                             if reply.ok:
                                 response = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
@@ -724,6 +725,7 @@ class FastAPIActionDisplayNode:
                                     # Cache the time for future requests
                                     self.current_simulation_time = response
                                     return {"success": True, "time_info": response}
+                            break
                         
                         return {"success": False, "message": "No response from map_node"}
                     except Exception as query_error:
@@ -746,7 +748,7 @@ class FastAPIActionDisplayNode:
                 query_key = f"cognitive/{character_name}/memory/entity/{target_character}?query=relation"
                 
                 try:
-                    replies = self.session.get(query_key, timeout=5.0 if not self.debug else 300.0)
+                    replies = self.session.get(query_key, target=QueryTarget.BEST_MATCHING, consolidation=ConsolidationMode.NONE, timeout=5.0 if not self.debug else 300.0)
                     for reply in replies:
                         try:
                             # Handle different Zenoh reply object types
@@ -779,7 +781,7 @@ class FastAPIActionDisplayNode:
                                 return {"success": False, "message": error_msg, "no_interaction": False}
                         except Exception as parse_error:
                             logger.warning(f"Failed to parse reply for {character_name}->{target_character}: {parse_error}")
-                            continue
+                            break
                     
                     # No valid response means entity doesn't exist yet (no interaction)
                     return {

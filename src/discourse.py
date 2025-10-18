@@ -43,13 +43,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger('discourse')
 
-# Add dedicated handler for llm_api logger
-llm_api_logger = logging.getLogger('llm_api')
-llm_api_file_handler = logging.FileHandler('logs/llm_api.log', mode='a')
-llm_api_file_handler.setLevel(logging.INFO)
-llm_api_file_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s', '%Y-%m-%d %H:%M:%S'))
-llm_api_logger.addHandler(llm_api_file_handler)
-llm_api_logger.setLevel(logging.INFO)
+
 
 # Add dedicated handler for llm_client logger
 llm_client_logger = logging.getLogger('llm_client')
@@ -329,7 +323,8 @@ Execution phase - fully aligned on plan, trust concerns addressed, ready to proc
 ###END EXAMPLE OUTPUT
 """
 
-TOM_UPDATE_TEMPLATE ="""You are updating a Theory of Mind model - your assessment of what the other person knows, wants, can do, and how reliable they are. This model helps interpret their statements and predict their future behavior.
+TOM_UPDATE_TEMPLATE ="""You are updating a Theory of Mind model - your assessment of what the other person knows, wants, can do, and how reliable they are. 
+This model helps interpret their statements and predict their future behavior. Be concise and to the point.
 
 PREVIOUS THEORY OF MIND MODEL:
 {{$previous_tom_model}}
@@ -344,38 +339,44 @@ CONVERSATION SEGMENT:
 
 PARTICIPANT TO MODEL: {{$other_person_name}}
 
-TASK: Update the Theory of Mind model based on this segment. Provide a complete updated assessment, not just changes.
+TASK: Update the Theory of Mind model based on this segment. Provide a complete updated assessment, not just changes. Be concise and to the point.
 
 OUTPUT FORMAT:
 
-THEORY OF MIND: {{$other_person_name}} (Turns {{$start_turn}}-{{$end_turn}})
+THEORY OF MIND: {{$other_person_name}}
 
 TRUST ASSESSMENT:
 
-Overall: [Provide a brief summary - e.g., "Moderate-high and improving" or "Low with concerns" or "High and stable"]
+Overall: [Provide a concise summary - e.g., "Moderate-high and improving" or "Low with concerns" or "High and stable"]
 
 Competence - Can they do what's needed?
-[Assess their capability to fulfill commitments and contribute effectively. Include domains where relevant (e.g., "navigation skills", "technical knowledge"). Note any demonstrations of skill or gaps revealed. 2-4 sentences.]
+[Assess their capability to fulfill commitments and contribute effectively. 
+Include domains where relevant (e.g., "navigation skills", "technical knowledge"). Note any demonstrations of skill or gaps revealed. Concise2 1-3 sentences.]
 
 Intentionality - Do they want to help/cooperate?
-[Assess whether their goals include helping you/the shared goal vs. primarily self-interested. Look for cooperation signals, consideration of your concerns, vs. dismissiveness or self-focus. 2-4 sentences.]
+[Assess whether their goals include helping you/the shared goal vs. primarily self-interested. 
+Look for cooperation signals, consideration of your concerns, vs. dismissiveness or self-focus. Concise, 1-3 sentences.]
 
 Reliability - Will they follow through consistently?
-[Assess track record of doing what they say. Limited if new relationship. Look for: kept commitments, acknowledged mistakes, consistency between words and actions. 2-4 sentences.]
+[Assess track record of doing what they say. 
+Limited if new relationship. Look for: kept commitments, acknowledged mistakes, consistency between words and actions. Concise 1-2 sentences.]
 
 Transparency - Can you verify what they say?
-[Assess how openly they share information and reasoning. Look for: proactive disclosure, explanations offered, willingness to show evidence, vs. withholding or evasiveness. 2-4 sentences.]
+[Assess how openly they share information and reasoning. 
+Look for: proactive disclosure, explanations offered, willingness to show evidence, vs. withholding or evasiveness. Concise. 1-2 sentences.]
 
 ---
 
 GOALS & ALIGNMENT:
-[Describe what they appear to want and how aligned their goals are with yours. Note if they have multiple goals (e.g., task completion + relationship maintenance). 2-3 sentences.]
+[Describe what they appear to want and how aligned their goals are with yours. 
+Note if they have multiple goals (e.g., task completion + relationship maintenance). Concise, 1-2 sentences.]
 
 EMOTIONAL STATE:
-[Brief assessment of current affect and emotional regulation. E.g., "Calm and focused", "Anxious but managing it", "Frustrated and short-tempered". 1-2 sentences.]
+[Brief assessment of current affect and emotional regulation. E.g., "Calm and focused", "Anxious but managing it", "Frustrated and short-tempered". Concise, 1 sentences.]
 
 CONCERNS/UNCERTAINTIES:
-[List any open questions, unresolved doubts, or things you're unsure about regarding them. If none, write "[none currently]". Use bullet points if multiple concerns.]
+[List any open questions, unresolved doubts, or things you're unsure about regarding them. If none, write "[none currently]". 
+Use bullet points if multiple concerns. Be terse]
 
 INSTRUCTIONS:
 
@@ -579,7 +580,7 @@ def extract_agenda_items(llm_client, discourse_state: str, my_name: str) -> List
     """
     
     prompt = """
-Extract agenda items from this discourse state for {{$my_name}}.
+Extract agenda items from this discourse state for {{$my_name}}. Be concise and to the point.
 
 DISCOURSE STATE:
 {{$discourse_state}}
@@ -589,7 +590,7 @@ Create agenda items for:
 2. [Other → Self] commitments - things others committed to do that {{$my_name}} should MONITOR
 3. Mutual agreements - joint ACTIVITIES both parties will pursue
 
-Skip vague cooperation statements. Focus on concrete, actionable items.
+Skip vague cooperation statements. Focus on concrete, actionable items, and be concise and to the point.
 
 Output format (one per line):
 TYPE|ACTION_DESCRIPTION

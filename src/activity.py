@@ -14,6 +14,7 @@ import logging
 import json
 import numpy as np
 import zenoh
+from zenoh import ConsolidationMode, QueryTarget
 #from sentence_transformers import SentenceTransformer
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from Messages import SystemMessage
@@ -44,13 +45,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger('activity')
 
-# Add dedicated handler for llm_api logger
-llm_api_logger = logging.getLogger('llm_api')
-llm_api_file_handler = logging.FileHandler('logs/llm_api.log', mode='a')
-llm_api_file_handler.setLevel(logging.INFO)
-llm_api_file_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s', '%Y-%m-%d %H:%M:%S'))
-llm_api_logger.addHandler(llm_api_file_handler)
-llm_api_logger.setLevel(logging.INFO)
+ 
 
 # Add dedicated handler for llm_client logger
 llm_client_logger = logging.getLogger('llm_client')
@@ -471,7 +466,7 @@ class ActivityManager:
                 situation['thoughts'] = thoughts
             # get inventory
             situation['inventory'] = []
-            for reply in self.executive_node.session.get(f"cognitive/{self.executive_node.character_name}/memory/inventory", timeout=2.0 if not self.executive_node.debug else 300.0):
+            for reply in self.executive_node.session.get(f"cognitive/{self.executive_node.character_name}/memory/inventory", target=QueryTarget.BEST_MATCHING, consolidation=ConsolidationMode.NONE, timeout=2.0 if not self.executive_node.debug else 300.0):
                 if reply.ok:
                     data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
                     if data.get('success'):
@@ -480,6 +475,7 @@ class ActivityManager:
                             situation['inventory'].extend(value)
                         elif value:
                             situation['inventory'].append(value)
+                break
  
         else:
             # Default values if no situation data available
@@ -493,7 +489,7 @@ class ActivityManager:
         
         # Get simulation time from map_node
         try:
-            for time_reply in self.executive_node.session.get("cognitive/map/simulation_time", timeout=70.0 if not self.executive_node.debug else 300.0):
+            for time_reply in self.executive_node.session.get("cognitive/map/simulation_time", target=QueryTarget.BEST_MATCHING, consolidation=ConsolidationMode.NONE, timeout=70.0 if not self.executive_node.debug else 300.0):
                 if time_reply.ok:
                     time_data = json.loads(time_reply.ok.payload.to_bytes().decode('utf-8'))
                     if time_data.get('success'):
@@ -511,6 +507,7 @@ class ActivityManager:
                     situation['time_info'] = {'period': 'unknown', 'season': 'unknown'}
                     situation['weather'] = 'unknown'
                     situation['datetime'] = None
+                break
         except Exception as e:
             logger.warning(f"Failed to get time data: {e}")
             situation['time_info'] = {'period': 'unknown', 'season': 'unknown'}
@@ -710,12 +707,14 @@ class ActivityManager:
         except Exception:
             current_view = None
 
-        # Resources: canonicalize instance names to base type by stripping trailing digits
+        # Resources: extract base resource name (strips trailing digits for WorldMap, keeps full name for custom names)
         if current_view:
             try:
                 for res in current_view.get('resources', []) or []:
                     nm = res.get('name') if isinstance(res, dict) else None
                     if isinstance(nm, str) and nm:
+                        # Strip trailing digits only if they exist (e.g., Farm3 -> Farm)
+                        # Keep full name for custom names (e.g., neural-attention stays as-is)
                         base = nm.rstrip('0123456789') or nm
                         candidate_primitives.add(base.lower())
             except Exception:

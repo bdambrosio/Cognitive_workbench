@@ -132,7 +132,7 @@ class ZenohMemoryNode:
         
         # Queryable for RAG semantic search (character-specific)
         self.rag_search_storage = self.session.declare_queryable(
-            f"cognitive/{character_name}/memory/rag/search/*",
+            f"cognitive/{character_name}/memory/rag/search",
             self.handle_rag_search_query
         )
         
@@ -591,21 +591,6 @@ class ZenohMemoryNode:
                 except Exception as e:
                     logger.error(f'Error parsing query parameter: {e}')
                     for handler in logger.handlers: handler.flush()
-            # Extract k
-            if 'k=' in selector:
-                try:
-                    k = int(selector.split('k=')[1].split('&')[0])
-                except Exception as e:
-                    logger.error(f'Error parsing k parameter: {e}')
-                    for handler in logger.handlers: handler.flush()
-            # Extract space
-            if 'space=' in selector:
-                try:
-                    import urllib.parse
-                    space = urllib.parse.unquote(selector.split('space=')[1].split('&')[0])
-                except Exception as e:
-                    logger.error(f'Error parsing space parameter: {e}')
-                    for handler in logger.handlers: handler.flush()
             # Extract entity filter
             if 'entity=' in selector:
                 try:
@@ -640,8 +625,8 @@ class ZenohMemoryNode:
                     'count': 0,
                     'query': query_text
                 }
-                query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
-                for handler in logger.handlers: handler.flush()
+                payload = json.dumps(response).encode("utf-8")
+                query.reply(query.key_expr, payload)
                 return
             
             # Parse and filter results

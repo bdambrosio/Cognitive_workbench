@@ -108,7 +108,7 @@
             "env": {
                 "PYTHONPATH": "${workspaceFolder}/src"
             },
-            "args": ["jill.yaml", "--ui", "--map-file", "lab.py"],
+            "args": ["jill.yaml", "--ui", "--map-file", "infolab.py"],
             "justMyCode": false,
             "stopOnEntry": false,
             "preLaunchTask": "setup-zenoh-environment"
@@ -218,6 +218,21 @@
                 "PYTHONPATH": "${workspaceFolder}/src"
             },
             "args": ["--v2", "--microbatch", "5", "--plans", "data/Michel-plans.jsonl", "--seed", "42", "--s1_out", "data/reflection_stage1.json"],
+            "justMyCode": false,
+            "stopOnEntry": false,
+            "preLaunchTask": "setup-zenoh-environment"
+        },
+        {
+            "name": "Infospace",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/maps/infolab.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/src",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src"
+            },
+            "args": ["/home/bruce/Downloads/Cognitive_workbench/src/maps/skills"],
             "justMyCode": false,
             "stopOnEntry": false,
             "preLaunchTask": "setup-zenoh-environment"

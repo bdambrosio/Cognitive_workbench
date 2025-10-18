@@ -405,7 +405,7 @@ REASONING: [explanation]
 
 
 REWRITE_TEMPLATE = """Task: rewrite an activity step into a concise goal statement using only allowed nouns and verbs.
-Output: a goal statement text string. Do not include any other text, introductory, explanatory, markdown, code fences, etc.
+Output: a hash-formattedgoal statement string. Do not include any other text, reasoning, introductory, explanatory, markdown, code fences, etc.
 
 INPUTS
 ------
@@ -462,8 +462,10 @@ be careful to insert line breaks only where shown, separating a value from the n
 #termination: 5–6 words; MUST be a checkable condition phrased with ONTOLOGY terms (e.g., “Reached ForestEdge within visibility” or “Acquired Edible from Appletree7”).
 ##
 
-Respond ONLY with the above hash-formatted text.
-end your response with </end>
+Again, the activity step to be rewritten is:
+{{$step_to_rewrite}}
+
+Respond ONLY with the above hash-formatted text. Do not output any reasoning.
 """
 
 GOAL_TEMPLATE = """What is the most relevant thing you should work on next? 
@@ -714,30 +716,7 @@ Instructions:
 Generate a score in [0.0,1.0] where 1.0 means perfectly aligned, 0.0 means completely unrelated. Use very concise rationales.
 Return ONLY a JSON object: {"score": float, "rationale": a terse string}"""
 
-WORLD_STATE_UPDATE_TEMPLATE = """The task is to update the world state based on the following update.
 
-#World state:
-{{$current_world_state}}
-
-#Action:
-{{$action}}
-
-#Update:
-{{$update_text}}
-
-#Simulation time:
-{{$simulation_time}}
-
-#Setting:
-{{$setting}}
-
-DIRECTIVE:
-Respond with a complete updated world state consistent with the update.
-Do not include any changes to the individual performing the action.
-Limit your response to 150 words.
-Respond only in text, with no JSON, formatting, or introductory or explanatory text.
-Return ONLY the updated world state.
-"""
 WORLD_STATE_UPDATE_TEMPLATE = """The task is to update the world state based on the following update.
 
 #World state:

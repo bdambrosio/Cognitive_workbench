@@ -53,8 +53,6 @@ logger = logging.getLogger('perception_node')
 
 # Prompt template for comparing predictions against actual results
 
-
-
 class ZenohPerceptionNode:
     """
     The Perception node processes sensory input and builds perceptual models.
@@ -107,7 +105,15 @@ class ZenohPerceptionNode:
             self.action_result_callback
         )
         
+        # Publisher for action anomalies (character-specific)
+        self.action_anomaly_publisher = self.session.declare_publisher(
+            f"cognitive/{character_name}/perception/action_anomaly"
+        )
+        
         logger.info(f'✅ {self.character_name} perception_node ready')
+        logger.info(f'   - Subscribing to: cognitive/{character_name}/sense_data')
+        logger.info(f'   - Subscribing to: cognitive/{character_name}/perception/action_result')
+        logger.info(f'   - Publishing to: cognitive/{character_name}/perception/action_anomaly')
     
     def sense_data_callback(self, sample):
         """Handle incoming sense data from the environment."""
@@ -166,7 +172,18 @@ Are these significantly different? Answer 'yes' or 'no', followed by a brief exp
                     timeout=30.0
                 )
                 if response.success:
-                    logger.warning(f'⚠️ Significant prediction mismatch for {action_type}: {response.text}')
+                    # Publish action anomaly with LLM comparison
+                    anomaly_payload = {
+                        'action': action,
+                        'update_text': update_text,
+                        'response': response.text
+                    }
+                    self.action_anomaly_publisher.put(json.dumps(anomaly_payload))
+                    
+                    if response.text.strip().lower().startswith('yes'):
+                        logger.warning(f'Significant prediction mismatch for {action_type}: {response.text}')
+                    else:
+                        logger.info(f'Prediction match for {action_type}: {response.text}')
             
         except Exception as e:
             logger.error(f'Error processing action_result: {e}')

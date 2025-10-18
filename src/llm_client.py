@@ -130,6 +130,19 @@ class ZenohLLMClient:
                     message_objects.append(UserMessage(content=message))
  
             result = self.ask(bindings, message_objects, max_tokens=max_tokens, temp=temperature, stops=stops, is_json=is_json, log=True, trace=False)
+            
+            # Check if result is None, empty string, or empty dict - retry once if so
+            if result is None or result == "" or result == {}:
+                logger.error(f'❌ LLM returned empty result (None/empty string/empty dict), retrying once...')
+                time.sleep(1.0)  # Brief backoff
+                result = self.ask(bindings, message_objects, max_tokens=max_tokens, temp=temperature, stops=stops, is_json=is_json, log=True, trace=False)
+                
+                # Check retry result
+                if result is None or result == "" or result == {}:
+                    logger.error(f'❌ LLM returned empty result on retry, giving up')
+                else:
+                    logger.info(f'✅ LLM request succeeded on retry after empty result')
+            
             """future = self.generate_async(messages, bindings, max_tokens, temperature, stops, is_json))
             timeout_value = timeout or self.service_timeout
             result = future.result(timeout=max(timeout_value, 200.0))
