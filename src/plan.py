@@ -524,7 +524,7 @@ REQ_KEYS = {
     "take": {"type", "target", "prediction"},
     "place": {"type", "target", "prediction"},
     "inspect": {"type", "target", "reason", "prediction"},
-    "use": {"type", "target", "reason", "prediction"},
+    "use": {"type", "target", "reason", "out", "prediction"},
     "scan": {"type", "target", "out", "prediction"},
     "while": {"type", "body", "condition"},
     "wait": {"type", "condition"},
@@ -541,7 +541,7 @@ OPTIONAL_KEYS = {
     "place": {"reason", "value"},
     "inspect": {"reason", "value"},
     "use": {"reason", "value"},
-    "scan": set(),  # scan has no optional keys
+    "scan": {"reason"},  # scan has no optional keys
     "while": {"reason", "value"},
     "wait": {"reason", "target", "value"},
     "if": {"else"},
@@ -706,7 +706,9 @@ Respond only with a JSON plan according to the provided PLAN_TEMPLATE. No prose 
         allowed_types.extend(character.map_types.get('infrastructure_types', []))
         allowed_types.extend(character.map_types.get('property_types', []))
         allowed_types.extend(character.map_types.get('character_names', []))
-
+        skills = character.map_types.get('skills', [])
+        for skill in skills:
+            allowed_types.append(skill['name'])
         parts.append("\n#ALLOWED SCAN TARGETS (types)\n" + "\n".join(allowed_types)+"\n##")
         parts.append("\n#Plan syntax specification:\n" + str(PLAN_TEMPLATE))
         parts.append("\nRespond only with JSON, no other text. End with </end>\n")
@@ -714,7 +716,7 @@ Respond only with a JSON plan according to the provided PLAN_TEMPLATE. No prose 
 
         llm = LLM(server_name=server_name, model_name=model_name)
         response = llm.ask(
-            {},
+            {"skills": json.dumps(skills)},
             [SystemMessage(content=system_prompt), UserMessage(content=user_prompt)],
             max_tokens=1500,
             stops=['</end>'],
@@ -848,8 +850,8 @@ def _evaluate_condition(character: ZenohExecutiveNode, condition: dict, observat
         def _target_matches(name: str, target_str: str) -> bool:
             if not isinstance(name, str) or not isinstance(target_str, str):
                 return False
-            # For non-scan semantics: always require exact id equality
-            return name == target_str
+            # Case-insensitive comparison to handle hyphenated names
+            return name.lower() == target_str.lower()
         
         # NEW: binding test conditions
         if normalized_type == 'bound':
@@ -870,27 +872,27 @@ def _evaluate_condition(character: ZenohExecutiveNode, condition: dict, observat
             try:
                 if not getattr(character, 'last_situation_data', None):
                     return None
-                tcap = tgt.capitalize() if isinstance(tgt, str) else tgt
+                tgt_lower = tgt.lower() if isinstance(tgt, str) else tgt
                 data = character.last_situation_data or {}
                 for view in data.get('views', []):
                     if 'characters' in view:
                         for c in view['characters']:
                             nm = c.get('name', '')
-                            if nm and (nm == tcap or tcap == 'Person'):
+                            if nm and (nm.lower() == tgt_lower or tgt_lower == 'person'):
                                 return nm
                     if 'resources' in view:
                         for r in view['resources']:
                             nm = r.get('name', '')
-                            if nm and _target_matches(nm, tcap):
+                            if nm and _target_matches(nm, tgt):
                                 return nm
                     if 'paths' in view:
                         for p in view['paths']:
                             nm = p.get('name', '')
-                            if nm and nm == tcap:
+                            if nm and _target_matches(nm, tgt):
                                 return nm
                     if 'terrain' in view:
                         terr = view.get('terrain')
-                        if isinstance(terr, str) and terr == tcap:
+                        if isinstance(terr, str) and terr.lower() == tgt_lower:
                             return terr
                 return None
             except Exception:
@@ -900,28 +902,28 @@ def _evaluate_condition(character: ZenohExecutiveNode, condition: dict, observat
             try:
                 if not getattr(character, 'last_situation_data', None):
                     return None
-                tcap = tgt.capitalize() if isinstance(tgt, str) else tgt
+                tgt_lower = tgt.lower() if isinstance(tgt, str) else tgt
                 data = character.last_situation_data or {}
                 for view in data.get('views', []):
                     if 'characters' in view:
                         for c in view['characters']:
-                            if float(c.get('distance', 20)) <= 2 and (c.get('name', '') == tcap or tcap == 'Person'):
+                            if float(c.get('distance', 20)) <= 2 and (c.get('name', '').lower() == tgt_lower or tgt_lower == 'person'):
                                 return c.get('name', '')
                     if 'resources' in view:
                         for r in view['resources']:
                             if float(r.get('distance', 20)) <= 2:
                                 nm = r.get('name', '')
-                                if nm and _target_matches(nm, tcap):
+                                if nm and _target_matches(nm, tgt):
                                     return nm
                     if 'paths' in view:
                         for p in view['paths']:
                             if float(p.get('distance', 20)) <= 2:
                                 nm = p.get('name', '')
-                                if nm and _target_matches(nm, tcap):
+                                if nm and _target_matches(nm, tgt):
                                     return nm
                     if 'terrain' in view:
                         terr = view.get('terrain')
-                        if isinstance(terr, str) and terr == tcap:
+                        if isinstance(terr, str) and terr.lower() == tgt_lower:
                             return terr
                 return None
             except Exception:
@@ -931,28 +933,28 @@ def _evaluate_condition(character: ZenohExecutiveNode, condition: dict, observat
             try:
                 if not getattr(character, 'last_situation_data', None):
                     return None
-                tcap = tgt.capitalize() if isinstance(tgt, str) else tgt
+                tgt_lower = tgt.lower() if isinstance(tgt, str) else tgt
                 data = character.last_situation_data or {}
                 for view in data.get('views', []):
                     if 'characters' in view:
                         for c in view['characters']:
-                            if float(c.get('distance', 20)) <= 1 and (c.get('name', '') == tcap or tcap == 'Person'):
+                            if float(c.get('distance', 20)) <= 1 and (c.get('name', '').lower() == tgt_lower or tgt_lower == 'person'):
                                 return c.get('name', '')
                     if 'resources' in view:
                         for r in view['resources']:
                             if float(r.get('distance', 20)) <= 2:
                                 nm = r.get('name', '')
-                                if nm and _target_matches(nm, tcap):
+                                if nm and _target_matches(nm, tgt):
                                     return nm
                     if 'paths' in view:
                         for p in view['paths']:
                             if float(p.get('distance', 20)) <= 2:
                                 nm = p.get('name', '')
-                                if nm and _target_matches(nm, tcap):
+                                if nm and _target_matches(nm, tgt):
                                     return nm
                     if 'terrain' in view:
                         terr = view.get('terrain')
-                        if isinstance(terr, str) and terr == tcap:
+                        if isinstance(terr, str) and terr.lower() == tgt_lower:
                             return terr
                 return None
             except Exception:

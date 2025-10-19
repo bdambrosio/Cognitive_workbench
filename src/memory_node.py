@@ -570,6 +570,51 @@ class ZenohMemoryNode:
             }
             query.reply(query.key_expr, json.dumps(error_response).encode('utf-8'))
     
+    def store_skill_result(self, skill_name: str, value_input: str, 
+                          result: dict, timestamp: datetime):
+        """
+        Stub for skill output storage.
+        
+        This method will eventually manage the agent's internal information space,
+        including storage, retrieval, organization, and skill output chaining.
+        
+        Future implementation will address:
+        - Structured storage of skill results in memory
+        - Indexing by skill_name, timestamp, input summary
+        - Semantic search over skill results
+        - Support for infospace navigation queries
+        - Skill output chaining (using output of skill A as input to skill B)
+        - Integration with agent's knowledge base and working memory
+        
+        Args:
+            skill_name: Name of the skill that was executed
+            value_input: Input value that was provided to the skill
+            result: Result dictionary from skill execution
+            timestamp: When the skill was executed
+            
+        Phase 2 TODO:
+        - Design internal infospace topology for knowledge organization
+        - Implement skill result persistence layer
+        - Add retrieval patterns (by skill, by time, by semantic similarity)
+        - Support skill chaining workflows
+        """
+        # Simple logging for Phase 1
+        logger.info(f"📚 Skill result: {skill_name}")
+        logger.debug(f"  Input: {value_input[:100] if value_input else 'None'}...")
+        logger.debug(f"  Success: {result.get('success', False)}")
+        logger.debug(f"  Timestamp: {timestamp}")
+        
+        # TODO Phase 2: Implement actual storage
+        # Proposed structure:
+        # self.skill_results[skill_name].append({
+        #     'timestamp': timestamp,
+        #     'input': value_input,
+        #     'result': result,
+        #     'embedding': generate_embedding(value_input + str(result)),
+        #     'summary': summarize_result(result)
+        # })
+        pass
+    
     def handle_rag_search_query(self, query):
         """Handle RAG semantic search queries."""
         import time

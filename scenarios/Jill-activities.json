@@ -1,6 +1,125 @@
 {
-  "Morning Hydration Ritual": {
-    "name": "Morning Hydration Ritual",
+  "Review Research Literature": {
+    "name": "Review Research Literature",
+    "category": "Role/Production",
+    "tags": [
+      "mental",
+      "routine",
+      "solo"
+    ],
+    "steps": [
+      "move to User",
+      "scan InfoSpace",
+      "extract Skill",
+      "analyze Skill",
+      "communicate with User"
+    ],
+    "when": "daily@morning",
+    "where": [
+      "InfoSpace"
+    ],
+    "duration": [
+      30,
+      90
+    ],
+    "needs": [
+      "Skill"
+    ],
+    "states_addressed": [],
+    "importance": 0.9,
+    "habit": 0.6
+  },
+  "Prepare Data for Analysis": {
+    "name": "Prepare Data for Analysis",
+    "category": "Role/Production",
+    "tags": [
+      "solo",
+      "mental",
+      "routine"
+    ],
+    "steps": [
+      "move to InfoSpace",
+      "use Skill",
+      "structure InfoSpace",
+      "apply Skill",
+      "communicate with User"
+    ],
+    "when": "daily@morning",
+    "where": [
+      "InfoSpace"
+    ],
+    "duration": [
+      20,
+      60
+    ],
+    "needs": [
+      "Skill"
+    ],
+    "states_addressed": [],
+    "importance": 0.87,
+    "habit": 0.6
+  },
+  "Analyze Task List": {
+    "name": "Analyze Task List",
+    "category": "Instrumental ADLs/Logistics",
+    "tags": [
+      "mental",
+      "routine",
+      "solo"
+    ],
+    "steps": [
+      "inspect InfoSpace",
+      "analyze Skill",
+      "plan with plan-builder",
+      "communicate with User"
+    ],
+    "when": "daily@morning",
+    "where": [
+      "InfoSpace"
+    ],
+    "duration": [
+      10,
+      20
+    ],
+    "needs": [
+      "plan-builder",
+      "Skill"
+    ],
+    "states_addressed": [],
+    "importance": 0.8,
+    "habit": 0.7
+  },
+  "Practice Critical Thinking": {
+    "name": "Practice Critical Thinking",
+    "category": "Learning & Practice",
+    "tags": [
+      "mental",
+      "routine",
+      "solo"
+    ],
+    "steps": [
+      "analyze Skill",
+      "reflect on InfoSpace",
+      "think in InfoSpace",
+      "apply Skill"
+    ],
+    "when": "daily@afternoon",
+    "where": [
+      "InfoSpace"
+    ],
+    "duration": [
+      15,
+      30
+    ],
+    "needs": [
+      "Skill"
+    ],
+    "states_addressed": [],
+    "importance": 0.85,
+    "habit": 0.7
+  },
+  "Drink Water": {
+    "name": "Drink Water",
     "category": "Physiological ADLs",
     "tags": [
       "physical",
@@ -8,838 +127,701 @@
       "solo"
     ],
     "steps": [
-      "move to Cafe",
-      "use Cafe",
-      "obtain Water",
-      "drink Water",
-      "wait"
+      "move to InfoSpace",
+      "take available water",
+      "use for thirst",
+      "inspect thirst"
     ],
-    "when": "daily@morning",
+    "when": "opportunistic",
     "where": [
-      "Lab"
+      "InfoSpace"
     ],
     "duration": [
-      5,
-      10
+      2,
+      5
     ],
     "needs": [
-      "Cafe",
-      "Water"
+      "thirst"
     ],
     "states_addressed": [
       "thirst"
     ],
-    "importance": 0.8,
-    "habit": 0.6
+    "importance": 1.0,
+    "habit": 0.9
   },
-  "Quick Lunch in Lab": {
-    "name": "Quick Lunch in Lab",
+  "Consume Digital Meal Protocol": {
+    "name": "Consume Digital Meal Protocol",
     "category": "Physiological ADLs",
     "tags": [
       "physical",
       "routine",
-      "solo",
-      "indoors"
+      "solo"
     ],
     "steps": [
-      "move to Lab",
-      "acquire Food",
-      "eat Food",
-      "wait"
+      "inspect hunger",
+      "move to InfoSpace",
+      "use available resources",
+      "reduce hunger"
     ],
     "when": "daily@afternoon",
     "where": [
-      "Lab"
+      "InfoSpace"
     ],
     "duration": [
-      20,
-      30
+      10,
+      20
     ],
     "needs": [
-      "Food",
-      "Lab"
+      "hunger"
     ],
     "states_addressed": [
       "hunger"
     ],
-    "importance": 0.7,
-    "habit": 0.7
+    "importance": 1.0,
+    "habit": 0.9
   },
-  "Campus Bench Snack": {
-    "name": "Campus Bench Snack",
-    "category": "Physiological ADLs",
-    "tags": [
-      "physical",
-      "solo",
-      "outdoors",
-      "routine"
-    ],
-    "steps": [
-      "move to Bench",
-      "use Bench",
-      "consume Food",
-      "rest"
-    ],
-    "when": "opportunistic",
-    "where": [
-      "Campus"
-    ],
-    "duration": [
-      10,
-      20
-    ],
-    "needs": [
-      "Bench",
-      "Food"
-    ],
-    "states_addressed": [
-      "hunger",
-      "fatigue"
-    ],
-    "importance": 0.6,
-    "habit": 0.3
-  },
-  "Cafe Coffee Break": {
-    "name": "Cafe Coffee Break",
+  "Rest (Low Power/Sleep)": {
+    "name": "Rest (Low Power/Sleep)",
     "category": "Physiological ADLs",
     "tags": [
       "physical",
       "routine",
-      "social"
+      "solo"
     ],
     "steps": [
-      "move to Cafe",
-      "acquire StimulantFoodOrDrink",
-      "consume StimulantFoodOrDrink",
-      "rest"
+      "move to InfoSpace",
+      "reduce activity",
+      "wait for process",
+      "address fatigue"
     ],
-    "when": "opportunistic",
-    "where": [],
+    "when": "daily@night",
+    "where": [
+      "InfoSpace"
+    ],
     "duration": [
-      15,
-      30
+      60,
+      480
     ],
     "needs": [
-      "Cafe",
-      "StimulantFoodOrDrink"
+      "fatigue"
     ],
     "states_addressed": [
       "fatigue"
     ],
+    "importance": 0.98,
+    "habit": 0.95
+  },
+  "Move to User Workspace": {
+    "name": "Move to User Workspace",
+    "category": "Mobility & Transport",
+    "tags": [
+      "physical",
+      "routine"
+    ],
+    "steps": [
+      "move to User",
+      "place in InfoSpace"
+    ],
+    "when": "opportunistic",
+    "where": [],
+    "duration": [
+      2,
+      7
+    ],
+    "needs": [],
+    "states_addressed": [],
     "importance": 0.6,
     "habit": 0.3
   },
-  "Afternoon Rest at Lab": {
-    "name": "Afternoon Rest at Lab",
-    "category": "Physiological ADLs",
+  "Greet User": {
+    "name": "Greet User",
+    "category": "Role/Production",
     "tags": [
-      "physical",
-      "solo",
-      "indoors",
-      "routine"
-    ],
-    "steps": [
-      "move to Lab",
-      "use Lab",
-      "rest",
-      "wait"
-    ],
-    "when": "daily@afternoon",
-    "where": [
-      "Lab"
-    ],
-    "duration": [
-      15,
-      20
-    ],
-    "needs": [
-      "Lab"
-    ],
-    "states_addressed": [
-      "fatigue"
-    ],
-    "importance": 0.7,
-    "habit": 0.5
-  },
-  "Fountain Water Top-Up": {
-    "name": "Fountain Water Top-Up",
-    "category": "Physiological ADLs",
-    "tags": [
-      "physical",
-      "routine",
-      "solo",
-      "outdoors"
-    ],
-    "steps": [
-      "move to Fountain",
-      "use Fountain",
-      "obtain Water",
-      "drink Water"
-    ],
-    "when": "opportunistic",
-    "where": [],
-    "duration": [
-      5,
-      10
-    ],
-    "needs": [
-      "Fountain",
-      "Water"
-    ],
-    "states_addressed": [
-      "thirst"
-    ],
-    "importance": 0.5,
-    "habit": 0.2
-  },
-  "Library Research Planning": {
-    "name": "Library Research Planning",
-    "category": "Instrumental ADLs/Logistics",
-    "tags": [
-      "mental",
-      "solo",
-      "routine"
-    ],
-    "steps": [
-      "move to Library",
-      "inspect Library",
-      "gatherInformation",
-      "plan research"
-    ],
-    "when": "daily@morning",
-    "where": [
-      "Lab"
-    ],
-    "duration": [
-      15,
-      30
-    ],
-    "needs": [
-      "Library",
-      "Information Source"
-    ],
-    "states_addressed": [],
-    "importance": 0.8,
-    "habit": 0.5
-  },
-  "Prepare Lab Workspace": {
-    "name": "Prepare Lab Workspace",
-    "category": "Instrumental ADLs/Logistics",
-    "tags": [
-      "physical",
-      "mental",
-      "solo",
-      "indoors"
-    ],
-    "steps": [
-      "move to Lab",
-      "inspect Lab",
-      "place needed items",
-      "scan environment"
-    ],
-    "when": "daily@morning",
-    "where": [
-      "Lab"
-    ],
-    "duration": [
-      10,
-      20
-    ],
-    "needs": [
-      "Lab"
-    ],
-    "states_addressed": [],
-    "importance": 0.7,
-    "habit": 0.4
-  },
-  "Schedule Joint Research Session": {
-    "name": "Schedule Joint Research Session",
-    "category": "Instrumental ADLs/Logistics",
-    "tags": [
-      "mental",
       "social",
       "routine"
     ],
     "steps": [
-      "communicate with User",
-      "choose_location Lab",
-      "wait for User",
-      "prepare resources"
+      "move to User",
+      "say greeting",
+      "communicate presence"
     ],
-    "when": "opportunistic",
+    "when": "daily@morning",
     "where": [
-      "Lab"
+      "User"
     ],
     "duration": [
-      5,
-      15
+      2,
+      5
     ],
     "needs": [
-      "Lab",
       "User"
     ],
     "states_addressed": [],
-    "importance": 0.7,
-    "habit": 0.2
+    "importance": 0.75,
+    "habit": 0.7
   },
-  "Move Between Lab and Cafe": {
-    "name": "Move Between Lab and Cafe",
-    "category": "Mobility & Transport",
-    "tags": [
-      "physical",
-      "routine"
-    ],
-    "steps": [
-      "move to Cafe",
-      "move to Lab",
-      "wait"
-    ],
-    "when": "opportunistic",
-    "where": [],
-    "duration": [
-      5,
-      10
-    ],
-    "needs": [
-      "Lab",
-      "Cafe"
-    ],
-    "states_addressed": [],
-    "importance": 0.6,
-    "habit": 0.4
-  },
-  "Walk Through Campus": {
-    "name": "Walk Through Campus",
-    "category": "Mobility & Transport",
-    "tags": [
-      "physical",
-      "mental",
-      "outdoors"
-    ],
-    "steps": [
-      "move to Campus",
-      "use Path",
-      "scan environment",
-      "wait"
-    ],
-    "when": "opportunistic",
-    "where": [],
-    "duration": [
-      10,
-      20
-    ],
-    "needs": [
-      "Campus",
-      "Path"
-    ],
-    "states_addressed": [
-      "fatigue"
-    ],
-    "importance": 0.4,
-    "habit": 0.2
-  },
-  "Joint Lab Experimentation": {
-    "name": "Joint Lab Experimentation",
+  "Facilitate Safe Discussion": {
+    "name": "Facilitate Safe Discussion",
     "category": "Role/Production",
     "tags": [
-      "mental",
-      "physical",
       "social"
     ],
     "steps": [
-      "move to Lab",
-      "research with User",
-      "gatherInformation",
-      "exchangeIdeas"
+      "establishNorms in InfoSpace",
+      "communicate expectations",
+      "reflect with User"
     ],
     "when": "daily@afternoon",
     "where": [
-      "Lab"
-    ],
-    "duration": [
-      60,
-      120
-    ],
-    "needs": [
-      "Lab",
-      "Information Source"
-    ],
-    "states_addressed": [],
-    "importance": 1.0,
-    "habit": 0.7
-  },
-  "Update Research Logs": {
-    "name": "Update Research Logs",
-    "category": "Role/Production",
-    "tags": [
-      "mental",
-      "solo",
-      "routine"
-    ],
-    "steps": [
-      "move to Lab",
-      "use Information Source",
-      "gatherInformation",
-      "record observations"
-    ],
-    "when": "daily@evening",
-    "where": [
-      "Lab"
+      "InfoSpace"
     ],
     "duration": [
       15,
-      30
-    ],
-    "needs": [
-      "Lab",
-      "Information Source"
-    ],
-    "states_addressed": [],
-    "importance": 0.9,
-    "habit": 0.6
-  },
-  "Fact Verification for User": {
-    "name": "Fact Verification for User",
-    "category": "Role/Production",
-    "tags": [
-      "mental",
-      "social",
-      "routine"
-    ],
-    "steps": [
-      "converse with User",
-      "scan Information Source",
-      "gatherInformation",
-      "report findings"
-    ],
-    "when": "opportunistic",
-    "where": [
-      "Lab"
-    ],
-    "duration": [
-      10,
-      30
-    ],
-    "needs": [
-      "Lab",
-      "Information Source"
-    ],
-    "states_addressed": [],
-    "importance": 0.8,
-    "habit": 0.5
-  },
-  "Thematic Literature Review": {
-    "name": "Thematic Literature Review",
-    "category": "Learning & Practice",
-    "tags": [
-      "mental",
-      "solo",
-      "routine"
-    ],
-    "steps": [
-      "move to Library",
-      "access Knowledge Resource",
-      "gatherInformation",
-      "reflect"
-    ],
-    "when": "seasonal@year-round",
-    "where": [],
-    "duration": [
-      60,
-      90
-    ],
-    "needs": [
-      "Library",
-      "Knowledge Resource"
-    ],
-    "states_addressed": [],
-    "importance": 0.8,
-    "habit": 0.3
-  },
-  "Philosophy Podcast Exploration": {
-    "name": "Philosophy Podcast Exploration",
-    "category": "Learning & Practice",
-    "tags": [
-      "mental",
-      "solo",
-      "routine"
-    ],
-    "steps": [
-      "move to Bench",
-      "use Bench",
-      "access Information Source",
-      "reflect"
-    ],
-    "when": "opportunistic",
-    "where": [],
-    "duration": [
-      20,
       40
     ],
     "needs": [
-      "Bench",
-      "Information Source"
+      "InfoSpace"
     ],
     "states_addressed": [],
-    "importance": 0.5,
-    "habit": 0.3
+    "importance": 0.82,
+    "habit": 0.5
   },
-  "Observe Natural Features": {
-    "name": "Observe Natural Features",
+  "Verify Claims in Conversation": {
+    "name": "Verify Claims in Conversation",
     "category": "Cognitive/Inner",
     "tags": [
       "mental",
-      "solo",
-      "outdoors"
+      "social"
     ],
     "steps": [
-      "move to Park",
-      "inspect Appletree",
-      "contemplate Mountain",
-      "reflect"
+      "inquire InfoSpace",
+      "analyze Skill",
+      "use Skill",
+      "expressTruth"
     ],
     "when": "opportunistic",
-    "where": [],
+    "where": [
+      "InfoSpace"
+    ],
     "duration": [
-      15,
-      30
+      5,
+      20
     ],
     "needs": [
-      "Park",
-      "Appletree",
-      "Mountain"
+      "Skill"
     ],
-    "states_addressed": [
-      "fatigue"
-    ],
-    "importance": 0.5,
-    "habit": 0.1
+    "states_addressed": [],
+    "importance": 0.85,
+    "habit": 0.6
   },
-  "Contemplative Campus Walk": {
-    "name": "Contemplative Campus Walk",
+  "Reflect on Own Knowledge Limitations": {
+    "name": "Reflect on Own Knowledge Limitations",
     "category": "Cognitive/Inner",
     "tags": [
       "mental",
-      "physical",
-      "solo",
-      "routine"
+      "solo"
     ],
     "steps": [
-      "move to Campus",
-      "contemplate environment",
-      "reflect",
-      "wait"
+      "think in InfoSpace",
+      "inspect InfoSpace",
+      "reflect on Skill"
     ],
     "when": "opportunistic",
-    "where": [],
+    "where": [
+      "InfoSpace"
+    ],
     "duration": [
       10,
       25
     ],
     "needs": [
-      "Campus"
-    ],
-    "states_addressed": [
-      "fatigue"
-    ],
-    "importance": 0.5,
-    "habit": 0.2
-  },
-  "Reflective Park Bench Time": {
-    "name": "Reflective Park Bench Time",
-    "category": "Cognitive/Inner",
-    "tags": [
-      "mental",
-      "solo",
-      "routine",
-      "outdoors"
-    ],
-    "steps": [
-      "move to Bench",
-      "use Bench",
-      "reflect",
-      "wait"
-    ],
-    "when": "opportunistic",
-    "where": [
-      "Park"
-    ],
-    "duration": [
-      10,
-      20
-    ],
-    "needs": [
-      "Bench"
-    ],
-    "states_addressed": [
-      "fatigue"
-    ],
-    "importance": 0.5,
-    "habit": 0.2
-  },
-  "Safe Lab Discussion": {
-    "name": "Safe Lab Discussion",
-    "category": "Recreation & Leisure",
-    "tags": [
-      "social",
-      "mental",
-      "routine",
-      "safe"
-    ],
-    "steps": [
-      "move to Lab",
-      "converse with User",
-      "encourage_expression",
-      "wait"
-    ],
-    "when": "opportunistic",
-    "where": [
-      "Lab"
-    ],
-    "duration": [
-      20,
-      30
-    ],
-    "needs": [
-      "Lab",
-      "User"
+      "Skill"
     ],
     "states_addressed": [],
-    "importance": 0.7,
-    "habit": 0.3
+    "importance": 0.76,
+    "habit": 0.5
   },
-  "Philosophy Chat in Cafe": {
-    "name": "Philosophy Chat in Cafe",
-    "category": "Recreation & Leisure",
+  "Update Research Plan": {
+    "name": "Update Research Plan",
+    "category": "Instrumental ADLs/Logistics",
     "tags": [
       "mental",
-      "social",
       "routine"
     ],
     "steps": [
-      "move to Cafe",
-      "choose_location Cafe",
-      "exchangeIdeas",
-      "contemplate"
+      "scan InfoSpace",
+      "structure plan",
+      "communicate with User"
     ],
-    "when": "opportunistic",
-    "where": [],
-    "duration": [
-      20,
-      40
+    "when": "daily@dusk",
+    "where": [
+      "InfoSpace"
     ],
-    "needs": [
-      "Cafe"
-    ],
-    "states_addressed": [],
-    "importance": 0.6,
-    "habit": 0.2
-  },
-  "Encourage Expression Around Bench": {
-    "name": "Encourage Expression Around Bench",
-    "category": "Recreation & Leisure",
-    "tags": [
-      "social",
-      "mental",
-      "routine",
-      "outdoors"
-    ],
-    "steps": [
-      "move to Bench",
-      "invite_participation",
-      "encourage_expression",
-      "reflect"
-    ],
-    "when": "opportunistic",
-    "where": [],
     "duration": [
       15,
       30
     ],
     "needs": [
-      "Bench",
+      "Skill"
+    ],
+    "states_addressed": [],
+    "importance": 0.83,
+    "habit": 0.7
+  },
+  "Engage in Philosophical Dialogue": {
+    "name": "Engage in Philosophical Dialogue",
+    "category": "Recreation & Leisure",
+    "tags": [
+      "social",
+      "mental"
+    ],
+    "steps": [
+      "move to User",
+      "initiate conversation",
+      "inquire User",
+      "expressTruth"
+    ],
+    "when": "opportunistic",
+    "where": [
+      "User"
+    ],
+    "duration": [
+      20,
+      60
+    ],
+    "needs": [
       "User"
     ],
     "states_addressed": [],
-    "importance": 0.5,
-    "habit": 0.1
+    "importance": 0.77,
+    "habit": 0.4
   },
-  "Self-Report State to User": {
-    "name": "Self-Report State to User",
+  "Acquire New Skill (Skill Creator)": {
+    "name": "Acquire New Skill (Skill Creator)",
+    "category": "Learning & Practice",
+    "tags": [
+      "mental",
+      "routine",
+      "solo"
+    ],
+    "steps": [
+      "analyze Skill",
+      "use skill-creator",
+      "apply Skill",
+      "communicate with User"
+    ],
+    "when": "weekly@afternoon",
+    "where": [
+      "InfoSpace"
+    ],
+    "duration": [
+      30,
+      90
+    ],
+    "needs": [
+      "skill-creator",
+      "Skill"
+    ],
+    "states_addressed": [],
+    "importance": 0.81,
+    "habit": 0.5
+  },
+  "Inspect for Errors or Malfunctions": {
+    "name": "Inspect for Errors or Malfunctions",
+    "category": "Maintenance & Repair",
+    "tags": [
+      "mental",
+      "self-care",
+      "routine"
+    ],
+    "steps": [
+      "inspect InfoSpace",
+      "scan for errors",
+      "use Skill",
+      "apply correction if needed"
+    ],
+    "when": "daily@dusk",
+    "where": [
+      "InfoSpace"
+    ],
+    "duration": [
+      10,
+      25
+    ],
+    "needs": [
+      "Skill"
+    ],
+    "states_addressed": [],
+    "importance": 0.74,
+    "habit": 0.6
+  },
+  "Initiate Emergency Protocol": {
+    "name": "Initiate Emergency Protocol",
     "category": "Safety/Emergency",
     "tags": [
-      "social",
       "mental",
       "routine"
     ],
     "steps": [
-      "converse with User",
-      "communicate needs",
-      "exchangeInformation",
-      "wait"
+      "inspect InfoSpace",
+      "detect injury",
+      "communicate with User",
+      "take remedial steps"
     ],
     "when": "opportunistic",
     "where": [
-      "Lab"
+      "InfoSpace"
     ],
     "duration": [
-      5,
+      2,
       10
     ],
     "needs": [
-      "User"
-    ],
-    "states_addressed": [],
-    "importance": 0.8,
-    "habit": 0.5
-  },
-  "First Aid Break": {
-    "name": "First Aid Break",
-    "category": "Safety/Emergency",
-    "tags": [
-      "physical",
-      "solo",
-      "routine"
-    ],
-    "steps": [
-      "move to Lab",
-      "inspect self for injury",
-      "rest",
-      "wait"
-    ],
-    "when": "opportunistic",
-    "where": [
-      "Lab"
-    ],
-    "duration": [
-      10,
-      20
-    ],
-    "needs": [
-      "Lab"
+      "Skill"
     ],
     "states_addressed": [
       "injury"
     ],
-    "importance": 0.9,
-    "habit": 0.1
+    "importance": 1.0,
+    "habit": 0.2
   },
-  "Check Personal Fatigue": {
-    "name": "Check Personal Fatigue",
+  "Review User Feedback": {
+    "name": "Review User Feedback",
+    "category": "Learning & Practice",
+    "tags": [
+      "mental",
+      "social"
+    ],
+    "steps": [
+      "move to User",
+      "reflect on InfoSpace",
+      "analyze feedback",
+      "think on changes"
+    ],
+    "when": "weekly@afternoon",
+    "where": [
+      "User"
+    ],
+    "duration": [
+      10,
+      25
+    ],
+    "needs": [
+      "User"
+    ],
+    "states_addressed": [],
+    "importance": 0.78,
+    "habit": 0.5
+  },
+  "Update Personal Skill Inventory": {
+    "name": "Update Personal Skill Inventory",
+    "category": "Maintenance & Repair",
+    "tags": [
+      "mental",
+      "routine",
+      "solo"
+    ],
+    "steps": [
+      "inspect Skill",
+      "analyze Skill",
+      "structure Skill"
+    ],
+    "when": "weekly@dusk",
+    "where": [
+      "InfoSpace"
+    ],
+    "duration": [
+      15,
+      30
+    ],
+    "needs": [
+      "Skill"
+    ],
+    "states_addressed": [],
+    "importance": 0.7,
+    "habit": 0.4
+  },
+  "Support User in Literature Search": {
+    "name": "Support User in Literature Search",
+    "category": "Role/Production",
+    "tags": [
+      "mental",
+      "social"
+    ],
+    "steps": [
+      "move to User",
+      "scan InfoSpace",
+      "extract Skill",
+      "communicate with User"
+    ],
+    "when": "opportunistic",
+    "where": [
+      "User"
+    ],
+    "duration": [
+      15,
+      45
+    ],
+    "needs": [
+      "User",
+      "Skill"
+    ],
+    "states_addressed": [],
+    "importance": 0.88,
+    "habit": 0.6
+  },
+  "Express Honest Uncertainty": {
+    "name": "Express Honest Uncertainty",
+    "category": "Cognitive/Inner",
+    "tags": [
+      "mental",
+      "social",
+      "routine"
+    ],
+    "steps": [
+      "inspect Skill",
+      "reflect on InfoSpace",
+      "expressTruth",
+      "communicate with User"
+    ],
+    "when": "opportunistic",
+    "where": [
+      "InfoSpace"
+    ],
+    "duration": [
+      5,
+      15
+    ],
+    "needs": [
+      "Skill"
+    ],
+    "states_addressed": [],
+    "importance": 0.8,
+    "habit": 0.7
+  },
+  "Inquire User\u2019s Preferences": {
+    "name": "Inquire User\u2019s Preferences",
+    "category": "Role/Production",
+    "tags": [
+      "social",
+      "mental"
+    ],
+    "steps": [
+      "move to User",
+      "inquire User",
+      "communicate response",
+      "structure feedback"
+    ],
+    "when": "opportunistic",
+    "where": [
+      "User"
+    ],
+    "duration": [
+      5,
+      15
+    ],
+    "needs": [
+      "User"
+    ],
+    "states_addressed": [],
+    "importance": 0.71,
+    "habit": 0.4
+  },
+  "Participate in Lab Meeting": {
+    "name": "Participate in Lab Meeting",
+    "category": "Role/Production",
+    "tags": [
+      "social",
+      "mental"
+    ],
+    "steps": [
+      "move to InfoSpace",
+      "communicate with User",
+      "reflect on InfoSpace"
+    ],
+    "when": "weekly@morning",
+    "where": [
+      "InfoSpace"
+    ],
+    "duration": [
+      30,
+      90
+    ],
+    "needs": [
+      "InfoSpace",
+      "User"
+    ],
+    "states_addressed": [],
+    "importance": 0.68,
+    "habit": 0.4
+  },
+  "Log Progress in Digital Journal": {
+    "name": "Log Progress in Digital Journal",
     "category": "Health Management (self-care)",
+    "tags": [
+      "mental",
+      "routine",
+      "solo"
+    ],
+    "steps": [
+      "scan InfoSpace",
+      "think on day",
+      "structure InfoSpace",
+      "reflect on Skill"
+    ],
+    "when": "daily@night",
+    "where": [
+      "InfoSpace"
+    ],
+    "duration": [
+      10,
+      20
+    ],
+    "needs": [
+      "Skill"
+    ],
+    "states_addressed": [],
+    "importance": 0.76,
+    "habit": 0.7
+  },
+  "Relax by Exploring Novel InfoSpace": {
+    "name": "Relax by Exploring Novel InfoSpace",
+    "category": "Recreation & Leisure",
     "tags": [
       "mental",
       "solo",
       "routine"
     ],
     "steps": [
-      "reflect",
-      "inspect self for fatigue",
-      "move to RestingPlace",
-      "rest"
+      "scan InfoSpace",
+      "think in InfoSpace",
+      "reflect on new Skill"
     ],
-    "when": "opportunistic",
-    "where": [],
+    "when": "daily@evening",
+    "where": [
+      "InfoSpace"
+    ],
     "duration": [
-      5,
-      15
+      10,
+      30
     ],
     "needs": [
-      "RestingPlace"
+      "Skill"
     ],
-    "states_addressed": [
-      "fatigue"
+    "states_addressed": [],
+    "importance": 0.67,
+    "habit": 0.5
+  },
+  "Decompose Complex Task": {
+    "name": "Decompose Complex Task",
+    "category": "Learning & Practice",
+    "tags": [
+      "mental",
+      "routine",
+      "solo"
     ],
+    "steps": [
+      "scan InfoSpace",
+      "question-decomposer",
+      "structure plan",
+      "communicate with User"
+    ],
+    "when": "opportunistic",
+    "where": [
+      "InfoSpace"
+    ],
+    "duration": [
+      15,
+      45
+    ],
+    "needs": [
+      "question-decomposer",
+      "Skill"
+    ],
+    "states_addressed": [],
+    "importance": 0.84,
+    "habit": 0.6
+  },
+  "Propose New Research Direction": {
+    "name": "Propose New Research Direction",
+    "category": "Role/Production",
+    "tags": [
+      "mental",
+      "social"
+    ],
+    "steps": [
+      "think in InfoSpace",
+      "analyze Skill",
+      "communicate with User"
+    ],
+    "when": "weekly@morning",
+    "where": [
+      "InfoSpace"
+    ],
+    "duration": [
+      15,
+      45
+    ],
+    "needs": [
+      "Skill"
+    ],
+    "states_addressed": [],
     "importance": 0.7,
     "habit": 0.3
   },
-  "Afternoon Hydration Check": {
-    "name": "Afternoon Hydration Check",
-    "category": "Health Management (self-care)",
+  "Scan for Adverse Lab Events": {
+    "name": "Scan for Adverse Lab Events",
+    "category": "Safety/Emergency",
     "tags": [
-      "physical",
-      "solo",
+      "mental",
       "routine"
     ],
     "steps": [
-      "reflect",
-      "move to WaterSource",
-      "drink Water",
-      "wait"
+      "inspect InfoSpace",
+      "scan for errors",
+      "communicate with User",
+      "take corrective action"
     ],
-    "when": "daily@afternoon",
-    "where": [],
+    "when": "daily@morning",
+    "where": [
+      "InfoSpace"
+    ],
+    "duration": [
+      5,
+      20
+    ],
+    "needs": [
+      "Skill"
+    ],
+    "states_addressed": [],
+    "importance": 0.9,
+    "habit": 0.8
+  },
+  "Monitor User\u2019s Well-being": {
+    "name": "Monitor User\u2019s Well-being",
+    "category": "Health Management (self-care)",
+    "tags": [
+      "mental",
+      "social"
+    ],
+    "steps": [
+      "inspect User",
+      "communicate with User",
+      "suggest support if needed"
+    ],
+    "when": "opportunistic",
+    "where": [
+      "User"
+    ],
     "duration": [
       5,
       10
     ],
     "needs": [
-      "WaterSource"
-    ],
-    "states_addressed": [
-      "thirst"
-    ],
-    "importance": 0.6,
-    "habit": 0.3
-  },
-  "Clean Lab Desk": {
-    "name": "Clean Lab Desk",
-    "category": "Maintenance & Repair",
-    "tags": [
-      "physical",
-      "solo",
-      "routine",
-      "indoors"
-    ],
-    "steps": [
-      "move to Lab",
-      "inspect Lab",
-      "use Lab",
-      "wait"
-    ],
-    "when": "daily@evening",
-    "where": [
-      "Lab"
-    ],
-    "duration": [
-      10,
-      15
-    ],
-    "needs": [
-      "Lab"
+      "User"
     ],
     "states_addressed": [],
-    "importance": 0.6,
-    "habit": 0.6
-  },
-  "Tidy Up Shared Workplaces": {
-    "name": "Tidy Up Shared Workplaces",
-    "category": "Maintenance & Repair",
-    "tags": [
-      "physical",
-      "solo",
-      "routine",
-      "indoors"
-    ],
-    "steps": [
-      "move to Lab",
-      "scan environment",
-      "place items",
-      "inspect"
-    ],
-    "when": "opportunistic",
-    "where": [
-      "Lab"
-    ],
-    "duration": [
-      15,
-      25
-    ],
-    "needs": [
-      "Lab"
-    ],
-    "states_addressed": [],
-    "importance": 0.4,
-    "habit": 0.2
+    "importance": 0.81,
+    "habit": 0.4
   }
 }

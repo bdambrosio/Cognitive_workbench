@@ -262,7 +262,7 @@ def create_discourse_ontology(context, map_types, resource_type_str, character_n
 
 
 
-def create_activities(context, map_types, character_name, character, character_drives, characters, ontology):
+def create_activities(context, map_types, resource_type_str, character_name, character, character_drives, characters, ontology):
 
     other_characters_str = ''
     for other_character_name, other_character_desc in characters.items():
@@ -291,6 +291,7 @@ def create_activities(context, map_types, character_name, character, character_d
                                    "plan_template": PLAN_TEMPLATE,
                                    "primitive_nouns": map_types_str,
                                    "primitive_verbs": PLAN_VERBS,
+                                   "primitive_tools": resource_type_str.strip(),
                                    "setting": context},
                     [SystemMessage(content=ACTIVITIES_TEMPLATE)],
                     max_tokens=8000,
