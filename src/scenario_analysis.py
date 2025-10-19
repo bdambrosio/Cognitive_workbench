@@ -98,6 +98,16 @@ def _ensure_map_types(session, scenario: dict):
                     rules_response = rules_response['resource_rules']
                     if 'description' in rules_response:
                         resource_type_str += f": {rules_response['description']}"
+                    
+                    # Special handling for Skills: list all instances
+                    if resource_type.lower() == 'skill' and 'skill_instances' in rules_response:
+                        skill_instances = rules_response['skill_instances']
+                        resource_type_str += f"\n\tAvailable skills ({len(skill_instances)}):"
+                        for skill in skill_instances:
+                            skill_name = skill.get('skill_name', skill.get('name', 'unnamed'))
+                            skill_desc = skill.get('description', '')
+                            resource_type_str += f"\n\t  - {skill_name}: {skill_desc}"
+                    
                     use_effects = ''
                     for effect in rules_response.get('use', []):
                         if use_effects == '':
@@ -207,7 +217,7 @@ def main():
             if not map_types:
                 logger.error("map/types unavailable; cannot create activities")
                 raise RuntimeError("missing map types")
-            activities = create_activities(setting, map_types, name, character_desc, character_drives, characters, ontology)
+            activities = create_activities(setting, map_types, resource_type_str, name, character_desc, character_drives, characters, ontology)
             if not activities:
                 raise RuntimeError("create_activities failed")
             save_activities(name, activities, scenario_dir)

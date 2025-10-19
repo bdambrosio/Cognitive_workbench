@@ -977,6 +977,35 @@ end your response with:
                             result['names'] = names_map[rt_name]
                     except Exception:
                         pass
+                    
+                    # For Skill type, include all skill instances with metadata
+                    if rt_name.lower() == 'skill':
+                        skill_instances = []
+                        for resource_id, resource_data in self.world_map.resource_registry.items():
+                            res_type = resource_data.get('type')
+                            res_type_name = getattr(res_type, 'name', str(res_type))
+                            
+                            if res_type_name.lower() == 'skill':
+                                props = resource_data.get('properties', {})
+                                instance_info = {
+                                    'name': resource_data.get('name', resource_id),
+                                    'description': resource_data.get('description', ''),
+                                    'skill_name': props.get('skill_name', ''),
+                                    'skill_type': props.get('skill_type', 'prompt_augmentation')
+                                }
+                                skill_instances.append(instance_info)
+                        
+                        result['skill_instances'] = skill_instances
+                    
+                    # For all resource types, include skill metadata fields if present
+                    skill_metadata_fields = [
+                        'skill_name', 'skill_type', 'skill_path', 'skill_md_content',
+                        'execution_mode', 'value_type', 'result_type', 
+                        'context_injection', 'entry_point', 'input_format', 'output_format'
+                    ]
+                    for field in skill_metadata_fields:
+                        if field in allocation:
+                            result[field] = allocation[field]
 
                     found = result
                     break
@@ -1498,7 +1527,7 @@ end your response with:
             query.reply(query.key_expr, json.dumps(error_response).encode('utf-8'))
     
     def handle_map_types(self, query):
-        """Handle map types query - returns available terrain, infrastructure, property, and resource types"""
+        """Handle map types query - returns available terrain, infrastructure, property, resource types, and skill instances"""
         try:
             # Get map types from the world map - extract enum member names
             terrain_types = []
@@ -1529,17 +1558,33 @@ end your response with:
                 else:
                     resource_types = [t.name for t in self.world_map.resource_types]
             
+            # Get skill instances with name, description, and type_name
+            skills = []
+            for resource_id, resource_data in self.world_map.resource_registry.items():
+                res_type = resource_data.get('type')
+                res_type_name = getattr(res_type, 'name', str(res_type))
+                
+                if res_type_name.lower() == 'skill':
+                    props = resource_data.get('properties', {})
+                    skill_info = {
+                        'name': resource_data.get('name', resource_id),
+                        'description': resource_data.get('description', ''),
+                        'type_name': props.get('skill_name', '')
+                    }
+                    skills.append(skill_info)
+            
             response = {
                 'success': True,
                 'terrain_types': terrain_types,
                 'infrastructure_types': infrastructure_types,
                 'property_types': property_types,
                 'resource_types': resource_types,
-                'character_names': list(self.agent_registry.keys())
+                'character_names': list(self.agent_registry.keys()),
+                'skills': skills
             }
             
             query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
-            logger.info(f'🗺️ Map types query: returned {len(terrain_types)} terrain, {len(infrastructure_types)} infrastructure, {len(property_types)} property, {len(resource_types)} resource types, {len(self.agent_registry)} characters')
+            logger.info(f'🗺️ Map types query: returned {len(terrain_types)} terrain, {len(infrastructure_types)} infrastructure, {len(property_types)} property, {len(resource_types)} resource types, {len(self.agent_registry)} characters, {len(skills)} skills')
             
         except Exception as e:
             logger.error(f'Error handling map types query: {e}')
@@ -1550,7 +1595,8 @@ end your response with:
                 'infrastructure_types': [],
                 'property_types': [],
                 'resource_types': [],
-                'character_names': []
+                'character_names': [],
+                'skills': []
             }
             query.reply(query.key_expr, json.dumps(error_response).encode('utf-8'))
     

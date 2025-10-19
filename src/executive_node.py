@@ -3064,25 +3064,25 @@ End your response with:
                     
                     # Search through each direction for the target
                     directions = ['North', 'Northeast', 'East', 'Southeast', 'South', 'Southwest', 'West', 'Northwest']
-                    target_name = target.capitalize()
+                    target_lower = target.lower()
                     
                     for view in views:
                         direction = view.get('direction', {})
                         
                         # Check resources in this direction
-                        if view['terrain'] == target_name:
+                        if view['terrain'].lower() == target_lower:
                             return direction
                         
                         if 'resources' in view:
                             for resource in view['resources']:
-                                if resource.get('name') == target_name:
+                                if resource.get('name', '').lower() == target_lower:
                                     logger.info(f'🎯 Found target "{target}" as resource in direction: {direction}')
                                     return direction
                         
                         # Check paths (infrastructure) in this direction
                         if 'paths' in view:
                             for path in view['paths']:
-                                if path.get('name') == target_name:
+                                if path.get('name', '').lower() == target_lower:
                                     logger.info(f'🎯 Found target "{target}" as path in direction: {direction}')
                                     return direction
                         
@@ -3090,7 +3090,7 @@ End your response with:
                         if 'characters' in view:
                             for character in view['characters']:
                                 character_name = character.get('name', '') 
-                                if character_name == target_name:
+                                if character_name.lower() == target_lower:
                                     logger.info(f'🎯 Found target "{target}" as character in direction: {direction}')
                                     return direction
                     
@@ -3371,13 +3371,87 @@ End your response with:
                 self.action_history[-1].result = f'inspect failed'
 
     def use(self, action: dict, target: str, action_data: dict):
-        """Use a resource."""
+        """Use a resource or skill."""
         # Note: Action publication handled by _act() method, not here
         try:
-            system_prompt = self._update_system_prompt()
-            user_prompt = self.observations['dynamic']
+            # Query resource rules to determine if this is a skill
+            rules_response = None
+            resource_type = None
+            skill_config = None
+            
+            try:
+                for reply in self.session.get(f"cognitive/map/resource_rules/{target}", target=QueryTarget.BEST_MATCHING, consolidation=ConsolidationMode.NONE, timeout=3.0 if not self.debug else 300.0):
+                    if reply.ok:
+                        rules_response = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
+                        break
+            except Exception as e:
+                logger.error(f'Error querying resource_rules: {e}')
+            
+            if rules_response and rules_response.get('success'):
+                resource_rules = rules_response.get('resource_rules', {})
+                resource_type = resource_rules.get('resource_type', '').lower()
+                skill_config = resource_rules
+            
+            # Branch: Skill execution or physical resource use
+            if resource_type == 'skill':
+                # SKILL EXECUTION PATH
+                logger.info(f'🧠 Executing skill: {target}')
+                
+                from skill_executor import SkillExecutor
+                executor = SkillExecutor(self)
+                
+                # Extract value parameter from action
+                value = action.get('value')
+                reason = action.get('reason', '')
+                
+                # Execute skill
+                result = executor.execute_skill(
+                    skill_name=target,
+                    value=value,
+                    reason=reason,
+                    skill_config=skill_config
+                )
+                
+                # Format result as outcome text
+                if result['success']:
+                    result_text = result.get('result', '')
+                    if isinstance(result_text, dict):
+                        # For structured results, format nicely
+                        result_text = json.dumps(result_text, indent=2)
+                    elif not isinstance(result_text, str):
+                        result_text = str(result_text)
+                    
+                    outcome_text = f"Skill {target} completed successfully.\nResult: {result_text}"
+                    logger.info(f'✓ {self.character_name} used skill {target}:\n{result_text[:200]}...')
+                else:
+                    outcome_text = f"Skill {target} failed: {result.get('error', 'Unknown error')}"
+                    logger.error(f'✗ Skill {target} failed: {result.get("error")}')
+                
+                # Store result (same flow as physical resources)
+                if self.action_history:
+                    self.action_history[-1].result = outcome_text
+                self.uses[target] = outcome_text
+                
+                # Publish (same flow as physical resources)
+                self.world_state_update_publisher.put(json.dumps({
+                    'action': action,
+                    'update_text': outcome_text
+                }))
+                self.perception_action_result_publisher.put(json.dumps({
+                    'action': action,
+                    'update_text': outcome_text,
+                    'prediction': action.get('prediction', '')
+                }))
+                action_data['response'] = outcome_text
+                
+                return result['success']
+                
+            else:
+                # PHYSICAL RESOURCE PATH (original LLM-based assessment)
+                system_prompt = self._update_system_prompt()
+                user_prompt = self.observations['dynamic']
 
-            directive = f"""You are attempting to use {target}.\n
+                directive = f"""You are attempting to use {target}.\n
 to achieve: {action['reason']}.\n\n 
 respond with a short assessment of the outcome of your attempt to use {target} to achieve {action['reason']}.
 Your assessment may conclude that the use of {target} was successful, or that it was not successful, or that it was not possible to use {target} to achieve {action['reason']}.
@@ -3387,43 +3461,44 @@ Do not include any other introductory, explanatory, discursive, or formatting te
 End your response with: 
 </end>
 """
-            if self.llm_client and not self.shutdown_requested:
-                # Use shorter timeout during shutdown
-                timeout = 5.0 if self.shutdown_requested else None
-                response = self.llm_client.generate(
-                    messages=[system_prompt, user_prompt, directive],
-                    max_tokens=50,
-                    temperature=0.7,
-                    timeout=timeout,
-                    stops=['</end>']
-                )
-                if response.success:
-                    logger.info(f'🤖 {self.character_name} Used {target}:\n\t {response.text}')
-                    if self.action_history:
-                        self.action_history[-1].result = response.text
-                    self.uses[target] = response.text
-                    self.world_state_update_publisher.put(json.dumps({'action': action, 'update_text': response.text}))
-                    self.perception_action_result_publisher.put(json.dumps({
-                        'action': action,
-                        'update_text': response.text,
-                        'prediction': action.get('prediction', '')
-                    }))
-                    action_data['response'] = response.text
-                    return True
+                if self.llm_client and not self.shutdown_requested:
+                    # Use shorter timeout during shutdown
+                    timeout = 5.0 if self.shutdown_requested else None
+                    response = self.llm_client.generate(
+                        messages=[system_prompt, user_prompt, directive],
+                        max_tokens=50,
+                        temperature=0.7,
+                        timeout=timeout,
+                        stops=['</end>']
+                    )
+                    if response.success:
+                        logger.info(f'🤖 {self.character_name} Used {target}:\n\t {response.text}')
+                        if self.action_history:
+                            self.action_history[-1].result = response.text
+                        self.uses[target] = response.text
+                        self.world_state_update_publisher.put(json.dumps({'action': action, 'update_text': response.text}))
+                        self.perception_action_result_publisher.put(json.dumps({
+                            'action': action,
+                            'update_text': response.text,
+                            'prediction': action.get('prediction', '')
+                        }))
+                        action_data['response'] = response.text
+                        return True
+                    else:
+                        logger.error(f'LLM call failed: {response.error}')
                 else:
-                    logger.error(f'LLM call failed: {response.error}')
-            else:
-                logger.error('LLM client not available')
+                    logger.error('LLM client not available')
 
-            logger.info(f'📦 Using {target} for {self.character_name}')
-            if self.action_history:
-                self.action_history[-1].result = f'{response.text}'
-            return True
+                logger.info(f'📦 Using {target} for {self.character_name}')
+                if self.action_history:
+                    self.action_history[-1].result = f'{response.text}'
+                return True
 
         except Exception as e:
             logger.error(f'Error in use operation for {target}: {e}')
             if self.action_history:
                 self.action_history[-1].result = f'use failed'
+            return False
         
     def think_about(self, action: dict):
         """Think about a value."""

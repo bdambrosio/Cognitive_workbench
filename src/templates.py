@@ -295,6 +295,9 @@ You are generating a comprehensive activity list for a character.
 #BASE VERBS:
 {{$primitive_verbs}}
 ##
+#BASE TOOLS AND RESOURCES:
+{{$primitive_tools}}
+##
 ------------- END ONTOLOGY ------------
 
 TASK: Generate 24-40 activities as a JSON object, with the keys being the activity names. Distribute across these categories:
@@ -568,7 +571,8 @@ Meta-spec (strictly observe these rules in your output):
     "place": ["type","target","prediction"],
     "wait": ["type","condition"],
     "inspect": ["type","target","reason","prediction"],
-    "use": ["type","target","reason","prediction"],
+    "use": ["type","target","reason","out","prediction"],
+    "use (with skills)": ["type","target","value","reason","out","prediction"],
     "scan": ["type","target","out","prediction"],
     "while": ["type","condition","body"],
     "if": ["type","condition","then"]
@@ -588,7 +592,8 @@ Meta-spec (strictly observe these rules in your output):
     { "type": "think", "value": "…" },
     { "type": "take", "target": "…", "prediction": "…"},
     { "type": "inspect", "target": "…", "reason": "…", "prediction": "…"},
-    { "type": "use", "target": "…", "reason": "…", "prediction": "…"},
+    { "type": "use", "target": "…", "reason": "…", "out": "variable_name to assign the use result to", "prediction": "…"},
+    { "type": "use", "target": "skill_name", "value": "input text for skill", "reason": "…", "prediction": "…"},
     { "type": "place", "target": "…", "prediction": "…"},
     { "type": "while", "condition": "…" , "body": [ /* steps */ ]},
     { "type": "if", "condition": "…", "then": [ /* steps */ ], "else": [ /* steps */ ] }
@@ -625,6 +630,18 @@ Worked example using a loop to approach a distant target:
     { "type": "use", "target": "$found_berries", "reason": "eat to reduce hunger", "prediction": "will reduce hunger" }
   ]
 }
+
+Using cognitive skills (if available):
+When using a Skill resource (cognitive tools), include the "value" field with the input text and the "out" field to assign the result to a variable:
+{
+  "plan": [
+    { "type": "move", "target": "question-decomposer" },
+    { "type": "use", "target": "question-decomposer", "value": "Should we adopt microservices architecture?", "reason": "break down complex decision into sub-questions", "out": "decomposition_result", "prediction": "will receive structured decomposition" }
+  ]
+}
+
+The "value" field when used with Skill resources contains the text input to the skill. The "out" field is used to assign the result to a variable.
+For physical resources (food, tools, etc.), use the standard form without "value" or "out" fields.
 
 A plan must include at least 1 step and no more than 8 steps including all nested while and if branches.
 In the following, <resource_name>, <character_name> are placeholders only for KNOWN resources, characters, or map_types, those appearing above.
@@ -664,7 +681,7 @@ prediction, where needed, should be a very terse (4-8 words) description of the 
      Remove a resource from your personal inventory and place it in the setting at your current location.
  - "inspect": { "type": "inspect", "target": "resource_name", "reason": "what is it you are hoping to learn? - 5 words max", "prediction": "expected outcome" } 
      Inspect a resource or character to learn something about it. Must be 'near' the resource or character to inspect it. reason focuses the inspection on some specific aspect of the resource or character.
- - "use": { "type": "use", "target": "resource_name", "reason": "what outcome do you hope to achieve? - 5 words max", "prediction": "expected outcome" } 
+ - "use": { "type": "use", "target": "resource_name", "reason": "what outcome do you hope to achieve? - 5 words max", "out": "variable_name to assign the use result to", "prediction": "expected outcome" } 
      Using a resource or infrastructure. You must be 'near' the resource or infrastructure to use it. 
      "use" on a path will move you one step along it to a new location.
      You may want to inspect a resource first to learn the effect of using it. Some resources are consumables; using edible resources (e.g., Berries) can reduce hunger.

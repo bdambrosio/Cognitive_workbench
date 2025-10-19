@@ -381,16 +381,16 @@ class ZenohSituationNode:
                 else:
                     negated = False
                 # Check if target is in current situation and distance < near_threshold
-                target_canonical = target.capitalize()
+                target_lower = target.lower()
                 response = None
                 for view in self.situation['views']:
-                    if view.get('terrain', '').capitalize() == target_canonical:
+                    if view.get('terrain', '').lower() == target_lower:
                         response = {'success': True, 'value': not negated, 'binding': view['direction']}
                         break
                     # Check resources in this direction
                     if not response:
                         for resource in view.get('resources', []):
-                            if resource['name'].capitalize() == target_canonical:
+                            if resource['name'].lower() == target_lower:
                                 if ((not negated and resource.get('distance', float('inf')) <= self.near_threshold)
                                     or (negated and resource.get('distance', float('inf')) > self.near_threshold)):
                                     response = {'success': True, 'value': True, 'binding': resource['name']}
@@ -400,7 +400,7 @@ class ZenohSituationNode:
                     # Check paths in this direction
                     if not response:
                         for path in view.get('paths', []):
-                            if path.get('name', '').capitalize() == target_canonical:
+                            if path.get('name', '').lower() == target_lower:
                                 if ((not negated and path.get('distance', float('inf')) <= self.near_threshold)
                                     or (negated and path.get('distance', float('inf')) > self.near_threshold)):
                                     response = {'success': True, 'value': True, 'binding': path['name']}
@@ -410,7 +410,7 @@ class ZenohSituationNode:
                     # Check characters if not found in resources
                     if not response:
                         for character in view.get('characters', []):
-                            if ('name' in character and character['name'].capitalize() == target_canonical):
+                            if ('name' in character and character['name'].lower() == target_lower):
                                 if ((not negated and character.get('distance', float('inf')) <= self.near_threshold) 
                                     or (negated and character.get('distance', float('inf')) > self.near_threshold)):
                                     response = {'success': True, 'value': True, 'binding': character['name']}
@@ -419,7 +419,7 @@ class ZenohSituationNode:
                                 break
 
                 if not response:
-                    response = {'success': False, 'value': negated, 'binding': target_canonical}
+                    response = {'success': False, 'value': negated, 'binding': target}
             
             query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
             logger.info(f'🧭 Proximity query for {target}: {response["value"]}')
@@ -453,29 +453,29 @@ class ZenohSituationNode:
                 else:
                     negated = False
                 # Check if target is in current situation and distance < near_threshold
-                target_canonical = target.capitalize()
+                target_lower = target.lower()
                 response = None
 
                 # Check if target is in visible terrains
                 for view in self.situation['views']:
-                    if view.get('terrain', '').capitalize() == target_canonical:
+                    if view.get('terrain', '').lower() == target_lower:
                         response = {'success': True, 'value': not negated, 'binding': view['direction']}
                         break
                 # Check resources
                 for resource in self.situation.get('resources', []):
                     # situation resources are strings, not dicts
-                    if resource.capitalize() == target_canonical:
+                    if resource.lower() == target_lower:
                         response = {'success': True, 'value': not negated, 'binding': resource}
                         break
                 # Paths currently only appear per-view; no top-level list to scan here
                 for character in self.situation.get('characters', []):
                     # situation characters are strings, not dicts
-                        if character == target_canonical:
+                        if character.lower() == target_lower:
                             response = {'success': True, 'value': not negated, 'binding': character}
                         break
                 
                 if not response:
-                    response = {'success': True, 'value': negated, 'binding': target_canonical}
+                    response = {'success': True, 'value': negated, 'binding': target}
             
             query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
             logger.info(f'🧭 Visibility query for {target}: {response["value"]}')
@@ -511,17 +511,17 @@ class ZenohSituationNode:
                 else:
                     negated = False
                 # Check if target is in current situation and distance < near_threshold
-                target_canonical = target.capitalize()
+                target_lower = target.lower()
                 response = None
                 # Check terrains
                 for view in self.situation['views']:
-                    if view.get('terrain', '').capitalize() == target_canonical:
+                    if view.get('terrain', '').lower() == target_lower:
                         response = {'success': True, 'value': not negated, 'binding': view['direction']}
                         break
                     # Check resources in this direction
                     if not response:
                         for resource in view.get('resources', []):
-                            if resource['name'].capitalize() == target_canonical:
+                            if resource['name'].lower() == target_lower:
                                 if ((not negated and resource.get('distance', float('inf')) <= self.at_location_threshold) 
                                      or (negated and resource.get('distance', float('inf')) > self.at_location_threshold)):
                                     response = {'success': True, 'value': True, 'binding': resource['name']}
@@ -531,7 +531,7 @@ class ZenohSituationNode:
                     # Check paths in this direction
                     if not response:
                         for path in view.get('paths', []):
-                            if path.get('name', '').capitalize() == target_canonical:
+                            if path.get('name', '').lower() == target_lower:
                                 if ((not negated and path.get('distance', float('inf')) <= self.at_location_threshold)
                                      or (negated and path.get('distance', float('inf')) > self.at_location_threshold)):
                                     response = {'success': True, 'value': True, 'binding': path['name']}
@@ -542,7 +542,7 @@ class ZenohSituationNode:
                     # Check characters if not found in resources
                     if not response:
                         for character in view.get('characters', []):
-                            if target_canonical == 'person' or ('name' in character and character['name'].capitalize() == target_canonical):
+                            if target_lower == 'person' or ('name' in character and character['name'].lower() == target_lower):
                                 if ((not negated and character.get('distance', float('inf')) <= self.at_location_threshold) 
                                      or (negated and character.get('distance', float('inf')) > self.at_location_threshold)):
                                     response = {'success': True, 'value': True, 'binding': character['name']}
@@ -551,7 +551,7 @@ class ZenohSituationNode:
                                 break
                 
                 if not response:
-                    response = {'success': False, 'value': False, 'binding': target_canonical}
+                    response = {'success': False, 'value': False, 'binding': target}
             
             query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
             logger.info(f'🧭 Proximity query for {target}: {response["value"]}')
