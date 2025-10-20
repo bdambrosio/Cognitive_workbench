@@ -26,8 +26,14 @@ class InfospaceTerrain(Enum):
 
 
 class InfospaceResources(Enum):
-    """Single resource type - individual skills are instances."""
+    """
+    Resource types in infospace.
+    
+    - Skill: Static resources (cognitive tools loaded from skills directory)
+    - Information: Dynamic resources (artifacts created by skill execution at runtime)
+    """
     Skill = auto()
+    Information = auto()
 
 
 # No infrastructure or properties needed
@@ -296,6 +302,8 @@ if __name__ == "__main__":
     # Or use module-level setup
     setup_module('/home/bruce/Downloads/Cognitive_workbench/src/maps/skills')
 
-# Specify map class for map_node
+# Import InfospaceMap for map_node
 from infospace_map import InfospaceMap
+
+# Specify map class for map_node
 map_class = InfospaceMap
