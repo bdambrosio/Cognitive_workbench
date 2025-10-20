@@ -182,6 +182,20 @@ class ZenohExecutiveNode:
         self.llm_client = ZenohLLMClient(server_name=server_name, model_name=model_name, service_timeout=200.0 if not self.debug else 300.0)
         logger.info(f'🤖 LLM client initialized (server={server_name}, model={model_name})')
         self.llm = LLM(server_name=server_name, model_name=model_name)
+        
+        # Detect infospace and initialize infospace executor if needed
+        self.is_infospace = self.character_config.get('is_infospace', False)
+        self.infospace_executor = None
+        if self.is_infospace:
+            from infospace_executor import InfospaceExecutor
+            map_name = self.character_config.get('map_name', 'infolab')
+            self.infospace_executor = InfospaceExecutor(
+                character_name,
+                self.session,
+                map_name
+            )
+            logger.info(f'🧩 Infospace executor initialized for {character_name}')
+        
         # Internal state
         self.action_counter = 0
         self.last_sense_data = None
@@ -1503,6 +1517,46 @@ end your response with </end>
         self.publish_time_proposal(proposed_minutes)
 
         action = self.current_action if self.current_action else action
+        
+        # Route to infospace executor if in infospace mode
+        if self.is_infospace:
+            action_type = action.get('type', '').lower()
+            # Infospace primitives that route to infospace executor
+            infospace_primitives = {
+                'scan', 'use', 'move', 'store', 'index', 'search',
+                'if', 'while', 'wait'
+            }
+            
+            # Route infospace-specific actions to infospace executor
+            if action_type in infospace_primitives:
+                logger.info(f'🧩 Routing {action_type} to infospace executor')
+                result = self.infospace_executor.execute_action(action)
+                
+                # Create action record for tracking
+                now_ts = datetime.now()
+                self.step_counter += 1
+                action_record = ActionRecord(
+                    action=action,
+                    result=result.get('value', '') if result.get('status') == 'success' else result.get('reason', 'failed'),
+                    timestamp=now_ts,
+                    step_id=self.step_counter,
+                    plan_id=self.current_plan_id,
+                    requested_target=action.get('target', ''),
+                    started_at=now_ts,
+                    ended_at=datetime.now()
+                )
+                action_record.proposed_minutes = proposed_minutes
+                action_record.outcome_status = result.get('status', 'unknown')
+                self._snapshot_physiology(action_record)
+                self.action_history.append(action_record)
+                
+                # Return success/failure based on result
+                return result.get('status') == 'success'
+            
+            # say and think work in both spaces, fall through to existing implementation
+        
+        # Continue with existing physical world execution
+        # ...
         
         # Create action record with basic telemetry
         now_ts = datetime.now()
@@ -3443,6 +3497,47 @@ End your response with:
                     'prediction': action.get('prediction', '')
                 }))
                 action_data['response'] = outcome_text
+                
+                # If skill succeeded and 'out' field present, create Information instance and bind variable
+                if result['success'] and action.get('out'):
+                    var_name = action.get('out')
+                    
+                    # Determine content format
+                    skill_result = result.get('result', '')
+                    if isinstance(skill_result, dict):
+                        content = skill_result
+                        format_type = 'json'
+                    else:
+                        content = str(skill_result)
+                        format_type = 'text'
+                    
+                    # Create Information instance via map_node
+                    try:
+                        for reply in self.session.get(
+                            "cognitive/map/information/create",
+                            target=QueryTarget.BEST_MATCHING,
+                            consolidation=ConsolidationMode.NONE,
+                            timeout=5.0 if not self.debug else 300.0,
+                            payload=json.dumps({
+                                'character_name': self.character_name,
+                                'content': content,
+                                'format': format_type,
+                                'source_skill': target,
+                                'source_value': value or ''
+                            }).encode('utf-8')
+                        ):
+                            if reply.ok:
+                                info_response = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
+                                if info_response.get('success'):
+                                    info_id = info_response.get('info_id')
+                                    # Bind variable to Information resource ID
+                                    self.plan_bindings[var_name] = info_id
+                                    logger.info(f'🔗 {self.character_name} bound variable: {var_name} = {info_id}')
+                                else:
+                                    logger.error(f'Failed to create Information instance: {info_response.get("error")}')
+                            break
+                    except Exception as e:
+                        logger.error(f'Error creating Information instance for variable {var_name}: {e}')
                 
                 return result['success']
                 

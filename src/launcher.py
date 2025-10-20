@@ -247,6 +247,35 @@ class CharacterLauncher:
         """Launch all character instances."""
         self.logger.info(f'Launching {len(self.characters)} characters...')
         
+        # Detect if map is infospace
+        is_infospace = False
+        map_name = None
+        if map_file:
+            import importlib.util
+            import os
+            maps_dir = os.path.join(os.path.dirname(__file__), 'maps')
+            map_path = os.path.join(maps_dir, map_file)
+            
+            # Try to load map module to check if it has InfospaceMap
+            if os.path.exists(map_path):
+                map_name = map_file.replace('.py', '')
+                spec = importlib.util.spec_from_file_location("temp_map_module", map_path)
+                temp_map_module = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(temp_map_module)
+                
+                # Check if it uses InfospaceMap
+                if hasattr(temp_map_module, 'map_class'):
+                    map_class_name = temp_map_module.map_class.__name__
+                    is_infospace = ('Infospace' in map_class_name or 'InfoSpace' in map_class_name)
+                    if is_infospace:
+                        self.logger.info(f'🧩 Detected infospace map: {map_file}')
+        
+        # Add infospace flag and map name to all character configs
+        for character in self.characters:
+            character.config['is_infospace'] = is_infospace
+            if map_name:
+                character.config['map_name'] = map_name
+        
         # Launch shared services first
         self.launch_shared_services(map_file, launch_ui, server_name, model_name, ui_port, setting, scenario_name)
         time.sleep(2)  # Give shared services time to start

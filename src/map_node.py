@@ -77,6 +77,9 @@ class MapNode:
         self.lock_request_counts = {}  # (requester, target) -> count of failed attempts
         self.lock_timeout_threshold = 3  # Number of failed attempts before timeout
         
+        # Information instance management (dynamic resources in infospace)
+        self.information_counter = 0  # Counter for generating unique Information IDs
+        
         # Persistence setup
         self.world_file = Path(f"data/world/{self.world_name}_world.json")
         self.world_file.parent.mkdir(parents=True, exist_ok=True)
@@ -120,6 +123,10 @@ class MapNode:
             self.max_turns = int(max_turns) if max_turns is not None else None
         except Exception:
             self.max_turns = None
+        
+        # Vector store management (for infospace memory)
+        self.vector_stores = {}  # store_name -> FAISSStore
+        self.embedder = None     # Lazy-loaded sentence-transformer
 
         # Load the map module
         self.load_map_module()
@@ -255,6 +262,12 @@ end your response with:
             self.handle_resource_place
         )
         
+        # Information creation queryable (dynamic resource creation)
+        self.information_create_queryable = self.session.declare_queryable(
+            "cognitive/map/information/create",
+            self.handle_create_information
+        )
+        
         # Terrain queryable
         self.terrain_queryable = self.session.declare_queryable(
             "cognitive/map/terrain",
@@ -371,6 +384,35 @@ end your response with:
         self.world_state_update_subscriber = self.session.declare_subscriber(
             "cognitive/map/world_state/update",
             self.handle_world_state_update
+        )
+        
+        # Infospace vector store subscribers (for semantic search/memory)
+        self.index_request_subscriber = self.session.declare_subscriber(
+            "map/*/index_request",
+            self.handle_index_request
+        )
+        
+        self.search_request_subscriber = self.session.declare_subscriber(
+            "map/*/search_request",
+            self.handle_search_request
+        )
+        
+        # Infospace skill execution (placeholder for now, skills handled by map)
+        self.skill_request_subscriber = self.session.declare_subscriber(
+            "map/*/skill_request",
+            self.handle_skill_request
+        )
+        
+        # Infospace scan request (find resources by name/interface)
+        self.scan_request_subscriber = self.session.declare_subscriber(
+            "map/*/scan_request",
+            self.handle_scan_request
+        )
+        
+        # Infospace move request (navigate to resource)
+        self.move_request_subscriber = self.session.declare_subscriber(
+            "map/*/move_request",
+            self.handle_move_request
         )
         
         logger.info("Map queryables and subscribers set up successfully")
@@ -1165,6 +1207,110 @@ end your response with:
         except Exception as e:
             logger.error(f"Error handling resource placement query: {e}")
             error_response = {'success': False, 'error': str(e)}
+            query.reply(query.key_expr, json.dumps(error_response).encode('utf-8'))
+    
+    def handle_create_information(self, query):
+        """
+        Handle Information resource creation from skill execution.
+        
+        Creates a dynamic Information resource instance and places it in the infospace.
+        This is called when a skill completes and returns a result that needs to be
+        bound to a plan variable.
+        
+        Topic: cognitive/map/information/create
+        Payload: {
+            "character_name": str,  # Agent creating the information
+            "content": str or dict,  # Skill result content
+            "format": "text|json",  # Content format
+            "source_skill": str,  # Name of skill that created this
+            "source_value": str,  # Input value to the skill
+        }
+        
+        Returns: {
+            "success": bool,
+            "info_id": str,  # Unique ID of created Information instance
+            "location": [x, y]  # Location where placed
+        }
+        """
+        try:
+            # Parse payload
+            if not query.payload:
+                raise ValueError("No payload provided")
+            
+            payload_bytes = query.payload.to_bytes()
+            payload_str = payload_bytes.decode('utf-8')
+            payload = json.loads(payload_str)
+            
+            character_name = payload.get('character_name')
+            content = payload.get('content')
+            format_type = payload.get('format', 'text')
+            source_skill = payload.get('source_skill', '')
+            source_value = payload.get('source_value', '')
+            
+            if not character_name:
+                raise ValueError("Missing character_name in payload")
+            if content is None:  # Allow empty string but not None
+                raise ValueError("Missing content in payload")
+            
+            # Get agent location
+            canonical_character_name = character_name.capitalize()
+            if canonical_character_name not in self.agent_registry:
+                raise ValueError(f"Agent for character '{character_name}' not found")
+            
+            agent = self.agent_registry[canonical_character_name]
+            location = (agent.x, agent.y)
+            
+            # Generate unique Information ID
+            self.information_counter += 1
+            info_id = f"Information_{self.information_counter}"
+            
+            # Create Information resource data structure
+            # Note: Assumes infospace has Information resource type in registry
+            try:
+                information_type = self.world_map.resource_types.Information
+            except AttributeError:
+                # Fallback if Information type not in registry
+                logger.error("Information resource type not found in world_map.resource_types")
+                raise ValueError("Information resource type not available in this map")
+            
+            info_data = {
+                'name': info_id,
+                'type': information_type,
+                'location': location,
+                'description': f"Information artifact created by {source_skill}",
+                'remove_on_take': False,  # Information is not consumable
+                'properties': {
+                    'content': content,
+                    'format': format_type,
+                    'created_by': canonical_character_name,
+                    'created_at': datetime.now().isoformat(),
+                    'source_skill': source_skill,
+                    'source_value': source_value
+                }
+            }
+            
+            # Register in resource_registry
+            self.world_map.resource_registry[info_id] = info_data
+            
+            # Place in spatial grid
+            x, y = location
+            self.world_map.patches[x][y].resources[info_id] = info_data
+            
+            logger.info(f"📝 Created Information instance: {info_id} at ({x}, {y}) by {canonical_character_name}")
+            
+            response = {
+                'success': True,
+                'info_id': info_id,
+                'location': [x, y]
+            }
+            query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
+            
+        except Exception as e:
+            logger.error(f"Error creating Information instance: {e}")
+            error_response = {
+                'success': False,
+                'error': str(e)
+            }
             query.reply(query.key_expr, json.dumps(error_response).encode('utf-8'))
     
     def handle_terrain_query(self, query):
@@ -2264,6 +2410,43 @@ end your response with:
                     else:
                         logger.info("📂 No world state in saved data")
                     
+                    # Restore Information instances (dynamic resources)
+                    if 'information_instances' in world_data:
+                        try:
+                            # Restore counter
+                            self.information_counter = world_data.get('information_counter', 0)
+                            
+                            # Get Information type from resource registry
+                            try:
+                                information_type = self.world_map.resource_types.Information
+                            except AttributeError:
+                                logger.warning("Information type not available in this map, skipping Information restoration")
+                                information_type = None
+                            
+                            if information_type:
+                                instances = world_data['information_instances']
+                                for info_id, info_data in instances.items():
+                                    # Reconstruct resource_data structure
+                                    resource_data = {
+                                        'name': info_data['name'],
+                                        'type': information_type,
+                                        'location': tuple(info_data['location']),
+                                        'description': info_data['description'],
+                                        'remove_on_take': False,
+                                        'properties': info_data.get('properties', {})
+                                    }
+                                    
+                                    # Register in resource_registry
+                                    self.world_map.resource_registry[info_id] = resource_data
+                                    
+                                    # Place in spatial grid
+                                    x, y = info_data['location']
+                                    self.world_map.patches[x][y].resources[info_id] = resource_data
+                                
+                                logger.info(f"📂 Restored {len(instances)} Information instances, counter at {self.information_counter}")
+                        except Exception as e:
+                            logger.error(f"Error restoring Information instances: {e}")
+                    
                     logger.info(f"📂 Loaded world data for '{self.world_name}'")
                     
                     # Start turn management if agents were restored
@@ -2300,6 +2483,26 @@ end your response with:
                     'position': [agent.x, agent.y]
                 }
                 world_data['agents'].append(agent_data)
+            
+            # Save Information instances (dynamic resources)
+            information_instances = {}
+            for resource_id, resource_data in self.world_map.resource_registry.items():
+                # Check if this is an Information type
+                resource_type = resource_data.get('type')
+                type_name = getattr(resource_type, 'name', str(resource_type))
+                
+                if type_name == 'Information':
+                    # Serialize Information instance
+                    info_serialized = {
+                        'name': resource_data.get('name'),
+                        'location': resource_data.get('location'),
+                        'description': resource_data.get('description'),
+                        'properties': resource_data.get('properties', {})
+                    }
+                    information_instances[resource_id] = info_serialized
+            
+            world_data['information_instances'] = information_instances
+            world_data['information_counter'] = self.information_counter
             
             # Save world map state
             # TODO: Add world map modifications (resources, terrain changes, etc.)
@@ -2546,6 +2749,386 @@ end your response with:
                 logger.error(f"Error during Zenoh session cleanup: {e}")
         
         logger.info("Map node shutdown complete")
+    
+    # ==================== Infospace Vector Store Support ====================
+    
+    def _init_embedder(self):
+        """Lazy-initialize sentence-transformer model for embeddings"""
+        if self.embedder:
+            return
+        
+        from sentence_transformers import SentenceTransformer
+        
+        # Use lightweight model for local embeddings
+        logger.info("Loading sentence-transformer model (all-MiniLM-L6-v2)...")
+        self.embedder = SentenceTransformer('all-MiniLM-L6-v2')
+        logger.info("Sentence-transformer model loaded")
+    
+    def _generate_embedding(self, text):
+        """Generate embedding vector for text"""
+        self._init_embedder()
+        
+        # Convert to string if needed
+        if not isinstance(text, str):
+            text = str(text)
+        
+        embedding = self.embedder.encode(text, convert_to_tensor=False)
+        return embedding.tolist()
+    
+    def _extract_content_for_embedding(self, item, fields):
+        """
+        Extract content from item for embedding based on field specifications.
+        
+        Args:
+            item: The data item (dict, string, or other)
+            fields: Dict mapping field names to actions (embed, keyword, store)
+            
+        Returns:
+            String content to embed
+        """
+        if isinstance(item, str):
+            return item
+        
+        if not isinstance(item, dict):
+            return str(item)
+        
+        # Collect fields marked for embedding
+        content_parts = []
+        for field_name, action in fields.items():
+            if action == 'embed' and field_name in item:
+                content_parts.append(str(item[field_name]))
+        
+        # If no specific fields, use whole item
+        if not content_parts:
+            return json.dumps(item)
+        
+        return ' '.join(content_parts)
+    
+    def handle_index_request(self, sample):
+        """
+        Handle request to create/update searchable vector store.
+        
+        Message format:
+        {
+            'agent_name': str,
+            'store_name': str,
+            'source': list of items,
+            'index_type': 'semantic' | 'keyword' | 'hybrid',
+            'fields': {field_name: 'embed'|'keyword'|'store'}
+        }
+        """
+        request = json.loads(sample.payload)
+        agent_name = request.get('agent_name')
+        store_name = request.get('store_name')
+        source = request.get('source', [])
+        index_type = request.get('index_type', 'semantic')
+        fields = request.get('fields', {})
+        
+        logger.info(f"Index request from {agent_name}: {len(source)} items to '{store_name}'")
+        
+        # Create or get store
+        if store_name not in self.vector_stores:
+            self.vector_stores[store_name] = FAISSStore(dimension=384, logger=logger)
+            logger.info(f"Created new vector store: {store_name}")
+        
+        store = self.vector_stores[store_name]
+        
+        # Index each item
+        indexed_count = 0
+        for item in source:
+            if index_type in ['semantic', 'hybrid']:
+                # Extract content to embed
+                content = self._extract_content_for_embedding(item, fields)
+                
+                # Generate embedding
+                embedding = self._generate_embedding(content)
+                
+                # Store with metadata
+                store.add(item, embedding, metadata={'timestamp': time.time()})
+                indexed_count += 1
+        
+        # Publish response
+        response = {
+            'status': 'success',
+            'store_name': store_name,
+            'indexed_count': indexed_count
+        }
+        
+        response_topic = f"map/{self.world_name}/index_response/{agent_name}"
+        self.session.put(response_topic, json.dumps(response))
+        
+        logger.info(f"Indexed {indexed_count} items to '{store_name}'")
+    
+    def handle_search_request(self, sample):
+        """
+        Handle semantic search query on indexed store.
+        
+        Message format:
+        {
+            'agent_name': str,
+            'store_name': str,
+            'query': str,
+            'mode': 'semantic' | 'keyword' | 'hybrid',
+            'limit': int,
+            'threshold': float (optional, default 0.0)
+        }
+        """
+        request = json.loads(sample.payload)
+        agent_name = request.get('agent_name')
+        store_name = request.get('store_name')
+        query = request.get('query')
+        mode = request.get('mode', 'semantic')
+        limit = request.get('limit', 5)
+        threshold = request.get('threshold', 0.0)
+        
+        logger.info(f"Search request from {agent_name}: '{query}' in '{store_name}'")
+        
+        # Check store exists
+        if store_name not in self.vector_stores:
+            response = {
+                'status': 'error',
+                'reason': f"Store '{store_name}' not found"
+            }
+        else:
+            store = self.vector_stores[store_name]
+            
+            if mode == 'semantic':
+                # Generate query embedding
+                query_embedding = self._generate_embedding(query)
+                
+                # Search
+                results = store.search(query_embedding, limit, threshold)
+                
+                response = {
+                    'status': 'success',
+                    'results': results,
+                    'count': len(results)
+                }
+                
+                logger.info(f"Search found {len(results)} results")
+            else:
+                # Keyword/hybrid not implemented in Phase 1
+                response = {
+                    'status': 'error',
+                    'reason': f"Mode '{mode}' not yet implemented"
+                }
+        
+        # Publish response
+        response_topic = f"map/{self.world_name}/search_response/{agent_name}"
+        self.session.put(response_topic, json.dumps(response))
+    
+    def handle_skill_request(self, sample):
+        """
+        Handle skill execution request (placeholder for Phase 1).
+        
+        Message format:
+        {
+            'agent_name': str,
+            'skill_name': str,
+            'input_value': str,
+            'reason': str
+        }
+        """
+        request = json.loads(sample.payload)
+        agent_name = request.get('agent_name')
+        skill_name = request.get('skill_name')
+        
+        logger.info(f"Skill request from {agent_name}: {skill_name}")
+        
+        # Phase 1: Return placeholder response
+        # TODO: Actually execute skills from /maps/skills/ directory
+        response = {
+            'status': 'success',
+            'result': f"[Skill {skill_name} executed - placeholder result]"
+        }
+        
+        response_topic = f"map/{self.world_name}/skill_response/{agent_name}"
+        self.session.put(response_topic, json.dumps(response))
+    
+    def handle_scan_request(self, sample):
+        """
+        Handle scan request to find resources by name or interface.
+        
+        Message format:
+        {
+            'agent_name': str,
+            'target': str (resource name or interface type),
+            'scan_type': str (skill, information, etc.)
+        }
+        """
+        request = json.loads(sample.payload)
+        agent_name = request.get('agent_name')
+        target = request.get('target')
+        
+        logger.info(f"Scan request from {agent_name}: {target}")
+        
+        # Search for matching resources
+        matching_resources = []
+        for resource in self.world_map.resource_registry:
+            if resource.name and target.lower() in resource.name.lower():
+                matching_resources.append({
+                    'name': resource.name,
+                    'type': resource.resource_type_name,
+                    'location': (resource.x, resource.y),
+                    'id': resource.resource_id
+                })
+        
+        # Return first match or error
+        if matching_resources:
+            result = matching_resources[0]
+            response = {
+                'status': 'success',
+                'result': result
+            }
+            logger.info(f"Scan found: {result['name']}")
+        else:
+            response = {
+                'status': 'error',
+                'reason': f"No resource matching '{target}' found"
+            }
+            logger.info(f"Scan found no matches for '{target}'")
+        
+        response_topic = f"map/{self.world_name}/scan_response/{agent_name}"
+        self.session.put(response_topic, json.dumps(response))
+    
+    def handle_move_request(self, sample):
+        """
+        Handle move request to navigate to resource.
+        
+        Message format:
+        {
+            'agent_name': str,
+            'target': str (resource name) or dict (resource info)
+        }
+        """
+        request = json.loads(sample.payload)
+        agent_name = request.get('agent_name')
+        target = request.get('target')
+        
+        logger.info(f"Move request from {agent_name}: {target}")
+        
+        # Get agent
+        agent = self.agent_registry.get(agent_name)
+        if not agent:
+            response = {
+                'status': 'error',
+                'reason': f"Agent '{agent_name}' not registered"
+            }
+        else:
+            # If target is dict with location, use it
+            if isinstance(target, dict) and 'location' in target:
+                target_x, target_y = target['location']
+            else:
+                # Find resource by name
+                target_resource = None
+                for resource in self.world_map.resource_registry:
+                    if resource.name and target.lower() in resource.name.lower():
+                        target_resource = resource
+                        break
+                
+                if not target_resource:
+                    response = {
+                        'status': 'error',
+                        'reason': f"Resource '{target}' not found"
+                    }
+                    response_topic = f"map/{self.world_name}/move_response/{agent_name}"
+                    self.session.put(response_topic, json.dumps(response))
+                    return
+                
+                target_x, target_y = target_resource.x, target_resource.y
+            
+            # Move agent to target location
+            agent.x = target_x
+            agent.y = target_y
+            
+            response = {
+                'status': 'success',
+                'location': (target_x, target_y)
+            }
+            logger.info(f"Moved {agent_name} to ({target_x}, {target_y})")
+        
+        response_topic = f"map/{self.world_name}/move_response/{agent_name}"
+        self.session.put(response_topic, json.dumps(response))
+
+
+class FAISSStore:
+    """
+    FAISS-based vector store for semantic search.
+    Stores documents with embeddings and metadata.
+    """
+    
+    def __init__(self, dimension=384, logger=None):
+        import faiss
+        import numpy as np
+        
+        self.dimension = dimension
+        self.index = faiss.IndexFlatIP(dimension)  # Inner product (cosine similarity)
+        self.documents = []
+        self.metadata = []
+        self.logger = logger
+        self.np = np
+    
+    def add(self, document, embedding, metadata=None):
+        """Add document with embedding to store"""
+        import faiss
+        
+        # Normalize for cosine similarity
+        embedding_array = self.np.array([embedding], dtype='float32')
+        faiss.normalize_L2(embedding_array)
+        
+        self.index.add(embedding_array)
+        self.documents.append(document)
+        self.metadata.append(metadata or {})
+    
+    def search(self, query_embedding, limit=5, threshold=0.0):
+        """Search for similar documents"""
+        import faiss
+        
+        query_array = self.np.array([query_embedding], dtype='float32')
+        faiss.normalize_L2(query_array)
+        
+        # Search
+        scores, indices = self.index.search(query_array, min(limit, len(self.documents)))
+        
+        # Filter by threshold and format results
+        results = []
+        for score, idx in zip(scores[0], indices[0]):
+            if idx < 0:  # FAISS returns -1 for no match
+                continue
+            if score < threshold:
+                continue
+            
+            results.append({
+                'document': self.documents[idx],
+                'score': float(score),
+                'metadata': self.metadata[idx]
+            })
+        
+        return results
+    
+    def save(self, path):
+        """Persist to disk"""
+        import faiss
+        import pickle
+        
+        faiss.write_index(self.index, f"{path}.faiss")
+        with open(f"{path}.meta", 'wb') as f:
+            pickle.dump({
+                'documents': self.documents,
+                'metadata': self.metadata
+            }, f)
+    
+    def load(self, path):
+        """Load from disk"""
+        import faiss
+        import pickle
+        
+        self.index = faiss.read_index(f"{path}.faiss")
+        with open(f"{path}.meta", 'rb') as f:
+            data = pickle.load(f)
+            self.documents = data['documents']
+            self.metadata = data['metadata']
+
 
 def signal_handler(signum, frame):
     """Handle shutdown signals"""
