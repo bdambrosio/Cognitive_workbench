@@ -510,7 +510,8 @@ def get_skill_instances_from_map(session, timeout: float = 10.0) -> list:
                             if skill_reply.ok:
                                 skill_data = json.loads(skill_reply.ok.payload.to_bytes().decode('utf-8'))
                                 if skill_data.get('success'):
-                                    return skill_data.get('skill_instances', [])
+                                    resource_rules = skill_data.get('resource_rules', {})
+                                    return resource_rules.get('skill_instances', [])
                             break
             break
     except Exception as e:

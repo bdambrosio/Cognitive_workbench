@@ -266,9 +266,9 @@ class LLM():
         except Exception as e:
             logger.error(f'  Simple JSON repair failed:\n {e}')
             error = e
-
+        logger.error(f'Repairing JSON: {response}')
         # Ok, ask llm
-        prompt = [UserMessage(content="""You are a JSON repair tool.
+        repair_prompt = [UserMessage(content="""You are a JSON repair tool.
 An LLM received the following prompt and returned invalid JSON. Your task is to repair the JSON.
 
 The prompt was:
@@ -285,7 +285,7 @@ Respond only with the repaired JSON string. Do not output any reasoning.
 Make sure the string is in a format that can be parsed by the json.loads function. No commentary, no code fences.
 """)]
 
-        response = self.ask({"json": response, "error": error, "prompt": prompt}, prompt, tag='repair_json', temp=0.2, max_tokens=3500)
+        response = self.ask({"json": response, "error": error, "prompt": prompt}, repair_prompt, tag='repair_json', temp=0.2, max_tokens=3500)
         try:
             return json.loads(response.replace("```json", "").replace("```", "").strip())
         except Exception as e:

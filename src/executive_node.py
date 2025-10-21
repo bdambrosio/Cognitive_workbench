@@ -653,6 +653,16 @@ class ZenohExecutiveNode:
                     logger.info(f'📥 {self.character_name} Received plan command from User: "{clean_input}"')
                     self.parse_and_set_plan(clean_input)
                     return  # Don't process as speech
+                elif clean_input.startswith('test:'):
+                    logger.info(f'📥 {self.character_name} Received test command from User: "{clean_input}"')
+                    if self.is_infospace and self.infospace_executor:
+                        if 'primitives' in clean_input.lower():
+                            self.infospace_executor.test_primitives()
+                        else:
+                            logger.warning(f'Unknown test command: {clean_input}')
+                    else:
+                        logger.warning(f'Test command only available in infospace mode')
+                    return  # Don't process as speech
             
             # Normal dialog processing
             logger.info(f'📥 {self.character_name} Processing text input: "{text_input}" (source: {source})')
@@ -668,13 +678,11 @@ class ZenohExecutiveNode:
             # Manual characters skip orient/plan entirely
             if self.manual:
                 if self.current_plan:
-                    action, status = self._plan_step(self.current_plan)
-                    if action is not None:
-                        action_succeeded = self._act(action)
-                        if not action_succeeded:
-                            # Action failed, don't advance plan state but complete turn
-                            logger.info(f'Manual action failed for {self.character_name}, will retry same step next turn')
-                            return
+                    action, action_succeeded = self._plan_step(self.current_plan)
+                    if action is not None and not action_succeeded:
+                        # Action failed, plan index already advanced, will try next step next turn
+                        logger.info(f'Manual action failed for {self.character_name}')
+                        return
                 return
             
             # Check for active activity and get current step
@@ -1040,17 +1048,41 @@ class ZenohExecutiveNode:
                 self.percepts_at_plan = self._capture_percepts_at_plan()
             except Exception:
                 self.percepts_at_plan = []
-            # Make LLM call via pure planner (avoid duplicate percepts: user_prompt already includes compact views)
+            
+            # Clear plan state for infospace
+            if self.is_infospace and self.infospace_executor:
+                self.infospace_executor.clear_plan_state()
+            
+            # Dispatch to appropriate planner
             if not self.shutdown_requested:
-                plan_candidate = generate_plan_with_context(
-                    character=self,
-                    current_activity=self.current_activity,
-                    goal_text=goal.name+(': '+goal.description if goal.description != goal.name else ''),
-                    prompt_text=user_prompt,
-                    percepts_at_plan=None,  # avoid double-including percepts
-                    server_name=os.getenv('CWB_LLM_SERVER', 'vllm'),
-                    model_name=os.getenv('CWB_LLM_MODEL', 'llama3.3-70B-instruct')
-                )
+                if self.is_infospace:
+                    # Use infospace planner
+                    from infospace_planner import InfospacePlanner
+                    planner = InfospacePlanner(self.llm_client, logger)
+                    
+                    # Build context for infospace planning
+                    context = {
+                        'available_tools': self._get_visible_tools(),
+                        'available_stores': [],  # TODO: Track store names
+                        'variables': self.infospace_executor.plan_bindings if self.infospace_executor else {},
+                        'situation': user_prompt
+                    }
+                    
+                    plan_candidate = planner.generate_plan(
+                        goal=goal.name + (': ' + goal.description if goal.description != goal.name else ''),
+                        context=context
+                    )
+                else:
+                    # Use physical planner
+                    plan_candidate = generate_plan_with_context(
+                        character=self,
+                        current_activity=self.current_activity,
+                        goal_text=goal.name+(': '+goal.description if goal.description != goal.name else ''),
+                        prompt_text=user_prompt,
+                        percepts_at_plan=None,
+                        server_name=os.getenv('CWB_LLM_SERVER', 'vllm'),
+                        model_name=os.getenv('CWB_LLM_MODEL', 'llama3.3-70B-instruct')
+                    )
             else:
                 plan_candidate = None
 
@@ -1058,7 +1090,13 @@ class ZenohExecutiveNode:
                 logger.debug(f'🤖 {self.character_name} New Plan candidate: {json.dumps(plan_candidate)}')
                 valid = False
                 try:
-                    valid = plan_module.verify_plan(plan_candidate)
+                    # Validate with appropriate validator
+                    if self.is_infospace:
+                        import infospace_planner
+                        valid = infospace_planner.verify_plan(plan_candidate)
+                    else:
+                        valid = plan_module.verify_plan(plan_candidate)
+                    
                     if not valid:
                         logger.error(f'Invalid plan JSON from planner')
                         plan_candidate = None
@@ -1396,8 +1434,16 @@ end your response with </end>
         
         logger.debug(f'🔄 {self.character_name} executing plan step {idx + 1}/{len(plan)}: {stype} action')
 
-        # Primitive actions (spec-compliant)
-        if stype in ('move', 'say', 'think', 'take', 'place', 'inspect', 'use', 'scan'):
+        # Primitive actions (spec-compliant + infospace primitives)
+        executable_primitives = {
+            # Physical world primitives
+            'move', 'say', 'think', 'take', 'place', 'inspect', 'use', 'scan',
+            # Infospace primitives - Phase 1 & 2
+            'store', 'index', 'search',
+            'extract', 'filter', 'merge', 'transform',
+            'aggregate', 'sort', 'group_by', 'compare'
+        }
+        if stype in executable_primitives:
             current['idx'] = idx + 1
             return step
 
@@ -1523,8 +1569,17 @@ end your response with </end>
             action_type = action.get('type', '').lower()
             # Infospace primitives that route to infospace executor
             infospace_primitives = {
-                'scan', 'use', 'move', 'store', 'index', 'search',
-                'if', 'while', 'wait'
+                # Phase 1 Core
+                'apply', 'move', 'create', 'save', 
+                'index', 'organize', 'search',
+                # Phase 1 Control
+                'if', 'while', 'wait',
+                # Phase 1 Communication
+                'say', 'think',
+                # Phase 2 Data
+                'extract', 'filter', 'merge', 'transform',
+                # Phase 2 Analysis
+                'aggregate', 'sort', 'group_by', 'compare'
             }
             
             # Route infospace-specific actions to infospace executor
@@ -1549,6 +1604,19 @@ end your response with </end>
                 action_record.outcome_status = result.get('status', 'unknown')
                 self._snapshot_physiology(action_record)
                 self.action_history.append(action_record)
+                
+                # Publish action for UI display
+                action_data = {
+                    'type': action_type,
+                    'action_id': self.action_counter,
+                    'timestamp': now_ts.isoformat(),
+                    'target': action.get('target', ''),
+                    'out': action.get('out', ''),
+                    'status': result.get('status', 'unknown'),
+                    'value': str(result.get('value', ''))[:200] if result.get('value') else ''
+                }
+                self.action_publisher.put(json.dumps(action_data))
+                self.action_counter += 1
                 
                 # Return success/failure based on result
                 return result.get('status') == 'success'
@@ -2733,7 +2801,7 @@ End your response with </end>
             parsed_goal = goal_text.strip().strip('"').strip("'")[6:]
             if not self.observations:
                 self._observe()
-            self.current_goal = plan_module.Goal(parsed_goal, [self.character_name], description='supplied by user', termination='')
+            self.current_goal = plan_module.Goal(parsed_goal, [self.character_name], description='', termination='')
             
             # In manual mode, publish goal and auto-generate plan
             if self.manual:
@@ -2758,25 +2826,35 @@ End your response with </end>
             return
 
     def parse_and_set_plan(self, plan_text):
-        """Parse plan input from UI and set current plan."""
+        """Parse JSON plan input from UI and set current plan."""
         try:
-            parsed_plan = plan_module.parse_plan_text(plan_text)
-            self._plan_completed("manual plan override")  # Clear any existing plan
+            # Parse JSON format
+            parsed_plan = plan_module.parse_plan_json(plan_text)
+            
+            # Validate with appropriate validator
+            if self.is_infospace:
+                import infospace_planner
+                valid = infospace_planner.verify_plan(parsed_plan)
+            else:
+                valid = plan_module.verify_plan(parsed_plan)
+            
+            if not valid:
+                logger.error(f"Invalid plan for {self.character_name}")
+                return
+            
+            # Clear existing plan and set new one
+            self._plan_completed("manual plan override")
             self.current_plan = parsed_plan
-            self.plan_bindings = {}  # Clear scan variables for new plan
+            self.plan_bindings = {}
             logger.info(f'🔄 {self.character_name} cleared plan_bindings for UI-assigned plan')
             logger.info(f'📋 {self.character_name} assigned UI plan with {len(parsed_plan["plan"])} steps')
             self.plan_bindings_cache = {}
-            self.plan_summary_completed = False  # Reset for new plan
+            self.plan_summary_completed = False
             self._publish_current_plan()
             self.plan_state = {
                 'step_stack': plan_module.Stack()
             }
-            # Clear plan bindings cache for new plan
-            self.plan_bindings_cache = {}
-            if not plan_module.verify_plan(self.current_plan):
-                logger.error(f"Invalid plan for {self.character_name}")
-                return
+            
             logger.info(f"📋 {self.character_name} received new plan with {len(parsed_plan['plan'])} steps")
         except Exception as e:
             logger.error(f"Plan parsing failed for {self.character_name}: {e}")
@@ -4173,6 +4251,52 @@ End your response with:
         except Exception as e:
             logger.error(f'Error checking conversation lock availability with {target_character}: {e}')
             return False
+    
+    def _get_visible_tools(self) -> List[str]:
+        """
+        Get list of visible tools from current situation (for infospace planning).
+        
+        View data only includes resource name and distance, not type information.
+        We make ONE query to get all tool instances from the map, then test
+        visible resources for membership in that set.
+        """
+        if not self.is_infospace:
+            return []
+        
+        # Query map once for all tool (Skill type) instances
+        tool_names = set()
+        for reply in self.session.get(
+            "cognitive/map/resource_rules/Skill",
+            target=QueryTarget.BEST_MATCHING,
+            consolidation=ConsolidationMode.NONE,
+            timeout=2.0 if not self.debug else 300.0
+        ):
+            if reply.ok:
+                response = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
+                if response.get('success'):
+                    # Extract tool names from skill_instances list in resource_rules
+                    resource_rules = response.get('resource_rules', {})
+                    skill_instances = resource_rules.get('skill_instances', [])
+                    for skill in skill_instances:
+                        tool_name = skill.get('name', '')
+                        if tool_name:
+                            tool_names.add(tool_name)
+                break
+            break
+        
+        # Now filter visible resources to only include tools
+        visible_tools = []
+        if self.last_situation_data:
+            views = self.last_situation_data.get('views', [])
+            for view in views:
+                resources = view.get('resources', [])
+                for resource in resources:
+                    resource_name = resource.get('name', '')
+                    if resource_name and resource_name in tool_names:
+                        if resource_name not in visible_tools:
+                            visible_tools.append(resource_name)
+        
+        return visible_tools
     
     def shutdown(self):
         """Clean shutdown."""

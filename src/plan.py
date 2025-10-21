@@ -279,207 +279,43 @@ def validate_and_create_goal(character_name, goal_hash):
 # public API
 # ---------------------------------------------------------------------------
 
-def parse_plan_text(plan_text):
-        """Parse plan text into internal plan structure matching the LLM format."""
-        plan_text = plan_text.strip()
-        
-        # Handle single-line format: "plan: action(target, value)"
-        if plan_text.startswith('plan:') and '\n' not in plan_text:
-            # Single line format - extract the action part after 'plan:'
-            action_part = plan_text[5:].strip()  # Remove 'plan:' and strip
-            if action_part:
-                # Parse as single action
-                parsed_step = _parse_action_line(action_part, 1)
-                return {"plan": [parsed_step]}
-            else:
-                return {"plan": []}  # Empty plan
-        
-        # Multi-line format
-        lines = plan_text.split('\n')
-        if not lines[0].strip() == 'plan:':
-            raise ValueError("Plan must start with 'plan:'")
-        
-        plan_steps = []
-        current_block = None
-        current_block_steps = []
-        while_condition = None  # Store while condition
-        
-        for i, line in enumerate(lines[1:], 1):  # Skip 'plan:' line
-            stripped_line = line.strip()
-            if not stripped_line:
-                continue
-                
-            # Calculate indentation (assuming 2 spaces per level)
-            current_indent = len(line) - len(line.lstrip())
-            
-            if stripped_line.startswith('while(') and stripped_line.endswith(':'):
-                # Start of while block - while(condition):
-                condition_text = stripped_line[6:-2]  # Extract condition from while(...):
-                condition_action = _parse_action_line(condition_text, i)
-                current_block = 'while'
-                current_block_steps = []
-                while_condition = condition_action  # Store condition for later
-                
-            elif stripped_line == 'endwhile:':
-                # End of while block
-                if current_block != 'while':
-                    raise ValueError(f"Line {i}: 'endwhile' without matching 'while'")
-                
-                plan_steps.append({
-                    'type': 'while',
-                    'body': current_block_steps,
-                    'condition': while_condition
-                })
-                current_block = None
-                current_block_steps = []
-                while_condition = None
-                
-            elif stripped_line == 'if:':
-                # Start of if block
-                current_block = 'if'
-                current_block_steps = []
-                if_condition = None  # Store the condition separately
-                if_step = None  # Initialize if_step
-                
-            elif stripped_line == 'else:':
-                # Switch to else block
-                if current_block != 'if':
-                    raise ValueError(f"Line {i}: 'else' without matching 'if'")
-                if if_condition is None:
-                    raise ValueError(f"Line {i}: 'else' without condition in if block")
-                
-                # Create the if step with then part
-                if_step = {
-                    'type': 'if',
-                    'condition': if_condition,
-                    'then': current_block_steps
-                }
-                
-                current_block = 'else'
-                current_block_steps = []
-                
-            elif stripped_line == 'endif:':
-                # End of if block
-                if current_block not in ['if', 'else']:
-                    raise ValueError(f"Line {i}: 'endif' without matching 'if'")
-                
-                if current_block == 'else':
-                    # Add the else steps to the existing if step
-                    if_step['else'] = current_block_steps
-                    plan_steps.append(if_step)
-                else:
-                    # No else block, create and add the if step
-                    if if_condition is None:
-                        raise ValueError(f"Line {i}: 'endif' without condition in if block")
-                    if_step = {
-                        'type': 'if',
-                        'condition': if_condition,
-                        'then': current_block_steps
-                    }
-                    plan_steps.append(if_step)
-                
-                current_block = None
-                current_block_steps = []
-                if_condition = None
-                if_step = None
-                
-            else:
-                # Regular action or condition
-                if current_block == 'if' and if_condition is None:
-                    # First line in if block is the condition
-                    if_condition = _parse_action_line(stripped_line, i)
-                else:
-                    # Regular action
-                    parsed_step = _parse_action_line(stripped_line, i)
-                    
-                    if current_block:
-                        # Add to current block
-                        current_block_steps.append(parsed_step)
-                    else:
-                        # Add to main plan
-                        plan_steps.append(parsed_step)
-        
-        # Check for unmatched blcks
-        if current_block == 'while':
-            raise ValueError("Unmatched 'while(...)' block without 'endwhile:'")
-        elif current_block in ['if', 'else']:
-            raise ValueError("Unmatched 'if:' block without 'endif'")
-        
-        return {"plan": plan_steps}
+def parse_plan_json(plan_text):
+    """
+    Parse JSON plan string into internal plan structure.
+    
+    Accepts:
+    - With prefix: 'plan: {"plan": [...]}'
+    - Without prefix: '{"plan": [...]}'
+    - Array format: '[{...}, {...}]'
+    
+    Returns:
+        Dict with 'plan' key containing list of actions
+    """
+    plan_text = plan_text.strip()
+    
+    # Remove 'plan:' prefix if present
+    if plan_text.startswith('plan:'):
+        plan_text = plan_text[5:].strip()
+    
+    # Parse JSON
+    parsed = json.loads(plan_text)
+    
+    # Ensure dict with 'plan' key
+    if isinstance(parsed, list):
+        return {'plan': parsed}
+    
+    if isinstance(parsed, dict):
+        return parsed
+    
+    raise ValueError(f"Invalid plan format: expected dict or list, got {type(parsed).__name__}")
 
-def _parse_action_line(line, line_number):
-        """Parse a single action line into step dictionary."""
-        # Check if it's a regular action
-        if '(' in line and line.endswith(')'):
-            # Parse action(target, value) or action(target)
-            paren_pos = line.find('(')
-            action = line[:paren_pos].strip()
-            args_str = line[paren_pos+1:-1]
-            
-            # Handle special case for 'say' action with colon syntax
-            if action == 'say' and ':' in args_str:
-                # say(Joe: Hello, how are you, my friend?)
-                colon_pos = args_str.find(':')
-                target = args_str[:colon_pos].strip()
-                value = args_str[colon_pos+1:].strip()
-            elif action == 'scan':
-                # scan(target, out_variable) - scan(Berries, found_berries)
-                args = []
-                if args_str.strip():
-                    raw_args = [arg.strip() for arg in args_str.split(',')]
-                    args = raw_args
-                
-                if len(args) != 2:
-                    raise ValueError(f"Line {line_number}: scan action requires exactly 2 arguments: target and out variable")
-                
-                target = args[0]
-                out_var = args[1]
-                
-                return {
-                    'type': action,
-                    'target': target,
-                    'out': out_var,
-                    'prediction': ''  # Empty prediction for text format
-                }
-            else:
-                # Split arguments - handle commas in quoted strings
-                args = []
-                if args_str.strip():
-                    # Simple split for now - could be enhanced for quoted strings later
-                    raw_args = [arg.strip() for arg in args_str.split(',')]
-                    args = raw_args
-                
-                # Determine target and value based on action type
-                if action == 'think':
-                    # think only needs value, not target
-                    value = args[0] if len(args) > 0 else ''
-                    target = ''
-                elif action in ['move']:
-                    # These actions only need target, not value
-                    target = args[0] if len(args) > 0 else ''
-                    value = ''
-                elif action in ['take', 'place', 'inspect', 'use']:
-                    # These actions need target and prediction (empty string for text format)
-                    target = args[0] if len(args) > 0 else ''
-                    value = ''
-                else:
-                    # Default case: first arg is target, second is value
-                    target = args[0] if len(args) > 0 else ''
-                    value = args[1] if len(args) > 1 else ''
-                
-                # Build the result based on what's needed
-                result = {'type': action}
-                if target:
-                    result['target'] = target
-                if value:
-                    result['value'] = value
-                # Add empty prediction for actions that require it (text format)
-                if action in ['take', 'place', 'inspect', 'use']:
-                    result['prediction'] = ''
-                
-                return result
-        else:
-            raise ValueError(f"Line {line_number}: Invalid action format '{line}'")
+
+# Legacy text format parser - DEPRECATED
+# Kept for reference, remove after migration complete
+def parse_plan_text(plan_text):
+    """DEPRECATED: Use parse_plan_json instead. Text format no longer supported."""
+    logger.warning("parse_plan_text is deprecated - use parse_plan_json with JSON format")
+    raise ValueError("Text plan format deprecated - use JSON format: plan: {\"plan\": [...]}")
 
 def verify_plan(plan_json: Any) -> bool:
     """

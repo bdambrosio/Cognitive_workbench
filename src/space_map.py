@@ -314,8 +314,20 @@ class SpaceMap(ABC):
         return None
     
     def get_resource_list(self):
-        """Get list of all resource IDs"""
-        return list(self.resource_registry.keys())
+        """
+        Get list of all resources with their data.
+        
+        Returns:
+            List of dicts, each containing resource data:
+            {'id': str, 'name': str, 'type': enum, 'location': tuple, 'description': str, ...}
+        """
+        resource_list = []
+        for resource_id, resource_data in self.resource_registry.items():
+            # Create a copy with the ID included
+            resource_info = dict(resource_data)
+            resource_info['id'] = resource_id
+            resource_list.append(resource_info)
+        return resource_list
     
     def get_resource_property(self, resource_id, property_name):
         """Get a property of a resource"""
