@@ -10,245 +10,157 @@ from typing import Dict, List, Any
 
 logger = logging.getLogger(__name__)
 
-# Phase 1 Template - Core primitives
-INFOSPACE_PLAN_TEMPLATE = """Task: Decompose your goal into a plan using information space primitives.
-Output: only valid JSON – no prose, no code fences.
+# Phase 1 & 2 Template - Core + Data Operations
+INFOSPACE_PLAN_TEMPLATE = """Task: Decompose your goal into a JSON-formatted plan using Information Space primitives.
 
-Meta-spec (strictly observe these rules in your output):
-{
-  "primitives": [
-    "scan", "use", "move", "store", "index", "search",
-    "if", "while", "wait", "say", "think"
-  ],
-  "conditions": [
-    "bound", "notbound", "has_value", "empty", "equals",
-    "near", "can_see"
-  ],
-  "required_fields": {
-    "scan": ["type", "target", "out", "prediction"],
-    "use": ["type", "target", "reason", "prediction"],
-    "move": ["type", "target"],
-    "store_variable": ["type", "value", "variable"],
-    "store_collection": ["type", "target", "collection"],
-    "index": ["type", "source", "store_name", "index_type", "fields"],
-    "search": ["type", "store_name", "query", "mode", "limit", "out", "prediction"],
-    "if": ["type", "condition", "then"],
-    "while": ["type", "condition", "body"],
-    "wait": ["type", "condition"],
-    "say": ["type", "target", "value"],
-    "think": ["type", "value"]
-  },
-  "variables": {"syntax": "$name", "must_be_bound_before_use": true},
-  "max_steps": 12
-}
-
-Action Schemas:
-
-scan - Locate resource/skill by name or interface:
-{
-  "type": "scan",
-  "target": "skill-name or interface-type",
-  "out": "variable_name",
-  "prediction": "will find matching skill"
-}
-
-use - Apply skill to input data:
-{
-  "type": "use",
-  "target": "skill-name or $variable",
-  "value": "input text",  // optional
-  "reason": "brief purpose",
-  "out": "result_variable",  // optional
-  "prediction": "expected outcome"
-}
-
-move - Navigate to resource location:
-{
-  "type": "move",
-  "target": "resource-name or $variable"
-}
-
-store - Persist to variable:
-{
-  "type": "store",
-  "value": "$computed_value or literal",
-  "variable": "name"
-}
-
-store - Append to collection:
-{
-  "type": "store",
-  "target": "$item",
-  "collection": "collection_name"
-}
-
-index - Create searchable store with embeddings:
-{
-  "type": "index",
-  "source": "$data_array",
-  "store_name": "my_memory",
-  "index_type": "semantic",
-  "fields": {
-    "content": "embed",
-    "title": "embed",
-    "metadata": "store"
-  }
-}
-
-search - Query indexed store:
-{
-  "type": "search",
-  "store_name": "my_memory",
-  "query": "search text",
-  "mode": "semantic",
-  "limit": 5,
-  "threshold": 0.0,
-  "out": "results",
-  "prediction": "will find relevant items"
-}
-
-if - Conditional branching:
-{
-  "type": "if",
-  "condition": {"type": "bound", "target": "results"},
-  "then": [/* steps */],
-  "else": [/* steps */]  // optional
-}
-
-while - Loop with condition:
-{
-  "type": "while",
-  "condition": {"type": "notbound", "target": "done"},
-  "body": [/* steps */],
-  "max_iterations": 10  // optional, default 100
-}
-
-wait - Block until condition satisfied:
-{
-  "type": "wait",
-  "condition": {"type": "bound", "target": "user_input"},
-  "timeout": 60  // optional, default 60
-}
-
-say - Output to user or agent:
-{
-  "type": "say",
-  "target": "user",
-  "value": "$message or literal text"
-}
-
-think - Internal reasoning (for transparency):
-{
-  "type": "think",
-  "value": "thought process"
-}
-
-Condition Types:
-- bound: {"type": "bound", "target": "variable_name"}
-- notbound: {"type": "notbound", "target": "variable_name"}
-- has_value: {"type": "has_value", "target": "$variable"}
-- empty: {"type": "empty", "target": "$variable"}
-- equals: {"type": "equals", "target": "$var", "value": "expected"}
-
-Example Workflow - Research and Store:
-{
-  "plan": [
-    {
-      "type": "scan",
-      "target": "web-search",
-      "out": "search_tool",
-      "prediction": "will find search capability"
-    },
-    {
-      "type": "use",
-      "target": "$search_tool",
-      "value": "LLM cognitive agents 2025",
-      "reason": "find recent articles",
-      "out": "search_results",
-      "prediction": "will return article URLs"
-    },
-    {
-      "type": "index",
-      "source": "$search_results",
-      "store_name": "research_memory",
-      "index_type": "semantic",
-      "fields": {
-        "title": "embed",
-        "content": "embed"
-      }
-    },
-    {
-      "type": "say",
-      "target": "user",
-      "value": "Research complete and indexed"
-    }
-  ]
-}
-
-Example with Search and Conditional:
-{
-  "plan": [
-    {
-      "type": "search",
-      "store_name": "research_memory",
-      "query": "cognitive persistence",
-      "mode": "semantic",
-      "limit": 3,
-      "out": "prior_research",
-      "prediction": "will find related past work"
-    },
-    {
-      "type": "if",
-      "condition": {"type": "has_value", "target": "$prior_research"},
-      "then": [
-        {
-          "type": "think",
-          "value": "Found related prior work to build on"
-        },
-        {
-          "type": "use",
-          "target": "synthesizer",
-          "value": "$prior_research",
-          "reason": "combine findings",
-          "out": "summary"
-        }
-      ],
-      "else": [
-        {
-          "type": "think",
-          "value": "No prior work found, starting fresh"
-        }
-      ]
-    },
-    {
-      "type": "say",
-      "target": "user",
-      "value": "$summary"
-    }
-  ]
-}
-
-CURRENT CONTEXT:
-{{context}}
-
-AVAILABLE SKILLS:
-{{skills}}
-
-AVAILABLE STORES:
-{{stores}}
-
-CURRENT VARIABLES:
-{{variables}}
-
-GOAL:
+Your goal is:
 {{goal}}
 
-CONSTRAINTS:
-- Use only primitives listed above
-- Variables must be bound before use (use scan/use/search to bind)
-- Stores must be indexed before search
-- Maximum 12 steps total (including nested if/while bodies)
-- Output only valid JSON, no markdown, no prose
+Output: only valid JSON — no reasoning, no prose, no code fences.
+
+# PLAN FORMAT
+
+{
+  "plan": [
+    {"type": "action_name", ...},
+    {"type": "action_name", ...}
+  ]
+}
+
+# AVAILABLE ACTIONS:
+
+apply - apply a tool/skill to input data and bind result to variable
+move - change current location or approach a resource
+create - create a Note or Collection object and bind to variable
+save - create Note object from a value and bind to variable
+index (organize) - build an embedding index for a Collection
+search - query an indexed store by name
+if - conditional branch 
+while - loop until condition false
+wait - pause until condition true
+say - produce output
+think - internal note
+
+# ARGUMENT TYPE CONVENTIONS:
+
+Variables: Use "$variable" to reference Note/Collection content previously bound
+Literals: Use plain strings/values (no $) for literal data or names
+Names: Output variable names in "out" fields use plain strings (no $)
+Skills/Resources: Can be literal "skill-name" or "$variable" holding name
+
+
+# ACTION SCHEMAS  (each must be valid JSON)
+
+apply — apply a tool/skill to input data
+{"type":"apply","target":"skill-name or $tool_var","value":"input text or $data","reason":"purpose","out":"result_variable"}
+
+move — change current location or approach a resource
+{"type":"move","target":"resource-name or {\"location\": [x,y]}"}
+
+create — create a typed Note or Collection object
+{"type":"create","kind":"Collection","value":[],"out":"my_collection"}
+{"type":"create","kind":"Note","value":"some data","out":"my_note"}
+
+save — create Note object from value
+{"type":"save","value":"literal or $value","out":"variable_name"}
+
+index (organize) — create searchable store with embeddings
+{"type":"index","source":"$collection","store_name":"my_store","index_type":"semantic","fields":{"title":"embed","content":"embed"}}
+
+search — query an indexed store
+{"type":"search","store_name":"my_store","query":"search text or $query","mode":"semantic","limit":5,"out":"results"}
+
+if — conditional branch
+{"type":"if","condition":{"type":"has_value","target":"$results"},"then":[/* steps */],"else":[/* optional steps */]}
+
+while — loop until condition false
+{"type":"while","condition":{"type":"has_value","target":"$results"},"body":[/* steps */],"max_iterations":10}
+
+wait — pause until condition true
+{"type":"wait","condition":{"type":"has_value","target":"$results"},"timeout":30}
+
+say — produce output
+{"type":"say","target":"user","value":"literal text or $variable"}
+
+think — internal note (logged only)
+{"type":"think","value":"thought text or $variable"}
+
+# CONDITION SCHEMA (uniform form)
+All conditions evaluate to a boolean:
+{"type": "<condition_type>", "target": "$variable", "field?": "optional_field", "value?": "<literal or variable>"}
+
+# CONDITION SYNTAX (all evaluate to boolean)
+
+Variable state - these conditions test the existence of a variable:
+{"type": "bound", "target": "$var"}           // true if $var exists
+{"type": "notbound", "target": "$var"}        // true if $var doesn't exist
+{"type": "has_value", "target": "$var"}       // true if $var is truthy
+{"type": "empty", "target": "$var"}           // true if $var is falsy/empty
+
+Value comparison - these conditions test Note object content:
+{"type": "equals", "target": "$var", "value": "expected"}
+{"type": "not_equals", "target": "$var", "value": "unwanted"}
+{"type": "greater_than", "target": "$score", "value": 0.8}
+{"type": "less_than", "target": "$count", "value": 100}
+{"type": "gte", "target": "$score", "value": 0.7}
+{"type": "lte", "target": "$size", "value": 1000}
+
+Membership - these conditions test Note object content:
+{"type": "contains", "target": "$text", "value": "keyword"}          // substring or list element
+{"type": "not_contains", "target": "$tags", "value": "spam"}
+
+Structured data - these conditions test Note object metadata:
+{"type": "field_exists", "target": "$data", "field": "urls"}
+{"type": "field_missing", "target": "$data", "field": "error"}
+
+
+# TOOLS - the tools available to the agent are listed below, make sure to use the correct name when calling apply.
+
+{{tools}}
+
+
+# EXAMPLES
+
+Minimal Example (say hello):
+{
+  "plan": [
+    {"type": "say", "target": "user", "value": "Hello!"}
+  ]
+}
+
+Research Example (multi-step information flow):
+{
+  "plan": [
+    {"type": "apply","target": "web-search","value": "LLM cognitive agents 2025","reason": "find recent work","out": "results"},
+    {"type": "index","source": "$results","store_name": "research_memory","index_type": "semantic","fields": {"title":"embed","content":"embed"}},
+    {"type": "say","target": "user","value": "Research complete and indexed."}
+  ]
+}
+
+# SEMANTIC RULES
+
+Type System:
+- Note: typed object storing a single value/data structure. Example: {"type":"Note","id":"Note_35","content":"Hello, world!"}
+- Collection: typed object storing a list of items. Example: {"type":"Collection","id":"Collection_2","items":['Note_35','Note_36', 'Collection_3']}
+- Both Note and Collection are created with id and stored in plan_bindings.
+
+Variables:
+- Variables are plan-local names that reference Note/Collection objects
+- Actions with "out" create new Note/Collection objects and bind to the variable name in the "out" field
+- "$variable" syntax resolves to the content stored in the Note/Collection
+- Variables are cleared after plan completion
+
+Argument Conventions:
+- Literal strings/values: Use directly without "$" prefix (e.g., "tool-name", "hello")
+- Variable references: Use "$variable" to resolve Note/Collection content
+- Output names: In "out" fields, use plain strings without "$" (e.g., "out":"result")
+
+CONSTRAINTS
+- Use only primitives listed above.
+- Variables must be created before use (save, apply, search, or index may bind them).
+- All JSON must be syntactically valid (no comments or trailing commas).
+- Nested steps count toward max_steps = 12.
+- Output only valid JSON.
 """
 
 
@@ -290,11 +202,19 @@ class InfospacePlanner:
         response = self.llm_client.generate(
             [formatted_template],
             max_tokens=2000,
-            temperature=0.7
+            temperature=0.6,
+            is_json=True
         )
         
-        # Parse JSON response
-        plan = self._parse_plan_response(response.text)
+        # Log response for debugging
+        self.logger.info(f"LLM response length: {len(response.text) if response.text else 0} chars")
+        if not isinstance(response.text, dict) and (not response.text or len(response.text) < 10):
+            self.logger.error(f"LLM response too short or empty: '{response.text}'")
+        
+        if not isinstance(response.text, dict): # Parse JSON response
+            plan = self._parse_plan_response(response.text)
+        else:
+            plan = response.text
         
         if plan.get('error'):
             self.logger.error(f"Plan generation failed: {plan['error']}")
@@ -311,12 +231,12 @@ class InfospacePlanner:
     
     def _format_template(self, goal: str, context: Dict) -> str:
         """Format template with goal and context"""
-        skills = context.get('available_skills', [])
+        tools = context.get('available_tools', [])
         stores = context.get('available_stores', [])
         variables = context.get('variables', {})
         
-        # Format skills list
-        skills_text = '\n'.join([f"- {skill}" for skill in skills]) if skills else "None visible (use scan)"
+        # Format tools list
+        tools_text = '\n'.join([f"- {tool}" for tool in tools]) if tools else "None visible"
         
         # Format stores list
         stores_text = '\n'.join([f"- {store}" for store in stores]) if stores else "None yet (create with index)"
@@ -330,7 +250,7 @@ class InfospacePlanner:
         # Fill in template
         filled = self.template
         filled = filled.replace('{{context}}', context_text)
-        filled = filled.replace('{{skills}}', skills_text)
+        filled = filled.replace('{{tools}}', tools_text)  # Note: template var is {{tools}} for compatibility
         filled = filled.replace('{{stores}}', stores_text)
         filled = filled.replace('{{variables}}', vars_text)
         filled = filled.replace('{{goal}}', goal)
@@ -339,6 +259,11 @@ class InfospacePlanner:
     
     def _parse_plan_response(self, response_text: str) -> Dict:
         """Parse LLM response into plan dict"""
+        # Check for empty response
+        if not response_text or not response_text.strip():
+            self.logger.error("LLM returned empty response")
+            return {'error': 'Empty response from LLM'}
+        
         # Remove markdown code fences if present
         text = response_text.strip()
         if text.startswith('```'):
@@ -398,23 +323,26 @@ class InfospacePlanner:
     def _validate_action_fields(self, action_type: str, action: Dict) -> Dict:
         """Validate required fields for action type"""
         required_fields = {
-            'scan': ['target', 'out', 'prediction'],
-            'use': ['target', 'reason', 'prediction'],
+            # Phase 1
+            'apply': ['target', 'reason', 'prediction'],
             'move': ['target'],
-            'store': [],  # Either variable or collection required
+            'save': ['value', 'out'],  # Creates Note and binds to variable
             'index': ['source', 'store_name', 'index_type', 'fields'],
             'search': ['store_name', 'query', 'mode', 'limit', 'out', 'prediction'],
             'if': ['condition', 'then'],
             'while': ['condition', 'body'],
             'wait': ['condition'],
             'say': ['target', 'value'],
-            'think': ['value']
+            'think': ['value'],
+
         }
         
-        # Special case for store
-        if action_type == 'store':
-            if 'variable' not in action and 'collection' not in action:
-                return {'valid': False, 'reason': 'store requires variable or collection'}
+        # Special case for save (accept 'out' or legacy 'variable')
+        if action_type == 'save':
+            if 'out' not in action and 'variable' not in action:
+                return {'valid': False, 'reason': 'save requires out'}
+            if 'value' not in action:
+                return {'valid': False, 'reason': 'save requires value'}
             return {'valid': True}
         
         required = required_fields.get(action_type, [])
@@ -424,4 +352,20 @@ class InfospacePlanner:
                 return {'valid': False, 'reason': f'Missing required field: {field}'}
         
         return {'valid': True}
+
+
+def verify_plan(plan_json: Any) -> bool:
+    """
+    Validate infospace plan structure.
+    Public interface for plan validation (matches plan.py API).
+    
+    Args:
+        plan_json: Plan as JSON string or dict
+        
+    Returns:
+        True if valid, False otherwise
+    """
+    planner = InfospacePlanner(None)  # Validator only, no LLM needed
+    validation = planner._validate_plan(plan_json if isinstance(plan_json, dict) else json.loads(plan_json))
+    return validation['valid']
 

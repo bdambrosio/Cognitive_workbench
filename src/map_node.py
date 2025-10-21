@@ -388,30 +388,30 @@ end your response with:
         
         # Infospace vector store subscribers (for semantic search/memory)
         self.index_request_subscriber = self.session.declare_subscriber(
-            "map/*/index_request",
+            "map/*/index_request/*",
             self.handle_index_request
         )
         
         self.search_request_subscriber = self.session.declare_subscriber(
-            "map/*/search_request",
+            "map/*/search_request/*",
             self.handle_search_request
         )
         
-        # Infospace skill execution (placeholder for now, skills handled by map)
-        self.skill_request_subscriber = self.session.declare_subscriber(
-            "map/*/skill_request",
-            self.handle_skill_request
+        # Infospace tool execution (placeholder for now, tools handled by map)
+        self.tool_request_subscriber = self.session.declare_subscriber(
+            "map/*/tool_request/*",
+            self.handle_tool_request
         )
         
         # Infospace scan request (find resources by name/interface)
         self.scan_request_subscriber = self.session.declare_subscriber(
-            "map/*/scan_request",
+            "map/*/scan_request/*",
             self.handle_scan_request
         )
         
         # Infospace move request (navigate to resource)
         self.move_request_subscriber = self.session.declare_subscriber(
-            "map/*/move_request",
+            "map/*/move_request/*",
             self.handle_move_request
         )
         
@@ -900,9 +900,18 @@ end your response with:
         """Handle resources list queries"""
         try:
             resources = self.world_map.get_resource_list()
+            
+            # Convert ResourceType enums to strings for JSON serialization
+            json_safe_resources = []
+            for resource in resources:
+                resource_copy = resource.copy()
+                if 'type' in resource_copy:
+                    resource_copy['type'] = str(resource_copy['type'])
+                json_safe_resources.append(resource_copy)
+            
             response = {
                 'success': True,
-                'resources': resources
+                'resources': json_safe_resources
             }
             query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
         except Exception as e:
@@ -2817,7 +2826,7 @@ end your response with:
             'fields': {field_name: 'embed'|'keyword'|'store'}
         }
         """
-        request = json.loads(sample.payload)
+        request = json.loads(sample.payload.to_bytes().decode('utf-8'))
         agent_name = request.get('agent_name')
         store_name = request.get('store_name')
         source = request.get('source', [])
@@ -2855,6 +2864,7 @@ end your response with:
         }
         
         response_topic = f"map/{self.world_name}/index_response/{agent_name}"
+        time.sleep(0.05)
         self.session.put(response_topic, json.dumps(response))
         
         logger.info(f"Indexed {indexed_count} items to '{store_name}'")
@@ -2873,7 +2883,7 @@ end your response with:
             'threshold': float (optional, default 0.0)
         }
         """
-        request = json.loads(sample.payload)
+        request = json.loads(sample.payload.to_bytes().decode('utf-8'))
         agent_name = request.get('agent_name')
         store_name = request.get('store_name')
         query = request.get('query')
@@ -2915,34 +2925,36 @@ end your response with:
         
         # Publish response
         response_topic = f"map/{self.world_name}/search_response/{agent_name}"
+        time.sleep(0.05)
         self.session.put(response_topic, json.dumps(response))
     
-    def handle_skill_request(self, sample):
+    def handle_tool_request(self, sample):
         """
-        Handle skill execution request (placeholder for Phase 1).
+        Handle tool execution request (placeholder for Phase 1).
         
         Message format:
         {
             'agent_name': str,
-            'skill_name': str,
+            'tool_name': str,
             'input_value': str,
             'reason': str
         }
         """
-        request = json.loads(sample.payload)
+        request = json.loads(sample.payload.to_bytes().decode('utf-8'))
         agent_name = request.get('agent_name')
-        skill_name = request.get('skill_name')
+        tool_name = request.get('tool_name')
         
-        logger.info(f"Skill request from {agent_name}: {skill_name}")
+        logger.info(f"Tool request from {agent_name}: {tool_name}")
         
         # Phase 1: Return placeholder response
-        # TODO: Actually execute skills from /maps/skills/ directory
+        # TODO: Actually execute tools from /maps/skills/ directory
         response = {
             'status': 'success',
-            'result': f"[Skill {skill_name} executed - placeholder result]"
+            'result': f"[Tool {tool_name} executed - placeholder result]"
         }
         
-        response_topic = f"map/{self.world_name}/skill_response/{agent_name}"
+        response_topic = f"map/{self.world_name}/tool_response/{agent_name}"
+        time.sleep(0.05)
         self.session.put(response_topic, json.dumps(response))
     
     def handle_scan_request(self, sample):
@@ -2953,24 +2965,31 @@ end your response with:
         {
             'agent_name': str,
             'target': str (resource name or interface type),
-            'scan_type': str (skill, information, etc.)
+            'scan_type': str (tool, information, etc.)
         }
         """
-        request = json.loads(sample.payload)
+        request = json.loads(sample.payload.to_bytes().decode('utf-8'))
         agent_name = request.get('agent_name')
         target = request.get('target')
         
         logger.info(f"Scan request from {agent_name}: {target}")
         
-        # Search for matching resources
+        # Get all resources and search for matches
+        resources = self.world_map.get_resource_list()
         matching_resources = []
-        for resource in self.world_map.resource_registry:
-            if resource.name and target.lower() in resource.name.lower():
+        
+        for resource_info in resources:
+            resource_name = resource_info.get('name', '')
+            if resource_name and target.lower() in resource_name.lower():
+                resource_type = resource_info.get('type', '')
+                # Convert enum to string for JSON serialization
+                if hasattr(resource_type, 'name'):
+                    resource_type = resource_type.name
                 matching_resources.append({
-                    'name': resource.name,
-                    'type': resource.resource_type_name,
-                    'location': (resource.x, resource.y),
-                    'id': resource.resource_id
+                    'name': resource_name,
+                    'type': str(resource_type),
+                    'location': resource_info.get('location', (0, 0)),
+                    'id': resource_info.get('id', '')
                 })
         
         # Return first match or error
@@ -2989,6 +3008,7 @@ end your response with:
             logger.info(f"Scan found no matches for '{target}'")
         
         response_topic = f"map/{self.world_name}/scan_response/{agent_name}"
+        time.sleep(0.05)
         self.session.put(response_topic, json.dumps(response))
     
     def handle_move_request(self, sample):
@@ -3001,7 +3021,7 @@ end your response with:
             'target': str (resource name) or dict (resource info)
         }
         """
-        request = json.loads(sample.payload)
+        request = json.loads(sample.payload.to_bytes().decode('utf-8'))
         agent_name = request.get('agent_name')
         target = request.get('target')
         
@@ -3020,10 +3040,13 @@ end your response with:
                 target_x, target_y = target['location']
             else:
                 # Find resource by name
+                resources = self.world_map.get_resource_list()
                 target_resource = None
-                for resource in self.world_map.resource_registry:
-                    if resource.name and target.lower() in resource.name.lower():
-                        target_resource = resource
+                
+                for resource_info in resources:
+                    resource_name = resource_info.get('name', '')
+                    if resource_name and target.lower() in resource_name.lower():
+                        target_resource = resource_info
                         break
                 
                 if not target_resource:
@@ -3032,10 +3055,11 @@ end your response with:
                         'reason': f"Resource '{target}' not found"
                     }
                     response_topic = f"map/{self.world_name}/move_response/{agent_name}"
+                    time.sleep(0.05)
                     self.session.put(response_topic, json.dumps(response))
                     return
                 
-                target_x, target_y = target_resource.x, target_resource.y
+                target_x, target_y = target_resource.get('location', (0, 0))
             
             # Move agent to target location
             agent.x = target_x
@@ -3048,6 +3072,7 @@ end your response with:
             logger.info(f"Moved {agent_name} to ({target_x}, {target_y})")
         
         response_topic = f"map/{self.world_name}/move_response/{agent_name}"
+        time.sleep(0.05)
         self.session.put(response_topic, json.dumps(response))
 
 

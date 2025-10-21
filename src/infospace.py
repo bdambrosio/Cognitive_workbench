@@ -30,10 +30,12 @@ class InfospaceResources(Enum):
     Resource types in infospace.
     
     - Skill: Static resources (cognitive tools loaded from skills directory)
-    - Information: Dynamic resources (artifacts created by skill execution at runtime)
+    - Note: Dynamic resources (artifacts created by skill execution at runtime)
+    - Collection: Dynamic resources (groups of related notes or structured data)
     """
     Skill = auto()
-    Information = auto()
+    Note = auto()
+    Collection = auto()
 
 
 # No infrastructure or properties needed

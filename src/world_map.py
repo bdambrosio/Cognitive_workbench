@@ -770,9 +770,19 @@ class WorldMap(SpaceMap):
         return None
 
     def get_resource_list(self):
+        """
+        Get list of all resources with their data.
+        
+        Returns:
+            List of dicts, each containing resource data:
+            {'id': str, 'name': str, 'type': enum, 'location': tuple, 'description': str, ...}
+        """
         resource_list = []
-        for resource_id in self.resource_registry:
-            resource_list.append(f'{self.resource_registry[resource_id]["name"]} {self.resource_registry[resource_id]["description"]} located at {self.resource_registry[resource_id]["location"]}')
+        for resource_id, resource_data in self.resource_registry.items():
+            # Create a copy with the ID included
+            resource_info = dict(resource_data)
+            resource_info['id'] = resource_id
+            resource_list.append(resource_info)
         return resource_list
         
         
