@@ -1439,7 +1439,7 @@ end your response with </end>
             # Physical world primitives
             'move', 'say', 'think', 'take', 'place', 'inspect', 'use', 'scan',
             # Infospace primitives - Phase 1 & 2
-            'store', 'index', 'search',
+            'apply', 'create', 'save', 'load', 'store', 'index', 'organize', 'search',
             'extract', 'filter', 'merge', 'transform',
             'aggregate', 'sort', 'group_by', 'compare'
         }
@@ -1570,7 +1570,7 @@ end your response with </end>
             # Infospace primitives that route to infospace executor
             infospace_primitives = {
                 # Phase 1 Core
-                'apply', 'move', 'create', 'save', 
+                'apply', 'move', 'create', 'save', 'load',
                 'index', 'organize', 'search',
                 # Phase 1 Control
                 'if', 'while', 'wait',
@@ -1615,6 +1615,12 @@ end your response with </end>
                     'status': result.get('status', 'unknown'),
                     'value': str(result.get('value', ''))[:200] if result.get('value') else ''
                 }
+                
+                # Add 'text' field for say/think actions (memory_node expects this)
+                if action_type in ('say', 'think'):
+                    action_data['text'] = str(result.get('value', ''))[:200] if result.get('value') else ''
+                    action_data['source'] = self.character_name
+                
                 self.action_publisher.put(json.dumps(action_data))
                 self.action_counter += 1
                 
@@ -3576,23 +3582,37 @@ End your response with:
                 }))
                 action_data['response'] = outcome_text
                 
-                # If skill succeeded and 'out' field present, create Information instance and bind variable
+                # If skill succeeded and 'out' field present, create Note or Collection instance
                 if result['success'] and action.get('out'):
                     var_name = action.get('out')
                     
-                    # Determine content format
+                    # Determine content type and format
                     skill_result = result.get('result', '')
-                    if isinstance(skill_result, dict):
+                    
+                    # Detect if result is a Collection (list) or Note (single value)
+                    if isinstance(skill_result, list):
+                        # Collection type
+                        content = skill_result
+                        format_type = 'list'
+                        resource_kind = 'Collection'
+                        create_topic = "cognitive/map/collection/create"
+                    elif isinstance(skill_result, dict):
+                        # Note with JSON content
                         content = skill_result
                         format_type = 'json'
+                        resource_kind = 'Note'
+                        create_topic = "cognitive/map/note/create"
                     else:
+                        # Note with text content
                         content = str(skill_result)
                         format_type = 'text'
+                        resource_kind = 'Note'
+                        create_topic = "cognitive/map/note/create"
                     
-                    # Create Information instance via map_node
+                    # Create Note or Collection instance via map_node
                     try:
                         for reply in self.session.get(
-                            "cognitive/map/information/create",
+                            create_topic,
                             target=QueryTarget.BEST_MATCHING,
                             consolidation=ConsolidationMode.NONE,
                             timeout=5.0 if not self.debug else 300.0,
@@ -3608,14 +3628,14 @@ End your response with:
                                 info_response = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
                                 if info_response.get('success'):
                                     info_id = info_response.get('info_id')
-                                    # Bind variable to Information resource ID
+                                    # Bind variable to Note or Collection resource ID
                                     self.plan_bindings[var_name] = info_id
-                                    logger.info(f'🔗 {self.character_name} bound variable: {var_name} = {info_id}')
+                                    logger.info(f'🔗 {self.character_name} bound variable: {var_name} = {info_id} ({resource_kind})')
                                 else:
-                                    logger.error(f'Failed to create Information instance: {info_response.get("error")}')
+                                    logger.error(f'Failed to create {resource_kind} instance: {info_response.get("error")}')
                             break
                     except Exception as e:
-                        logger.error(f'Error creating Information instance for variable {var_name}: {e}')
+                        logger.error(f'Error creating {resource_kind} instance for variable {var_name}: {e}')
                 
                 return result['success']
                 

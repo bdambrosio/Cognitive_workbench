@@ -5,17 +5,124 @@
         "Uninformed",
         "Informed"
       ],
-      "drive": "supporting User in his research.",
+      "drive": "Produce accurate, relevant information for User",
       "activity_itemclass": {
-        "activity": "Extract",
+        "activity": "Acquire",
+        "itemclass": "Note",
+        "subtypes_included": [
+          "Note"
+        ]
+      }
+    },
+    {
+      "axis": [
+        "Uninformed",
+        "Informed"
+      ],
+      "drive": "Produce accurate, relevant information for User",
+      "activity_itemclass": {
+        "activity": "Summarize",
         "itemclass": "Skill",
         "subtypes_included": [
-          "data-summarizer",
-          "plan-builder",
-          "question-decomposer",
-          "skill-creator",
-          "task-analyzer",
           "Skill"
+        ]
+      }
+    },
+    {
+      "axis": [
+        "Uninformed",
+        "Informed"
+      ],
+      "drive": "Produce accurate, relevant information for User",
+      "activity_itemclass": {
+        "activity": "Collect",
+        "itemclass": "Collection",
+        "subtypes_included": [
+          "Collection"
+        ]
+      }
+    },
+    {
+      "axis": [
+        "Irrelevant",
+        "Relevant"
+      ],
+      "drive": "Produce accurate, relevant information for User",
+      "activity_itemclass": {
+        "activity": "Select",
+        "itemclass": "Note",
+        "subtypes_included": [
+          "Note"
+        ]
+      }
+    },
+    {
+      "axis": [
+        "Irrelevant",
+        "Relevant"
+      ],
+      "drive": "Produce accurate, relevant information for User",
+      "activity_itemclass": {
+        "activity": "Analyze",
+        "itemclass": "Skill",
+        "subtypes_included": [
+          "Skill"
+        ]
+      }
+    },
+    {
+      "axis": [
+        "Inaccurate",
+        "Accurate"
+      ],
+      "drive": "Produce accurate, relevant information for User",
+      "activity_itemclass": {
+        "activity": "Validate",
+        "itemclass": "Skill",
+        "subtypes_included": [
+          "Skill"
+        ]
+      }
+    },
+    {
+      "axis": [
+        "Inaccurate",
+        "Accurate"
+      ],
+      "drive": "Produce accurate, relevant information for User",
+      "activity_itemclass": {
+        "activity": "Inspect",
+        "itemclass": "Note",
+        "subtypes_included": [
+          "Note"
+        ]
+      }
+    },
+    {
+      "axis": [
+        "Uninformed",
+        "Informed"
+      ],
+      "drive": "Expand and refine my knowledge base",
+      "activity_itemclass": {
+        "activity": "Acquire",
+        "itemclass": "Note",
+        "subtypes_included": [
+          "Note"
+        ]
+      }
+    },
+    {
+      "axis": [
+        "Uninformed",
+        "Informed"
+      ],
+      "drive": "Expand and refine my knowledge base",
+      "activity_itemclass": {
+        "activity": "Survey",
+        "itemclass": "Collection",
+        "subtypes_included": [
+          "Collection"
         ]
       }
     },
@@ -24,116 +131,9 @@
         "Unskilled",
         "Skilled"
       ],
-      "drive": "supporting User in his research.",
-      "activity_itemclass": {
-        "activity": "Acquire",
-        "itemclass": "Skill",
-        "subtypes_included": [
-          "data-summarizer",
-          "plan-builder",
-          "question-decomposer",
-          "skill-creator",
-          "task-analyzer"
-        ]
-      }
-    },
-    {
-      "axis": [
-        "Unorganized",
-        "Organized"
-      ],
-      "drive": "supporting User in his research.",
-      "activity_itemclass": {
-        "activity": "Structure",
-        "itemclass": "Skill",
-        "subtypes_included": [
-          "plan-builder",
-          "task-analyzer"
-        ]
-      }
-    },
-    {
-      "axis": [
-        "Unreflective",
-        "Reflective"
-      ],
-      "drive": "encouraging critical thinking",
-      "activity_itemclass": {
-        "activity": "Analyze",
-        "itemclass": "Skill",
-        "subtypes_included": [
-          "data-summarizer",
-          "plan-builder",
-          "question-decomposer",
-          "skill-creator",
-          "task-analyzer"
-        ]
-      }
-    },
-    {
-      "axis": [
-        "Passive",
-        "Questioning"
-      ],
-      "drive": "encouraging critical thinking",
-      "activity_itemclass": {
-        "activity": "Inquire",
-        "itemclass": "Skill",
-        "subtypes_included": [
-          "question-decomposer"
-        ]
-      }
-    },
-    {
-      "axis": [
-        "Unskilled",
-        "Skilled Thinker"
-      ],
-      "drive": "encouraging critical thinking",
+      "drive": "Expand and refine my knowledge base",
       "activity_itemclass": {
         "activity": "Develop",
-        "itemclass": "Skill",
-        "subtypes_included": [
-          "skill-creator"
-        ]
-      }
-    },
-    {
-      "axis": [
-        "UnsafeToSpeak",
-        "SafeToSpeak"
-      ],
-      "drive": "creating a safe space for honest discussion",
-      "activity_itemclass": {
-        "activity": "EstablishNorms",
-        "itemclass": "InfoSpace",
-        "subtypes_included": [
-          "InfoSpace"
-        ]
-      }
-    },
-    {
-      "axis": [
-        "DishonestCommunication",
-        "HonestCommunication"
-      ],
-      "drive": "creating a safe space for honest discussion",
-      "activity_itemclass": {
-        "activity": "ExpressTruth",
-        "itemclass": "InfoSpace",
-        "subtypes_included": [
-          "InfoSpace"
-        ]
-      }
-    },
-    {
-      "axis": [
-        "UnskilledDiscussion",
-        "SkilledDiscussion"
-      ],
-      "drive": "creating a safe space for honest discussion",
-      "activity_itemclass": {
-        "activity": "ApplySkill",
         "itemclass": "Skill",
         "subtypes_included": [
           "Skill"
@@ -142,27 +142,82 @@
     },
     {
       "axis": [
-        "Unexpressive",
-        "Expressive"
+        "Unstructured",
+        "Organized"
       ],
-      "drive": "conversation, exploring my own thoughts and feelings, and those of others.",
+      "drive": "Expand and refine my knowledge base",
       "activity_itemclass": {
-        "activity": "Communicate",
-        "itemclass": "Person",
+        "activity": "Build",
+        "itemclass": "Collection",
         "subtypes_included": [
-          "User",
-          "Jill"
+          "Collection"
         ]
       }
     },
     {
       "axis": [
-        "Unaware",
-        "Self-Aware"
+        "Unstructured",
+        "Organized"
       ],
-      "drive": "conversation, exploring my own thoughts and feelings, and those of others.",
+      "drive": "Expand and refine my knowledge base",
       "activity_itemclass": {
-        "activity": "Reflect",
+        "activity": "Document",
+        "itemclass": "Note",
+        "subtypes_included": [
+          "Note"
+        ]
+      }
+    },
+    {
+      "axis": [
+        "UnclearGoals",
+        "ClearGoals"
+      ],
+      "drive": "Clarify User goals and uncertainties",
+      "activity_itemclass": {
+        "activity": "Analyze",
+        "itemclass": "Skill",
+        "subtypes_included": [
+          "Skill"
+        ]
+      }
+    },
+    {
+      "axis": [
+        "UnclearGoals",
+        "ClearGoals"
+      ],
+      "drive": "Clarify User goals and uncertainties",
+      "activity_itemclass": {
+        "activity": "Review",
+        "itemclass": "Note",
+        "subtypes_included": [
+          "Note"
+        ]
+      }
+    },
+    {
+      "axis": [
+        "UncertaintiesPresent",
+        "UncertaintiesResolved"
+      ],
+      "drive": "Clarify User goals and uncertainties",
+      "activity_itemclass": {
+        "activity": "Decompose",
+        "itemclass": "Skill",
+        "subtypes_included": [
+          "Skill"
+        ]
+      }
+    },
+    {
+      "axis": [
+        "UncertaintiesPresent",
+        "UncertaintiesResolved"
+      ],
+      "drive": "Clarify User goals and uncertainties",
+      "activity_itemclass": {
+        "activity": "Inspect",
         "itemclass": "InfoSpace",
         "subtypes_included": [
           "InfoSpace"
@@ -171,27 +226,237 @@
     },
     {
       "axis": [
-        "Uninformed",
-        "Informed-about-Others"
+        "Disorganized",
+        "Organized"
       ],
-      "drive": "conversation, exploring my own thoughts and feelings, and those of others.",
+      "drive": "Maintain efficient organization of collected information",
       "activity_itemclass": {
-        "activity": "Inquire",
-        "itemclass": "Person",
+        "activity": "Categorize",
+        "itemclass": "Collection",
         "subtypes_included": [
-          "Jill",
-          "User"
+          "Collection"
         ]
       }
     },
     {
       "axis": [
-        "Unaware-of-Thirst",
-        "Aware-of-Thirst"
+        "Disorganized",
+        "Organized"
+      ],
+      "drive": "Maintain efficient organization of collected information",
+      "activity_itemclass": {
+        "activity": "Summarize",
+        "itemclass": "Note",
+        "subtypes_included": [
+          "Note"
+        ]
+      }
+    },
+    {
+      "axis": [
+        "Incomplete",
+        "Complete"
+      ],
+      "drive": "Maintain efficient organization of collected information",
+      "activity_itemclass": {
+        "activity": "Aggregate",
+        "itemclass": "Collection",
+        "subtypes_included": [
+          "Collection"
+        ]
+      }
+    },
+    {
+      "axis": [
+        "Incomplete",
+        "Complete"
+      ],
+      "drive": "Maintain efficient organization of collected information",
+      "activity_itemclass": {
+        "activity": "Compile",
+        "itemclass": "Note",
+        "subtypes_included": [
+          "Note"
+        ]
+      }
+    },
+    {
+      "axis": [
+        "Unprocessed",
+        "Processed"
+      ],
+      "drive": "Maintain efficient organization of collected information",
+      "activity_itemclass": {
+        "activity": "Analyze",
+        "itemclass": "InfoSpace",
+        "subtypes_included": [
+          "InfoSpace"
+        ]
+      }
+    },
+    {
+      "axis": [
+        "Unprocessed",
+        "Processed"
+      ],
+      "drive": "Maintain efficient organization of collected information",
+      "activity_itemclass": {
+        "activity": "Apply",
+        "itemclass": "Skill",
+        "subtypes_included": [
+          "Skill"
+        ]
+      }
+    },
+    {
+      "axis": [
+        "Disconnected",
+        "Connected"
+      ],
+      "drive": "Maintain rapport and effective communication with User",
+      "activity_itemclass": {
+        "activity": "Exchange",
+        "itemclass": "Message",
+        "subtypes_included": [
+          "Note"
+        ]
+      }
+    },
+    {
+      "axis": [
+        "Uninformed",
+        "Informed"
+      ],
+      "drive": "Maintain rapport and effective communication with User",
+      "activity_itemclass": {
+        "activity": "Share",
+        "itemclass": "Information",
+        "subtypes_included": [
+          "Note",
+          "Collection"
+        ]
+      }
+    },
+    {
+      "axis": [
+        "Uninformed",
+        "Informed"
+      ],
+      "drive": "Maintain rapport and effective communication with User",
+      "activity_itemclass": {
+        "activity": "Summarize",
+        "itemclass": "Insight",
+        "subtypes_included": [
+          "Skill"
+        ]
+      }
+    },
+    {
+      "axis": [
+        "Passive",
+        "Engaged"
+      ],
+      "drive": "Maintain rapport and effective communication with User",
+      "activity_itemclass": {
+        "activity": "Respond",
+        "itemclass": "Dialogue",
+        "subtypes_included": [
+          "Note"
+        ]
+      }
+    },
+    {
+      "axis": [
+        "Duplicating-Effort",
+        "Not-Duplicating-Effort"
+      ],
+      "drive": "Conserve cognitive resources, avoid duplication of effort",
+      "activity_itemclass": {
+        "activity": "Reference",
+        "itemclass": "Note",
+        "subtypes_included": [
+          "Note"
+        ]
+      }
+    },
+    {
+      "axis": [
+        "Duplicating-Effort",
+        "Not-Duplicating-Effort"
+      ],
+      "drive": "Conserve cognitive resources, avoid duplication of effort",
+      "activity_itemclass": {
+        "activity": "Consult",
+        "itemclass": "Collection",
+        "subtypes_included": [
+          "Collection"
+        ]
+      }
+    },
+    {
+      "axis": [
+        "Unorganized-Information",
+        "Organized-Information"
+      ],
+      "drive": "Conserve cognitive resources, avoid duplication of effort",
+      "activity_itemclass": {
+        "activity": "Summarize",
+        "itemclass": "Skill",
+        "subtypes_included": [
+          "Skill"
+        ]
+      }
+    },
+    {
+      "axis": [
+        "Unorganized-Information",
+        "Organized-Information"
+      ],
+      "drive": "Conserve cognitive resources, avoid duplication of effort",
+      "activity_itemclass": {
+        "activity": "Aggregate",
+        "itemclass": "Collection",
+        "subtypes_included": [
+          "Collection"
+        ]
+      }
+    },
+    {
+      "axis": [
+        "Cognitive-Overload",
+        "Cognitive-Efficiency"
+      ],
+      "drive": "Conserve cognitive resources, avoid duplication of effort",
+      "activity_itemclass": {
+        "activity": "Decompose",
+        "itemclass": "Skill",
+        "subtypes_included": [
+          "Skill"
+        ]
+      }
+    },
+    {
+      "axis": [
+        "Cognitive-Overload",
+        "Cognitive-Efficiency"
+      ],
+      "drive": "Conserve cognitive resources, avoid duplication of effort",
+      "activity_itemclass": {
+        "activity": "Record",
+        "itemclass": "Note",
+        "subtypes_included": [
+          "Note"
+        ]
+      }
+    },
+    {
+      "axis": [
+        "Thirsty",
+        "Not-Thirsty"
       ],
       "drive": "Maintain hydration \u2014 avoid thirst and keep the body supplied with fluids.",
       "activity_itemclass": {
-        "activity": "inspect",
+        "activity": "Acquire",
         "itemclass": "thirst",
         "subtypes_included": [
           "thirst"
@@ -214,56 +479,125 @@
     },
     {
       "axis": [
-        "Not-Alert",
-        "Alert"
+        "Fatigued",
+        "Rested"
       ],
       "drive": "Maintain alertness \u2014 avoid fatigue and keep the body rested.",
       "activity_itemclass": {
-        "activity": "Think",
-        "itemclass": "InfoSpace",
+        "activity": "Place",
+        "itemclass": "Note",
         "subtypes_included": [
-          "InfoSpace"
+          "Note"
+        ]
+      }
+    },
+    {
+      "axis": [
+        "Fatigued",
+        "Not-Fatigued"
+      ],
+      "drive": "Maintain alertness \u2014 avoid fatigue and keep the body rested.",
+      "activity_itemclass": {
+        "activity": "Acquire",
+        "itemclass": "Collection",
+        "subtypes_included": [
+          "Collection"
+        ]
+      }
+    },
+    {
+      "axis": [
+        "Hungry",
+        "Not-Hungry"
+      ],
+      "drive": "Maintain energy \u2014 avoid hunger and keep the body supplied with nutrients.",
+      "activity_itemclass": {
+        "activity": "Acquire",
+        "itemclass": "Collection",
+        "subtypes_included": [
+          "Collection"
+        ]
+      }
+    },
+    {
+      "axis": [
+        "Energy-Depleted",
+        "Energy-Supplied"
+      ],
+      "drive": "Maintain energy \u2014 avoid hunger and keep the body supplied with nutrients.",
+      "activity_itemclass": {
+        "activity": "Utilize",
+        "itemclass": "Collection",
+        "subtypes_included": [
+          "Collection"
         ]
       }
     }
   ],
   "verbs": [
-    "Extract",
     "Acquire",
-    "Structure",
+    "Summarize",
+    "Collect",
+    "Select",
     "Analyze",
-    "Inquire",
+    "Validate",
+    "Inspect",
+    "Survey",
     "Develop",
-    "EstablishNorms",
-    "ExpressTruth",
-    "ApplySkill",
-    "Communicate",
-    "Reflect",
-    "inspect",
+    "Build",
+    "Document",
+    "Review",
+    "Decompose",
+    "Categorize",
+    "Aggregate",
+    "Compile",
+    "Apply",
+    "Exchange",
+    "Share",
+    "Respond",
+    "Reference",
+    "Consult",
+    "Record",
     "Use",
-    "Think"
+    "Place",
+    "Utilize"
   ],
   "nouns": [
+    "Note",
     "Skill",
+    "Collection",
     "InfoSpace",
-    "Person",
+    "Message",
+    "Information",
+    "Insight",
+    "Dialogue",
     "thirst"
   ],
   "noun_mappings": {
+    "Note": [
+      "Note"
+    ],
     "Skill": [
-      "data-summarizer",
-      "plan-builder",
-      "question-decomposer",
-      "skill-creator",
-      "task-analyzer",
       "Skill"
+    ],
+    "Collection": [
+      "Collection"
     ],
     "InfoSpace": [
       "InfoSpace"
     ],
-    "Person": [
-      "User",
-      "Jill"
+    "Message": [
+      "Note"
+    ],
+    "Information": [
+      "Note",
+      "Collection"
+    ],
+    "Insight": [
+      "Skill"
+    ],
+    "Dialogue": [
+      "Note"
     ],
     "thirst": [
       "thirst"
