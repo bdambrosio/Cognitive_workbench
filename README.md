@@ -1,5 +1,13 @@
 # Cognitive workbench
 
+- What's a cognitive actor that can't reason about what it knows?
+- Stage 1 - create an actor that operates in Information space instead of (simulated) physical space.
+- Stage 2 - map the actor's internal representations into Information space. 
+
+Early stage 1, code isn't working yet, but Jill has information operators to create, 'see', search, manipulate (via primitives + a simplified Anthropic skills model) information objects.
+
+----------------------------------------------------------------------------------------------------------------------
+
 My new playground for cognitive AI experiments.
 A simplified cognitive framework using Zenoh for parallelism and communication.
 Barest of functionality, this is the initial skeleton, tested enough I believe it is worth building on.
