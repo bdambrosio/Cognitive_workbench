@@ -690,6 +690,7 @@ A plan must include no more than 8 steps including all nested while and if branc
 """
 
 PLAN_TEMPLATE_C = """
+Respond only with the complete JSON plan for the goal, no other text.
 """
 
 PLAN_TEMPLATE = PLAN_TEMPLATE_A + PLAN_TEMPLATE_B + PLAN_TEMPLATE_C

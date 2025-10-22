@@ -77,6 +77,7 @@ class InfospaceExecutor:
             'move': self._execute_move,
             'create': self._execute_create,
             'save': self._execute_save,
+            'load': self._execute_load,
             'index': self._execute_index,
             'organize': self._execute_index,  # Alias for index
             'search': self._execute_search,
@@ -242,14 +243,21 @@ class InfospaceExecutor:
     
     def _execute_create(self, action: Dict) -> Dict:
         """
-        Create a Note or Collection object.
+        Create a Note or Collection object as a spatial resource.
         
         Required: type, out
         Optional: kind ("Note" or "Collection"), value, name
+        
+        Creates both:
+        1. Local plan binding (ephemeral, for plan execution)
+        2. Spatial resource via map_node (persistent for Notes, session-local for Collections)
+        
+        Collections store resource IDs (references to Notes/Collections).
         """
         out_var = action.get('out') or action.get('name')
         kind = action.get('kind', 'Note')
-        value = self._resolve_value(action.get('value', None))
+        value_arg = action.get('value', None)
+        collection_name = action.get('name')  # Optional stable name for Collections
         
         if not out_var:
             return {'status': 'failed', 'reason': 'create requires out'}
@@ -257,21 +265,105 @@ class InfospaceExecutor:
         if kind not in ['Note', 'Collection']:
             return {'status': 'failed', 'reason': f'Invalid kind: {kind}, must be Note or Collection'}
         
-        # Create typed info object
-        if kind == 'Collection' and value is None:
-            value = []  # Empty collection by default
+        # Handle Collections specially - convert variables to resource IDs
+        if kind == 'Collection':
+            if value_arg is None:
+                resource_ids = []  # Empty collection
+            elif isinstance(value_arg, list):
+                # Convert list of $variables to resource IDs
+                resource_ids = []
+                for item in value_arg:
+                    if isinstance(item, str) and item.startswith('$'):
+                        # Resolve variable to resource ID
+                        var_name = item[1:]
+                        if var_name in self.plan_bindings:
+                            resource_id = self.plan_bindings[var_name]
+                            resource_ids.append(resource_id)
+                        else:
+                            return {'status': 'failed', 'reason': f'Unbound variable: {item}'}
+                    else:
+                        # Must be literal - create Note to wrap it
+                        note_id = self._create_info(content=item, name=f"item_{len(resource_ids)}", kind='Note')
+                        resource_ids.append(note_id)
+                        logger.info(f"Auto-wrapped literal in Note: {note_id}")
+            elif isinstance(value_arg, str) and value_arg.startswith('$'):
+                # Single variable - resolve it
+                resolved = self._resolve_value(value_arg)
+                if isinstance(resolved, list):
+                    # Recursively process list
+                    return self._execute_create({
+                        **action,
+                        'value': resolved
+                    })
+                else:
+                    # Single item - wrap in list
+                    var_name = value_arg[1:]
+                    if var_name in self.plan_bindings:
+                        resource_ids = [self.plan_bindings[var_name]]
+                    else:
+                        return {'status': 'failed', 'reason': f'Unbound variable: {value_arg}'}
+            else:
+                return {'status': 'failed', 'reason': 'Collection value must be list or $variable'}
+            
+            # Validate all items are valid resource IDs
+            validation_error = self._validate_collection_content(resource_ids)
+            if validation_error:
+                return {'status': 'failed', 'reason': validation_error}
+            
+            spatial_content = resource_ids
+            format_type = 'list'
+            create_topic = f"cognitive/map/collection/create"
+            
+        else:  # Note
+            value = self._resolve_value(value_arg) if value_arg is not None else ''
+            format_type = 'json'  # Always JSON envelope for Notes
+            create_topic = f"cognitive/map/note/create"
+            spatial_content = self._wrap_note_content(value, out_var)  # Wrap Notes in envelope
         
+        # Create spatial resource via map_node
+        try:
+            from zenoh import QueryTarget, ConsolidationMode
+            for reply in self.session.get(
+                create_topic,
+                target=QueryTarget.BEST_MATCHING,
+                consolidation=ConsolidationMode.NONE,
+                timeout=5.0,
+                payload=json.dumps({
+                    'character_name': self.agent_name,
+                    'content': spatial_content,
+                    'format': format_type,
+                    'source_skill': 'create_primitive',
+                    'source_value': str(value)[:100],
+                    'collection_name': collection_name  # Pass name for Collections
+                }).encode('utf-8')
+            ):
+                if reply.ok:
+                    response = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
+                    if response.get('success'):
+                        info_id = response.get('info_id')
+                        # Bind variable to resource ID
+                        self._bind_variable(out_var, info_id)
+                        logger.info(f"Created {kind} spatial resource → ${out_var} = {info_id}")
+                        return {'status': 'success', 'value': info_id}
+                    else:
+                        logger.error(f'Failed to create {kind} resource: {response.get("error")}')
+                        return {'status': 'failed', 'reason': response.get('error', 'Unknown error')}
+                break
+        except Exception as e:
+            logger.error(f'Error creating {kind} spatial resource: {e}')
+            return {'status': 'failed', 'reason': str(e)}
+        
+        # Fallback: create local only if spatial creation failed
+        logger.warning(f"Spatial {kind} creation failed, creating local only")
         info_id = self._create_info(content=value, name=out_var, kind=kind)
         self._bind_variable(out_var, info_id)
-        
-        logger.info(f"Created {kind} → ${out_var}")
         return {'status': 'success', 'value': info_id}
     
     # ==================== Storage Operations ====================
     
     def _execute_save(self, action: Dict) -> Dict:
         """
-        Store value by creating Note object.
+        Store value by creating Note object as a spatial resource.
         
         Required: value, out (or variable)
         
@@ -279,7 +371,7 @@ class InfospaceExecutor:
         - value: literal value OR $variable (resolves to content)
         - out: literal string (variable name, no $ prefix)
         
-        Creates a Note object containing the value.
+        Creates a persistent Note object containing the value with consistent envelope schema.
         """
         value = self._resolve_value(action.get('value'))
         out_var = action.get('out') or action.get('variable')
@@ -287,14 +379,108 @@ class InfospaceExecutor:
         if not out_var:
             return {'status': 'failed', 'reason': 'save requires out'}
         
-        # Create Note object
-        info_id = self._create_info(content=value, name=out_var)
+        # Wrap in consistent Note envelope
+        note_content = self._wrap_note_content(value, out_var)
         
-        # Bind variable to Note
+        # Create spatial Note resource via map_node
+        try:
+            from zenoh import QueryTarget, ConsolidationMode
+            for reply in self.session.get(
+                f"cognitive/map/note/create",
+                target=QueryTarget.BEST_MATCHING,
+                consolidation=ConsolidationMode.NONE,
+                timeout=5.0,
+                payload=json.dumps({
+                    'character_name': self.agent_name,
+                    'content': note_content,
+                    'format': 'json',  # Always JSON envelope
+                    'source_skill': 'save_primitive',
+                    'source_value': str(value)[:100]
+                }).encode('utf-8')
+            ):
+                if reply.ok:
+                    response = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
+                    if response.get('success'):
+                        info_id = response.get('info_id')
+                        # Bind variable to resource ID
+                        self._bind_variable(out_var, info_id)
+                        logger.info(f"Saved Note spatial resource → ${out_var} = {info_id}")
+                        return {'status': 'success', 'value': info_id}
+                    else:
+                        logger.error(f'Failed to create Note resource: {response.get("error")}')
+                        return {'status': 'failed', 'reason': response.get('error', 'Unknown error')}
+                break
+        except Exception as e:
+            logger.error(f'Error creating Note spatial resource: {e}')
+            return {'status': 'failed', 'reason': str(e)}
+        
+        # Fallback: create local only if spatial creation failed
+        logger.warning(f"Spatial Note creation failed, creating local only")
+        info_id = self._create_info(content=value, name=out_var, kind='Note')
         self._bind_variable(out_var, info_id)
-        
-        logger.info(f"Stored to ${out_var}")
         return {'status': 'success', 'value': info_id}
+    
+    def _execute_load(self, action: Dict) -> Dict:
+        """
+        Load a persistent Note or Collection by resource ID.
+        
+        Required: resource_id, out
+        
+        Retrieves an existing spatial resource from the map and binds it to a variable.
+        """
+        resource_id = action.get('resource_id')
+        out_var = action.get('out')
+        
+        if not resource_id:
+            return {'status': 'failed', 'reason': 'load requires resource_id'}
+        
+        if not out_var:
+            return {'status': 'failed', 'reason': 'load requires out'}
+        
+        # Determine resource type from ID
+        if resource_id.startswith('note_') or resource_id.startswith('Note_'):
+            resource_type = 'note'
+        elif resource_id.startswith('collection_') or resource_id.startswith('Collection_'):
+            resource_type = 'collection'
+        else:
+            return {'status': 'failed', 'reason': f'Invalid resource_id format: {resource_id}'}
+        
+        # Query map_node for the resource
+        try:
+            from zenoh import QueryTarget, ConsolidationMode
+            for reply in self.session.get(
+                f"cognitive/map/{resource_type}/get",
+                target=QueryTarget.BEST_MATCHING,
+                consolidation=ConsolidationMode.NONE,
+                timeout=5.0,
+                payload=json.dumps({
+                    'character_name': self.agent_name,
+                    'resource_id': resource_id
+                }).encode('utf-8')
+            ):
+                if reply.ok:
+                    response = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
+                    if response.get('success'):
+                        content = response.get('content')
+                        kind = 'Note' if resource_type == 'note' else 'Collection'
+                        
+                        # Store in plan_bindings
+                        self.plan_bindings[f"_content_{resource_id}"] = content
+                        self.plan_bindings[f"_kind_{resource_id}"] = kind
+                        self._bind_variable(out_var, resource_id)
+                        
+                        logger.info(f"Loaded {kind} {resource_id} → ${out_var}")
+                        return {'status': 'success', 'value': resource_id}
+                    else:
+                        error_msg = response.get('error', 'Unknown error')
+                        logger.error(f'Failed to load {resource_type}: {error_msg}')
+                        return {'status': 'failed', 'reason': error_msg}
+                break
+        except Exception as e:
+            logger.error(f'Error loading {resource_type} {resource_id}: {e}')
+            return {'status': 'failed', 'reason': str(e)}
+        
+        return {'status': 'failed', 'reason': f'{resource_type.capitalize()} not found: {resource_id}'}
     
     def _execute_index(self, action: Dict) -> Dict:
         """
@@ -303,28 +489,49 @@ class InfospaceExecutor:
         Required: type, source, store_name, index_type, fields
         
         Argument types:
-        - source: $variable (resolves to Collection/list content) OR literal list
+        - source: $variable (Collection of Notes to index)
         - store_name: literal string (name of the index store)
         - index_type: literal string ('semantic' or 'keyword')
         - fields: dict specifying which fields to embed
+        
+        Dereferences Collection to get actual Note contents for indexing.
         """
-        source = self._resolve_value(action.get('source'))
+        source_arg = action.get('source')
         store_name = action.get('store_name')
         index_type = action.get('index_type', 'semantic')
         fields = action.get('fields', {})
         
-        if not source or not store_name:
+        if not source_arg or not store_name:
             return {'status': 'failed', 'reason': 'index requires source and store_name'}
         
-        # Ensure source is a list
-        if not isinstance(source, list):
-            source = [source]
+        # Source should be a Collection variable
+        if not isinstance(source_arg, str) or not source_arg.startswith('$'):
+            return {'status': 'failed', 'reason': 'index source must be $variable referencing a Collection'}
+        
+        collection_var = source_arg[1:]
+        
+        # Dereference the Collection to get actual Note contents
+        dereferenced_notes = self._dereference_collection(collection_var)
+        
+        if not dereferenced_notes:
+            logger.warning(f"Collection {collection_var} is empty or failed to dereference")
+            return {'status': 'success', 'value': 0}  # Empty collection, nothing to index
+        
+        # Extract content from Note envelopes
+        index_data = []
+        for note in dereferenced_notes:
+            if isinstance(note, dict) and 'content' in note:
+                # Note envelope - extract content
+                index_data.append(note['content'])
+            else:
+                # Raw data (shouldn't happen with reference model, but handle gracefully)
+                index_data.append(note)
         
         # Request indexing from map_node
         request = {
             'agent_name': self.agent_name,
             'store_name': store_name,
-            'source': source,
+            'source': index_data,
             'index_type': index_type,
             'fields': fields
         }
@@ -347,7 +554,7 @@ class InfospaceExecutor:
             return {'status': 'failed', 'reason': response.get('reason', 'Index failed')}
         
         indexed_count = response.get('indexed_count', 0)
-        logger.info(f"Indexed {indexed_count} items to {store_name}")
+        logger.info(f"Indexed {indexed_count} items from Collection to {store_name}")
         return {'status': 'success', 'value': indexed_count}
     
     def _execute_search(self, action: Dict) -> Dict:
@@ -525,6 +732,17 @@ class InfospaceExecutor:
         if value is None:
             return {'status': 'failed', 'reason': 'think requires value'}
         
+        # Publish think message to map (for memory system)
+        message = {
+            'agent_name': self.agent_name,
+            'content': str(value)
+        }
+        
+        self.session.put(
+            f"map/{self.map_name}/think/{self.agent_name}",
+            json.dumps(message)
+        )
+        
         logger.info(f"Think: {value}")
         return {'status': 'success', 'value': value}
     
@@ -583,23 +801,36 @@ class InfospaceExecutor:
     
     def _execute_filter(self, action: Dict) -> Dict:
         """
-        Reduce collection by predicate.
+        Reduce Collection by predicate.
         
         Required: type, target, condition, out
+        
+        Filters a Collection of Notes, returns new Collection with matching Notes.
         """
         # Validate required fields
         error = self._validate_required_fields(action, 'target', 'condition', 'out')
         if error:
             return {'status': 'failed', 'reason': error}
         
-        target = self._resolve_value(action.get('target'))
+        target_arg = action.get('target')
         condition = action.get('condition')
         out_var = action.get('out')
         
-        # Validate type
-        error = self._validate_type(target, (list,), 'target')
-        if error:
-            return {'status': 'failed', 'reason': error}
+        # Target should be a Collection variable
+        if not isinstance(target_arg, str) or not target_arg.startswith('$'):
+            return {'status': 'failed', 'reason': 'filter target must be $variable referencing a Collection'}
+        
+        collection_var = target_arg[1:]
+        
+        # Get resource IDs from Collection
+        if collection_var not in self.plan_bindings:
+            return {'status': 'failed', 'reason': f'Unbound variable: {target_arg}'}
+        
+        collection_id = self.plan_bindings[collection_var]
+        resource_ids = self.plan_bindings.get(f"_content_{collection_id}", [])
+        
+        # Dereference to get actual content for filtering
+        dereferenced_notes = self._dereference_collection(collection_var)
         
         # Extract condition parameters
         field = condition.get('field')
@@ -609,17 +840,20 @@ class InfospaceExecutor:
         if not field or not operator:
             return {'status': 'failed', 'reason': 'filter condition requires field and operator'}
         
-        # Filter based on operator
-        filtered = []
-        for item in target:
-            item_value = item.get(field) if isinstance(item, dict) else item
+        # Filter and track which resource IDs pass
+        filtered_ids = []
+        for i, note in enumerate(dereferenced_notes):
+            # Extract content from Note envelope
+            content = note.get('content') if isinstance(note, dict) else note
+            item_value = content.get(field) if isinstance(content, dict) else content
             
             if self._apply_operator(item_value, operator, value):
-                filtered.append(item)
+                filtered_ids.append(resource_ids[i])
         
-        info_id = self._create_info(content=filtered, name=out_var)
+        # Create new Collection with filtered resource IDs
+        info_id = self._create_info(content=filtered_ids, name=out_var, kind='Collection')
         self._bind_variable(out_var, info_id)
-        logger.info(f"Filtered {len(target)} → {len(filtered)} items → ${out_var}")
+        logger.info(f"Filtered {len(resource_ids)} → {len(filtered_ids)} Notes → ${out_var}")
         return {'status': 'success', 'value': info_id}
     
     def _execute_merge(self, action: Dict) -> Dict:
@@ -823,51 +1057,68 @@ class InfospaceExecutor:
     
     def _execute_sort(self, action: Dict) -> Dict:
         """
-        Order items by criteria.
+        Order Collection items by criteria.
         
         Required: type, target, by, out
         Optional: order, limit
+        
+        Sorts a Collection of Notes, returns new Collection with sorted Notes.
         """
         # Validate required fields
         error = self._validate_required_fields(action, 'target', 'by', 'out')
         if error:
             return {'status': 'failed', 'reason': error}
         
-        target = self._resolve_value(action.get('target'))
+        target_arg = action.get('target')
         by = action.get('by')
         out_var = action.get('out')
         order = action.get('order', 'asc')
         limit = action.get('limit')
         
-        # Validate type
-        error = self._validate_type(target, (list,), 'target')
-        if error:
-            return {'status': 'failed', 'reason': error}
+        # Target should be a Collection variable
+        if not isinstance(target_arg, str) or not target_arg.startswith('$'):
+            return {'status': 'failed', 'reason': 'sort target must be $variable referencing a Collection'}
         
-        # Sort by field or comparator
+        collection_var = target_arg[1:]
+        
+        # Get resource IDs from Collection
+        if collection_var not in self.plan_bindings:
+            return {'status': 'failed', 'reason': f'Unbound variable: {target_arg}'}
+        
+        collection_id = self.plan_bindings[collection_var]
+        resource_ids = self.plan_bindings.get(f"_content_{collection_id}", [])
+        
+        # Dereference to get actual content for sorting
+        dereferenced_notes = self._dereference_collection(collection_var)
+        
+        # Create list of (resource_id, note_content) pairs
+        id_content_pairs = list(zip(resource_ids, dereferenced_notes))
+        
+        # Sort by field
         reverse = (order == 'desc')
         
-        if isinstance(by, str) and by.startswith('$'):
-            # Sort using comparator variable (function)
-            logger.warning("Comparator variables not fully supported in Phase 2")
-            sorted_items = sorted(target, reverse=reverse)
-        else:
-            # Sort by field name
-            def get_sort_key(item):
-                if isinstance(item, dict):
-                    return item.get(by, '')
-                else:
-                    return item
-            
-            sorted_items = sorted(target, key=get_sort_key, reverse=reverse)
+        def get_sort_key(pair):
+            resource_id, note = pair
+            # Extract content from Note envelope
+            content = note.get('content') if isinstance(note, dict) else note
+            if isinstance(content, dict):
+                return content.get(by, '')
+            else:
+                return content
+        
+        sorted_pairs = sorted(id_content_pairs, key=get_sort_key, reverse=reverse)
+        
+        # Extract sorted resource IDs
+        sorted_ids = [pair[0] for pair in sorted_pairs]
         
         # Apply limit if specified
         if limit:
-            sorted_items = sorted_items[:limit]
+            sorted_ids = sorted_ids[:limit]
         
-        info_id = self._create_info(content=sorted_items, name=out_var)
+        # Create new Collection with sorted resource IDs
+        info_id = self._create_info(content=sorted_ids, name=out_var, kind='Collection')
         self._bind_variable(out_var, info_id)
-        logger.info(f"Sorted by {by} → ${out_var}")
+        logger.info(f"Sorted {len(resource_ids)} Notes by {by} → ${out_var}")
         return {'status': 'success', 'value': info_id}
     
     def _execute_group_by(self, action: Dict) -> Dict:
@@ -1149,6 +1400,144 @@ class InfospaceExecutor:
     
     # ==================== Utility Methods ====================
     
+    def _validate_collection_content(self, items: List[str]) -> Optional[str]:
+        """
+        Validate that all items in a Collection are valid resource IDs.
+        
+        Args:
+            items: List of strings that should be resource IDs
+            
+        Returns:
+            Error message if invalid, None if valid
+        """
+        if not isinstance(items, list):
+            return "Collection content must be a list"
+        
+        for item in items:
+            if not isinstance(item, str):
+                return f"Collection item must be string resource ID, got {type(item).__name__}"
+            
+            # Validate resource ID format: note_xxx, Note_xxx, collection_xxx, Collection_xxx
+            if not re.match(r'^(note_|Note_|collection_|Collection_)[a-zA-Z0-9]+$', item):
+                return f"Invalid resource ID format: {item}"
+        
+        return None
+    
+    def _dereference_collection(self, collection_var: str) -> List[Dict]:
+        """
+        Dereference a Collection to load all referenced Notes/Collections.
+        
+        Args:
+            collection_var: Variable name (without $) of the Collection
+            
+        Returns:
+            List of dereferenced Note/Collection contents
+        """
+        if collection_var not in self.plan_bindings:
+            logger.warning(f"Collection variable not bound: {collection_var}")
+            return []
+        
+        collection_id = self.plan_bindings[collection_var]
+        resource_ids = self.plan_bindings.get(f"_content_{collection_id}", [])
+        
+        if not isinstance(resource_ids, list):
+            logger.warning(f"Collection content is not a list: {collection_id}")
+            return []
+        
+        # Dereference each resource ID
+        dereferenced = []
+        for resource_id in resource_ids:
+            # Check if already in plan_bindings
+            content = self.plan_bindings.get(f"_content_{resource_id}")
+            if content is not None:
+                dereferenced.append(content)
+            else:
+                # Need to load from map_node
+                loaded = self._load_resource_by_id(resource_id)
+                if loaded is not None:
+                    dereferenced.append(loaded)
+                else:
+                    logger.warning(f"Failed to dereference resource: {resource_id}")
+        
+        return dereferenced
+    
+    def _load_resource_by_id(self, resource_id: str) -> Optional[Any]:
+        """
+        Load a resource by ID from map_node.
+        
+        Args:
+            resource_id: Resource ID (note_xxx or collection_xxx)
+            
+        Returns:
+            Resource content or None if not found
+        """
+        # Determine resource type
+        if resource_id.startswith('note_') or resource_id.startswith('Note_'):
+            resource_type = 'note'
+        elif resource_id.startswith('collection_') or resource_id.startswith('Collection_'):
+            resource_type = 'collection'
+        else:
+            logger.error(f"Invalid resource ID format: {resource_id}")
+            return None
+        
+        # Query map_node
+        from zenoh import QueryTarget, ConsolidationMode
+        for reply in self.session.get(
+            f"cognitive/map/{resource_type}/get",
+            target=QueryTarget.BEST_MATCHING,
+            consolidation=ConsolidationMode.NONE,
+            timeout=5.0,
+            payload=json.dumps({
+                'character_name': self.agent_name,
+                'resource_id': resource_id
+            }).encode('utf-8')
+        ):
+            if reply.ok:
+                response = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
+                if response.get('success'):
+                    content = response.get('content')
+                    # Cache in plan_bindings
+                    self.plan_bindings[f"_content_{resource_id}"] = content
+                    kind = 'Note' if resource_type == 'note' else 'Collection'
+                    self.plan_bindings[f"_kind_{resource_id}"] = kind
+                    return content
+            break
+        
+        return None
+    
+    def _wrap_note_content(self, content: Any, name: str = None) -> Dict:
+        """
+        Wrap content in consistent Note envelope schema.
+        
+        Args:
+            content: The actual data to store
+            name: Variable name for the Note
+            
+        Returns:
+            Dict with consistent Note schema
+        """
+        from datetime import datetime
+        
+        # Determine content type
+        if isinstance(content, dict):
+            content_type = 'json'
+        elif isinstance(content, list):
+            content_type = 'list'
+        elif isinstance(content, (int, float)):
+            content_type = 'number'
+        elif isinstance(content, bool):
+            content_type = 'boolean'
+        else:
+            content_type = 'text'
+        
+        return {
+            'name': name or 'unnamed',
+            'created': datetime.now().isoformat(),
+            'creator': self.agent_name,
+            'content': content,
+            'content_type': content_type
+        }
+    
     def _create_info(self, content: Any, name: str = None, kind: str = 'Note') -> str:
         """
         Create Note or Collection object, return info_id.
@@ -1162,10 +1551,17 @@ class InfospaceExecutor:
             info_id string
         """
         import uuid
-        info_id = f"info_{uuid.uuid4().hex[:8]}"
+        prefix = 'note_' if kind == 'Note' else 'collection_'
+        info_id = f"{prefix}{uuid.uuid4().hex[:8]}"
+        
+        # Wrap content in consistent schema for Notes
+        if kind == 'Note':
+            wrapped_content = self._wrap_note_content(content, name)
+        else:
+            wrapped_content = content  # Collections store raw content
         
         # Store content and type
-        self.plan_bindings[f"_content_{info_id}"] = content
+        self.plan_bindings[f"_content_{info_id}"] = wrapped_content
         self.plan_bindings[f"_kind_{info_id}"] = kind
         
         logger.info(f"Created {kind} {info_id}" + (f" '{name}'" if name else ""))
@@ -1174,7 +1570,7 @@ class InfospaceExecutor:
     def _resolve_value(self, value: Any) -> Any:
         """
         Resolve $variable to Note/Collection content.
-        Returns the content stored in the Note or Collection.
+        For Notes with envelope schema, returns the actual content field.
         
         Args:
             value: Can be a literal value, or "$variable" string
@@ -1198,7 +1594,15 @@ class InfospaceExecutor:
         # Get content from Note/Collection
         content_key = f"_content_{info_id}"
         if content_key in self.plan_bindings:
-            return self.plan_bindings[content_key]
+            stored_content = self.plan_bindings[content_key]
+            kind = self.plan_bindings.get(f"_kind_{info_id}", 'Note')
+            
+            # For Notes with envelope schema, extract the actual content
+            if kind == 'Note' and isinstance(stored_content, dict) and 'content' in stored_content:
+                return stored_content['content']
+            
+            # For Collections or raw content, return as-is
+            return stored_content
         
         logger.warning(f"Note/Collection content not found for {info_id}")
         return None

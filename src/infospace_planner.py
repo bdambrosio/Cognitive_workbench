@@ -11,12 +11,12 @@ from typing import Dict, List, Any
 logger = logging.getLogger(__name__)
 
 # Phase 1 & 2 Template - Core + Data Operations
-INFOSPACE_PLAN_TEMPLATE = """Task: Decompose your goal into a JSON-formatted plan using Information Space primitives.
+INFOSPACE_PLAN_TEMPLATE = """TASK: Generate a JSON format plan for the goal below using the ACTIONS and CONDITIONS listed below.
 
 Your goal is:
 {{goal}}
 
-Output: only valid JSON — no reasoning, no prose, no code fences.
+OUTPUT: only valid JSON — no reasoning, no prose, no code fences.
 
 # PLAN FORMAT
 
@@ -33,6 +33,7 @@ apply - apply a tool/skill to input data and bind result to variable
 move - change current location or approach a resource
 create - create a Note or Collection object and bind to variable
 save - create Note object from a value and bind to variable
+load - retrieve a persistent Note or Collection by resource ID
 index (organize) - build an embedding index for a Collection
 search - query an indexed store by name
 if - conditional branch 
@@ -46,23 +47,29 @@ think - internal note
 Variables: Use "$variable" to reference Note/Collection content previously bound
 Literals: Use plain strings/values (no $) for literal data or names
 Names: Output variable names in "out" fields use plain strings (no $)
-Skills/Resources: Can be literal "skill-name" or "$variable" holding name
+Tools/Resources: Can be literal "tool-name/resource-name" or "$variable" holding name
+Resource IDs: Cannot be referenced directly - use "load" action first to bind to variable
 
 
 # ACTION SCHEMAS  (each must be valid JSON)
 
 apply — apply a tool/skill to input data
-{"type":"apply","target":"skill-name or $tool_var","value":"input text or $data","reason":"purpose","out":"result_variable"}
+{"type":"apply","target":"tool-name/resource-name or $tool_var","value":"input text or $data","reason":"purpose","out":"result_variable"}
 
 move — change current location or approach a resource
-{"type":"move","target":"resource-name or {\"location\": [x,y]}"}
+{"type":"move","target":"resource-name or {"location": [x,y]}"}
 
 create — create a typed Note or Collection object
-{"type":"create","kind":"Collection","value":[],"out":"my_collection"}
-{"type":"create","kind":"Note","value":"some data","out":"my_note"}
+{"type":"create","kind":"Collection","value":["$note1","$note2"],"out":"my_collection"}  # Collection of Note references
+{"type":"create","kind":"Collection","name":"research","value":[],"out":"papers"}  # Named empty Collection
+{"type":"create","kind":"Note","value":"some data","out":"my_note"}  # Note with content
 
 save — create Note object from value
 {"type":"save","value":"literal or $value","out":"variable_name"}
+
+load — retrieve a persistent Note or Collection by resource ID
+{"type":"load","resource_id":"Note_123","out":"my_note"}
+{"type":"load","resource_id":"Collection_5","out":"items"}
 
 index (organize) — create searchable store with embeddings
 {"type":"index","source":"$collection","store_name":"my_store","index_type":"semantic","fields":{"title":"embed","content":"embed"}}
@@ -131,8 +138,12 @@ Minimal Example (say hello):
 Research Example (multi-step information flow):
 {
   "plan": [
-    {"type": "apply","target": "web-search","value": "LLM cognitive agents 2025","reason": "find recent work","out": "results"},
-    {"type": "index","source": "$results","store_name": "research_memory","index_type": "semantic","fields": {"title":"embed","content":"embed"}},
+    {"type": "save","value": "LLM cognitive agents 2025","out": "query"},
+    {"type": "apply","target": "web-search","value": "$query","reason": "find recent work","out": "result1"},
+    {"type": "save","value": "transformer architecture papers","out": "query2"},
+    {"type": "apply","target": "web-search","value": "$query2","reason": "find architecture papers","out": "result2"},
+    {"type": "create","kind": "Collection","value": ["$result1","$result2"],"out": "research_collection"},
+    {"type": "index","source": "$research_collection","store_name": "research_memory","index_type": "semantic","fields": {"title":"embed","content":"embed"}},
     {"type": "say","target": "user","value": "Research complete and indexed."}
   ]
 }
@@ -140,8 +151,12 @@ Research Example (multi-step information flow):
 # SEMANTIC RULES
 
 Type System:
-- Note: typed object storing a single value/data structure. Example: {"type":"Note","id":"Note_35","content":"Hello, world!"}
-- Collection: typed object storing a list of items. Example: {"type":"Collection","id":"Collection_2","items":['Note_35','Note_36', 'Collection_3']}
+- Note: typed object storing a single value/data structure. Persists across restarts.
+  - All Notes have envelope schema: {name, created, creator, content, content_type}
+- Collection: typed object storing a list of Note/Collection resource IDs (references). Session-local only (lost on restart).
+  - Collections store references (e.g., ["Note_123", "Note_456"]), not raw data
+  - Literals in Collection values are auto-wrapped in Notes
+- Named Collection: Collection with stable name for referencing across plans within session.
 - Both Note and Collection are created with id and stored in plan_bindings.
 
 Variables:
@@ -161,6 +176,8 @@ CONSTRAINTS
 - All JSON must be syntactically valid (no comments or trailing commas).
 - Nested steps count toward max_steps = 12.
 - Output only valid JSON.
+
+Respond only with the complete JSON plan for the goal, no other text.
 """
 
 
@@ -324,11 +341,13 @@ class InfospacePlanner:
         """Validate required fields for action type"""
         required_fields = {
             # Phase 1
-            'apply': ['target', 'reason', 'prediction'],
+            'apply': ['target', 'reason', 'out'],
             'move': ['target'],
+            'create': ['kind', 'value', 'out'],  # Creates Note/Collection and binds to variable
             'save': ['value', 'out'],  # Creates Note and binds to variable
+            'load': ['resource_id', 'out'],  # Loads existing Note/Collection by ID
             'index': ['source', 'store_name', 'index_type', 'fields'],
-            'search': ['store_name', 'query', 'mode', 'limit', 'out', 'prediction'],
+            'search': ['store_name', 'query', 'mode', 'limit', 'out'],
             'if': ['condition', 'then'],
             'while': ['condition', 'body'],
             'wait': ['condition'],

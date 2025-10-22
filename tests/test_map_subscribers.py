@@ -19,6 +19,8 @@ NOT Tested (fire-and-forget or risky):
 - shutdown - Destructive
 - character actions - State interference
 - turn management - Complex coordination
+- note/create - Queryable (not subscriber)
+- collection/create - Queryable (not subscriber)
 
 Usage:
     python tests/test_map_subscribers.py
@@ -321,6 +323,8 @@ def main():
     print("  - cognitive/shutdown/shared")
     print("  - cognitive/*/action")
     print("  - cognitive/map/world_state/update")
+    print("  - cognitive/map/note/create (queryable, not subscriber)")
+    print("  - cognitive/map/collection/create (queryable, not subscriber)")
     print("  - Turn management subscribers")
     print_separator()
     print()

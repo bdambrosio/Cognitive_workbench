@@ -5,7 +5,7 @@ Test Map Node Queryables
 Run this while the Jill scenario is active to test map_node queryables.
 Displays query and response for manual verification.
 
-Coverage: 19 of 22 queryables (86%)
+Coverage: 19 of 24 queryables (79%)
 
 Tested:
 - Basic queries: summary, types, resources, terrain, time, world_state
@@ -18,7 +18,8 @@ Tested:
 NOT Tested (destructive):
 - resource/remove/* - Deletes resources
 - resource/place/* - Creates resources
-- information/create - Creates dynamic resources
+- note/create - Creates dynamic Note resources
+- collection/create - Creates dynamic Collection resources
 
 Usage:
     python tests/test_map_queryables.py
@@ -467,11 +468,12 @@ def main():
     
     print_separator()
     print(f"Results: {passed}/{total} passed")
-    print(f"Coverage: {total} of 22 total queryables ({total/22*100:.0f}%)")
+    print(f"Coverage: {total} of 24 total queryables ({total/24*100:.0f}%)")
     print("\nNOT TESTED (destructive operations):")
     print("  - cognitive/map/resource/remove/*")
     print("  - cognitive/map/resource/place/*")
-    print("  - cognitive/map/information/create")
+    print("  - cognitive/map/note/create")
+    print("  - cognitive/map/collection/create")
     print_separator()
     print()
     

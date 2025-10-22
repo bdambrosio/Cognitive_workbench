@@ -77,8 +77,12 @@ class MapNode:
         self.lock_request_counts = {}  # (requester, target) -> count of failed attempts
         self.lock_timeout_threshold = 3  # Number of failed attempts before timeout
         
-        # Information instance management (dynamic resources in infospace)
-        self.information_counter = 0  # Counter for generating unique Information IDs
+        # Note instance management (dynamic resources in infospace)
+        self.note_counter = 0  # Counter for generating unique Note IDs
+        
+        # Collection instance management (dynamic resources in infospace)
+        self.collection_counter = 0  # Counter for generating unique Collection IDs
+        self.named_collections = {}  # name -> collection_id mapping for stable references
         
         # Persistence setup
         self.world_file = Path(f"data/world/{self.world_name}_world.json")
@@ -262,10 +266,16 @@ end your response with:
             self.handle_resource_place
         )
         
-        # Information creation queryable (dynamic resource creation)
-        self.information_create_queryable = self.session.declare_queryable(
-            "cognitive/map/information/create",
-            self.handle_create_information
+        # Note creation queryable (dynamic resource creation)
+        self.note_create_queryable = self.session.declare_queryable(
+            "cognitive/map/note/create",
+            self.handle_create_note
+        )
+        
+        # Collection creation queryable (dynamic resource creation)
+        self.collection_create_queryable = self.session.declare_queryable(
+            "cognitive/map/collection/create",
+            self.handle_create_collection
         )
         
         # Terrain queryable
@@ -1218,17 +1228,17 @@ end your response with:
             error_response = {'success': False, 'error': str(e)}
             query.reply(query.key_expr, json.dumps(error_response).encode('utf-8'))
     
-    def handle_create_information(self, query):
+    def handle_create_note(self, query):
         """
-        Handle Information resource creation from skill execution.
+        Handle Note resource creation from skill execution.
         
-        Creates a dynamic Information resource instance and places it in the infospace.
+        Creates a dynamic Note resource instance and places it in the infospace.
         This is called when a skill completes and returns a result that needs to be
         bound to a plan variable.
         
-        Topic: cognitive/map/information/create
+        Topic: cognitive/map/note/create
         Payload: {
-            "character_name": str,  # Agent creating the information
+            "character_name": str,  # Agent creating the note
             "content": str or dict,  # Skill result content
             "format": "text|json",  # Content format
             "source_skill": str,  # Name of skill that created this
@@ -1237,7 +1247,7 @@ end your response with:
         
         Returns: {
             "success": bool,
-            "info_id": str,  # Unique ID of created Information instance
+            "info_id": str,  # Unique ID of created Note instance
             "location": [x, y]  # Location where placed
         }
         """
@@ -1269,25 +1279,25 @@ end your response with:
             agent = self.agent_registry[canonical_character_name]
             location = (agent.x, agent.y)
             
-            # Generate unique Information ID
-            self.information_counter += 1
-            info_id = f"Information_{self.information_counter}"
+            # Generate unique Note ID
+            self.note_counter += 1
+            info_id = f"Note_{self.note_counter}"
             
-            # Create Information resource data structure
-            # Note: Assumes infospace has Information resource type in registry
+            # Create Note resource data structure
+            # Note: Assumes infospace has Note resource type in registry
             try:
-                information_type = self.world_map.resource_types.Information
+                note_type = self.world_map.resource_types.Note
             except AttributeError:
-                # Fallback if Information type not in registry
-                logger.error("Information resource type not found in world_map.resource_types")
-                raise ValueError("Information resource type not available in this map")
+                # Fallback if Note type not in registry
+                logger.error("Note resource type not found in world_map.resource_types")
+                raise ValueError("Note resource type not available in this map")
             
             info_data = {
                 'name': info_id,
-                'type': information_type,
+                'type': note_type,
                 'location': location,
-                'description': f"Information artifact created by {source_skill}",
-                'remove_on_take': False,  # Information is not consumable
+                'description': f"Note artifact created by {source_skill}",
+                'remove_on_take': False,  # Note is not consumable
                 'properties': {
                     'content': content,
                     'format': format_type,
@@ -1305,7 +1315,7 @@ end your response with:
             x, y = location
             self.world_map.patches[x][y].resources[info_id] = info_data
             
-            logger.info(f"📝 Created Information instance: {info_id} at ({x}, {y}) by {canonical_character_name}")
+            logger.info(f"📝 Created Note instance: {info_id} at ({x}, {y}) by {canonical_character_name}")
             
             response = {
                 'success': True,
@@ -1315,7 +1325,119 @@ end your response with:
             query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
             
         except Exception as e:
-            logger.error(f"Error creating Information instance: {e}")
+            logger.error(f"Error creating Note instance: {e}")
+            error_response = {
+                'success': False,
+                'error': str(e)
+            }
+            query.reply(query.key_expr, json.dumps(error_response).encode('utf-8'))
+    
+    def handle_create_collection(self, query):
+        """
+        Handle Collection resource creation from skill execution or explicit create.
+        
+        Creates a dynamic Collection resource instance and places it in the infospace.
+        Collections are lists/arrays that can be indexed and searched.
+        
+        Topic: cognitive/map/collection/create
+        Payload: {
+            "character_name": str,  # Agent creating the collection
+            "content": list or dict,  # Collection items/content
+            "format": "list|dict",  # Content format
+            "source_skill": str,  # Name of skill/operation that created this (optional)
+            "source_value": str,  # Input value to the operation (optional)
+            "collection_name": str,  # Optional stable name for referencing (optional)
+        }
+        
+        Returns: {
+            "success": bool,
+            "info_id": str,  # Unique ID of created Collection instance
+            "location": [x, y]  # Location where placed
+        }
+        """
+        try:
+            # Parse payload
+            if not query.payload:
+                raise ValueError("No payload provided")
+            
+            payload_bytes = query.payload.to_bytes()
+            payload_str = payload_bytes.decode('utf-8')
+            payload = json.loads(payload_str)
+            
+            character_name = payload.get('character_name')
+            content = payload.get('content')
+            format_type = payload.get('format', 'list')
+            source_skill = payload.get('source_skill', '')
+            source_value = payload.get('source_value', '')
+            collection_name = payload.get('collection_name', '')
+            
+            if not character_name:
+                raise ValueError("Missing character_name in payload")
+            if content is None:  # Allow empty list but not None
+                content = []
+            
+            # Get agent location
+            canonical_character_name = character_name.capitalize()
+            if canonical_character_name not in self.agent_registry:
+                raise ValueError(f"Agent for character '{character_name}' not found")
+            
+            agent = self.agent_registry[canonical_character_name]
+            location = (agent.x, agent.y)
+            
+            # Generate unique Collection ID
+            self.collection_counter += 1
+            info_id = f"Collection_{self.collection_counter}"
+            
+            # Create Collection resource data structure
+            # Note: Assumes infospace has Collection resource type in registry
+            try:
+                collection_type = self.world_map.resource_types.Collection
+            except AttributeError:
+                # Fallback if Collection type not in registry
+                logger.error("Collection resource type not found in world_map.resource_types")
+                raise ValueError("Collection resource type not available in this map")
+            
+            info_data = {
+                'name': info_id,
+                'type': collection_type,
+                'location': location,
+                'description': f"Collection artifact{' created by ' + source_skill if source_skill else ''}",
+                'remove_on_take': False,  # Collection is not consumable
+                'properties': {
+                    'content': content,
+                    'format': format_type,
+                    'created_by': canonical_character_name,
+                    'created_at': datetime.now().isoformat(),
+                    'source_skill': source_skill,
+                    'source_value': source_value,
+                    'item_count': len(content) if isinstance(content, (list, dict)) else 0,
+                    'collection_name': collection_name  # Store stable name for referencing
+                }
+            }
+            
+            # Register in resource_registry
+            self.world_map.resource_registry[info_id] = info_data
+            
+            # Place in spatial grid
+            x, y = location
+            self.world_map.patches[x][y].resources[info_id] = info_data
+            
+            # Register named collection if name provided
+            if collection_name:
+                self.named_collections[collection_name] = info_id
+                logger.info(f"📚 Created named Collection: '{collection_name}' = {info_id} at ({x}, {y}) by {canonical_character_name} ({info_data['properties']['item_count']} items)")
+            else:
+                logger.info(f"📚 Created Collection instance: {info_id} at ({x}, {y}) by {canonical_character_name} ({info_data['properties']['item_count']} items)")
+            
+            response = {
+                'success': True,
+                'info_id': info_id,
+                'location': [x, y]
+            }
+            query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
+            
+        except Exception as e:
+            logger.error(f"Error creating Collection instance: {e}")
             error_response = {
                 'success': False,
                 'error': str(e)
@@ -2419,26 +2541,26 @@ end your response with:
                     else:
                         logger.info("📂 No world state in saved data")
                     
-                    # Restore Information instances (dynamic resources)
-                    if 'information_instances' in world_data:
+                    # Restore Note instances (dynamic resources)
+                    if 'note_instances' in world_data:
                         try:
                             # Restore counter
-                            self.information_counter = world_data.get('information_counter', 0)
+                            self.note_counter = world_data.get('note_counter', 0)
                             
-                            # Get Information type from resource registry
+                            # Get Note type from resource registry
                             try:
-                                information_type = self.world_map.resource_types.Information
+                                note_type = self.world_map.resource_types.Note
                             except AttributeError:
-                                logger.warning("Information type not available in this map, skipping Information restoration")
-                                information_type = None
+                                logger.warning("Note type not available in this map, skipping Note restoration")
+                                note_type = None
                             
-                            if information_type:
-                                instances = world_data['information_instances']
+                            if note_type:
+                                instances = world_data['note_instances']
                                 for info_id, info_data in instances.items():
                                     # Reconstruct resource_data structure
                                     resource_data = {
                                         'name': info_data['name'],
-                                        'type': information_type,
+                                        'type': note_type,
                                         'location': tuple(info_data['location']),
                                         'description': info_data['description'],
                                         'remove_on_take': False,
@@ -2452,9 +2574,13 @@ end your response with:
                                     x, y = info_data['location']
                                     self.world_map.patches[x][y].resources[info_id] = resource_data
                                 
-                                logger.info(f"📂 Restored {len(instances)} Information instances, counter at {self.information_counter}")
+                                logger.info(f"📂 Restored {len(instances)} Note instances, counter at {self.note_counter}")
                         except Exception as e:
-                            logger.error(f"Error restoring Information instances: {e}")
+                            logger.error(f"Error restoring Note instances: {e}")
+                    
+                    # Collections are session-local only - not restored from world file
+                    # They must be rebuilt by agents during the session
+                    logger.info("📂 Collections are session-local - must be rebuilt by agents")
                     
                     logger.info(f"📂 Loaded world data for '{self.world_name}'")
                     
@@ -2493,25 +2619,29 @@ end your response with:
                 }
                 world_data['agents'].append(agent_data)
             
-            # Save Information instances (dynamic resources)
-            information_instances = {}
+            # Save Note instances only (Collections are session-local, not persisted)
+            note_instances = {}
             for resource_id, resource_data in self.world_map.resource_registry.items():
-                # Check if this is an Information type
+                # Check resource type
                 resource_type = resource_data.get('type')
                 type_name = getattr(resource_type, 'name', str(resource_type))
                 
-                if type_name == 'Information':
-                    # Serialize Information instance
+                if type_name == 'Note':
+                    # Serialize Note instance
                     info_serialized = {
                         'name': resource_data.get('name'),
                         'location': resource_data.get('location'),
                         'description': resource_data.get('description'),
                         'properties': resource_data.get('properties', {})
                     }
-                    information_instances[resource_id] = info_serialized
+                    note_instances[resource_id] = info_serialized
+                elif type_name == 'Collection':
+                    # Skip Collections - they're session-local only
+                    logger.debug(f"Skipping Collection {resource_id} (session-local, not persisted)")
             
-            world_data['information_instances'] = information_instances
-            world_data['information_counter'] = self.information_counter
+            world_data['note_instances'] = note_instances
+            world_data['note_counter'] = self.note_counter
+            # Collections not saved - they must be rebuilt on restart
             
             # Save world map state
             # TODO: Add world map modifications (resources, terrain changes, etc.)
