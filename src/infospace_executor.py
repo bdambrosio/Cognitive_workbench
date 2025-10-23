@@ -81,9 +81,6 @@ class InfospaceExecutor:
             'index': self._execute_index,
             'organize': self._execute_index,  # Alias for index
             'search': self._execute_search,
-            'if': self._execute_if,
-            'while': self._execute_while,
-            'wait': self._execute_wait,
             'say': self._execute_say,
             'think': self._execute_think,
             # Phase 2: Data & Analysis
@@ -95,6 +92,7 @@ class InfospaceExecutor:
             'sort': self._execute_sort,
             'group_by': self._execute_group_by,
             'compare': self._execute_compare,
+            'map': self._execute_map,
         }
         
         handler = handlers.get(action_type)
@@ -154,55 +152,38 @@ class InfospaceExecutor:
         Apply tool to input data.
         
         Required: type, target, reason, prediction
-        Optional: value (input), out (output binding)
+        Optional: value (input), args (additional arguments), out (output binding)
         
         Argument types:
         - target: literal string (tool name) OR $variable (resolves to tool name)
         - value: literal string/value OR $variable (resolves to Note/Collection content)
+        - args: dict of additional arguments (resolved if they're variables)
         - out: literal string (variable name, no $ prefix)
         """
         target = self._resolve_value(action.get('target'))
         value = self._resolve_value(action.get('value', ''))
         reason = action.get('reason', '')
+        additional_args = action.get('args', {})
         out_var = action.get('out')
         
         if not target:
             return {'status': 'failed', 'reason': 'apply requires target'}
         
-        # Request tool execution from map
-        request = {
-            'agent_name': self.agent_name,
-            'tool_name': target,
-            'input_value': value,
-            'reason': reason
-        }
+        # Apply the operation using shared helper
+        result = self._apply_operation_to_value(target, value, reason, additional_args)
         
-        self.session.put(
-            f"map/{self.map_name}/tool_request/{self.agent_name}",
-            json.dumps(request)
-        )
+        if result.get('status') != 'success':
+            return result
         
-        # Wait for response
-        response = self._wait_for_response(
-            f"map/{self.map_name}/tool_response/{self.agent_name}",
-            timeout=5.0  # Tools may take longer
-        )
-        
-        if not response:
-            return {'status': 'failed', 'reason': 'Tool execution timeout'}
-        
-        if response.get('status') != 'success':
-            return {'status': 'failed', 'reason': response.get('reason', 'Tool execution failed')}
-        
-        # Get result and create Note
-        result = response.get('result')
+        # Get result value
+        result_value = result.get('value')
         if out_var:
-            info_id = self._create_info(content=result, name=out_var)
+            info_id = self._create_info(content=result_value, name=out_var)
             self._bind_variable(out_var, info_id)
             logger.info(f"Tool executed, result → ${out_var}")
             return {'status': 'success', 'value': info_id}
         
-        return {'status': 'success', 'value': result}
+        return {'status': 'success', 'value': result_value}
     
     def _execute_move(self, action: Dict) -> Dict:
         """
@@ -316,9 +297,9 @@ class InfospaceExecutor:
             
         else:  # Note
             value = self._resolve_value(value_arg) if value_arg is not None else ''
-            format_type = 'json'  # Always JSON envelope for Notes
+            format_type = 'json' if isinstance(value, (dict, list)) else 'text'
             create_topic = f"cognitive/map/note/create"
-            spatial_content = self._wrap_note_content(value, out_var)  # Wrap Notes in envelope
+            spatial_content = value  # Send raw content - map_node handles metadata
         
         # Create spatial resource via map_node
         try:
@@ -333,7 +314,7 @@ class InfospaceExecutor:
                     'content': spatial_content,
                     'format': format_type,
                     'source_skill': 'create_primitive',
-                    'source_value': str(value)[:100],
+                    'source_value': str(spatial_content)[:100],
                     'collection_name': collection_name  # Pass name for Collections
                 }).encode('utf-8')
             ):
@@ -355,7 +336,7 @@ class InfospaceExecutor:
         
         # Fallback: create local only if spatial creation failed
         logger.warning(f"Spatial {kind} creation failed, creating local only")
-        info_id = self._create_info(content=value, name=out_var, kind=kind)
+        info_id = self._create_info(content=spatial_content, name=out_var, kind=kind)
         self._bind_variable(out_var, info_id)
         return {'status': 'success', 'value': info_id}
     
@@ -371,7 +352,10 @@ class InfospaceExecutor:
         - value: literal value OR $variable (resolves to content)
         - out: literal string (variable name, no $ prefix)
         
-        Creates a persistent Note object containing the value with consistent envelope schema.
+        Creates a persistent Note object containing the value.
+        Map_node handles all metadata (created_at, created_by, etc.).
+        
+        Special case: null values bind to the distinguished Note_null singleton.
         """
         value = self._resolve_value(action.get('value'))
         out_var = action.get('out') or action.get('variable')
@@ -379,8 +363,14 @@ class InfospaceExecutor:
         if not out_var:
             return {'status': 'failed', 'reason': 'save requires out'}
         
-        # Wrap in consistent Note envelope
-        note_content = self._wrap_note_content(value, out_var)
+        # Bind null values to distinguished Note_null singleton
+        if value is None:
+            self._bind_variable(out_var, "Note_null")
+            logger.info(f"Saved null value → ${out_var} = Note_null")
+            return {'status': 'success', 'value': "Note_null"}
+        
+        # Determine format type
+        format_type = 'json' if isinstance(value, (dict, list)) else 'text'
         
         # Create spatial Note resource via map_node
         try:
@@ -392,8 +382,8 @@ class InfospaceExecutor:
                 timeout=5.0,
                 payload=json.dumps({
                     'character_name': self.agent_name,
-                    'content': note_content,
-                    'format': 'json',  # Always JSON envelope
+                    'content': value,
+                    'format': format_type,
                     'source_skill': 'save_primitive',
                     'source_value': str(value)[:100]
                 }).encode('utf-8')
@@ -445,23 +435,21 @@ class InfospaceExecutor:
         else:
             return {'status': 'failed', 'reason': f'Invalid resource_id format: {resource_id}'}
         
-        # Query map_node for the resource
+        # Query map_node for the resource using resource by name queryable
         try:
             from zenoh import QueryTarget, ConsolidationMode
             for reply in self.session.get(
-                f"cognitive/map/{resource_type}/get",
+                f"cognitive/map/resource/{resource_id}",
                 target=QueryTarget.BEST_MATCHING,
                 consolidation=ConsolidationMode.NONE,
-                timeout=5.0,
-                payload=json.dumps({
-                    'character_name': self.agent_name,
-                    'resource_id': resource_id
-                }).encode('utf-8')
+                timeout=5.0
             ):
                 if reply.ok:
                     response = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
                     if response.get('success'):
-                        content = response.get('content')
+                        resource_data = response.get('resource')
+                        # Extract content from properties field
+                        content = resource_data.get('properties', {}).get('content')
                         kind = 'Note' if resource_type == 'note' else 'Collection'
                         
                         # Store in plan_bindings
@@ -613,85 +601,6 @@ class InfospaceExecutor:
         
         logger.info(f"Search found {len(results)} results")
         return {'status': 'success', 'value': results}
-    
-    # ==================== Control Flow ====================
-    
-    def _execute_if(self, action: Dict) -> Dict:
-        """
-        Conditional branching.
-        
-        Required: type, condition, then
-        Optional: else
-        """
-        condition = action.get('condition')
-        then_branch = action.get('then', [])
-        else_branch = action.get('else', [])
-        
-        if not condition:
-            return {'status': 'failed', 'reason': 'if requires condition'}
-        
-        # Evaluate condition
-        condition_result = self._evaluate_condition(condition)
-        
-        # Execute appropriate branch
-        branch = then_branch if condition_result else else_branch
-        
-        for step in branch:
-            result = self.execute_action(step)
-            if result.get('status') == 'failed':
-                return result
-        
-        return {'status': 'success', 'value': condition_result}
-    
-    def _execute_while(self, action: Dict) -> Dict:
-        """
-        Loop while condition holds.
-        
-        Required: type, condition, body
-        """
-        condition = action.get('condition')
-        body = action.get('body', [])
-        max_iterations = action.get('max_iterations', 100)
-        
-        if not condition:
-            return {'status': 'failed', 'reason': 'while requires condition'}
-        
-        iteration = 0
-        while self._evaluate_condition(condition) and iteration < max_iterations:
-            for step in body:
-                result = self.execute_action(step)
-                if result.get('status') == 'failed':
-                    return result
-            iteration += 1
-        
-        if iteration >= max_iterations:
-            logger.warning(f"While loop hit max iterations: {max_iterations}")
-        
-        return {'status': 'success', 'value': iteration}
-    
-    def _execute_wait(self, action: Dict) -> Dict:
-        """
-        Block until condition satisfied.
-        
-        Required: type, condition
-        Optional: timeout
-        """
-        condition = action.get('condition')
-        timeout = action.get('timeout', 60.0)
-        
-        if not condition:
-            return {'status': 'failed', 'reason': 'wait requires condition'}
-        
-        start_time = time.time()
-        check_interval = 0.5  # Check every 500ms
-        
-        while time.time() - start_time < timeout:
-            if self._evaluate_condition(condition):
-                return {'status': 'success', 'value': True}
-            time.sleep(check_interval)
-        
-        logger.warning(f"Wait timeout after {timeout}s")
-        return {'status': 'failed', 'reason': 'Wait timeout'}
     
     def _execute_say(self, action: Dict) -> Dict:
         """
@@ -1198,6 +1107,168 @@ class InfospaceExecutor:
         logger.info(f"Compared {len(resolved_targets)} items → ${out_var}")
         return {'status': 'success', 'value': info_id}
     
+    def _execute_map(self, action: Dict) -> Dict:
+        """
+        Apply operation to each item in a Collection.
+        
+        Required: type, target, operation, out
+        Optional: filter_null (bool), args (dict)
+        
+        operation can be:
+        - String: tool name to apply to each item
+        - Dict with "type": inline action (e.g., {"type": "extract", "field": "score"})
+        - Dict with "tool": tool name with additional args
+        
+        Argument types:
+        - target: $variable (Collection to map over)
+        - operation: string or dict
+        - args: dict of additional arguments (for tool operations)
+        - filter_null: bool (exclude null/None results)
+        - out: variable name for result Collection
+        """
+        # Validate required fields
+        error = self._validate_required_fields(action, 'target', 'operation', 'out')
+        if error:
+            return {'status': 'failed', 'reason': error}
+        
+        target_arg = action.get('target')
+        operation = action.get('operation')
+        out_var = action.get('out')
+        filter_null = action.get('filter_null', False)
+        additional_args = action.get('args', {})
+        
+        # Target must be a Collection variable
+        if not isinstance(target_arg, str) or not target_arg.startswith('$'):
+            return {'status': 'failed', 'reason': 'map target must be $variable referencing a Collection'}
+        
+        collection_var = target_arg[1:]
+        
+        # Get resource IDs from Collection
+        if collection_var not in self.plan_bindings:
+            return {'status': 'failed', 'reason': f'Unbound variable: {target_arg}'}
+        
+        collection_id = self.plan_bindings[collection_var]
+        resource_ids = self.plan_bindings.get(f"_content_{collection_id}", [])
+        
+        if not isinstance(resource_ids, list):
+            return {'status': 'failed', 'reason': 'map target must be a Collection'}
+        
+        # Dereference to get actual content
+        dereferenced_notes = self._dereference_collection(collection_var)
+        
+        # Apply operation to each item
+        result_ids = []
+        for i, note in enumerate(dereferenced_notes):
+            # Extract content from Note envelope
+            content = note.get('content') if isinstance(note, dict) else note
+            
+            # Apply operation based on type
+            if isinstance(operation, str):
+                # Tool name - apply to content
+                result = self._apply_operation_to_value(operation, content, 
+                                                       f"map item {i}", additional_args)
+            elif isinstance(operation, dict):
+                if 'tool' in operation:
+                    # Dict with tool name and args
+                    tool_name = operation['tool']
+                    tool_args = operation.get('args', {})
+                    tool_args.update(additional_args)  # Merge with action-level args
+                    result = self._apply_operation_to_value(tool_name, content,
+                                                           f"map item {i}", tool_args)
+                elif 'type' in operation:
+                    # Inline action - execute it with content as implicit target
+                    inline_action = operation.copy()
+                    # For extract, set target to content
+                    if inline_action['type'] == 'extract':
+                        inline_action['target'] = content
+                        inline_action['out'] = f"_map_temp_{i}"
+                        result = self._execute_extract(inline_action)
+                        # Get the created info
+                        if result.get('status') == 'success':
+                            temp_var = f"_map_temp_{i}"
+                            temp_id = self.plan_bindings.get(temp_var)
+                            temp_content = self.plan_bindings.get(f"_content_{temp_id}")
+                            result = {'status': 'success', 'value': temp_content}
+                    else:
+                        return {'status': 'failed', 
+                               'reason': f"Inline action type '{inline_action['type']}' not supported in map"}
+                else:
+                    return {'status': 'failed', 'reason': 'operation dict must have "tool" or "type" field'}
+            else:
+                return {'status': 'failed', 'reason': 'operation must be string (tool name) or dict'}
+            
+            # Handle result
+            if result.get('status') == 'success':
+                result_value = result.get('value')
+                # Create Note for result
+                note_id = self._create_info(content=result_value, name=f"{out_var}_item_{i}", kind='Note')
+                # Include unless filtering nulls and value is None
+                if not (filter_null and result_value is None):
+                    result_ids.append(note_id)
+            else:
+                # Map failed on this item
+                logger.warning(f"Map failed on item {i}: {result.get('reason')}")
+                if not filter_null:
+                    # Create note_null reference (or skip if filtering)
+                    result_ids.append("Note_null")
+        
+        # Create new Collection with result IDs
+        collection_id = self._create_info(content=result_ids, name=out_var, kind='Collection')
+        self._bind_variable(out_var, collection_id)
+        logger.info(f"Mapped {len(dereferenced_notes)} → {len(result_ids)} items → ${out_var}")
+        return {'status': 'success', 'value': collection_id}
+    
+    # ==================== Operation Application Helpers ====================
+    
+    def _apply_operation_to_value(self, tool_name: str, value: Any, reason: str = '', 
+                                   additional_args: Dict = None) -> Dict:
+        """
+        Helper to apply a tool to a single value with optional additional arguments.
+        Shared by apply and map primitives.
+        
+        Args:
+            tool_name: Name of the tool/skill to invoke
+            value: Input value to the tool
+            reason: Reason for invoking (for logging)
+            additional_args: Optional dict of additional arguments for the tool
+            
+        Returns:
+            Result dict with 'status' and 'value' fields
+        """
+        # Resolve any variables in additional args
+        resolved_args = {}
+        if additional_args:
+            for key, val in additional_args.items():
+                resolved_args[key] = self._resolve_value(val)
+        
+        # Build tool request
+        request = {
+            'agent_name': self.agent_name,
+            'tool_name': tool_name,
+            'input_value': value,
+            'reason': reason,
+            'additional_args': resolved_args  # Pass extra args to tool executor
+        }
+        
+        self.session.put(
+            f"map/{self.map_name}/tool_request/{self.agent_name}",
+            json.dumps(request)
+        )
+        
+        # Wait for response
+        response = self._wait_for_response(
+            f"map/{self.map_name}/tool_response/{self.agent_name}",
+            timeout=5.0
+        )
+        
+        if not response:
+            return {'status': 'failed', 'reason': 'Tool execution timeout'}
+        
+        if response.get('status') != 'success':
+            return {'status': 'failed', 'reason': response.get('reason', 'Tool execution failed')}
+        
+        return {'status': 'success', 'value': response.get('result')}
+    
     # ==================== Helper Methods ====================
     
     def _apply_operator(self, item_value: Any, operator: str, compare_value: Any) -> bool:
@@ -1480,22 +1551,20 @@ class InfospaceExecutor:
             logger.error(f"Invalid resource ID format: {resource_id}")
             return None
         
-        # Query map_node
+        # Query map_node using resource by name queryable
         from zenoh import QueryTarget, ConsolidationMode
         for reply in self.session.get(
-            f"cognitive/map/{resource_type}/get",
+            f"cognitive/map/resource/{resource_id}",
             target=QueryTarget.BEST_MATCHING,
             consolidation=ConsolidationMode.NONE,
-            timeout=5.0,
-            payload=json.dumps({
-                'character_name': self.agent_name,
-                'resource_id': resource_id
-            }).encode('utf-8')
+            timeout=5.0
         ):
             if reply.ok:
                 response = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
                 if response.get('success'):
-                    content = response.get('content')
+                    resource_data = response.get('resource')
+                    # Extract content from properties field
+                    content = resource_data.get('properties', {}).get('content')
                     # Cache in plan_bindings
                     self.plan_bindings[f"_content_{resource_id}"] = content
                     kind = 'Note' if resource_type == 'note' else 'Collection'
@@ -1540,10 +1609,10 @@ class InfospaceExecutor:
     
     def _create_info(self, content: Any, name: str = None, kind: str = 'Note') -> str:
         """
-        Create Note or Collection object, return info_id.
+        Create Note or Collection object locally (fallback), return info_id.
         
         Args:
-            content: The data to store
+            content: The data to store (raw, not wrapped)
             name: Optional variable name for logging
             kind: 'Note' or 'Collection' (default: 'Note')
         
@@ -1554,14 +1623,8 @@ class InfospaceExecutor:
         prefix = 'note_' if kind == 'Note' else 'collection_'
         info_id = f"{prefix}{uuid.uuid4().hex[:8]}"
         
-        # Wrap content in consistent schema for Notes
-        if kind == 'Note':
-            wrapped_content = self._wrap_note_content(content, name)
-        else:
-            wrapped_content = content  # Collections store raw content
-        
-        # Store content and type
-        self.plan_bindings[f"_content_{info_id}"] = wrapped_content
+        # Store raw content and type
+        self.plan_bindings[f"_content_{info_id}"] = content
         self.plan_bindings[f"_kind_{info_id}"] = kind
         
         logger.info(f"Created {kind} {info_id}" + (f" '{name}'" if name else ""))
@@ -1570,7 +1633,6 @@ class InfospaceExecutor:
     def _resolve_value(self, value: Any) -> Any:
         """
         Resolve $variable to Note/Collection content.
-        For Notes with envelope schema, returns the actual content field.
         
         Args:
             value: Can be a literal value, or "$variable" string
@@ -1594,15 +1656,8 @@ class InfospaceExecutor:
         # Get content from Note/Collection
         content_key = f"_content_{info_id}"
         if content_key in self.plan_bindings:
-            stored_content = self.plan_bindings[content_key]
-            kind = self.plan_bindings.get(f"_kind_{info_id}", 'Note')
-            
-            # For Notes with envelope schema, extract the actual content
-            if kind == 'Note' and isinstance(stored_content, dict) and 'content' in stored_content:
-                return stored_content['content']
-            
-            # For Collections or raw content, return as-is
-            return stored_content
+            # Map_node stores raw content - return as-is
+            return self.plan_bindings[content_key]
         
         logger.warning(f"Note/Collection content not found for {info_id}")
         return None
@@ -1758,23 +1813,6 @@ class InfospaceExecutor:
                 'out': 'test_results',
                 'prediction': 'test search results'
             },
-            'if': {
-                'type': 'if',
-                'condition': {'type': 'equals', 'target': 'test', 'value': 'test'},
-                'then': [{'type': 'save', 'variable': 'test_result', 'value': 'success'}],
-                'else': []
-            },
-            'while': {
-                'type': 'while',
-                'condition': {'type': 'empty', 'target': '$test_var'},
-                'body': [{'type': 'save', 'variable': 'test_result', 'value': 'looped'}],
-                'max_iterations': 1
-            },
-            'wait': {
-                'type': 'wait',
-                'condition': {'type': 'equals', 'target': 'ready', 'value': 'ready'},
-                'timeout': 0.1
-            },
             'say': {
                 'type': 'say',
                 'value': 'test output message',
@@ -1799,6 +1837,13 @@ class InfospaceExecutor:
                 'condition': {'field': 'val', 'operator': 'gt', 'value': 0},
                 'out': 'test_filtered',
                 'prediction': 'test filter'
+            },
+            'map': {
+                'type': 'map',
+                'target': '$test_filtered',
+                'operation': {'type': 'extract', 'field': 'val'},
+                'out': 'test_mapped',
+                'prediction': 'test map'
             },
             'merge': {
                 'type': 'merge',

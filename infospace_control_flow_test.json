@@ -1,0 +1,119 @@
+{
+  "plan": [
+    {
+      "type": "think",
+      "value": "Testing infospace control flow: if, while, condition evaluation"
+    },
+    {
+      "type": "save",
+      "value": {"score": 85},
+      "out": "item1"
+    },
+    {
+      "type": "if",
+      "condition": {
+        "type": "bound",
+        "target": "$item1"
+      },
+      "then": [
+        {
+          "type": "say",
+          "target": "User",
+          "value": "Item1 bound - test passed"
+        }
+      ],
+      "else": [
+        {
+          "type": "say",
+          "target": "User",
+          "value": "Item1 not bound - test failed"
+        }
+      ]
+    },
+    {
+      "type": "if",
+      "condition": {
+        "type": "bound",
+        "target": "$missing"
+      },
+      "then": [
+        {
+          "type": "say",
+          "target": "User",
+          "value": "ERROR: Missing variable appeared bound"
+        }
+      ],
+      "else": [
+        {
+          "type": "say",
+          "target": "User",
+          "value": "Notbound check passed"
+        }
+      ]
+    },
+    {
+      "type": "save",
+      "value": 0,
+      "out": "counter"
+    },
+    {
+      "type": "while",
+      "condition": {
+        "type": "less_than",
+        "target": "$counter",
+        "value": 2
+      },
+      "body": [
+        {
+          "type": "say",
+          "target": "User",
+          "value": "Loop iteration"
+        },
+        {
+          "type": "save",
+          "value": 999,
+          "out": "counter"
+        }
+      ]
+    },
+    {
+      "type": "if",
+      "condition": {
+        "type": "equals",
+        "target": "$item1",
+        "value": {"score": 85}
+      },
+      "then": [
+        {
+          "type": "say",
+          "target": "User",
+          "value": "Equals check passed"
+        }
+      ]
+    },
+    {
+      "type": "save",
+      "value": null,
+      "out": "empty_val"
+    },
+    {
+      "type": "if",
+      "condition": {
+        "type": "empty",
+        "target": "$empty_val"
+      },
+      "then": [
+        {
+          "type": "say",
+          "target": "User",
+          "value": "Empty check passed"
+        }
+      ]
+    },
+    {
+      "type": "say",
+      "target": "User",
+      "value": "Control flow test complete!"
+    }
+  ]
+}

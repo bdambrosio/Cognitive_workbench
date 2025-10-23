@@ -1,0 +1,78 @@
+{
+  "plan": [
+    {
+      "type": "think",
+      "value": "Testing infospace primitives: save, create, filter, sort, and index operations"
+    },
+    {
+      "type": "save",
+      "value": {"name": "Study A", "score": 85, "topic": "cognitive architecture"},
+      "out": "note1"
+    },
+    {
+      "type": "save",
+      "value": {"name": "Study B", "score": 72, "topic": "memory systems"},
+      "out": "note2"
+    },
+    {
+      "type": "save",
+      "value": {"name": "Study C", "score": 91, "topic": "planning algorithms"},
+      "out": "note3"
+    },
+    {
+      "type": "create",
+      "kind": "Collection",
+      "value": ["$note1", "$note2", "$note3"],
+      "out": "all_studies"
+    },
+    {
+      "type": "say",
+      "target": "User",
+      "value": "I've created 3 study notes and collected them. The notes should now be visible in my current location."
+    },
+    {
+      "type": "filter",
+      "target": "$all_studies",
+      "condition": {
+        "type": "greater_than",
+        "field": "score",
+        "value": 80
+      },
+      "out": "high_scores"
+    },
+    {
+      "type": "say",
+      "target": "User",
+      "value": "I've filtered the studies to find those with scores above 80."
+    },
+    {
+      "type": "sort",
+      "target": "$all_studies",
+      "field": "score",
+      "order": "descending",
+      "out": "sorted_studies"
+    },
+    {
+      "type": "say",
+      "target": "User",
+      "value": "I've sorted all studies by score in descending order."
+    },
+    {
+      "type": "index",
+      "source": "$all_studies",
+      "store_name": "study_index",
+      "index_type": "semantic",
+      "fields": {
+        "embed": ["topic"],
+        "metadata": ["name", "score"]
+      },
+      "out": "index_result"
+    },
+    {
+      "type": "say",
+      "target": "User",
+      "value": "I've created a semantic index of all studies. Test complete!"
+    }
+  ]
+}
+

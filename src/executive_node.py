@@ -226,6 +226,7 @@ class ZenohExecutiveNode:
         self.step_counter: int = 0
         self.current_plan_prompt_template:str = ''
         self.current_plan_prompt_bindings:dict = {}
+        self.current_plan_prompt: str = ''  # Set during LLM planning or manual plan load
         self.plan_log: List[Dict[str, Any]] = [] # log of plans and actions
         # Track simulation time at plan boundaries
         self.current_plan_start_sim_iso: Optional[str] = None
@@ -673,6 +674,9 @@ class ZenohExecutiveNode:
         try:
             # Tick local physiology/state using global simulation time if available
             self._ooda_housekeeping()
+            # Request fresh situation update for UI
+            self.map_update_request_publisher.put(json.dumps({'type': 'ooda observe'}))
+            time.sleep(0.1)
             # Observe: Collect current situation and sense data
             observations = self._observe()
             # Manual characters skip orient/plan entirely
@@ -1379,8 +1383,12 @@ end your response with </end>
             return None
 
         def _cond_outcome(cond):
-            result = plan_module._evaluate_condition(self, cond, self.observations)
-            return result['value'], result['binding'] if result['binding'] else None
+            if self.is_infospace:
+                outcome = self.infospace_executor._evaluate_condition(cond)
+                return outcome, None
+            else:
+                result = plan_module._evaluate_condition(self, cond, self.observations)
+                return result['value'], result['binding'] if result['binding'] else None
 
         current = step_stack.peek()
         plan = current['plan']
@@ -1441,7 +1449,7 @@ end your response with </end>
             # Infospace primitives - Phase 1 & 2
             'apply', 'create', 'save', 'load', 'store', 'index', 'organize', 'search',
             'extract', 'filter', 'merge', 'transform',
-            'aggregate', 'sort', 'group_by', 'compare'
+            'aggregate', 'sort', 'group_by', 'compare', 'map'
         }
         if stype in executable_primitives:
             current['idx'] = idx + 1
@@ -1572,14 +1580,12 @@ end your response with </end>
                 # Phase 1 Core
                 'apply', 'move', 'create', 'save', 'load',
                 'index', 'organize', 'search',
-                # Phase 1 Control
-                'if', 'while', 'wait',
                 # Phase 1 Communication
                 'say', 'think',
                 # Phase 2 Data
                 'extract', 'filter', 'merge', 'transform',
                 # Phase 2 Analysis
-                'aggregate', 'sort', 'group_by', 'compare'
+                'aggregate', 'sort', 'group_by', 'compare', 'map'
             }
             
             # Route infospace-specific actions to infospace executor
@@ -2286,7 +2292,7 @@ end your response with </end>
 
         # Request situation/map update for UI after non-move actions that may affect visibility/adjacency
         try:
-            if action['type'].lower() in ["take", "inspect", "use"]:
+            if action['type'].lower() in ["take", "inspect", "use", "save", "create"]:
                 self.map_update_request_publisher.put(json.dumps({'type': 'step_look'}))
         except Exception:
             pass
@@ -2851,6 +2857,7 @@ End your response with </end>
             # Clear existing plan and set new one
             self._plan_completed("manual plan override")
             self.current_plan = parsed_plan
+            self.current_plan_prompt = "Manual plan via UI"  # Store indicator of manual plan
             self.plan_bindings = {}
             logger.info(f'🔄 {self.character_name} cleared plan_bindings for UI-assigned plan')
             logger.info(f'📋 {self.character_name} assigned UI plan with {len(parsed_plan["plan"])} steps')
