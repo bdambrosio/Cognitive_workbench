@@ -6,7 +6,7 @@ from typing import Dict, List
 from infospace_map import InfospaceMap
 
 import infospace
-infospace.setup_module('/home/bruce/Downloads/Cognitive_workbench/src/maps/tools')
+infospace.setup_module()
 
 # Re-export the attributes that map_node expects
 terrain_types = infospace.terrain_types

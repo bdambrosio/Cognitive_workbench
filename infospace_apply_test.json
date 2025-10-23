@@ -1,0 +1,53 @@
+{
+  "plan": [
+    {
+      "type": "think",
+      "value": "Testing apply primitive with tools: summarize, decompose, analyze"
+    },
+    {
+      "type": "save",
+      "value": "Cognitive architectures for autonomous agents combine perception, planning, and execution in a unified framework. They enable agents to maintain coherent mental models while adapting to changing environments. Key components include working memory, episodic memory, and procedural knowledge. Modern implementations leverage large language models to enhance reasoning capabilities and natural language understanding. The integration of symbolic and subsymbolic processing remains an active research challenge.",
+      "out": "long_text"
+    },
+    {
+      "type": "say",
+      "target": "User",
+      "value": "Saved long text about cognitive architectures."
+    },
+    {
+      "type": "apply",
+      "target": "summarize-content",
+      "value": "$long_text",
+      "reason": "Test summarization tool",
+      "out": "summary"
+    },
+    {
+      "type": "say",
+      "target": "User",
+      "value": "$summary"
+    },
+    {
+      "type": "save",
+      "value": "A large dataset containing information about customer purchases, product reviews, and demographic data across multiple years.",
+      "out": "entity_text"
+    },
+    {
+      "type": "apply",
+      "target": "extract-entities",
+      "value": "$entity_text",
+      "reason": "Test entity extraction",
+      "out": "entities"
+    },
+    {
+      "type": "say",
+      "target": "User",
+      "value": "$entities"
+    },
+    {
+      "type": "say",
+      "target": "User",
+      "value": "Apply primitive tests complete!"
+    }
+  ]
+}
+

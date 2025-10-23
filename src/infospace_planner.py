@@ -199,15 +199,17 @@ class InfospacePlanner:
     Uses infospace-specific templates and primitives.
     """
     
-    def __init__(self, llm_client, logger=None):
+    def __init__(self, llm_client, available_tools: Dict[str, Dict] = None, logger=None):
         """
         Initialize infospace planner.
         
         Args:
             llm_client: LLM client for plan generation
+            available_tools: Dict of tool_name -> metadata (from tool_loader)
             logger: Optional logger instance
         """
         self.llm_client = llm_client
+        self.available_tools = available_tools or {}
         self.logger = logger or logging.getLogger(__name__)
         self.template = INFOSPACE_PLAN_TEMPLATE
     
@@ -260,12 +262,17 @@ class InfospacePlanner:
     
     def _format_template(self, goal: str, context: Dict) -> str:
         """Format template with goal and context"""
-        tools = context.get('available_tools', [])
         stores = context.get('available_stores', [])
         variables = context.get('variables', {})
         
-        # Format tools list
-        tools_text = '\n'.join([f"- {tool}" for tool in tools]) if tools else "None visible"
+        # Format tools list from available_tools
+        if self.available_tools:
+            tools_text = '\n'.join([
+                f"- {name}: {info.get('description', 'No description')}"
+                for name, info in self.available_tools.items()
+            ])
+        else:
+            tools_text = "None available"
         
         # Format stores list
         stores_text = '\n'.join([f"- {store}" for store in stores]) if stores else "None yet (create with index)"
@@ -279,7 +286,7 @@ class InfospacePlanner:
         # Fill in template
         filled = self.template
         filled = filled.replace('{{context}}', context_text)
-        filled = filled.replace('{{tools}}', tools_text)  # Note: template var is {{tools}} for compatibility
+        filled = filled.replace('{{tools}}', tools_text)
         filled = filled.replace('{{stores}}', stores_text)
         filled = filled.replace('{{variables}}', vars_text)
         filled = filled.replace('{{goal}}', goal)

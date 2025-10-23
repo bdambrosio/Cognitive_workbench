@@ -28,7 +28,7 @@ class InfospaceExecutor:
     Design principle: Content is opaque. Field-based operations delegated to tools.
     """
     
-    def __init__(self, agent_name: str, session, map_name: str):
+    def __init__(self, agent_name: str, session, map_name: str, llm_client, available_tools: Dict[str, Dict]):
         """
         Initialize infospace executor.
         
@@ -36,19 +36,22 @@ class InfospaceExecutor:
             agent_name: Name of the agent
             session: Zenoh session for communication
             map_name: Name of the map (for Zenoh topics)
+            llm_client: LLM client for tool execution
+            available_tools: Dict of tool_name -> metadata (from tool_loader)
         """
         self.agent_name = agent_name
         self.session = session
         self.map_name = map_name
+        self.llm_client = llm_client
+        self.available_tools = available_tools
         
         # Plan-local state (ephemeral, cleared each plan)
         self.plan_bindings = {}  # $var_name -> info_id
         
         # Agent state
         self.agent_position = None
-        self.visible_tools = {}
         
-        logger.info(f"InfospaceExecutor initialized for {agent_name}")
+        logger.info(f"InfospaceExecutor initialized for {agent_name} with {len(available_tools)} tools")
     
     def clear_plan_state(self):
         """Clear ephemeral plan state (call at start of new plan)"""
@@ -143,7 +146,7 @@ class InfospaceExecutor:
         """
         Apply tool to input data.
         
-        Required: type, target, reason, prediction
+        Required: type, target, reason
         Optional: value (input), args (additional arguments), out (output binding)
         
         Argument types:
@@ -161,21 +164,95 @@ class InfospaceExecutor:
         if not target:
             return {'status': 'failed', 'reason': 'apply requires target'}
         
-        # Apply the operation using shared helper
-        result = self._apply_operation_to_value(target, value, reason, additional_args)
+        # Check if this is a prompt-augmentation tool (handled locally)
+        tool_info = self._get_tool_info(target)
+        
+        if tool_info and tool_info.get('type') == 'prompt_augmentation':
+            # Execute locally using LLM
+            result = self._execute_prompt_tool(target, value, tool_info, additional_args)
+        else:
+            # Delegate to map node (external tool or code execution)
+            result = self._apply_operation_to_value(target, value, reason, additional_args)
         
         if result.get('status') != 'success':
             return result
         
-        # Get result value
+        # Bind result if output variable specified
         result_value = result.get('value')
         if out_var:
             self._bind_variable(out_var, result_value)
-            logger.info(f"Tool executed, result → ${out_var}")
-            return {'status': 'success', 'value': result_value}
+            logger.info(f"Tool '{target}' executed, result → ${out_var}")
         
         return {'status': 'success', 'value': result_value}
-    
+
+    def _get_tool_info(self, tool_name: str) -> Optional[Dict]:
+        """
+        Get tool metadata from available tools.
+        
+        Returns tool info dict with 'type', 'description', 'tool_md_content', etc.
+        Returns None if tool not found.
+        """
+        return self.available_tools.get(tool_name)
+
+    def _execute_prompt_tool(self, tool_name: str, input_value: Any, 
+                            tool_info: Dict, additional_args: Dict) -> Dict:
+        """
+        Execute a prompt-augmentation tool using local LLM.
+        
+        Args:
+            tool_name: Name of the tool
+            input_value: Input data to process
+            tool_info: Tool metadata including SKILL.md content
+            additional_args: Optional parameters (e.g., length='brief')
+            
+        Returns:
+            Result dict with 'status' and 'value'
+        """
+        try:
+            # Extract SKILL.md content
+            skill_content = tool_info.get('tool_md_content', '')
+            if not skill_content:
+                return {'status': 'failed', 'reason': f'No SKILL.md content for {tool_name}'}
+            
+            # Build prompt with tool instructions + input
+            prompt_parts = [
+                "You are executing a cognitive tool. Follow the instructions carefully.\n",
+                "# TOOL INSTRUCTIONS\n",
+                skill_content,
+                "\n# INPUT\n",
+                str(input_value),
+            ]
+            
+            # Add additional args as context if provided
+            if additional_args:
+                prompt_parts.append("\n# PARAMETERS\n")
+                for key, val in additional_args.items():
+                    prompt_parts.append(f"{key}: {val}\n")
+            
+            prompt_parts.append("\n# OUTPUT\nProvide the result directly, following the tool's output format:")
+            
+            full_prompt = "".join(prompt_parts)
+            
+            # Call LLM directly
+            llm_response = self.llm_client.generate(
+                messages=[full_prompt],
+                bindings={},
+                max_tokens=1000,
+                temperature=0.5
+            )
+            
+            if not llm_response or not llm_response.text:
+                return {'status': 'failed', 'reason': 'LLM returned empty response'}
+            
+            result_text = llm_response.text
+            logger.info(f"Prompt tool '{tool_name}' completed ({len(result_text)} chars)")
+            
+            return {'status': 'success', 'value': result_text}
+            
+        except Exception as e:
+            logger.error(f"Prompt tool execution failed: {e}")
+            return {'status': 'failed', 'reason': str(e)}
+
     def _execute_move(self, action: Dict) -> Dict:
         """
         Move to resource location.
