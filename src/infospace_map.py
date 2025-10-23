@@ -148,11 +148,11 @@ class InfospaceMap(SpaceMap):
         for type_name, resources in resource_types.items():
             summary_parts.append(f"  - {type_name}: {len(resources)} instances")
             
-            # For skills, show names
+            # For tools, show names
             for resource in resources[:5]:  # Show first 5
-                if 'skill_name' in resource['properties']:
-                    skill_name = resource['properties']['skill_name']
-                    summary_parts.append(f"    • {skill_name}")
+                if 'tool_name' in resource['properties']:
+                    tool_name = resource['properties']['tool_name']
+                    summary_parts.append(f"    • {tool_name}")
             
             if len(resources) > 5:
                 summary_parts.append(f"    ... and {len(resources) - 5} more")
@@ -334,11 +334,11 @@ def get_detailed_visibility_description_impl(world: InfospaceMap, camera_x: int,
                 resource_element.set("id", resource_id)
                 resource_element.set("distance", str(distance))
                 
-                # Add skill name if available
+                # Add tool name if available
                 resource_data = world.resource_registry.get(resource_id)
-                if resource_data and 'skill_name' in resource_data['properties']:
-                    resource_element.set("skill_name", 
-                                       resource_data['properties']['skill_name'])
+                if resource_data and 'tool_name' in resource_data['properties']:
+                    resource_element.set("tool_name", 
+                                       resource_data['properties']['tool_name'])
                 
                 resource_element.text = ""
         

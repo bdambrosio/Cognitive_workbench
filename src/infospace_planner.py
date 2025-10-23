@@ -30,6 +30,8 @@ OUTPUT: only valid JSON — no reasoning, no prose, no code fences.
 # AVAILABLE ACTIONS:
 
 apply - apply a tool/skill to input data and bind result to variable
+map - apply operation to each item in a Collection
+transform - convert data format or structure (whole-value operations only)
 move - change current location or approach a resource
 create - create a Note or Collection object and bind to variable
 save - create Note object from a value and bind to variable
@@ -55,6 +57,13 @@ Resource IDs: Cannot be referenced directly - use "load" action first to bind to
 
 apply — apply a tool/skill to input data
 {"type":"apply","target":"tool-name/resource-name or $tool_var","value":"input text or $data","reason":"purpose","out":"result_variable"}
+
+map — apply operation to each item in Collection
+{"type":"map","target":"$collection","operation":"tool-name or {'tool':'name','args':{}}","out":"result_collection"}
+{"type":"map","target":"$collection","operation":"tool-name","filter_null":true,"out":"filtered_results"}  # exclude null results
+
+transform — convert data format or structure (whole-value)
+{"type":"transform","target":"$data","operation":"flatten|normalize|pivot|reshape","out":"transformed"}
 
 move — change current location or approach a resource
 {"type":"move","target":"resource-name or {"location": [x,y]}"}
@@ -112,13 +121,16 @@ Value comparison - these conditions test Note object content:
 {"type": "gte", "target": "$score", "value": 0.7}
 {"type": "lte", "target": "$size", "value": 1000}
 
-Membership - these conditions test Note object content:
+Membership - these conditions test Note object content (whole-value):
 {"type": "contains", "target": "$text", "value": "keyword"}          // substring or list element
 {"type": "not_contains", "target": "$tags", "value": "spam"}
 
-Structured data - these conditions test Note object metadata:
-{"type": "field_exists", "target": "$data", "field": "urls"}
-{"type": "field_missing", "target": "$data", "field": "error"}
+Pattern matching:
+{"type": "matches_pattern", "target": "$text", "pattern": "regex_pattern"}
+
+Tool-based conditions - delegate complex predicates to external tools:
+{"type": "tool_condition", "tool": "has_field", "target": "$data", "args": {"field": "urls"}}    // tool returns boolean
+{"type": "tool_condition", "tool": "json_valid", "target": "$text", "args": {}}                  // validate structure
 
 
 # TOOLS - the tools available to the agent are listed below, make sure to use the correct name when calling apply.
@@ -205,7 +217,7 @@ class InfospacePlanner:
         
         Args:
             goal: String goal description
-            context: Dict with available_skills, stores, variables, state
+            context: Dict with available_tools, stores, variables, state
             
         Returns:
             Plan dict with 'plan' array of actions, or error dict

@@ -237,8 +237,8 @@ class SpaceMap(ABC):
                     print(f"Warning: Could not place {resource_type}")
                     continue
                 
-                # Generate resource ID - use custom name if provided (e.g., skill_name for infospace)
-                custom_name = allocation.get('skill_name') or allocation.get('custom_name')
+                # Generate resource ID - use custom name if provided (e.g., tool_name for infospace)
+                custom_name = allocation.get('tool_name') or allocation.get('custom_name')
                 resource_id = self._generate_resource_id(resource_type, custom_name=custom_name)
                 
                 # Create resource entry
