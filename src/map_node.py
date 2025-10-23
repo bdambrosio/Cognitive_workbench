@@ -172,10 +172,59 @@ class MapNode:
             # Load existing world data if available
             self.load_world_data()
             
+            # Create distinguished note_null system resource
+            self.create_note_null()
+            
         except Exception as e:
             logger.error(traceback.format_exc())
             logger.error(f"Failed to load map module: {e}")
             raise
+    
+    def create_note_null(self):
+        """
+        Create distinguished note_null system resource.
+        
+        This is a singleton Note instance representing "no result" / empty value.
+        Created at map initialization and visible to all agents.
+        """
+        try:
+            # Check if Note resource type exists (only for infospace maps)
+            if not hasattr(self.world_map.scenario_module.resource_types, 'Note'):
+                logger.info("Skipping note_null creation (not an infospace map)")
+                return
+            
+            # Generate unique ID
+            note_id = f"Note_null"
+            
+            # Create Note properties
+            properties = {
+                'content': None,
+                'format': 'json',
+                'created_at': datetime.now().isoformat(),
+                'created_by': 'system',
+                'source_skill': 'system',
+                'source_value': '',
+                'is_system': True
+            }
+            
+            # Place at origin (0, 0)
+            x, y = 0, 0
+            
+            # Register in map's resource registry
+            resource_data = {
+                'type': self.world_map.scenario_module.resource_types.Note,
+                'location': (x, y),
+                'properties': properties
+            }
+            
+            self.world_map.resource_registry[note_id] = resource_data
+            self.world_map.patches[x][y].resources[note_id] = resource_data
+            
+            logger.info(f"Created system resource: {note_id} at ({x}, {y})")
+            
+        except Exception as e:
+            logger.error(f"Failed to create note_null: {e}")
+            # Non-fatal - continue initialization
     
     def initialize_setting(self):
         """Initialize the setting"""
