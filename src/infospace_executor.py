@@ -18,14 +18,14 @@ class InfospaceExecutor:
     """
     Executor for information space primitives.
     
-    Phase 1 Primitives:
-    - Core: scan, apply, move
-    - Storage: save, index, search
-    - Control: if, while, wait
+    Core Primitives (whole-value operations only):
+    - Computation: apply, map, transform
+    - Storage: save, load, create
+    - Indexing: index, search
+    - Communication: say, think
+    - Spatial: move
     
-    Phase 2 Primitives:
-    - Data: extract, filter, merge, transform
-    - Analysis: aggregate, sort, group_by, compare
+    Design principle: Content is opaque. Field-based operations delegated to tools.
     """
     
     def __init__(self, agent_name: str, session, map_name: str):
@@ -83,15 +83,8 @@ class InfospaceExecutor:
             'search': self._execute_search,
             'say': self._execute_say,
             'think': self._execute_think,
-            # Phase 2: Data & Analysis
-            'extract': self._execute_extract,
-            'filter': self._execute_filter,
-            'merge': self._execute_merge,
+            # Phase 2: Data Operations (whole-value only)
             'transform': self._execute_transform,
-            'aggregate': self._execute_aggregate,
-            'sort': self._execute_sort,
-            'group_by': self._execute_group_by,
-            'compare': self._execute_compare,
             'map': self._execute_map,
         }
         
@@ -140,12 +133,11 @@ class InfospaceExecutor:
         # Get result and create Note for it
         result = response.get('result')
         
-        # Create Note object for scanned resource
-        info_id = self._create_info(content=result, name=out_var)
-        self._bind_variable(out_var, info_id)
+        # Bind result to variable
+        self._bind_variable(out_var, result)
         
         logger.info(f"Scan found: {result['name'] if isinstance(result, dict) else result}")
-        return {'status': 'success', 'value': info_id}
+        return {'status': 'success', 'value': result}
     
     def _execute_apply(self, action: Dict) -> Dict:
         """
@@ -178,10 +170,9 @@ class InfospaceExecutor:
         # Get result value
         result_value = result.get('value')
         if out_var:
-            info_id = self._create_info(content=result_value, name=out_var)
-            self._bind_variable(out_var, info_id)
+            self._bind_variable(out_var, result_value)
             logger.info(f"Tool executed, result → ${out_var}")
-            return {'status': 'success', 'value': info_id}
+            return {'status': 'success', 'value': result_value}
         
         return {'status': 'success', 'value': result_value}
     
@@ -246,54 +237,27 @@ class InfospaceExecutor:
         if kind not in ['Note', 'Collection']:
             return {'status': 'failed', 'reason': f'Invalid kind: {kind}, must be Note or Collection'}
         
-        # Handle Collections specially - convert variables to resource IDs
+        # Resolve values for Collection or Note
         if kind == 'Collection':
             if value_arg is None:
-                resource_ids = []  # Empty collection
+                collection_values = []  # Empty collection
             elif isinstance(value_arg, list):
-                # Convert list of $variables to resource IDs
-                resource_ids = []
-                for item in value_arg:
-                    if isinstance(item, str) and item.startswith('$'):
-                        # Resolve variable to resource ID
-                        var_name = item[1:]
-                        if var_name in self.plan_bindings:
-                            resource_id = self.plan_bindings[var_name]
-                            resource_ids.append(resource_id)
-                        else:
-                            return {'status': 'failed', 'reason': f'Unbound variable: {item}'}
-                    else:
-                        # Must be literal - create Note to wrap it
-                        note_id = self._create_info(content=item, name=f"item_{len(resource_ids)}", kind='Note')
-                        resource_ids.append(note_id)
-                        logger.info(f"Auto-wrapped literal in Note: {note_id}")
+                # Resolve each item (variable or literal)
+                collection_values = [self._resolve_value(item) for item in value_arg]
             elif isinstance(value_arg, str) and value_arg.startswith('$'):
                 # Single variable - resolve it
                 resolved = self._resolve_value(value_arg)
                 if isinstance(resolved, list):
-                    # Recursively process list
-                    return self._execute_create({
-                        **action,
-                        'value': resolved
-                    })
+                    collection_values = resolved
                 else:
-                    # Single item - wrap in list
-                    var_name = value_arg[1:]
-                    if var_name in self.plan_bindings:
-                        resource_ids = [self.plan_bindings[var_name]]
-                    else:
-                        return {'status': 'failed', 'reason': f'Unbound variable: {value_arg}'}
+                    collection_values = [resolved]
             else:
                 return {'status': 'failed', 'reason': 'Collection value must be list or $variable'}
             
-            # Validate all items are valid resource IDs
-            validation_error = self._validate_collection_content(resource_ids)
-            if validation_error:
-                return {'status': 'failed', 'reason': validation_error}
-            
-            spatial_content = resource_ids
-            format_type = 'list'
-            create_topic = f"cognitive/map/collection/create"
+            # Bind Collection as list of values
+            self._bind_variable(out_var, collection_values)
+            logger.info(f"Created Collection → ${out_var} ({len(collection_values)} items)")
+            return {'status': 'success', 'value': collection_values}
             
         else:  # Note
             value = self._resolve_value(value_arg) if value_arg is not None else ''
@@ -322,10 +286,10 @@ class InfospaceExecutor:
                     response = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
                     if response.get('success'):
                         info_id = response.get('info_id')
-                        # Bind variable to resource ID
-                        self._bind_variable(out_var, info_id)
-                        logger.info(f"Created {kind} spatial resource → ${out_var} = {info_id}")
-                        return {'status': 'success', 'value': info_id}
+                        # Bind variable to actual value (Note persistence is handled by map_node)
+                        self._bind_variable(out_var, value)
+                        logger.info(f"Created {kind} spatial resource → ${out_var}, persisted as {info_id}")
+                        return {'status': 'success', 'value': value}
                     else:
                         logger.error(f'Failed to create {kind} resource: {response.get("error")}')
                         return {'status': 'failed', 'reason': response.get('error', 'Unknown error')}
@@ -334,11 +298,10 @@ class InfospaceExecutor:
             logger.error(f'Error creating {kind} spatial resource: {e}')
             return {'status': 'failed', 'reason': str(e)}
         
-        # Fallback: create local only if spatial creation failed
-        logger.warning(f"Spatial {kind} creation failed, creating local only")
-        info_id = self._create_info(content=spatial_content, name=out_var, kind=kind)
-        self._bind_variable(out_var, info_id)
-        return {'status': 'success', 'value': info_id}
+        # Fallback: bind value even if spatial creation failed
+        logger.warning(f"Spatial {kind} creation failed, binding locally only")
+        self._bind_variable(out_var, value)
+        return {'status': 'success', 'value': value}
     
     # ==================== Storage Operations ====================
     
@@ -392,10 +355,10 @@ class InfospaceExecutor:
                     response = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
                     if response.get('success'):
                         info_id = response.get('info_id')
-                        # Bind variable to resource ID
-                        self._bind_variable(out_var, info_id)
-                        logger.info(f"Saved Note spatial resource → ${out_var} = {info_id}")
-                        return {'status': 'success', 'value': info_id}
+                        # Bind variable to actual value (Note persistence handled by map_node)
+                        self._bind_variable(out_var, value)
+                        logger.info(f"Saved Note → ${out_var}, persisted as {info_id}")
+                        return {'status': 'success', 'value': value}
                     else:
                         logger.error(f'Failed to create Note resource: {response.get("error")}')
                         return {'status': 'failed', 'reason': response.get('error', 'Unknown error')}
@@ -404,11 +367,10 @@ class InfospaceExecutor:
             logger.error(f'Error creating Note spatial resource: {e}')
             return {'status': 'failed', 'reason': str(e)}
         
-        # Fallback: create local only if spatial creation failed
-        logger.warning(f"Spatial Note creation failed, creating local only")
-        info_id = self._create_info(content=value, name=out_var, kind='Note')
-        self._bind_variable(out_var, info_id)
-        return {'status': 'success', 'value': info_id}
+        # Fallback: bind value even if spatial creation failed
+        logger.warning(f"Spatial Note creation failed, binding locally only")
+        self._bind_variable(out_var, value)
+        return {'status': 'success', 'value': value}
     
     def _execute_load(self, action: Dict) -> Dict:
         """
@@ -452,13 +414,11 @@ class InfospaceExecutor:
                         content = resource_data.get('properties', {}).get('content')
                         kind = 'Note' if resource_type == 'note' else 'Collection'
                         
-                        # Store in plan_bindings
-                        self.plan_bindings[f"_content_{resource_id}"] = content
-                        self.plan_bindings[f"_kind_{resource_id}"] = kind
-                        self._bind_variable(out_var, resource_id)
+                        # Bind actual content to variable
+                        self._bind_variable(out_var, content)
                         
                         logger.info(f"Loaded {kind} {resource_id} → ${out_var}")
-                        return {'status': 'success', 'value': resource_id}
+                        return {'status': 'success', 'value': content}
                     else:
                         error_msg = response.get('error', 'Unknown error')
                         logger.error(f'Failed to load {resource_type}: {error_msg}')
@@ -657,189 +617,6 @@ class InfospaceExecutor:
     
     # ==================== Phase 2: Data Operations ====================
     
-    def _execute_extract(self, action: Dict) -> Dict:
-        """
-        Extract specific fields or elements from structured data.
-        
-        Required: type, target, field, out
-        Optional: default
-        """
-        target = self._resolve_value(action.get('target'))
-        field = action.get('field')
-        out_var = action.get('out')
-        default = action.get('default')
-        
-        if not target or not field or not out_var:
-            return {'status': 'failed', 'reason': 'extract requires target, field, and out'}
-        
-        # Extract field value
-        result = None
-        
-        # Handle nested field paths (e.g., "metadata.author")
-        if '.' in field:
-            parts = field.split('.')
-            current = target
-            for part in parts:
-                if isinstance(current, dict):
-                    current = current.get(part)
-                elif isinstance(current, list) and part.isdigit():
-                    idx = int(part)
-                    current = current[idx] if 0 <= idx < len(current) else None
-                else:
-                    current = None
-                    break
-            result = current
-        else:
-            # Simple field extraction
-            if isinstance(target, dict):
-                result = target.get(field, default)
-            elif isinstance(target, list):
-                # Extract field from all items in list
-                result = [item.get(field, default) if isinstance(item, dict) else None for item in target]
-            else:
-                result = default
-        
-        # Use default if extraction failed
-        if result is None and default is not None:
-            result = default
-        
-        info_id = self._create_info(content=result, name=out_var)
-        self._bind_variable(out_var, info_id)
-        logger.info(f"Extracted field '{field}' → ${out_var}")
-        return {'status': 'success', 'value': info_id}
-    
-    def _execute_filter(self, action: Dict) -> Dict:
-        """
-        Reduce Collection by predicate.
-        
-        Required: type, target, condition, out
-        
-        Filters a Collection of Notes, returns new Collection with matching Notes.
-        """
-        # Validate required fields
-        error = self._validate_required_fields(action, 'target', 'condition', 'out')
-        if error:
-            return {'status': 'failed', 'reason': error}
-        
-        target_arg = action.get('target')
-        condition = action.get('condition')
-        out_var = action.get('out')
-        
-        # Target should be a Collection variable
-        if not isinstance(target_arg, str) or not target_arg.startswith('$'):
-            return {'status': 'failed', 'reason': 'filter target must be $variable referencing a Collection'}
-        
-        collection_var = target_arg[1:]
-        
-        # Get resource IDs from Collection
-        if collection_var not in self.plan_bindings:
-            return {'status': 'failed', 'reason': f'Unbound variable: {target_arg}'}
-        
-        collection_id = self.plan_bindings[collection_var]
-        resource_ids = self.plan_bindings.get(f"_content_{collection_id}", [])
-        
-        # Dereference to get actual content for filtering
-        dereferenced_notes = self._dereference_collection(collection_var)
-        
-        # Extract condition parameters
-        field = condition.get('field')
-        operator = condition.get('operator')
-        value = self._resolve_value(condition.get('value'))
-        
-        if not field or not operator:
-            return {'status': 'failed', 'reason': 'filter condition requires field and operator'}
-        
-        # Filter and track which resource IDs pass
-        filtered_ids = []
-        for i, note in enumerate(dereferenced_notes):
-            # Extract content from Note envelope
-            content = note.get('content') if isinstance(note, dict) else note
-            item_value = content.get(field) if isinstance(content, dict) else content
-            
-            if self._apply_operator(item_value, operator, value):
-                filtered_ids.append(resource_ids[i])
-        
-        # Create new Collection with filtered resource IDs
-        info_id = self._create_info(content=filtered_ids, name=out_var, kind='Collection')
-        self._bind_variable(out_var, info_id)
-        logger.info(f"Filtered {len(resource_ids)} → {len(filtered_ids)} Notes → ${out_var}")
-        return {'status': 'success', 'value': info_id}
-    
-    def _execute_merge(self, action: Dict) -> Dict:
-        """
-        Combine multiple collections or objects.
-        
-        Required: type, targets, out
-        Optional: strategy, deduplicate_by
-        """
-        targets = action.get('targets', [])
-        out_var = action.get('out')
-        strategy = action.get('strategy', 'append')
-        deduplicate_by = action.get('deduplicate_by')
-        
-        if not targets or not out_var:
-            return {'status': 'failed', 'reason': 'merge requires targets and out'}
-        
-        # Resolve all targets
-        resolved_targets = []
-        for target in targets:
-            resolved = self._resolve_value(target)
-            if resolved is not None:
-                resolved_targets.append(resolved)
-        
-        if not resolved_targets:
-            return {'status': 'failed', 'reason': 'No valid targets to merge'}
-        
-        # Merge based on strategy
-        result = []
-        
-        if strategy == 'append':
-            # Simple concatenation
-            for target in resolved_targets:
-                if isinstance(target, list):
-                    result.extend(target)
-                else:
-                    result.append(target)
-        
-        elif strategy == 'deduplicate':
-            # Remove duplicates
-            seen = set()
-            for target in resolved_targets:
-                items = target if isinstance(target, list) else [target]
-                for item in items:
-                    # Deduplicate by field or by value
-                    if deduplicate_by and isinstance(item, dict):
-                        key = item.get(deduplicate_by)
-                        if key not in seen:
-                            seen.add(key)
-                            result.append(item)
-                    else:
-                        # Try to use item as hashable key
-                        item_str = json.dumps(item, sort_keys=True) if isinstance(item, (dict, list)) else str(item)
-                        if item_str not in seen:
-                            seen.add(item_str)
-                            result.append(item)
-        
-        elif strategy in ['union', 'intersection']:
-            # Set operations (treating lists as sets)
-            sets = [set(json.dumps(item, sort_keys=True) if isinstance(item, (dict, list)) else str(item) for item in (target if isinstance(target, list) else [target])) for target in resolved_targets]
-            
-            if strategy == 'union':
-                result_set = set.union(*sets) if sets else set()
-            else:  # intersection
-                result_set = set.intersection(*sets) if sets else set()
-            
-            # Convert back to list (json strings -> objects)
-            result = [json.loads(item) if item.startswith(('{', '[')) else item for item in result_set]
-        
-        else:
-            return {'status': 'failed', 'reason': f'Unknown merge strategy: {strategy}'}
-        
-        info_id = self._create_info(content=result, name=out_var)
-        self._bind_variable(out_var, info_id)
-        logger.info(f"Merged {len(resolved_targets)} → ${out_var}")
-        return {'status': 'success', 'value': info_id}
-    
     def _execute_transform(self, action: Dict) -> Dict:
         """
         Convert data format or structure.
@@ -902,210 +679,9 @@ class InfospaceExecutor:
         else:
             return {'status': 'failed', 'reason': f'Unknown transform operation: {operation}'}
         
-        info_id = self._create_info(content=result, name=out_var)
-        self._bind_variable(out_var, info_id)
+        self._bind_variable(out_var, result)
         logger.info(f"Transformed ({operation}) → ${out_var}")
-        return {'status': 'success', 'value': info_id}
-    
-    # ==================== Phase 2: Analysis Operations ====================
-    
-    def _execute_aggregate(self, action: Dict) -> Dict:
-        """
-        Reduce collection to single value.
-        
-        Required: type, target, operation, out
-        """
-        # Validate required fields
-        error = self._validate_required_fields(action, 'target', 'operation', 'out')
-        if error:
-            return {'status': 'failed', 'reason': error}
-        
-        target = self._resolve_value(action.get('target'))
-        operation = action.get('operation')
-        out_var = action.get('out')
-        
-        # Validate type
-        error = self._validate_type(target, (list,), 'target')
-        if error:
-            return {'status': 'failed', 'reason': error}
-        
-        result = None
-        
-        if operation == 'sum':
-            result = sum(float(item) if isinstance(item, (int, float, str)) and str(item).replace('.', '').isdigit() else 0 for item in target)
-        
-        elif operation == 'average':
-            numeric = [float(item) for item in target if isinstance(item, (int, float)) or (isinstance(item, str) and str(item).replace('.', '').isdigit())]
-            result = sum(numeric) / len(numeric) if numeric else 0
-        
-        elif operation == 'count':
-            result = len(target)
-        
-        elif operation == 'max':
-            numeric = [float(item) for item in target if isinstance(item, (int, float))]
-            result = max(numeric) if numeric else None
-        
-        elif operation == 'min':
-            numeric = [float(item) for item in target if isinstance(item, (int, float))]
-            result = min(numeric) if numeric else None
-        
-        elif operation == 'concat':
-            result = ''.join(str(item) for item in target)
-        
-        elif operation == 'join':
-            separator = action.get('separator', ', ')
-            result = separator.join(str(item) for item in target)
-        
-        else:
-            return {'status': 'failed', 'reason': f'Unknown aggregate operation: {operation}'}
-        
-        info_id = self._create_info(content=result, name=out_var)
-        self._bind_variable(out_var, info_id)
-        logger.info(f"Aggregated ({operation}) → ${out_var}")
-        return {'status': 'success', 'value': info_id}
-    
-    def _execute_sort(self, action: Dict) -> Dict:
-        """
-        Order Collection items by criteria.
-        
-        Required: type, target, by, out
-        Optional: order, limit
-        
-        Sorts a Collection of Notes, returns new Collection with sorted Notes.
-        """
-        # Validate required fields
-        error = self._validate_required_fields(action, 'target', 'by', 'out')
-        if error:
-            return {'status': 'failed', 'reason': error}
-        
-        target_arg = action.get('target')
-        by = action.get('by')
-        out_var = action.get('out')
-        order = action.get('order', 'asc')
-        limit = action.get('limit')
-        
-        # Target should be a Collection variable
-        if not isinstance(target_arg, str) or not target_arg.startswith('$'):
-            return {'status': 'failed', 'reason': 'sort target must be $variable referencing a Collection'}
-        
-        collection_var = target_arg[1:]
-        
-        # Get resource IDs from Collection
-        if collection_var not in self.plan_bindings:
-            return {'status': 'failed', 'reason': f'Unbound variable: {target_arg}'}
-        
-        collection_id = self.plan_bindings[collection_var]
-        resource_ids = self.plan_bindings.get(f"_content_{collection_id}", [])
-        
-        # Dereference to get actual content for sorting
-        dereferenced_notes = self._dereference_collection(collection_var)
-        
-        # Create list of (resource_id, note_content) pairs
-        id_content_pairs = list(zip(resource_ids, dereferenced_notes))
-        
-        # Sort by field
-        reverse = (order == 'desc')
-        
-        def get_sort_key(pair):
-            resource_id, note = pair
-            # Extract content from Note envelope
-            content = note.get('content') if isinstance(note, dict) else note
-            if isinstance(content, dict):
-                return content.get(by, '')
-            else:
-                return content
-        
-        sorted_pairs = sorted(id_content_pairs, key=get_sort_key, reverse=reverse)
-        
-        # Extract sorted resource IDs
-        sorted_ids = [pair[0] for pair in sorted_pairs]
-        
-        # Apply limit if specified
-        if limit:
-            sorted_ids = sorted_ids[:limit]
-        
-        # Create new Collection with sorted resource IDs
-        info_id = self._create_info(content=sorted_ids, name=out_var, kind='Collection')
-        self._bind_variable(out_var, info_id)
-        logger.info(f"Sorted {len(resource_ids)} Notes by {by} → ${out_var}")
-        return {'status': 'success', 'value': info_id}
-    
-    def _execute_group_by(self, action: Dict) -> Dict:
-        """
-        Partition collection by key or category.
-        
-        Required: type, target, by, out
-        """
-        # Validate required fields
-        error = self._validate_required_fields(action, 'target', 'by', 'out')
-        if error:
-            return {'status': 'failed', 'reason': error}
-        
-        target = self._resolve_value(action.get('target'))
-        by = action.get('by')
-        out_var = action.get('out')
-        
-        # Validate type
-        error = self._validate_type(target, (list,), 'target')
-        if error:
-            return {'status': 'failed', 'reason': error}
-        
-        # Group by field name
-        grouped = {}
-        
-        for item in target:
-            if isinstance(item, dict):
-                key = item.get(by, 'unknown')
-            else:
-                key = 'items'
-            
-            key_str = str(key)
-            if key_str not in grouped:
-                grouped[key_str] = []
-            
-            grouped[key_str].append(item)
-        
-        info_id = self._create_info(content=grouped, name=out_var)
-        self._bind_variable(out_var, info_id)
-        logger.info(f"Grouped by {by} → ${out_var}")
-        return {'status': 'success', 'value': info_id}
-    
-    def _execute_compare(self, action: Dict) -> Dict:
-        """
-        Side-by-side comparison between items.
-        
-        Required: type, targets, out
-        Optional: dimensions
-        """
-        targets = action.get('targets', [])
-        out_var = action.get('out')
-        dimensions = action.get('dimensions', [])
-        
-        if not targets or not out_var:
-            return {'status': 'failed', 'reason': 'compare requires targets and out'}
-        
-        # Resolve all targets
-        resolved_targets = [self._resolve_value(t) for t in targets]
-        
-        # Build comparison structure
-        comparison = {
-            'items': resolved_targets,
-            'count': len(resolved_targets)
-        }
-        
-        # If dimensions specified, compare on those fields
-        if dimensions:
-            comparison['dimensions'] = {}
-            for dim in dimensions:
-                comparison['dimensions'][dim] = [
-                    item.get(dim) if isinstance(item, dict) else None
-                    for item in resolved_targets
-                ]
-        
-        info_id = self._create_info(content=comparison, name=out_var)
-        self._bind_variable(out_var, info_id)
-        logger.info(f"Compared {len(resolved_targets)} items → ${out_var}")
-        return {'status': 'success', 'value': info_id}
+        return {'status': 'success', 'value': result}
     
     def _execute_map(self, action: Dict) -> Dict:
         """
@@ -1143,29 +719,19 @@ class InfospaceExecutor:
         
         collection_var = target_arg[1:]
         
-        # Get resource IDs from Collection
-        if collection_var not in self.plan_bindings:
-            return {'status': 'failed', 'reason': f'Unbound variable: {target_arg}'}
+        # Get Collection values
+        collection_values = self._dereference_collection(collection_var)
         
-        collection_id = self.plan_bindings[collection_var]
-        resource_ids = self.plan_bindings.get(f"_content_{collection_id}", [])
-        
-        if not isinstance(resource_ids, list):
+        if not isinstance(collection_values, list):
             return {'status': 'failed', 'reason': 'map target must be a Collection'}
         
-        # Dereference to get actual content
-        dereferenced_notes = self._dereference_collection(collection_var)
-        
         # Apply operation to each item
-        result_ids = []
-        for i, note in enumerate(dereferenced_notes):
-            # Extract content from Note envelope
-            content = note.get('content') if isinstance(note, dict) else note
-            
+        result_values = []
+        for i, item in enumerate(collection_values):
             # Apply operation based on type
             if isinstance(operation, str):
-                # Tool name - apply to content
-                result = self._apply_operation_to_value(operation, content, 
+                # Tool name - apply to item
+                result = self._apply_operation_to_value(operation, item, 
                                                        f"map item {i}", additional_args)
             elif isinstance(operation, dict):
                 if 'tool' in operation:
@@ -1173,50 +739,29 @@ class InfospaceExecutor:
                     tool_name = operation['tool']
                     tool_args = operation.get('args', {})
                     tool_args.update(additional_args)  # Merge with action-level args
-                    result = self._apply_operation_to_value(tool_name, content,
+                    result = self._apply_operation_to_value(tool_name, item,
                                                            f"map item {i}", tool_args)
-                elif 'type' in operation:
-                    # Inline action - execute it with content as implicit target
-                    inline_action = operation.copy()
-                    # For extract, set target to content
-                    if inline_action['type'] == 'extract':
-                        inline_action['target'] = content
-                        inline_action['out'] = f"_map_temp_{i}"
-                        result = self._execute_extract(inline_action)
-                        # Get the created info
-                        if result.get('status') == 'success':
-                            temp_var = f"_map_temp_{i}"
-                            temp_id = self.plan_bindings.get(temp_var)
-                            temp_content = self.plan_bindings.get(f"_content_{temp_id}")
-                            result = {'status': 'success', 'value': temp_content}
-                    else:
-                        return {'status': 'failed', 
-                               'reason': f"Inline action type '{inline_action['type']}' not supported in map"}
                 else:
-                    return {'status': 'failed', 'reason': 'operation dict must have "tool" or "type" field'}
+                    return {'status': 'failed', 'reason': 'operation dict must have "tool" field'}
             else:
                 return {'status': 'failed', 'reason': 'operation must be string (tool name) or dict'}
             
             # Handle result
             if result.get('status') == 'success':
                 result_value = result.get('value')
-                # Create Note for result
-                note_id = self._create_info(content=result_value, name=f"{out_var}_item_{i}", kind='Note')
                 # Include unless filtering nulls and value is None
                 if not (filter_null and result_value is None):
-                    result_ids.append(note_id)
+                    result_values.append(result_value)
             else:
                 # Map failed on this item
                 logger.warning(f"Map failed on item {i}: {result.get('reason')}")
                 if not filter_null:
-                    # Create note_null reference (or skip if filtering)
-                    result_ids.append("Note_null")
+                    result_values.append(None)
         
-        # Create new Collection with result IDs
-        collection_id = self._create_info(content=result_ids, name=out_var, kind='Collection')
-        self._bind_variable(out_var, collection_id)
-        logger.info(f"Mapped {len(dereferenced_notes)} → {len(result_ids)} items → ${out_var}")
-        return {'status': 'success', 'value': collection_id}
+        # Bind new Collection (list of result values)
+        self._bind_variable(out_var, result_values)
+        logger.info(f"Mapped {len(collection_values)} → {len(result_values)} items → ${out_var}")
+        return {'status': 'success', 'value': result_values}
     
     # ==================== Operation Application Helpers ====================
     
@@ -1269,37 +814,7 @@ class InfospaceExecutor:
         
         return {'status': 'success', 'value': response.get('result')}
     
-    # ==================== Helper Methods ====================
-    
-    def _apply_operator(self, item_value: Any, operator: str, compare_value: Any) -> bool:
-        """Apply comparison operator to item value"""
-        if operator == 'equals':
-            return item_value == compare_value
-        elif operator == 'not_equals':
-            return item_value != compare_value
-        elif operator == 'contains':
-            return compare_value in str(item_value) if item_value else False
-        elif operator == 'not_contains':
-            return compare_value not in str(item_value) if item_value else True
-        elif operator == 'matches':
-            # Regex match
-            return bool(re.match(str(compare_value), str(item_value))) if item_value else False
-        elif operator in ['gt', 'greater_than']:
-            return float(item_value) > float(compare_value) if isinstance(item_value, (int, float)) else False
-        elif operator in ['lt', 'less_than']:
-            return float(item_value) < float(compare_value) if isinstance(item_value, (int, float)) else False
-        elif operator in ['gte', 'greater_than_equals']:
-            return float(item_value) >= float(compare_value) if isinstance(item_value, (int, float)) else False
-        elif operator in ['lte', 'less_than_equals']:
-            return float(item_value) <= float(compare_value) if isinstance(item_value, (int, float)) else False
-        elif operator == 'after':
-            # Date comparison
-            return str(item_value) > str(compare_value)
-        elif operator == 'before':
-            return str(item_value) < str(compare_value)
-        else:
-            logger.warning(f"Unknown operator: {operator}")
-            return False
+
     
     # ==================== Condition Evaluation ====================
     
@@ -1320,17 +835,12 @@ class InfospaceExecutor:
             return False
         
         handlers = {
-            # Phase 1 conditions
+            # Basic conditions (whole-value)
             'bound': self._eval_bound,
             'notbound': self._eval_notbound,
             'has_value': self._eval_has_value,
             'empty': self._eval_empty,
             'equals': self._eval_equals,
-            'near': self._eval_near,
-            'can_see': self._eval_can_see,
-            # Phase 2 extended conditions
-            'field_exists': self._eval_field_exists,
-            'field_missing': self._eval_field_missing,
             'not_equals': self._eval_not_equals,
             'greater_than': self._eval_greater_than,
             'less_than': self._eval_less_than,
@@ -1339,6 +849,11 @@ class InfospaceExecutor:
             'contains': self._eval_contains,
             'not_contains': self._eval_not_contains,
             'matches_pattern': self._eval_matches_pattern,
+            # Spatial conditions (compatibility)
+            'near': self._eval_near,
+            'can_see': self._eval_can_see,
+            # Tool-based conditions (delegate to external tools)
+            'tool_condition': self._eval_tool_condition,
         }
         
         handler = handlers.get(cond_type)
@@ -1386,21 +901,6 @@ class InfospaceExecutor:
         # For infospace, assume visibility based on scan results
         logger.warning("can_see condition not fully implemented for infospace")
         return True
-    
-    # Phase 2 extended condition evaluators
-    
-    def _eval_field_exists(self, condition: Dict) -> bool:
-        """Check if field exists in structured data"""
-        target = self._resolve_value(condition.get('target'))
-        field = condition.get('field')
-        
-        if isinstance(target, dict):
-            return field in target
-        return False
-    
-    def _eval_field_missing(self, condition: Dict) -> bool:
-        """Check if field is missing"""
-        return not self._eval_field_exists(condition)
     
     def _eval_not_equals(self, condition: Dict) -> bool:
         """Check value inequality"""
@@ -1469,6 +969,50 @@ class InfospaceExecutor:
         
         return bool(re.match(pattern, str(target))) if target else False
     
+    def _eval_tool_condition(self, condition: Dict) -> bool:
+        """
+        Evaluate condition by invoking an external tool.
+        
+        Tool must return boolean or truthy value.
+        
+        Condition format:
+        {
+            "type": "tool_condition",
+            "tool": "tool_name",
+            "target": "$variable",
+            "args": {...}  # Optional additional arguments
+        }
+        """
+        tool_name = condition.get('tool')
+        if not tool_name:
+            logger.error("tool_condition requires 'tool' field")
+            return False
+        
+        target = self._resolve_value(condition.get('target'))
+        args = condition.get('args', {})
+        
+        # Invoke tool with target value
+        result = self._apply_operation_to_value(
+            tool_name=tool_name,
+            value=target,
+            reason='condition evaluation',
+            additional_args=args
+        )
+        
+        if result.get('status') != 'success':
+            logger.warning(f"Tool condition '{tool_name}' failed: {result.get('reason')}")
+            return False
+        
+        # Interpret result as boolean
+        result_value = result.get('value')
+        
+        # Explicit boolean
+        if isinstance(result_value, bool):
+            return result_value
+        
+        # Truthy/falsy coercion
+        return bool(result_value)
+    
     # ==================== Utility Methods ====================
     
     def _validate_collection_content(self, items: List[str]) -> Optional[str]:
@@ -1494,85 +1038,28 @@ class InfospaceExecutor:
         
         return None
     
-    def _dereference_collection(self, collection_var: str) -> List[Dict]:
+    def _dereference_collection(self, collection_var: str) -> List[Any]:
         """
-        Dereference a Collection to load all referenced Notes/Collections.
+        Get Collection contents (already a list of values).
         
         Args:
             collection_var: Variable name (without $) of the Collection
             
         Returns:
-            List of dereferenced Note/Collection contents
+            List of values in the Collection
         """
         if collection_var not in self.plan_bindings:
             logger.warning(f"Collection variable not bound: {collection_var}")
             return []
         
-        collection_id = self.plan_bindings[collection_var]
-        resource_ids = self.plan_bindings.get(f"_content_{collection_id}", [])
+        collection_values = self.plan_bindings[collection_var]
         
-        if not isinstance(resource_ids, list):
-            logger.warning(f"Collection content is not a list: {collection_id}")
+        if not isinstance(collection_values, list):
+            logger.warning(f"Collection variable is not a list: {collection_var}")
             return []
         
-        # Dereference each resource ID
-        dereferenced = []
-        for resource_id in resource_ids:
-            # Check if already in plan_bindings
-            content = self.plan_bindings.get(f"_content_{resource_id}")
-            if content is not None:
-                dereferenced.append(content)
-            else:
-                # Need to load from map_node
-                loaded = self._load_resource_by_id(resource_id)
-                if loaded is not None:
-                    dereferenced.append(loaded)
-                else:
-                    logger.warning(f"Failed to dereference resource: {resource_id}")
-        
-        return dereferenced
+        return collection_values
     
-    def _load_resource_by_id(self, resource_id: str) -> Optional[Any]:
-        """
-        Load a resource by ID from map_node.
-        
-        Args:
-            resource_id: Resource ID (note_xxx or collection_xxx)
-            
-        Returns:
-            Resource content or None if not found
-        """
-        # Determine resource type
-        if resource_id.startswith('note_') or resource_id.startswith('Note_'):
-            resource_type = 'note'
-        elif resource_id.startswith('collection_') or resource_id.startswith('Collection_'):
-            resource_type = 'collection'
-        else:
-            logger.error(f"Invalid resource ID format: {resource_id}")
-            return None
-        
-        # Query map_node using resource by name queryable
-        from zenoh import QueryTarget, ConsolidationMode
-        for reply in self.session.get(
-            f"cognitive/map/resource/{resource_id}",
-            target=QueryTarget.BEST_MATCHING,
-            consolidation=ConsolidationMode.NONE,
-            timeout=5.0
-        ):
-            if reply.ok:
-                response = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
-                if response.get('success'):
-                    resource_data = response.get('resource')
-                    # Extract content from properties field
-                    content = resource_data.get('properties', {}).get('content')
-                    # Cache in plan_bindings
-                    self.plan_bindings[f"_content_{resource_id}"] = content
-                    kind = 'Note' if resource_type == 'note' else 'Collection'
-                    self.plan_bindings[f"_kind_{resource_id}"] = kind
-                    return content
-            break
-        
-        return None
     
     def _wrap_note_content(self, content: Any, name: str = None) -> Dict:
         """
@@ -1607,38 +1094,15 @@ class InfospaceExecutor:
             'content_type': content_type
         }
     
-    def _create_info(self, content: Any, name: str = None, kind: str = 'Note') -> str:
-        """
-        Create Note or Collection object locally (fallback), return info_id.
-        
-        Args:
-            content: The data to store (raw, not wrapped)
-            name: Optional variable name for logging
-            kind: 'Note' or 'Collection' (default: 'Note')
-        
-        Returns:
-            info_id string
-        """
-        import uuid
-        prefix = 'note_' if kind == 'Note' else 'collection_'
-        info_id = f"{prefix}{uuid.uuid4().hex[:8]}"
-        
-        # Store raw content and type
-        self.plan_bindings[f"_content_{info_id}"] = content
-        self.plan_bindings[f"_kind_{info_id}"] = kind
-        
-        logger.info(f"Created {kind} {info_id}" + (f" '{name}'" if name else ""))
-        return info_id
-    
     def _resolve_value(self, value: Any) -> Any:
         """
-        Resolve $variable to Note/Collection content.
+        Resolve $variable to its bound value.
         
         Args:
             value: Can be a literal value, or "$variable" string
             
         Returns:
-            Resolved content or the original value if not a variable
+            Resolved value or the original value if not a variable
         """
         if not isinstance(value, str):
             return value
@@ -1651,20 +1115,11 @@ class InfospaceExecutor:
             logger.warning(f"Unbound variable: {value}")
             return None
         
-        info_id = self.plan_bindings[var_name]
-        
-        # Get content from Note/Collection
-        content_key = f"_content_{info_id}"
-        if content_key in self.plan_bindings:
-            # Map_node stores raw content - return as-is
-            return self.plan_bindings[content_key]
-        
-        logger.warning(f"Note/Collection content not found for {info_id}")
-        return None
+        return self.plan_bindings[var_name]
     
     def _get_kind(self, var_name: str) -> Optional[str]:
         """
-        Get the kind (Note or Collection) of a variable.
+        Get the kind (Note or Collection) of a variable by inspecting its type.
         
         Args:
             var_name: Variable name (with or without $ prefix)
@@ -1678,18 +1133,17 @@ class InfospaceExecutor:
         if var_name not in self.plan_bindings:
             return None
         
-        info_id = self.plan_bindings[var_name]
-        kind_key = f"_kind_{info_id}"
-        
-        return self.plan_bindings.get(kind_key, 'Note')
+        value = self.plan_bindings[var_name]
+        # Collection is a list, Note is anything else
+        return 'Collection' if isinstance(value, list) else 'Note'
     
-    def _bind_variable(self, var_name: str, info_id: str):
-        """Bind variable name to Note/Collection ID"""
+    def _bind_variable(self, var_name: str, value: Any):
+        """Bind variable name to actual value"""
         if var_name.startswith('$'):
             var_name = var_name[1:]
         
-        self.plan_bindings[var_name] = info_id
-        logger.debug(f"Bound ${var_name} → {info_id}")
+        self.plan_bindings[var_name] = value
+        logger.debug(f"Bound ${var_name} → {type(value).__name__}")
     
     def _validate_required_fields(self, action: Dict, *fields) -> Optional[str]:
         """

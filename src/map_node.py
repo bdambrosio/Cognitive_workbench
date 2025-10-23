@@ -1100,20 +1100,20 @@ end your response with:
                                 instance_info = {
                                     'name': resource_data.get('name', resource_id),
                                     'description': resource_data.get('description', ''),
-                                    'skill_name': props.get('skill_name', ''),
-                                    'skill_type': props.get('skill_type', 'prompt_augmentation')
+                                    'tool_name': props.get('tool_name', ''),
+                                    'tool_type': props.get('tool_type', 'prompt_augmentation')
                                 }
                                 skill_instances.append(instance_info)
                         
                         result['skill_instances'] = skill_instances
                     
-                    # For all resource types, include skill metadata fields if present
-                    skill_metadata_fields = [
-                        'skill_name', 'skill_type', 'skill_path', 'skill_md_content',
+                    # For all resource types, include tool metadata fields if present
+                    tool_metadata_fields = [
+                        'tool_name', 'tool_type', 'tool_path', 'tool_md_content',
                         'execution_mode', 'value_type', 'result_type', 
                         'context_injection', 'entry_point', 'input_format', 'output_format'
                     ]
-                    for field in skill_metadata_fields:
+                    for field in tool_metadata_fields:
                         if field in allocation:
                             result[field] = allocation[field]
 
@@ -1895,7 +1895,7 @@ end your response with:
                     skill_info = {
                         'name': resource_data.get('name', resource_id),
                         'description': resource_data.get('description', ''),
-                        'type_name': props.get('skill_name', '')
+                        'type_name': props.get('tool_name', '')
                     }
                     skills.append(skill_info)
             

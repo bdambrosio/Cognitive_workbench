@@ -1577,15 +1577,12 @@ end your response with </end>
             action_type = action.get('type', '').lower()
             # Infospace primitives that route to infospace executor
             infospace_primitives = {
-                # Phase 1 Core
-                'apply', 'move', 'create', 'save', 'load',
+                # Core primitives
+                'apply', 'map', 'transform', 'move',
+                'create', 'save', 'load',
                 'index', 'organize', 'search',
-                # Phase 1 Communication
-                'say', 'think',
-                # Phase 2 Data
-                'extract', 'filter', 'merge', 'transform',
-                # Phase 2 Analysis
-                'aggregate', 'sort', 'group_by', 'compare', 'map'
+                # Communication
+                'say', 'think'
             }
             
             # Route infospace-specific actions to infospace executor
