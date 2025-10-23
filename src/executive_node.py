@@ -186,13 +186,23 @@ class ZenohExecutiveNode:
         # Detect infospace and initialize infospace executor if needed
         self.is_infospace = self.character_config.get('is_infospace', False)
         self.infospace_executor = None
+        self.available_tools = {}
         if self.is_infospace:
             from infospace_executor import InfospaceExecutor
+            from utils.tool_loader import load_tools
+            
+            # Load tools from directory
+            tools_dir = os.path.join(os.path.dirname(__file__), 'maps', 'tools')
+            self.available_tools = load_tools(tools_dir)
+            logger.info(f'🧩 Loaded {len(self.available_tools)} tools for infospace')
+            
             map_name = self.character_config.get('map_name', 'infolab')
             self.infospace_executor = InfospaceExecutor(
                 character_name,
                 self.session,
-                map_name
+                map_name,
+                self.llm_client,
+                self.available_tools
             )
             logger.info(f'🧩 Infospace executor initialized for {character_name}')
         
@@ -1062,11 +1072,10 @@ class ZenohExecutiveNode:
                 if self.is_infospace:
                     # Use infospace planner
                     from infospace_planner import InfospacePlanner
-                    planner = InfospacePlanner(self.llm_client, logger)
+                    planner = InfospacePlanner(self.llm_client, self.available_tools, logger)
                     
                     # Build context for infospace planning
                     context = {
-                        'available_tools': self._get_visible_tools(),
                         'available_stores': [],  # TODO: Track store names
                         'variables': self.infospace_executor.plan_bindings if self.infospace_executor else {},
                         'situation': user_prompt
@@ -4275,52 +4284,6 @@ End your response with:
         except Exception as e:
             logger.error(f'Error checking conversation lock availability with {target_character}: {e}')
             return False
-    
-    def _get_visible_tools(self) -> List[str]:
-        """
-        Get list of visible tools from current situation (for infospace planning).
-        
-        View data only includes resource name and distance, not type information.
-        We make ONE query to get all tool instances from the map, then test
-        visible resources for membership in that set.
-        """
-        if not self.is_infospace:
-            return []
-        
-        # Query map once for all tool (Skill type) instances
-        tool_names = set()
-        for reply in self.session.get(
-            "cognitive/map/resource_rules/Skill",
-            target=QueryTarget.BEST_MATCHING,
-            consolidation=ConsolidationMode.NONE,
-            timeout=2.0 if not self.debug else 300.0
-        ):
-            if reply.ok:
-                response = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
-                if response.get('success'):
-                    # Extract tool names from skill_instances list in resource_rules
-                    resource_rules = response.get('resource_rules', {})
-                    skill_instances = resource_rules.get('skill_instances', [])
-                    for skill in skill_instances:
-                        tool_name = skill.get('name', '')
-                        if tool_name:
-                            tool_names.add(tool_name)
-                break
-            break
-        
-        # Now filter visible resources to only include tools
-        visible_tools = []
-        if self.last_situation_data:
-            views = self.last_situation_data.get('views', [])
-            for view in views:
-                resources = view.get('resources', [])
-                for resource in resources:
-                    resource_name = resource.get('name', '')
-                    if resource_name and resource_name in tool_names:
-                        if resource_name not in visible_tools:
-                            visible_tools.append(resource_name)
-        
-        return visible_tools
     
     def shutdown(self):
         """Clean shutdown."""
