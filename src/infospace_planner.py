@@ -56,18 +56,18 @@ Resource IDs: Cannot be referenced directly - use "load" action first to bind to
 
 # ACTION SCHEMAS  (each must be valid JSON)
 
-apply — apply a tool/skill to input data
+apply — apply a tool/skill to input data (input: Note → output: Note)
 {"type":"apply","target":"tool-name/resource-name or $tool_var","value":"input text or $data","reason":"purpose","out":"result_variable"}
 
-map — apply operation to each item in Collection
+map — apply operation to each item in Collection (input: Collection → output: Collection)
 {"type":"map","target":"$collection","operation":"tool-name or {'tool':'name','args':{}}","out":"result_collection"}
 {"type":"map","target":"$collection","operation":"tool-name","filter_null":true,"out":"filtered_results"}  # exclude null results
 
-flatten — convert Collection to single Note by concatenating items
+flatten — convert Collection to single Note by concatenating items (input: Collection → output: Note)
 {"type":"flatten","target":"$collection","out":"combined_note"}
 {"type":"flatten","target":"$collection","separator":"\\n---\\n","out":"combined"}  # custom separator
 
-transform — convert data format or structure (whole-value)
+transform — convert data format or structure (whole-value) (input: Note → output: Note)
 {"type":"transform","target":"$data","operation":"flatten|normalize|pivot|reshape","out":"transformed"}
 
 move — change current location or approach a resource
@@ -112,28 +112,28 @@ All conditions evaluate to a boolean:
 
 # CONDITION SYNTAX (all evaluate to boolean)
 
-Variable state - these conditions test the existence of a variable:
+Variable state - test existence/binding (works on both Note and Collection):
 {"type": "bound", "target": "$var"}           // true if $var exists
 {"type": "notbound", "target": "$var"}        // true if $var doesn't exist
 {"type": "has_value", "target": "$var"}       // true if $var is truthy
-{"type": "empty", "target": "$var"}           // true if $var is falsy/empty
+{"type": "empty", "target": "$var"}           // true if $var is falsy/empty (or empty Collection)
 
-Value comparison - these conditions test Note object content:
+Value comparison - test content (target must be Note with comparable content):
 {"type": "equals", "target": "$var", "value": "expected"}
 {"type": "not_equals", "target": "$var", "value": "unwanted"}
-{"type": "greater_than", "target": "$score", "value": 0.8}
-{"type": "less_than", "target": "$count", "value": 100}
-{"type": "gte", "target": "$score", "value": 0.7}
-{"type": "lte", "target": "$size", "value": 1000}
+{"type": "greater_than", "target": "$score", "value": 0.8}         // numeric comparison
+{"type": "less_than", "target": "$count", "value": 100}            // numeric comparison
+{"type": "gte", "target": "$score", "value": 0.7}                  // numeric comparison
+{"type": "lte", "target": "$size", "value": 1000}                  // numeric comparison
 
-Membership - these conditions test Note object content (whole-value):
-{"type": "contains", "target": "$text", "value": "keyword"}          // substring or list element
+Membership - test content (target must be Note):
+{"type": "contains", "target": "$text", "value": "keyword"}        // substring (string) or element (list)
 {"type": "not_contains", "target": "$tags", "value": "spam"}
 
-Pattern matching:
+Pattern matching (target must be Note with string content):
 {"type": "matches_pattern", "target": "$text", "pattern": "regex_pattern"}
 
-Tool-based conditions - delegate complex predicates to external tools:
+Tool-based conditions - delegate complex predicates (target can be Note or Collection):
 {"type": "tool_condition", "tool": "has_field", "target": "$data", "args": {"field": "urls"}}    // tool returns boolean
 {"type": "tool_condition", "tool": "json_valid", "target": "$text", "args": {}}                  // validate structure
 
@@ -273,7 +273,7 @@ class InfospacePlanner:
         # Format tools list from available_tools
         if self.available_tools:
             tools_text = '\n'.join([
-                f"- {name}: {info.get('description', 'No description')}"
+                f"- {name}: {info.get('description', 'No description')}\n  Parameters: {info.get('parameters', 'none')}"
                 for name, info in self.available_tools.items()
             ])
         else:

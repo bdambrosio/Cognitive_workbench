@@ -3,6 +3,7 @@ name: web-search
 type: python
 trusted: true
 description: Search the web using Tavily API and return formatted results with titles, snippets, and URLs
+parameters: none
 ---
 
 # Web Search Tool

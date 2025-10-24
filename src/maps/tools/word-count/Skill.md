@@ -3,6 +3,7 @@ name: word-count
 description: Count words in text
 type: python
 trusted: true
+parameters: none
 ---
 
 # Word Count
