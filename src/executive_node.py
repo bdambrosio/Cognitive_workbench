@@ -1458,7 +1458,7 @@ end your response with </end>
             # Infospace primitives - Phase 1 & 2
             'apply', 'create', 'save', 'load', 'store', 'index', 'organize', 'search',
             'extract', 'filter', 'merge', 'transform',
-            'aggregate', 'sort', 'group_by', 'compare', 'map', 'flatten'
+            'aggregate', 'sort', 'group_by', 'compare', 'map', 'flatten', 'add'
         }
         if stype in executable_primitives:
             current['idx'] = idx + 1

@@ -48,9 +48,9 @@ class InfospaceExecutor:
         self.available_tools = available_tools
         
         # Plan-local state (ephemeral, cleared each plan)
-        self.plan_bindings = {}  # $var_name -> info_id
+        self.plan_bindings = {}  # $var_name -> resource_id (Note_N or Collection_N)
         
-        # Agent state
+        # Agent state (persistent across plans)
         self.agent_position = None
         
         logger.info(f"InfospaceExecutor initialized for {agent_name} with {len(available_tools)} tools")
@@ -58,6 +58,74 @@ class InfospaceExecutor:
     def clear_plan_state(self):
         """Clear ephemeral plan state (call at start of new plan)"""
         self.plan_bindings = {}
+    
+    def _create_collection(self, note_ids: list, source_context: str) -> Optional[str]:
+        """
+        Create a Collection resource in map_node.
+        
+        Args:
+            note_ids: List of Note IDs (e.g., ["Note_2", "Note_3"])
+            source_context: Description for logging (e.g., 'map_operation', 'create_collection')
+            
+        Returns:
+            Collection ID if successful, None if failed
+        """
+        from zenoh import QueryTarget, ConsolidationMode
+        for reply in self.session.get(
+            f"cognitive/map/collection/create",
+            target=QueryTarget.BEST_MATCHING,
+            consolidation=ConsolidationMode.NONE,
+            timeout=5.0,
+            payload=json.dumps({
+                'character_name': self.agent_name,
+                'content': note_ids,  # List of Note IDs
+                'format': 'list',
+                'source_skill': source_context
+            }).encode('utf-8')
+        ):
+            if reply.ok:
+                response = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
+                if response.get('success'):
+                    return response.get('info_id')
+                else:
+                    logger.error(f'Failed to create Collection: {response.get("error")}')
+            break
+        return None
+    
+    def _get_content(self, resource_id: str) -> Any:
+        """
+        Fetch content from map_node for a given resource ID.
+        
+        Args:
+            resource_id: Note_N or Collection_N ID
+            
+        Returns:
+            Content value, or None if not found
+        """
+        if resource_id == "Note_null":
+            return None
+        
+        # Query map_node for the resource
+        from zenoh import QueryTarget, ConsolidationMode
+        for reply in self.session.get(
+            f"cognitive/map/resource/{resource_id}",
+            target=QueryTarget.BEST_MATCHING,
+            consolidation=ConsolidationMode.NONE,
+            timeout=5.0
+        ):
+            if reply.ok:
+                response = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
+                if response.get('success'):
+                    resource_data = response.get('resource')
+                    content = resource_data.get('properties', {}).get('content')
+                    return content
+                else:
+                    logger.warning(f"Failed to fetch {resource_id}: {response.get('error')}")
+                    return None
+            break
+        
+        logger.warning(f"No response for {resource_id}")
+        return None
     
     def execute_action(self, action: Dict) -> Dict:
         """
@@ -92,6 +160,7 @@ class InfospaceExecutor:
             'transform': self._execute_transform,
             'map': self._execute_map,
             'flatten': self._execute_flatten,
+            'add': self._execute_add,
         }
         
         handler = handlers.get(action_type)
@@ -193,10 +262,12 @@ class InfospaceExecutor:
             # Persist result as Note
             info_id = self._persist_note(result_value, f'apply_{target}')
             if info_id:
-                logger.info(f"Tool '{target}' executed, result → ${out_var}, persisted as {info_id}")
+                self._bind_variable(out_var, info_id)
+                logger.info(f"Tool '{target}' executed, Note {info_id} → ${out_var}")
+                return {'status': 'success', 'value': info_id}
             else:
-                logger.warning(f"Tool '{target}' result persisted locally only → ${out_var}")
-            self._bind_variable(out_var, result_value)
+                logger.error(f"Failed to persist result from '{target}'")
+                return {'status': 'failed', 'reason': 'Failed to persist result'}
         
         return {'status': 'success', 'value': result_value}
 
@@ -396,30 +467,54 @@ class InfospaceExecutor:
         # Resolve values for Collection or Note
         if kind == 'Collection':
             if value_arg is None:
-                collection_values = []  # Empty collection
+                note_ids = []  # Empty collection
             elif isinstance(value_arg, list):
-                # Resolve each item (variable or literal)
-                collection_values = [self._resolve_value(item) for item in value_arg]
+                # Resolve each item - if it's a $var, get Note ID from bindings; if literal, create Note
+                note_ids = []
+                for i, item in enumerate(value_arg):
+                    if isinstance(item, str) and item.startswith('$'):
+                        # Variable - get Note ID from bindings
+                        var_name = item[1:]
+                        if var_name not in self.plan_bindings:
+                            logger.warning(f"Variable {item} not bound, skipping")
+                            continue
+                        note_id = self.plan_bindings[var_name]
+                        if isinstance(note_id, str) and note_id.startswith('Note_'):
+                            note_ids.append(note_id)
+                        else:
+                            logger.warning(f"Variable {item} is not a Note, skipping")
+                    else:
+                        # Literal - create Note for it
+                        note_id = self._persist_note(item, f'create_collection_item_{i}')
+                        if note_id:
+                            note_ids.append(note_id)
+                        else:
+                            logger.warning(f"Failed to persist collection item {i}, skipping")
             elif isinstance(value_arg, str) and value_arg.startswith('$'):
-                # Single variable - resolve it
-                resolved = self._resolve_value(value_arg)
-                if isinstance(resolved, list):
-                    collection_values = resolved
+                # Single variable - get Note ID or list of Note IDs
+                var_name = value_arg[1:]
+                if var_name not in self.plan_bindings:
+                    return {'status': 'failed', 'reason': f'Variable {value_arg} not bound'}
+                bound_value = self.plan_bindings[var_name]
+                if isinstance(bound_value, str) and bound_value.startswith('Note_'):
+                    note_ids = [bound_value]
+                elif isinstance(bound_value, list):
+                    # Assume it's a list of Note IDs
+                    note_ids = bound_value
                 else:
-                    collection_values = [resolved]
+                    return {'status': 'failed', 'reason': f'Variable {value_arg} is not a Note or list'}
             else:
                 return {'status': 'failed', 'reason': 'Collection value must be list or $variable'}
             
-            # Persist Collection as Note (list stored as JSON)
-            info_id = self._persist_note(collection_values, 'create_collection')
-            if info_id:
-                logger.info(f"Created Collection → ${out_var} ({len(collection_values)} items), persisted as {info_id}")
+            # Create Collection in map_node
+            collection_id = self._create_collection(note_ids, 'create_collection')
+            if collection_id:
+                self._bind_variable(out_var, collection_id)
+                logger.info(f"Created {collection_id} → ${out_var} ({len(note_ids)} Note IDs)")
+                return {'status': 'success', 'value': collection_id}
             else:
-                logger.warning(f"Collection persisted locally only → ${out_var}")
-            
-            # Bind Collection as list of values
-            self._bind_variable(out_var, collection_values)
-            return {'status': 'success', 'value': collection_values}
+                logger.error(f"Failed to create Collection")
+                return {'status': 'failed', 'reason': 'Failed to create Collection'}
             
         else:  # Note
             value = self._resolve_value(value_arg) if value_arg is not None else ''
@@ -536,14 +631,13 @@ class InfospaceExecutor:
         # Persist to map_node
         info_id = self._persist_note(value, 'save_primitive')
         if info_id:
-            self._bind_variable(out_var, value)
-            logger.info(f"Saved Note → ${out_var}, persisted as {info_id}")
-            return {'status': 'success', 'value': value}
+            self._bind_variable(out_var, info_id)
+            logger.info(f"Saved Note {info_id} → ${out_var}")
+            return {'status': 'success', 'value': info_id}
         
-        # Fallback: bind value even if spatial creation failed
-        logger.warning(f"Spatial Note creation failed, binding locally only")
-        self._bind_variable(out_var, value)
-        return {'status': 'success', 'value': value}
+        # Fallback: failed to create Note
+        logger.error(f"Spatial Note creation failed for ${out_var}")
+        return {'status': 'failed', 'reason': 'Failed to create Note'}
     
     def _execute_load(self, action: Dict) -> Dict:
         """
@@ -567,6 +661,12 @@ class InfospaceExecutor:
             resource_type = 'note'
         elif resource_id.startswith('collection_') or resource_id.startswith('Collection_'):
             resource_type = 'collection'
+            # Check if Collection is in local store (new-style Collection_N IDs)
+            if resource_id in self.collections:
+                collection_id = resource_id
+                self._bind_variable(out_var, collection_id)
+                logger.info(f"Loaded {collection_id} → ${out_var} ({len(self.collections[collection_id])} items)")
+                return {'status': 'success', 'value': collection_id}
         else:
             return {'status': 'failed', 'reason': f'Invalid resource_id format: {resource_id}'}
         
@@ -607,23 +707,22 @@ class InfospaceExecutor:
         """
         Create searchable store with embeddings (also callable as 'organize').
         
-        Required: type, source, store_name, index_type, fields
+        Store is created using Collection ID as the key. The Collection becomes indexed.
+        
+        Required: source, index_type (optional)
         
         Argument types:
         - source: $variable (Collection of Notes to index)
-        - store_name: literal string (name of the index store)
-        - index_type: literal string ('semantic' or 'keyword')
-        - fields: dict specifying which fields to embed
+        - index_type: literal string ('semantic' or 'keyword', default 'semantic')
         
-        Dereferences Collection to get actual Note contents for indexing.
+        The Collection ID becomes the store name automatically.
         """
         source_arg = action.get('source')
-        store_name = action.get('store_name')
         index_type = action.get('index_type', 'semantic')
         fields = action.get('fields', {})
         
-        if not source_arg or not store_name:
-            return {'status': 'failed', 'reason': 'index requires source and store_name'}
+        if not source_arg:
+            return {'status': 'failed', 'reason': 'index requires source'}
         
         # Source should be a Collection variable
         if not isinstance(source_arg, str) or not source_arg.startswith('$'):
@@ -631,28 +730,20 @@ class InfospaceExecutor:
         
         collection_var = source_arg[1:]
         
-        # Dereference the Collection to get actual Note contents
-        dereferenced_notes = self._dereference_collection(collection_var)
+        # Get Collection ID from bindings
+        if collection_var not in self.plan_bindings:
+            logger.warning(f"Collection variable not bound: {collection_var}")
+            return {'status': 'failed', 'reason': f'Collection variable not bound: {collection_var}'}
         
-        if not dereferenced_notes:
-            logger.warning(f"Collection {collection_var} is empty or failed to dereference")
-            return {'status': 'success', 'value': 0}  # Empty collection, nothing to index
+        collection_id = self.plan_bindings[collection_var]
         
-        # Extract content from Note envelopes
-        index_data = []
-        for note in dereferenced_notes:
-            if isinstance(note, dict) and 'content' in note:
-                # Note envelope - extract content
-                index_data.append(note['content'])
-            else:
-                # Raw data (shouldn't happen with reference model, but handle gracefully)
-                index_data.append(note)
+        if not isinstance(collection_id, str) or not collection_id.startswith('Collection_'):
+            return {'status': 'failed', 'reason': f'Variable {collection_var} is not a Collection'}
         
-        # Request indexing from map_node
+        # Request indexing from map_node - use Collection ID as store name
         request = {
             'agent_name': self.agent_name,
-            'store_name': store_name,
-            'source': index_data,
+            'collection_id': collection_id,  # Collection ID is also the store name
             'index_type': index_type,
             'fields': fields
         }
@@ -675,36 +766,53 @@ class InfospaceExecutor:
             return {'status': 'failed', 'reason': response.get('reason', 'Index failed')}
         
         indexed_count = response.get('indexed_count', 0)
-        logger.info(f"Indexed {indexed_count} items from Collection to {store_name}")
+        logger.info(f"Indexed {indexed_count} items from {collection_id}")
         return {'status': 'success', 'value': indexed_count}
     
     def _execute_search(self, action: Dict) -> Dict:
         """
-        Query local indexed store.
+        Query indexed Collection.
         
-        Required: type, store_name, query, mode, limit, out, prediction
+        Required: source, query, out
+        Optional: mode, limit, threshold
         
         Argument types:
-        - store_name: literal string (name of indexed store)
+        - source: $variable (indexed Collection to search)
         - query: literal string OR $variable (resolves to query text)
-        - mode: literal string ('semantic' or 'keyword')
-        - limit: int (max results to return)
+        - mode: literal string ('semantic' or 'keyword', default 'semantic')
+        - limit: int (max results to return, default 5)
+        - threshold: float (minimum similarity score, default 0.0)
         - out: literal string (variable name to store results)
         """
-        store_name = action.get('store_name')
+        source_arg = action.get('source')
         query = self._resolve_value(action.get('query'))
         mode = action.get('mode', 'semantic')
         limit = action.get('limit', 5)
         threshold = action.get('threshold', 0.0)
         out_var = action.get('out')
         
-        if not store_name or not query or not out_var:
-            return {'status': 'failed', 'reason': 'search requires store_name, query, and out'}
+        if not source_arg or not query or not out_var:
+            return {'status': 'failed', 'reason': 'search requires source, query, and out'}
         
-        # Request search from map_node
+        # Source should be a Collection variable
+        if not isinstance(source_arg, str) or not source_arg.startswith('$'):
+            return {'status': 'failed', 'reason': 'search source must be $variable referencing an indexed Collection'}
+        
+        collection_var = source_arg[1:]
+        
+        # Get Collection ID from bindings
+        if collection_var not in self.plan_bindings:
+            return {'status': 'failed', 'reason': f'Collection variable not bound: {collection_var}'}
+        
+        collection_id = self.plan_bindings[collection_var]
+        
+        if not isinstance(collection_id, str) or not collection_id.startswith('Collection_'):
+            return {'status': 'failed', 'reason': f'Variable {collection_var} is not a Collection'}
+        
+        # Request search from map_node - use Collection ID as store name
         request = {
             'agent_name': self.agent_name,
-            'store_name': store_name,
+            'collection_id': collection_id,  # Collection ID is the store name
             'query': query,
             'mode': mode,
             'limit': limit,
@@ -731,15 +839,22 @@ class InfospaceExecutor:
         # Bind results to output variable
         results = response.get('results', [])
         
-        # Persist search results as Collection
-        info_id = self._persist_note(results, f'search_{store_name}')
-        if info_id:
-            logger.info(f"Search found {len(results)} results → ${out_var}, persisted as {info_id}")
-        else:
-            logger.warning(f"Search results persisted locally only → ${out_var}")
+        # Create Notes for each search result
+        note_ids = []
+        for i, result in enumerate(results):
+            note_id = self._persist_note(result, f'search_result_{i}')
+            if note_id:
+                note_ids.append(note_id)
         
-        self._bind_variable(out_var, results)
-        return {'status': 'success', 'value': results}
+        # Create Collection in map_node
+        result_collection_id = self._create_collection(note_ids, 'search_results')
+        if result_collection_id:
+            self._bind_variable(out_var, result_collection_id)
+            logger.info(f"Search found {len(results)} results, created {result_collection_id} with {len(note_ids)} Notes → ${out_var}")
+            return {'status': 'success', 'value': result_collection_id}
+        else:
+            logger.error(f"Failed to create Collection for search results")
+            return {'status': 'failed', 'reason': 'Failed to create result Collection'}
     
     def _execute_say(self, action: Dict) -> Dict:
         """
@@ -861,12 +976,12 @@ class InfospaceExecutor:
         # Persist transformed result
         info_id = self._persist_note(result, f'transform_{operation}')
         if info_id:
-            logger.info(f"Transformed ({operation}) → ${out_var}, persisted as {info_id}")
+            self._bind_variable(out_var, info_id)
+            logger.info(f"Transformed ({operation}) → Note {info_id} → ${out_var}")
+            return {'status': 'success', 'value': info_id}
         else:
-            logger.warning(f"Transform result persisted locally only → ${out_var}")
-        
-        self._bind_variable(out_var, result)
-        return {'status': 'success', 'value': result}
+            logger.error(f"Failed to persist transform result")
+            return {'status': 'failed', 'reason': 'Failed to persist result'}
     
     def _execute_map(self, action: Dict) -> Dict:
         """
@@ -904,19 +1019,25 @@ class InfospaceExecutor:
         
         collection_var = target_arg[1:]
         
-        # Get Collection values
-        collection_values = self._dereference_collection(collection_var)
+        # Get Collection Note IDs
+        note_ids = self._dereference_collection(collection_var)
         
-        if not isinstance(collection_values, list):
+        if not isinstance(note_ids, list):
             return {'status': 'failed', 'reason': 'map target must be a Collection'}
         
-        # Apply operation to each item
-        result_values = []
-        for i, item in enumerate(collection_values):
+        # Apply operation to each Note
+        result_note_ids = []
+        for i, note_id in enumerate(note_ids):
+            # Fetch content for this Note
+            content = self._get_content(note_id)
+            if content is None and note_id != "Note_null":
+                logger.warning(f"Failed to fetch content for {note_id}, skipping")
+                continue
+            
             # Apply operation based on type
             if isinstance(operation, str):
-                # Tool name - apply to item
-                result = self._apply_operation_to_value(operation, item, 
+                # Tool name - apply to content
+                result = self._apply_operation_to_value(operation, content, 
                                                        f"map item {i}", additional_args)
             elif isinstance(operation, dict):
                 if 'tool' in operation:
@@ -924,7 +1045,7 @@ class InfospaceExecutor:
                     tool_name = operation['tool']
                     tool_args = operation.get('args', {})
                     tool_args.update(additional_args)  # Merge with action-level args
-                    result = self._apply_operation_to_value(tool_name, item,
+                    result = self._apply_operation_to_value(tool_name, content,
                                                            f"map item {i}", tool_args)
                 else:
                     return {'status': 'failed', 'reason': 'operation dict must have "tool" field'}
@@ -934,25 +1055,30 @@ class InfospaceExecutor:
             # Handle result
             if result.get('status') == 'success':
                 result_value = result.get('value')
-                # Include unless filtering nulls and value is None
-                if not (filter_null and result_value is None):
-                    result_values.append(result_value)
+                # Create Note for result
+                if result_value is None:
+                    if not filter_null:
+                        result_note_ids.append("Note_null")
+                else:
+                    result_note_id = self._persist_note(result_value, f'map_result_{i}')
+                    if result_note_id and not (filter_null and result_value is None):
+                        result_note_ids.append(result_note_id)
             else:
                 # Map failed on this item
                 logger.warning(f"Map failed on item {i}: {result.get('reason')}")
                 if not filter_null:
-                    result_values.append(None)
+                    result_note_ids.append("Note_null")
         
-        # Persist Collection as Note (list stored as JSON)
-        info_id = self._persist_note(result_values, f'map_{operation if isinstance(operation, str) else "operation"}')
-        if info_id:
-            logger.info(f"Mapped {len(collection_values)} → {len(result_values)} items → ${out_var}, persisted as {info_id}")
+        # Create Collection in map_node
+        operation_str = operation if isinstance(operation, str) else 'operation'
+        collection_id = self._create_collection(result_note_ids, f'map_{operation_str}')
+        if collection_id:
+            self._bind_variable(out_var, collection_id)
+            logger.info(f"Mapped {len(note_ids)} → {len(result_note_ids)} Notes, created {collection_id} → ${out_var}")
+            return {'status': 'success', 'value': collection_id}
         else:
-            logger.warning(f"Map result persisted locally only → ${out_var}")
-        
-        # Bind new Collection (list of result values)
-        self._bind_variable(out_var, result_values)
-        return {'status': 'success', 'value': result_values}
+            logger.error(f"Failed to create Collection for map results")
+            return {'status': 'failed', 'reason': 'Failed to create result Collection'}
     
     def _execute_flatten(self, action: Dict) -> Dict:
         """
@@ -979,24 +1105,107 @@ class InfospaceExecutor:
             return {'status': 'failed', 'reason': 'flatten target must be $variable'}
         
         collection_var = target_arg[1:]
-        collection_values = self._dereference_collection(collection_var)
+        note_ids = self._dereference_collection(collection_var)
         
-        if not isinstance(collection_values, list):
+        if not isinstance(note_ids, list):
             return {'status': 'failed', 'reason': 'flatten target must be Collection'}
         
-        # Convert all items to strings and join
-        str_items = [str(item) for item in collection_values if item is not None]
+        # Fetch content for each Note and convert to strings
+        str_items = []
+        for note_id in note_ids:
+            content = self._get_content(note_id)
+            if content is not None:
+                str_items.append(str(content))
+        
         flattened = separator.join(str_items)
         
         # Persist flattened result as Note
         info_id = self._persist_note(flattened, 'flatten')
         if info_id:
-            logger.info(f"Flattened {len(collection_values)} items → ${out_var}, persisted as {info_id}")
+            self._bind_variable(out_var, info_id)
+            logger.info(f"Flattened {len(note_ids)} Notes → Note {info_id} → ${out_var}")
+            return {'status': 'success', 'value': info_id}
         else:
-            logger.warning(f"Flatten result persisted locally only → ${out_var}")
+            logger.error(f"Failed to persist flatten result")
+            return {'status': 'failed', 'reason': 'Failed to persist result'}
+    
+    def _execute_add(self, action: Dict) -> Dict:
+        """
+        Add a Note to an existing Collection (mutates Collection).
         
-        self._bind_variable(out_var, flattened)
-        return {'status': 'success', 'value': flattened}
+        Required: target, value, out
+        
+        Argument types:
+        - target: $variable (Collection to add to)
+        - value: $variable or literal (Note to add)
+        - out: variable name (should be same as target to maintain reference)
+        
+        This is a controlled mutation for practical use cases like dialog histories.
+        """
+        error = self._validate_required_fields(action, 'target', 'value', 'out')
+        if error:
+            return {'status': 'failed', 'reason': error}
+        
+        target_arg = action.get('target')
+        value_arg = action.get('value')
+        out_var = action.get('out')
+        
+        # Target must be Collection variable
+        if not isinstance(target_arg, str) or not target_arg.startswith('$'):
+            return {'status': 'failed', 'reason': 'add target must be $variable'}
+        
+        collection_var = target_arg[1:]
+        
+        # Get Collection ID from bindings
+        if collection_var not in self.plan_bindings:
+            return {'status': 'failed', 'reason': f'Collection variable not bound: {collection_var}'}
+        
+        collection_id = self.plan_bindings[collection_var]
+        
+        if not isinstance(collection_id, str) or not collection_id.startswith('Collection_'):
+            return {'status': 'failed', 'reason': f'Variable {collection_var} is not a Collection'}
+        
+        # Resolve value to Note ID
+        if isinstance(value_arg, str) and value_arg.startswith('$'):
+            # Variable - get Note ID from bindings
+            var_name = value_arg[1:]
+            if var_name not in self.plan_bindings:
+                return {'status': 'failed', 'reason': f'Note variable not bound: {var_name}'}
+            note_id = self.plan_bindings[var_name]
+            if not isinstance(note_id, str) or not note_id.startswith('Note_'):
+                return {'status': 'failed', 'reason': f'Variable {var_name} is not a Note'}
+        else:
+            # Literal - create Note for it
+            note_id = self._persist_note(value_arg, 'add_item')
+            if not note_id:
+                return {'status': 'failed', 'reason': 'Failed to persist value as Note'}
+        
+        # Request add from map_node
+        from zenoh import QueryTarget, ConsolidationMode
+        for reply in self.session.get(
+            f"cognitive/map/collection/add",
+            target=QueryTarget.BEST_MATCHING,
+            consolidation=ConsolidationMode.NONE,
+            timeout=5.0,
+            payload=json.dumps({
+                'collection_id': collection_id,
+                'note_id': note_id,
+                'agent_name': self.agent_name
+            }).encode('utf-8')
+        ):
+            if reply.ok:
+                response = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
+                if response.get('success'):
+                    # Bind to out variable (usually same as target)
+                    self._bind_variable(out_var, collection_id)
+                    logger.info(f"Added {note_id} to {collection_id} → ${out_var}")
+                    return {'status': 'success', 'value': collection_id}
+                else:
+                    logger.error(f'Failed to add to Collection: {response.get("error")}')
+                    return {'status': 'failed', 'reason': response.get('error', 'Add failed')}
+            break
+        
+        return {'status': 'failed', 'reason': 'No response from map_node'}
     
     # ==================== Operation Application Helpers ====================
     
@@ -1268,27 +1477,34 @@ class InfospaceExecutor:
         
         return None
     
-    def _dereference_collection(self, collection_var: str) -> List[Any]:
+    def _dereference_collection(self, collection_var: str) -> List[str]:
         """
-        Get Collection contents (already a list of values).
+        Get Collection Note IDs by querying map_node.
         
         Args:
             collection_var: Variable name (without $) of the Collection
             
         Returns:
-            List of values in the Collection
+            List of Note IDs in the Collection
         """
         if collection_var not in self.plan_bindings:
             logger.warning(f"Collection variable not bound: {collection_var}")
             return []
         
-        collection_values = self.plan_bindings[collection_var]
+        collection_id = self.plan_bindings[collection_var]
         
-        if not isinstance(collection_values, list):
-            logger.warning(f"Collection variable is not a list: {collection_var}")
-            return []
+        # Check if it's a Collection_N ID
+        if isinstance(collection_id, str) and collection_id.startswith('Collection_'):
+            # Fetch Collection from map_node
+            content = self._get_content(collection_id)
+            if isinstance(content, list):
+                return content
+            else:
+                logger.warning(f"Collection {collection_id} content is not a list: {type(content)}")
+                return []
         
-        return collection_values
+        logger.warning(f"Collection variable is not a Collection: {collection_var}")
+        return []
     
     
     def _wrap_note_content(self, content: Any, name: str = None) -> Dict:
@@ -1326,13 +1542,13 @@ class InfospaceExecutor:
     
     def _resolve_value(self, value: Any) -> Any:
         """
-        Resolve $variable to its bound value.
+        Resolve $variable to its content value.
         
         Args:
             value: Can be a literal value, or "$variable" string
             
         Returns:
-            Resolved value or the original value if not a variable
+            Resolved content value (fetches from map_node if resource ID)
         """
         if not isinstance(value, str):
             return value
@@ -1345,7 +1561,14 @@ class InfospaceExecutor:
             logger.warning(f"Unbound variable: {value}")
             return None
         
-        return self.plan_bindings[var_name]
+        resource_id = self.plan_bindings[var_name]
+        
+        # If it's a resource ID, fetch content from map_node
+        if isinstance(resource_id, str) and (resource_id.startswith('Note_') or resource_id.startswith('Collection_')):
+            return self._get_content(resource_id)
+        
+        # Otherwise return as-is (shouldn't happen in new model, but handle gracefully)
+        return resource_id
     
     def _get_kind(self, var_name: str) -> Optional[str]:
         """
@@ -1364,16 +1587,19 @@ class InfospaceExecutor:
             return None
         
         value = self.plan_bindings[var_name]
-        # Collection is a list, Note is anything else
+        # Check if value is a Collection_N ID
+        if isinstance(value, str) and value.startswith('Collection_'):
+            return 'Collection'
+        # Legacy: list values (pre-Collection ID implementation)
         return 'Collection' if isinstance(value, list) else 'Note'
     
-    def _bind_variable(self, var_name: str, value: Any):
-        """Bind variable name to actual value"""
+    def _bind_variable(self, var_name: str, resource_id: str):
+        """Bind variable name to resource ID"""
         if var_name.startswith('$'):
             var_name = var_name[1:]
         
-        self.plan_bindings[var_name] = value
-        logger.debug(f"Bound ${var_name} → {type(value).__name__}")
+        self.plan_bindings[var_name] = resource_id
+        logger.debug(f"Bound ${var_name} → {resource_id}")
     
     def _validate_required_fields(self, action: Dict, *fields) -> Optional[str]:
         """
