@@ -67,6 +67,10 @@ flatten — convert Collection to single Note by concatenating items (input: Col
 {"type":"flatten","target":"$collection","out":"combined_note"}
 {"type":"flatten","target":"$collection","separator":"\\n---\\n","out":"combined"}  # custom separator
 
+add — add a Note to an existing Collection (mutates Collection in place)
+{"type":"add","target":"$collection","value":"$new_note","out":"collection"}  # out should match target
+{"type":"add","target":"$dialog_history","value":"Hello user","out":"dialog_history"}  # literal value creates new Note
+
 transform — convert data format or structure (whole-value) (input: Note → output: Note)
 {"type":"transform","target":"$data","operation":"flatten|normalize|pivot|reshape","out":"transformed"}
 
@@ -85,11 +89,13 @@ load — retrieve a persistent Note or Collection by resource ID
 {"type":"load","resource_id":"Note_123","out":"my_note"}
 {"type":"load","resource_id":"Collection_5","out":"items"}
 
-index (organize) — create searchable store with embeddings
-{"type":"index","source":"$collection","store_name":"my_store","index_type":"semantic","fields":{"title":"embed","content":"embed"}}
+index (organize) — create searchable store with embeddings (Collection becomes indexed)
+{"type":"index","source":"$collection","index_type":"semantic"}
+{"type":"index","source":"$papers","index_type":"semantic","fields":{"title":"embed","content":"embed"}}  # optional fields
 
-search — query an indexed store
-{"type":"search","store_name":"my_store","query":"search text or $query","mode":"semantic","limit":5,"out":"results"}
+search — query an indexed Collection
+{"type":"search","source":"$collection","query":"search text or $query","mode":"semantic","limit":5,"out":"results"}
+{"type":"search","source":"$papers","query":"quantum computing","limit":3,"out":"top_papers"}  # search indexed Collection
 
 if — conditional branch
 {"type":"if","condition":{"type":"has_value","target":"$results"},"then":[/* steps */],"else":[/* optional steps */]}

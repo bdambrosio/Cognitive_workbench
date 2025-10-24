@@ -83,6 +83,7 @@ class MapNode:
         # Collection instance management (dynamic resources in infospace)
         self.collection_counter = 0  # Counter for generating unique Collection IDs
         self.named_collections = {}  # name -> collection_id mapping for stable references
+        self.collection_indexes = {}  # Track indexed Collections: {collection_id: collection_id} (store name = collection_id)
         
         # Persistence setup
         self.world_file = Path(f"data/world/{self.world_name}_world.json")
@@ -325,6 +326,12 @@ end your response with:
         self.collection_create_queryable = self.session.declare_queryable(
             "cognitive/map/collection/create",
             self.handle_create_collection
+        )
+        
+        # Collection add queryable (mutate existing Collection)
+        self.collection_add_queryable = self.session.declare_queryable(
+            "cognitive/map/collection/add",
+            self.handle_collection_add
         )
         
         # Terrain queryable
@@ -1487,6 +1494,85 @@ end your response with:
             
         except Exception as e:
             logger.error(f"Error creating Collection instance: {e}")
+            error_response = {
+                'success': False,
+                'error': str(e)
+            }
+            query.reply(query.key_expr, json.dumps(error_response).encode('utf-8'))
+    
+    def handle_collection_add(self, query):
+        """
+        Handle adding a Note to an existing Collection (controlled mutation).
+        
+        Topic: cognitive/map/collection/add
+        Payload: {
+            "collection_id": str,  # Collection to modify
+            "note_id": str,  # Note to add
+            "agent_name": str  # Agent performing the add
+        }
+        
+        Returns: {
+            "success": bool,
+            "collection_id": str,
+            "item_count": int  # New count after add
+        }
+        """
+        try:
+            # Parse payload
+            if not query.payload:
+                raise ValueError("No payload provided")
+            
+            payload_bytes = query.payload.to_bytes()
+            payload_str = payload_bytes.decode('utf-8')
+            payload = json.loads(payload_str)
+            
+            collection_id = payload.get('collection_id')
+            note_id = payload.get('note_id')
+            agent_name = payload.get('agent_name')
+            
+            if not collection_id or not note_id:
+                raise ValueError("Missing collection_id or note_id in payload")
+            
+            # Fetch Collection from resource_registry
+            collection = self.world_map.resource_registry.get(collection_id)
+            if not collection:
+                raise ValueError(f"Collection {collection_id} not found")
+            
+            # Mutate the Collection's content list
+            content_list = collection['properties'].get('content', [])
+            if not isinstance(content_list, list):
+                raise ValueError(f"Collection {collection_id} content is not a list")
+            
+            content_list.append(note_id)
+            collection['properties']['item_count'] = len(content_list)
+            
+            logger.info(f"📚 Added {note_id} to {collection_id} (now {len(content_list)} items) by {agent_name}")
+            
+            # Auto-update associated index (if Collection is indexed)
+            if collection_id in self.collection_indexes:
+                # Collection is indexed - store name = collection_id
+                if collection_id in self.vector_stores:
+                    # Fetch Note content
+                    note = self.world_map.get_resource_by_name(note_id)
+                    if note:
+                        note_content = note.get('properties', {}).get('content')
+                        if note_content is not None:
+                            # Generate embedding and add to store
+                            store = self.vector_stores[collection_id]
+                            content_text = self._extract_content_for_embedding(note_content, {})
+                            embedding = self._generate_embedding(content_text)
+                            store.add(note_content, embedding, metadata={'timestamp': time.time()})
+                            logger.info(f"  ↳ Updated index for {collection_id} with new item")
+            
+            response = {
+                'success': True,
+                'collection_id': collection_id,
+                'item_count': len(content_list)
+            }
+            query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
+            
+        except Exception as e:
+            logger.error(f"Error adding to Collection: {e}")
             error_response = {
                 'success': False,
                 'error': str(e)
@@ -2996,34 +3082,54 @@ end your response with:
         """
         Handle request to create/update searchable vector store.
         
+        Store is created using Collection ID as the key. The Collection becomes indexed.
+        
         Message format:
         {
             'agent_name': str,
-            'store_name': str,
-            'source': list of items,
+            'collection_id': str,  # Collection_N - also used as store name
             'index_type': 'semantic' | 'keyword' | 'hybrid',
             'fields': {field_name: 'embed'|'keyword'|'store'}
         }
         """
         request = json.loads(sample.payload.to_bytes().decode('utf-8'))
         agent_name = request.get('agent_name')
-        store_name = request.get('store_name')
-        source = request.get('source', [])
+        collection_id = request.get('collection_id')
         index_type = request.get('index_type', 'semantic')
         fields = request.get('fields', {})
         
-        logger.info(f"Index request from {agent_name}: {len(source)} items to '{store_name}'")
+        if not collection_id:
+            logger.error("Index request missing collection_id")
+            return
         
-        # Create or get store
-        if store_name not in self.vector_stores:
-            self.vector_stores[store_name] = FAISSStore(dimension=384, logger=logger)
-            logger.info(f"Created new vector store: {store_name}")
+        # Fetch Collection and dereference locally
+        collection = self.world_map.get_resource_by_name(collection_id)
+        if not collection:
+            logger.warning(f"Collection {collection_id} not found")
+            return
         
-        store = self.vector_stores[store_name]
+        note_ids = collection.get('properties', {}).get('content', [])
+        # Fetch content for each Note
+        items_to_index = []
+        for note_id in note_ids:
+            note = self.world_map.get_resource_by_name(note_id)
+            if note:
+                content = note.get('properties', {}).get('content')
+                if content is not None:
+                    items_to_index.append(content)
+        
+        logger.info(f"Index request from {agent_name}: indexing {collection_id} ({len(items_to_index)} items)")
+        
+        # Create or get store - use Collection ID as store name
+        if collection_id not in self.vector_stores:
+            self.vector_stores[collection_id] = FAISSStore(dimension=384, logger=logger)
+            logger.info(f"Created vector store for {collection_id}")
+        
+        store = self.vector_stores[collection_id]
         
         # Index each item
         indexed_count = 0
-        for item in source:
+        for item in items_to_index:
             if index_type in ['semantic', 'hybrid']:
                 # Extract content to embed
                 content = self._extract_content_for_embedding(item, fields)
@@ -3035,10 +3141,15 @@ end your response with:
                 store.add(item, embedding, metadata={'timestamp': time.time()})
                 indexed_count += 1
         
+        # Track that this Collection is indexed (store name = collection_id)
+        if collection_id not in self.collection_indexes:
+            self.collection_indexes[collection_id] = collection_id  # Store ID is Collection ID
+            logger.info(f"Tracking: {collection_id} is indexed for auto-updates")
+        
         # Publish response
         response = {
             'status': 'success',
-            'store_name': store_name,
+            'collection_id': collection_id,
             'indexed_count': indexed_count
         }
         
@@ -3046,16 +3157,18 @@ end your response with:
         time.sleep(0.05)
         self.session.put(response_topic, json.dumps(response))
         
-        logger.info(f"Indexed {indexed_count} items to '{store_name}'")
+        logger.info(f"Indexed {indexed_count} items for {collection_id}")
     
     def handle_search_request(self, sample):
         """
-        Handle semantic search query on indexed store.
+        Handle semantic search query on indexed Collection.
+        
+        Store is looked up using Collection ID as the key.
         
         Message format:
         {
             'agent_name': str,
-            'store_name': str,
+            'collection_id': str,  # Collection_N - also the store name
             'query': str,
             'mode': 'semantic' | 'keyword' | 'hybrid',
             'limit': int,
@@ -3064,22 +3177,22 @@ end your response with:
         """
         request = json.loads(sample.payload.to_bytes().decode('utf-8'))
         agent_name = request.get('agent_name')
-        store_name = request.get('store_name')
+        collection_id = request.get('collection_id')
         query = request.get('query')
         mode = request.get('mode', 'semantic')
         limit = request.get('limit', 5)
         threshold = request.get('threshold', 0.0)
         
-        logger.info(f"Search request from {agent_name}: '{query}' in '{store_name}'")
+        logger.info(f"Search request from {agent_name}: '{query}' in {collection_id}")
         
-        # Check store exists
-        if store_name not in self.vector_stores:
+        # Check if Collection is indexed (store exists)
+        if collection_id not in self.vector_stores:
             response = {
                 'status': 'error',
-                'reason': f"Store '{store_name}' not found"
+                'reason': f"Collection '{collection_id}' is not indexed. Use 'index' primitive first."
             }
         else:
-            store = self.vector_stores[store_name]
+            store = self.vector_stores[collection_id]
             
             if mode == 'semantic':
                 # Generate query embedding
