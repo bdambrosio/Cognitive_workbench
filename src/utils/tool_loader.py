@@ -91,16 +91,35 @@ def load_tools(tools_dir_path: str) -> Dict[str, Dict]:
             logger.warning(f"Missing 'description' in {tool_md_path}")
         
         tool_type = metadata.get('type', 'code_execution')
+        trusted = metadata.get('trusted', False)
         
         # Check for duplicate names
         if tool_name in tools:
             logger.warning(f"Duplicate tool name '{tool_name}' in {tool_dir}, skipping")
             continue
         
+        # For Python tools, find Python file and validate trust
+        python_file = None
+        if tool_type == 'python':
+            # Check for tool.py first, then {tool-name}.py
+            candidate = tool_dir / 'tool.py'
+            if candidate.exists():
+                python_file = str(candidate.absolute())
+            else:
+                candidate = tool_dir / f"{tool_name}.py"
+                if candidate.exists():
+                    python_file = str(candidate.absolute())
+            
+            if not python_file:
+                logger.warning(f"Tool {tool_name} type is 'python' but no tool.py or {tool_name}.py found")
+            
+            if not trusted:
+                logger.warning(f"Tool {tool_name} type is 'python' but trusted is not true")
+        
         # Collect additional files in the tool directory
         additional_files = [
             f.name for f in tool_dir.iterdir() 
-            if f.is_file() and f.name != "SKILL.md"
+            if f.is_file() and f.name not in ("SKILL.md", "Skill.md")
         ]
         
         # Store tool metadata
@@ -108,12 +127,15 @@ def load_tools(tools_dir_path: str) -> Dict[str, Dict]:
             'name': tool_name,
             'description': tool_description,
             'type': tool_type,
+            'trusted': trusted,
             'tool_md_content': content,
             'path': str(tool_dir.absolute()),
+            'python_file': python_file,
             'additional_files': additional_files
         }
         
-        logger.info(f"Loaded tool: {tool_name} (type: {tool_type})")
+        trust_info = " [TRUSTED]" if trusted else ""
+        logger.info(f"Loaded tool: {tool_name} (type: {tool_type}){trust_info}")
     
     logger.info(f"Successfully loaded {len(tools)} tools from {tools_dir_path}")
     
