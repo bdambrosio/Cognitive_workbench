@@ -2821,6 +2821,17 @@ End your response with </end>
                 self._observe()
             self.current_goal = plan_module.Goal(parsed_goal, [self.character_name], description='', termination='')
             
+            # In infospace mode, skip goal rewriting and plan immediately
+            if self.is_infospace:
+                self._publish_goal(self.current_goal)
+                logger.info(f'🧩 {self.character_name} infospace planning for goal: {parsed_goal}')
+                self._plan_completed("manual goal override")
+                self._plan(self.current_goal)
+                if self.current_plan:
+                    self._publish_current_plan()
+                    logger.info(f'📋 {self.character_name} generated plan with {len(self.current_plan["plan"])} steps')
+                return
+            
             # In manual mode, publish goal and auto-generate plan
             if self.manual:
                 self._publish_goal(self.current_goal)
