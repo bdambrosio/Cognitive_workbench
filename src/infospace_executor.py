@@ -9,6 +9,8 @@ import json
 import time
 import logging
 import re
+import importlib.util
+from pathlib import Path
 from typing import Dict, List, Any, Optional
 
 logger = logging.getLogger(__name__)
@@ -164,15 +166,22 @@ class InfospaceExecutor:
         if not target:
             return {'status': 'failed', 'reason': 'apply requires target'}
         
-        # Check if this is a prompt-augmentation tool (handled locally)
+        # Get tool info and route by type
         tool_info = self._get_tool_info(target)
         
-        if tool_info and tool_info.get('type') == 'prompt_augmentation':
+        if not tool_info:
+            return {'status': 'failed', 'reason': f'Tool not found: {target}'}
+        
+        tool_type = tool_info.get('type')
+        
+        if tool_type == 'prompt_augmentation':
             # Execute locally using LLM
             result = self._execute_prompt_tool(target, value, tool_info, additional_args)
+        elif tool_type == 'python':
+            # Execute Python tool
+            result = self._execute_python_tool(target, value, tool_info, additional_args)
         else:
-            # Delegate to map node (external tool or code execution)
-            result = self._apply_operation_to_value(target, value, reason, additional_args)
+            return {'status': 'failed', 'reason': f'Unknown tool type: {tool_type}'}
         
         if result.get('status') != 'success':
             return result
@@ -252,6 +261,70 @@ class InfospaceExecutor:
         except Exception as e:
             logger.error(f"Prompt tool execution failed: {e}")
             return {'status': 'failed', 'reason': str(e)}
+
+    def _execute_python_tool(self, tool_name: str, input_value: Any,
+                            tool_info: Dict, additional_args: Dict) -> Dict:
+        """
+        Execute a Python-based tool by importing and calling tool() function.
+        
+        Args:
+            tool_name: Name of the tool
+            input_value: Input data to process
+            tool_info: Tool metadata including python_file path
+            additional_args: Optional parameters passed as **kwargs
+            
+        Returns:
+            Result dict with 'status' and 'value'
+        """
+        # Check trust flag
+        if not tool_info.get('trusted', False):
+            return {'status': 'failed', 
+                   'reason': f'Untrusted Python tool: {tool_name}. Set trusted: true in SKILL.md'}
+        
+        # Get Python file path
+        python_file = tool_info.get('python_file')
+        if not python_file:
+            return {'status': 'failed', 
+                   'reason': f'No Python file found for tool: {tool_name}'}
+        
+        python_path = Path(python_file)
+        if not python_path.exists():
+            return {'status': 'failed', 
+                   'reason': f'Python file not found: {python_path}'}
+        
+        # Import module dynamically
+        spec = importlib.util.spec_from_file_location(
+            f"tool_{tool_name.replace('-', '_')}", 
+            python_path
+        )
+        tool_module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(tool_module)
+        
+        # Get tool function
+        if not hasattr(tool_module, 'tool'):
+            return {'status': 'failed', 
+                   'reason': f'No tool() function in {python_path.name}'}
+        
+        tool_func = tool_module.tool
+        
+        # Resolve any variables in additional args
+        resolved_args = {}
+        if additional_args:
+            for key, val in additional_args.items():
+                resolved_args[key] = self._resolve_value(val)
+        
+        # Execute tool
+        result = tool_func(input_value, **resolved_args)
+        
+        # Handle result format
+        if isinstance(result, dict) and 'status' in result:
+            # Tool returned structured response
+            logger.info(f"Python tool '{tool_name}' completed with status: {result.get('status')}")
+            return result
+        else:
+            # Tool returned raw value
+            logger.info(f"Python tool '{tool_name}' completed")
+            return {'status': 'success', 'value': result}
 
     def _execute_move(self, action: Dict) -> Dict:
         """
@@ -846,10 +919,10 @@ class InfospaceExecutor:
                                    additional_args: Dict = None) -> Dict:
         """
         Helper to apply a tool to a single value with optional additional arguments.
-        Shared by apply and map primitives.
+        Shared by map and transform primitives.
         
         Args:
-            tool_name: Name of the tool/skill to invoke
+            tool_name: Name of the tool to invoke
             value: Input value to the tool
             reason: Reason for invoking (for logging)
             additional_args: Optional dict of additional arguments for the tool
@@ -857,39 +930,22 @@ class InfospaceExecutor:
         Returns:
             Result dict with 'status' and 'value' fields
         """
-        # Resolve any variables in additional args
-        resolved_args = {}
-        if additional_args:
-            for key, val in additional_args.items():
-                resolved_args[key] = self._resolve_value(val)
+        # Get tool info and route by type
+        tool_info = self._get_tool_info(tool_name)
         
-        # Build tool request
-        request = {
-            'agent_name': self.agent_name,
-            'tool_name': tool_name,
-            'input_value': value,
-            'reason': reason,
-            'additional_args': resolved_args  # Pass extra args to tool executor
-        }
+        if not tool_info:
+            return {'status': 'failed', 'reason': f'Tool not found: {tool_name}'}
         
-        self.session.put(
-            f"map/{self.map_name}/tool_request/{self.agent_name}",
-            json.dumps(request)
-        )
+        tool_type = tool_info.get('type')
         
-        # Wait for response
-        response = self._wait_for_response(
-            f"map/{self.map_name}/tool_response/{self.agent_name}",
-            timeout=5.0
-        )
-        
-        if not response:
-            return {'status': 'failed', 'reason': 'Tool execution timeout'}
-        
-        if response.get('status') != 'success':
-            return {'status': 'failed', 'reason': response.get('reason', 'Tool execution failed')}
-        
-        return {'status': 'success', 'value': response.get('result')}
+        if tool_type == 'prompt_augmentation':
+            # Execute locally using LLM
+            return self._execute_prompt_tool(tool_name, value, tool_info, additional_args or {})
+        elif tool_type == 'python':
+            # Execute Python tool
+            return self._execute_python_tool(tool_name, value, tool_info, additional_args or {})
+        else:
+            return {'status': 'failed', 'reason': f'Unknown tool type: {tool_type}'}
     
 
     
@@ -1050,7 +1106,7 @@ class InfospaceExecutor:
         """
         Evaluate condition by invoking an external tool.
         
-        Tool must return boolean or truthy value.
+        Tool must return boolean (Python tools) or "true"/"false" string (prompt tools).
         
         Condition format:
         {
@@ -1083,11 +1139,23 @@ class InfospaceExecutor:
         # Interpret result as boolean
         result_value = result.get('value')
         
-        # Explicit boolean
+        # Explicit boolean (Python tools)
         if isinstance(result_value, bool):
             return result_value
         
-        # Truthy/falsy coercion
+        # String parsing (prompt-augmentation tools)
+        if isinstance(result_value, str):
+            cleaned = result_value.strip().lower()
+            if cleaned in ('true', '1', 'yes'):
+                return True
+            elif cleaned in ('false', '0', 'no'):
+                return False
+            else:
+                logger.warning(f"Ambiguous tool_condition result from '{tool_name}': '{result_value}', defaulting to False")
+                return False
+        
+        # Fallback: truthy/falsy coercion
+        logger.warning(f"Tool_condition '{tool_name}' returned non-boolean/non-string: {type(result_value).__name__}, using truthy coercion")
         return bool(result_value)
     
     # ==================== Utility Methods ====================

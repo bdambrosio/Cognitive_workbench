@@ -2,51 +2,70 @@
   "plan": [
     {
       "type": "think",
-      "value": "Testing apply primitive with tools: summarize, decompose, analyze"
+      "value": "Testing apply primitive with LLM and Python tools"
     },
     {
       "type": "save",
-      "value": "Cognitive architectures for autonomous agents combine perception, planning, and execution in a unified framework. They enable agents to maintain coherent mental models while adapting to changing environments. Key components include working memory, episodic memory, and procedural knowledge. Modern implementations leverage large language models to enhance reasoning capabilities and natural language understanding. The integration of symbolic and subsymbolic processing remains an active research challenge.",
-      "out": "long_text"
-    },
-    {
-      "type": "say",
-      "target": "User",
-      "value": "Saved long text about cognitive architectures."
+      "value": "Cognitive architectures combine perception, planning, and execution. They enable agents to maintain coherent mental models while adapting.",
+      "out": "text"
     },
     {
       "type": "apply",
       "target": "summarize-content",
-      "value": "$long_text",
-      "reason": "Test summarization tool",
+      "value": "$text",
+      "reason": "Test LLM tool",
       "out": "summary"
     },
     {
-      "type": "say",
-      "target": "User",
-      "value": "$summary"
+      "type": "save",
+      "value": "Machine learning uses statistical methods. Deep learning uses neural networks.",
+      "out": "note1"
     },
     {
       "type": "save",
-      "value": "A large dataset containing information about customer purchases, product reviews, and demographic data across multiple years.",
-      "out": "entity_text"
+      "value": "Deep learning employs multi-layer neural networks.",
+      "out": "note2"
+    },
+    {
+      "type": "create",
+      "kind": "Collection",
+      "value": ["$note1", "$note2"],
+      "out": "notes"
     },
     {
       "type": "apply",
-      "target": "extract-entities",
-      "value": "$entity_text",
-      "reason": "Test entity extraction",
-      "out": "entities"
+      "target": "compare-notes",
+      "value": "$notes",
+      "reason": "Test comparison",
+      "out": "comparison"
+    },
+    {
+      "type": "create",
+      "kind": "Collection",
+      "value": ["Python is great", "JavaScript is popular", "Python is versatile"],
+      "out": "items"
+    },
+    {
+      "type": "apply",
+      "target": "filter-by-predicate",
+      "value": "$items",
+      "args": {
+        "predicate": "mentions Python"
+      },
+      "reason": "Test filtering",
+      "out": "filtered"
+    },
+    {
+      "type": "apply",
+      "target": "word-count",
+      "value": "The quick brown fox jumps over the lazy dog",
+      "reason": "Test Python tool",
+      "out": "count_result"
     },
     {
       "type": "say",
       "target": "User",
-      "value": "$entities"
-    },
-    {
-      "type": "say",
-      "target": "User",
-      "value": "Apply primitive tests complete!"
+      "value": "$count_result"
     }
   ]
 }

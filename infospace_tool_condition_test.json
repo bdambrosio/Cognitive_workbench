@@ -1,0 +1,122 @@
+{
+  "plan": [
+    {
+      "type": "think",
+      "value": "Testing tool_condition with Python and prompt-augmentation tools"
+    },
+    {
+      "type": "save",
+      "value": 10,
+      "out": "positive_num"
+    },
+    {
+      "type": "if",
+      "condition": {
+        "type": "tool_condition",
+        "tool": "is-positive",
+        "target": "$positive_num"
+      },
+      "then": [
+        {
+          "type": "say",
+          "target": "User",
+          "value": "Correctly identified positive number"
+        }
+      ],
+      "else": [
+        {
+          "type": "say",
+          "target": "User",
+          "value": "ERROR: Failed to identify positive number"
+        }
+      ]
+    },
+    {
+      "type": "save",
+      "value": -5,
+      "out": "negative_num"
+    },
+    {
+      "type": "if",
+      "condition": {
+        "type": "tool_condition",
+        "tool": "is-positive",
+        "target": "$negative_num"
+      },
+      "then": [
+        {
+          "type": "say",
+          "target": "User",
+          "value": "ERROR: Incorrectly identified negative as positive"
+        }
+      ],
+      "else": [
+        {
+          "type": "say",
+          "target": "User",
+          "value": "Correctly identified negative number"
+        }
+      ]
+    },
+    {
+      "type": "save",
+      "value": "What time is it?",
+      "out": "question_text"
+    },
+    {
+      "type": "if",
+      "condition": {
+        "type": "tool_condition",
+        "tool": "is-question",
+        "target": "$question_text"
+      },
+      "then": [
+        {
+          "type": "say",
+          "target": "User",
+          "value": "Correctly identified question text"
+        }
+      ],
+      "else": [
+        {
+          "type": "say",
+          "target": "User",
+          "value": "ERROR: Failed to identify question"
+        }
+      ]
+    },
+    {
+      "type": "save",
+      "value": "The sky is blue.",
+      "out": "statement_text"
+    },
+    {
+      "type": "if",
+      "condition": {
+        "type": "tool_condition",
+        "tool": "is-question",
+        "target": "$statement_text"
+      },
+      "then": [
+        {
+          "type": "say",
+          "target": "User",
+          "value": "ERROR: Incorrectly identified statement as question"
+        }
+      ],
+      "else": [
+        {
+          "type": "say",
+          "target": "User",
+          "value": "Correctly identified non-question text"
+        }
+      ]
+    },
+    {
+      "type": "say",
+      "target": "User",
+      "value": "Tool condition tests complete!"
+    }
+  ]
+}
+
