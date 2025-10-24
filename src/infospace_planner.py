@@ -31,6 +31,7 @@ OUTPUT: only valid JSON — no reasoning, no prose, no code fences.
 
 apply - apply a tool/skill to input data and bind result to variable
 map - apply operation to each item in a Collection
+flatten - convert Collection to single Note by concatenating items
 transform - convert data format or structure (whole-value operations only)
 move - change current location or approach a resource
 create - create a Note or Collection object and bind to variable
@@ -61,6 +62,10 @@ apply — apply a tool/skill to input data
 map — apply operation to each item in Collection
 {"type":"map","target":"$collection","operation":"tool-name or {'tool':'name','args':{}}","out":"result_collection"}
 {"type":"map","target":"$collection","operation":"tool-name","filter_null":true,"out":"filtered_results"}  # exclude null results
+
+flatten — convert Collection to single Note by concatenating items
+{"type":"flatten","target":"$collection","out":"combined_note"}
+{"type":"flatten","target":"$collection","separator":"\\n---\\n","out":"combined"}  # custom separator
 
 transform — convert data format or structure (whole-value)
 {"type":"transform","target":"$data","operation":"flatten|normalize|pivot|reshape","out":"transformed"}

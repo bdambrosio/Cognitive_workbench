@@ -1458,7 +1458,7 @@ end your response with </end>
             # Infospace primitives - Phase 1 & 2
             'apply', 'create', 'save', 'load', 'store', 'index', 'organize', 'search',
             'extract', 'filter', 'merge', 'transform',
-            'aggregate', 'sort', 'group_by', 'compare', 'map'
+            'aggregate', 'sort', 'group_by', 'compare', 'map', 'flatten'
         }
         if stype in executable_primitives:
             current['idx'] = idx + 1
@@ -1618,6 +1618,9 @@ end your response with </end>
                 self.action_history.append(action_record)
                 
                 # Publish action for UI display
+                result_value = str(result.get('value', '')) if result.get('value') else ''
+                display_value = result_value if self.is_infospace else result_value[:200]
+                
                 action_data = {
                     'type': action_type,
                     'action_id': self.action_counter,
@@ -1625,12 +1628,12 @@ end your response with </end>
                     'target': action.get('target', ''),
                     'out': action.get('out', ''),
                     'status': result.get('status', 'unknown'),
-                    'value': str(result.get('value', ''))[:200] if result.get('value') else ''
+                    'value': display_value
                 }
                 
                 # Add 'text' field for say/think actions (memory_node expects this)
                 if action_type in ('say', 'think'):
-                    action_data['text'] = str(result.get('value', ''))[:200] if result.get('value') else ''
+                    action_data['text'] = display_value
                     action_data['source'] = self.character_name
                 
                 self.action_publisher.put(json.dumps(action_data))

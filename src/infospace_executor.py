@@ -91,6 +91,7 @@ class InfospaceExecutor:
             # Phase 2: Data Operations (whole-value only)
             'transform': self._execute_transform,
             'map': self._execute_map,
+            'flatten': self._execute_flatten,
         }
         
         handler = handlers.get(action_type)
@@ -912,6 +913,44 @@ class InfospaceExecutor:
         self._bind_variable(out_var, result_values)
         logger.info(f"Mapped {len(collection_values)} → {len(result_values)} items → ${out_var}")
         return {'status': 'success', 'value': result_values}
+    
+    def _execute_flatten(self, action: Dict) -> Dict:
+        """
+        Flatten a Collection into a single Note by concatenating content.
+        
+        Required: target, out
+        Optional: separator (default: "\\n\\n")
+        
+        Argument types:
+        - target: $variable (Collection to flatten)
+        - separator: string literal (joins items)
+        - out: variable name for result Note
+        """
+        error = self._validate_required_fields(action, 'target', 'out')
+        if error:
+            return {'status': 'failed', 'reason': error}
+        
+        target_arg = action.get('target')
+        out_var = action.get('out')
+        separator = action.get('separator', '\n\n')
+        
+        # Target must be Collection variable
+        if not isinstance(target_arg, str) or not target_arg.startswith('$'):
+            return {'status': 'failed', 'reason': 'flatten target must be $variable'}
+        
+        collection_var = target_arg[1:]
+        collection_values = self._dereference_collection(collection_var)
+        
+        if not isinstance(collection_values, list):
+            return {'status': 'failed', 'reason': 'flatten target must be Collection'}
+        
+        # Convert all items to strings and join
+        str_items = [str(item) for item in collection_values if item is not None]
+        flattened = separator.join(str_items)
+        
+        self._bind_variable(out_var, flattened)
+        logger.info(f"Flattened {len(collection_values)} items → ${out_var}")
+        return {'status': 'success', 'value': flattened}
     
     # ==================== Operation Application Helpers ====================
     
