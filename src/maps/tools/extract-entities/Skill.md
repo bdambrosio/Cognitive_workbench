@@ -2,6 +2,7 @@
 name: extract-entities
 description: Extract named entities, topics, and relationships from text or structured content
 type: prompt_augmentation
+parameters: none
 ---
 
 # Extract Entities

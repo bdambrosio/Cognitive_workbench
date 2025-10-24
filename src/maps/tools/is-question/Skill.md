@@ -2,6 +2,7 @@
 name: is-question
 description: Check if text contains a question
 type: prompt_augmentation
+parameters: none
 ---
 
 # Is Question

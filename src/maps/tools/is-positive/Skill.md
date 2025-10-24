@@ -3,6 +3,7 @@ name: is-positive
 description: Check if a number is positive
 type: python
 trusted: true
+parameters: none
 ---
 
 # Is Positive

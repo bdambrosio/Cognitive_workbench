@@ -2,6 +2,7 @@
 name: filter-by-predicate
 description: Evaluate complex criteria on each item in a collection and return matching items
 type: prompt_augmentation
+parameters: predicate (required) - filtering condition to evaluate
 ---
 
 # Filter By Predicate

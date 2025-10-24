@@ -190,8 +190,13 @@ class InfospaceExecutor:
         # Bind result if output variable specified
         result_value = result.get('value')
         if out_var:
+            # Persist result as Note
+            info_id = self._persist_note(result_value, f'apply_{target}')
+            if info_id:
+                logger.info(f"Tool '{target}' executed, result → ${out_var}, persisted as {info_id}")
+            else:
+                logger.warning(f"Tool '{target}' result persisted locally only → ${out_var}")
             self._bind_variable(out_var, result_value)
-            logger.info(f"Tool '{target}' executed, result → ${out_var}")
         
         return {'status': 'success', 'value': result_value}
 
@@ -405,9 +410,15 @@ class InfospaceExecutor:
             else:
                 return {'status': 'failed', 'reason': 'Collection value must be list or $variable'}
             
+            # Persist Collection as Note (list stored as JSON)
+            info_id = self._persist_note(collection_values, 'create_collection')
+            if info_id:
+                logger.info(f"Created Collection → ${out_var} ({len(collection_values)} items), persisted as {info_id}")
+            else:
+                logger.warning(f"Collection persisted locally only → ${out_var}")
+            
             # Bind Collection as list of values
             self._bind_variable(out_var, collection_values)
-            logger.info(f"Created Collection → ${out_var} ({len(collection_values)} items)")
             return {'status': 'success', 'value': collection_values}
             
         else:  # Note
@@ -456,6 +467,45 @@ class InfospaceExecutor:
     
     # ==================== Storage Operations ====================
     
+    def _persist_note(self, value: Any, source_context: str) -> Optional[str]:
+        """
+        Helper to persist a Note to map_node as a spatial resource.
+        
+        Args:
+            value: Content to persist
+            source_context: Description for logging (e.g., 'save_primitive', 'apply_result')
+            
+        Returns:
+            Note ID if successful, None if failed
+        """
+        if value is None:
+            return "Note_null"
+        
+        format_type = 'json' if isinstance(value, (dict, list)) else 'text'
+        
+        from zenoh import QueryTarget, ConsolidationMode
+        for reply in self.session.get(
+            f"cognitive/map/note/create",
+            target=QueryTarget.BEST_MATCHING,
+            consolidation=ConsolidationMode.NONE,
+            timeout=5.0,
+            payload=json.dumps({
+                'character_name': self.agent_name,
+                'content': value,
+                'format': format_type,
+                'source_skill': source_context,
+                'source_value': str(value)[:100]
+            }).encode('utf-8')
+        ):
+            if reply.ok:
+                response = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
+                if response.get('success'):
+                    return response.get('info_id')
+                else:
+                    logger.error(f'Failed to create Note: {response.get("error")}')
+            break
+        return None
+
     def _execute_save(self, action: Dict) -> Dict:
         """
         Store value by creating Note object as a spatial resource.
@@ -483,40 +533,12 @@ class InfospaceExecutor:
             logger.info(f"Saved null value → ${out_var} = Note_null")
             return {'status': 'success', 'value': "Note_null"}
         
-        # Determine format type
-        format_type = 'json' if isinstance(value, (dict, list)) else 'text'
-        
-        # Create spatial Note resource via map_node
-        try:
-            from zenoh import QueryTarget, ConsolidationMode
-            for reply in self.session.get(
-                f"cognitive/map/note/create",
-                target=QueryTarget.BEST_MATCHING,
-                consolidation=ConsolidationMode.NONE,
-                timeout=5.0,
-                payload=json.dumps({
-                    'character_name': self.agent_name,
-                    'content': value,
-                    'format': format_type,
-                    'source_skill': 'save_primitive',
-                    'source_value': str(value)[:100]
-                }).encode('utf-8')
-            ):
-                if reply.ok:
-                    response = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
-                    if response.get('success'):
-                        info_id = response.get('info_id')
-                        # Bind variable to actual value (Note persistence handled by map_node)
-                        self._bind_variable(out_var, value)
-                        logger.info(f"Saved Note → ${out_var}, persisted as {info_id}")
-                        return {'status': 'success', 'value': value}
-                    else:
-                        logger.error(f'Failed to create Note resource: {response.get("error")}')
-                        return {'status': 'failed', 'reason': response.get('error', 'Unknown error')}
-                break
-        except Exception as e:
-            logger.error(f'Error creating Note spatial resource: {e}')
-            return {'status': 'failed', 'reason': str(e)}
+        # Persist to map_node
+        info_id = self._persist_note(value, 'save_primitive')
+        if info_id:
+            self._bind_variable(out_var, value)
+            logger.info(f"Saved Note → ${out_var}, persisted as {info_id}")
+            return {'status': 'success', 'value': value}
         
         # Fallback: bind value even if spatial creation failed
         logger.warning(f"Spatial Note creation failed, binding locally only")
@@ -708,9 +730,15 @@ class InfospaceExecutor:
         
         # Bind results to output variable
         results = response.get('results', [])
-        self._bind_variable(out_var, results)
         
-        logger.info(f"Search found {len(results)} results")
+        # Persist search results as Collection
+        info_id = self._persist_note(results, f'search_{store_name}')
+        if info_id:
+            logger.info(f"Search found {len(results)} results → ${out_var}, persisted as {info_id}")
+        else:
+            logger.warning(f"Search results persisted locally only → ${out_var}")
+        
+        self._bind_variable(out_var, results)
         return {'status': 'success', 'value': results}
     
     def _execute_say(self, action: Dict) -> Dict:
@@ -830,8 +858,14 @@ class InfospaceExecutor:
         else:
             return {'status': 'failed', 'reason': f'Unknown transform operation: {operation}'}
         
+        # Persist transformed result
+        info_id = self._persist_note(result, f'transform_{operation}')
+        if info_id:
+            logger.info(f"Transformed ({operation}) → ${out_var}, persisted as {info_id}")
+        else:
+            logger.warning(f"Transform result persisted locally only → ${out_var}")
+        
         self._bind_variable(out_var, result)
-        logger.info(f"Transformed ({operation}) → ${out_var}")
         return {'status': 'success', 'value': result}
     
     def _execute_map(self, action: Dict) -> Dict:
@@ -909,9 +943,15 @@ class InfospaceExecutor:
                 if not filter_null:
                     result_values.append(None)
         
+        # Persist Collection as Note (list stored as JSON)
+        info_id = self._persist_note(result_values, f'map_{operation if isinstance(operation, str) else "operation"}')
+        if info_id:
+            logger.info(f"Mapped {len(collection_values)} → {len(result_values)} items → ${out_var}, persisted as {info_id}")
+        else:
+            logger.warning(f"Map result persisted locally only → ${out_var}")
+        
         # Bind new Collection (list of result values)
         self._bind_variable(out_var, result_values)
-        logger.info(f"Mapped {len(collection_values)} → {len(result_values)} items → ${out_var}")
         return {'status': 'success', 'value': result_values}
     
     def _execute_flatten(self, action: Dict) -> Dict:
@@ -948,8 +988,14 @@ class InfospaceExecutor:
         str_items = [str(item) for item in collection_values if item is not None]
         flattened = separator.join(str_items)
         
+        # Persist flattened result as Note
+        info_id = self._persist_note(flattened, 'flatten')
+        if info_id:
+            logger.info(f"Flattened {len(collection_values)} items → ${out_var}, persisted as {info_id}")
+        else:
+            logger.warning(f"Flatten result persisted locally only → ${out_var}")
+        
         self._bind_variable(out_var, flattened)
-        logger.info(f"Flattened {len(collection_values)} items → ${out_var}")
         return {'status': 'success', 'value': flattened}
     
     # ==================== Operation Application Helpers ====================
