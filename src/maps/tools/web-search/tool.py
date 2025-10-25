@@ -141,7 +141,7 @@ def _extract_subtext(text: str, keywords: List[str], keyword_weights: Dict[str, 
     for s, blk in score:
         if s <= 0:
             continue
-        if total + len(blk) + 1 > max_chars and s < max_score // 6:
+        if total + len(blk) + 1 > max_chars and s < max_score // 10:
             continue
         acc.append(blk)
         total += len(blk) + 1
@@ -221,7 +221,7 @@ def _process_url(url: str, query: str, client, per_url_timeout: float, max_chars
 # Public entry point
 # ------------------------------
 
-def llm_search(query: str, client, max_chars: int = 4000, max_urls: int = 10, max_workers: int = 4, wall_time_limit: float = 16.0) -> List[Dict[str, Any]]:
+def llm_search(query: str, client, max_chars: int = 8000, max_urls: int = 10, max_workers: int = 4, wall_time_limit: float = 16.0) -> List[Dict[str, Any]]:
     """
     High-level:
       1) Google CSE for initial URL set (two phrasings interleaved).
@@ -241,7 +241,11 @@ def llm_search(query: str, client, max_chars: int = 4000, max_urls: int = 10, ma
     rephr = ""
     try:
         rephr = client.generate(
-            prompt=[f"Rephrase the following query to be more targeted for a google search query. Do not leave out any important keywords or details. {query}"],
+            prompt=[f"""Rephrase the following query as a best-practice google search query. 
+Keep any dates, times, locations, keywords, and subject specifiers and any other significant details that narrow the search. 
+Respond only with the rephrased query, no commentary, no code fences, no reasoning.
+#Query:
+{query}"""],
             max_tokens=150,
             temperature=0.2,
         )

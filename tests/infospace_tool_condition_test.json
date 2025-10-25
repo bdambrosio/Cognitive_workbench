@@ -5,7 +5,7 @@
       "value": "Testing tool_condition with Python and prompt-augmentation tools"
     },
     {
-      "type": "save",
+      "type": "createNote",
       "value": 10,
       "out": "positive_num"
     },
@@ -32,7 +32,7 @@
       ]
     },
     {
-      "type": "save",
+      "type": "createNote",
       "value": -5,
       "out": "negative_num"
     },
@@ -59,7 +59,7 @@
       ]
     },
     {
-      "type": "save",
+      "type": "createNote",
       "value": "What time is it?",
       "out": "question_text"
     },
@@ -86,7 +86,7 @@
       ]
     },
     {
-      "type": "save",
+      "type": "createNote",
       "value": "The sky is blue.",
       "out": "statement_text"
     },

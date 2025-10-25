@@ -148,8 +148,9 @@ class InfospaceExecutor:
             # Phase 1: Core, Storage, Control, Communication
             'apply': self._execute_apply,
             'move': self._execute_move,
-            'create': self._execute_create,
-            'save': self._execute_save,
+            'createNote': self._execute_createNote,
+            'createCollection': self._execute_createCollection,
+            'persist': self._execute_persist,
             'load': self._execute_load,
             'index': self._execute_index,
             'organize': self._execute_index,  # Alias for index
@@ -455,125 +456,93 @@ class InfospaceExecutor:
         logger.info(f"Moved to {target}")
         return {'status': 'success', 'value': target}
     
-    def _execute_create(self, action: Dict) -> Dict:
+    def _execute_createNote(self, action: Dict) -> Dict:
         """
-        Create a Note or Collection object as a spatial resource.
+        Create a Note object as persistent spatial resource.
         
-        Required: type, out
-        Optional: kind ("Note" or "Collection"), value, name
+        Required: value, out
+        """
+        value_arg = action.get('value')
+        out_var = action.get('out')
         
-        Creates both:
-        1. Local plan binding (ephemeral, for plan execution)
-        2. Spatial resource via map_node (persistent for Notes, session-local for Collections)
+        if not out_var:
+            return {'status': 'failed', 'reason': 'createNote requires out'}
+        
+        value = self._resolve_value(value_arg) if value_arg is not None else ''
+        
+        if value is None:
+            self._bind_variable(out_var, "Note_null")
+            logger.info(f"Created null Note → ${out_var} = Note_null")
+            return {'status': 'success', 'value': "Note_null"}
+        
+        info_id = self._persist_note(value, 'createNote_primitive')
+        if info_id:
+            self._bind_variable(out_var, info_id)
+            logger.info(f"Created Note {info_id} → ${out_var}")
+            return {'status': 'success', 'value': info_id}
+        
+        logger.error(f"Note creation failed for ${out_var}")
+        return {'status': 'failed', 'reason': 'Failed to create Note'}
+    
+    def _execute_createCollection(self, action: Dict) -> Dict:
+        """
+        Create a Collection object as session-local resource.
+        
+        Required: value, out
+        Optional: name (stable name for Collection)
         
         Collections store resource IDs (references to Notes/Collections).
         """
-        out_var = action.get('out') or action.get('name')
-        kind = action.get('kind', 'Note')
-        value_arg = action.get('value', None)
-        collection_name = action.get('name')  # Optional stable name for Collections
+        out_var = action.get('out')
+        value_arg = action.get('value')
+        collection_name = action.get('name')
         
         if not out_var:
-            return {'status': 'failed', 'reason': 'create requires out'}
+            return {'status': 'failed', 'reason': 'createCollection requires out'}
         
-        if kind not in ['Note', 'Collection']:
-            return {'status': 'failed', 'reason': f'Invalid kind: {kind}, must be Note or Collection'}
-        
-        # Resolve values for Collection or Note
-        if kind == 'Collection':
-            if value_arg is None:
-                note_ids = []  # Empty collection
-            elif isinstance(value_arg, list):
-                # Resolve each item - if it's a $var, get Note ID from bindings; if literal, create Note
-                note_ids = []
-                for i, item in enumerate(value_arg):
-                    if isinstance(item, str) and item.startswith('$'):
-                        # Variable - get Note ID from bindings
-                        var_name = item[1:]
-                        if var_name not in self.plan_bindings:
-                            logger.warning(f"Variable {item} not bound, skipping")
-                            continue
-                        note_id = self.plan_bindings[var_name]
-                        if isinstance(note_id, str) and note_id.startswith('Note_'):
-                            note_ids.append(note_id)
-                        else:
-                            logger.warning(f"Variable {item} is not a Note, skipping")
+        if value_arg is None:
+            note_ids = []
+        elif isinstance(value_arg, list):
+            note_ids = []
+            for i, item in enumerate(value_arg):
+                if isinstance(item, str) and item.startswith('$'):
+                    var_name = item[1:]
+                    if var_name not in self.plan_bindings:
+                        logger.warning(f"Variable {item} not bound, skipping")
+                        continue
+                    note_id = self.plan_bindings[var_name]
+                    if isinstance(note_id, str) and (note_id.startswith('Note_') or note_id.startswith('Collection_')):
+                        note_ids.append(note_id)
                     else:
-                        # Literal - create Note for it
-                        note_id = self._persist_note(item, f'create_collection_item_{i}')
-                        if note_id:
-                            note_ids.append(note_id)
-                        else:
-                            logger.warning(f"Failed to persist collection item {i}, skipping")
-            elif isinstance(value_arg, str) and value_arg.startswith('$'):
-                # Single variable - get Note ID or list of Note IDs
-                var_name = value_arg[1:]
-                if var_name not in self.plan_bindings:
-                    return {'status': 'failed', 'reason': f'Variable {value_arg} not bound'}
-                bound_value = self.plan_bindings[var_name]
-                if isinstance(bound_value, str) and bound_value.startswith('Note_'):
-                    note_ids = [bound_value]
-                elif isinstance(bound_value, list):
-                    # Assume it's a list of Note IDs
-                    note_ids = bound_value
+                        logger.warning(f"Variable {item} is not a Note/Collection, skipping")
                 else:
-                    return {'status': 'failed', 'reason': f'Variable {value_arg} is not a Note or list'}
-            else:
-                return {'status': 'failed', 'reason': 'Collection value must be list or $variable'}
-            
-            # Create Collection in map_node
-            collection_id = self._create_collection(note_ids, 'create_collection')
-            if collection_id:
-                self._bind_variable(out_var, collection_id)
-                logger.info(f"Created {collection_id} → ${out_var} ({len(note_ids)} Note IDs)")
-                return {'status': 'success', 'value': collection_id}
-            else:
-                logger.error(f"Failed to create Collection")
-                return {'status': 'failed', 'reason': 'Failed to create Collection'}
-            
-        else:  # Note
-            value = self._resolve_value(value_arg) if value_arg is not None else ''
-            format_type = 'json' if isinstance(value, (dict, list)) else 'text'
-            create_topic = f"cognitive/map/note/create"
-            spatial_content = value  # Send raw content - map_node handles metadata
-        
-        # Create spatial resource via map_node
-        try:
-            from zenoh import QueryTarget, ConsolidationMode
-            for reply in self.session.get(
-                create_topic,
-                target=QueryTarget.BEST_MATCHING,
-                consolidation=ConsolidationMode.NONE,
-                timeout=5.0,
-                payload=json.dumps({
-                    'character_name': self.agent_name,
-                    'content': spatial_content,
-                    'format': format_type,
-                    'source_skill': 'create_primitive',
-                    'source_value': str(spatial_content)[:100],
-                    'collection_name': collection_name  # Pass name for Collections
-                }).encode('utf-8')
-            ):
-                if reply.ok:
-                    response = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
-                    if response.get('success'):
-                        info_id = response.get('info_id')
-                        # Bind variable to actual value (Note persistence is handled by map_node)
-                        self._bind_variable(out_var, value)
-                        logger.info(f"Created {kind} spatial resource → ${out_var}, persisted as {info_id}")
-                        return {'status': 'success', 'value': value}
+                    note_id = self._persist_note(item, f'createCollection_item_{i}')
+                    if note_id:
+                        note_ids.append(note_id)
                     else:
-                        logger.error(f'Failed to create {kind} resource: {response.get("error")}')
-                        return {'status': 'failed', 'reason': response.get('error', 'Unknown error')}
-                break
-        except Exception as e:
-            logger.error(f'Error creating {kind} spatial resource: {e}')
-            return {'status': 'failed', 'reason': str(e)}
+                        logger.warning(f"Failed to persist collection item {i}, skipping")
+        elif isinstance(value_arg, str) and value_arg.startswith('$'):
+            var_name = value_arg[1:]
+            if var_name not in self.plan_bindings:
+                return {'status': 'failed', 'reason': f'Variable {value_arg} not bound'}
+            bound_value = self.plan_bindings[var_name]
+            if isinstance(bound_value, str) and (bound_value.startswith('Note_') or bound_value.startswith('Collection_')):
+                note_ids = [bound_value]
+            elif isinstance(bound_value, list):
+                note_ids = bound_value
+            else:
+                return {'status': 'failed', 'reason': f'Variable {value_arg} is not a Note/Collection or list'}
+        else:
+            return {'status': 'failed', 'reason': 'Collection value must be list or $variable'}
         
-        # Fallback: bind value even if spatial creation failed
-        logger.warning(f"Spatial {kind} creation failed, binding locally only")
-        self._bind_variable(out_var, value)
-        return {'status': 'success', 'value': value}
+        collection_id = self._create_collection(note_ids, 'createCollection_primitive')
+        if collection_id:
+            self._bind_variable(out_var, collection_id)
+            logger.info(f"Created {collection_id} → ${out_var} ({len(note_ids)} items)")
+            return {'status': 'success', 'value': collection_id}
+        
+        logger.error(f"Collection creation failed for ${out_var}")
+        return {'status': 'failed', 'reason': 'Failed to create Collection'}
     
     # ==================== Storage Operations ====================
     
@@ -616,43 +585,55 @@ class InfospaceExecutor:
             break
         return None
 
-    def _execute_save(self, action: Dict) -> Dict:
+    def _execute_persist(self, action: Dict) -> Dict:
         """
-        Store value by creating Note object as a spatial resource.
+        Mark a Collection as persistent (saved to filesystem).
         
-        Required: value, out (or variable)
+        Required: target
         
-        Argument types:
-        - value: literal value OR $variable (resolves to content)
-        - out: literal string (variable name, no $ prefix)
-        
-        Creates a persistent Note object containing the value.
-        Map_node handles all metadata (created_at, created_by, etc.).
-        
-        Special case: null values bind to the distinguished Note_null singleton.
+        Once marked persistent, Collection is saved to filesystem on next persist cycle.
         """
-        value = self._resolve_value(action.get('value'))
-        out_var = action.get('out') or action.get('variable')
+        target_arg = action.get('target')
         
-        if not out_var:
-            return {'status': 'failed', 'reason': 'save requires out'}
+        if not target_arg:
+            return {'status': 'failed', 'reason': 'persist requires target'}
         
-        # Bind null values to distinguished Note_null singleton
-        if value is None:
-            self._bind_variable(out_var, "Note_null")
-            logger.info(f"Saved null value → ${out_var} = Note_null")
-            return {'status': 'success', 'value': "Note_null"}
+        if not isinstance(target_arg, str) or not target_arg.startswith('$'):
+            return {'status': 'failed', 'reason': 'persist target must be $variable'}
         
-        # Persist to map_node
-        info_id = self._persist_note(value, 'save_primitive')
-        if info_id:
-            self._bind_variable(out_var, info_id)
-            logger.info(f"Saved Note {info_id} → ${out_var}")
-            return {'status': 'success', 'value': info_id}
+        collection_var = target_arg[1:]
         
-        # Fallback: failed to create Note
-        logger.error(f"Spatial Note creation failed for ${out_var}")
-        return {'status': 'failed', 'reason': 'Failed to create Note'}
+        if collection_var not in self.plan_bindings:
+            return {'status': 'failed', 'reason': f'Variable not bound: {collection_var}'}
+        
+        collection_id = self.plan_bindings[collection_var]
+        
+        if not isinstance(collection_id, str) or not collection_id.startswith('Collection_'):
+            return {'status': 'failed', 'reason': f'Variable {collection_var} is not a Collection'}
+        
+        from zenoh import QueryTarget, ConsolidationMode
+        for reply in self.session.get(
+            f"cognitive/map/collection/persist",
+            target=QueryTarget.BEST_MATCHING,
+            consolidation=ConsolidationMode.NONE,
+            timeout=5.0,
+            payload=json.dumps({
+                'collection_id': collection_id,
+                'character_name': self.agent_name
+            }).encode('utf-8')
+        ):
+            if reply.ok:
+                response = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
+                if response.get('success'):
+                    logger.info(f"Marked {collection_id} as persistent")
+                    return {'status': 'success', 'value': collection_id}
+                else:
+                    logger.error(f'Failed to persist Collection: {response.get("error")}')
+                    return {'status': 'failed', 'reason': response.get('error', 'Unknown error')}
+            break
+        
+        logger.error(f"Collection persist request failed for {collection_id}")
+        return {'status': 'failed', 'reason': 'Failed to mark Collection as persistent'}
     
     def _execute_load(self, action: Dict) -> Dict:
         """

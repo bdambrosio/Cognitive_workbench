@@ -2187,7 +2187,15 @@ class FastAPIActionDisplayNode:
                     if (actionData.requested_target && (!actionData.resolved_target && !actionData.target)) {
                         actionDetails.push(`Requested: ${actionData.requested_target}`);
                     }
-                    if (actionData.value) actionDetails.push(`Value: ${actionData.value}`);
+                    if (actionData.value) {
+                        if (typeLower === 'createnote') {
+                            actionDetails.push(`Created: ${actionData.value}`);
+                        } else if (typeLower === 'createcollection') {
+                            actionDetails.push(`Created: ${actionData.value}`);
+                        } else {
+                            actionDetails.push(`Value: ${actionData.value}`);
+                        }
+                    }
                     // Add scan-specific details
                     if (typeLower === 'scan') {
                         if (actionData.out) actionDetails.push(`Variable: ${actionData.out}`);

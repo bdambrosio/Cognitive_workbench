@@ -1,18 +1,17 @@
 {
   "plan": [
     {
-      "type": "save",
+      "type": "createNote",
       "value": "Python is a high-level, interpreted programming language known for its simplicity and readability. Created by Guido van Rossum in 1991, it emphasizes code readability with significant whitespace. Python supports multiple programming paradigms including procedural, object-oriented, and functional programming.",
       "out": "note1"
     },
     {
-      "type": "save",
+      "type": "createNote",
       "value": "JavaScript is a high-level, interpreted programming language that conforms to the ECMAScript specification. Created by Brendan Eich in 1995, it is primarily used for web development to create interactive web pages. JavaScript supports event-driven, functional, and imperative programming styles.",
       "out": "note2"
     },
     {
-      "type": "create",
-      "kind": "Collection",
+      "type": "createCollection",
       "value": ["$note1", "$note2"],
       "out": "both_languages"
     },

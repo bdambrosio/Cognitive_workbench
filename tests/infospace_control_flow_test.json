@@ -5,7 +5,7 @@
       "value": "Testing infospace control flow: if, while, condition evaluation"
     },
     {
-      "type": "save",
+      "type": "createNote",
       "value": {"score": 85},
       "out": "item1"
     },
@@ -52,7 +52,7 @@
       ]
     },
     {
-      "type": "save",
+      "type": "createNote",
       "value": 0,
       "out": "counter"
     },
@@ -70,7 +70,7 @@
           "value": "Loop iteration"
         },
         {
-          "type": "save",
+          "type": "createNote",
           "value": 999,
           "out": "counter"
         }
@@ -92,7 +92,7 @@
       ]
     },
     {
-      "type": "save",
+      "type": "createNote",
       "value": null,
       "out": "empty_val"
     },
