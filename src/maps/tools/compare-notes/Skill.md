@@ -21,16 +21,19 @@ Support:
 ## Input Format
 
 Accepts:
-- Two Notes (primary comparison)
-- List of Notes (multi-way comparison)
-- Collection reference (compares all members)
+- **Single Note** - returns self-analysis
+- **Two or more Notes** - via Collection variable (recommended)
+- Tool automatically unpacks Collection and compares all member Notes
 
-Expected structure when input is list/collection:
+**Usage Pattern:**
 ```json
-[
-  {"id": "note1", "content": "..."},
-  {"id": "note2", "content": "..."}
-]
+{"type":"create","kind":"Collection","value":["$note1","$note2"],"out":"notes_to_compare"}
+{"type":"apply","target":"compare-notes","value":"$notes_to_compare","out":"comparison"}
+```
+
+Optional focus argument for targeted comparison:
+```json
+{"type":"apply","target":"compare-notes","value":"$notes_to_compare","args":{"focus":"methodology differences"},"out":"comparison"}
 ```
 
 ## Output Format

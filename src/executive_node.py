@@ -2820,6 +2820,15 @@ End your response with </end>
         """Parse goal input from UI and set current goal."""
         try:
             parsed_goal = goal_text.strip().strip('"').strip("'")[6:]
+            
+            # Immediately clear existing plan/activity to interrupt execution
+            self.current_plan = None
+            self.current_activity = None
+            self.plan_state = None
+            self.plan_bindings = {}
+            self.plan_bindings_cache = {}
+            logger.info(f'🛑 {self.character_name} interrupting existing plan for new goal')
+            
             if not self.observations:
                 self._observe()
             self.current_goal = plan_module.Goal(parsed_goal, [self.character_name], description='', termination='')
@@ -2828,7 +2837,6 @@ End your response with </end>
             if self.is_infospace:
                 self._publish_goal(self.current_goal)
                 logger.info(f'🧩 {self.character_name} infospace planning for goal: {parsed_goal}')
-                self._plan_completed("manual goal override")
                 self._plan(self.current_goal)
                 if self.current_plan:
                     self._publish_current_plan()
@@ -2849,8 +2857,7 @@ End your response with </end>
                     logger.info(f'📋 {self.character_name} auto-generated plan with {len(self.current_plan["plan"])} steps')
                 else:
                     logger.warning(f'⚠️ {self.character_name} failed to auto-generate plan for goal: {parsed_goal}')
-            else:
-                self._plan_completed("manual goal override")
+            
             return
         except Exception as e:
             logger.error(f"Goal parsing failed for {self.character_name}: {e}")
@@ -2874,14 +2881,18 @@ End your response with </end>
                 logger.error(f"Invalid plan for {self.character_name}")
                 return
             
-            # Clear existing plan and set new one
-            self._plan_completed("manual plan override")
-            self.current_plan = parsed_plan
-            self.current_plan_prompt = "Manual plan via UI"  # Store indicator of manual plan
+            # Immediately clear existing plan/activity to interrupt execution
+            self.current_plan = None
+            self.current_activity = None
+            self.plan_state = None
             self.plan_bindings = {}
-            logger.info(f'🔄 {self.character_name} cleared plan_bindings for UI-assigned plan')
-            logger.info(f'📋 {self.character_name} assigned UI plan with {len(parsed_plan["plan"])} steps')
             self.plan_bindings_cache = {}
+            logger.info(f'🛑 {self.character_name} interrupting existing plan for new plan')
+            
+            # Set new plan
+            self.current_plan = parsed_plan
+            self.current_plan_prompt = "Manual plan via UI"
+            logger.info(f'📋 {self.character_name} assigned UI plan with {len(parsed_plan["plan"])} steps')
             self.plan_summary_completed = False
             self._publish_current_plan()
             self.plan_state = {

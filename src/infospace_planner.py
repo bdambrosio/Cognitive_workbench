@@ -54,6 +54,26 @@ Tools/Resources: Can be literal "tool-name/resource-name" or "$variable" holding
 Resource IDs: Cannot be referenced directly - use "load" action first to bind to variable
 
 
+# COMMON PATTERNS:
+
+Pattern: Multi-item tool application
+  When you need to apply a tool to multiple Notes (e.g., compare, analyze together):
+  1. Create a Collection containing the Notes
+  2. Apply the tool to the Collection (tool receives all items)
+  
+  Example - Compare two search results:
+  {"type":"create","kind":"Collection","value":["$results_2024","$results_2025"],"out":"both_years"}
+  {"type":"apply","target":"compare-notes","value":"$both_years","out":"comparison"}
+  
+  Tools that work with Collections: compare-notes, summarize-content, extract-entities
+
+Pattern: Optional tool arguments
+  Many tools accept optional "focus" or "mode" parameters via "args" field:
+  {"type":"apply","target":"summarize-content","value":"$doc","args":{"focus":"key findings"},"out":"summary"}
+  
+  Using focus is optional - tools work generically without it, but focus can improve precision.
+
+
 # ACTION SCHEMAS  (each must be valid JSON)
 
 apply — apply a tool/skill to input data (input: Note → output: Note)
