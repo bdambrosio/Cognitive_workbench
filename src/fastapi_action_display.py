@@ -1209,6 +1209,78 @@ class FastAPIActionDisplayNode:
                 border-right: 1px solid #333;
             }
         }
+        
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.7);
+        }
+        
+        .modal-content {
+            background-color: #2b2b2b;
+            margin: 5% auto;
+            padding: 0;
+            border: 1px solid #555;
+            width: 80%;
+            max-width: 900px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.5);
+        }
+        
+        .modal-header {
+            padding: 15px 20px;
+            background-color: #1e1e1e;
+            border-bottom: 1px solid #555;
+            border-radius: 8px 8px 0 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .modal-header h2 {
+            margin: 0;
+            color: #4ecdc4;
+            font-size: 1.2em;
+        }
+        
+        .modal-close {
+            color: #aaa;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: color 0.2s;
+        }
+        
+        .modal-close:hover,
+        .modal-close:focus {
+            color: #fff;
+        }
+        
+        .modal-body {
+            padding: 20px;
+            max-height: 70vh;
+            overflow-y: auto;
+        }
+        
+        .modal-body pre {
+            background-color: #1e1e1e;
+            color: #e0e0e0;
+            padding: 15px;
+            border-radius: 4px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            line-height: 1.5;
+            margin: 0;
+        }
     </style>
 </head>
 <body>
@@ -1337,6 +1409,19 @@ class FastAPIActionDisplayNode:
                     <button onclick="sendText()">Send</button>
                     <div id="sendResult"></div>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Display Modal for formatted content -->
+    <div id="displayModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalTitle">Content Display</h2>
+                <span class="modal-close" onclick="closeDisplayModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <pre id="modalContent"></pre>
             </div>
         </div>
     </div>
@@ -2146,6 +2231,14 @@ class FastAPIActionDisplayNode:
         
         function addActionEntry(actionData) {
             console.log('Adding action entry:', actionData);
+            
+            // Handle display action type - show in popup modal instead of inline
+            const typeLower = (actionData.action_type || '').toLowerCase();
+            if (typeLower === 'display') {
+                showDisplayModal(actionData);
+                return;
+            }
+            
             const entry = document.createElement('div');
             entry.className = 'action-entry';
             
@@ -2153,7 +2246,6 @@ class FastAPIActionDisplayNode:
             const timestamp = latestSimTimeISO ? new Date(latestSimTimeISO).toLocaleTimeString() : new Date().toLocaleTimeString();
             let html = `<span class="timestamp">[${timestamp}]</span> `;
             html += `<span class="character-name">[${actionData.character.toUpperCase()}]</span> `;
-            const typeLower = (actionData.action_type || '').toLowerCase();
             let actorLabel = '';
             if (actionData.is_text_only) {
                 if (typeLower === 'say' && actionData.target) {
@@ -2703,6 +2795,45 @@ class FastAPIActionDisplayNode:
                 console.log('Initial time query failed, waiting for WebSocket updates');
             }
         }
+        
+        // Display Modal Functions
+        function showDisplayModal(actionData) {
+            const modal = document.getElementById('displayModal');
+            const modalTitle = document.getElementById('modalTitle');
+            const modalContent = document.getElementById('modalContent');
+            
+            // Set title with character and target
+            const character = actionData.character || 'Agent';
+            const target = actionData.target || 'User';
+            modalTitle.textContent = `${character} → ${target}`;
+            
+            // Set content from text, value, or llm_response
+            const content = actionData.text || actionData.value || actionData.llm_response || 'No content';
+            modalContent.textContent = content;
+            
+            // Show modal
+            modal.style.display = 'block';
+            
+            // Close on background click
+            modal.onclick = function(event) {
+                if (event.target === modal) {
+                    closeDisplayModal();
+                }
+            };
+        }
+        
+        function closeDisplayModal() {
+            const modal = document.getElementById('displayModal');
+            modal.style.display = 'none';
+            modal.onclick = null;
+        }
+        
+        // Close modal on Escape key
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape') {
+                closeDisplayModal();
+            }
+        });
     </script>
 </body>
 </html>

@@ -334,6 +334,12 @@ end your response with:
             self.handle_collection_add
         )
         
+        # Collection persist queryable (mark Collection as persistent)
+        self.collection_persist_queryable = self.session.declare_queryable(
+            "cognitive/map/collection/persist",
+            self.handle_collection_persist
+        )
+        
         # Terrain queryable
         self.terrain_queryable = self.session.declare_queryable(
             "cognitive/map/terrain",
@@ -1579,6 +1585,62 @@ end your response with:
             }
             query.reply(query.key_expr, json.dumps(error_response).encode('utf-8'))
     
+    def handle_collection_persist(self, query):
+        """
+        Handle marking a Collection as persistent.
+        
+        Topic: cognitive/map/collection/persist
+        Payload: {
+            "collection_id": str,  # Collection to mark as persistent
+            "character_name": str  # Agent performing the persist
+        }
+        
+        Returns: {
+            "success": bool,
+            "collection_id": str
+        }
+        """
+        try:
+            # Parse payload
+            if not query.payload:
+                raise ValueError("No payload provided")
+            
+            payload_bytes = query.payload.to_bytes()
+            payload_str = payload_bytes.decode('utf-8')
+            payload = json.loads(payload_str)
+            
+            collection_id = payload.get('collection_id')
+            character_name = payload.get('character_name')
+            
+            if not collection_id:
+                raise ValueError("Missing collection_id in payload")
+            
+            # Fetch Collection from resource_registry
+            collection = self.world_map.resource_registry.get(collection_id)
+            if not collection:
+                raise ValueError(f"Collection {collection_id} not found")
+            
+            # Mark as persistent
+            collection['properties']['persistent'] = True
+            collection['properties']['persisted_at'] = datetime.now().isoformat()
+            collection['properties']['persisted_by'] = character_name
+            
+            logger.info(f"💾 Marked {collection_id} as persistent by {character_name}")
+            
+            response = {
+                'success': True,
+                'collection_id': collection_id
+            }
+            query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
+            
+        except Exception as e:
+            logger.error(f"Error persisting Collection: {e}")
+            error_response = {
+                'success': False,
+                'error': str(e)
+            }
+            query.reply(query.key_expr, json.dumps(error_response).encode('utf-8'))
+    
     def handle_terrain_query(self, query):
         """Handle terrain queries"""
         try:
@@ -2713,9 +2775,44 @@ end your response with:
                         except Exception as e:
                             logger.error(f"Error restoring Note instances: {e}")
                     
-                    # Collections are session-local only - not restored from world file
-                    # They must be rebuilt by agents during the session
-                    logger.info("📂 Collections are session-local - must be rebuilt by agents")
+                    # Restore persistent Collection instances
+                    if 'collection_instances' in world_data:
+                        try:
+                            # Restore counter
+                            self.collection_counter = world_data.get('collection_counter', 0)
+                            
+                            # Get Collection type from resource registry
+                            try:
+                                collection_type = self.world_map.resource_types.Collection
+                            except AttributeError:
+                                logger.warning("Collection type not available in this map, skipping Collection restoration")
+                                collection_type = None
+                            
+                            if collection_type:
+                                instances = world_data['collection_instances']
+                                for info_id, info_data in instances.items():
+                                    # Reconstruct resource_data structure
+                                    resource_data = {
+                                        'name': info_data['name'],
+                                        'type': collection_type,
+                                        'location': tuple(info_data['location']),
+                                        'description': info_data['description'],
+                                        'remove_on_take': False,
+                                        'properties': info_data.get('properties', {})
+                                    }
+                                    
+                                    # Register in resource_registry
+                                    self.world_map.resource_registry[info_id] = resource_data
+                                    
+                                    # Place in spatial grid
+                                    x, y = info_data['location']
+                                    self.world_map.patches[x][y].resources[info_id] = resource_data
+                                
+                                logger.info(f"📂 Restored {len(instances)} persistent Collection instances, counter at {self.collection_counter}")
+                        except Exception as e:
+                            logger.error(f"Error restoring Collection instances: {e}")
+                    else:
+                        logger.info("📂 No persistent Collections in saved data")
                     
                     logger.info(f"📂 Loaded world data for '{self.world_name}'")
                     
@@ -2754,8 +2851,9 @@ end your response with:
                 }
                 world_data['agents'].append(agent_data)
             
-            # Save Note instances only (Collections are session-local, not persisted)
+            # Save Note and persistent Collection instances
             note_instances = {}
+            collection_instances = {}
             for resource_id, resource_data in self.world_map.resource_registry.items():
                 # Check resource type
                 resource_type = resource_data.get('type')
@@ -2771,12 +2869,23 @@ end your response with:
                     }
                     note_instances[resource_id] = info_serialized
                 elif type_name == 'Collection':
-                    # Skip Collections - they're session-local only
-                    logger.debug(f"Skipping Collection {resource_id} (session-local, not persisted)")
+                    # Save Collections marked as persistent
+                    if resource_data.get('properties', {}).get('persistent'):
+                        info_serialized = {
+                            'name': resource_data.get('name'),
+                            'location': resource_data.get('location'),
+                            'description': resource_data.get('description'),
+                            'properties': resource_data.get('properties', {})
+                        }
+                        collection_instances[resource_id] = info_serialized
+                        logger.debug(f"Saving persistent Collection {resource_id}")
+                    else:
+                        logger.debug(f"Skipping Collection {resource_id} (not marked persistent)")
             
             world_data['note_instances'] = note_instances
             world_data['note_counter'] = self.note_counter
-            # Collections not saved - they must be rebuilt on restart
+            world_data['collection_instances'] = collection_instances
+            world_data['collection_counter'] = self.collection_counter
             
             # Save world map state
             # TODO: Add world map modifications (resources, terrain changes, etc.)

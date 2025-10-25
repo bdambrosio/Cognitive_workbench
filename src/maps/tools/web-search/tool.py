@@ -371,21 +371,30 @@ def tool(value, **kwargs):
         }
     
     if not results:
-        return f"# Search Results for: {value}\n\nNo results found."
+        return json.dumps({
+            'query': value,
+            'results': [],
+            'count': 0
+        })
     
-    # Format as markdown
-    output = [f"# Search Results for: {value}\n"]
-    
-    for i, result in enumerate(results, 1):
+    # Return structured JSON for better processing in infospace
+    result_items = []
+    for result in results:
         url = result.get('url', '')
         domain = result.get('domain', _extract_domain(url))
         extract = result.get('extract', 'No content available')
         
-        output.append(f"## {i}. {domain}")
-        output.append(extract)
-        output.append(f"Source: {url}\n")
+        result_items.append({
+            'domain': domain,
+            'url': url,
+            'content': extract
+        })
     
-    return '\n'.join(output)
+    return json.dumps({
+        'query': value,
+        'results': result_items,
+        'count': len(result_items)
+    }, indent=2)
 
 if __name__ == "__main__":
     from llm_client import ZenohLLMClient

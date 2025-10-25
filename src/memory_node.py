@@ -258,7 +258,7 @@ class ZenohMemoryNode:
                 # Store announcement in short-term memory
                 self.short_term_memory.append(data)
                 logger.info(f'Stored character announcement: {data.get("character_name", "unknown")}')
-            elif action_type == 'say' or action_type == 'response' or action_type == 'think':
+            elif action_type == 'say' or action_type == 'display' or action_type == 'response' or action_type == 'think':
                 source = data.get('source', 'unknown')
                 text = data['text']
                 input = data.get('input', '')
