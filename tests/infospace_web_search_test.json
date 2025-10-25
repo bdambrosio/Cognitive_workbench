@@ -1,7 +1,7 @@
 {
   "plan": [
     {
-      "type": "save",
+      "type": "createNote",
       "value": "weather forecast for Oct 24, 2025 in Berkeley, CA",
       "out": "query"
     },

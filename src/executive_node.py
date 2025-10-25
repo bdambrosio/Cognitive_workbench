@@ -213,6 +213,8 @@ class ZenohExecutiveNode:
         
         # OODA loop state
         self.current_goal = None
+        self.goal_source = None  # Track goal origin: 'ui', 'autonomous', or None
+        self.awaiting_user_input = False  # Pause autonomous behavior after UI goal completion
         self.observations = None
         self.interrupt_pending = False
         self.text_input_queue = []
@@ -699,6 +701,15 @@ class ZenohExecutiveNode:
                         return
                 return
             
+            # If awaiting user input but turn advanced, user is signaling to resume autonomous behavior
+            if self.awaiting_user_input:
+                logger.info(f'▶️ {self.character_name} resuming autonomous behavior (user clicked step/run)')
+                self.awaiting_user_input = False
+                # Clear any lingering UI goal/plan state to ensure fresh autonomous selection
+                self.current_goal = None
+                self.current_plan = None
+                self.goal_source = None
+            
             # Check for active activity and get current step
             previous_step = self.current_step
             previous_goal = self.current_goal
@@ -707,6 +718,10 @@ class ZenohExecutiveNode:
             if self.current_plan:
                 action, status = self._plan_step(self.current_plan)
                 if action is not None:
+                    return
+                # Check if plan completion set awaiting_user_input flag
+                if self.awaiting_user_input:
+                    logger.info(f'⏸️ {self.character_name} awaiting user input after plan completion')
                     return
                 
             # Physiological overrides are now checked at top level (line ~358) before entering OODA loop
@@ -742,6 +757,7 @@ class ZenohExecutiveNode:
 
             if self.current_step:
                 self.current_goal = self._orient(observations, step_rewrite=True)
+                self.goal_source = 'autonomous'
                 self._publish_goal(self.current_goal)
                 logger.info(f'🎯 {self.character_name} oriented to goal: {self.current_goal.to_string()}')
                 action, status = self.plan_and_initiate_execution(self.current_goal, activity_manager=self.activity_manager)
@@ -749,6 +765,7 @@ class ZenohExecutiveNode:
 
             self.current_goal = self._orient(observations, step_rewrite=False)
             if self.current_goal:
+                self.goal_source = 'autonomous'
                 self._publish_goal(self.current_goal)
                 logger.info(f'🎯 {self.character_name} oriented to goal: {self.current_goal.to_string()}')
                 action, status = self.plan_and_initiate_execution(self.current_goal)
@@ -1314,6 +1331,12 @@ end your response with </end>
             # No activity - clear goal (existing behavior)
             self.current_goal = None
             self._publish_goal(self.current_goal)
+        
+        # If goal was from UI, pause autonomous behavior to await next user input
+        if self.goal_source == 'ui':
+            self.awaiting_user_input = True
+            logger.info(f'⏸️ {self.character_name} UI goal completed, awaiting user input')
+        self.goal_source = None
 
         self._publish_current_plan()
         
@@ -1456,7 +1479,7 @@ end your response with </end>
             # Physical world primitives
             'move', 'say', 'think', 'take', 'place', 'inspect', 'use', 'scan',
             # Infospace primitives - Phase 1 & 2
-            'apply', 'create', 'save', 'load', 'store', 'index', 'organize', 'search',
+            'apply', 'createNote', 'createCollection', 'persist', 'load', 'store', 'index', 'organize', 'search',
             'extract', 'filter', 'merge', 'transform',
             'aggregate', 'sort', 'group_by', 'compare', 'map', 'flatten', 'add'
         }
@@ -1588,7 +1611,7 @@ end your response with </end>
             infospace_primitives = {
                 # Core primitives
                 'apply', 'map', 'transform', 'move',
-                'create', 'save', 'load',
+                'createnote', 'createcollection', 'persist', 'load',
                 'index', 'organize', 'search',
                 # Communication
                 'say', 'think'
@@ -2827,6 +2850,8 @@ End your response with </end>
             self.plan_state = None
             self.plan_bindings = {}
             self.plan_bindings_cache = {}
+            self.goal_source = 'ui'
+            self.awaiting_user_input = False
             logger.info(f'🛑 {self.character_name} interrupting existing plan for new goal')
             
             if not self.observations:
@@ -2887,6 +2912,8 @@ End your response with </end>
             self.plan_state = None
             self.plan_bindings = {}
             self.plan_bindings_cache = {}
+            self.goal_source = 'ui'
+            self.awaiting_user_input = False
             logger.info(f'🛑 {self.character_name} interrupting existing plan for new plan')
             
             # Set new plan

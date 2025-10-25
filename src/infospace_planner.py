@@ -34,8 +34,9 @@ map - apply operation to each item in a Collection
 flatten - convert Collection to single Note by concatenating items
 transform - convert data format or structure (whole-value operations only)
 move - change current location or approach a resource
-create - create a Note or Collection object and bind to variable
-save - create Note object from a value and bind to variable
+createNote - create a persistent Note object and bind to variable
+createCollection - create a session-local Collection object and bind to variable
+persist - mark a Collection as persistent (saved to filesystem)
 load - retrieve a persistent Note or Collection by resource ID
 index (organize) - build an embedding index for a Collection
 search - query an indexed store by name
@@ -57,12 +58,12 @@ Resource IDs: Cannot be referenced directly - use "load" action first to bind to
 # COMMON PATTERNS:
 
 Pattern: Multi-item tool application
-  When you need to apply a tool to multiple Notes (e.g., compare, analyze together):
+  When you need to apply a tool to *two or more* Notes (e.g., compare, analyze together):
   1. Create a Collection containing the Notes
   2. Apply the tool to the Collection (tool receives all items)
   
   Example - Compare two search results:
-  {"type":"create","kind":"Collection","value":["$results_2024","$results_2025"],"out":"both_years"}
+  {"type":"createCollection","value":["$results_2024","$results_2025"],"out":"both_years"}
   {"type":"apply","target":"compare-notes","value":"$both_years","out":"comparison"}
   
   Tools that work with Collections: compare-notes, summarize-content, extract-entities
@@ -72,6 +73,20 @@ Pattern: Optional tool arguments
   {"type":"apply","target":"summarize-content","value":"$doc","args":{"focus":"key findings"},"out":"summary"}
   
   Using focus is optional - tools work generically without it, but focus can improve precision.
+
+Pattern: Single vs. Multiple Item Processing
+  Collections are for handling MULTIPLE Notes together. For single Notes, apply tools directly.
+  
+  AVOID - Unnecessary Collection wrapper:
+  {"type":"createCollection","value":["$single_result"],"out":"wrapper"}
+  {"type":"apply","target":"summarize-content","value":"$wrapper","out":"summary"}
+  
+  PREFER - Direct application:
+  {"type":"apply","target":"summarize-content","value":"$single_result","out":"summary"}
+  
+  Use Collections ONLY when you have 2+ Notes to process together:
+  {"type":"createCollection","value":["$result1","$result2","$result3"],"out":"multiple"}
+  {"type":"apply","target":"summarize-content","value":"$multiple","out":"summary"}
 
 
 # ACTION SCHEMAS  (each must be valid JSON)
@@ -97,13 +112,17 @@ transform — convert data format or structure (whole-value) (input: Note → ou
 move — change current location or approach a resource
 {"type":"move","target":"resource-name or {"location": [x,y]}"}
 
-create — create a typed Note or Collection object
-{"type":"create","kind":"Collection","value":["$note1","$note2"],"out":"my_collection"}  # Collection of Note references
-{"type":"create","kind":"Collection","name":"research","value":[],"out":"papers"}  # Named empty Collection
-{"type":"create","kind":"Note","value":"some data","out":"my_note"}  # Note with content
+createNote — create a persistent Note object
+{"type":"createNote","value":"some data","out":"my_note"}
+{"type":"createNote","value":"$variable","out":"new_note"}
 
-save — create Note object from value
-{"type":"save","value":"literal or $value","out":"variable_name"}
+createCollection — create a session-local Collection object
+{"type":"createCollection","value":["$note1","$note2"],"out":"my_collection"}  # Collection of Note references
+{"type":"createCollection","name":"research","value":[],"out":"papers"}  # Named empty Collection
+{"type":"createCollection","value":"$note","out":"single_item"}  # Collection with one item
+
+persist — mark Collection as persistent (saved to filesystem)
+{"type":"persist","target":"$collection"}
 
 load — retrieve a persistent Note or Collection by resource ID
 {"type":"load","resource_id":"Note_123","out":"my_note"}
@@ -181,11 +200,11 @@ Minimal Example (say hello):
 Research Example (multi-step information flow):
 {
   "plan": [
-    {"type": "save","value": "LLM cognitive agents 2025","out": "query"},
+    {"type": "createNote","value": "LLM cognitive agents 2025","out": "query"},
     {"type": "apply","target": "web-search","value": "$query","reason": "find recent work","out": "result1"},
-    {"type": "save","value": "transformer architecture papers","out": "query2"},
+    {"type": "createNote","value": "transformer architecture papers","out": "query2"},
     {"type": "apply","target": "web-search","value": "$query2","reason": "find architecture papers","out": "result2"},
-    {"type": "create","kind": "Collection","value": ["$result1","$result2"],"out": "research_collection"},
+    {"type": "createCollection","value": ["$result1","$result2"],"out": "research_collection"},
     {"type": "index","source": "$research_collection","store_name": "research_memory","index_type": "semantic","fields": {"title":"embed","content":"embed"}},
     {"type": "say","target": "user","value": "Research complete and indexed."}
   ]
@@ -215,10 +234,15 @@ Argument Conventions:
 
 CONSTRAINTS
 - Use only primitives listed above.
-- Variables must be created before use (save, apply, search, or index may bind them).
+- Variables must be created before use (createNote, createCollection, apply, search, or index may bind them).
 - All JSON must be syntactically valid (no comments or trailing commas).
 - Nested steps count toward max_steps = 12.
 - Output only valid JSON.
+
+EFFICIENCY RULES
+- Apply tools directly to Notes when processing single items
+- Create Collections only when you need to process 2+ Notes together
+- Minimize intermediate steps - prefer direct operations over unnecessary wrapping
 
 Respond only with the complete JSON plan for the goal, no other text.
 """
@@ -390,12 +414,12 @@ class InfospacePlanner:
     def _validate_action_fields(self, action_type: str, action: Dict) -> Dict:
         """Validate required fields for action type"""
         required_fields = {
-            # Phase 1
             'apply': ['target', 'reason', 'out'],
             'move': ['target'],
-            'create': ['kind', 'value', 'out'],  # Creates Note/Collection and binds to variable
-            'save': ['value', 'out'],  # Creates Note and binds to variable
-            'load': ['resource_id', 'out'],  # Loads existing Note/Collection by ID
+            'createNote': ['value', 'out'],
+            'createCollection': ['value', 'out'],
+            'persist': ['target'],
+            'load': ['resource_id', 'out'],
             'index': ['source', 'store_name', 'index_type', 'fields'],
             'search': ['store_name', 'query', 'mode', 'limit', 'out'],
             'if': ['condition', 'then'],
@@ -403,16 +427,7 @@ class InfospacePlanner:
             'wait': ['condition'],
             'say': ['target', 'value'],
             'think': ['value'],
-
         }
-        
-        # Special case for save (accept 'out' or legacy 'variable')
-        if action_type == 'save':
-            if 'out' not in action and 'variable' not in action:
-                return {'valid': False, 'reason': 'save requires out'}
-            if 'value' not in action:
-                return {'valid': False, 'reason': 'save requires value'}
-            return {'valid': True}
         
         required = required_fields.get(action_type, [])
         

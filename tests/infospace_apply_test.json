@@ -5,7 +5,7 @@
       "value": "Testing apply primitive with LLM and Python tools"
     },
     {
-      "type": "save",
+      "type": "createNote",
       "value": "Cognitive architectures combine perception, planning, and execution. They enable agents to maintain coherent mental models while adapting.",
       "out": "text"
     },
@@ -17,18 +17,17 @@
       "out": "summary"
     },
     {
-      "type": "save",
+      "type": "createNote",
       "value": "Machine learning uses statistical methods. Deep learning uses neural networks.",
       "out": "note1"
     },
     {
-      "type": "save",
+      "type": "createNote",
       "value": "Deep learning employs multi-layer neural networks.",
       "out": "note2"
     },
     {
-      "type": "create",
-      "kind": "Collection",
+      "type": "createCollection",
       "value": ["$note1", "$note2"],
       "out": "notes"
     },
@@ -40,8 +39,7 @@
       "out": "comparison"
     },
     {
-      "type": "create",
-      "kind": "Collection",
+      "type": "createCollection",
       "value": ["Python is great", "JavaScript is popular", "Python is versatile"],
       "out": "items"
     },

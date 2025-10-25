@@ -5,23 +5,22 @@
       "value": "Testing infospace core primitives: save, create, transform, and whole-value operations"
     },
     {
-      "type": "save",
+      "type": "createNote",
       "value": "Study on cognitive architecture",
       "out": "note1"
     },
     {
-      "type": "save",
+      "type": "createNote",
       "value": "Study on memory systems",
       "out": "note2"
     },
     {
-      "type": "save",
+      "type": "createNote",
       "value": "Study on planning algorithms",
       "out": "note3"
     },
     {
-      "type": "create",
-      "kind": "Collection",
+      "type": "createCollection",
       "value": ["$note1", "$note2", "$note3"],
       "out": "all_studies"
     },
@@ -45,7 +44,7 @@
       ]
     },
     {
-      "type": "save",
+      "type": "createNote",
       "value": [1, 2, 3],
       "out": "numbers"
     },
