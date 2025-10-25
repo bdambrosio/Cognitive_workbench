@@ -39,11 +39,12 @@ createCollection - create a session-local Collection object and bind to variable
 persist - mark a Collection as persistent (saved to filesystem)
 load - retrieve a persistent Note or Collection by resource ID
 index (organize) - build an embedding index for a Collection
-search - query an indexed store by name
+search - query an indexed Collection
 if - conditional branch 
 while - loop until condition false
 wait - pause until condition true
-say - produce output
+say - produce output (inline)
+display - show formatted content (popup)
 think - internal note
 
 # ARGUMENT TYPE CONVENTIONS:
@@ -92,7 +93,7 @@ Pattern: Single vs. Multiple Item Processing
 # ACTION SCHEMAS  (each must be valid JSON)
 
 apply — apply a tool/skill to input data (input: Note → output: Note)
-{"type":"apply","target":"tool-name/resource-name or $tool_var","value":"input text or $data","reason":"purpose","out":"result_variable"}
+{"type":"apply","target":"tool-name/resource-name or $tool_var","value":"input text or $data","reason":"purpose (optional)","out":"result_variable"}
 
 map — apply operation to each item in Collection (input: Collection → output: Collection)
 {"type":"map","target":"$collection","operation":"tool-name or {'tool':'name','args':{}}","out":"result_collection"}
@@ -105,6 +106,10 @@ flatten — convert Collection to single Note by concatenating items (input: Col
 add — add a Note to an existing Collection (mutates Collection in place)
 {"type":"add","target":"$collection","value":"$new_note","out":"collection"}  # out should match target
 {"type":"add","target":"$dialog_history","value":"Hello user","out":"dialog_history"}  # literal value creates new Note
+
+expand — expand a Note containing JSON array into a Collection of Notes (input: Note → output: Collection)
+{"type":"expand","target":"$search_results","out":"results_collection"}  # default field is 'results'
+{"type":"expand","target":"$data","field":"items","out":"items_collection"}  # custom field name
 
 transform — convert data format or structure (whole-value) (input: Note → output: Note)
 {"type":"transform","target":"$data","operation":"flatten|normalize|pivot|reshape","out":"transformed"}
@@ -128,7 +133,7 @@ load — retrieve a persistent Note or Collection by resource ID
 {"type":"load","resource_id":"Note_123","out":"my_note"}
 {"type":"load","resource_id":"Collection_5","out":"items"}
 
-index (organize) — create searchable store with embeddings (Collection becomes indexed)
+index (organize) — create embeddings index for a Collection
 {"type":"index","source":"$collection","index_type":"semantic"}
 {"type":"index","source":"$papers","index_type":"semantic","fields":{"title":"embed","content":"embed"}}  # optional fields
 
@@ -145,8 +150,11 @@ while — loop until condition false
 wait — pause until condition true
 {"type":"wait","condition":{"type":"has_value","target":"$results"},"timeout":30}
 
-say — produce output
+say — produce output (inline display)
 {"type":"say","target":"user","value":"literal text or $variable"}
+
+display — show formatted content in popup (for documents/formatted output)
+{"type":"display","target":"user","value":"$formatted_note"}
 
 think — internal note (logged only)
 {"type":"think","value":"thought text or $variable"}
@@ -205,7 +213,7 @@ Research Example (multi-step information flow):
     {"type": "createNote","value": "transformer architecture papers","out": "query2"},
     {"type": "apply","target": "web-search","value": "$query2","reason": "find architecture papers","out": "result2"},
     {"type": "createCollection","value": ["$result1","$result2"],"out": "research_collection"},
-    {"type": "index","source": "$research_collection","store_name": "research_memory","index_type": "semantic","fields": {"title":"embed","content":"embed"}},
+    {"type": "index","source": "$research_collection","index_type": "semantic","fields": {"title":"embed","content":"embed"}},
     {"type": "say","target": "user","value": "Research complete and indexed."}
   ]
 }
@@ -236,7 +244,7 @@ CONSTRAINTS
 - Use only primitives listed above.
 - Variables must be created before use (createNote, createCollection, apply, search, or index may bind them).
 - All JSON must be syntactically valid (no comments or trailing commas).
-- Nested steps count toward max_steps = 12.
+- Keep plans concise (recommended: 12 steps or fewer).
 - Output only valid JSON.
 
 EFFICIENCY RULES
@@ -274,7 +282,7 @@ class InfospacePlanner:
         
         Args:
             goal: String goal description
-            context: Dict with available_tools, stores, variables, state
+            context: Dict with available_tools, variables, state
             
         Returns:
             Plan dict with 'plan' array of actions, or error dict
@@ -317,7 +325,6 @@ class InfospacePlanner:
     
     def _format_template(self, goal: str, context: Dict) -> str:
         """Format template with goal and context"""
-        stores = context.get('available_stores', [])
         variables = context.get('variables', {})
         
         # Format tools list from available_tools
@@ -329,9 +336,6 @@ class InfospacePlanner:
         else:
             tools_text = "None available"
         
-        # Format stores list
-        stores_text = '\n'.join([f"- {store}" for store in stores]) if stores else "None yet (create with index)"
-        
         # Format variables
         vars_text = '\n'.join([f"- ${k}: {type(v).__name__}" for k, v in variables.items()]) if variables else "None"
         
@@ -342,7 +346,6 @@ class InfospacePlanner:
         filled = self.template
         filled = filled.replace('{{context}}', context_text)
         filled = filled.replace('{{tools}}', tools_text)
-        filled = filled.replace('{{stores}}', stores_text)
         filled = filled.replace('{{variables}}', vars_text)
         filled = filled.replace('{{goal}}', goal)
         
@@ -393,7 +396,7 @@ class InfospacePlanner:
             return {'valid': False, 'reason': 'Plan must be array'}
         
         if len(actions) > 12:
-            return {'valid': False, 'reason': f'Plan too long: {len(actions)} steps (max 12)'}
+            self.logger.warning(f'Plan has {len(actions)} steps (recommended max: 12)')
         
         # Validate each action
         for i, action in enumerate(actions):
@@ -414,18 +417,20 @@ class InfospacePlanner:
     def _validate_action_fields(self, action_type: str, action: Dict) -> Dict:
         """Validate required fields for action type"""
         required_fields = {
-            'apply': ['target', 'reason', 'out'],
+            'apply': ['target', 'out'],
             'move': ['target'],
             'createNote': ['value', 'out'],
             'createCollection': ['value', 'out'],
             'persist': ['target'],
             'load': ['resource_id', 'out'],
-            'index': ['source', 'store_name', 'index_type', 'fields'],
-            'search': ['store_name', 'query', 'mode', 'limit', 'out'],
+            'index': ['source'],
+            'search': ['source', 'query', 'out'],
+            'expand': ['target', 'out'],
             'if': ['condition', 'then'],
             'while': ['condition', 'body'],
             'wait': ['condition'],
             'say': ['target', 'value'],
+            'display': ['target', 'value'],
             'think': ['value'],
         }
         

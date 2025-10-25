@@ -12,6 +12,7 @@ import re
 import importlib.util
 from pathlib import Path
 from typing import Dict, List, Any, Optional
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
@@ -156,12 +157,14 @@ class InfospaceExecutor:
             'organize': self._execute_index,  # Alias for index
             'search': self._execute_search,
             'say': self._execute_say,
+            'display': self._execute_display,
             'think': self._execute_think,
             # Phase 2: Data Operations (whole-value only)
             'transform': self._execute_transform,
             'map': self._execute_map,
             'flatten': self._execute_flatten,
             'add': self._execute_add,
+            'expand': self._execute_expand,
         }
         
         handler = handlers.get(action_type)
@@ -219,8 +222,8 @@ class InfospaceExecutor:
         """
         Apply tool to input data.
         
-        Required: type, target, reason
-        Optional: value (input), args (additional arguments), out (output binding)
+        Required: type, target, out
+        Optional: value (input), reason (documentation), args (additional arguments)
         
         Argument types:
         - target: literal string (tool name) OR $variable (resolves to tool name)
@@ -701,9 +704,9 @@ class InfospaceExecutor:
     
     def _execute_index(self, action: Dict) -> Dict:
         """
-        Create searchable store with embeddings (also callable as 'organize').
+        Create embeddings index for a Collection (also callable as 'organize').
         
-        Store is created using Collection ID as the key. The Collection becomes indexed.
+        Index is created using Collection ID as the key. The Collection becomes searchable.
         
         Required: source, index_type (optional)
         
@@ -711,7 +714,7 @@ class InfospaceExecutor:
         - source: $variable (Collection of Notes to index)
         - index_type: literal string ('semantic' or 'keyword', default 'semantic')
         
-        The Collection ID becomes the store name automatically.
+        The Collection ID is used as the index identifier.
         """
         source_arg = action.get('source')
         index_type = action.get('index_type', 'semantic')
@@ -736,10 +739,10 @@ class InfospaceExecutor:
         if not isinstance(collection_id, str) or not collection_id.startswith('Collection_'):
             return {'status': 'failed', 'reason': f'Variable {collection_var} is not a Collection'}
         
-        # Request indexing from map_node - use Collection ID as store name
+        # Request indexing from map_node using Collection ID
         request = {
             'agent_name': self.agent_name,
-            'collection_id': collection_id,  # Collection ID is also the store name
+            'collection_id': collection_id,
             'index_type': index_type,
             'fields': fields
         }
@@ -752,7 +755,7 @@ class InfospaceExecutor:
         # Wait for response
         response = self._wait_for_response(
             f"map/{self.map_name}/index_response/{self.agent_name}",
-            timeout=5.0  # Embedding generation takes time
+            timeout=15.0  # Embedding generation takes time, especially on first model load
         )
         
         if not response:
@@ -805,10 +808,10 @@ class InfospaceExecutor:
         if not isinstance(collection_id, str) or not collection_id.startswith('Collection_'):
             return {'status': 'failed', 'reason': f'Variable {collection_var} is not a Collection'}
         
-        # Request search from map_node - use Collection ID as store name
+        # Request search from map_node using Collection ID
         request = {
             'agent_name': self.agent_name,
-            'collection_id': collection_id,  # Collection ID is the store name
+            'collection_id': collection_id,
             'query': query,
             'mode': mode,
             'limit': limit,
@@ -865,19 +868,63 @@ class InfospaceExecutor:
         if value is None:
             return {'status': 'failed', 'reason': 'say requires value'}
         
-        # Publish say message to map
-        message = {
-            'agent_name': self.agent_name,
-            'target': target,
-            'content': str(value)
+        # Capitalize 'user' to 'User' for character name
+        if target.lower() == 'user':
+            target = 'User'
+        
+        # Send message to target's sense_data (mirrors physical space send_text_input)
+        sense_data = {
+            'timestamp': datetime.now().isoformat(),
+            'sequence_id': 0,
+            'mode': 'text',
+            'content': json.dumps({
+                'source': self.agent_name,
+                'text': str(value)
+            })
         }
         
         self.session.put(
-            f"map/{self.map_name}/say/{self.agent_name}",
-            json.dumps(message)
+            f"cognitive/{target}/sense_data",
+            json.dumps(sense_data)
         )
         
         logger.info(f"Say [{target}]: {value}")
+        return {'status': 'success', 'value': value}
+    
+    def _execute_display(self, action: Dict) -> Dict:
+        """
+        Display formatted content in popup (similar to say but with popup UI).
+        
+        Required: type, value
+        Optional: target (default: "user")
+        """
+        value = self._resolve_value(action.get('value'))
+        target = action.get('target', 'user')
+        
+        if value is None:
+            return {'status': 'failed', 'reason': 'display requires value'}
+        
+        # Capitalize 'user' to 'User' for character name
+        if target.lower() == 'user':
+            target = 'User'
+        
+        # Send message to target's sense_data (mirrors physical space send_text_input)
+        sense_data = {
+            'timestamp': datetime.now().isoformat(),
+            'sequence_id': 0,
+            'mode': 'text',
+            'content': json.dumps({
+                'source': self.agent_name,
+                'text': str(value)
+            })
+        }
+        
+        self.session.put(
+            f"cognitive/{target}/sense_data",
+            json.dumps(sense_data)
+        )
+        
+        logger.info(f"Display [{target}]: {value}")
         return {'status': 'success', 'value': value}
     
     def _execute_think(self, action: Dict) -> Dict:
@@ -1202,6 +1249,82 @@ class InfospaceExecutor:
             break
         
         return {'status': 'failed', 'reason': 'No response from map_node'}
+    
+    def _execute_expand(self, action: Dict) -> Dict:
+        """
+        Expand a Note containing JSON with an array field into a Collection of Notes.
+        
+        Required: target, out
+        Optional: field (default: 'results')
+        
+        Argument types:
+        - target: $variable (Note containing JSON with array)
+        - field: literal string (name of array field, default 'results')
+        - out: variable name for resulting Collection
+        
+        Example: Expand web-search results into separate Notes
+        """
+        error = self._validate_required_fields(action, 'target', 'out')
+        if error:
+            return {'status': 'failed', 'reason': error}
+        
+        target_arg = action.get('target')
+        field_name = action.get('field', 'results')
+        out_var = action.get('out')
+        
+        # Target must be Note variable
+        if not isinstance(target_arg, str) or not target_arg.startswith('$'):
+            return {'status': 'failed', 'reason': 'expand target must be $variable'}
+        
+        note_var = target_arg[1:]
+        
+        # Get Note ID from bindings
+        if note_var not in self.plan_bindings:
+            return {'status': 'failed', 'reason': f'Note variable not bound: {note_var}'}
+        
+        note_id = self.plan_bindings[note_var]
+        
+        if not isinstance(note_id, str) or not note_id.startswith('Note_'):
+            return {'status': 'failed', 'reason': f'Variable {note_var} is not a Note'}
+        
+        # Get Note content
+        content = self._get_content(note_id)
+        if content is None:
+            return {'status': 'failed', 'reason': f'Note {note_id} has no content'}
+        
+        # Parse JSON
+        if isinstance(content, str):
+            content_obj = json.loads(content)
+        elif isinstance(content, dict):
+            content_obj = content
+        else:
+            return {'status': 'failed', 'reason': 'Note content must be JSON string or dict'}
+        
+        # Extract array field
+        if field_name not in content_obj:
+            return {'status': 'failed', 'reason': f'JSON does not have field: {field_name}'}
+        
+        array_data = content_obj[field_name]
+        if not isinstance(array_data, list):
+            return {'status': 'failed', 'reason': f'Field {field_name} is not an array'}
+        
+        # Create Note for each array element
+        note_ids = []
+        for i, item in enumerate(array_data):
+            item_note_id = self._persist_note(item, f'expand_item_{i}')
+            if item_note_id:
+                note_ids.append(item_note_id)
+        
+        # Create Collection from Notes
+        collection_id = self._create_collection(note_ids, 'expanded_collection')
+        if not collection_id:
+            return {'status': 'failed', 'reason': 'Failed to create Collection'}
+        
+        # Bind to out variable
+        self._bind_variable(out_var, collection_id)
+        logger.info(f"Expanded {note_id}.{field_name} ({len(note_ids)} items) → ${out_var}")
+        
+        return {'status': 'success', 'value': collection_id}
     
     # ==================== Operation Application Helpers ====================
     
@@ -1701,19 +1824,17 @@ class InfospaceExecutor:
             },
             'index': {
                 'type': 'index',
-                'source': 'test_data',
-                'store_name': 'test_store',
+                'source': '$test_data',
                 'index_type': 'keyword'
             },
             'organize': {
                 'type': 'organize',
-                'source': 'test_data',
-                'store_name': 'test_store_org',
+                'source': '$test_data',
                 'index_type': 'keyword'
             },
             'search': {
                 'type': 'search',
-                'store_name': 'test_store',
+                'source': '$test_data',
                 'query': 'test query',
                 'mode': 'keyword',
                 'out': 'test_results',

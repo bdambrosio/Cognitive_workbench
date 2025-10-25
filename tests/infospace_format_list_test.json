@@ -1,0 +1,26 @@
+{
+  "plan": [
+    {
+      "type": "createNote",
+      "value": "Research findings on mycelial networks\n\nMycelial networks can span vast areas\nThey facilitate nutrient sharing between plants\nSome networks are over 1000 years old\nThey enable chemical communication between trees\nThey respond to environmental changes",
+      "out": "research_note"
+    },
+    {
+      "type": "apply",
+      "target": "format",
+      "reason": "Format research findings as numbered outline",
+      "value": "$research_note",
+      "parameters": {
+        "title": "Mycelial Network Research",
+        "style": "outline"
+      },
+      "out": "formatted_research"
+    },
+    {
+      "type": "display",
+      "target": "user",
+      "value": "$formatted_research"
+    }
+  ]
+}
+

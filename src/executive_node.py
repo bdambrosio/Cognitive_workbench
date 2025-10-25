@@ -1093,7 +1093,6 @@ class ZenohExecutiveNode:
                     
                     # Build context for infospace planning
                     context = {
-                        'available_stores': [],  # TODO: Track store names
                         'variables': self.infospace_executor.plan_bindings if self.infospace_executor else {},
                         'situation': user_prompt
                     }
@@ -1174,6 +1173,10 @@ class ZenohExecutiveNode:
             self.plan_bindings = {}  # Clear scan variables for new plan
             logger.info(f'🔄 {self.character_name} cleared plan_bindings for single-action plan')
             logger.info(f'📋 {self.character_name} created single-action plan: {single_action["type"]}')
+            # Clear goal_source for fallback plans - they shouldn't trigger UI goal completion
+            if single_action['type'] == 'sleep' and self.goal_source == 'ui':
+                logger.warning(f'⚠️ {self.character_name} plan generation failed for UI goal, clearing goal_source to allow retry')
+                self.goal_source = None
         self.plan_summary_completed = False  # Reset for new plan
         # Initialize plan identifiers and control-flow events
         self.plan_counter += 1
@@ -1479,9 +1482,9 @@ end your response with </end>
             # Physical world primitives
             'move', 'say', 'think', 'take', 'place', 'inspect', 'use', 'scan',
             # Infospace primitives - Phase 1 & 2
-            'apply', 'createNote', 'createCollection', 'persist', 'load', 'store', 'index', 'organize', 'search',
+            'apply', 'display', 'createNote', 'createCollection', 'persist', 'load', 'index', 'organize', 'search',
             'extract', 'filter', 'merge', 'transform',
-            'aggregate', 'sort', 'group_by', 'compare', 'map', 'flatten', 'add'
+            'aggregate', 'sort', 'group_by', 'compare', 'map', 'flatten', 'add', 'expand'
         }
         if stype in executable_primitives:
             current['idx'] = idx + 1
@@ -1613,8 +1616,10 @@ end your response with </end>
                 'apply', 'map', 'transform', 'move',
                 'createnote', 'createcollection', 'persist', 'load',
                 'index', 'organize', 'search',
+                # Data operations
+                'flatten', 'add', 'expand',
                 # Communication
-                'say', 'think'
+                'say', 'display', 'think'
             }
             
             # Route infospace-specific actions to infospace executor
@@ -1654,8 +1659,8 @@ end your response with </end>
                     'value': display_value
                 }
                 
-                # Add 'text' field for say/think actions (memory_node expects this)
-                if action_type in ('say', 'think'):
+                # Add 'text' field for say/display/think actions (memory_node expects this)
+                if action_type in ('say', 'display', 'think'):
                     action_data['text'] = display_value
                     action_data['source'] = self.character_name
                 
