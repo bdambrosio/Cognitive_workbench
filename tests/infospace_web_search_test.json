@@ -1,0 +1,32 @@
+{
+  "plan": [
+    {
+      "type": "save",
+      "value": "weather forecast for Oct 24, 2025 in Berkeley, CA",
+      "out": "query"
+    },
+    {
+      "type": "apply",
+      "target": "web-search",
+      "value": "$query",
+      "reason": "retrieve weather forecast",
+      "out": "search_results"
+    },
+    {
+      "type": "apply",
+      "target": "summarize-content",
+      "value": "$search_results",
+      "args": {
+        "focus": "weather forecast details and conditions"
+      },
+      "reason": "extract forecast, include source URLs",
+      "out": "summary"
+    },
+    {
+      "type": "say",
+      "target": "user",
+      "value": "$summary"
+    }
+  ]
+}
+

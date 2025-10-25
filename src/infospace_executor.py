@@ -300,13 +300,28 @@ class InfospaceExecutor:
             if not skill_content:
                 return {'status': 'failed', 'reason': f'No SKILL.md content for {tool_name}'}
             
+            # Handle Collection input (list of Note IDs) - dereference and format
+            if isinstance(input_value, list):
+                formatted_notes = []
+                for i, item in enumerate(input_value, 1):
+                    if isinstance(item, str) and item.startswith('Note_'):
+                        # It's a Note ID - fetch content
+                        content = self._get_content(item)
+                        formatted_notes.append(f"## Note {i}\n{content}\n")
+                    else:
+                        # It's already content
+                        formatted_notes.append(f"## Item {i}\n{item}\n")
+                input_str = '\n'.join(formatted_notes)
+            else:
+                input_str = str(input_value)
+            
             # Build prompt with tool instructions + input
             prompt_parts = [
                 "You are executing a cognitive tool. Follow the instructions carefully.\n",
                 "# TOOL INSTRUCTIONS\n",
                 skill_content,
                 "\n# INPUT\n",
-                str(input_value),
+                input_str,
             ]
             
             # Add additional args as context if provided

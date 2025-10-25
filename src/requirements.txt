@@ -29,6 +29,8 @@ colorama>=0.4.6
 noise>=1.2.2
 python-dotenv>=1.1.0
 watchfiles>=1.1.0
+unstructured>=0.10.0
+wordfreq>=3.0.0
 
 # Development and testing (optional)
 pytest>=7.4.0
