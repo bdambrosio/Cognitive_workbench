@@ -60,13 +60,14 @@ class InfospaceExecutor:
         """Clear ephemeral plan state (call at start of new plan)"""
         self.plan_bindings = {}
     
-    def _create_collection(self, note_ids: list, source_context: str) -> Optional[str]:
+    def _create_collection(self, note_ids: list, source_context: str, collection_name: str = '') -> Optional[str]:
         """
         Create a Collection resource in map_node.
         
         Args:
             note_ids: List of Note IDs (e.g., ["Note_2", "Note_3"])
             source_context: Description for logging (e.g., 'map_operation', 'create_collection')
+            collection_name: Optional stable name for the Collection
             
         Returns:
             Collection ID if successful, None if failed
@@ -81,7 +82,8 @@ class InfospaceExecutor:
                 'character_name': self.agent_name,
                 'content': note_ids,  # List of Note IDs
                 'format': 'list',
-                'source_skill': source_context
+                'source_skill': source_context,
+                'collection_name': collection_name
             }).encode('utf-8')
         ):
             if reply.ok:
@@ -117,8 +119,20 @@ class InfospaceExecutor:
             if reply.ok:
                 response = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
                 if response.get('success'):
-                    resource_data = response.get('resource')
-                    content = resource_data.get('properties', {}).get('content')
+                    # Handle both response formats:
+                    # 1. handle_resource_by_name: {'success': True, 'resource': {...}}
+                    # 2. handle_resource_viewer: {'success': True, 'type': '...', 'content': ..., 'metadata': {...}}
+                    if 'resource' in response:
+                        # Format 1: extract content from resource.properties
+                        resource_data = response.get('resource')
+                        if not resource_data:
+                            logger.error(f"Resource {resource_id} returned no data")
+                            return None
+                        content = resource_data.get('properties', {}).get('content')
+                    else:
+                        # Format 2: content is directly in response
+                        content = response.get('content')
+                    
                     return content
                 else:
                     logger.warning(f"Failed to fetch {resource_id}: {response.get('error')}")
@@ -538,10 +552,11 @@ class InfospaceExecutor:
         else:
             return {'status': 'failed', 'reason': 'Collection value must be list or $variable'}
         
-        collection_id = self._create_collection(note_ids, 'createCollection_primitive')
+        collection_id = self._create_collection(note_ids, 'createCollection_primitive', collection_name)
         if collection_id:
             self._bind_variable(out_var, collection_id)
-            logger.info(f"Created {collection_id} → ${out_var} ({len(note_ids)} items)")
+            name_display = f" '{collection_name}'" if collection_name else ""
+            logger.info(f"Created {collection_id}{name_display} → ${out_var} ({len(note_ids)} items)")
             return {'status': 'success', 'value': collection_id}
         
         logger.error(f"Collection creation failed for ${out_var}")
@@ -640,11 +655,12 @@ class InfospaceExecutor:
     
     def _execute_load(self, action: Dict) -> Dict:
         """
-        Load a persistent Note or Collection by resource ID.
+        Load a persistent Note or Collection by resource ID or name.
         
         Required: resource_id, out
         
         Retrieves an existing spatial resource from the map and binds it to a variable.
+        resource_id can be: Note_X, Collection_X, or a collection name.
         """
         resource_id = action.get('resource_id')
         out_var = action.get('out')
@@ -655,21 +671,7 @@ class InfospaceExecutor:
         if not out_var:
             return {'status': 'failed', 'reason': 'load requires out'}
         
-        # Determine resource type from ID
-        if resource_id.startswith('note_') or resource_id.startswith('Note_'):
-            resource_type = 'note'
-        elif resource_id.startswith('collection_') or resource_id.startswith('Collection_'):
-            resource_type = 'collection'
-            # Check if Collection is in local store (new-style Collection_N IDs)
-            if resource_id in self.collections:
-                collection_id = resource_id
-                self._bind_variable(out_var, collection_id)
-                logger.info(f"Loaded {collection_id} → ${out_var} ({len(self.collections[collection_id])} items)")
-                return {'status': 'success', 'value': collection_id}
-        else:
-            return {'status': 'failed', 'reason': f'Invalid resource_id format: {resource_id}'}
-        
-        # Query map_node for the resource using resource by name queryable
+        # Query map_node for the resource (handles IDs and names)
         try:
             from zenoh import QueryTarget, ConsolidationMode
             for reply in self.session.get(
@@ -684,23 +686,23 @@ class InfospaceExecutor:
                         resource_data = response.get('resource')
                         # Extract content from properties field
                         content = resource_data.get('properties', {}).get('content')
-                        kind = 'Note' if resource_type == 'note' else 'Collection'
+                        resource_name = resource_data.get('name', resource_id)
                         
                         # Bind actual content to variable
                         self._bind_variable(out_var, content)
                         
-                        logger.info(f"Loaded {kind} {resource_id} → ${out_var}")
+                        logger.info(f"Loaded {resource_name} → ${out_var}")
                         return {'status': 'success', 'value': content}
                     else:
                         error_msg = response.get('error', 'Unknown error')
-                        logger.error(f'Failed to load {resource_type}: {error_msg}')
+                        logger.error(f'Failed to load resource: {error_msg}')
                         return {'status': 'failed', 'reason': error_msg}
                 break
         except Exception as e:
-            logger.error(f'Error loading {resource_type} {resource_id}: {e}')
+            logger.error(f'Error loading resource {resource_id}: {e}')
             return {'status': 'failed', 'reason': str(e)}
         
-        return {'status': 'failed', 'reason': f'{resource_type.capitalize()} not found: {resource_id}'}
+        return {'status': 'failed', 'reason': f'Resource not found: {resource_id}'}
     
     def _execute_index(self, action: Dict) -> Dict:
         """
