@@ -37,7 +37,7 @@ move - change current location or approach a resource
 createNote - create a persistent Note object and bind to variable
 createCollection - create a session-local Collection object and bind to variable
 persist - mark a Collection as persistent (saved to filesystem)
-load - retrieve a persistent Note or Collection by resource ID
+load - retrieve a persistent Note or Collection by resource ID or name
 index (organize) - build an embedding index for a Collection
 search - query an indexed Collection
 if - conditional branch 
@@ -129,9 +129,10 @@ createCollection — create a session-local Collection object
 persist — mark Collection as persistent (saved to filesystem)
 {"type":"persist","target":"$collection"}
 
-load — retrieve a persistent Note or Collection by resource ID
+load — retrieve a persistent Note or Collection by resource ID or name
 {"type":"load","resource_id":"Note_123","out":"my_note"}
 {"type":"load","resource_id":"Collection_5","out":"items"}
+{"type":"load","resource_id":"shopping_list","out":"list"}  # Load by collection name
 
 index (organize) — create embeddings index for a Collection
 {"type":"index","source":"$collection","index_type":"semantic"}

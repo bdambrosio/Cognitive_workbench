@@ -340,6 +340,12 @@ end your response with:
             self.handle_collection_persist
         )
         
+        # Resource viewer queryable (get Note/Collection content by ID)
+        self.resource_viewer_queryable = self.session.declare_queryable(
+            "cognitive/map/resource/*",
+            self.handle_resource_viewer
+        )
+        
         # Terrain queryable
         self.terrain_queryable = self.session.declare_queryable(
             "cognitive/map/terrain",
@@ -1004,7 +1010,20 @@ end your response with:
             if not resource_name:
                 raise ValueError("No resource name provided")
             
+            # Try direct lookup first (checks resource_registry and patches)
             resource = self.world_map.get_resource_by_name(resource_name)
+            
+            # If not found, try resource_registry directly (for Note/Collection IDs)
+            if not resource and resource_name in self.world_map.resource_registry:
+                resource = self.world_map.resource_registry[resource_name]
+            
+            # If not found and doesn't look like an ID, try named_collections
+            if not resource and not resource_name.startswith(('Note_', 'Collection_')):
+                if resource_name in self.named_collections:
+                    collection_id = self.named_collections[resource_name]
+                    resource = self.world_map.resource_registry.get(collection_id)
+                    logger.info(f"📚 Resolved collection name '{resource_name}' → {collection_id}")
+            
             if resource:
                 # Create JSON-safe version of resource
                 json_safe_resource = resource.copy()
@@ -1635,6 +1654,74 @@ end your response with:
             
         except Exception as e:
             logger.error(f"Error persisting Collection: {e}")
+            error_response = {
+                'success': False,
+                'error': str(e)
+            }
+            query.reply(query.key_expr, json.dumps(error_response).encode('utf-8'))
+    
+    def handle_resource_viewer(self, query):
+        """
+        Handle resource content viewing for UI.
+        
+        Topic: cognitive/map/resource/<resource_id>
+        
+        Returns: {
+            "success": bool,
+            "type": "Note" | "Collection",
+            "content": any,
+            "metadata": {
+                "name": str,
+                "creator": str,
+                "created_at": str,
+                "description": str
+            }
+        }
+        """
+        try:
+            # Extract resource_id from query key
+            key_expr = str(query.key_expr)
+            resource_id = key_expr.split('/')[-1]
+            
+            # Fetch resource from registry
+            resource = self.world_map.resource_registry.get(resource_id)
+            if not resource:
+                raise ValueError(f"Resource {resource_id} not found")
+            
+            # Get resource type
+            resource_type = resource.get('type')
+            type_name = getattr(resource_type, 'name', str(resource_type))
+            
+            # Get content from properties
+            props = resource.get('properties', {})
+            content = props.get('content')
+            
+            # Build metadata
+            metadata = {
+                'name': resource.get('name', resource_id),
+                'creator': props.get('created_by', props.get('creator', 'unknown')),
+                'created_at': props.get('created_at', ''),
+                'description': resource.get('description', ''),
+                'format': props.get('format', 'unknown'),
+                'source_skill': props.get('source_skill', '')
+            }
+            
+            # For Collections, also include item count
+            if type_name == 'Collection':
+                if isinstance(content, list):
+                    metadata['item_count'] = len(content)
+                metadata['persistent'] = props.get('persistent', False)
+            
+            response = {
+                'success': True,
+                'type': type_name,
+                'content': content,
+                'metadata': metadata
+            }
+            query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
+            
+        except Exception as e:
+            logger.error(f"Error fetching resource for viewer: {e}")
             error_response = {
                 'success': False,
                 'error': str(e)

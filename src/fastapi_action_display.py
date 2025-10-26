@@ -737,6 +737,40 @@ class FastAPIActionDisplayNode:
             except Exception as e:
                 return {"success": False, "message": f"Error: {str(e)}"}
         
+        @self.app.get("/api/resource/{resource_id}")
+        async def get_resource_content(resource_id: str):
+            """Get Note or Collection content by resource ID."""
+            try:
+                if not hasattr(self, 'session'):
+                    return {"success": False, "message": "Zenoh session not available"}
+                
+                # Query map_node for resource content
+                query_key = f"cognitive/map/resource/{resource_id}"
+                
+                replies = self.session.get(query_key, target=QueryTarget.BEST_MATCHING, consolidation=ConsolidationMode.NONE, timeout=5.0 if not self.debug else 300.0)
+                for reply in replies:
+                    if hasattr(reply, 'ok') and reply.ok is not None:
+                        payload_bytes = reply.ok.payload.to_bytes()
+                        response = json.loads(payload_bytes.decode('utf-8'))
+                        
+                        if response.get('success'):
+                            return {
+                                "success": True,
+                                "resource_id": resource_id,
+                                "type": response.get('type'),
+                                "content": response.get('content'),
+                                "metadata": response.get('metadata', {})
+                            }
+                        else:
+                            return {"success": False, "message": response.get('error', 'Resource not found')}
+                    break
+                
+                return {"success": False, "message": "No response from map_node"}
+                    
+            except Exception as e:
+                logger.error(f"Error fetching resource {resource_id}: {e}")
+                return {"success": False, "message": f"Error: {str(e)}"}
+        
         @self.app.get("/api/relation/{character_name}/{target_character}")
         async def get_relation_data(character_name: str, target_character: str):
             """Get relation data (discourse_state and tom_model) for a character pair."""
@@ -1280,6 +1314,19 @@ class FastAPIActionDisplayNode:
             font-size: 0.9em;
             line-height: 1.5;
             margin: 0;
+        }
+        
+        /* Resource Link Styles */
+        .resource-link {
+            color: #4a9eff;
+            text-decoration: none;
+            cursor: pointer;
+            border-bottom: 1px dotted #4a9eff;
+        }
+        
+        .resource-link:hover {
+            color: #6ab7ff;
+            border-bottom: 1px solid #6ab7ff;
         }
     </style>
 </head>
@@ -2280,12 +2327,26 @@ class FastAPIActionDisplayNode:
                         actionDetails.push(`Requested: ${actionData.requested_target}`);
                     }
                     if (actionData.value) {
+                        // Check if value is a resource ID (Note_X or Collection_X)
+                        const isResourceId = /^(Note_|Collection_)\d+$/.test(actionData.value);
                         if (typeLower === 'createnote') {
-                            actionDetails.push(`Created: ${actionData.value}`);
+                            if (isResourceId) {
+                                actionDetails.push(`Created: <a href="#" class="resource-link" data-resource-id="${actionData.value}">${actionData.value}</a>`);
+                            } else {
+                                actionDetails.push(`Created: ${actionData.value}`);
+                            }
                         } else if (typeLower === 'createcollection') {
-                            actionDetails.push(`Created: ${actionData.value}`);
+                            if (isResourceId) {
+                                actionDetails.push(`Created: <a href="#" class="resource-link" data-resource-id="${actionData.value}">${actionData.value}</a>`);
+                            } else {
+                                actionDetails.push(`Created: ${actionData.value}`);
+                            }
                         } else {
-                            actionDetails.push(`Value: ${actionData.value}`);
+                            if (isResourceId) {
+                                actionDetails.push(`Value: <a href="#" class="resource-link" data-resource-id="${actionData.value}">${actionData.value}</a>`);
+                            } else {
+                                actionDetails.push(`Value: ${actionData.value}`);
+                            }
                         }
                     }
                     // Add scan-specific details
@@ -2832,6 +2893,94 @@ class FastAPIActionDisplayNode:
         document.addEventListener('keydown', function(event) {
             if (event.key === 'Escape') {
                 closeDisplayModal();
+            }
+        });
+        
+        // Resource Viewer Functions
+        async function showResourceModal(resourceId) {
+            const modal = document.getElementById('displayModal');
+            const modalTitle = document.getElementById('modalTitle');
+            const modalContent = document.getElementById('modalContent');
+            
+            // Set loading state
+            modalTitle.textContent = 'Resource Viewer';
+            modalContent.textContent = 'Loading...';
+            modal.style.display = 'block';
+            
+            try {
+                // Fetch resource content from API
+                const response = await fetch(`/api/resource/${resourceId}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    // Set title with resource ID and type
+                    modalTitle.textContent = `${data.type}: ${resourceId}`;
+                    
+                    // Format content for display
+                    let formattedContent = '';
+                    
+                    // Add metadata
+                    const metadata = data.metadata || {};
+                    if (metadata.creator) formattedContent += `Creator: ${metadata.creator}\\n`;
+                    if (metadata.created_at) formattedContent += `Created: ${metadata.created_at}\\n`;
+                    if (metadata.format) formattedContent += `Format: ${metadata.format}\\n`;
+                    if (metadata.source_skill) formattedContent += `Source: ${metadata.source_skill}\\n`;
+                    if (metadata.item_count !== undefined) formattedContent += `Items: ${metadata.item_count}\\n`;
+                    if (metadata.persistent !== undefined) formattedContent += `Persistent: ${metadata.persistent}\\n`;
+                    formattedContent += '\\n---\\n\\n';
+                    
+                    // Add content (format JSON if needed)
+                    let content = data.content;
+                    
+                    // If content is null or undefined, show placeholder
+                    if (content === null || content === undefined) {
+                        formattedContent += '(empty)';
+                    } else if (typeof content === 'object') {
+                        // Already an object, stringify it
+                        formattedContent += JSON.stringify(content, null, 2);
+                    } else if (typeof content === 'string') {
+                        // Try to parse as JSON if it looks like JSON
+                        if (content.trim().startsWith('{') || content.trim().startsWith('[')) {
+                            try {
+                                const parsed = JSON.parse(content);
+                                formattedContent += JSON.stringify(parsed, null, 2);
+                            } catch (e) {
+                                // Not valid JSON, display as-is
+                                formattedContent += content;
+                            }
+                        } else {
+                            formattedContent += content;
+                        }
+                    } else {
+                        formattedContent += String(content);
+                    }
+                    
+                    modalContent.textContent = formattedContent;
+                } else {
+                    modalTitle.textContent = 'Error';
+                    modalContent.textContent = data.message || 'Failed to load resource';
+                }
+            } catch (error) {
+                modalTitle.textContent = 'Error';
+                modalContent.textContent = `Failed to fetch resource: ${error.message}`;
+            }
+            
+            // Close on background click
+            modal.onclick = function(event) {
+                if (event.target === modal) {
+                    closeDisplayModal();
+                }
+            };
+        }
+        
+        // Add click handlers to resource links (delegated event listener)
+        document.addEventListener('click', function(event) {
+            if (event.target.classList.contains('resource-link')) {
+                event.preventDefault();
+                const resourceId = event.target.getAttribute('data-resource-id');
+                if (resourceId) {
+                    showResourceModal(resourceId);
+                }
             }
         });
     </script>
