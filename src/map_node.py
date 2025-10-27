@@ -342,7 +342,7 @@ end your response with:
         
         # Resource viewer queryable (get Note/Collection content by ID)
         self.resource_viewer_queryable = self.session.declare_queryable(
-            "cognitive/map/resource/*",
+            "cognitive/map/resource/view/*",
             self.handle_resource_viewer
         )
         
@@ -1664,7 +1664,7 @@ end your response with:
         """
         Handle resource content viewing for UI.
         
-        Topic: cognitive/map/resource/<resource_id>
+        Topic: cognitive/map/resource/view/<resource_id>
         
         Returns: {
             "success": bool,

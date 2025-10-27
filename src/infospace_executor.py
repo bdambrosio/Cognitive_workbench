@@ -671,38 +671,16 @@ class InfospaceExecutor:
         if not out_var:
             return {'status': 'failed', 'reason': 'load requires out'}
         
-        # Query map_node for the resource (handles IDs and names)
-        try:
-            from zenoh import QueryTarget, ConsolidationMode
-            for reply in self.session.get(
-                f"cognitive/map/resource/{resource_id}",
-                target=QueryTarget.BEST_MATCHING,
-                consolidation=ConsolidationMode.NONE,
-                timeout=5.0
-            ):
-                if reply.ok:
-                    response = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
-                    if response.get('success'):
-                        resource_data = response.get('resource')
-                        # Extract content from properties field
-                        content = resource_data.get('properties', {}).get('content')
-                        resource_name = resource_data.get('name', resource_id)
-                        
-                        # Bind actual content to variable
-                        self._bind_variable(out_var, content)
-                        
-                        logger.info(f"Loaded {resource_name} → ${out_var}")
-                        return {'status': 'success', 'value': content}
-                    else:
-                        error_msg = response.get('error', 'Unknown error')
-                        logger.error(f'Failed to load resource: {error_msg}')
-                        return {'status': 'failed', 'reason': error_msg}
-                break
-        except Exception as e:
-            logger.error(f'Error loading resource {resource_id}: {e}')
-            return {'status': 'failed', 'reason': str(e)}
+        # Verify resource exists
+        content = self._get_content(resource_id)
+        if content is None:
+            return {'status': 'failed', 'reason': f'Resource not found: {resource_id}'}
         
-        return {'status': 'failed', 'reason': f'Resource not found: {resource_id}'}
+        # Bind resource ID to variable (not content)
+        self._bind_variable(out_var, resource_id)
+        
+        logger.info(f"Loaded {resource_id} → ${out_var}")
+        return {'status': 'success', 'value': resource_id}
     
     def _execute_index(self, action: Dict) -> Dict:
         """

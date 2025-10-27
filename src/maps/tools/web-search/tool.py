@@ -141,13 +141,17 @@ def _extract_subtext(text: str, keywords: List[str], keyword_weights: Dict[str, 
     for s, blk in score:
         if s <= 0:
             continue
-        if total + len(blk) + 1 > max_chars and s < max_score // 10:
+        if total + len(blk) + 1 > max_chars and s < max_score // 6:
             continue
         acc.append(blk)
         total += len(blk) + 1
         if total >= 2*max_chars:
             break
-    return "\n".join(acc)
+    result = "\n".join(acc)
+    if len(result) > max_chars:
+        logger.warning(f"Extracted text exceeds max_chars: {len(result)} > {max_chars}")
+        result = result[:int(max_chars)]
+    return result
 
 def _html_to_text_extract(html: str, query: str, max_chars: int) -> str:
     # partition_html returns elements (titles, narrative text, etc.). We'll join their string forms.
@@ -168,7 +172,7 @@ def _llm_tldr(LLM_client, text: str, query: str, max_chars: int) -> str:
     Your environment should provide LLM_client.generate(...)
     Keep this call shape; fill in your client inside your app.
     """
-    prompt = ["Your task is to analyze the following Text to identify content relevant to the Query.\n",
+    prompt = ["Your task is to analyze the following Text to identify content directly relevant to the Query.\n",
               """Query:
 {{$query}}
 
@@ -178,7 +182,9 @@ Text:
 
 
 Respond using the following JSON format. 
-If there is relevant content, set relevant to 'true' and set extract to the relevant content.
+If there is relevant content, set relevant to 'true' and set extract to the relevant content. 
+You should respond with only the actual relevant content, no commentary, no code fences, no reasoning. 
+This may require rewriting passages of mostly irrelevant content to eliminate irrelevant or peripherally relevantinformation.
 If there is no relevant content, set relevant to 'false'.
 Respond only with the JSON, no commentary, no code fences, no reasoning    :
 {"relevant":<true / false>, "extract":"<only relevant content>"}
@@ -196,11 +202,20 @@ Respond only with the JSON, no commentary, no code fences, no reasoning    :
     except Exception as e:
         traceback.print_exc()
         pass
-    return raw.text
+    logger.error(f"Invalid JSON from site response eval: {raw.text}")
+    return "invalid JSON from site response eval"
 
 # ------------------------------
 # URL processing
 # ------------------------------
+
+def _is_mostly_numbers(text: str) -> bool:
+    """Check if text is mostly digits (frequency dumps, logs, etc.)"""
+    alnum = [c for c in text if c.isalnum()]
+    if not alnum:
+        return False
+    digits = sum(1 for c in alnum if c.isdigit())
+    return digits / len(alnum) > 0.5
 
 def _process_url(url: str, query: str, client, per_url_timeout: float, max_chars: int) -> Dict[str, Any]:
     start = time.time()
@@ -211,6 +226,12 @@ def _process_url(url: str, query: str, client, per_url_timeout: float, max_chars
         extract = _html_to_text_extract(html, query=query, max_chars=max_chars)
         if not extract or len(extract) < 16:
             return {"url": url, "domain": _extract_domain(url), "extract": "", "elapsed_ms": int((time.time()-start)*1000)}
+        
+        # Reject garbage content (frequency dumps, logs, etc.)
+        if _is_mostly_numbers(extract):
+            logger.warning(f"Rejected mostly-numeric content from {url}")
+            return {"url": url, "domain": _extract_domain(url), "extract": "", "elapsed_ms": int((time.time()-start)*1000)}
+        
         tldr = _llm_tldr(client, extract, query=query, max_chars=max_chars)
         return {"url": url, "domain": _extract_domain(url), "extract": tldr or extract, "elapsed_ms": int((time.time()-start)*1000)}
     except Exception:
@@ -279,7 +300,7 @@ Respond only with the rephrased query, no commentary, no code fences, no reasoni
                 url = interleaved[idx]
                 idx += 1
                 per_url_timeout = max(3.0, wall_time_limit - (time.time() - t0) - 1.0)
-                fut = ex.submit(_process_url, url, query, client, per_url_timeout, max_chars)
+                fut = ex.submit(_process_url, url, query, client, per_url_timeout, max_chars/4)
                 logger.info(f"Submitted task for url: {url}")
                 in_flight.append(fut)
 
@@ -359,7 +380,7 @@ def tool(value, **kwargs):
         results = llm_search(
             query=value,
             client=llm_client,
-            max_chars=1000,
+            max_chars=32000,
             max_urls=10,
             max_workers=4,
             wall_time_limit=16.0

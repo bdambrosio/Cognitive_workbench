@@ -330,10 +330,14 @@ class InfospacePlanner:
         
         # Format tools list from available_tools
         if self.available_tools:
-            tools_text = '\n'.join([
-                f"- {name}: {info.get('description', 'No description')}\n  Parameters: {info.get('parameters', 'none')}"
-                for name, info in self.available_tools.items()
-            ])
+            tool_entries = []
+            for name, info in self.available_tools.items():
+                entry = f"- {name}: {info.get('description', 'No description')}\n  Parameters: {info.get('parameters', 'none')}"
+                # Add workflows if present
+                if info.get('workflows'):
+                    entry += f"\n{info['workflows']}"
+                tool_entries.append(entry)
+            tools_text = '\n'.join(tool_entries)
         else:
             tools_text = "None available"
         

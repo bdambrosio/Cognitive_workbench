@@ -745,7 +745,7 @@ class FastAPIActionDisplayNode:
                     return {"success": False, "message": "Zenoh session not available"}
                 
                 # Query map_node for resource content
-                query_key = f"cognitive/map/resource/{resource_id}"
+                query_key = f"cognitive/map/resource/view/{resource_id}"
                 
                 replies = self.session.get(query_key, target=QueryTarget.BEST_MATCHING, consolidation=ConsolidationMode.NONE, timeout=5.0 if not self.debug else 300.0)
                 for reply in replies:
