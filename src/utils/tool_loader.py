@@ -32,6 +32,38 @@ def parse_yaml_frontmatter(content: str) -> Optional[Dict]:
     return metadata
 
 
+def extract_markdown_section(content: str, section_header: str) -> Optional[str]:
+    """
+    Extract a markdown section by header.
+    
+    Args:
+        content: Full markdown content
+        section_header: Header to find (e.g., "## Common Workflows")
+        
+    Returns:
+        Section content (excluding header), or None if not found
+    """
+    lines = content.split('\n')
+    section_lines = []
+    in_section = False
+    
+    for line in lines:
+        # Check if we hit the target section
+        if line.strip() == section_header:
+            in_section = True
+            continue
+        
+        # If in section and hit another header of same/higher level, stop
+        if in_section:
+            if line.startswith('#') and not line.startswith('###'):
+                break
+            section_lines.append(line)
+    
+    if section_lines:
+        return '\n'.join(section_lines).strip()
+    return None
+
+
 def load_tools(tools_dir_path: str) -> Dict[str, Dict]:
     """
     Load all tools from directory and return metadata dict.
@@ -122,6 +154,9 @@ def load_tools(tools_dir_path: str) -> Dict[str, Dict]:
             if f.is_file() and f.name not in ("SKILL.md", "Skill.md")
         ]
         
+        # Extract common workflows section if present
+        workflows = extract_markdown_section(content, "## Common Workflows")
+        
         # Store tool metadata
         tools[tool_name] = {
             'name': tool_name,
@@ -129,6 +164,7 @@ def load_tools(tools_dir_path: str) -> Dict[str, Dict]:
             'type': tool_type,
             'trusted': trusted,
             'tool_md_content': content,
+            'workflows': workflows,
             'path': str(tool_dir.absolute()),
             'python_file': python_file,
             'additional_files': additional_files

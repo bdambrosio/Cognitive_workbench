@@ -215,6 +215,7 @@ class ZenohExecutiveNode:
         self.current_goal = None
         self.goal_source = None  # Track goal origin: 'ui', 'autonomous', or None
         self.awaiting_user_input = False  # Pause autonomous behavior after UI goal completion
+        self.plan_just_generated = False  # Skip execution on same turn as plan generation
         self.observations = None
         self.interrupt_pending = False
         self.text_input_queue = []
@@ -666,6 +667,10 @@ class ZenohExecutiveNode:
                     logger.info(f'📥 {self.character_name} Received plan command from User: "{clean_input}"')
                     self.parse_and_set_plan(clean_input)
                     return  # Don't process as speech
+                elif clean_input.startswith('edit:'):
+                    logger.info(f'📥 {self.character_name} Received edit command from User: "{clean_input}"')
+                    self.parse_and_edit_plan(clean_input)
+                    return  # Don't process as speech
                 elif clean_input.startswith('test:'):
                     logger.info(f'📥 {self.character_name} Received test command from User: "{clean_input}"')
                     if self.is_infospace and self.infospace_executor:
@@ -684,6 +689,10 @@ class ZenohExecutiveNode:
     def _run_ooda_loop(self):
         """Execute the OODA loop: Observe, Orient, Decide, Act."""
         try:
+            # Clear plan generation flag from previous turn
+            plan_was_just_generated = self.plan_just_generated
+            self.plan_just_generated = False
+            
             # Tick local physiology/state using global simulation time if available
             self._ooda_housekeeping()
             # Request fresh situation update for UI
@@ -693,7 +702,7 @@ class ZenohExecutiveNode:
             observations = self._observe()
             # Manual characters skip orient/plan entirely
             if self.manual:
-                if self.current_plan:
+                if self.current_plan and not plan_was_just_generated:
                     action, action_succeeded = self._plan_step(self.current_plan)
                     if action is not None and not action_succeeded:
                         # Action failed, plan index already advanced, will try next step next turn
@@ -715,7 +724,7 @@ class ZenohExecutiveNode:
             previous_goal = self.current_goal
             previous_plan = self.current_plan
 
-            if self.current_plan:
+            if self.current_plan and not plan_was_just_generated:
                 action, status = self._plan_step(self.current_plan)
                 if action is not None:
                     return
@@ -723,6 +732,11 @@ class ZenohExecutiveNode:
                 if self.awaiting_user_input:
                     logger.info(f'⏸️ {self.character_name} awaiting user input after plan completion')
                     return
+            
+            # If plan was just generated, skip autonomous behavior this turn
+            if plan_was_just_generated and self.current_plan:
+                logger.info(f'📋 {self.character_name} plan ready for execution (next turn)')
+                return
                 
             # Physiological overrides are now checked at top level (line ~358) before entering OODA loop
             
@@ -2870,6 +2884,7 @@ End your response with </end>
                 self._plan(self.current_goal)
                 if self.current_plan:
                     self._publish_current_plan()
+                    self.plan_just_generated = True
                     logger.info(f'📋 {self.character_name} generated plan with {len(self.current_plan["plan"])} steps')
                 return
             
@@ -2884,6 +2899,7 @@ End your response with </end>
                 # Publish the generated plan to UI
                 if self.current_plan:
                     self._publish_current_plan()
+                    self.plan_just_generated = True
                     logger.info(f'📋 {self.character_name} auto-generated plan with {len(self.current_plan["plan"])} steps')
                 else:
                     logger.warning(f'⚠️ {self.character_name} failed to auto-generate plan for goal: {parsed_goal}')
@@ -2927,6 +2943,7 @@ End your response with </end>
             logger.info(f'📋 {self.character_name} assigned UI plan with {len(parsed_plan["plan"])} steps')
             self.plan_summary_completed = False
             self._publish_current_plan()
+            self.plan_just_generated = True
             self.plan_state = {
                 'step_stack': plan_module.Stack()
             }
@@ -2935,6 +2952,90 @@ End your response with </end>
         except Exception as e:
             logger.error(f"Plan parsing failed for {self.character_name}: {e}")
             # Plan assignment failed - character continues with existing behavior
+
+    def parse_and_edit_plan(self, edit_text):
+        """Edit existing plan using natural language instruction."""
+        try:
+            if not self.current_plan:
+                logger.warning(f'⚠️ {self.character_name} no current plan to edit')
+                return
+            
+            instruction = edit_text.strip().strip('"').strip("'")[5:].strip()
+            if not instruction:
+                logger.warning(f'⚠️ {self.character_name} empty edit instruction')
+                return
+            
+            logger.info(f'✏️ {self.character_name} editing plan with instruction: {instruction}')
+            
+            current_plan_json = json.dumps(self.current_plan, indent=2)
+            
+            # Build prompt with planning language spec
+            if self.is_infospace:
+                import infospace_planner
+                plan_template = infospace_planner.INFOSPACE_PLAN_TEMPLATE
+                
+                # Format available tools
+                tools_text = ""
+                if self.available_tools:
+                    tools_text = "\n\nAVAILABLE TOOLS:\n"
+                    for tool_name, tool_info in self.available_tools.items():
+                        tools_text += f"- {tool_name}: {tool_info.get('description', 'No description')}\n"
+                
+                prompt = f"""You are editing an infospace plan.
+
+{plan_template}
+{tools_text}
+
+INSTRUCTION: {instruction}
+
+CURRENT PLAN:
+{current_plan_json}
+
+Return ONLY the edited plan as valid JSON, with no explanation or commentary.
+
+EDITED PLAN:"""
+            else:
+                prompt = f"""Edit the following plan according to the instruction provided.
+Return ONLY valid JSON in the same format, with no explanation or commentary.
+Preserve all required fields and use only valid action types.
+
+INSTRUCTION: {instruction}
+
+CURRENT PLAN:
+{current_plan_json}
+
+EDITED PLAN (JSON only):"""
+            
+            response = self.llm_client.generate([prompt], temperature=0.3, is_json=True)
+            if not response or not response.success:
+                logger.error(f'❌ {self.character_name} LLM failed to edit plan')
+                return
+            
+            # Handle response - may already be parsed dict or JSON string
+            if isinstance(response.text, dict):
+                edited_plan = response.text
+            else:
+                edited_plan = json.loads(response.text)
+            
+            # Validate with appropriate validator
+            if self.is_infospace:
+                import infospace_planner
+                valid = infospace_planner.verify_plan(edited_plan)
+            else:
+                valid = plan_module.verify_plan(edited_plan)
+            
+            if not valid:
+                logger.error(f'❌ {self.character_name} edited plan validation failed')
+                return
+            
+            # Update plan
+            self.current_plan = edited_plan
+            self.plan_just_generated = True
+            self._publish_current_plan()
+            logger.info(f'✅ {self.character_name} plan edited successfully, {len(edited_plan["plan"])} steps')
+        except Exception as e:
+            logger.error(f"Plan editing failed for {self.character_name}: {e}")
+            traceback.print_exc()
 
     def generate_speech(self, text_input: str, source: str, mode: str = 'say'):
         """In say mode, this is start of conversation. In respond mode, this is a response in an ongoing dialog"""

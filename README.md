@@ -1,197 +1,260 @@
-# Cognitive workbench
+# Cognitive Workbench
 
-- What's a cognitive actor that can't reason about what it knows?
-- Stage 1 - create an actor that operates in Information space instead of (simulated) physical space.
-- Stage 2 - map the actor's internal representations into Information space. 
+**A cognitive architecture for building LLM-powered agents that plan, reason, and operate over information spaces.**
 
-Early stage 1, code isn't working yet, but Jill has information operators to create, 'see', search, manipulate (via primitives + a simplified Anthropic skills model) information objects.
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+[![License: Research](https://img.shields.io/badge/license-Research-green.svg)](LICENSE)
+[![Status: Active Development](https://img.shields.io/badge/status-active%20development-orange.svg)]()
 
-----------------------------------------------------------------------------------------------------------------------
+---
 
-My new playground for cognitive AI experiments.
-A simplified cognitive framework using Zenoh for parallelism and communication.
-Barest of functionality, this is the initial skeleton, tested enough I believe it is worth building on.
-Multiple characters can be defined in a simple 2 1/2 grid world. you define personality and drives. Each then creates goals, implements plans (simple scripts with control flow - if/then/else and while), maintains beliefs and TOM models of others, etc.
+## What is Cognitive Workbench?
 
-System even has a minimal UI that allows stepping, manual input of simple plans, etc.
+Cognitive Workbench is a research framework for building autonomous agents with persistent memory, goal-directed planning, and tool use. Agents can operate in both **physical spaces** (simulated 2D worlds) and **information spaces** (semantic operations over notes, collections, and web content).
 
-## This is my sketchpad, it is always in motion and rarely in a working state
- DM or post issue for a stable release
+**Key capabilities:**
+- **Autonomous planning**: Agents generate multi-step plans with control flow (conditionals, loops) to achieve goals
+- **Information space operations**: Create, search, index, and manipulate structured information (notes, collections)
+- **Extensible tool system**: Web search, content summarization, entity extraction, and custom tools
+- **Interactive development**: Manual goal setting, plan editing, and step-by-step execution
+- **Parallel execution**: Multi-agent scenarios with Zenoh-based communication
 
-# Background
+Built for researchers exploring cognitive architectures, tool-augmented LLMs, and agent reasoning.
 
-One goal of current work on LLMs is coherent long-term behavior.
+---
 
-In coding, one measure is length of time of productive engagement.
-Techniques include SFT / DPO / GPRO / ... embed policies/... into weights.
+## Quick Start
 
-A more Socratic approach might be to attempt to *ask* what they already know and how they prefer to talk about it.<br>
-**Claim**: LLM base models 'know' more about 'natural' and 'near-natural' worlds than you do.
-	Evidence: they have been trained on Trillions of tokens of text about natural and near-natural worlds: textbooks, scholarly works, fiction, ...<br>
-**Observation**: 
-	Near-natural worlds are Turing complete (mod infinity)
+### Prerequisites
+- Python 3.10+
+- OpenAI API key, or local LLM server (vLLM/Ollama), or OpenRouter account
 
-Claim 2: A simple worldsim is 'near-natural', ie, is an instance of the 'sorts' of ontologies / universes-of-discourse an LLM has encountered in its training corpus.
-	As a result, they have formed an 'innate' 'ontology' of natural worlds.<br>
-	**Innate** - It is not necessarily explicitly represented in the LLM<br>
-	**Ontology** - High dimensional multi-valent relationship model among ...<br>
-**Observation**: 
-	Most interesting problems in near-natural worlds are hard.
-	That doesn't seem to bother my cat.
-	
-**Claim 3**: Part of an LLMs 'knowledge' is the ability to generate excellent near-optimal solutions to many hard problems, including the hardest of all, framing, and the second-hardest, reflection.
-
-**Claim 4**: To work with them in applications related to natural worlds, it is advantageous to speak their language.
-
-**Claim 5**: This even works for reflective tasks like case selection and policy optimization.
-
-# 9/12
-
-Giving a talk at the end of the month, so I've spent much of the last few weeks testing, instrumenting, running evaluations, even though the base system is incomplete and completely undocumented. Sorry. I'll get back to development (including SLAM fun) and documentation after Oct 3. 
-
-### 8/17 - A huge commit, including:
-
-1. activity generation and management - Claim: Planning from scratch is a very rare event. Given a new situation, we adopt remembered roles and activities. 
-The new activity system 'remembers' offline, and generates a set of activity templates.
-Right now only instantiated for the lost.yaml scenario - see scenarios/Joe-activities.json and scenarios/Samantha-activities.json.
-You can compile activities for any fully specified scenario by running python3 activity.py <scenario>/yaml - but note most other scenarios aren't complete! See lost.yaml
-
-2. NPCs and you - two new flags in character specs in scenario.yaml files. Again see lost.yaml
- - manual: true - means the character doesn't have activities, take turns, etc.
- - manual_response: true/false - determines whether a manual character responds when spoken to. NPCs set this to true so the only thing they do is respond when spoken to.
- - in the example below 'User' is defined as a character so other characters can 'see' you. Otherwise they just hear a voice from nowhere.
-```yaml
-  Hermit:
-    manual: true
-    manual_response: false
-    location: Hut1
-    character: |
-      Hermit, a 60-year-old male dresses in tatters and is covered in dirt.
-      I know the secrets of the forest but I'm not sure I can trust you.
-    drives:
-      - "hunger, thirst, and shelter"
-
-  User:
-    manual: true
-    manual_response: true
-    character: |
-      User, a 25-year-old male who wears a blue shirt and jeans..
-      I know way more than I let on.
-    drives:
-      - "conversation, exploring my own thoughts and feelings, and those of others."
-      - "encouraging critical thinking"
-      - "helping others stay safe"
-```
-
-3. More UI, including display of activities and plans. Hierarchy: characters choose an activity. It has a series of steps, each step translates to a goal. plans are generated to carry out goals. plans are executed as a (conditional) series of actions, each of which is displayed sequentially in the main display area. Much of this is nonsensical at the moment (e.g. picking muchrooms to start a fire), but the infrastructure is now in place!
-
-4. Time slider in UI - characters live! the time slider sets a delay between turns, so you can run CG in the background, come back in a few hours, and ask a character what s/he has been doing. I envision providing characters web access and increased inter-character interaction abilities. AI-friends with lives of their own? CG-Sims? I have no idea where this is going. Your thoughts welcome.
-
-5. Probably lots of other stuff, sorry.
-
-## 🚀 Quick Start
-
-### 1. Setup Environment
+### Installation
 
 ```bash
-mkdir Cog
-cd Cog
+# Clone repository
+git clone https://github.com/bdambrosio/Cognitive_workbench.git
+cd Cognitive_workbench
+
 # Create virtual environment
 python3 -m venv zenoh_venv
-
-# Activate virtual environment
-source zenoh_venv/bin/activate
+source zenoh_venv/bin/activate  # On Windows: zenoh_venv\Scripts\activate
 
 # Install dependencies
-pip install -r zenoh_cognitive_framework/requirements.txt
+pip install -r src/requirements.txt
 ```
 
-### 2. Launch the System
+### Configure LLM
 
-First, be sure you edit the scenario you want to run to use the proper llm.
-Scenarios are in Cognitive_workbench/scenarios (but maps are in src/maps, I should fix that)
-
-The system supports OpenAI and OpenRouter as well as a local option on port 5000
-scenarios are in yaml format, the first few lines look like:
+Edit `scenarios/jill.yaml` to set your LLM provider:
 
 ```yaml
-map: forest.py
-# Cognitive Workbench Configuration
+# For OpenAI
+llm_config:
+  server_name: "openai"
+  model_name: "gpt-4.1"
+
+# For local vLLM
 llm_config:
   server_name: "vllm"
   model_name: "llama3.3-70B"
 ```
-model doesn't actually matter for vllm, it will get model from server. I've been using llama3.3-70B-FP8. Other reasoning models pbly won't work unless you shut off reasoning.
 
+Set your API key (if using OpenAI/OpenRouter):
 ```bash
-# Activate virtual environment (if not already active)
-source zenoh_venv/bin/activate
-
-# Launch all nodes
-cd src
-python3 launcher.py lost.yaml --ui
-# watch for 'Reuse existing world' message (if it finds saves for this scenario). probably safest to answer no, this often fails at the moment.
+export OPENAI_API_KEY='your-key-here'
 ```
 
-### 3. Use the System
+### Launch
 
-A browser tab should open (localhost:3000) with a minimal UI.
-The main panel lists actions characters perform and the results.
-The left panel allows inspection. Click on a character name and 
-- its current goal will be displayed above the main panel
-- below in the left panel are a set of tabs:
-  - plan displays its current_plan
-  - view displays its current report from the map
-  - this will be expanded to show inventory, TOM, plan history and analysis, ... work in progress
-The bottom, in addition to the control buttons, contains an entry area.
-- A small entry area for a character name
-- A larger text area for chatting with that character. type text and press send. The named character will usually answer.
-- You can also start with goal: or plan: to give the character a new goal or a plan. The plan text format is a bit fragile.
-Characters run in parallel. 'Step' gives every character a single turn. Run is just a loop calling step repeatedly.
-Condition testing for an if or while does not count as a step. 
+```bash
+cd src
+python3 launcher.py ../scenarios/jill.yaml --ui
+```
 
-Shutdown button or ^C on console shuts everything down (15-20 secs, be patient).
+A browser tab will open at `localhost:3000` with the interactive UI. Click **Step** to advance the simulation, or enter goals in the chat interface.
 
-Word of caution: debugging is hard because if you set a breakpoint a character will time out and be deemed unresponsive, and dropped from turn manager in launcher.py. Should pbly add a debug mode to launch that disables that, but there are timeouts in zenoh queryables too. tbd. Ideas welcome.
+---
 
-## 📁 Project Structure
+## Core Concepts
+
+### Information Space (Infospace)
+
+Agents can operate over **semantic information** rather than just physical actions:
+
+- **Notes**: Persistent text/data objects with metadata
+- **Collections**: Ordered sets of Notes/Collections
+- **Primitives**: createNote, createCollection, load, persist, flatten, add, expand
+- **Operations**: index (RAG embeddings), search (semantic), transform, map
+
+Example agent goal: *"Search the web for transformer papers, create a collection, index it, and find papers about attention mechanisms"*
+
+### Planning System
+
+Agents generate **structured JSON plans** with:
+- **Primitives**: Core operations (createNote, search, say, display)
+- **Tools**: Extensible skills (web-search, summarize-content, parse-json, edit-text)
+- **Control flow**: Conditionals (`if`), loops (`while`), error handling
+- **Variables**: Plan-local bindings (`$note`, `$results`)
+
+Plans can be:
+- Auto-generated from natural language goals
+- Manually edited via `edit:` command
+- Stepped through interactively in the UI
+
+### Tool System
+
+Tools are defined as `Skill.md` files with YAML frontmatter:
+
+```yaml
+---
+name: web-search
+type: python
+description: Search the web using Google CSE
+parameters: query (required)
+---
+```
+
+Types:
+- **prompt_augmentation**: LLM-based tools (summarize-content, compare-notes)
+- **python**: Code execution tools (web-search, format)
+
+### Architecture
+
+**Shared Nodes:**
+- **FastAPI UI**: Web interface for monitoring and interaction
+- **Map Node**: World state, spatial resources, turn management
+- **LLM Service** (optional): Centralized LLM API access
+
+**Per-Character Nodes:**
+- **Executive Node**: OODA loop, planning, decision-making
+- **Memory Node**: Conversation history, entity models, RAG storage
+- **Infospace Executor**: Primitive execution, tool invocation
+
+All nodes communicate via **Zenoh** pub/sub and queryables.
+
+---
+
+## Example Usage
+
+### Information Research Assistant
+
+```python
+# Launch Jill (configured for infospace)
+python3 launcher.py ../scenarios/jill.yaml --ui
+```
+
+In the UI chat, enter:
+```
+goal: search the web for Berkeley weather Oct 26 2025, summarize results, and report to user
+```
+
+Jill will:
+1. Generate a plan (web-search → summarize-content → say)
+2. Execute each step
+3. Display results in the UI
+
+### Interactive Planning
+
+```
+goal: create a note about AI safety
+edit: make it more detailed and add references
+edit: organize into bullet points
+```
+
+The `edit:` command uses the full planning template to intelligently modify plans.
+
+### Physical World Simulation
+
+```python
+# Launch multi-character scenario
+python3 launcher.py ../scenarios/lost.yaml --ui
+```
+
+Characters navigate a 2D world, manage physiological states (hunger, thirst), select activities, and interact with each other.
+
+---
+
+## Development Status
+
+**Active features:**
+- ✅ Infospace primitives (12 primitives)
+- ✅ Tool system (9 built-in tools)
+- ✅ Web UI with plan editing
+- ✅ Note/Collection viewer
+- ✅ Multi-agent parallelism
+- ✅ Physical world simulation
+
+**In progress:**
+- 🚧 Advanced reflection and learning
+- 🚧 Cross-agent information sharing
+- 🚧 SLAM for spatial awareness
+- 🚧 Better error recovery
+
+**Known limitations:**
+- Plan validation can be strict (use `edit:` to iterate)
+- World save/load is fragile
+- Debugging requires disabling timeouts
+- Documentation incomplete (see `Docs/` for details)
+
+---
+
+## Documentation
+
+- [Implementation Status](Docs/IMPLEMENTATION_STATUS.md)
+- [Infospace Architecture](Docs/SPACEMAP_ARCHITECTURE.md)
+- [Map Node API](Docs/MAP_NODE_API_ANALYSIS.md)
+- Research context and claims: See [BACKGROUND.md](BACKGROUND.md)
+
+---
+
+## Contributing
+
+This is a research project in active development. Contributions welcome:
+
+1. **Issues**: Bug reports and feature requests
+2. **Pull requests**: Code improvements (test thoroughly!)
+3. **Ideas**: Architectural feedback and use cases
+
+**Development notes:**
+- Most complexity is in `executive_node.py` (OODA loop), `infospace_executor.py` (primitives), and `map_node.py` (world state)
+- Zenoh timeouts can interfere with debugging - set longer timeouts or disable turn management in debug mode
+- The UI uses HTMX + vanilla JS (may migrate to React)
+
+---
+
+## Citation
+
+If you use Cognitive Workbench in research, please cite:
+
+```
+@software{cognitive_workbench,
+  author = {Bruce D'Ambrosio},
+  title = {Cognitive Workbench: A Framework for LLM-Powered Cognitive Agents},
+  year = {2024-2025},
+  url = {https://github.com/bdambrosio/Cognitive_workbench}
+}
+```
+
+---
+
+## License
+
+Provided as-is for educational and research purposes. See [LICENSE](LICENSE) for details.
+
+---
+
+## Research Context
+
+**Core hypothesis**: LLMs have implicit knowledge of "near-natural" world ontologies from training. By providing a cognitively-inspired architecture (OODA, planning, memory, tools), we can build agents that leverage this knowledge for coherent long-term behavior.
+
+For detailed background and claims, see [BACKGROUND.md](BACKGROUND.md).
+
+---
+
+## Contact
+
+Questions, ideas, or collaboration? Open an issue or reach out via GitHub.
 
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/bdambrosio/Cognitive_workbench)
 
-
-## 🎯 Features
-
-- **Multi-core performance**: Each character is modeled as multiple zenoh nodes. Each zenoh node runs as a separate Python job
-- **Simple communication**: Zenoh pub/sub and queryables (simple? hmm)
-- **Built-in storage**: json / files, maybe migrate to Zenoh's storage capabilities in future.
-- **Easy deployment**: Just Python processes, no complex configuration (tried ROS2 earlier, bad idea)
-- **Fault tolerance**: Automatic reconnection and recovery
-- **Standard Python**: except for HTMX/js ui (may move this to React later to better support modularity as UI complexity increases)
-
-## 🔧 Architecture
-
-The workbench consists of these nodes, each running as a separate process:
-
-1. **Fastapi_action_display Node** - Shared - horrible name for UI
-2. **Map Node** - Shared - simple 2D world
-3. **LLM Service Node** - Shared - Provides LLM API access via Zenoh pub/sub - uses futures, but actually not needed since vllm / openai / openrouter can all handle simultaneous requests. refactoring needed
-4. **Executive Node** - per character, overall orchestration for a character.
-5. **Memory Node** - per character, provides memory services and persistent storage using json format files. (aside - 'memory', what a simple word for the heart of cognition.
-6. **Situation node** - per character, manages current external environment interface.
-7. **Sense Node** - per character - handles sensory input and publishes perception data - mostly a stub right now, this, like memory, is where most of the complexity lies.
-
-## 📚 Documentation
-
-Ain't none yet but what you see here. 
-
-## 📝 License
-
-This framework is provided as-is for educational and research purposes.
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test thoroughly
-5. Submit a pull request 
