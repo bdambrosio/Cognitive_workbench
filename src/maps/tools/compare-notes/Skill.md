@@ -27,13 +27,13 @@ Accepts:
 
 **Usage Pattern:**
 ```json
-{"type":"create","kind":"Collection","value":["$note1","$note2"],"out":"notes_to_compare"}
-{"type":"apply","target":"compare-notes","value":"$notes_to_compare","out":"comparison"}
+{"type":"createCollection","value":["$note1","$note2"],"out":"notes_to_compare"}
+{"type":"compare-notes","value":"$notes_to_compare","out":"comparison"}
 ```
 
 Optional focus argument for targeted comparison:
 ```json
-{"type":"apply","target":"compare-notes","value":"$notes_to_compare","args":{"focus":"methodology differences"},"out":"comparison"}
+{"type":"compare-notes","value":"$notes_to_compare","args":{"focus":"methodology differences"},"out":"comparison"}
 ```
 
 ## Output Format

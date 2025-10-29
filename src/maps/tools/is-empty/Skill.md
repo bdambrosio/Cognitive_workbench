@@ -34,12 +34,12 @@ Returns a Note containing:
 
 **Basic validation:**
 ```json
-{"type":"apply","target":"is-empty","value":"$result","out":"is_empty"}
+{"type":"is-empty","value":"$result","out":"is_empty"}
 ```
 
 **Used in conditional:**
 ```json
-{"type":"apply","target":"is-empty","value":"$search_results","out":"no_results"}
+{"type":"is-empty","value":"$search_results","out":"no_results"}
 ```
 
 ## Guidelines

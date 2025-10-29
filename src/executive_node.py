@@ -185,22 +185,28 @@ class ZenohExecutiveNode:
         
         # Detect infospace and initialize infospace executor if needed
         self.is_infospace = self.character_config.get('is_infospace', False)
+        self.map_name = self.character_config.get('map_name', 'infolab' if self.is_infospace else 'default')
         self.infospace_executor = None
         self.available_tools = {}
+        
+        # Initialize unified planner
+        from unified_planner import UnifiedPlanner
+        world_type = 'infospace' if self.is_infospace else 'physical'
+        self.planner = UnifiedPlanner(
+            llm_client=self.llm_client,
+            world_type=world_type,
+            map_name=self.map_name,
+            logger_instance=logger
+        )
+        self.available_tools = self.planner.available_tools
+        
         if self.is_infospace:
             from infospace_executor import InfospaceExecutor
-            from utils.tool_loader import load_tools
             
-            # Load tools from directory
-            tools_dir = os.path.join(os.path.dirname(__file__), 'maps', 'tools')
-            self.available_tools = load_tools(tools_dir)
-            logger.info(f'🧩 Loaded {len(self.available_tools)} tools for infospace')
-            
-            map_name = self.character_config.get('map_name', 'infolab')
             self.infospace_executor = InfospaceExecutor(
                 character_name,
                 self.session,
-                map_name,
+                self.map_name,
                 self.llm_client,
                 self.available_tools
             )
@@ -685,6 +691,7 @@ class ZenohExecutiveNode:
             # Normal dialog processing
             logger.info(f'📥 {self.character_name} Processing text input: "{text_input}" (source: {source})')
             self.generate_speech(text_input, source, mode='respond')
+            self.plan_just_generated = True  # Skip action execution this turn
         
     def _run_ooda_loop(self):
         """Execute the OODA loop: Observe, Orient, Decide, Act."""
@@ -1098,34 +1105,27 @@ class ZenohExecutiveNode:
             if self.is_infospace and self.infospace_executor:
                 self.infospace_executor.clear_plan_state()
             
-            # Dispatch to appropriate planner
+            # Use unified planner
             if not self.shutdown_requested:
+                goal_text = goal.name + (': ' + goal.description if goal.description != goal.name else '')
+                
+                # Build context
                 if self.is_infospace:
-                    # Use infospace planner
-                    from infospace_planner import InfospacePlanner
-                    planner = InfospacePlanner(self.llm_client, self.available_tools, logger)
-                    
-                    # Build context for infospace planning
                     context = {
                         'variables': self.infospace_executor.plan_bindings if self.infospace_executor else {},
                         'situation': user_prompt
                     }
-                    
-                    plan_candidate = planner.generate_plan(
-                        goal=goal.name + (': ' + goal.description if goal.description != goal.name else ''),
-                        context=context
-                    )
                 else:
-                    # Use physical planner
-                    plan_candidate = generate_plan_with_context(
-                        character=self,
-                        current_activity=self.current_activity,
-                        goal_text=goal.name+(': '+goal.description if goal.description != goal.name else ''),
-                        prompt_text=user_prompt,
-                        percepts_at_plan=None,
-                        server_name=os.getenv('CWB_LLM_SERVER', 'vllm'),
-                        model_name=os.getenv('CWB_LLM_MODEL', 'llama3.3-70B-instruct')
-                    )
+                    context = {
+                        'character': self,
+                        'current_activity': self.current_activity,
+                        'situation': user_prompt,
+                        'percepts': None,
+                        'server_name': os.getenv('CWB_LLM_SERVER', 'vllm'),
+                        'model_name': os.getenv('CWB_LLM_MODEL', 'llama3.3-70B-instruct')
+                    }
+                
+                plan_candidate = self.planner.generate_plan(goal=goal_text, context=context)
             else:
                 plan_candidate = None
 
@@ -1503,6 +1503,20 @@ end your response with </end>
         if stype in executable_primitives:
             current['idx'] = idx + 1
             return step
+        
+        # Check if step type is a tool (direct tool invocation)
+        if self.is_infospace and stype in self.available_tools:
+            # Convert tool invocation to apply format for execution
+            tool_step = {
+                'type': 'apply',
+                'target': stype,
+                'value': step.get('value'),
+                'args': step.get('args', {}),
+                'out': step.get('out'),
+                'reason': step.get('reason', '')
+            }
+            current['idx'] = idx + 1
+            return tool_step
 
         elif stype == 'while':
             body = step.get('body', [])

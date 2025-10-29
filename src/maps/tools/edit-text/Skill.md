@@ -34,22 +34,22 @@ Returns a new Note containing the edited text.
 
 **Simple replacement:**
 ```json
-{"type":"apply","target":"edit-text","value":"$shopping_list","args":{"instruction":"change 'milk' to 'almond milk'"},"out":"updated_list"}
+{"type":"edit-text","value":"$shopping_list","args":{"instruction":"change 'milk' to 'almond milk'"},"out":"updated_list"}
 ```
 
 **Content addition:**
 ```json
-{"type":"apply","target":"edit-text","value":"$document","args":{"instruction":"add a table of contents at the beginning"},"out":"doc_with_toc"}
+{"type":"edit-text","value":"$document","args":{"instruction":"add a table of contents at the beginning"},"out":"doc_with_toc"}
 ```
 
 **Style changes:**
 ```json
-{"type":"apply","target":"edit-text","value":"$draft","args":{"instruction":"make the tone more formal"},"out":"formal_version"}
+{"type":"edit-text","value":"$draft","args":{"instruction":"make the tone more formal"},"out":"formal_version"}
 ```
 
 **Restructuring:**
 ```json
-{"type":"apply","target":"edit-text","value":"$notes","args":{"instruction":"organize into bullet points by topic"},"out":"organized_notes"}
+{"type":"edit-text","value":"$notes","args":{"instruction":"organize into bullet points by topic"},"out":"organized_notes"}
 ```
 
 ## Guidelines

@@ -86,6 +86,15 @@ def load_tools(tools_dir_path: str) -> Dict[str, Dict]:
     
     tools = {}
     
+    # Primitive action names that tools cannot collide with
+    primitive_names = {
+        'move', 'say', 'think', 'take', 'place', 'inspect', 'use', 'scan',
+        'apply', 'display', 'createNote', 'createCollection', 'persist', 'load', 'index', 'organize', 'search',
+        'extract', 'filter', 'merge', 'transform',
+        'aggregate', 'sort', 'group_by', 'compare', 'map', 'flatten', 'add', 'expand',
+        'while', 'if', 'wait', 'sleep'
+    }
+    
     # Scan immediate subdirectories
     for tool_dir in sorted(tools_dir.iterdir()):
         if not tool_dir.is_dir():
@@ -130,6 +139,41 @@ def load_tools(tools_dir_path: str) -> Dict[str, Dict]:
             logger.warning(f"Duplicate tool name '{tool_name}' in {tool_dir}, skipping")
             continue
         
+        # Check for name collision with primitives
+        if tool_name in primitive_names:
+            logger.warning(f"Tool name '{tool_name}' collides with primitive action name - tool will shadow primitive")
+        
+        # Store tool metadata
+        
+        # For plan tools, load plan.json file
+        plan_data = None
+        if tool_type == 'plan':
+            # Look for plan.json or tool.json
+            plan_file = tool_dir / 'plan.json'
+            if not plan_file.exists():
+                plan_file = tool_dir / 'tool.json'
+            
+            if not plan_file.exists():
+                logger.error(f"Plan tool {tool_name} missing plan.json or tool.json, skipping")
+                continue
+            
+            # Load and parse plan JSON
+            import json as json_lib
+            with open(plan_file, 'r', encoding='utf-8') as f:
+                plan_data = json_lib.load(f)
+            
+            # Validate plan structure
+            if 'plan' not in plan_data:
+                logger.error(f"Plan tool {tool_name} plan.json missing 'plan' field, skipping")
+                continue
+            
+            if 'out' not in plan_data:
+                logger.error(f"Plan tool {tool_name} plan.json missing 'out' field, skipping")
+                continue
+            
+            plan_steps = plan_data.get('plan', [])
+            logger.info(f"Plan tool {tool_name}: {len(plan_steps)} steps")
+        
         # For Python tools, find Python file and validate trust
         python_file = None
         if tool_type == 'python':
@@ -157,7 +201,6 @@ def load_tools(tools_dir_path: str) -> Dict[str, Dict]:
         # Extract common workflows section if present
         workflows = extract_markdown_section(content, "## Common Workflows")
         
-        # Store tool metadata
         tools[tool_name] = {
             'name': tool_name,
             'description': tool_description,
@@ -167,7 +210,8 @@ def load_tools(tools_dir_path: str) -> Dict[str, Dict]:
             'workflows': workflows,
             'path': str(tool_dir.absolute()),
             'python_file': python_file,
-            'additional_files': additional_files
+            'additional_files': additional_files,
+            'plan_data': plan_data
         }
         
         trust_info = " [TRUSTED]" if trusted else ""

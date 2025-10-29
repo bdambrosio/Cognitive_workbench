@@ -38,17 +38,17 @@ Returns a Note containing:
 
 **Simple substring check:**
 ```json
-{"type":"apply","target":"contains-pattern","value":"$text","args":{"pattern":"error"},"out":"has_error"}
+{"type":"contains-pattern","value":"$text","args":{"pattern":"error"},"out":"has_error"}
 ```
 
 **Regex pattern match:**
 ```json
-{"type":"apply","target":"contains-pattern","value":"$email","args":{"pattern":"^[a-z]+@example\\.com$","match_type":"regex"},"out":"is_valid_email"}
+{"type":"contains-pattern","value":"$email","args":{"pattern":"^[a-z]+@example\\.com$","match_type":"regex"},"out":"is_valid_email"}
 ```
 
 **Exact match:**
 ```json
-{"type":"apply","target":"contains-pattern","value":"$status","args":{"pattern":"complete","match_type":"exact"},"out":"is_complete"}
+{"type":"contains-pattern","value":"$status","args":{"pattern":"complete","match_type":"exact"},"out":"is_complete"}
 ```
 
 ## Match Types

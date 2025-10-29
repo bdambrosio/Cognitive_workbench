@@ -9,6 +9,7 @@ import json
 import time
 import logging
 import re
+import traceback
 import importlib.util
 from pathlib import Path
 from typing import Dict, List, Any, Optional
@@ -431,6 +432,11 @@ class InfospaceExecutor:
             # Tool returned structured response
             logger.info(f"Python tool '{tool_name}' completed with status: {result.get('status')}")
             return result
+        elif isinstance(result, str) and result.startswith('Error:'):
+            # Tool returned error string
+            error_msg = result
+            logger.error(f"Python tool '{tool_name}' failed: {error_msg}")
+            return {'status': 'failed', 'reason': error_msg}
         else:
             # Tool returned raw value
             logger.info(f"Python tool '{tool_name}' completed")
@@ -1657,8 +1663,9 @@ class InfospaceExecutor:
         
         var_name = value[1:]
         if var_name not in self.plan_bindings:
-            logger.warning(f"Unbound variable: {value}")
-            return None
+            error_msg = f"Unbound variable: {value}"
+            logger.error(error_msg)
+            raise ValueError(error_msg)
         
         resource_id = self.plan_bindings[var_name]
         

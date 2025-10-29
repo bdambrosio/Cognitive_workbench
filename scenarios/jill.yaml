@@ -9,7 +9,7 @@ setting: |
 
 characters:
   Jill:
-    manual: false
+    manual: true
     manual_response: false
 
     character: |
