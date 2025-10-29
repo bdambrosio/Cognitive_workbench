@@ -82,7 +82,7 @@ Content:
 ## Typical Pattern
 
 ```json
-{"type": "apply", "target": "format", "value": "$raw_note", "out": "formatted"}
+{"type": "format", "value": "$raw_note", "out": "formatted"}
 {"type": "display", "target": "user", "value": "$formatted"}
 ```
 

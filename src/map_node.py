@@ -1606,17 +1606,17 @@ end your response with:
     
     def handle_collection_persist(self, query):
         """
-        Handle marking a Collection as persistent.
+        Handle marking a Note or Collection as persistent.
         
         Topic: cognitive/map/collection/persist
         Payload: {
-            "collection_id": str,  # Collection to mark as persistent
+            "resource_id": str,  # Note or Collection to mark as persistent
             "character_name": str  # Agent performing the persist
         }
         
         Returns: {
             "success": bool,
-            "collection_id": str
+            "resource_id": str
         }
         """
         try:
@@ -1628,27 +1628,27 @@ end your response with:
             payload_str = payload_bytes.decode('utf-8')
             payload = json.loads(payload_str)
             
-            collection_id = payload.get('collection_id')
+            resource_id = payload.get('resource_id') or payload.get('collection_id')
             character_name = payload.get('character_name')
             
-            if not collection_id:
-                raise ValueError("Missing collection_id in payload")
+            if not resource_id:
+                raise ValueError("Missing resource_id in payload")
             
-            # Fetch Collection from resource_registry
-            collection = self.world_map.resource_registry.get(collection_id)
-            if not collection:
-                raise ValueError(f"Collection {collection_id} not found")
+            # Fetch resource from resource_registry
+            resource = self.world_map.resource_registry.get(resource_id)
+            if not resource:
+                raise ValueError(f"Resource {resource_id} not found")
             
             # Mark as persistent
-            collection['properties']['persistent'] = True
-            collection['properties']['persisted_at'] = datetime.now().isoformat()
-            collection['properties']['persisted_by'] = character_name
+            resource['properties']['persistent'] = True
+            resource['properties']['persisted_at'] = datetime.now().isoformat()
+            resource['properties']['persisted_by'] = character_name
             
-            logger.info(f"💾 Marked {collection_id} as persistent by {character_name}")
+            logger.info(f"💾 Marked {resource_id} as persistent by {character_name}")
             
             response = {
                 'success': True,
-                'collection_id': collection_id
+                'resource_id': resource_id
             }
             query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
             
@@ -2947,14 +2947,18 @@ end your response with:
                 type_name = getattr(resource_type, 'name', str(resource_type))
                 
                 if type_name == 'Note':
-                    # Serialize Note instance
-                    info_serialized = {
-                        'name': resource_data.get('name'),
-                        'location': resource_data.get('location'),
-                        'description': resource_data.get('description'),
-                        'properties': resource_data.get('properties', {})
-                    }
-                    note_instances[resource_id] = info_serialized
+                    # Save Notes marked as persistent
+                    if resource_data.get('properties', {}).get('persistent'):
+                        info_serialized = {
+                            'name': resource_data.get('name'),
+                            'location': resource_data.get('location'),
+                            'description': resource_data.get('description'),
+                            'properties': resource_data.get('properties', {})
+                        }
+                        note_instances[resource_id] = info_serialized
+                        logger.debug(f"Saving persistent Note {resource_id}")
+                    else:
+                        logger.debug(f"Skipping Note {resource_id} (not marked persistent)")
                 elif type_name == 'Collection':
                     # Save Collections marked as persistent
                     if resource_data.get('properties', {}).get('persistent'):
@@ -3597,11 +3601,20 @@ class FAISSStore:
         """Search for similar documents"""
         import faiss
         
+        # Check if index has documents
+        if self.index.ntotal == 0 or len(self.documents) == 0:
+            return []
+        
         query_array = self.np.array([query_embedding], dtype='float32')
         faiss.normalize_L2(query_array)
         
+        # Ensure k > 0 for FAISS
+        k = min(limit, len(self.documents))
+        if k <= 0:
+            return []
+        
         # Search
-        scores, indices = self.index.search(query_array, min(limit, len(self.documents)))
+        scores, indices = self.index.search(query_array, k)
         
         # Filter by threshold and format results
         results = []

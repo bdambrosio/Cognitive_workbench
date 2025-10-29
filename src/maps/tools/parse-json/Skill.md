@@ -36,17 +36,17 @@ Returns a Note containing:
 
 **Parse entire JSON:**
 ```json
-{"type":"apply","target":"parse-json","value":"$json_note","out":"parsed_data"}
+{"type":"parse-json","value":"$json_note","out":"parsed_data"}
 ```
 
 **Extract specific value:**
 ```json
-{"type":"apply","target":"parse-json","value":"$json_note","args":{"path":"results[0].name"},"out":"first_name"}
+{"type":"parse-json","value":"$json_note","args":{"path":"results[0].name"},"out":"first_name"}
 ```
 
 **Extract nested field:**
 ```json
-{"type":"apply","target":"parse-json","value":"$api_response","args":{"path":"data.user.email"},"out":"user_email"}
+{"type":"parse-json","value":"$api_response","args":{"path":"data.user.email"},"out":"user_email"}
 ```
 
 ## Guidelines

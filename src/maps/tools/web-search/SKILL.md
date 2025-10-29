@@ -50,18 +50,16 @@ Source: https://arxiv.org/abs/1810.04805
 ### Pattern 1: Search for user consumption
 When user needs direct answer, summarize results with query as focus:
 ```json
-{"type":"apply","target":"web-search","args":{"query":"what are transformers in AI"},"out":"results"}
-{"type":"apply","target":"summarize-content","value":"$results","args":{"focus":"what are transformers"},"out":"summary"}
+{"type":"web-search","args":{"query":"what are transformers in AI"},"out":"results"}
+{"type":"summarize-content","value":"$results","args":{"focus":"what are transformers"},"out":"summary"}
 {"type":"say","target":"user","value":"$summary"}
 ```
 
-### Pattern 2: Search for further analysis
-When results need indexing/semantic search, split into individual notes per URL:
+### Pattern 2: Search and form a collection from result
+When results need a collection split into individual notes per URL:
 ```json
-{"type":"apply","target":"web-search","args":{"query":"transformer papers"},"out":"results"}
+{"type":"web-search","args":{"query":"transformer papers"},"out":"results"}
 {"type":"expand","target":"$results","out":"notes_collection"}
-{"type":"index","value":"$notes_collection"}
-{"type":"search","value":"$notes_collection","args":{"query":"attention mechanism"},"out":"relevant"}
 ```
 
 Note: Do NOT create a collection with only the web-search result Note and try to index/search it - this returns the same single item. Use Pattern 1 (summarize) or Pattern 2 (expand) instead.

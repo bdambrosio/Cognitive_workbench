@@ -1427,6 +1427,7 @@ class FastAPIActionDisplayNode:
                         <button onclick="stopTurns()" style="background: #ff6b6b; margin-right: 10px;">Stop</button>
                         <button onclick="saveAll()" style="background: #95e1d3; color: #1a1a1a; margin-right: 10px;">Save</button>
                         <button onclick="exportToObsidian()" style="background: #7c3aed; color: white; margin-right: 10px;">Obsidian</button>
+                        <button onclick="openResourceBrowser()" style="background: #0e639c; color: white; margin-right: 10px;">🔍 Browser</button>
                         <button onclick="showShutdownDialog()" style="background: #ff4757; color: white;">Shutdown</button>
                     </div>
                     <div style="margin-bottom: 15px; padding: 10px; background: #333; border-radius: 5px;">
@@ -2714,6 +2715,12 @@ class FastAPIActionDisplayNode:
             } catch (error) {
                 resultDiv.innerHTML = `<span class="error">Export error: ${error.message}</span>`;
             }
+        }
+        
+        function openResourceBrowser() {
+            // Open Resource Browser in new tab
+            // Just open it - browser will show connection error if not running
+            window.open('http://localhost:3001', '_blank');
         }
         
         function showShutdownDialog() {

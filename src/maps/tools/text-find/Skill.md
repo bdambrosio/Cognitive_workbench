@@ -42,17 +42,17 @@ Returns null if no matches found.
 
 **Simple text search:**
 ```json
-{"type":"apply","target":"text-find","value":"$document","args":{"pattern":"TODO"},"out":"todo_locations"}
+{"type":"text-find","value":"$document","args":{"pattern":"TODO"},"out":"todo_locations"}
 ```
 
 **Pattern search with context:**
 ```json
-{"type":"apply","target":"text-find","value":"$log","args":{"pattern":"ERROR.*timeout","context_lines":3},"out":"errors"}
+{"type":"text-find","value":"$log","args":{"pattern":"ERROR.*timeout","context_lines":3},"out":"errors"}
 ```
 
 **Find email addresses:**
 ```json
-{"type":"apply","target":"text-find","value":"$contact_info","args":{"pattern":"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}"},"out":"emails"}
+{"type":"text-find","value":"$contact_info","args":{"pattern":"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}"},"out":"emails"}
 ```
 
 ## Guidelines

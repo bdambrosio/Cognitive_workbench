@@ -1,0 +1,16 @@
+{
+  "plan": [
+    {
+      "type": "createCollection",
+      "value": "#items",
+      "name": "#name",
+      "out": "collection"
+    },
+    {
+      "type": "persist",
+      "target": "$collection"
+    }
+  ],
+  "out": "collection"
+}
+

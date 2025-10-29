@@ -31,7 +31,7 @@
             "env": {
                 "PYTHONPATH": "${workspaceFolder}/src"
             },
-            "args": ["laTerre.yaml", "--ui"],
+            "args": ["laTerre.yaml", "--ui", "--resource-browser"],
             "justMyCode": false,
             "stopOnEntry": false,
             "preLaunchTask": "setup-zenoh-environment"
@@ -46,7 +46,7 @@
             "env": {
                 "PYTHONPATH": "${workspaceFolder}/src"
             },
-            "args": ["CountryLife.yaml", "--ui"],
+            "args": ["CountryLife.yaml", "--ui", "--resource-browser"],
             "justMyCode": false,
             "stopOnEntry": false,
             "preLaunchTask": "setup-zenoh-environment"
@@ -78,7 +78,7 @@
                 "PYTHONPATH": "${workspaceFolder}/src",
                 "CWB_DEBUG": "1"
             },
-            "args": ["lost.yaml", "--ui", "--map-file", "forest.py"],
+            "args": ["lost.yaml", "--ui", "--resource-browser", "--map-file", "forest.py"],
             "justMyCode": false,
             "stopOnEntry": false,
             "preLaunchTask": "setup-zenoh-environment"
@@ -93,7 +93,7 @@
                 "env": {
                     "PYTHONPATH": "${workspaceFolder}/src"
                 },
-                "args": ["ABetterLife.yaml", "--ui", "--map-file", "suburban.py"],
+                "args": ["ABetterLife.yaml", "--ui", "--resource-browser", "--map-file", "suburban.py"],
                 "justMyCode": false,
                 "stopOnEntry": false,
                 "preLaunchTask": "setup-zenoh-environment"
@@ -108,7 +108,7 @@
             "env": {
                 "PYTHONPATH": "${workspaceFolder}/src"
             },
-            "args": ["jill.yaml", "--ui", "--map-file", "infolab.py"],
+            "args": ["jill.yaml", "--ui", "--resource-browser", "--map-file", "infolab.py"],
             "justMyCode": false,
             "stopOnEntry": false,
             "preLaunchTask": "setup-zenoh-environment"

@@ -29,7 +29,7 @@ OUTPUT: only valid JSON — no reasoning, no prose, no code fences.
 
 # AVAILABLE ACTIONS:
 
-apply - apply a tool/skill to input data and bind result to variable
+# Primitives:
 map - apply operation to each item in a Collection
 flatten - convert Collection to single Note by concatenating items
 transform - convert data format or structure (whole-value operations only)
@@ -58,6 +58,20 @@ Resource IDs: Cannot be referenced directly - use "load" action first to bind to
 
 # COMMON PATTERNS:
 
+Pattern: Adding filtered items to existing Collection
+  When you need to search, filter, then add results to a persistent collection:
+  1. Load the persistent collection
+  2. Search/expand to get new items
+  3. Optionally filter with map + tool
+  4. Use map with add to append each item
+  
+  Example - Add new research papers to existing collection:
+  {"type":"load","resource_id":"papers","out":"papers"}
+  {"type":"web-search","value":"LLM agents 2025","out":"results"}
+  {"type":"expand","target":"$results","out":"new_papers"}
+  {"type":"map","target":"$new_papers","operation":"add","args":{"target":"$papers"},"out":"papers"}
+  {"type":"persist","target":"$papers"}
+
 Pattern: Multi-item tool application
   When you need to apply a tool to *two or more* Notes (e.g., compare, analyze together):
   1. Create a Collection containing the Notes
@@ -65,39 +79,58 @@ Pattern: Multi-item tool application
   
   Example - Compare two search results:
   {"type":"createCollection","value":["$results_2024","$results_2025"],"out":"both_years"}
-  {"type":"apply","target":"compare-notes","value":"$both_years","out":"comparison"}
+  {"type":"compare-notes","value":"$both_years","out":"comparison"}
   
   Tools that work with Collections: compare-notes, summarize-content, extract-entities
 
 Pattern: Optional tool arguments
   Many tools accept optional "focus" or "mode" parameters via "args" field:
-  {"type":"apply","target":"summarize-content","value":"$doc","args":{"focus":"key findings"},"out":"summary"}
+  {"type":"summarize-content","value":"$doc","args":{"focus":"key findings"},"out":"summary"}
   
   Using focus is optional - tools work generically without it, but focus can improve precision.
 
 Pattern: Single vs. Multiple Item Processing
-  Collections are for handling MULTIPLE Notes together. For single Notes, apply tools directly.
+  Collections are for handling MULTIPLE Notes together. For single Notes, use tools directly.
   
   AVOID - Unnecessary Collection wrapper:
   {"type":"createCollection","value":["$single_result"],"out":"wrapper"}
-  {"type":"apply","target":"summarize-content","value":"$wrapper","out":"summary"}
+  {"type":"summarize-content","value":"$wrapper","out":"summary"}
   
-  PREFER - Direct application:
-  {"type":"apply","target":"summarize-content","value":"$single_result","out":"summary"}
+  PREFER - Direct tool use:
+  {"type":"summarize-content","value":"$single_result","out":"summary"}
   
   Use Collections ONLY when you have 2+ Notes to process together:
   {"type":"createCollection","value":["$result1","$result2","$result3"],"out":"multiple"}
-  {"type":"apply","target":"summarize-content","value":"$multiple","out":"summary"}
+  {"type":"summarize-content","value":"$multiple","out":"summary"}
+
+Pattern: Universal LLM Transformations (transform-note, test-note)
+  For ad-hoc transformations without specialized tools, use transform-note with natural language commands.
+  PREFER specialized tools when available (faster, cheaper, deterministic).
+  USE transform-note for novel/exploratory operations.
+  
+  Example - Extract schema when no specialized tool exists:
+  {"type":"transform-note","value":"$data","args":{"command":"extract schema as JSON"},"out":"schema"}
+  
+  Example - Complex reasoning (use premium model):
+  {"type":"transform-note","value":"$paper","args":{"command":"identify all citations","model":"sonnet"},"out":"citations"}
+  
+  Example - Boolean test in conditional:
+  {"type":"if","condition":{"type":"tool_condition","tool":"test-note","target":"$content","args":{"predicate":"contains citations?"}},"then":[...]}
+  
+  Cost aware: transform-note uses LLM per call. Reserve for cases where specialized tools don't exist.
 
 
 # ACTION SCHEMAS  (each must be valid JSON)
 
-apply — apply a tool/skill to input data (input: Note → output: Note)
-{"type":"apply","target":"tool-name/resource-name or $tool_var","value":"input text or $data","reason":"purpose (optional)","out":"result_variable"}
+# Tools - use tool name directly as action type:
+{"type":"tool-name","value":"input text or $data","args":{"optional":"param"},"out":"result_variable"}
+Example: {"type":"download-pdf","value":"https://example.com/doc.pdf","out":"pdf_note"}
+Example: {"type":"summarize-content","value":"$doc","args":{"focus":"key points"},"out":"summary"}
 
 map — apply operation to each item in Collection (input: Collection → output: Collection)
 {"type":"map","target":"$collection","operation":"tool-name or {'tool':'name','args':{}}","out":"result_collection"}
 {"type":"map","target":"$collection","operation":"tool-name","filter_null":true,"out":"filtered_results"}  # exclude null results
+{"type":"map","target":"$new_items","operation":"add","args":{"target":"$existing_collection"},"out":"existing_collection"}  # add each item to collection
 
 flatten — convert Collection to single Note by concatenating items (input: Collection → output: Note)
 {"type":"flatten","target":"$collection","out":"combined_note"}
@@ -192,7 +225,7 @@ Tool-based conditions - delegate complex predicates (target can be Note or Colle
 {"type": "tool_condition", "tool": "json_valid", "target": "$text", "args": {}}                  // validate structure
 
 
-# TOOLS - the tools available to the agent are listed below, make sure to use the correct name when calling apply.
+# TOOLS - use tool names directly as action types. Tools available to the agent are listed below.
 
 {{tools}}
 
@@ -210,9 +243,9 @@ Research Example (multi-step information flow):
 {
   "plan": [
     {"type": "createNote","value": "LLM cognitive agents 2025","out": "query"},
-    {"type": "apply","target": "web-search","value": "$query","reason": "find recent work","out": "result1"},
+    {"type": "web-search","value": "$query","out": "result1"},
     {"type": "createNote","value": "transformer architecture papers","out": "query2"},
-    {"type": "apply","target": "web-search","value": "$query2","reason": "find architecture papers","out": "result2"},
+    {"type": "web-search","value": "$query2","out": "result2"},
     {"type": "createCollection","value": ["$result1","$result2"],"out": "research_collection"},
     {"type": "index","source": "$research_collection","index_type": "semantic","fields": {"title":"embed","content":"embed"}},
     {"type": "say","target": "user","value": "Research complete and indexed."}
@@ -237,19 +270,20 @@ Variables:
 - Variables are cleared after plan completion
 
 Argument Conventions:
-- Literal strings/values: Use directly without "$" prefix (e.g., "tool-name", "hello")
+- Literal strings/values: Use directly without "$" prefix (e.g., "hello")
 - Variable references: Use "$variable" to resolve Note/Collection content
 - Output names: In "out" fields, use plain strings without "$" (e.g., "out":"result")
+- Tools: Use tool name directly as action type (e.g., {"type":"tool-name",...})
 
 CONSTRAINTS
-- Use only primitives listed above.
-- Variables must be created before use (createNote, createCollection, apply, search, or index may bind them).
+- Use only primitives listed above or tools from the tools list below.
+- Variables must be created before use (createNote, createCollection, tools, search, or index may bind them).
 - All JSON must be syntactically valid (no comments or trailing commas).
 - Keep plans concise (recommended: 12 steps or fewer).
 - Output only valid JSON.
 
 EFFICIENCY RULES
-- Apply tools directly to Notes when processing single items
+- Use tools directly on Notes when processing single items
 - Create Collections only when you need to process 2+ Notes together
 - Minimize intermediate steps - prefer direct operations over unnecessary wrapping
 

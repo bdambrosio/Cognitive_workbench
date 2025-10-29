@@ -112,8 +112,8 @@ class CharacterLauncher:
         self.characters.append(character)
         self.logger.info(f'Added character: {canonical_name}')
     
-    def launch_shared_services(self, map_file: str = None, launch_ui: bool = False, server_name: str = 'vllm', model_name: str = None, ui_port: int = 3000, setting: str = None, scenario_name: str = None):
-        """Launch shared services (map node and optional UI)."""
+    def launch_shared_services(self, map_file: str = None, launch_ui: bool = False, launch_resource_browser: bool = False, server_name: str = 'vllm', model_name: str = None, ui_port: int = 3000, setting: str = None, scenario_name: str = None):
+        """Launch shared services (map node, optional UI, optional resource browser)."""
         self.logger.info('Launching shared services...')
         
         # Launch FastAPI Action Display Node (optional UI)
@@ -128,6 +128,22 @@ class CharacterLauncher:
                 self.logger.info(f'   - Web UI available at: http://localhost:{ui_port}')
             except Exception as e:
                 self.logger.error(f'❌ Failed to launch FastAPI Action Display Node: {e}')
+        
+        # Launch Resource Browser (optional debug tool)
+        if launch_resource_browser:
+            try:
+                # Extract map name from map_file for resource browser
+                map_name = 'infolab'  # default
+                if map_file:
+                    map_name = map_file.replace('.py', '')
+                
+                browser_args = [sys.executable, 'resource_browser.py', '--map', map_name, '--port', '3001', '--no-browser']
+                browser_process = subprocess.Popen(browser_args)
+                self.shared_processes.append(browser_process)
+                self.logger.info(f'✅ Resource Browser launched on port 3001')
+                self.logger.info(f'   - Access via button in Action Display UI')
+            except Exception as e:
+                self.logger.error(f'❌ Failed to launch Resource Browser: {e}')
                 
         
         # Launch map node (required for situation awareness)
@@ -243,7 +259,7 @@ class CharacterLauncher:
         except Exception as e:
             self.logger.error(f'❌ Failed to launch {character.name} executive_node: {e}')
     
-    def launch_all_characters(self, map_file: str = None, launch_ui: bool = False, server_name: str = 'vllm', model_name: str = None, ui_port: int = 3000, setting: str = None, scenario_name: str = None):
+    def launch_all_characters(self, map_file: str = None, launch_ui: bool = False, launch_resource_browser: bool = False, server_name: str = 'vllm', model_name: str = None, ui_port: int = 3000, setting: str = None, scenario_name: str = None):
         """Launch all character instances."""
         self.logger.info(f'Launching {len(self.characters)} characters...')
         
@@ -277,7 +293,7 @@ class CharacterLauncher:
                 character.config['map_name'] = map_name
         
         # Launch shared services first
-        self.launch_shared_services(map_file, launch_ui, server_name, model_name, ui_port, setting, scenario_name)
+        self.launch_shared_services(map_file, launch_ui, launch_resource_browser, server_name, model_name, ui_port, setting, scenario_name)
         time.sleep(2)  # Give shared services time to start
         
         # Launch each character
@@ -402,6 +418,7 @@ def main():
     parser.add_argument('--map-file', help='Map file name (e.g., forest.py) to load in the shared map node (overrides YAML "map" if provided)')
     parser.add_argument('--ui', action='store_true', help='Launch FastAPI web UI')
     parser.add_argument('--ui-port', type=int, default=3000, help='Port for FastAPI web UI (default: 3000)')
+    parser.add_argument('--resource-browser', action='store_true', help='Launch Resource Browser for debugging (port 3001)')
     parser.add_argument('--scenario-id', type=str, default=None, help='Optional scenario identifier (forwarded, not used yet)')
     parser.add_argument('--debug', action='store_true', help='Enable debug mode (disables map turn timeout)')
     
@@ -546,7 +563,7 @@ def main():
                                         print(f"Failed to remove RAG store for {char_name}: {e}")
                 else:
                     print(f"Reusing existing world '{world_name}'")
-        launcher.launch_all_characters(effective_map_file, args.ui, server_name, model_name, ui_port=args.ui_port, setting=setting, scenario_name=scenario_name)
+        launcher.launch_all_characters(effective_map_file, args.ui, args.resource_browser, server_name, model_name, ui_port=args.ui_port, setting=setting, scenario_name=scenario_name)
         
         # Monitor processes
         launcher.monitor_processes()
