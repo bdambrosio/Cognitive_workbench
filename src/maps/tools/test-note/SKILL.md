@@ -23,7 +23,7 @@ Provides flexible conditionals for plan control flow. Use when:
 ## Input
 
 - `predicate`: Natural language question (e.g., "contains citations?", "is valid JSON?", "mentions neural networks?")
-- `value`: Note content to test
+- `target`: Note content to test
 
 ## Output
 

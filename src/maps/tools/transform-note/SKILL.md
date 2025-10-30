@@ -27,7 +27,7 @@ Provides flexible, ad-hoc transformations without requiring specialized tools. U
 ## Input
 
 - `command`: Natural language instruction (e.g., "extract schema", "identify citations", "convert to bullet list")
-- `value`: Note content to transform
+- `target`: Note content to transform
 - `model` (optional): LLM model selection - "fast" (default), "sonnet" (premium)
 
 ## Output
@@ -38,17 +38,17 @@ Returns Note containing transformed content according to command.
 
 Extract schema:
 ```json
-{"type":"transform-note","value":"$data","args":{"command":"extract schema"},"out":"schema"}
+{"type":"transform-note","target":"$data","args":{"command":"extract schema"},"out":"schema"}
 ```
 
 Extract citations:
 ```json
-{"type":"transform-note","value":"$paper","args":{"command":"list all citations in JSON format"},"out":"citations"}
+{"type":"transform-note","target":"$paper","args":{"command":"list all citations in JSON format"},"out":"citations"}
 ```
 
 Use premium model:
 ```json
-{"type":"transform-note","value":"$complex_data","args":{"command":"analyze structure","model":"sonnet"},"out":"analysis"}
+{"type":"transform-note","target":"$complex_data","args":{"command":"analyze structure","model":"sonnet"},"out":"analysis"}
 ```
 
 ## Guidelines

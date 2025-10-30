@@ -51,7 +51,7 @@ Source: https://arxiv.org/abs/1810.04805
 When user needs direct answer, summarize results with query as focus:
 ```json
 {"type":"web-search","args":{"query":"what are transformers in AI"},"out":"results"}
-{"type":"summarize-content","value":"$results","args":{"focus":"what are transformers"},"out":"summary"}
+{"type":"summarize-content","target":"$results","args":{"focus":"what are transformers"},"out":"summary"}
 {"type":"say","target":"user","value":"$summary"}
 ```
 

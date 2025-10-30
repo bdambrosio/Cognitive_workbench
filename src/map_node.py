@@ -12,6 +12,7 @@ import signal
 import time
 import threading
 import queue
+import hashlib
 from pathlib import Path
 from datetime import datetime, timedelta
 import traceback
@@ -1324,6 +1325,7 @@ end your response with:
             "format": "text|json",  # Content format
             "source_skill": str,  # Name of skill that created this
             "source_value": str,  # Input value to the skill
+            "properties": dict,  # Optional extra metadata (kind, parent_id, order, span, section, source, entity, edge)
         }
         
         Returns: {
@@ -1346,6 +1348,7 @@ end your response with:
             format_type = payload.get('format', 'text')
             source_skill = payload.get('source_skill', '')
             source_value = payload.get('source_value', '')
+            extra_props = payload.get('properties', {}) or {}
             
             if not character_name:
                 raise ValueError("Missing character_name in payload")
@@ -1389,6 +1392,25 @@ end your response with:
                 }
             }
             
+            # Compute defaults for metadata
+            try:
+                if isinstance(content, (dict, list)):
+                    content_str = json.dumps(content, sort_keys=True)
+                    info_data['properties']['content_type'] = 'json'
+                else:
+                    content_str = str(content)
+                    info_data['properties']['content_type'] = 'text'
+                info_data['properties']['length'] = len(content_str)
+                info_data['properties']['fingerprint'] = hashlib.sha1(content_str.encode('utf-8')).hexdigest()
+            except Exception as e:
+                logger.warning(f"Failed to compute Note metadata: {e}")
+            
+            # Merge allowed metadata fields from extra_props
+            allowed_fields = {'kind', 'parent_id', 'order', 'span', 'section', 'source', 'entity', 'edge'}
+            for key in allowed_fields:
+                if key in extra_props:
+                    info_data['properties'][key] = extra_props[key]
+            
             # Register in resource_registry
             self.world_map.resource_registry[info_id] = info_data
             
@@ -1428,6 +1450,7 @@ end your response with:
             "source_skill": str,  # Name of skill/operation that created this (optional)
             "source_value": str,  # Input value to the operation (optional)
             "collection_name": str,  # Optional stable name for referencing (optional)
+            "properties": dict,  # Optional extra metadata (kind, doc_meta, chunking, indexes)
         }
         
         Returns: {
@@ -1451,6 +1474,7 @@ end your response with:
             source_skill = payload.get('source_skill', '')
             source_value = payload.get('source_value', '')
             collection_name = payload.get('collection_name', '')
+            extra_props = payload.get('properties', {}) or {}
             
             if not character_name:
                 raise ValueError("Missing character_name in payload")
@@ -1495,6 +1519,16 @@ end your response with:
                     'collection_name': collection_name  # Store stable name for referencing
                 }
             }
+            
+            # Merge allowed metadata fields from extra_props
+            allowed_fields = {'kind', 'doc_meta', 'chunking', 'indexes'}
+            for key in allowed_fields:
+                if key in extra_props:
+                    info_data['properties'][key] = extra_props[key]
+            
+            # If declared as document, set chunk_count convenience
+            if info_data['properties'].get('kind') == 'document':
+                info_data['properties']['chunk_count'] = info_data['properties'].get('item_count', 0)
             
             # Register in resource_registry
             self.world_map.resource_registry[info_id] = info_data
@@ -3345,6 +3379,16 @@ end your response with:
         if collection_id not in self.collection_indexes:
             self.collection_indexes[collection_id] = collection_id  # Store ID is Collection ID
             logger.info(f"Tracking: {collection_id} is indexed for auto-updates")
+        
+        # Record index info on the Collection
+        try:
+            props = collection.setdefault('properties', {})
+            indexes = props.get('indexes', {})
+            indexes[index_type] = collection_id
+            props['indexes'] = indexes
+            props['indexed_at'] = datetime.now().isoformat()
+        except Exception as e:
+            logger.warning(f"Failed to record index info on Collection: {e}")
         
         # Publish response
         response = {

@@ -593,7 +593,7 @@ Meta-spec (strictly observe these rules in your output):
     { "type": "take", "target": "…", "prediction": "…"},
     { "type": "inspect", "target": "…", "reason": "…", "prediction": "…"},
     { "type": "use", "target": "…", "reason": "…", "out": "variable_name to assign the use result to", "prediction": "…"},
-    { "type": "use", "target": "skill_name", "value": "input text for skill", "reason": "…", "prediction": "…"},
+    { "type": "use", "target": "skill_name", "value": "input text for skill", "reason": "…", "out": "variable_name to assign the use result to", "prediction": "…"},
     { "type": "place", "target": "…", "prediction": "…"},
     { "type": "while", "condition": "…" , "body": [ /* steps */ ]},
     { "type": "if", "condition": "…", "then": [ /* steps */ ], "else": [ /* steps */ ] }
@@ -608,7 +608,7 @@ Example workflow using scan and variables:
     { "type": "scan", "target": "Berries", "out": "found_berries", "prediction": "will find nearby berries" },
     { "type": "move", "target": "$found_berries" },
     { "type": "take", "target": "$found_berries", "prediction": "will obtain berries for consumption" },
-    { "type": "use", "target": "$found_berries", "reason": "eat to reduce hunger", "prediction": "hunger will decrease" }
+    { "type": "use", "target": "$found_berries", "reason": "eat to reduce hunger", "out": "hunger_reduction", "prediction": "hunger will decrease" }
   ]
 }
 
@@ -627,7 +627,7 @@ Worked example using a loop to approach a distant target:
       { "type": "move", "target": "$found_berries" }
     ]},
     { "type": "take", "target": "$found_berries", "prediction": "will add berries to inventory" },
-    { "type": "use", "target": "$found_berries", "reason": "eat to reduce hunger", "prediction": "will reduce hunger" }
+    { "type": "use", "target": "$found_berries", "reason": "eat to reduce hunger", "out": "hunger_reduction", "prediction": "will reduce hunger" }
   ]
 }
 

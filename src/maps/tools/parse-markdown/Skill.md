@@ -39,17 +39,17 @@ Returns a Note containing extracted elements:
 
 **Extract all structure:**
 ```json
-{"type":"parse-markdown","value":"$document","out":"structure"}
+{"type":"parse-markdown","target":"$document","out":"structure"}
 ```
 
 **Extract only headers:**
 ```json
-{"type":"parse-markdown","value":"$document","args":{"element":"headers"},"out":"toc"}
+{"type":"parse-markdown","target":"$document","args":{"element":"headers"},"out":"toc"}
 ```
 
 **Extract links:**
 ```json
-{"type":"parse-markdown","value":"$page","args":{"element":"links"},"out":"all_links"}
+{"type":"parse-markdown","target":"$page","args":{"element":"links"},"out":"all_links"}
 ```
 
 ## Guidelines

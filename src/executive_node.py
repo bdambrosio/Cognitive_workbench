@@ -1136,14 +1136,19 @@ class ZenohExecutiveNode:
                     # Validate with appropriate validator
                     if self.is_infospace:
                         import infospace_planner
-                        valid = infospace_planner.verify_plan(plan_candidate)
+                        validation = infospace_planner.verify_plan(plan_candidate, available_tools=self.available_tools)
+                        valid = validation.get('valid', False) if isinstance(validation, dict) else validation
+                        if not valid:
+                            reason = validation.get('reason', 'Unknown validation error') if isinstance(validation, dict) else 'Validation failed'
+                            logger.error(f'Invalid plan JSON from planner: {reason}')
+                            plan_candidate = None
                     else:
                         valid = plan_module.verify_plan(plan_candidate)
+                        if not valid:
+                            logger.error(f'Invalid plan JSON from planner')
+                            plan_candidate = None
                     
-                    if not valid:
-                        logger.error(f'Invalid plan JSON from planner')
-                        plan_candidate = None
-                    else:
+                    if valid:
                         logger.info(f'📋 {self.character_name} generated new plan: {json.dumps(plan_candidate, indent=2)}')
                 except Exception as e:
                     logger.error(f'Invalid plan structure from planner: {e}')
@@ -1507,14 +1512,24 @@ end your response with </end>
         # Check if step type is a tool (direct tool invocation)
         if self.is_infospace and stype in self.available_tools:
             # Convert tool invocation to apply format for execution
-            tool_step = {
-                'type': 'apply',
-                'target': stype,
-                'value': step.get('value'),
-                'args': step.get('args', {}),
-                'out': step.get('out'),
-                'reason': step.get('reason', '')
-            }
+            # Special handling: web-search uses args.query, others use target/value
+            if stype == 'web-search':
+                tool_step = {
+                    'type': 'apply',
+                    'target': stype,
+                    'args': step.get('args', {}),
+                    'out': step.get('out'),
+                    'reason': step.get('reason', '')
+                }
+            else:
+                tool_step = {
+                    'type': 'apply',
+                    'target': stype,
+                    'value': step.get('target') or step.get('value'),  # Support both target and value for backward compatibility
+                    'args': step.get('args', {}),
+                    'out': step.get('out'),
+                    'reason': step.get('reason', '')
+                }
             current['idx'] = idx + 1
             return tool_step
 
@@ -2944,13 +2959,17 @@ End your response with </end>
             # Validate with appropriate validator
             if self.is_infospace:
                 import infospace_planner
-                valid = infospace_planner.verify_plan(parsed_plan)
+                validation = infospace_planner.verify_plan(parsed_plan, available_tools=self.available_tools)
+                valid = validation.get('valid', False) if isinstance(validation, dict) else validation
+                if not valid:
+                    reason = validation.get('reason', 'Unknown validation error') if isinstance(validation, dict) else 'Validation failed'
+                    logger.error(f"Invalid plan for {self.character_name}: {reason}")
+                    return
             else:
                 valid = plan_module.verify_plan(parsed_plan)
-            
-            if not valid:
-                logger.error(f"Invalid plan for {self.character_name}")
-                return
+                if not valid:
+                    logger.error(f"Invalid plan for {self.character_name}")
+                    return
             
             # Immediately clear existing plan/activity to interrupt execution
             self.current_plan = None
@@ -3045,13 +3064,17 @@ EDITED PLAN (JSON only):"""
             # Validate with appropriate validator
             if self.is_infospace:
                 import infospace_planner
-                valid = infospace_planner.verify_plan(edited_plan)
+                validation = infospace_planner.verify_plan(edited_plan, available_tools=self.available_tools)
+                valid = validation.get('valid', False) if isinstance(validation, dict) else validation
+                if not valid:
+                    reason = validation.get('reason', 'Unknown validation error') if isinstance(validation, dict) else 'Validation failed'
+                    logger.error(f'❌ {self.character_name} edited plan validation failed: {reason}')
+                    return
             else:
                 valid = plan_module.verify_plan(edited_plan)
-            
-            if not valid:
-                logger.error(f'❌ {self.character_name} edited plan validation failed')
-                return
+                if not valid:
+                    logger.error(f'❌ {self.character_name} edited plan validation failed')
+                    return
             
             # Update plan
             self.current_plan = edited_plan
