@@ -115,7 +115,7 @@ Write predicates as natural language conditions. The tool evaluates each item's 
 
 ### Example 1: Content Filtering
 
-**Input (value):**
+**Input (target):**
 ```json
 [
   {"id": "1", "content": "How to build a neural network from scratch with code examples"},
@@ -141,7 +141,7 @@ Write predicates as natural language conditions. The tool evaluates each item's 
 
 ### Example 2: Complex Logic
 
-**Input (value):**
+**Input (target):**
 ```json
 [
   {"title": "AI Safety Research Agenda", "date": "2025-01"},
@@ -168,7 +168,7 @@ Write predicates as natural language conditions. The tool evaluates each item's 
 
 ### Example 3: Exclusion Mode
 
-**Input (value):**
+**Input (target):**
 ```json
 [
   "Theoretical framework for AGI",

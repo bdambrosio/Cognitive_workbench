@@ -310,13 +310,6 @@ def parse_plan_json(plan_text):
     raise ValueError(f"Invalid plan format: expected dict or list, got {type(parsed).__name__}")
 
 
-# Legacy text format parser - DEPRECATED
-# Kept for reference, remove after migration complete
-def parse_plan_text(plan_text):
-    """DEPRECATED: Use parse_plan_json instead. Text format no longer supported."""
-    logger.warning("parse_plan_text is deprecated - use parse_plan_json with JSON format")
-    raise ValueError("Text plan format deprecated - use JSON format: plan: {\"plan\": [...]}")
-
 def verify_plan(plan_json: Any) -> bool:
     """
     Validate a plan object against the expected JSON grammar.
@@ -645,20 +638,6 @@ def _validate_variable_references(plan_steps: List[Any]) -> bool:
             return False
     
     return True
-
-def is_near(character, target: str, negated: bool) -> bool:
-    """Check if a target (resource or character) is near this character."""
-    try:
-        character_name = character.character_name
-        for reply in character.session.get(f"cognitive/{character_name}/situation/proximity?target={target}&negated={negated}", target=QueryTarget.BEST_MATCHING, consolidation=ConsolidationMode.NONE, timeout=6.0 if not character.debug else 300.0):
-            if reply.ok:
-                data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
-                if data['success']:
-                    return {'value': data['value'], 'binding': data['binding']}
-            break
-    except Exception as e:
-        logger.error(f'Error checking proximity for {target}: {e}')
-    return {'value': False, 'binding': None}
 
 def _evaluate_condition(character: ZenohExecutiveNode, condition: dict, observations: dict) -> bool:
         """Evaluate a condition action dict using distributed node queries."""

@@ -1157,6 +1157,36 @@ class FastAPIActionDisplayNode:
             font-family: 'Consolas', 'Monaco', 'Courier New', monospace; 
             font-size: 13px;
             color: #e0e0e0;
+            transition: height 0.3s ease;
+        }
+        .action-log.collapsed {
+            height: 0;
+            padding: 0;
+            overflow: hidden;
+            border: none;
+        }
+        .log-toggle {
+            background: #2d2d2d;
+            border: 1px solid #404040;
+            border-radius: 8px 8px 0 0;
+            padding: 8px 12px;
+            cursor: pointer;
+            user-select: none;
+            color: #00d4ff;
+            font-size: 13px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .log-toggle:hover {
+            background: #333;
+        }
+        .log-toggle::after {
+            content: '▼';
+            transition: transform 0.3s ease;
+        }
+        .log-toggle.collapsed::after {
+            transform: rotate(-90deg);
         }
         .input-section { 
             background: #2d2d2d; 
@@ -1178,10 +1208,11 @@ class FastAPIActionDisplayNode:
             color: #e0e0e0; 
             font-size: 14px;
         }
-        .input-section input:focus { 
-            outline: none; 
-            border-color: #00d4ff; 
-            box-shadow: 0 0 5px rgba(0, 212, 255, 0.3); 
+        #messageInput {
+            transition: height 0.3s ease;
+        }
+        #messageInput:focus {
+            height: 200px !important;
         }
         .input-section button { 
             margin: 5px; 
@@ -1309,9 +1340,29 @@ class FastAPIActionDisplayNode:
             padding: 0;
             border: 1px solid #555;
             width: 80%;
-            max-width: 900px;
+            min-width: 600px;
+            max-width: 95%;
+            max-height: 85vh;
             border-radius: 8px;
             box-shadow: 0 4px 8px rgba(0,0,0,0.5);
+            position: relative;
+            overflow: auto;
+        }
+        
+        .modal-resize-handle {
+            position: absolute;
+            bottom: 0;
+            right: 0;
+            width: 20px;
+            height: 20px;
+            cursor: nwse-resize;
+            background: linear-gradient(135deg, transparent 0%, transparent 40%, #555 40%, #555 45%, transparent 45%, transparent 55%, #555 55%, #555 60%, transparent 60%);
+            border-radius: 0 0 8px 0;
+            z-index: 1001;
+        }
+        
+        .modal-resize-handle:hover {
+            background: linear-gradient(135deg, transparent 0%, transparent 40%, #777 40%, #777 45%, transparent 45%, transparent 55%, #777 55%, #777 60%, transparent 60%);
         }
         
         .modal-header {
@@ -1461,6 +1512,9 @@ class FastAPIActionDisplayNode:
                     <p>Real-time action monitoring and text input</p>
                 </div>
                 
+                <div class="log-toggle" id="logToggle" onclick="toggleLog()">
+                    <span>Action Log</span>
+                </div>
                 <div class="action-log" id="actionLog">
                     <div style="color: #888; font-style: italic;">Waiting for actions...</div>
                 </div>
@@ -1509,7 +1563,7 @@ class FastAPIActionDisplayNode:
 
     <!-- Display Modal for formatted content -->
     <div id="displayModal" class="modal">
-        <div class="modal-content">
+        <div class="modal-content" id="modalContentDiv">
             <div class="modal-header">
                 <h2 id="modalTitle">Content Display</h2>
                 <span class="modal-close" onclick="closeDisplayModal()">&times;</span>
@@ -1517,6 +1571,7 @@ class FastAPIActionDisplayNode:
             <div class="modal-body">
                 <pre id="modalContent"></pre>
             </div>
+            <div class="modal-resize-handle" id="modalResizeHandle"></div>
         </div>
     </div>
 
@@ -2899,6 +2954,13 @@ class FastAPIActionDisplayNode:
             }
         }
         
+        function toggleLog() {
+            const log = document.getElementById('actionLog');
+            const toggle = document.getElementById('logToggle');
+            log.classList.toggle('collapsed');
+            toggle.classList.toggle('collapsed');
+        }
+        
 
         
         // Initialize time slider when page loads
@@ -2967,6 +3029,36 @@ class FastAPIActionDisplayNode:
             const modal = document.getElementById('displayModal');
             modal.style.display = 'none';
             modal.onclick = null;
+        }
+        
+        // Modal resize functionality
+        let isResizingModal = false;
+        let startX, startY, startWidth, startHeight;
+        
+        const modalResizeHandle = document.getElementById('modalResizeHandle');
+        const modalContentDiv = document.getElementById('modalContentDiv');
+        
+        if (modalResizeHandle && modalContentDiv) {
+            modalResizeHandle.addEventListener('mousedown', function(e) {
+                isResizingModal = true;
+                startX = e.clientX;
+                startY = e.clientY;
+                startWidth = parseInt(document.defaultView.getComputedStyle(modalContentDiv).width, 10);
+                startHeight = parseInt(document.defaultView.getComputedStyle(modalContentDiv).height, 10);
+                e.preventDefault();
+            });
+            
+            document.addEventListener('mousemove', function(e) {
+                if (!isResizingModal) return;
+                const width = startWidth + e.clientX - startX;
+                const height = startHeight + e.clientY - startY;
+                modalContentDiv.style.width = Math.max(600, Math.min(width, window.innerWidth * 0.95)) + 'px';
+                modalContentDiv.style.height = Math.max(400, Math.min(height, window.innerHeight * 0.85)) + 'px';
+            });
+            
+            document.addEventListener('mouseup', function() {
+                isResizingModal = false;
+            });
         }
         
         // Close modal on Escape key

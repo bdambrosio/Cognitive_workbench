@@ -61,7 +61,7 @@ class InfospaceExecutor:
         """Clear ephemeral plan state (call at start of new plan)"""
         self.plan_bindings = {}
     
-    def _create_collection(self, note_ids: list, source_context: str, collection_name: str = '') -> Optional[str]:
+    def _create_collection(self, note_ids: list, source_context: str, collection_name: str = '', properties: Optional[Dict] = None) -> Optional[str]:
         """
         Create a Collection resource in map_node.
         
@@ -69,23 +69,27 @@ class InfospaceExecutor:
             note_ids: List of Note IDs (e.g., ["Note_2", "Note_3"])
             source_context: Description for logging (e.g., 'map_operation', 'create_collection')
             collection_name: Optional stable name for the Collection
+            properties: Optional dict of extra properties to attach
             
         Returns:
             Collection ID if successful, None if failed
         """
         from zenoh import QueryTarget, ConsolidationMode
+        payload_dict = {
+            'character_name': self.agent_name,
+            'content': note_ids,  # List of Note IDs
+            'format': 'list',
+            'source_skill': source_context,
+            'collection_name': collection_name
+        }
+        if properties:
+            payload_dict['properties'] = properties
         for reply in self.session.get(
             f"cognitive/map/collection/create",
             target=QueryTarget.BEST_MATCHING,
             consolidation=ConsolidationMode.NONE,
             timeout=5.0,
-            payload=json.dumps({
-                'character_name': self.agent_name,
-                'content': note_ids,  # List of Note IDs
-                'format': 'list',
-                'source_skill': source_context,
-                'collection_name': collection_name
-            }).encode('utf-8')
+            payload=json.dumps(payload_dict).encode('utf-8')
         ):
             if reply.ok:
                 response = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
@@ -254,6 +258,12 @@ class InfospaceExecutor:
         
         if not target:
             return {'status': 'failed', 'reason': 'apply requires target'}
+        
+        # Special handling for web-search: extract query from args.query and use as value
+        if target == 'web-search' and 'query' in additional_args:
+            value = self._resolve_value(additional_args.get('query'))
+            # Remove query from args since it's now the main value
+            additional_args = {k: v for k, v in additional_args.items() if k != 'query'}
         
         # Get tool info and route by type
         tool_info = self._get_tool_info(target)
@@ -484,9 +494,11 @@ class InfospaceExecutor:
         Create a Note object as persistent spatial resource.
         
         Required: value, out
+        Optional: properties (dict of extra metadata)
         """
         value_arg = action.get('value')
         out_var = action.get('out')
+        extra_props = action.get('properties')
         
         if not out_var:
             return {'status': 'failed', 'reason': 'createNote requires out'}
@@ -498,7 +510,7 @@ class InfospaceExecutor:
             logger.info(f"Created null Note → ${out_var} = Note_null")
             return {'status': 'success', 'value': "Note_null"}
         
-        info_id = self._persist_note(value, 'createNote_primitive')
+        info_id = self._persist_note(value, 'createNote_primitive', extra_props)
         if info_id:
             self._bind_variable(out_var, info_id)
             logger.info(f"Created Note {info_id} → ${out_var}")
@@ -512,13 +524,14 @@ class InfospaceExecutor:
         Create a Collection object as session-local resource.
         
         Required: value, out
-        Optional: name (stable name for Collection)
+        Optional: name (stable name for Collection), properties (dict of extra metadata)
         
         Collections store resource IDs (references to Notes/Collections).
         """
         out_var = action.get('out')
         value_arg = action.get('value')
         collection_name = action.get('name')
+        extra_props = action.get('properties')
         
         if not out_var:
             return {'status': 'failed', 'reason': 'createCollection requires out'}
@@ -558,7 +571,7 @@ class InfospaceExecutor:
         else:
             return {'status': 'failed', 'reason': 'Collection value must be list or $variable'}
         
-        collection_id = self._create_collection(note_ids, 'createCollection_primitive', collection_name)
+        collection_id = self._create_collection(note_ids, 'createCollection_primitive', collection_name, extra_props)
         if collection_id:
             self._bind_variable(out_var, collection_id)
             name_display = f" '{collection_name}'" if collection_name else ""
@@ -570,13 +583,14 @@ class InfospaceExecutor:
     
     # ==================== Storage Operations ====================
     
-    def _persist_note(self, value: Any, source_context: str) -> Optional[str]:
+    def _persist_note(self, value: Any, source_context: str, properties: Optional[Dict] = None) -> Optional[str]:
         """
         Helper to persist a Note to map_node as a spatial resource.
         
         Args:
             value: Content to persist
             source_context: Description for logging (e.g., 'save_primitive', 'apply_result')
+            properties: Optional dict of extra properties to attach
             
         Returns:
             Note ID if successful, None if failed
@@ -587,18 +601,21 @@ class InfospaceExecutor:
         format_type = 'json' if isinstance(value, (dict, list)) else 'text'
         
         from zenoh import QueryTarget, ConsolidationMode
+        payload_dict = {
+            'character_name': self.agent_name,
+            'content': value,
+            'format': format_type,
+            'source_skill': source_context,
+            'source_value': str(value)[:100]
+        }
+        if properties:
+            payload_dict['properties'] = properties
         for reply in self.session.get(
             f"cognitive/map/note/create",
             target=QueryTarget.BEST_MATCHING,
             consolidation=ConsolidationMode.NONE,
             timeout=5.0,
-            payload=json.dumps({
-                'character_name': self.agent_name,
-                'content': value,
-                'format': format_type,
-                'source_skill': source_context,
-                'source_value': str(value)[:100]
-            }).encode('utf-8')
+            payload=json.dumps(payload_dict).encode('utf-8')
         ):
             if reply.ok:
                 response = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))

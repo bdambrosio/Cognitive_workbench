@@ -66,10 +66,10 @@ Pattern: Adding filtered items to existing Collection
   4. Use map with add to append each item
   
   Example - Add new research papers to existing collection:
-  {"type":"load","resource_id":"papers","out":"papers"}
-  {"type":"web-search","value":"LLM agents 2025","out":"results"}
-  {"type":"expand","target":"$results","out":"new_papers"}
-  {"type":"map","target":"$new_papers","operation":"add","args":{"target":"$papers"},"out":"papers"}
+  {"type":"load","resource_id":"papers","out":"$papers"}
+  {"type":"web-search","args":{"query":"LLM agents 2025"},"out":"$results"}
+  {"type":"expand","target":"$results","out":"$new_papers"}
+  {"type":"map","target":"$new_papers","operation":"add","args":{"target":"$papers"},"out":"$papers"}
   {"type":"persist","target":"$papers"}
 
 Pattern: Multi-item tool application
@@ -78,14 +78,14 @@ Pattern: Multi-item tool application
   2. Apply the tool to the Collection (tool receives all items)
   
   Example - Compare two search results:
-  {"type":"createCollection","value":["$results_2024","$results_2025"],"out":"both_years"}
-  {"type":"compare-notes","value":"$both_years","out":"comparison"}
+  {"type":"createCollection","value":["$results_2024","$results_2025"],"out":"$both_years"}
+  {"type":"compare-notes","target":"$both_years","out":"$comparison"}
   
   Tools that work with Collections: compare-notes, summarize-content, extract-entities
 
 Pattern: Optional tool arguments
   Many tools accept optional "focus" or "mode" parameters via "args" field:
-  {"type":"summarize-content","value":"$doc","args":{"focus":"key findings"},"out":"summary"}
+  {"type":"summarize-content","target":"$doc","args":{"focus":"key findings"},"out":"$summary"}
   
   Using focus is optional - tools work generically without it, but focus can improve precision.
 
@@ -93,15 +93,15 @@ Pattern: Single vs. Multiple Item Processing
   Collections are for handling MULTIPLE Notes together. For single Notes, use tools directly.
   
   AVOID - Unnecessary Collection wrapper:
-  {"type":"createCollection","value":["$single_result"],"out":"wrapper"}
-  {"type":"summarize-content","value":"$wrapper","out":"summary"}
+  {"type":"createCollection","value":["$single_result"],"out":"$wrapper"}
+  {"type":"summarize-content","target":"$wrapper","out":"$summary"}
   
   PREFER - Direct tool use:
-  {"type":"summarize-content","value":"$single_result","out":"summary"}
+  {"type":"summarize-content","target":"$single_result","out":"$summary"}
   
   Use Collections ONLY when you have 2+ Notes to process together:
-  {"type":"createCollection","value":["$result1","$result2","$result3"],"out":"multiple"}
-  {"type":"summarize-content","value":"$multiple","out":"summary"}
+  {"type":"createCollection","value":["$result1","$result2","$result3"],"out":"$multiple"}
+  {"type":"summarize-content","target":"$multiple","out":"$summary"}
 
 Pattern: Universal LLM Transformations (transform-note, test-note)
   For ad-hoc transformations without specialized tools, use transform-note with natural language commands.
@@ -109,10 +109,10 @@ Pattern: Universal LLM Transformations (transform-note, test-note)
   USE transform-note for novel/exploratory operations.
   
   Example - Extract schema when no specialized tool exists:
-  {"type":"transform-note","value":"$data","args":{"command":"extract schema as JSON"},"out":"schema"}
+  {"type":"transform-note","target":"$data","args":{"command":"extract schema as JSON"},"out":"$schema"}
   
   Example - Complex reasoning (use premium model):
-  {"type":"transform-note","value":"$paper","args":{"command":"identify all citations","model":"sonnet"},"out":"citations"}
+  {"type":"transform-note","target":"$paper","args":{"command":"identify all citations","model":"sonnet"},"out":"$citations"}
   
   Example - Boolean test in conditional:
   {"type":"if","condition":{"type":"tool_condition","tool":"test-note","target":"$content","args":{"predicate":"contains citations?"}},"then":[...]}
@@ -123,57 +123,57 @@ Pattern: Universal LLM Transformations (transform-note, test-note)
 # ACTION SCHEMAS  (each must be valid JSON)
 
 # Tools - use tool name directly as action type:
-{"type":"tool-name","value":"input text or $data","args":{"optional":"param"},"out":"result_variable"}
-Example: {"type":"download-pdf","value":"https://example.com/doc.pdf","out":"pdf_note"}
-Example: {"type":"summarize-content","value":"$doc","args":{"focus":"key points"},"out":"summary"}
+{"type":"tool-name","target":"input text or $data","args":{"optional":"param"},"out":"$result_variable"}
+Example: {"type":"download-pdf","target":"https://example.com/doc.pdf","out":"$pdf_note"}
+Example: {"type":"summarize-content","target":"$doc","args":{"focus":"key points"},"out":"$summary"}
 
 map — apply operation to each item in Collection (input: Collection → output: Collection)
-{"type":"map","target":"$collection","operation":"tool-name or {'tool':'name','args':{}}","out":"result_collection"}
-{"type":"map","target":"$collection","operation":"tool-name","filter_null":true,"out":"filtered_results"}  # exclude null results
-{"type":"map","target":"$new_items","operation":"add","args":{"target":"$existing_collection"},"out":"existing_collection"}  # add each item to collection
+{"type":"map","target":"$collection","operation":"tool-name or {'tool':'name','args':{}}","out":"$result_collection"}
+{"type":"map","target":"$collection","operation":"tool-name","filter_null":true,"out":"$filtered_results"}  # exclude null results
+{"type":"map","target":"$new_items","operation":"add","args":{"target":"$existing_collection"},"out":"$existing_collection"}  # add each item to collection
 
 flatten — convert Collection to single Note by concatenating items (input: Collection → output: Note)
-{"type":"flatten","target":"$collection","out":"combined_note"}
-{"type":"flatten","target":"$collection","separator":"\\n---\\n","out":"combined"}  # custom separator
+{"type":"flatten","target":"$collection","out":"$combined_note"}
+{"type":"flatten","target":"$collection","separator":"\\n---\\n","out":"$combined"}  # custom separator
 
 add — add a Note to an existing Collection (mutates Collection in place)
-{"type":"add","target":"$collection","value":"$new_note","out":"collection"}  # out should match target
-{"type":"add","target":"$dialog_history","value":"Hello user","out":"dialog_history"}  # literal value creates new Note
+{"type":"add","target":"$collection","value":"$new_note","out":"$collection"}  # out should match target
+{"type":"add","target":"$dialog_history","value":"Hello user","out":"$dialog_history"}  # literal value creates new Note
 
 expand — expand a Note containing JSON array into a Collection of Notes (input: Note → output: Collection)
-{"type":"expand","target":"$search_results","out":"results_collection"}  # default field is 'results'
-{"type":"expand","target":"$data","field":"items","out":"items_collection"}  # custom field name
+{"type":"expand","target":"$search_results","out":"$results_collection"}  # default field is 'results'
+{"type":"expand","target":"$data","field":"items","out":"$items_collection"}  # custom field name
 
 transform — convert data format or structure (whole-value) (input: Note → output: Note)
-{"type":"transform","target":"$data","operation":"flatten|normalize|pivot|reshape","out":"transformed"}
+{"type":"transform","target":"$data","operation":"flatten|normalize|pivot|reshape","out":"$transformed"}
 
 move — change current location or approach a resource
 {"type":"move","target":"resource-name or {"location": [x,y]}"}
 
 createNote — create a persistent Note object
-{"type":"createNote","value":"some data","out":"my_note"}
-{"type":"createNote","value":"$variable","out":"new_note"}
+{"type":"createNote","value":"some data","out":"$my_note"}
+{"type":"createNote","value":"$variable","out":"$new_note"}
 
 createCollection — create a session-local Collection object
-{"type":"createCollection","value":["$note1","$note2"],"out":"my_collection"}  # Collection of Note references
-{"type":"createCollection","name":"research","value":[],"out":"papers"}  # Named empty Collection
-{"type":"createCollection","value":"$note","out":"single_item"}  # Collection with one item
+{"type":"createCollection","value":["$note1","$note2"],"out":"$my_collection"}  # Collection of Note references
+{"type":"createCollection","name":"research","value":[],"out":"$papers"}  # Named empty Collection
+{"type":"createCollection","value":"$note","out":"$single_item"}  # Collection with one item
 
 persist — mark Collection as persistent (saved to filesystem)
 {"type":"persist","target":"$collection"}
 
 load — retrieve a persistent Note or Collection by resource ID or name
-{"type":"load","resource_id":"Note_123","out":"my_note"}
-{"type":"load","resource_id":"Collection_5","out":"items"}
-{"type":"load","resource_id":"shopping_list","out":"list"}  # Load by collection name
+{"type":"load","resource_id":"Note_123","out":"$my_note"}
+{"type":"load","resource_id":"Collection_5","out":"$items"}
+{"type":"load","resource_id":"shopping_list","out":"$list"}  # Load by collection name
 
 index (organize) — create embeddings index for a Collection
 {"type":"index","source":"$collection","index_type":"semantic"}
 {"type":"index","source":"$papers","index_type":"semantic","fields":{"title":"embed","content":"embed"}}  # optional fields
 
 search — query an indexed Collection
-{"type":"search","source":"$collection","query":"search text or $query","mode":"semantic","limit":5,"out":"results"}
-{"type":"search","source":"$papers","query":"quantum computing","limit":3,"out":"top_papers"}  # search indexed Collection
+{"type":"search","source":"$collection","query":"search text or $query","mode":"semantic","limit":5,"out":"$results"}
+{"type":"search","source":"$papers","query":"quantum computing","limit":3,"out":"$top_papers"}  # search indexed Collection
 
 if — conditional branch
 {"type":"if","condition":{"type":"has_value","target":"$results"},"then":[/* steps */],"else":[/* optional steps */]}
@@ -242,11 +242,11 @@ Minimal Example (say hello):
 Research Example (multi-step information flow):
 {
   "plan": [
-    {"type": "createNote","value": "LLM cognitive agents 2025","out": "query"},
-    {"type": "web-search","value": "$query","out": "result1"},
-    {"type": "createNote","value": "transformer architecture papers","out": "query2"},
-    {"type": "web-search","value": "$query2","out": "result2"},
-    {"type": "createCollection","value": ["$result1","$result2"],"out": "research_collection"},
+    {"type": "createNote","value": "LLM cognitive agents 2025","out": "$query"},
+    {"type": "web-search","args":{"query":"$query"},"out": "$result1"},
+    {"type": "createNote","value": "transformer architecture papers","out": "$query2"},
+    {"type": "web-search","args":{"query":"$query2"},"out": "$result2"},
+    {"type": "createCollection","value": ["$result1","$result2"],"out": "$research_collection"},
     {"type": "index","source": "$research_collection","index_type": "semantic","fields": {"title":"embed","content":"embed"}},
     {"type": "say","target": "user","value": "Research complete and indexed."}
   ]
@@ -266,13 +266,13 @@ Type System:
 Variables:
 - Variables are plan-local names that reference Note/Collection objects
 - Actions with "out" create new Note/Collection objects and bind to the variable name in the "out" field
-- "$variable" syntax resolves to the content stored in the Note/Collection
+- Always use "$variable" syntax for variables (in target, value, out fields)
 - Variables are cleared after plan completion
 
 Argument Conventions:
 - Literal strings/values: Use directly without "$" prefix (e.g., "hello")
 - Variable references: Use "$variable" to resolve Note/Collection content
-- Output names: In "out" fields, use plain strings without "$" (e.g., "out":"result")
+- Output names: In "out" fields, use "$variable" syntax (e.g., "out":"$result")
 - Tools: Use tool name directly as action type (e.g., {"type":"tool-name",...})
 
 CONSTRAINTS
@@ -311,114 +311,6 @@ class InfospacePlanner:
         self.logger = logger or logging.getLogger(__name__)
         self.template = INFOSPACE_PLAN_TEMPLATE
     
-    def generate_plan(self, goal: str, context: Dict) -> Dict:
-        """
-        Generate plan for infospace goal.
-        
-        Args:
-            goal: String goal description
-            context: Dict with available_tools, variables, state
-            
-        Returns:
-            Plan dict with 'plan' array of actions, or error dict
-        """
-        self.logger.info(f"Generating infospace plan for goal: {goal}")
-        
-        # Format context into template
-        formatted_template = self._format_template(goal, context)
-        
-        # Generate plan using LLM
-        response = self.llm_client.generate(
-            [formatted_template],
-            max_tokens=2000,
-            temperature=0.6,
-            is_json=True
-        )
-        
-        # Log response for debugging
-        self.logger.info(f"LLM response length: {len(response.text) if response.text else 0} chars")
-        if not isinstance(response.text, dict) and (not response.text or len(response.text) < 10):
-            self.logger.error(f"LLM response too short or empty: '{response.text}'")
-        
-        if not isinstance(response.text, dict): # Parse JSON response
-            plan = self._parse_plan_response(response.text)
-        else:
-            plan = response.text
-        
-        if plan.get('error'):
-            self.logger.error(f"Plan generation failed: {plan['error']}")
-            return plan
-        
-        # Validate plan structure
-        validation = self._validate_plan(plan)
-        if not validation['valid']:
-            self.logger.error(f"Plan validation failed: {validation['reason']}")
-            return {'error': validation['reason']}
-        
-        self.logger.info(f"Generated plan with {len(plan.get('plan', []))} steps")
-        return plan
-    
-    def _format_template(self, goal: str, context: Dict) -> str:
-        """Format template with goal and context"""
-        variables = context.get('variables', {})
-        
-        # Format tools list from available_tools
-        if self.available_tools:
-            tool_entries = []
-            for name, info in self.available_tools.items():
-                entry = f"- {name}: {info.get('description', 'No description')}\n  Parameters: {info.get('parameters', 'none')}"
-                # Add workflows if present
-                if info.get('workflows'):
-                    entry += f"\n{info['workflows']}"
-                tool_entries.append(entry)
-            tools_text = '\n'.join(tool_entries)
-        else:
-            tools_text = "None available"
-        
-        # Format variables
-        vars_text = '\n'.join([f"- ${k}: {type(v).__name__}" for k, v in variables.items()]) if variables else "None"
-        
-        # Format context description
-        context_text = context.get('situation', 'No additional context')
-        
-        # Fill in template
-        filled = self.template
-        filled = filled.replace('{{context}}', context_text)
-        filled = filled.replace('{{tools}}', tools_text)
-        filled = filled.replace('{{variables}}', vars_text)
-        filled = filled.replace('{{goal}}', goal)
-        
-        return filled
-    
-    def _parse_plan_response(self, response_text: str) -> Dict:
-        """Parse LLM response into plan dict"""
-        # Check for empty response
-        if not response_text or not response_text.strip():
-            self.logger.error("LLM returned empty response")
-            return {'error': 'Empty response from LLM'}
-        
-        # Remove markdown code fences if present
-        text = response_text.strip()
-        if text.startswith('```'):
-            # Find first and last ```
-            lines = text.split('\n')
-            start_idx = 0
-            end_idx = len(lines)
-            
-            for i, line in enumerate(lines):
-                if line.startswith('```'):
-                    if start_idx == 0:
-                        start_idx = i + 1
-                    else:
-                        end_idx = i
-                        break
-            
-            text = '\n'.join(lines[start_idx:end_idx])
-        
-        # Parse JSON
-        parsed = json.loads(text)
-        return parsed
-    
     def _validate_plan(self, plan: Dict) -> Dict:
         """
         Validate plan structure.
@@ -455,6 +347,7 @@ class InfospacePlanner:
     
     def _validate_action_fields(self, action_type: str, action: Dict) -> Dict:
         """Validate required fields for action type"""
+        # Known primitive action types with their required fields
         required_fields = {
             'apply': ['target', 'out'],
             'move': ['target'],
@@ -465,6 +358,10 @@ class InfospacePlanner:
             'index': ['source'],
             'search': ['source', 'query', 'out'],
             'expand': ['target', 'out'],
+            'flatten': ['target', 'out'],
+            'transform': ['target', 'operation', 'out'],
+            'add': ['target', 'value', 'out'],
+            'map': ['target', 'operation', 'out'],
             'if': ['condition', 'then'],
             'while': ['condition', 'body'],
             'wait': ['condition'],
@@ -475,6 +372,35 @@ class InfospacePlanner:
         
         required = required_fields.get(action_type, [])
         
+        # If action_type is not a known primitive, treat it as a tool name
+        if not required:
+            # Validate tool name exists in available_tools if provided
+            if self.available_tools and action_type not in self.available_tools:
+                return {'valid': False, 'reason': f'Unknown tool name: {action_type}'}
+            
+            # Tool names should have 'target' and 'out' fields per template examples
+            # Exception: web-search uses args.query instead of target
+            if action_type == 'web-search':
+                if 'args' not in action or 'query' not in action.get('args', {}):
+                    return {'valid': False, 'reason': f'Missing required field: args.query'}
+                if 'out' not in action:
+                    return {'valid': False, 'reason': f'Missing required field: out'}
+                # Validate out field uses $variable syntax
+                out_val = action.get('out', '')
+                if not isinstance(out_val, str) or not out_val.startswith('$'):
+                    return {'valid': False, 'reason': f'out field must use $variable syntax, got: {out_val}'}
+                return {'valid': True}
+            
+            if 'target' not in action:
+                return {'valid': False, 'reason': f'Missing required field: target'}
+            if 'out' not in action:
+                return {'valid': False, 'reason': f'Missing required field: out'}
+            # Validate out field uses $variable syntax
+            out_val = action.get('out', '')
+            if not isinstance(out_val, str) or not out_val.startswith('$'):
+                return {'valid': False, 'reason': f'out field must use $variable syntax, got: {out_val}'}
+            return {'valid': True}
+        
         for field in required:
             if field not in action:
                 return {'valid': False, 'reason': f'Missing required field: {field}'}
@@ -482,18 +408,19 @@ class InfospacePlanner:
         return {'valid': True}
 
 
-def verify_plan(plan_json: Any) -> bool:
+def verify_plan(plan_json: Any, available_tools: Dict[str, Dict] = None) -> Dict:
     """
     Validate infospace plan structure.
-    Public interface for plan validation (matches plan.py API).
+    Public interface for plan validation.
     
     Args:
         plan_json: Plan as JSON string or dict
+        available_tools: Optional dict of available tool_name -> metadata for validating tool names
         
     Returns:
-        True if valid, False otherwise
+        Dict with 'valid' (bool) and 'reason' (str if invalid)
     """
-    planner = InfospacePlanner(None)  # Validator only, no LLM needed
+    planner = InfospacePlanner(None, available_tools=available_tools)  # Validator only, no LLM needed
     validation = planner._validate_plan(plan_json if isinstance(plan_json, dict) else json.loads(plan_json))
-    return validation['valid']
+    return validation
 
