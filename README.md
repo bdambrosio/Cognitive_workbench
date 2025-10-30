@@ -84,8 +84,8 @@ Agents can operate over **semantic information** rather than just physical actio
 
 - **Notes**: Persistent text/data objects with metadata
 - **Collections**: Ordered sets of Notes/Collections
-- **Primitives**: createNote, createCollection, load, persist, flatten, add, expand
-- **Operations**: index (RAG embeddings), search (semantic), transform, map
+- **Primitives**: createNote, createCollection, load, persist, index, search, map, flatten, transform, add, expand, say, display, think, if, while, wait, move
+- **Operations**: index (RAG embeddings), search (semantic), transform (flatten nested lists), map (apply operation to each item)
 
 Example agent goal: *"Search the web for transformer papers, create a collection, index it, and find papers about attention mechanisms"*
 
@@ -116,8 +116,12 @@ parameters: query (required)
 ```
 
 Types:
-- **prompt_augmentation**: LLM-based tools (summarize-content, compare-notes)
-- **python**: Code execution tools (web-search, format)
+- **prompt_augmentation**: LLM-based tools (summarize-content, compare-notes, transform-note, test-note, extract-entities)
+- **python**: Code execution tools (web-search, format, parse-json, parse-markdown, edit-text, text-find, contains-pattern, filter-by-predicate)
+
+Built-in tools include: web-search, summarize-content, compare-notes, transform-note, test-note, extract-entities, format, parse-json, parse-markdown, edit-text, text-find, contains-pattern, filter-by-predicate, is-empty, is-question, is-positive, word-count, download-pdf, extract-paper-text, extract-metadata, create-and-persist.
+
+**Tool argument conventions**: Most tools use `target` for input data; `web-search` uses `args.query` for the search query.
 
 ### Architecture
 
@@ -178,9 +182,9 @@ Characters navigate a 2D world, manage physiological states (hunger, thirst), se
 ## Development Status
 
 **Active features:**
-- ✅ Infospace primitives (12 primitives)
-- ✅ Tool system (9 built-in tools)
-- ✅ Web UI with plan editing
+- ✅ Infospace primitives (12+ primitives: createNote, createCollection, load, persist, index, search, map, flatten, transform, add, expand, say, display, think, if, while, wait, move)
+- ✅ Tool system (20+ built-in tools)
+- ✅ Web UI with plan editing, resizable display, collapsible logs
 - ✅ Note/Collection viewer
 - ✅ Multi-agent parallelism
 - ✅ Physical world simulation

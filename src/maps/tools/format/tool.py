@@ -110,7 +110,7 @@ def tool(value, **kwargs):
             line = line.rstrip()
             if not line:
                 lines.append('')
-            elif len(line) > 80:
+            elif len(line) > 120:
                 # Only wrap if line is extremely long
                 words = line.split()
                 current_line = []

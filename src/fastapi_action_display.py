@@ -3033,7 +3033,7 @@ class FastAPIActionDisplayNode:
         
         // Modal resize functionality
         let isResizingModal = false;
-        let startX, startY, startWidth, startHeight;
+        let modalStartX, modalStartY, modalStartWidth, modalStartHeight;
         
         const modalResizeHandle = document.getElementById('modalResizeHandle');
         const modalContentDiv = document.getElementById('modalContentDiv');
@@ -3041,17 +3041,17 @@ class FastAPIActionDisplayNode:
         if (modalResizeHandle && modalContentDiv) {
             modalResizeHandle.addEventListener('mousedown', function(e) {
                 isResizingModal = true;
-                startX = e.clientX;
-                startY = e.clientY;
-                startWidth = parseInt(document.defaultView.getComputedStyle(modalContentDiv).width, 10);
-                startHeight = parseInt(document.defaultView.getComputedStyle(modalContentDiv).height, 10);
+                modalStartX = e.clientX;
+                modalStartY = e.clientY;
+                modalStartWidth = parseInt(document.defaultView.getComputedStyle(modalContentDiv).width, 10);
+                modalStartHeight = parseInt(document.defaultView.getComputedStyle(modalContentDiv).height, 10);
                 e.preventDefault();
             });
             
             document.addEventListener('mousemove', function(e) {
                 if (!isResizingModal) return;
-                const width = startWidth + e.clientX - startX;
-                const height = startHeight + e.clientY - startY;
+                const width = modalStartWidth + e.clientX - modalStartX;
+                const height = modalStartHeight + e.clientY - modalStartY;
                 modalContentDiv.style.width = Math.max(600, Math.min(width, window.innerWidth * 0.95)) + 'px';
                 modalContentDiv.style.height = Math.max(400, Math.min(height, window.innerHeight * 0.85)) + 'px';
             });

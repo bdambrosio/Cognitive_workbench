@@ -145,7 +145,7 @@ expand — expand a Note containing JSON array into a Collection of Notes (input
 {"type":"expand","target":"$data","field":"items","out":"$items_collection"}  # custom field name
 
 transform — convert data format or structure (whole-value) (input: Note → output: Note)
-{"type":"transform","target":"$data","operation":"flatten|normalize|pivot|reshape","out":"$transformed"}
+{"type":"transform","target":"$data","operation":"flatten","out":"$transformed"}
 
 move — change current location or approach a resource
 {"type":"move","target":"resource-name or {"location": [x,y]}"}
