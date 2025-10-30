@@ -1130,7 +1130,7 @@ class ZenohExecutiveNode:
                 plan_candidate = None
 
             if plan_candidate and isinstance(plan_candidate, dict):
-                logger.debug(f'🤖 {self.character_name} New Plan candidate: {json.dumps(plan_candidate)}')
+                logger.info(f'🤖 {self.character_name} New Plan candidate: {json.dumps(plan_candidate, indent=2)}')
                 valid = False
                 try:
                     # Validate with appropriate validator
@@ -1144,7 +1144,7 @@ class ZenohExecutiveNode:
                         logger.error(f'Invalid plan JSON from planner')
                         plan_candidate = None
                     else:
-                        logger.debug(f'📋 {self.character_name} generated new plan: {json.dumps(plan_candidate, indent=2)}')
+                        logger.info(f'📋 {self.character_name} generated new plan: {json.dumps(plan_candidate, indent=2)}')
                 except Exception as e:
                     logger.error(f'Invalid plan structure from planner: {e}')
                     plan_candidate = None
@@ -1948,6 +1948,17 @@ end your response with </end>
             if ok:
                 action_record.outcome_status = 'success'
                 action_record.failure_code = None
+                # Publish successful take action so memory_node can add to inventory
+                action_data = {
+                    'type': 'take',
+                    'action_id': self.action_counter,
+                    'timestamp': datetime.now().isoformat(),
+                    'target': resolved if resolved else '',
+                    'requested_target': action.get('target', ''),
+                    'resolved_target': resolved if resolved else '',
+                    'status': 'success'
+                }
+                self.action_publisher.put(json.dumps(action_data))
             else:
                 action_record.outcome_status = 'failure'
                 action_record.failure_code = 'execution:failed'

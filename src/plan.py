@@ -376,7 +376,7 @@ OPTIONAL_KEYS = {
     "take": {"reason", "value"},
     "place": {"reason", "value"},
     "inspect": {"reason", "value"},
-    "use": {"reason", "value"},
+    "use": {"value"},
     "scan": {"reason"},  # scan has no optional keys
     "while": {"reason", "value"},
     "wait": {"reason", "target", "value"},

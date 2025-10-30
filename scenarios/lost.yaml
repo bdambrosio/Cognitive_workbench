@@ -13,6 +13,7 @@ setting: |
     
 characters:
   Samantha:
+    manual: true
     character: |
       Samantha, a healthy, dark-haired young woman in grey hiking pants and a blue pendleton shirt. 
       You love the outdoors and hiking.
@@ -29,6 +30,7 @@ characters:
       - "love and belonging, including home, acceptance, friendship, trust, intimacy."
 
   Joe:
+    manual: true
     character: |
       Joe, a healthy young man, short beard  and dark hair, in grey chinos and a red t-shirt. 
       You are intelligent and self-sufficient, informal and somewhat impulsive. 
