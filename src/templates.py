@@ -640,8 +640,8 @@ When using a Skill resource (cognitive tools), include the "value" field with th
   ]
 }
 
-The "value" field when used with Skill resources contains the text input to the skill. The "out" field is used to assign the result to a variable.
-For physical resources (food, tools, etc.), use the standard form without "value" or "out" fields.
+The "value" field when used with Skill resources contains the text input to the skill. The "out" field is required for all "use" actions to capture the result.
+For physical resources (food, tools, etc.), use the standard form without "value" field (only skills need "value").
 
 A plan must include at least 1 step and no more than 8 steps including all nested while and if branches.
 In the following, <resource_name>, <character_name> are placeholders only for KNOWN resources, characters, or map_types, those appearing above.

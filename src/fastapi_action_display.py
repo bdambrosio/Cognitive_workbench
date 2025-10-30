@@ -663,6 +663,52 @@ class FastAPIActionDisplayNode:
             except Exception as e:
                 return {"success": False, "message": f"Error: {str(e)}"}
         
+        @self.app.get("/api/character/{character_name}/inventory")
+        async def get_character_inventory(character_name: str):
+            """Get inventory list for a character."""
+            try:
+                if not hasattr(self, 'session'):
+                    return {"success": False, "message": "Zenoh session not available", "inventory": []}
+                
+                # Query memory_node for inventory
+                query_key = f"cognitive/{character_name}/memory/inventory"
+                
+                try:
+                    replies = self.session.get(query_key, target=QueryTarget.BEST_MATCHING, consolidation=ConsolidationMode.NONE, timeout=5.0 if not self.debug else 300.0)
+                    for reply in replies:
+                        try:
+                            if hasattr(reply, 'ok') and reply.ok is not None:
+                                payload_bytes = reply.ok.payload.to_bytes()
+                            elif hasattr(reply, 'payload'):
+                                payload_bytes = reply.payload.to_bytes()
+                            else:
+                                continue
+                            
+                            response = json.loads(payload_bytes.decode('utf-8'))
+                            
+                            if response.get('success'):
+                                inventory_list = response.get('value', [])
+                                if not isinstance(inventory_list, list):
+                                    inventory_list = [inventory_list] if inventory_list else []
+                                return {
+                                    "success": True,
+                                    "inventory": inventory_list
+                                }
+                            else:
+                                return {"success": False, "message": response.get('error', 'Unknown error'), "inventory": []}
+                        except Exception as parse_error:
+                            logger.warning(f"Failed to parse inventory reply for {character_name}: {parse_error}")
+                            break
+                    
+                    # No valid response - return empty inventory
+                    return {"success": True, "inventory": []}
+                except Exception as e:
+                    logger.error(f"Error querying inventory for {character_name}: {e}")
+                    return {"success": False, "message": str(e), "inventory": []}
+            except Exception as e:
+                logger.error(f"Error in get_character_inventory for {character_name}: {e}")
+                return {"success": False, "message": str(e), "inventory": []}
+        
         @self.app.post("/api/shutdown")
         async def shutdown_only():
             """Request centralized shutdown via launcher (no save)."""
@@ -2161,7 +2207,34 @@ class FastAPIActionDisplayNode:
                 const v = state[key] && typeof state[key].value !== 'undefined' ? state[key].value : '';
                 html += `<div class="character-data-item"><div class="character-data-label">${key.charAt(0).toUpperCase() + key.slice(1)}</div><div class="character-data-value">${Math.round(Number(v) || 0)}/100</div></div>`;
             });
-            stateDiv.innerHTML = html;
+            
+            // Fetch and display inventory
+            fetch(`/api/character/${characterName}/inventory`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success && data.inventory && data.inventory.length > 0) {
+                        html += '<hr style="border: none; border-top: 1px solid #404040; margin: 8px 0;">';
+                        html += '<div class="character-data-item"><div class="character-data-label">Inventory</div><div class="character-data-value">';
+                        data.inventory.forEach(item => {
+                            html += `<div style="margin: 2px 0;">${escapeHtml(item)}</div>`;
+                        });
+                        html += '</div></div>';
+                    } else if (data.success) {
+                        html += '<hr style="border: none; border-top: 1px solid #404040; margin: 8px 0;">';
+                        html += '<div class="character-data-item"><div class="character-data-label">Inventory</div><div class="character-data-value" style="color: #888; font-style: italic;">Empty</div></div>';
+                    }
+                    stateDiv.innerHTML = html;
+                })
+                .catch(error => {
+                    console.error(`Error fetching inventory for ${characterName}:`, error);
+                    stateDiv.innerHTML = html;
+                });
+        }
+        
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
         }
         
         function updateSituationDataDisplay(characterName) {
