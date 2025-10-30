@@ -45,14 +45,14 @@
     },
     {
       "type": "createNote",
-      "value": [1, 2, 3],
+      "value": [[1, 2], [3, 4]],
       "out": "numbers"
     },
     {
       "type": "transform",
       "target": "$numbers",
-      "operation": "normalize",
-      "out": "normalized"
+      "operation": "flatten",
+      "out": "flattened"
     },
     {
       "type": "say",

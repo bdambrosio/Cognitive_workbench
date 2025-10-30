@@ -435,7 +435,12 @@ class InfospaceExecutor:
                 resolved_args[key] = self._resolve_value(val)
         
         # Execute tool
-        result = tool_func(input_value, **resolved_args)
+        try:
+            logger.debug(f"Calling tool '{tool_name}' with input_value type: {type(input_value)}, length: {len(str(input_value)) if isinstance(input_value, str) else 'N/A'}")
+            result = tool_func(input_value, **resolved_args)
+        except Exception as e:
+            logger.error(f"Python tool '{tool_name}' execution error: {e}", exc_info=True)
+            return {'status': 'failed', 'reason': f'Tool execution error: {str(e)}'}
         
         # Handle result format
         if isinstance(result, dict) and 'status' in result:
@@ -1003,39 +1008,6 @@ class InfospaceExecutor:
                         result.append(item)
             else:
                 result = target
-        
-        elif operation == 'normalize':
-            # Normalize to consistent format (dict list)
-            if isinstance(target, dict):
-                result = [target]
-            elif isinstance(target, list):
-                result = target
-            else:
-                result = [target]
-        
-        elif operation == 'pivot':
-            # Simple pivot: list of dicts -> dict of lists by key
-            if isinstance(target, list):
-                result = {}
-                for item in target:
-                    if isinstance(item, dict):
-                        for key, value in item.items():
-                            if key not in result:
-                                result[key] = []
-                            result[key].append(value)
-            else:
-                result = target
-        
-        elif operation == 'reshape':
-            # Reshape to single dict (merge all dict keys)
-            if isinstance(target, list):
-                result = {}
-                for item in target:
-                    if isinstance(item, dict):
-                        result.update(item)
-            else:
-                result = target
-        
         else:
             return {'status': 'failed', 'reason': f'Unknown transform operation: {operation}'}
         
