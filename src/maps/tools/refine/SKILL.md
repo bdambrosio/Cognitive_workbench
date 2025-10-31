@@ -1,0 +1,51 @@
+---
+name: refine
+description: Transform Note content using natural language instruction via LLM
+type: python
+trusted: true
+parameters:
+  - name: instruction
+    type: string
+    description: Natural language instruction for transformation
+---
+
+# Transform Note
+
+Universal transformation tool that applies natural language instructions to Note content using LLM.
+
+## Purpose
+
+Provides flexible, ad-hoc transformations without requiring specialized tools. Use when:
+- No specialized tool exists for the transformation
+- One-off or exploratory analysis
+- Complex reasoning over content needed
+- Novel or unexpected data formats
+
+## Input
+
+- `instruction`: Natural language instruction (e.g., "extract schema", "identify citations", "convert to bullet list")
+- `target`: Note content to transform
+
+## Output
+
+Returns Note containing transformed content according to instruction.
+
+## Usage Examples
+
+Extract schema:
+```json
+{"type":"refine","target":"$data","args":{"instruction":"extract schema"},"out":"schema"}
+```
+
+Extract citations:
+```json
+{"type":"refine","target":"$paper","args":{"instruction":"list all citations in JSON format"},"out":"citations"}
+```
+
+## Guidelines
+
+- **Prefer specialized tools when available:** Use parse-json, extract-entities, etc. when they exist - they're faster and cheaper.
+- **Be specific:** Clear instructions yield better results. "Extract all DOIs as JSON array" is better than "get DOIs"
+- **One transformation per call:** Break complex multi-step transforms into separate calls.
+
+

@@ -84,16 +84,16 @@ Agents can operate over **semantic information** rather than just physical actio
 
 - **Notes**: Persistent text/data objects with metadata
 - **Collections**: Ordered sets of Notes/Collections
-- **Primitives**: createNote, createCollection, load, persist, index, search, map, flatten, transform, add, expand, say, display, think, if, while, wait, move
-- **Operations**: index (RAG embeddings), search (semantic), transform (flatten nested lists), map (apply operation to each item)
+- **Primitives**: create-note, create-collection, load, persist, index, search, map, flatten, coerce, add, expand, say, display, think, if, while, wait, focus
+- **Operations**: index (RAG embeddings), search (semantic), coerce (flatten nested lists), map (apply operation to each item)
 
 Example agent goal: *"Search the web for transformer papers, create a collection, index it, and find papers about attention mechanisms"*
 
 ### Planning System
 
 Agents generate **structured JSON plans** with:
-- **Primitives**: Core operations (createNote, search, say, display)
-- **Tools**: Extensible skills (web-search, summarize-content, parse-json, edit-text)
+- **Primitives**: Core operations (create-note, search, say, display)
+- **Tools**: Extensible skills (query-web, summarize, parse-json, revise)
 - **Control flow**: Conditionals (`if`), loops (`while`), error handling
 - **Variables**: Plan-local bindings (`$note`, `$results`)
 
@@ -108,7 +108,7 @@ Tools are defined as `Skill.md` files with YAML frontmatter:
 
 ```yaml
 ---
-name: web-search
+name: query-web
 type: python
 description: Search the web using Google CSE
 parameters: query (required)
@@ -116,12 +116,12 @@ parameters: query (required)
 ```
 
 Types:
-- **prompt_augmentation**: LLM-based tools (summarize-content, compare-notes, transform-note, test-note, extract-entities)
-- **python**: Code execution tools (web-search, format, parse-json, parse-markdown, edit-text, text-find, contains-pattern, filter-by-predicate)
+- **prompt_augmentation**: LLM-based tools (summarize, relate, refine, assess, extract-entities)
+- **python**: Code execution tools (query-web, render, parse-json, parse-markdown, revise, text-find, matches, filter-by-predicate)
 
-Built-in tools include: web-search, summarize-content, compare-notes, transform-note, test-note, extract-entities, format, parse-json, parse-markdown, edit-text, text-find, contains-pattern, filter-by-predicate, is-empty, is-question, is-positive, word-count, download-pdf, extract-paper-text, extract-metadata, create-and-persist.
+Built-in tools include: query-web, summarize, relate, refine, assess, extract-entities, render, parse-json, parse-markdown, revise, text-find, matches, filter-by-predicate, is-empty, is-question, is-positive, word-count, download-pdf, extract-paper-text, extract-struct, save.
 
-**Tool argument conventions**: Most tools use `target` for input data; `web-search` uses `args.query` for the search query.
+**Tool argument conventions**: Most tools use `target` for input data; `query-web` uses `args.query` for the search query.
 
 ### Architecture
 
@@ -154,7 +154,7 @@ goal: search the web for Berkeley weather Oct 26 2025, summarize results, and re
 ```
 
 Jill will:
-1. Generate a plan (web-search → summarize-content → say)
+1. Generate a plan (query-web → summarize → say)
 2. Execute each step
 3. Display results in the UI
 
@@ -182,7 +182,7 @@ Characters navigate a 2D world, manage physiological states (hunger, thirst), se
 ## Development Status
 
 **Active features:**
-- ✅ Infospace primitives (12+ primitives: createNote, createCollection, load, persist, index, search, map, flatten, transform, add, expand, say, display, think, if, while, wait, move)
+- ✅ Infospace primitives (12+ primitives: create-note, create-collection, load, persist, index, search, map, flatten, coerce, add, expand, say, display, think, if, while, wait, focus)
 - ✅ Tool system (20+ built-in tools)
 - ✅ Web UI with plan editing, resizable display, collapsible logs
 - ✅ Note/Collection viewer

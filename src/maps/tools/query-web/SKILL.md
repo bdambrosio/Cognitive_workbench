@@ -1,5 +1,5 @@
 ---
-name: web-search
+name: query-web
 type: python
 trusted: true
 description: Search the web using Google CSE + LLM extraction and return formatted results with relevant content and URLs

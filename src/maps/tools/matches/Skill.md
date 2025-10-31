@@ -1,5 +1,5 @@
 ---
-name: contains-pattern
+name: matches
 description: Check if text matches regex pattern or contains substring
 type: prompt_augmentation
 parameters: pattern (required) - text string or regex pattern to match; match_type (optional) - "substring"|"regex"|"exact"

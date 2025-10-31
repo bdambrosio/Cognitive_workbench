@@ -1,5 +1,5 @@
 ---
-name: extract-metadata
+name: extract-struct
 description: Extract structured metadata (title, authors, year) from paper text using LLM
 type: prompt_augmentation
 parameters:

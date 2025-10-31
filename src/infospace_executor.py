@@ -23,11 +23,11 @@ class InfospaceExecutor:
     Executor for information space primitives.
     
     Core Primitives (whole-value operations only):
-    - Computation: apply, map, transform
+    - Computation: apply, map, coerce
     - Storage: save, load, create
     - Indexing: index, search
     - Communication: say, think
-    - Spatial: move
+    - Spatial: focus
     
     Design principle: Content is opaque. Field-based operations delegated to tools.
     """
@@ -167,9 +167,9 @@ class InfospaceExecutor:
         handlers = {
             # Phase 1: Core, Storage, Control, Communication
             'apply': self._execute_apply,
-            'move': self._execute_move,
-            'createNote': self._execute_createNote,
-            'createCollection': self._execute_createCollection,
+            'focus': self._execute_focus,
+            'create-note': self._execute_create_note,
+            'create-collection': self._execute_create_collection,
             'persist': self._execute_persist,
             'load': self._execute_load,
             'index': self._execute_index,
@@ -179,7 +179,7 @@ class InfospaceExecutor:
             'display': self._execute_display,
             'think': self._execute_think,
             # Phase 2: Data Operations (whole-value only)
-            'transform': self._execute_transform,
+            'coerce': self._execute_coerce,
             'map': self._execute_map,
             'flatten': self._execute_flatten,
             'add': self._execute_add,
@@ -259,8 +259,8 @@ class InfospaceExecutor:
         if not target:
             return {'status': 'failed', 'reason': 'apply requires target'}
         
-        # Special handling for web-search: extract query from args.query and use as value
-        if target == 'web-search' and 'query' in additional_args:
+        # Special handling for query-web: extract query from args.query and use as value
+        if target == 'query-web' and 'query' in additional_args:
             value = self._resolve_value(additional_args.get('query'))
             # Remove query from args since it's now the main value
             additional_args = {k: v for k, v in additional_args.items() if k != 'query'}
@@ -457,16 +457,16 @@ class InfospaceExecutor:
             logger.info(f"Python tool '{tool_name}' completed")
             return {'status': 'success', 'value': result}
 
-    def _execute_move(self, action: Dict) -> Dict:
+    def _execute_focus(self, action: Dict) -> Dict:
         """
-        Move to resource location.
+        Focus on resource location.
         
         Required: type, target
         """
         target = self._resolve_value(action.get('target'))
         
         if not target:
-            return {'status': 'failed', 'reason': 'move requires target'}
+            return {'status': 'failed', 'reason': 'focus requires target'}
         
         # Request movement from map
         request = {
@@ -486,15 +486,15 @@ class InfospaceExecutor:
         )
         
         if not response:
-            return {'status': 'failed', 'reason': 'Move timeout'}
+            return {'status': 'failed', 'reason': 'Focus timeout'}
         
         if response.get('status') != 'success':
-            return {'status': 'failed', 'reason': response.get('reason', 'Move failed')}
+            return {'status': 'failed', 'reason': response.get('reason', 'Focus failed')}
         
-        logger.info(f"Moved to {target}")
+        logger.info(f"Focused on {target}")
         return {'status': 'success', 'value': target}
     
-    def _execute_createNote(self, action: Dict) -> Dict:
+    def _execute_create_note(self, action: Dict) -> Dict:
         """
         Create a Note object as persistent spatial resource.
         
@@ -506,7 +506,7 @@ class InfospaceExecutor:
         extra_props = action.get('properties')
         
         if not out_var:
-            return {'status': 'failed', 'reason': 'createNote requires out'}
+            return {'status': 'failed', 'reason': 'create-note requires out'}
         
         value = self._resolve_value(value_arg) if value_arg is not None else ''
         
@@ -515,7 +515,7 @@ class InfospaceExecutor:
             logger.info(f"Created null Note → ${out_var} = Note_null")
             return {'status': 'success', 'value': "Note_null"}
         
-        info_id = self._persist_note(value, 'createNote_primitive', extra_props)
+        info_id = self._persist_note(value, 'create-note-primitive', extra_props)
         if info_id:
             self._bind_variable(out_var, info_id)
             logger.info(f"Created Note {info_id} → ${out_var}")
@@ -524,7 +524,7 @@ class InfospaceExecutor:
         logger.error(f"Note creation failed for ${out_var}")
         return {'status': 'failed', 'reason': 'Failed to create Note'}
     
-    def _execute_createCollection(self, action: Dict) -> Dict:
+    def _execute_create_collection(self, action: Dict) -> Dict:
         """
         Create a Collection object as session-local resource.
         
@@ -539,7 +539,7 @@ class InfospaceExecutor:
         extra_props = action.get('properties')
         
         if not out_var:
-            return {'status': 'failed', 'reason': 'createCollection requires out'}
+            return {'status': 'failed', 'reason': 'create-collection requires out'}
         
         if value_arg is None:
             note_ids = []
@@ -576,7 +576,7 @@ class InfospaceExecutor:
         else:
             return {'status': 'failed', 'reason': 'Collection value must be list or $variable'}
         
-        collection_id = self._create_collection(note_ids, 'createCollection_primitive', collection_name, extra_props)
+        collection_id = self._create_collection(note_ids, 'create-collection-primitive', collection_name, extra_props)
         if collection_id:
             self._bind_variable(out_var, collection_id)
             name_display = f" '{collection_name}'" if collection_name else ""
@@ -982,9 +982,9 @@ class InfospaceExecutor:
     
     # ==================== Phase 2: Data Operations ====================
     
-    def _execute_transform(self, action: Dict) -> Dict:
+    def _execute_coerce(self, action: Dict) -> Dict:
         """
-        Convert data format or structure.
+        Coerce data format or structure.
         
         Required: type, target, operation, out
         """
@@ -993,7 +993,7 @@ class InfospaceExecutor:
         out_var = action.get('out')
         
         if not target or not operation or not out_var:
-            return {'status': 'failed', 'reason': 'transform requires target, operation, and out'}
+            return {'status': 'failed', 'reason': 'coerce requires target, operation, and out'}
         
         result = None
         
@@ -1009,16 +1009,16 @@ class InfospaceExecutor:
             else:
                 result = target
         else:
-            return {'status': 'failed', 'reason': f'Unknown transform operation: {operation}'}
+            return {'status': 'failed', 'reason': f'Unknown coerce operation: {operation}'}
         
-        # Persist transformed result
-        info_id = self._persist_note(result, f'transform_{operation}')
+        # Persist coerced result
+        info_id = self._persist_note(result, f'coerce_{operation}')
         if info_id:
             self._bind_variable(out_var, info_id)
-            logger.info(f"Transformed ({operation}) → Note {info_id} → ${out_var}")
+            logger.info(f"Coerced ({operation}) → Note {info_id} → ${out_var}")
             return {'status': 'success', 'value': info_id}
         else:
-            logger.error(f"Failed to persist transform result")
+            logger.error(f"Failed to persist coerce result")
             return {'status': 'failed', 'reason': 'Failed to persist result'}
     
     def _execute_map(self, action: Dict) -> Dict:
@@ -1257,7 +1257,7 @@ class InfospaceExecutor:
         - field: literal string (name of array field, default 'results')
         - out: variable name for resulting Collection
         
-        Example: Expand web-search results into separate Notes
+        Example: Expand query-web results into separate Notes
         """
         error = self._validate_required_fields(action, 'target', 'out')
         if error:
@@ -1327,7 +1327,7 @@ class InfospaceExecutor:
                                    additional_args: Dict = None) -> Dict:
         """
         Helper to apply a tool to a single value with optional additional arguments.
-        Shared by map and transform primitives.
+        Shared by map and coerce primitives.
         
         Args:
             tool_name: Name of the tool to invoke
@@ -1801,10 +1801,10 @@ class InfospaceExecutor:
                 'out': 'test_output',
                 'prediction': 'test output'
             },
-            'move': {
-                'type': 'move',
+            'focus': {
+                'type': 'focus',
                 'target': 'question-decomposer',
-                'prediction': 'test move'
+                'prediction': 'test focus'
             },
             'create': {
                 'type': 'create',
@@ -1874,12 +1874,12 @@ class InfospaceExecutor:
                 'out': 'test_merged',
                 'prediction': 'test merge'
             },
-            'transform': {
-                'type': 'transform',
+            'coerce': {
+                'type': 'coerce',
                 'target': [[1, 2], [3, 4]],
                 'operation': 'flatten',
-                'out': 'test_transformed',
-                'prediction': 'test transform'
+                'out': 'test_coerced',
+                'prediction': 'test coerce'
             },
             'aggregate': {
                 'type': 'aggregate',

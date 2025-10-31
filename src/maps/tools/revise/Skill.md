@@ -1,5 +1,5 @@
 ---
-name: edit-text
+name: revise
 description: Edit text content based on natural language instructions
 type: prompt_augmentation
 parameters: instruction (required) - natural language description of how to modify the text

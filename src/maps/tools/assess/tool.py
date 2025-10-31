@@ -3,32 +3,31 @@
 Universal LLM-based Note predicate testing tool.
 """
 import logging
-
+from llm_client import ZenohLLMClient
+llm_client = ZenohLLMClient(server_name='vllm', model_name='models/Qwen3-Next:1.5B')
 logger = logging.getLogger(__name__)
 
-
-def execute(value: str, predicate: str = None, llm_client=None, **kwargs) -> str:
+def tool(value, **kwargs):
     """
     Test Note content against natural language predicate.
     
     Args:
         value: Note content to test
-        predicate: Natural language question/test
-        llm_client: LLM client instance
-        
+        **kwargs: Optional parameters
+            - predicate: Natural language question/test (required)
+            - llm_client: LLM client instance (required)
+    
     Returns:
         "true" or "false" as string
     """
+    predicate = kwargs.get('predicate')
     if not predicate:
         return "false"
     
     if not value:
         return "false"
     
-    if not llm_client:
-        logger.error("test-note: llm_client not available")
-        return "false"
-    
+
     # Build prompt
     prompt = f"""Answer this question about the content with ONLY "true" or "false":
 
@@ -57,10 +56,10 @@ Answer (true or false):"""
         answer = "false"
     else:
         # Default to false if unclear
-        logger.warning(f"test-note ambiguous response: '{result}' for predicate: {predicate[:50]}")
+        logger.warning(f"assess ambiguous response: '{result}' for predicate: {predicate[:50]}")
         answer = "false"
     
-    logger.info(f"test-note: predicate='{predicate[:50]}...' → {answer}")
+    logger.info(f"assess: predicate='{predicate[:50]}...' → {answer}")
     
     return answer
 
