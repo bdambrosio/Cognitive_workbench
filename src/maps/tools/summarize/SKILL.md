@@ -1,5 +1,5 @@
 ---
-name: summarize-content
+name: summarize
 description: Compress information while preserving key points and structure
 type: prompt_augmentation
 parameters: focus (optional) - topic to guide summarization

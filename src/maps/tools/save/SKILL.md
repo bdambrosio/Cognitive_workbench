@@ -1,5 +1,5 @@
 ---
-name: create-and-persist
+name: save
 description: Create a Collection from items and persist it to filesystem
 type: plan
 ---

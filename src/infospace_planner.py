@@ -32,13 +32,13 @@ OUTPUT: only valid JSON — no reasoning, no prose, no code fences.
 # Primitives:
 map - apply operation to each item in a Collection
 flatten - convert Collection to single Note by concatenating items
-transform - convert data format or structure (whole-value operations only)
-move - change current location or approach a resource
-createNote - create a persistent Note object and bind to variable
-createCollection - create a session-local Collection object and bind to variable
+coerce - convert data format or structure (whole-value operations only)
+focus - change current location or approach a resource
+create-note - create a persistent Note object and bind to variable
+create-collection - create a session-local Collection object and bind to variable
 persist - mark a Collection as persistent (saved to filesystem)
 load - retrieve a persistent Note or Collection by resource ID or name
-index (organize) - build an embedding index for a Collection
+index - build an embedding index for a Collection
 search - query an indexed Collection
 if - conditional branch 
 while - loop until condition false
@@ -67,7 +67,7 @@ Pattern: Adding filtered items to existing Collection
   
   Example - Add new research papers to existing collection:
   {"type":"load","resource_id":"papers","out":"$papers"}
-  {"type":"web-search","args":{"query":"LLM agents 2025"},"out":"$results"}
+  {"type":"query-web","args":{"query":"LLM agents 2025"},"out":"$results"}
   {"type":"expand","target":"$results","out":"$new_papers"}
   {"type":"map","target":"$new_papers","operation":"add","args":{"target":"$papers"},"out":"$papers"}
   {"type":"persist","target":"$papers"}
@@ -78,14 +78,14 @@ Pattern: Multi-item tool application
   2. Apply the tool to the Collection (tool receives all items)
   
   Example - Compare two search results:
-  {"type":"createCollection","value":["$results_2024","$results_2025"],"out":"$both_years"}
-  {"type":"compare-notes","target":"$both_years","out":"$comparison"}
+  {"type":"create-collection","value":["$results_2024","$results_2025"],"out":"$both_years"}
+  {"type":"relate","target":"$both_years","out":"$comparison"}
   
-  Tools that work with Collections: compare-notes, summarize-content, extract-entities
+  Tools that work with Collections: relate, summarize, extract-entities
 
 Pattern: Optional tool arguments
   Many tools accept optional "focus" or "mode" parameters via "args" field:
-  {"type":"summarize-content","target":"$doc","args":{"focus":"key findings"},"out":"$summary"}
+  {"type":"summarize","target":"$doc","args":{"focus":"key findings"},"out":"$summary"}
   
   Using focus is optional - tools work generically without it, but focus can improve precision.
 
@@ -93,31 +93,30 @@ Pattern: Single vs. Multiple Item Processing
   Collections are for handling MULTIPLE Notes together. For single Notes, use tools directly.
   
   AVOID - Unnecessary Collection wrapper:
-  {"type":"createCollection","value":["$single_result"],"out":"$wrapper"}
-  {"type":"summarize-content","target":"$wrapper","out":"$summary"}
+  {"type":"create-collection","value":["$single_result"],"out":"$wrapper"}
+  {"type":"summarize","target":"$wrapper","out":"$summary"}
   
   PREFER - Direct tool use:
-  {"type":"summarize-content","target":"$single_result","out":"$summary"}
+  {"type":"summarize","target":"$single_result","out":"$summary"}
   
   Use Collections ONLY when you have 2+ Notes to process together:
-  {"type":"createCollection","value":["$result1","$result2","$result3"],"out":"$multiple"}
-  {"type":"summarize-content","target":"$multiple","out":"$summary"}
+  {"type":"create-collection","value":["$result1","$result2","$result3"],"out":"$multiple"}
+  {"type":"summarize","target":"$multiple","out":"$summary"}
 
-Pattern: Universal LLM Transformations (transform-note, test-note)
-  For ad-hoc transformations without specialized tools, use transform-note with natural language commands.
+Pattern: Universal LLM Transformations (refine, assess)
+  For ad-hoc transformations without specialized tools, use refine with natural language commands.
   PREFER specialized tools when available (faster, cheaper, deterministic).
-  USE transform-note for novel/exploratory operations.
+  USE refine for novel/exploratory operations.
   
   Example - Extract schema when no specialized tool exists:
-  {"type":"transform-note","target":"$data","args":{"command":"extract schema as JSON"},"out":"$schema"}
+  {"type":"refine","target":"$data","args":{"instruction":"extract schema as JSON"},"out":"$schema"}
   
   Example - Complex reasoning (use premium model):
-  {"type":"transform-note","target":"$paper","args":{"command":"identify all citations","model":"sonnet"},"out":"$citations"}
+  {"type":"refine","target":"$paper","args":{"instruction":"identify all citations","model":"sonnet"},"out":"$citations"}
   
   Example - Boolean test in conditional:
-  {"type":"if","condition":{"type":"tool_condition","tool":"test-note","target":"$content","args":{"predicate":"contains citations?"}},"then":[...]}
+  {"type":"if","condition":{"type":"tool_condition","tool":"assess","target":"$content","args":{"predicate":"contains citations?"}},"then":[...]}
   
-  Cost aware: transform-note uses LLM per call. Reserve for cases where specialized tools don't exist.
 
 
 # ACTION SCHEMAS  (each must be valid JSON)
@@ -125,7 +124,7 @@ Pattern: Universal LLM Transformations (transform-note, test-note)
 # Tools - use tool name directly as action type:
 {"type":"tool-name","target":"input text or $data","args":{"optional":"param"},"out":"$result_variable"}
 Example: {"type":"download-pdf","target":"https://example.com/doc.pdf","out":"$pdf_note"}
-Example: {"type":"summarize-content","target":"$doc","args":{"focus":"key points"},"out":"$summary"}
+Example: {"type":"summarize","target":"$doc","args":{"focus":"key points"},"out":"$summary"}
 
 map — apply operation to each item in Collection (input: Collection → output: Collection)
 {"type":"map","target":"$collection","operation":"tool-name or {'tool':'name','args':{}}","out":"$result_collection"}
@@ -144,20 +143,20 @@ expand — expand a Note containing JSON array into a Collection of Notes (input
 {"type":"expand","target":"$search_results","out":"$results_collection"}  # default field is 'results'
 {"type":"expand","target":"$data","field":"items","out":"$items_collection"}  # custom field name
 
-transform — convert data format or structure (whole-value) (input: Note → output: Note)
-{"type":"transform","target":"$data","operation":"flatten","out":"$transformed"}
+coerce — convert data format or structure (whole-value) (input: Note → output: Note)
+{"type":"coerce","target":"$data","operation":"flatten","out":"$coerced"}
 
-move — change current location or approach a resource
-{"type":"move","target":"resource-name or {"location": [x,y]}"}
+focus — change current location or approach a resource
+{"type":"focus","target":"resource-name or {"location": [x,y]}"}
 
-createNote — create a persistent Note object
-{"type":"createNote","value":"some data","out":"$my_note"}
-{"type":"createNote","value":"$variable","out":"$new_note"}
+create-note — create a persistent Note object
+{"type":"create-note","value":"some data","out":"$my_note"}
+{"type":"create-note","value":"$variable","out":"$new_note"}
 
-createCollection — create a session-local Collection object
-{"type":"createCollection","value":["$note1","$note2"],"out":"$my_collection"}  # Collection of Note references
-{"type":"createCollection","name":"research","value":[],"out":"$papers"}  # Named empty Collection
-{"type":"createCollection","value":"$note","out":"$single_item"}  # Collection with one item
+create-collection — create a session-local Collection object
+{"type":"create-collection","value":["$note1","$note2"],"out":"$my_collection"}  # Collection of Note references
+{"type":"create-collection","name":"research","value":[],"out":"$papers"}  # Named empty Collection
+{"type":"create-collection","value":"$note","out":"$single_item"}  # Collection with one item
 
 persist — mark Collection as persistent (saved to filesystem)
 {"type":"persist","target":"$collection"}
@@ -167,7 +166,7 @@ load — retrieve a persistent Note or Collection by resource ID or name
 {"type":"load","resource_id":"Collection_5","out":"$items"}
 {"type":"load","resource_id":"shopping_list","out":"$list"}  # Load by collection name
 
-index (organize) — create embeddings index for a Collection
+index — create embeddings index for a Collection
 {"type":"index","source":"$collection","index_type":"semantic"}
 {"type":"index","source":"$papers","index_type":"semantic","fields":{"title":"embed","content":"embed"}}  # optional fields
 
@@ -242,11 +241,11 @@ Minimal Example (say hello):
 Research Example (multi-step information flow):
 {
   "plan": [
-    {"type": "createNote","value": "LLM cognitive agents 2025","out": "$query"},
-    {"type": "web-search","args":{"query":"$query"},"out": "$result1"},
-    {"type": "createNote","value": "transformer architecture papers","out": "$query2"},
-    {"type": "web-search","args":{"query":"$query2"},"out": "$result2"},
-    {"type": "createCollection","value": ["$result1","$result2"],"out": "$research_collection"},
+    {"type": "create-note","value": "LLM cognitive agents 2025","out": "$query"},
+    {"type": "query-web","args":{"query":"$query"},"out": "$result1"},
+    {"type": "create-note","value": "transformer architecture papers","out": "$query2"},
+    {"type": "query-web","args":{"query":"$query2"},"out": "$result2"},
+    {"type": "create-collection","value": ["$result1","$result2"],"out": "$research_collection"},
     {"type": "index","source": "$research_collection","index_type": "semantic","fields": {"title":"embed","content":"embed"}},
     {"type": "say","target": "user","value": "Research complete and indexed."}
   ]
@@ -277,7 +276,7 @@ Argument Conventions:
 
 CONSTRAINTS
 - Use only primitives listed above or tools from the tools list below.
-- Variables must be created before use (createNote, createCollection, tools, search, or index may bind them).
+- Variables must be created before use (create-note, create-collection, tools, search, or index may bind them).
 - All JSON must be syntactically valid (no comments or trailing commas).
 - Keep plans concise (recommended: 12 steps or fewer).
 - Output only valid JSON.
@@ -350,16 +349,16 @@ class InfospacePlanner:
         # Known primitive action types with their required fields
         required_fields = {
             'apply': ['target', 'out'],
-            'move': ['target'],
-            'createNote': ['value', 'out'],
-            'createCollection': ['value', 'out'],
+            'focus': ['target'],
+            'create-note': ['value', 'out'],
+            'create-collection': ['value', 'out'],
             'persist': ['target'],
             'load': ['resource_id', 'out'],
             'index': ['source'],
             'search': ['source', 'query', 'out'],
             'expand': ['target', 'out'],
             'flatten': ['target', 'out'],
-            'transform': ['target', 'operation', 'out'],
+            'coerce': ['target', 'operation', 'out'],
             'add': ['target', 'value', 'out'],
             'map': ['target', 'operation', 'out'],
             'if': ['condition', 'then'],
@@ -379,8 +378,8 @@ class InfospacePlanner:
                 return {'valid': False, 'reason': f'Unknown tool name: {action_type}'}
             
             # Tool names should have 'target' and 'out' fields per template examples
-            # Exception: web-search uses args.query instead of target
-            if action_type == 'web-search':
+            # Exception: query-web uses args.query instead of target
+            if action_type == 'query-web':
                 if 'args' not in action or 'query' not in action.get('args', {}):
                     return {'valid': False, 'reason': f'Missing required field: args.query'}
                 if 'out' not in action:

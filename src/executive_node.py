@@ -1501,8 +1501,8 @@ end your response with </end>
             # Physical world primitives
             'move', 'say', 'think', 'take', 'place', 'inspect', 'use', 'scan',
             # Infospace primitives - Phase 1 & 2
-            'apply', 'display', 'createNote', 'createCollection', 'persist', 'load', 'index', 'organize', 'search',
-            'extract', 'filter', 'merge', 'transform',
+            'apply', 'display', 'create-note', 'create-collection', 'persist', 'load', 'index', 'organize', 'search',
+            'extract', 'filter', 'merge', 'coerce',
             'aggregate', 'sort', 'group_by', 'compare', 'map', 'flatten', 'add', 'expand'
         }
         if stype in executable_primitives:
@@ -1512,8 +1512,8 @@ end your response with </end>
         # Check if step type is a tool (direct tool invocation)
         if self.is_infospace and stype in self.available_tools:
             # Convert tool invocation to apply format for execution
-            # Special handling: web-search uses args.query, others use target/value
-            if stype == 'web-search':
+            # Special handling: query-web uses args.query, others use target/value
+            if stype == 'query-web':
                 tool_step = {
                     'type': 'apply',
                     'target': stype,
@@ -1656,8 +1656,8 @@ end your response with </end>
             # Infospace primitives that route to infospace executor
             infospace_primitives = {
                 # Core primitives
-                'apply', 'map', 'transform', 'move',
-                'createnote', 'createcollection', 'persist', 'load',
+                'apply', 'map', 'coerce', 'focus',
+                'create-note', 'create-collection', 'persist', 'load',
                 'index', 'organize', 'search',
                 # Data operations
                 'flatten', 'add', 'expand',
@@ -1711,7 +1711,11 @@ end your response with </end>
                 self.action_counter += 1
                 
                 # Return success/failure based on result
-                return result.get('status') == 'success'
+                success = result.get('status') == 'success'
+                if not success:
+                    reason = result.get('reason', 'Unknown error')
+                    logger.error(f'Action failed for {self.character_name}: {action.get("type")} - {reason}')
+                return success
             
             # say and think work in both spaces, fall through to existing implementation
         

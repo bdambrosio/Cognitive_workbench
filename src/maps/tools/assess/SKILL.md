@@ -1,5 +1,5 @@
 ---
-name: test-note
+name: assess
 description: Test Note content against natural language predicate using LLM (returns boolean)
 type: python
 trusted: true

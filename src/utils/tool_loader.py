@@ -89,10 +89,10 @@ def load_tools(tools_dir_path: str) -> Dict[str, Dict]:
     # Primitive action names that tools cannot collide with
     primitive_names = {
         'move', 'say', 'think', 'take', 'place', 'inspect', 'use', 'scan',
-        'apply', 'display', 'createNote', 'createCollection', 'persist', 'load', 'index', 'organize', 'search',
-        'extract', 'filter', 'merge', 'transform',
+        'apply', 'display', 'create-note', 'create-collection', 'persist', 'load', 'index', 'organize', 'search',
+        'extract', 'filter', 'merge', 'coerce',
         'aggregate', 'sort', 'group_by', 'compare', 'map', 'flatten', 'add', 'expand',
-        'while', 'if', 'wait', 'sleep'
+        'while', 'if', 'wait', 'sleep', 'focus'
     }
     
     # Scan immediate subdirectories
