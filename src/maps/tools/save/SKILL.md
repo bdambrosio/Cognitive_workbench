@@ -2,6 +2,8 @@
 name: save
 description: Create a Collection from items and persist it to filesystem
 type: plan
+examples:
+  - '{"type":"save","args":{"items":["$note1","$note2"],"name":"research-findings"},"out":"$saved_collection"}'
 ---
 
 # Create and Persist

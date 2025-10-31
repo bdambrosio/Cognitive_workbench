@@ -118,7 +118,7 @@ This enables **plan inspection**, **editing**, and **learning** - you can't impr
 
 Rather than monolithic capabilities, agents use **composable tools**:
 - One tool per semantic operation
-- Tools chain naturally (web-search → parse-json → expand → index → search)
+- Tools chain naturally (web-search → as-json → expand → index → search)
 - Easy to add domain-specific tools
 - LLM sees tool documentation, not implementation
 

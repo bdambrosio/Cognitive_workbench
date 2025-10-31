@@ -4,6 +4,8 @@ type: python
 trusted: true
 description: Search the web using Google CSE + LLM extraction and return formatted results with relevant content and URLs
 parameters: none
+examples:
+  - '{"type":"query-web","args":{"query":"transformer architecture papers"},"out":"$results"}'
 ---
 
 # Web Search Tool

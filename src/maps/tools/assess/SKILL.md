@@ -7,6 +7,8 @@ parameters:
   - name: predicate
     type: string
     description: Natural language question or test condition
+examples:
+  - '{"type":"if","condition":{"type":"tool_condition","tool":"assess","target":"$content","args":{"predicate":"contains citations?"}},"then":[...]}'
 ---
 
 # Test Note

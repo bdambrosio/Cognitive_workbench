@@ -7,6 +7,8 @@ parameters:
   - name: url
     type: string
     description: URL of PDF to download
+examples:
+  - '{"type":"download-pdf","target":"https://example.com/doc.pdf","out":"$pdf_note"}'
 ---
 
 # Download PDF

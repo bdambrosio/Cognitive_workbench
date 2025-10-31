@@ -3,6 +3,8 @@ name: text-find
 description: Locate pattern or substring and return position with context
 type: prompt_augmentation
 parameters: pattern (required) - text or regex pattern to find; context_lines (optional) - lines of context to include
+examples:
+  - '{"type":"text-find","target":"$document","args":{"pattern":"conclusion"},"out":"$location"}'
 ---
 
 # Text Find

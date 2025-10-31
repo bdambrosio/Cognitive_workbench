@@ -201,6 +201,11 @@ def load_tools(tools_dir_path: str) -> Dict[str, Dict]:
         # Extract common workflows section if present
         workflows = extract_markdown_section(content, "## Common Workflows")
         
+        # Extract examples from frontmatter for planner
+        examples = metadata.get('examples', [])
+        if not examples:
+            logger.warning(f"Tool {tool_name} missing examples in SKILL.md frontmatter")
+        
         tools[tool_name] = {
             'name': tool_name,
             'description': tool_description,
@@ -208,6 +213,7 @@ def load_tools(tools_dir_path: str) -> Dict[str, Dict]:
             'trusted': trusted,
             'tool_md_content': content,
             'workflows': workflows,
+            'examples': examples,
             'path': str(tool_dir.absolute()),
             'python_file': python_file,
             'additional_files': additional_files,

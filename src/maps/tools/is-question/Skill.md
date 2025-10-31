@@ -3,6 +3,8 @@ name: is-question
 description: Check if text contains a question
 type: prompt_augmentation
 parameters: none
+examples:
+  - '{"type":"if","condition":{"type":"tool_condition","tool":"is-question","target":"$input"},"then":[...]}'
 ---
 
 # Is Question

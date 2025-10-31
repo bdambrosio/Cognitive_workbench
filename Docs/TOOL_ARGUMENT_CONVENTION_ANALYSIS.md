@@ -23,8 +23,8 @@
 - `web-search` - uses `value` (via args.query, but value is main input)
 - `summarize-content` - uses `value`
 - `compare-notes` - uses `value`
-- `parse-json` - uses `value`
-- `parse-markdown` - uses `value`
+- `as-json` - uses `value`
+- `as-markdown` - uses `value`
 - `format` - uses `value`
 - `edit-text` - uses `value`
 - `is-empty` - uses `value`
@@ -81,8 +81,8 @@
 2. ✅ `test-note` - operates on existing Note (like conditions)
 3. ✅ `summarize-content` - operates on existing content
 4. ✅ `compare-notes` - operates on existing Notes
-5. ✅ `parse-json` - operates on existing JSON Note
-6. ✅ `parse-markdown` - operates on existing markdown Note
+5. ✅ `as-json` - operates on existing JSON Note
+6. ✅ `as-markdown` - operates on existing markdown Note
 7. ✅ `format` - operates on existing text
 8. ✅ `edit-text` - operates on existing text
 9. ✅ `is-empty` - operates on existing Note

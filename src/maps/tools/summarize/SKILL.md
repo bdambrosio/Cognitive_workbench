@@ -3,6 +3,9 @@ name: summarize
 description: Compress information while preserving key points and structure
 type: prompt_augmentation
 parameters: focus (optional) - topic to guide summarization
+examples:
+  - '{"type":"summarize","target":"$doc","args":{"focus":"key points"},"out":"$summary"}'
+  - '{"type":"summarize","target":"$results","out":"$summary"}'
 ---
 
 # Summarize Content

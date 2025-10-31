@@ -6,6 +6,8 @@ parameters:
   - name: paper_text
     type: string
     description: Full text or first pages of academic paper
+examples:
+  - '{"type":"extract-struct","target":"$paper_text","out":"$metadata"}'
 ---
 
 # Extract Metadata
