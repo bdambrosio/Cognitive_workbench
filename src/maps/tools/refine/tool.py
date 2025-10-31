@@ -28,37 +28,105 @@ def tool(value, **kwargs):
     
     if not value:
         return "Error: value parameter required"
-    if len(value) > 32000:
-        logger.warning(f"refine: value too long, truncating to 32000 characters")
-        value = value[:32000]
     
-    # Build prompt
-    prompt = f"""Transform the following content according to this instruction:
+    # Segment long content into chunks
+    chunks = _segment_text(value, max_chunk_size=16000)
+    logger.info(f"refine: {instruction[:50]}... ({len(chunks)} chunks)")
+    
+    results = []
+    for i, (chunk_text, delimiter) in enumerate(chunks):
+        # Build prompt for this chunk
+        prompt = f"""Transform the following content according to this instruction:
 
 Instruction: {instruction}
 
 Content:
-{value}
+{chunk_text}
 
 Return only the transformed result, no explanation."""
+        
+        # Calculate max_tokens based on chunk size
+        max_tokens = len(chunk_text) // 2
+        
+        # Call LLM
+        response = llm_client.generate(
+            messages=[prompt],
+            max_tokens=max_tokens,
+            temperature=0.5,
+            is_json=False
+        )
+        
+        if not response.success:
+            logger.error(f"refine chunk {i+1}/{len(chunks)} failed: {response.error}")
+            return f"Error: {response.error}"
+        
+        results.append(response.text)
+        # Append delimiter if it's not the last chunk
+        if delimiter and i < len(chunks) - 1:
+            results.append(delimiter)
     
-    logger.info(f"refine: {instruction[:50]}...")
-    
-    # Call LLM
-    response = llm_client.generate(
-        messages=[prompt],
-        max_tokens=2000,
-        temperature=0.5,
-        is_json=False
-    )
-    
-    if not response.success:
-        logger.error(f"refine failed: {response.error}")
-        return f"Error: {response.error}"
-    
-    result = response.text
+    result = ''.join(results)
     logger.info(f"refine complete: output_len={len(result)}")
     
     return result
+
+
+def _segment_text(text, max_chunk_size=16000):
+    """
+    Segment text into chunks at sentence or word boundaries.
+    
+    Returns list of (chunk_text, delimiter) tuples where delimiter
+    is the separator found at the split point (to preserve on concatenation).
+    """
+    if len(text) <= max_chunk_size:
+        return [(text, None)]
+    
+    chunks = []
+    pos = 0
+    
+    while pos < len(text):
+        # Determine chunk end position
+        end_pos = min(pos + max_chunk_size, len(text))
+        
+        if end_pos >= len(text):
+            # Last chunk
+            chunks.append((text[pos:], None))
+            break
+        
+        # Try to find sentence boundary near end_pos
+        # Look backward up to 500 chars for ". " or ".\n"
+        search_start = max(pos, end_pos - 500)
+        best_split = -1
+        best_delimiter = None
+        
+        # Search for sentence boundaries
+        for i in range(end_pos, search_start, -1):
+            if i < len(text) - 1:
+                if text[i] == '.' and text[i+1] in (' ', '\n'):
+                    best_split = i + 1  # Include the period
+                    best_delimiter = text[i+1]  # Space or newline
+                    break
+        
+        # Fall back to word boundary if no sentence boundary found
+        if best_split == -1:
+            for i in range(end_pos, search_start, -1):
+                if text[i] in (' ', '\n', '\t'):
+                    best_split = i
+                    best_delimiter = text[i]
+                    break
+        
+        # Fall back to hard split if no boundary found
+        if best_split == -1:
+            best_split = end_pos
+            best_delimiter = ''
+        
+        # Extract chunk (up to but not including delimiter)
+        chunk_text = text[pos:best_split]
+        chunks.append((chunk_text, best_delimiter))
+        
+        # Move position past the delimiter
+        pos = best_split + (1 if best_delimiter else 0)
+    
+    return chunks
 
 

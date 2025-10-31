@@ -3,6 +3,8 @@ name: matches
 description: Check if text matches regex pattern or contains substring
 type: prompt_augmentation
 parameters: pattern (required) - text string or regex pattern to match; match_type (optional) - "substring"|"regex"|"exact"
+examples:
+  - '{"type":"if","condition":{"type":"tool_condition","tool":"matches","target":"$text","args":{"pattern":"error"}},"then":[...]}'
 ---
 
 # Contains Pattern

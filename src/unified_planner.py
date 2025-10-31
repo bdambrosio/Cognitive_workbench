@@ -170,10 +170,20 @@ class UnifiedPlanner:
             return "No tools available."
         
         lines = []
-        for tool_name, tool_info in sorted(self.available_tools.items()):
-            tool_type = tool_info.get('type', 'unknown')
-            desc = tool_info.get('description', 'No description')
-            lines.append(f"- {tool_name} ({tool_type}): {desc}")
+        for tool_name in sorted(self.available_tools.keys()):
+            tool = self.available_tools[tool_name]
+            description = tool.get('description', 'No description')
+            examples = tool.get('examples', [])
+            
+            # Tool header: name — description
+            lines.append(f"{tool_name} — {description}")
+            
+            # Add examples
+            for example in examples:
+                lines.append(example)
+            
+            # Blank line between tools
+            lines.append("")
         
         return '\n'.join(lines)
     

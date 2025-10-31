@@ -4,6 +4,8 @@ description: Check if a number is positive
 type: python
 trusted: true
 parameters: none
+examples:
+  - '{"type":"if","condition":{"type":"tool_condition","tool":"is-positive","target":"$score"},"then":[...]}'
 ---
 
 # Is Positive

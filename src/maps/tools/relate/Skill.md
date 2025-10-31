@@ -3,6 +3,9 @@ name: relate
 description: Find similarities, differences, and relationships between two or more Notes
 type: prompt_augmentation
 parameters: comparison_mode (optional) - 'similarity'|'contradiction'|'comprehensive'; threshold (optional) - minimum similarity (default 0.3); focus_aspects (optional) - specific dimensions to compare
+examples:
+  - '{"type":"create-collection","value":["$doc1","$doc2"],"out":"$docs"}'
+  - '{"type":"relate","target":"$docs","out":"$comparison"}'
 ---
 
 # Compare Notes

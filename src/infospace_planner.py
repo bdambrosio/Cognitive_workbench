@@ -104,27 +104,16 @@ Pattern: Single vs. Multiple Item Processing
   {"type":"summarize","target":"$multiple","out":"$summary"}
 
 Pattern: Universal LLM Transformations (refine, assess)
-  For ad-hoc transformations without specialized tools, use refine with natural language commands.
+  For ad-hoc transformations without specialized tools, use refine with natural language instructions.
   PREFER specialized tools when available (faster, cheaper, deterministic).
   USE refine for novel/exploratory operations.
-  
-  Example - Extract schema when no specialized tool exists:
-  {"type":"refine","target":"$data","args":{"instruction":"extract schema as JSON"},"out":"$schema"}
-  
-  Example - Complex reasoning (use premium model):
-  {"type":"refine","target":"$paper","args":{"instruction":"identify all citations","model":"sonnet"},"out":"$citations"}
-  
-  Example - Boolean test in conditional:
-  {"type":"if","condition":{"type":"tool_condition","tool":"assess","target":"$content","args":{"predicate":"contains citations?"}},"then":[...]}
-  
+  USE assess for complex boolean conditions in control flow.
 
 
 # ACTION SCHEMAS  (each must be valid JSON)
 
 # Tools - use tool name directly as action type:
 {"type":"tool-name","target":"input text or $data","args":{"optional":"param"},"out":"$result_variable"}
-Example: {"type":"download-pdf","target":"https://example.com/doc.pdf","out":"$pdf_note"}
-Example: {"type":"summarize","target":"$doc","args":{"focus":"key points"},"out":"$summary"}
 
 map — apply operation to each item in Collection (input: Collection → output: Collection)
 {"type":"map","target":"$collection","operation":"tool-name or {'tool':'name','args':{}}","out":"$result_collection"}
@@ -308,7 +297,46 @@ class InfospacePlanner:
         self.llm_client = llm_client
         self.available_tools = available_tools or {}
         self.logger = logger or logging.getLogger(__name__)
-        self.template = INFOSPACE_PLAN_TEMPLATE
+        self.template = self._build_template()
+    
+    def _build_template(self) -> str:
+        """
+        Build the complete template with dynamically loaded tool definitions.
+        
+        Returns:
+            Complete template string with tools section populated
+        """
+        tools_section = self._build_tools_section()
+        return INFOSPACE_PLAN_TEMPLATE.replace("{{tools}}", tools_section)
+    
+    def _build_tools_section(self) -> str:
+        """
+        Build tools section from loaded tool metadata.
+        Format matches primitive definitions for consistency.
+        
+        Returns:
+            Formatted tools section string
+        """
+        if not self.available_tools:
+            return "# No tools currently available"
+        
+        lines = []
+        for tool_name in sorted(self.available_tools.keys()):
+            tool = self.available_tools[tool_name]
+            description = tool.get('description', 'No description')
+            examples = tool.get('examples', [])
+            
+            # Tool header: name — description
+            lines.append(f"{tool_name} — {description}")
+            
+            # Add examples
+            for example in examples:
+                lines.append(example)
+            
+            # Blank line between tools
+            lines.append("")
+        
+        return "\n".join(lines)
     
     def _validate_plan(self, plan: Dict) -> Dict:
         """

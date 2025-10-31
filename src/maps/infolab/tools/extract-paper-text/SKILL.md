@@ -7,6 +7,8 @@ parameters:
   - name: pdf_content
     type: string
     description: Base64 encoded PDF content
+examples:
+  - '{"type":"extract-paper-text","target":"$pdf_note","out":"$paper_text"}'
 ---
 
 # Extract Paper Text

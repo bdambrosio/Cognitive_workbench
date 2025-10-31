@@ -4,6 +4,8 @@ description: Count words in text
 type: python
 trusted: true
 parameters: none
+examples:
+  - '{"type":"word-count","target":"$text","out":"$count"}'
 ---
 
 # Word Count

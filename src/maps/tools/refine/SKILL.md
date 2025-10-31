@@ -7,6 +7,9 @@ parameters:
   - name: instruction
     type: string
     description: Natural language instruction for transformation
+examples:
+  - '{"type":"refine","target":"$data","args":{"instruction":"extract schema as JSON"},"out":"$schema"}'
+  - '{"type":"refine","target":"$paper","args":{"instruction":"list all citations in JSON format"},"out":"$citations"}'
 ---
 
 # Transform Note
@@ -44,7 +47,7 @@ Extract citations:
 
 ## Guidelines
 
-- **Prefer specialized tools when available:** Use parse-json, extract-entities, etc. when they exist - they're faster and cheaper.
+- **Prefer specialized tools when available:** Use as-json, extract-entities, etc. when they exist - they're faster and cheaper.
 - **Be specific:** Clear instructions yield better results. "Extract all DOIs as JSON array" is better than "get DOIs"
 - **One transformation per call:** Break complex multi-step transforms into separate calls.
 

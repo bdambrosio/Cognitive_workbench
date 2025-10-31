@@ -93,7 +93,7 @@ Example agent goal: *"Search the web for transformer papers, create a collection
 
 Agents generate **structured JSON plans** with:
 - **Primitives**: Core operations (create-note, search, say, display)
-- **Tools**: Extensible skills (query-web, summarize, parse-json, revise)
+- **Tools**: Extensible skills (query-web, summarize, as-json, revise)
 - **Control flow**: Conditionals (`if`), loops (`while`), error handling
 - **Variables**: Plan-local bindings (`$note`, `$results`)
 
@@ -117,9 +117,9 @@ parameters: query (required)
 
 Types:
 - **prompt_augmentation**: LLM-based tools (summarize, relate, refine, assess, extract-entities)
-- **python**: Code execution tools (query-web, render, parse-json, parse-markdown, revise, text-find, matches, filter-by-predicate)
+- **python**: Code execution tools (query-web, render, as-json, as-markdown, revise, text-find, matches, filter-by-predicate)
 
-Built-in tools include: query-web, summarize, relate, refine, assess, extract-entities, render, parse-json, parse-markdown, revise, text-find, matches, filter-by-predicate, is-empty, is-question, is-positive, word-count, download-pdf, extract-paper-text, extract-struct, save.
+Built-in tools include: query-web, summarize, relate, refine, assess, extract-entities, render, as-json, as-markdown, revise, text-find, matches, filter-by-predicate, is-empty, is-question, is-positive, word-count, download-pdf, extract-paper-text, extract-struct, save.
 
 **Tool argument conventions**: Most tools use `target` for input data; `query-web` uses `args.query` for the search query.
 

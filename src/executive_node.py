@@ -3026,8 +3026,14 @@ End your response with </end>
                 tools_text = ""
                 if self.available_tools:
                     tools_text = "\n\nAVAILABLE TOOLS:\n"
-                    for tool_name, tool_info in self.available_tools.items():
-                        tools_text += f"- {tool_name}: {tool_info.get('description', 'No description')}\n"
+                    for tool_name in sorted(self.available_tools.keys()):
+                        tool_info = self.available_tools[tool_name]
+                        description = tool_info.get('description', 'No description')
+                        examples = tool_info.get('examples', [])
+                        tools_text += f"{tool_name} — {description}\n"
+                        for example in examples:
+                            tools_text += f"{example}\n"
+                        tools_text += "\n"
                 
                 prompt = f"""You are editing an infospace plan.
 
