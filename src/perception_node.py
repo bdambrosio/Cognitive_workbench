@@ -51,7 +51,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger('perception_node')
 
-# Prompt template for comparing predictions against actual results
+# Prompt template for comparing expectations against actual results
 
 class ZenohPerceptionNode:
     """
@@ -59,7 +59,7 @@ class ZenohPerceptionNode:
     
     Features:
     - Process sense_data from environment
-    - Track 'use' action results with predictions
+    - Track action results with expectations
     - Maintain perceptual state (future)
     """
     
@@ -80,14 +80,14 @@ class ZenohPerceptionNode:
         # Shutdown flag
         self.shutdown_requested = False
         
-        # Initialize LLM client for prediction comparison (optional feature)
-        compare_predictions = True
-        if compare_predictions:
+        # Initialize LLM client for expectation comparison (optional feature)
+        compare_expectations = True
+        if compare_expectations:
             llm_config = self.character_config.get('llm_config', {})
             server_name = llm_config.get('server_name', 'openai')
             model_name = llm_config.get('model_name', 'gpt-4.1')
             self.llm_client = ZenohLLMClient(server_name=server_name, model_name=model_name)
-            logger.info(f'🤖 LLM prediction comparison enabled for {self.character_name} (server={server_name}, model={model_name})')
+            logger.info(f'🤖 LLM expectation comparison enabled for {self.character_name} (server={server_name}, model={model_name})')
         else:
             self.llm_client = None
         
@@ -131,29 +131,29 @@ class ZenohPerceptionNode:
             logger.error(f'Error processing sense_data: {e}')
     
     def action_result_callback(self, sample):
-        """Handle action results with predictions for inspect, use, take, place, scan."""
+        """Handle action results with expectations for all monitored actions."""
         try:
             payload = sample.payload.to_bytes().decode('utf-8')
             action_result = json.loads(payload)
             
             action = action_result.get('action', {})
             update_text = action_result.get('update_text', '')
-            prediction = action_result.get('prediction', '')
+            expect = action_result.get('expect', '')
             
             action_type = action.get('type', 'unknown')
             
             if self.debug:
                 logger.info(f'Received action_result: type={action_type}, '
-                           f'prediction={prediction[:50]}..., result={update_text[:50]}...')
+                           f'expect={expect[:50]}..., result={update_text[:50]}...')
             
-            # Compare prediction against actual result using LLM
-            if self.llm_client and prediction and update_text:
-                prompt_text = f"""Compare the predicted outcome against the actual result for an action.
+            # Compare expectation against actual result using LLM
+            if self.llm_client and expect and update_text:
+                prompt_text = f"""Compare the expected outcome against the actual result for an action.
 #Action:
 {{$action_text}}
 
-#Prediction: 
-{{$prediction_text}}
+#Expected: 
+{{$expect_text}}
 
 #Actual Result:
 {{$update_text}}
@@ -164,7 +164,7 @@ Are these significantly different? Answer 'yes' or 'no', followed by a brief exp
                     [prompt_text],
                     bindings={
                         "action_text": action,
-                        "prediction_text": prediction,
+                        "expect_text": expect,
                         "update_text": update_text
                     },
                     max_tokens=100,
@@ -181,9 +181,9 @@ Are these significantly different? Answer 'yes' or 'no', followed by a brief exp
                     self.action_anomaly_publisher.put(json.dumps(anomaly_payload))
                     
                     if response.text.strip().lower().startswith('yes'):
-                        logger.warning(f'Significant prediction mismatch for {action_type}: {response.text}')
+                        logger.warning(f'Significant expectation mismatch for {action_type}: {response.text}')
                     else:
-                        logger.info(f'Prediction match for {action_type}: {response.text}')
+                        logger.info(f'Expectation match for {action_type}: {response.text}')
             
         except Exception as e:
             logger.error(f'Error processing action_result: {e}')

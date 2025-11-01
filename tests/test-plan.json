@@ -1,0 +1,54 @@
+{
+  "plan": [
+    {
+      "type": "query-web",
+      "args": {
+        "query": "recent transformer architecture improvements 2024-2025"
+      },
+      "out": "$search_results",
+      "expect": "should find recent papers on transformer architecture improvements"
+    },
+    {
+      "type": "expand",
+      "target": "$search_results",
+      "out": "$papers"
+    },
+    {
+      "type": "index",
+      "source": "$papers",
+      "index_type": "semantic",
+      "fields": {
+        "title": "embed",
+        "content": "embed"
+      }
+    },
+    {
+      "type": "search",
+      "source": "$papers",
+      "query": "transformer architecture improvements",
+      "mode": "semantic",
+      "limit": 3,
+      "out": "$top_papers",
+      "expect": "should return top 3 most cited papers"
+    },
+    {
+      "type": "map",
+      "target": "$top_papers",
+      "operation": "summarize",
+      "args": {
+        "focus": "key findings"
+      },
+      "out": "$summaries"
+    },
+    {
+      "type": "flatten",
+      "target": "$summaries",
+      "out": "$final_summary"
+    },
+    {
+      "type": "say",
+      "target": "user",
+      "value": "$final_summary"
+    }
+  ]
+}

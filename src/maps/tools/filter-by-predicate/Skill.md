@@ -4,7 +4,7 @@ description: Evaluate complex criteria on each item in a collection and return m
 type: prompt_augmentation
 parameters: predicate (required) - filtering condition to evaluate
 examples:
-  - '{"type":"filter-by-predicate","target":"$collection","args":{"predicate":"contains technical content"},"out":"$filtered"}'
+  - '{"type":"filter-by-predicate","target":"$collection","args":{"predicate":"contains technical content"},"out":"$filtered","expect":"should return technical papers only"}'
 ---
 
 # Filter By Predicate

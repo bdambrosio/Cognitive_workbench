@@ -191,7 +191,12 @@ class InfospaceExecutor:
             logger.error(f"Unknown action type: {action_type}")
             return {'status': 'failed', 'reason': f'Unknown action: {action_type}'}
         
-        return handler(action)
+        try:
+            return handler(action)
+        except Exception as e:
+            logger.error(f"Error executing action {action_type}: {e}")
+            logger.error(traceback.format_exc())
+            return {'status': 'failed', 'reason': f'Execution error: {str(e)}'}
     
     # ==================== Core Operations ====================
     
@@ -199,7 +204,7 @@ class InfospaceExecutor:
         """
         Scan for resource/tool by name or interface type.
         
-        Required: type, target, out, prediction
+        Required: type, target, out, expect
         """
         # Validate required fields
         error = self._validate_required_fields(action, 'target', 'out')
@@ -343,6 +348,23 @@ class InfospaceExecutor:
                 input_str = '\n'.join(formatted_notes)
             else:
                 input_str = str(input_value)
+            
+            # Special handling for extract-struct: truncate input since metadata is always at start
+            if tool_name == 'extract-struct':
+                # Check if input is JSON from extract-paper-text and extract text field
+                if isinstance(input_str, str):
+                    try:
+                        parsed = json.loads(input_str)
+                        if isinstance(parsed, dict) and 'text' in parsed:
+                            input_str = parsed['text']
+                            logger.info(f"extract-struct: extracted 'text' field from JSON input")
+                    except (json.JSONDecodeError, TypeError):
+                        pass
+                
+                # Truncate to first 15000 chars (metadata is always at start)
+                if len(input_str) > 15000:
+                    logger.info(f"extract-struct: truncating input from {len(input_str)} to 15000 chars (metadata is at start)")
+                    input_str = input_str[:15000]
             
             # Build prompt with tool instructions + input
             prompt_parts = [
@@ -633,11 +655,11 @@ class InfospaceExecutor:
 
     def _execute_persist(self, action: Dict) -> Dict:
         """
-        Mark a Collection as persistent (saved to filesystem).
+        Mark a Note or Collection as persistent (saved to filesystem).
         
         Required: target
         
-        Once marked persistent, Collection is saved to filesystem on next persist cycle.
+        Once marked persistent, Note or Collection is saved to filesystem on next persist cycle.
         """
         target_arg = action.get('target')
         
@@ -647,15 +669,15 @@ class InfospaceExecutor:
         if not isinstance(target_arg, str) or not target_arg.startswith('$'):
             return {'status': 'failed', 'reason': 'persist target must be $variable'}
         
-        collection_var = target_arg[1:]
+        resource_var = target_arg[1:]
         
-        if collection_var not in self.plan_bindings:
-            return {'status': 'failed', 'reason': f'Variable not bound: {collection_var}'}
+        if resource_var not in self.plan_bindings:
+            return {'status': 'failed', 'reason': f'Variable not bound: {resource_var}'}
         
-        collection_id = self.plan_bindings[collection_var]
+        resource_id = self.plan_bindings[resource_var]
         
-        if not isinstance(collection_id, str) or not collection_id.startswith('Collection_'):
-            return {'status': 'failed', 'reason': f'Variable {collection_var} is not a Collection'}
+        if not isinstance(resource_id, str) or not (resource_id.startswith('Collection_') or resource_id.startswith('Note_')):
+            return {'status': 'failed', 'reason': f'Variable {resource_var} is not a Note or Collection'}
         
         from zenoh import QueryTarget, ConsolidationMode
         for reply in self.session.get(
@@ -664,22 +686,22 @@ class InfospaceExecutor:
             consolidation=ConsolidationMode.NONE,
             timeout=5.0,
             payload=json.dumps({
-                'collection_id': collection_id,
+                'resource_id': resource_id,
                 'character_name': self.agent_name
             }).encode('utf-8')
         ):
             if reply.ok:
                 response = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
                 if response.get('success'):
-                    logger.info(f"Marked {collection_id} as persistent")
-                    return {'status': 'success', 'value': collection_id}
+                    logger.info(f"Marked {resource_id} as persistent")
+                    return {'status': 'success', 'value': resource_id}
                 else:
-                    logger.error(f'Failed to persist Collection: {response.get("error")}')
+                    logger.error(f'Failed to persist resource: {response.get("error")}')
                     return {'status': 'failed', 'reason': response.get('error', 'Unknown error')}
             break
         
-        logger.error(f"Collection persist request failed for {collection_id}")
-        return {'status': 'failed', 'reason': 'Failed to mark Collection as persistent'}
+        logger.error(f"Persist request failed for {resource_id}")
+        return {'status': 'failed', 'reason': 'Failed to mark resource as persistent'}
     
     def _execute_load(self, action: Dict) -> Dict:
         """
@@ -923,18 +945,16 @@ class InfospaceExecutor:
         """
         Display formatted content in popup (similar to say but with popup UI).
         
-        Required: type, value
-        Optional: target (default: "user")
+        Required: type, value or target (accepts both for compatibility)
         """
-        value = self._resolve_value(action.get('value'))
-        target = action.get('target', 'user')
+        # Accept both value and target (target preferred for consistency with other primitives)
+        value = self._resolve_value(action.get('value') or action.get('target'))
         
         if value is None:
-            return {'status': 'failed', 'reason': 'display requires value'}
+            return {'status': 'failed', 'reason': 'display requires value or target'}
         
-        # Capitalize 'user' to 'User' for character name
-        if target.lower() == 'user':
-            target = 'User'
+        # Always display to User
+        target = 'User'
         
         # Send message to target's sense_data (mirrors physical space send_text_input)
         sense_data = {
@@ -959,12 +979,13 @@ class InfospaceExecutor:
         """
         Internal thought/note (logged but not communicated externally).
         
-        Required: type, value
+        Required: type, value or target (accepts both for compatibility)
         """
-        value = self._resolve_value(action.get('value'))
+        # Accept both value and target (target preferred for consistency with other primitives)
+        value = self._resolve_value(action.get('value') or action.get('target'))
         
         if value is None:
-            return {'status': 'failed', 'reason': 'think requires value'}
+            return {'status': 'failed', 'reason': 'think requires value or target'}
         
         # Publish think message to map (for memory system)
         message = {
@@ -1799,19 +1820,19 @@ class InfospaceExecutor:
                 'value': 'how much wood can a wood chuck chuck?',
                 'reason': 'test apply',
                 'out': 'test_output',
-                'prediction': 'test output'
+                'expect': 'test output'
             },
             'focus': {
                 'type': 'focus',
                 'target': 'question-decomposer',
-                'prediction': 'test focus'
+                'expect': 'test focus'
             },
             'create': {
                 'type': 'create',
                 'kind': 'Note',
                 'value': 'test note content',
                 'out': 'test_note',
-                'prediction': 'test create'
+                'expect': 'test create'
             },
             'save': {
                 'type': 'save',
@@ -1834,59 +1855,59 @@ class InfospaceExecutor:
                 'query': 'test query',
                 'mode': 'keyword',
                 'out': 'test_results',
-                'prediction': 'test search results'
+                'expect': 'test search results'
             },
             'say': {
                 'type': 'say',
                 'value': 'test output message',
                 'target': 'user',
-                'prediction': 'test say'
+                'expect': 'test say'
             },
             'think': {
                 'type': 'think',
                 'value': 'test internal thought',
-                'prediction': 'test think'
+                'expect': 'test think'
             },
             'extract': {
                 'type': 'extract',
                 'target': {'test': 'value'},
                 'field': 'test',
                 'out': 'test_extracted',
-                'prediction': 'test extract'
+                'expect': 'test extract'
             },
             'filter': {
                 'type': 'filter',
                 'target': [{'val': 1}, {'val': 2}, {'val': 3}],
                 'condition': {'field': 'val', 'operator': 'gt', 'value': 0},
                 'out': 'test_filtered',
-                'prediction': 'test filter'
+                'expect': 'test filter'
             },
             'map': {
                 'type': 'map',
                 'target': '$test_filtered',
                 'operation': {'type': 'extract', 'field': 'val'},
                 'out': 'test_mapped',
-                'prediction': 'test map'
+                'expect': 'test map'
             },
             'merge': {
                 'type': 'merge',
                 'targets': [{'a': 1}, {'b': 2}],
                 'out': 'test_merged',
-                'prediction': 'test merge'
+                'expect': 'test merge'
             },
             'coerce': {
                 'type': 'coerce',
                 'target': [[1, 2], [3, 4]],
                 'operation': 'flatten',
                 'out': 'test_coerced',
-                'prediction': 'test coerce'
+                'expect': 'test coerce'
             },
             'aggregate': {
                 'type': 'aggregate',
                 'target': [1, 2, 3],
                 'operation': 'count',
                 'out': 'test_aggregated',
-                'prediction': 'test aggregate'
+                'expect': 'test aggregate'
             },
             'sort': {
                 'type': 'sort',
@@ -1894,20 +1915,20 @@ class InfospaceExecutor:
                 'by': 'val',
                 'order': 'asc',
                 'out': 'test_sorted',
-                'prediction': 'test sort'
+                'expect': 'test sort'
             },
             'group_by': {
                 'type': 'group_by',
                 'target': [{'type': 'a'}, {'type': 'b'}],
                 'by': 'type',
                 'out': 'test_grouped',
-                'prediction': 'test group'
+                'expect': 'test group'
             },
             'compare': {
                 'type': 'compare',
                 'targets': ['test', 'test'],
                 'out': 'test_compared',
-                'prediction': 'test compare'
+                'expect': 'test compare'
             }
         }
         

@@ -1,11 +1,15 @@
 ---
 name: summarize
 description: Compress information while preserving key points and structure
-type: prompt_augmentation
-parameters: focus (optional) - topic to guide summarization
+type: python
+trusted: true
+parameters:
+  - name: focus
+    type: string
+    description: Optional topic to guide summarization
 examples:
-  - '{"type":"summarize","target":"$doc","args":{"focus":"key points"},"out":"$summary"}'
-  - '{"type":"summarize","target":"$results","out":"$summary"}'
+  - '{"type":"summarize","target":"$doc","args":{"focus":"key points"},"out":"$summary","expect":"should capture main findings"}'
+  - '{"type":"summarize","target":"$results","out":"$summary","expect":"should condense results"}'
 ---
 
 # Summarize Content

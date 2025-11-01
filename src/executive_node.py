@@ -402,7 +402,6 @@ class ZenohExecutiveNode:
                     except Exception as e:
                         traceback.print_exc()
                         logger.error(f'Error in OODA loop: {e}')
-                    self._complete_turn()
                 time.sleep(0.2)
                 
         except KeyboardInterrupt:
@@ -714,7 +713,6 @@ class ZenohExecutiveNode:
                     if action is not None and not action_succeeded:
                         # Action failed, plan index already advanced, will try next step next turn
                         logger.info(f'Manual action failed for {self.character_name}')
-                        return
                 return
             
             # If awaiting user input but turn advanced, user is signaling to resume autonomous behavior
@@ -795,7 +793,9 @@ class ZenohExecutiveNode:
         except Exception as e:
             logger.error(f'Error in OODA loop: {e}')
             logger.error(traceback.format_exc())
-        return
+        finally:
+            # Always complete turn, regardless of execution path or errors
+            self._complete_turn()
 
 
     def plan_and_initiate_execution(self, goal, activity_manager=None):
@@ -878,6 +878,24 @@ class ZenohExecutiveNode:
 
         return formatted_situation
 
+    def _truncate_result(self, result: Any, max_len: int = 120) -> str:
+        """
+        Truncate action result for prompt inclusion.
+        
+        Args:
+            result: Action result (can be string, dict, or other)
+            max_len: Maximum length in characters
+            
+        Returns:
+            Truncated string representation
+        """
+        if result is None:
+            return ''
+        result_str = str(result)
+        if len(result_str) <= max_len:
+            return result_str
+        return result_str[:max_len] + '...'
+    
     def _update_system_prompt(self):
         """Update the system prompt with the current situation."""
         system_prompt = self.observations['static']
@@ -889,7 +907,8 @@ class ZenohExecutiveNode:
             system_prompt += f"\n#Your current plan is:\n\t{json.dumps(self.current_plan, indent=2)}\n"
         if self.action_history:
             last_action = self.action_history[-1]
-            system_prompt += f"\n#Your last action was:\n\t{last_action.action.get('type')}: {last_action.action.get('target')} - {last_action.result}\n"
+            result_str = self._truncate_result(last_action.result)
+            system_prompt += f"\n#Your last action was:\n\t{last_action.action.get('type')}: {last_action.action.get('target')} - {result_str}\n"
         return system_prompt
 
     def _observe(self):
@@ -954,8 +973,9 @@ class ZenohExecutiveNode:
             user_prompt += '\n'
             if self.action_history:
                 last_action = self.action_history[-1]
+                result_str = self._truncate_result(last_action.result)
                 user_prompt += f'\n#Your last action was:'
-                user_prompt += f"\n\t{last_action.action.get('type')}: {last_action.action.get('target')} - {last_action.result}\n"
+                user_prompt += f"\n\t{last_action.action.get('type')}: {last_action.action.get('target')} - {result_str}\n"
 
             self.observations = {'static': system_prompt, 'dynamic': user_prompt}
             return self.observations
@@ -1135,8 +1155,7 @@ class ZenohExecutiveNode:
                 try:
                     # Validate with appropriate validator
                     if self.is_infospace:
-                        import infospace_planner
-                        validation = infospace_planner.verify_plan(plan_candidate, available_tools=self.available_tools)
+                        validation = self.planner.verify_plan(plan_candidate)
                         valid = validation.get('valid', False) if isinstance(validation, dict) else validation
                         if not valid:
                             reason = validation.get('reason', 'Unknown validation error') if isinstance(validation, dict) else 'Validation failed'
@@ -1150,6 +1169,29 @@ class ZenohExecutiveNode:
                     
                     if valid:
                         logger.info(f'📋 {self.character_name} generated new plan: {json.dumps(plan_candidate, indent=2)}')
+                        
+                        # Semantic validation (logs only, doesn't reject) - after syntactic validation passes
+                        try:
+                            from infospace_semantic_validator import validate_plan_semantically
+                            from pathlib import Path
+                            
+                            # Determine tools directory
+                            maps_base = Path(__file__).parent / 'maps'
+                            tools_dir = maps_base / self.map_name / 'tools'
+                            if not tools_dir.exists():
+                                tools_dir = maps_base / 'tools'
+                            
+                            repair_suggestions = validate_plan_semantically(
+                                plan_candidate,
+                                tools_dir=str(tools_dir) if tools_dir.exists() else None
+                            )
+                            
+                            if repair_suggestions:
+                                logger.warning(f'🔍 {self.character_name} Semantic validation issues:\n{repair_suggestions}')
+                            else:
+                                logger.info(f'✅ {self.character_name} Semantic validation passed')
+                        except Exception as e:
+                            logger.warning(f'{self.character_name} Semantic validation error: {e}')
                 except Exception as e:
                     logger.error(f'Invalid plan structure from planner: {e}')
                     plan_candidate = None
@@ -1668,7 +1710,12 @@ end your response with </end>
             # Route infospace-specific actions to infospace executor
             if action_type in infospace_primitives:
                 logger.info(f'🧩 Routing {action_type} to infospace executor')
-                result = self.infospace_executor.execute_action(action)
+                try:
+                    result = self.infospace_executor.execute_action(action)
+                except Exception as e:
+                    logger.error(f'Exception executing infospace action: {e}')
+                    logger.error(traceback.format_exc())
+                    result = {'status': 'failed', 'reason': f'Exception: {str(e)}'}
                 
                 # Create action record for tracking
                 now_ts = datetime.now()
@@ -1708,6 +1755,15 @@ end your response with </end>
                     action_data['source'] = self.character_name
                 
                 self.action_publisher.put(json.dumps(action_data))
+                
+                # Publish to perception_node for expectation monitoring
+                if action.get('expect') and result.get('status') == 'success':
+                    self.perception_action_result_publisher.put(json.dumps({
+                        'action': action,
+                        'update_text': str(result.get('value', '')),
+                        'expect': action.get('expect')
+                    }))
+                
                 self.action_counter += 1
                 
                 # Return success/failure based on result
@@ -2368,7 +2424,7 @@ end your response with </end>
                 self.perception_action_result_publisher.put(json.dumps({
                     'action': action,
                     'update_text': f'scanned and found {scan_result}',
-                    'prediction': action.get('prediction', '')
+                    'expect': action.get('expect', '')
                 }))
             
             self.action_counter += 1
@@ -2472,8 +2528,9 @@ end your response with </end>
             action_type = record.action.get('type', 'unknown')
             target = record.action.get('target', 'unknown')
             result = record.result if record.result else 'no result recorded'
+            result_str = self._truncate_result(result)
             timestamp = record.timestamp.strftime('%H:%M:%S')
-            actions_text.append(f"{timestamp} - {action_type}: {target} -> {result}")
+            actions_text.append(f"{timestamp} - {action_type}: {target} -> {result_str}")
         
         actions_summary = '\n'.join(actions_text)
         
@@ -2962,8 +3019,7 @@ End your response with </end>
             
             # Validate with appropriate validator
             if self.is_infospace:
-                import infospace_planner
-                validation = infospace_planner.verify_plan(parsed_plan, available_tools=self.available_tools)
+                validation = self.planner.verify_plan(parsed_plan)
                 valid = validation.get('valid', False) if isinstance(validation, dict) else validation
                 if not valid:
                     reason = validation.get('reason', 'Unknown validation error') if isinstance(validation, dict) else 'Validation failed'
@@ -3073,8 +3129,7 @@ EDITED PLAN (JSON only):"""
             
             # Validate with appropriate validator
             if self.is_infospace:
-                import infospace_planner
-                validation = infospace_planner.verify_plan(edited_plan, available_tools=self.available_tools)
+                validation = self.planner.verify_plan(edited_plan)
                 valid = validation.get('valid', False) if isinstance(validation, dict) else validation
                 if not valid:
                     reason = validation.get('reason', 'Unknown validation error') if isinstance(validation, dict) else 'Validation failed'
@@ -3595,7 +3650,7 @@ End your response with:
                 self.perception_action_result_publisher.put(json.dumps({
                     'action': action,
                     'update_text': f'took {target}',
-                    'prediction': action.get('prediction', '')
+                    'expect': action.get('expect', '')
                 }))
             
             return result
@@ -3651,7 +3706,7 @@ End your response with:
                 self.perception_action_result_publisher.put(json.dumps({
                     'action': action,
                     'update_text': f'placed {target}',
-                    'prediction': action.get('prediction', '')
+                    'expect': action.get('expect', '')
                 }))
             
             return result
@@ -3719,7 +3774,7 @@ End your response with:
                     self.perception_action_result_publisher.put(json.dumps({
                         'action': action,
                         'update_text': response.text,
-                        'prediction': action.get('prediction', '')
+                        'expect': action.get('expect', '')
                     }))
                     return True
                 else:
@@ -3807,7 +3862,7 @@ End your response with:
                 self.perception_action_result_publisher.put(json.dumps({
                     'action': action,
                     'update_text': outcome_text,
-                    'prediction': action.get('prediction', '')
+                    'expect': action.get('expect', '')
                 }))
                 action_data['response'] = outcome_text
                 
@@ -3902,7 +3957,7 @@ End your response with:
                         self.perception_action_result_publisher.put(json.dumps({
                             'action': action,
                             'update_text': response.text,
-                            'prediction': action.get('prediction', '')
+                            'expect': action.get('expect', '')
                         }))
                         action_data['response'] = response.text
                         return True
@@ -4068,7 +4123,8 @@ End your response with:
             # Recent actions compact
             actions_text = ''
             for ar in (self.action_history or [])[-20:]:
-                actions_text += f"""{ar.action.get('type', '')}, {ar.action .get('target', '')}: result: {ar.result or ''}\n"""
+                result_str = self._truncate_result(ar.result)
+                actions_text += f"""{ar.action.get('type', '')}, {ar.action .get('target', '')}: result: {result_str}\n"""
 
         except Exception as e:
             logger.error(f'Error collecting drive assessment context: {e}')

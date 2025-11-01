@@ -8,8 +8,8 @@ parameters:
     type: string
     description: Natural language instruction for transformation
 examples:
-  - '{"type":"refine","target":"$data","args":{"instruction":"extract schema as JSON"},"out":"$schema"}'
-  - '{"type":"refine","target":"$paper","args":{"instruction":"list all citations in JSON format"},"out":"$citations"}'
+  - '{"type":"refine","target":"$data","args":{"instruction":"extract schema as JSON"},"out":"$schema","expect":"should extract JSON schema"}'
+  - '{"type":"refine","target":"$paper","args":{"instruction":"list all citations in JSON format"},"out":"$citations","expect":"should find citation list"}'
 ---
 
 # Transform Note
@@ -37,12 +37,12 @@ Returns Note containing transformed content according to instruction.
 
 Extract schema:
 ```json
-{"type":"refine","target":"$data","args":{"instruction":"extract schema"},"out":"schema"}
+{"type":"refine","target":"$data","args":{"instruction":"extract schema"},"out":"$schema","expect":"should extract JSON schema"}
 ```
 
 Extract citations:
 ```json
-{"type":"refine","target":"$paper","args":{"instruction":"list all citations in JSON format"},"out":"citations"}
+{"type":"refine","target":"$paper","args":{"instruction":"list all citations in JSON format"},"out":"$citations","expect":"should find citations"}
 ```
 
 ## Guidelines

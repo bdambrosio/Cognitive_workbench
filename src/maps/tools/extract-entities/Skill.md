@@ -1,10 +1,11 @@
 ---
 name: extract-entities
 description: Extract named entities, topics, and relationships from text or structured content
-type: prompt_augmentation
+type: python
+trusted: true
 parameters: none
 examples:
-  - '{"type":"extract-entities","target":"$paper_text","out":"$entities"}'
+  - '{"type":"extract-entities","target":"$paper_text","out":"$entities","expect":"should find authors and organizations"}'
 ---
 
 # Extract Entities
