@@ -9,6 +9,7 @@ parameters:
     description: Natural language question or test condition
 examples:
   - '{"type":"if","condition":{"type":"tool_condition","tool":"assess","target":"$content","args":{"predicate":"contains citations?"}},"then":[...]}'
+  - '{"type":"assess","target":"$document","args":{"predicate":"discusses AI safety?"},"out":"$is_relevant","expect":"should return true or false"}'
 ---
 
 # Test Note

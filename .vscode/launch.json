@@ -178,6 +178,21 @@
             "preLaunchTask": "setup-zenoh-environment"
         },
         {
+            "name": "Test Semantic Plan Validation",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/infospace_semantic_validator.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/src",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src"
+            },
+            "args": ["../tests/test-plan.json", "maps/infolab/tools/"],
+            "justMyCode": false,
+            "stopOnEntry": false,
+            "preLaunchTask": "setup-zenoh-environment"
+        },
+        {
             "name": "Scenario Manager",
             "type": "debugpy",
             "request": "launch",

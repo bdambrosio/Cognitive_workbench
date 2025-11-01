@@ -44,6 +44,16 @@ class UnifiedPlanner:
         # Load appropriate template
         self.template = self._load_template()
         
+        # Create infospace planner instance if needed (for validation and reuse)
+        self.infospace_planner = None
+        if world_type == 'infospace':
+            from infospace_planner import InfospacePlanner
+            self.infospace_planner = InfospacePlanner(
+                llm_client=llm_client,
+                available_tools=self.available_tools,
+                logger=self.logger
+            )
+        
         self.logger.info(f"UnifiedPlanner initialized: {world_type} world, map={map_name}, {len(self.available_tools)} tools")
     
     def _load_tools(self) -> Dict[str, Dict]:
@@ -100,9 +110,11 @@ class UnifiedPlanner:
         
         # Route to appropriate planner
         if self.world_type == 'infospace':
-            return self._generate_infospace_plan(goal, context)
+            plan = self._generate_infospace_plan(goal, context)
         else:
-            return self._generate_physical_plan(goal, context)
+            plan = self._generate_physical_plan(goal, context)
+        
+        return plan
     
     def _generate_infospace_plan(self, goal: str, context: Dict) -> Dict:
         """Generate infospace plan."""
@@ -206,4 +218,26 @@ class UnifiedPlanner:
         except json.JSONDecodeError as e:
             self.logger.error(f"Failed to parse plan JSON: {e}")
             return {'error': f'JSON parse error: {e}'}
+    
+    def verify_plan(self, plan_json: Any) -> Dict:
+        """
+        Validate plan structure.
+        Delegates to infospace planner for infospace plans, returns error for physical.
+        
+        Args:
+            plan_json: Plan as JSON string or dict
+            
+        Returns:
+            Dict with 'valid' (bool) and 'reason' (str if invalid)
+        """
+        if self.world_type == 'infospace':
+            if self.infospace_planner:
+                plan = plan_json if isinstance(plan_json, dict) else json.loads(plan_json)
+                return self.infospace_planner.verify_plan(plan)
+            else:
+                return {'valid': False, 'reason': 'Infospace planner not initialized'}
+        else:
+            # Physical world validation handled by plan_module in executive_node
+            return {'valid': True}
+
 
