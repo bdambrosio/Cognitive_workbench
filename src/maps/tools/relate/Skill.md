@@ -1,7 +1,8 @@
 ---
 name: relate
-description: Find similarities, differences, and relationships between two or more Notes
-type: prompt_augmentation
+description: Find similarities, differences, and relationships between exactly two Notes or Collections
+type: python
+trusted: true
 parameters: comparison_mode (optional) - 'similarity'|'contradiction'|'comprehensive'; threshold (optional) - minimum similarity (default 0.3); focus_aspects (optional) - specific dimensions to compare
 examples:
   - '{"type":"create-collection","value":["$doc1","$doc2"],"out":"$docs"}'
@@ -23,15 +24,16 @@ Support:
 
 ## Input Format
 
-Accepts:
-- **Single Note** - returns self-analysis
-- **Two or more Notes** - via Collection variable (recommended)
-- Tool automatically unpacks Collection and compares all member Notes
+Requires exactly 2 elements:
+- **Two Notes** - via Collection variable containing exactly 2 Note IDs
+- **Two Collections** - Collection containing exactly 2 Collection IDs (each Collection is flattened before comparison)
+- **Mixed** - Collection containing 1 Note ID and 1 Collection ID
+- Tool automatically flattens Collections (including nested Collections) and fetches Note content
 
 **Usage Pattern:**
 ```json
-{"type":"createCollection","value":["$note1","$note2"],"out":"notes_to_compare"}
-{"type":"compare-notes","target":"$notes_to_compare","out":"comparison"}
+{"type":"create-collection","value":["$note1","$note2"],"out":"$notes_to_compare"}
+{"type":"relate","target":"$notes_to_compare","out":"$comparison"}
 ```
 
 Optional focus argument for targeted comparison:
@@ -43,7 +45,7 @@ Optional focus argument for targeted comparison:
 
 Returns comparison analysis:
 
-**For 2 Notes:**
+**Output Format:**
 ```json
 {
   "similarity_score": 0.75,
@@ -55,23 +57,6 @@ Returns comparison analysis:
   ],
   "relationship": "first_elaborates_on_second",
   "summary": "Both discuss X, but first adds Y perspective"
-}
-```
-
-**For multiple Notes:**
-```json
-{
-  "common_themes": ["theme1"],
-  "consensus_points": ["point1", "point2"],
-  "divergences": [
-    {"aspect": "approach", "views": {"note1": "view1", "note2": "view2"}}
-  ],
-  "outliers": ["note3"],
-  "clusters": [
-    {"notes": ["note1", "note2"], "theme": "agrees on X"},
-    {"notes": ["note4", "note5"], "theme": "disagrees on Y"}
-  ],
-  "summary": "Three main perspectives emerge..."
 }
 ```
 

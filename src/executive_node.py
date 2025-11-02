@@ -1561,7 +1561,8 @@ end your response with </end>
                     'target': stype,
                     'args': step.get('args', {}),
                     'out': step.get('out'),
-                    'reason': step.get('reason', '')
+                    'reason': step.get('reason', ''),
+                    'expect': step.get('expect')
                 }
             else:
                 tool_step = {
@@ -1570,7 +1571,8 @@ end your response with </end>
                     'value': step.get('target') or step.get('value'),  # Support both target and value for backward compatibility
                     'args': step.get('args', {}),
                     'out': step.get('out'),
-                    'reason': step.get('reason', '')
+                    'reason': step.get('reason', ''),
+                    'expect': step.get('expect')
                 }
             current['idx'] = idx + 1
             return tool_step
@@ -2443,7 +2445,7 @@ end your response with </end>
 
         # Request situation/map update for UI after non-move actions that may affect visibility/adjacency
         try:
-            if action['type'].lower() in ["take", "inspect", "use", "save", "create"]:
+            if action['type'].lower() in ["take", "inspect", "use", "create"]:
                 self.map_update_request_publisher.put(json.dumps({'type': 'step_look'}))
         except Exception:
             pass

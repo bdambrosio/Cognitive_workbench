@@ -1588,9 +1588,11 @@ end your response with:
             collection_id = payload.get('collection_id')
             note_id = payload.get('note_id')
             agent_name = payload.get('agent_name')
+            operation = payload.get('operation', 'add')  # 'add' or 'update'
+            content = payload.get('content')  # For update operation
             
-            if not collection_id or not note_id:
-                raise ValueError("Missing collection_id or note_id in payload")
+            if not collection_id:
+                raise ValueError("Missing collection_id in payload")
             
             # Fetch Collection from resource_registry
             collection = self.world_map.resource_registry.get(collection_id)
@@ -1602,31 +1604,41 @@ end your response with:
             if not isinstance(content_list, list):
                 raise ValueError(f"Collection {collection_id} content is not a list")
             
-            content_list.append(note_id)
-            collection['properties']['item_count'] = len(content_list)
-            
-            logger.info(f"📚 Added {note_id} to {collection_id} (now {len(content_list)} items) by {agent_name}")
-            
-            # Auto-update associated index (if Collection is indexed)
-            if collection_id in self.collection_indexes:
-                # Collection is indexed - store name = collection_id
-                if collection_id in self.vector_stores:
-                    # Fetch Note content
-                    note = self.world_map.get_resource_by_name(note_id)
-                    if note:
-                        note_content = note.get('properties', {}).get('content')
-                        if note_content is not None:
-                            # Generate embedding and add to store
-                            store = self.vector_stores[collection_id]
-                            content_text = self._extract_content_for_embedding(note_content, {})
-                            embedding = self._generate_embedding(content_text)
-                            store.add(note_content, embedding, metadata={'timestamp': time.time()})
-                            logger.info(f"  ↳ Updated index for {collection_id} with new item")
+            if operation == 'update' and content is not None:
+                # Update: replace entire content
+                if not isinstance(content, list):
+                    raise ValueError("Update content must be a list")
+                collection['properties']['content'] = content
+                collection['properties']['item_count'] = len(content)
+                logger.info(f"📚 Updated {collection_id} content (now {len(content)} items) by {agent_name}")
+            else:
+                # Add: append single note
+                if not note_id:
+                    raise ValueError("Missing note_id for add operation")
+                content_list.append(note_id)
+                collection['properties']['item_count'] = len(content_list)
+                logger.info(f"📚 Added {note_id} to {collection_id} (now {len(content_list)} items) by {agent_name}")
+                
+                # Auto-update associated index (if Collection is indexed)
+                if collection_id in self.collection_indexes:
+                    # Collection is indexed - store name = collection_id
+                    if collection_id in self.vector_stores:
+                        # Fetch Note content
+                        note = self.world_map.get_resource_by_name(note_id)
+                        if note:
+                            note_content = note.get('properties', {}).get('content')
+                            if note_content is not None:
+                                # Generate embedding and add to store
+                                store = self.vector_stores[collection_id]
+                                content_text = self._extract_content_for_embedding(note_content, {})
+                                embedding = self._generate_embedding(content_text)
+                                store.add(note_content, embedding, metadata={'timestamp': time.time()})
+                                logger.info(f"  ↳ Updated index for {collection_id} with new item")
             
             response = {
                 'success': True,
                 'collection_id': collection_id,
-                'item_count': len(content_list)
+                'item_count': collection['properties']['item_count']
             }
             query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
             

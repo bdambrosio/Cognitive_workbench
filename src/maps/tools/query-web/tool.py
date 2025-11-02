@@ -167,7 +167,7 @@ def _html_to_text_extract(html: str, query: str, max_chars: int) -> str:
 # LLM-assisted TL;DR
 # ------------------------------
 
-def _llm_tldr(LLM_client, text: str, query: str, max_chars: int) -> str:
+def _llm_tldr(LLM_client, text: str, query: str, max_chars: int, timeout: float = 10.0) -> str:
     """
     Your environment should provide LLM_client.generate(...)
     Keep this call shape; fill in your client inside your app.
@@ -191,7 +191,7 @@ Respond only with the JSON, no commentary, no code fences, no reasoning    :
 
 """]
     try:
-        raw = LLM_client.generate(messages=prompt, bindings={"query": query, "text": text}, max_tokens = max_chars, temperature=0.2, is_json=True)
+        raw = LLM_client.generate(messages=prompt, bindings={"query": query, "text": text}, max_tokens = max_chars, temperature=0.2, is_json=True, timeout=timeout)
         # Accept either dict or string JSON
         if isinstance(raw.text, dict):
             if str(raw.text.get("relevant", "")).lower().startswith("true"):
@@ -199,11 +199,11 @@ Respond only with the JSON, no commentary, no code fences, no reasoning    :
             else:
                 logger.error(f"No relevant content found for query: {query}")
                 return ""
+        return ""
     except Exception as e:
+        logger.error(f"LLM TLDR failed: {e}")
         traceback.print_exc()
-        pass
-    logger.error(f"Invalid JSON from site response eval: {raw.text}")
-    return "invalid JSON from site response eval"
+        return ""
 
 # ------------------------------
 # URL processing
@@ -232,7 +232,9 @@ def _process_url(url: str, query: str, client, per_url_timeout: float, max_chars
             logger.warning(f"Rejected mostly-numeric content from {url}")
             return {"url": url, "domain": _extract_domain(url), "extract": "", "elapsed_ms": int((time.time()-start)*1000)}
         
-        tldr = _llm_tldr(client, extract, query=query, max_chars=max_chars)
+        # Calculate remaining time for LLM call (leave 1s buffer)
+        remaining_time = max(3.0, per_url_timeout - (time.time() - start) - 1.0)
+        tldr = _llm_tldr(client, extract, query=query, max_chars=max_chars, timeout=remaining_time)
         return {"url": url, "domain": _extract_domain(url), "extract": tldr or extract, "elapsed_ms": int((time.time()-start)*1000)}
     except Exception:
         traceback.print_exc()
@@ -314,11 +316,26 @@ Respond only with the rephrased query, no commentary, no code fences, no reasoni
                         if item.get("extract"):
                             results.append(item)
                     except Exception:
-                        # swallow and continue
                         pass
+                    still.append(None)
                 else:
-                    still.append(fut)
-            in_flight = still
+                    # Check if we should timeout this future
+                    remaining_time = wall_time_limit - (time.time() - t0)
+                    if remaining_time <= 0:
+                        fut.cancel()
+                    else:
+                        try:
+                            # Wait with timeout - if it completes, get result
+                            item = fut.result(timeout=0.1)
+                            logger.info(f"Completed task: {item}")
+                            if item.get("extract"):
+                                results.append(item)
+                            still.append(None)
+                        except concurrent.futures.TimeoutError:
+                            still.append(fut)
+                        except Exception:
+                            still.append(None)
+            in_flight = [f for f in still if f is not None]
             time.sleep(0.05 if len(in_flight) < max_workers else 0.2)
 
         # cancel remaining if wall time exceeded
