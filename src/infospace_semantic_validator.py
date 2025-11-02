@@ -136,7 +136,7 @@ Analyze this plan and identify any semantic errors."""
             response = self.llm.ask(
                 {},
                 [SystemMessage(content=system_prompt), UserMessage(content=user_prompt)],
-                max_tokens=2000,
+                max_tokens=200,
                 stops=['</end>'],
                 log=True
             )

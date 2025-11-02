@@ -184,6 +184,12 @@ class InfospaceExecutor:
             'flatten': self._execute_flatten,
             'add': self._execute_add,
             'expand': self._execute_expand,
+            # Set operations
+            'size': self._execute_size,
+            'union': self._execute_union,
+            'intersection': self._execute_intersection,
+            'difference': self._execute_difference,
+            'remove': self._execute_remove,
         }
         
         handler = handlers.get(action_type)
@@ -589,7 +595,13 @@ class InfospaceExecutor:
             if var_name not in self.plan_bindings:
                 return {'status': 'failed', 'reason': f'Variable {value_arg} not bound'}
             bound_value = self.plan_bindings[var_name]
-            if isinstance(bound_value, str) and (bound_value.startswith('Note_') or bound_value.startswith('Collection_')):
+            if isinstance(bound_value, str) and bound_value.startswith('Collection_'):
+                # Dereference Collection to get its Note IDs
+                note_ids = self._dereference_collection(var_name)
+                if not isinstance(note_ids, list):
+                    return {'status': 'failed', 'reason': f'Failed to dereference Collection {value_arg}'}
+            elif isinstance(bound_value, str) and bound_value.startswith('Note_'):
+                # Single Note - wrap in list
                 note_ids = [bound_value]
             elif isinstance(bound_value, list):
                 note_ids = bound_value
@@ -948,7 +960,16 @@ class InfospaceExecutor:
         Required: type, value or target (accepts both for compatibility)
         """
         # Accept both value and target (target preferred for consistency with other primitives)
-        value = self._resolve_value(action.get('value') or action.get('target'))
+        target_arg = action.get('value') or action.get('target')
+        
+        # Resolve variable if it's a $variable
+        value = self._resolve_value(target_arg)
+        
+        # If resolved value is a resource ID (literal string like "Note_20"), dereference it
+        if isinstance(value, str) and (value.startswith('Note_') or value.startswith('Collection_')):
+            content = self._get_content(value)
+            if content is not None:
+                value = content
         
         if value is None:
             return {'status': 'failed', 'reason': 'display requires value or target'}
@@ -1069,7 +1090,7 @@ class InfospaceExecutor:
         target_arg = action.get('target')
         operation = action.get('operation')
         out_var = action.get('out')
-        filter_null = action.get('filter_null', False)
+        filter_null = action.get('filter_null', True)
         additional_args = action.get('args', {})
         
         # Target must be a Collection variable
@@ -1342,6 +1363,232 @@ class InfospaceExecutor:
         
         return {'status': 'success', 'value': collection_id}
     
+    # ==================== Set Operations ====================
+    
+    def _execute_size(self, action: Dict) -> Dict:
+        """
+        Get size (item count) of a Collection.
+        
+        Required: target, out
+        """
+        error = self._validate_required_fields(action, 'target', 'out')
+        if error:
+            return {'status': 'failed', 'reason': error}
+        
+        target_arg = action.get('target')
+        out_var = action.get('out')
+        
+        if not isinstance(target_arg, str) or not target_arg.startswith('$'):
+            return {'status': 'failed', 'reason': 'size target must be $variable'}
+        
+        collection_var = target_arg[1:]
+        note_ids = self._dereference_collection(collection_var)
+        
+        if not isinstance(note_ids, list):
+            return {'status': 'failed', 'reason': 'size target must be a Collection'}
+        
+        size = len(note_ids)
+        info_id = self._persist_note(size, 'size_result')
+        if info_id:
+            self._bind_variable(out_var, info_id)
+            logger.info(f"Size of {collection_var}: {size} → ${out_var}")
+            return {'status': 'success', 'value': info_id}
+        
+        return {'status': 'failed', 'reason': 'Failed to persist size result'}
+    
+    def _execute_union(self, action: Dict) -> Dict:
+        """
+        Union of two Collections (A ∪ B) - all items from both, deduplicated.
+        
+        Required: target, value, out
+        """
+        error = self._validate_required_fields(action, 'target', 'value', 'out')
+        if error:
+            return {'status': 'failed', 'reason': error}
+        
+        target_arg = action.get('target')
+        value_arg = action.get('value')
+        out_var = action.get('out')
+        
+        if not isinstance(target_arg, str) or not target_arg.startswith('$'):
+            return {'status': 'failed', 'reason': 'union target must be $variable'}
+        if not isinstance(value_arg, str) or not value_arg.startswith('$'):
+            return {'status': 'failed', 'reason': 'union value must be $variable'}
+        
+        target_var = target_arg[1:]
+        value_var = value_arg[1:]
+        
+        target_ids = self._dereference_collection(target_var)
+        value_ids = self._dereference_collection(value_var)
+        
+        if not isinstance(target_ids, list) or not isinstance(value_ids, list):
+            return {'status': 'failed', 'reason': 'union requires both arguments to be Collections'}
+        
+        # Union: combine and deduplicate
+        union_ids = list(dict.fromkeys(target_ids + value_ids))
+        
+        collection_id = self._create_collection(union_ids, 'union_result')
+        if collection_id:
+            self._bind_variable(out_var, collection_id)
+            logger.info(f"Union {len(target_ids)} + {len(value_ids)} → {len(union_ids)} → ${out_var}")
+            return {'status': 'success', 'value': collection_id}
+        
+        return {'status': 'failed', 'reason': 'Failed to create union Collection'}
+    
+    def _execute_intersection(self, action: Dict) -> Dict:
+        """
+        Intersection of two Collections (A ∩ B) - items in both.
+        
+        Required: target, value, out
+        """
+        error = self._validate_required_fields(action, 'target', 'value', 'out')
+        if error:
+            return {'status': 'failed', 'reason': error}
+        
+        target_arg = action.get('target')
+        value_arg = action.get('value')
+        out_var = action.get('out')
+        
+        if not isinstance(target_arg, str) or not target_arg.startswith('$'):
+            return {'status': 'failed', 'reason': 'intersection target must be $variable'}
+        if not isinstance(value_arg, str) or not value_arg.startswith('$'):
+            return {'status': 'failed', 'reason': 'intersection value must be $variable'}
+        
+        target_var = target_arg[1:]
+        value_var = value_arg[1:]
+        
+        target_ids = self._dereference_collection(target_var)
+        value_ids = self._dereference_collection(value_var)
+        
+        if not isinstance(target_ids, list) or not isinstance(value_ids, list):
+            return {'status': 'failed', 'reason': 'intersection requires both arguments to be Collections'}
+        
+        # Intersection: items in both
+        intersection_ids = [item for item in target_ids if item in value_ids]
+        
+        collection_id = self._create_collection(intersection_ids, 'intersection_result')
+        if collection_id:
+            self._bind_variable(out_var, collection_id)
+            logger.info(f"Intersection {len(target_ids)} ∩ {len(value_ids)} → {len(intersection_ids)} → ${out_var}")
+            return {'status': 'success', 'value': collection_id}
+        
+        return {'status': 'failed', 'reason': 'Failed to create intersection Collection'}
+    
+    def _execute_difference(self, action: Dict) -> Dict:
+        """
+        Difference of two Collections (A - B) - items in A but not in B.
+        
+        Required: target, value, out
+        """
+        error = self._validate_required_fields(action, 'target', 'value', 'out')
+        if error:
+            return {'status': 'failed', 'reason': error}
+        
+        target_arg = action.get('target')
+        value_arg = action.get('value')
+        out_var = action.get('out')
+        
+        if not isinstance(target_arg, str) or not target_arg.startswith('$'):
+            return {'status': 'failed', 'reason': 'difference target must be $variable'}
+        if not isinstance(value_arg, str) or not value_arg.startswith('$'):
+            return {'status': 'failed', 'reason': 'difference value must be $variable'}
+        
+        target_var = target_arg[1:]
+        value_var = value_arg[1:]
+        
+        target_ids = self._dereference_collection(target_var)
+        value_ids = self._dereference_collection(value_var)
+        
+        if not isinstance(target_ids, list) or not isinstance(value_ids, list):
+            return {'status': 'failed', 'reason': 'difference requires both arguments to be Collections'}
+        
+        # Difference: items in target but not in value
+        value_set = set(value_ids)
+        difference_ids = [item for item in target_ids if item not in value_set]
+        
+        collection_id = self._create_collection(difference_ids, 'difference_result')
+        if collection_id:
+            self._bind_variable(out_var, collection_id)
+            logger.info(f"Difference {len(target_ids)} - {len(value_ids)} → {len(difference_ids)} → ${out_var}")
+            return {'status': 'success', 'value': collection_id}
+        
+        return {'status': 'failed', 'reason': 'Failed to create difference Collection'}
+    
+    def _execute_remove(self, action: Dict) -> Dict:
+        """
+        Remove a Note from a Collection (mutates Collection).
+        
+        Required: target, value, out
+        """
+        error = self._validate_required_fields(action, 'target', 'value', 'out')
+        if error:
+            return {'status': 'failed', 'reason': error}
+        
+        target_arg = action.get('target')
+        value_arg = action.get('value')
+        out_var = action.get('out')
+        
+        if not isinstance(target_arg, str) or not target_arg.startswith('$'):
+            return {'status': 'failed', 'reason': 'remove target must be $variable'}
+        
+        collection_var = target_arg[1:]
+        
+        if collection_var not in self.plan_bindings:
+            return {'status': 'failed', 'reason': f'Collection variable not bound: {collection_var}'}
+        
+        collection_id = self.plan_bindings[collection_var]
+        
+        if not isinstance(collection_id, str) or not collection_id.startswith('Collection_'):
+            return {'status': 'failed', 'reason': f'Variable {collection_var} is not a Collection'}
+        
+        # Resolve value to Note ID
+        if isinstance(value_arg, str) and value_arg.startswith('$'):
+            var_name = value_arg[1:]
+            if var_name not in self.plan_bindings:
+                return {'status': 'failed', 'reason': f'Note variable not bound: {var_name}'}
+            note_id = self.plan_bindings[var_name]
+            if not isinstance(note_id, str) or not note_id.startswith('Note_'):
+                return {'status': 'failed', 'reason': f'Variable {var_name} is not a Note'}
+        else:
+            # Literal value - treat as Note ID
+            note_id = value_arg if isinstance(value_arg, str) else str(value_arg)
+        
+        # Get current Collection content
+        note_ids = self._dereference_collection(collection_var)
+        if note_id not in note_ids:
+            logger.warning(f"Note {note_id} not in Collection {collection_id}, nothing to remove")
+            self._bind_variable(out_var, collection_id)
+            return {'status': 'success', 'value': collection_id}
+        
+        # Remove from list
+        note_ids.remove(note_id)
+        
+        # Update Collection via map_node (similar to add but with modified content)
+        from zenoh import QueryTarget, ConsolidationMode
+        for reply in self.session.get(
+            f"cognitive/map/collection/add",
+            target=QueryTarget.BEST_MATCHING,
+            consolidation=ConsolidationMode.NONE,
+            timeout=5.0,
+            payload=json.dumps({
+                'collection_id': collection_id,
+                'content': note_ids,  # Send full updated content
+                'agent_name': self.agent_name,
+                'operation': 'update'  # Signal this is an update, not add
+            }).encode('utf-8')
+        ):
+            if reply.ok:
+                response = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
+                if response.get('success'):
+                    self._bind_variable(out_var, collection_id)
+                    logger.info(f"Removed {note_id} from {collection_id} (now {len(note_ids)} items) → ${out_var}")
+                    return {'status': 'success', 'value': collection_id}
+                else:
+                    return {'status': 'failed', 'reason': response.get('error', 'Remove failed')}
+            break
+        
+        return {'status': 'failed', 'reason': 'No response from map_node'}
+    
     # ==================== Operation Application Helpers ====================
     
     def _apply_operation_to_value(self, tool_name: str, value: Any, reason: str = '', 
@@ -1442,8 +1689,24 @@ class InfospaceExecutor:
         return bool(target)
     
     def _eval_empty(self, condition: Dict) -> bool:
-        """Check if variable is empty/falsy"""
-        return not self._eval_has_value(condition)
+        """Check if variable is empty/falsy or Collection has 0 items"""
+        target_arg = condition.get('target')
+        
+        if not isinstance(target_arg, str) or not target_arg.startswith('$'):
+            target = self._resolve_value(target_arg)
+            return not bool(target)
+        
+        # Check if target is Collection
+        target_var = target_arg[1:]
+        if target_var in self.plan_bindings:
+            target_id = self.plan_bindings[target_var]
+            if isinstance(target_id, str) and target_id.startswith('Collection_'):
+                note_ids = self._dereference_collection(target_var)
+                return len(note_ids) == 0
+        
+        # Not a Collection - use existing logic
+        target = self._resolve_value(target_arg)
+        return not bool(target)
     
     def _eval_equals(self, condition: Dict) -> bool:
         """Check value equality"""
@@ -1505,10 +1768,44 @@ class InfospaceExecutor:
         return False
     
     def _eval_contains(self, condition: Dict) -> bool:
-        """Check if value contains substring or element"""
-        target = self._resolve_value(condition.get('target'))
-        value = self._resolve_value(condition.get('value'))
+        """Check if value contains substring/element (Note) or Note ID membership (Collection)"""
+        target_arg = condition.get('target')
+        value_arg = condition.get('value')
         
+        if not isinstance(target_arg, str) or not target_arg.startswith('$'):
+            # Not a variable - use existing content check
+            target = self._resolve_value(target_arg)
+            value = self._resolve_value(value_arg)
+            return self._check_content_contains(target, value)
+        
+        # Check if target is Collection
+        target_var = target_arg[1:]
+        if target_var in self.plan_bindings:
+            target_id = self.plan_bindings[target_var]
+            if isinstance(target_id, str) and target_id.startswith('Collection_'):
+                # Collection membership check - resolve value to Note ID
+                note_ids = self._dereference_collection(target_var)
+                if not note_ids:
+                    return False
+                
+                # Resolve value to Note ID
+                if isinstance(value_arg, str) and value_arg.startswith('$'):
+                    value_var = value_arg[1:]
+                    if value_var in self.plan_bindings:
+                        value_id = self.plan_bindings[value_var]
+                        return value_id in note_ids
+                    return False
+                else:
+                    # Literal value - check if string matches Note ID
+                    return value_arg in note_ids
+        
+        # Not a Collection - use existing Note content check
+        target = self._resolve_value(target_arg)
+        value = self._resolve_value(value_arg)
+        return self._check_content_contains(target, value)
+    
+    def _check_content_contains(self, target: Any, value: Any) -> bool:
+        """Check if value appears in target content (existing logic)"""
         if isinstance(target, str):
             return str(value) in target
         elif isinstance(target, list):
@@ -1833,11 +2130,6 @@ class InfospaceExecutor:
                 'value': 'test note content',
                 'out': 'test_note',
                 'expect': 'test create'
-            },
-            'save': {
-                'type': 'save',
-                'out': 'test_var',
-                'value': 'test_data'
             },
             'index': {
                 'type': 'index',

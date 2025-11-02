@@ -30,13 +30,13 @@ Output: out: $variable → Collection (same length or filtered)
 Parameters:
   - target (required): $variable referencing Collection
   - operation (required): tool-name string or {"tool":"name","args":{}} object
-  - filter_null (optional): boolean, exclude null results (default: false)
+  - filter_null (optional): boolean, exclude null/failed results (default: true)
   - out (required): $variable name for resulting Collection
 Preconditions: target variable must be bound to Collection
-Postconditions: out variable bound to Collection with transformed items
+Postconditions: out variable bound to Collection with transformed items (failures excluded by default)
 Examples:
   {"type":"map","target":"$collection","operation":"tool-name","out":"$result_collection"}
-  {"type":"map","target":"$collection","operation":"tool-name","filter_null":true,"out":"$filtered_results"}
+  {"type":"map","target":"$collection","operation":"tool-name","filter_null":false,"out":"$all_results"}
   {"type":"map","target":"$new_items","operation":"add","args":{"target":"$existing_collection"},"out":"$existing_collection"}
 
 ## flatten
@@ -93,6 +93,71 @@ Postconditions: Collection has new item added, out variable references same Coll
 Examples:
   {"type":"add","target":"$collection","value":"$new_note","out":"$collection"}
   {"type":"add","target":"$dialog_history","value":"Hello user","out":"$dialog_history"}
+
+## size
+Description: Get item count of a Collection
+Input: target: $variable → Collection
+Output: out: $variable → Note (containing integer count)
+Parameters:
+  - target (required): $variable referencing Collection
+  - out (required): $variable name for resulting Note
+Preconditions: target variable must be bound to Collection
+Postconditions: out variable bound to Note containing Collection size
+Examples:
+  {"type":"size","target":"$collection","out":"$count"}
+
+## union
+Description: Union of two Collections (A ∪ B) - all items from both, deduplicated
+Input: target: $variable → Collection A, value: $variable → Collection B
+Output: out: $variable → Collection (union result)
+Parameters:
+  - target (required): $variable referencing first Collection
+  - value (required): $variable referencing second Collection
+  - out (required): $variable name for resulting Collection
+Preconditions: both variables must be bound to Collections
+Postconditions: out variable bound to new Collection containing union
+Examples:
+  {"type":"union","target":"$collection1","value":"$collection2","out":"$combined"}
+
+## intersection
+Description: Intersection of two Collections (A ∩ B) - items in both
+Input: target: $variable → Collection A, value: $variable → Collection B
+Output: out: $variable → Collection (intersection result)
+Parameters:
+  - target (required): $variable referencing first Collection
+  - value (required): $variable referencing second Collection
+  - out (required): $variable name for resulting Collection
+Preconditions: both variables must be bound to Collections
+Postconditions: out variable bound to new Collection containing common items
+Examples:
+  {"type":"intersection","target":"$papers_2024","value":"$papers_2025","out":"$common_papers"}
+
+## difference
+Description: Difference of two Collections (A - B) - items in A but not in B
+Input: target: $variable → Collection A, value: $variable → Collection B
+Output: out: $variable → Collection (difference result)
+Parameters:
+  - target (required): $variable referencing first Collection
+  - value (required): $variable referencing second Collection
+  - out (required): $variable name for resulting Collection
+Preconditions: both variables must be bound to Collections
+Postconditions: out variable bound to new Collection containing items only in A
+Examples:
+  {"type":"difference","target":"$all_papers","value":"$reviewed_papers","out":"$unreviewed"}
+
+## remove
+Description: Remove a Note from a Collection (mutates Collection)
+Input: target: $variable → Collection, value: $variable → Note or Note ID literal
+Output: out: $variable → Collection (same variable, mutated)
+Parameters:
+  - target (required): $variable referencing Collection
+  - value (required): $variable referencing Note or literal Note ID
+  - out (required): $variable name (should match target)
+Preconditions: target variable must be bound to Collection
+Postconditions: Collection has item removed, out variable references same Collection
+Examples:
+  {"type":"remove","target":"$collection","value":"$note_id","out":"$collection"}
+  {"type":"remove","target":"$collection","value":"Note_123","out":"$collection"}
 
 ## create-note
 Description: Create a persistent Note object and bind to variable
@@ -273,7 +338,7 @@ All conditions evaluate to boolean. Uniform form:
 - bound: {"type": "bound", "target": "$var"} - true if $var exists
 - notbound: {"type": "notbound", "target": "$var"} - true if $var doesn't exist
 - has_value: {"type": "has_value", "target": "$var"} - true if $var is truthy
-- empty: {"type": "empty", "target": "$var"} - true if $var is falsy/empty (or empty Collection)
+- empty: {"type": "empty", "target": "$var"} - true if Note is falsy/empty or Collection has 0 items
 
 ## Value Comparison Conditions (target must be Note with comparable content):
 - equals: {"type": "equals", "target": "$var", "value": "expected"}
@@ -283,8 +348,8 @@ All conditions evaluate to boolean. Uniform form:
 - gte: {"type": "gte", "target": "$score", "value": 0.7} (numeric)
 - lte: {"type": "lte", "target": "$size", "value": 1000} (numeric)
 
-## Membership Conditions (target must be Note):
-- contains: {"type": "contains", "target": "$text", "value": "keyword"} (substring or element)
+## Membership Conditions (target can be Note or Collection):
+- contains: {"type": "contains", "target": "$text", "value": "keyword"} (substring/element for Note, Note ID membership for Collection)
 - not_contains: {"type": "not_contains", "target": "$tags", "value": "spam"}
 
 ## Pattern Matching (target must be Note with string content):
@@ -316,6 +381,29 @@ OUTPUT: only valid JSON — no reasoning, no prose, no code fences.
 {primitives_reference}
 
 # COMMON PATTERNS:
+
+Pattern: Persisting Collections
+  When you need to save a Collection to filesystem for persistence:
+  1. Create Collection with create-collection
+  2. Mark it persistent with persist
+  3. Optionally use name parameter for named Collection
+  
+  Example - Save research findings:
+  {"type":"create-collection","value":["$methodology_summary","$gaps_analysis"],"name":"constitutional-ai-findings","out":"$findings"}
+  {"type":"persist","target":"$findings"}
+
+Pattern: Downloading PDFs from web search results
+  When query-web returns results with JSON objects containing URLs:
+  1. Query web to get results
+  2. Expand to get individual result items
+  3. Use map with as-json to extract URL field from each item
+  4. Use map with download-pdf to download each PDF
+  
+  Example:
+  {"type":"query-web","args":{"query":"attention mechanism papers"},"out":"$results","expect":"should find papers"}
+  {"type":"expand","target":"$results","out":"$items"}
+  {"type":"map","target":"$items","operation":"as-json","args":{"field":"url"},"out":"$urls"}
+  {"type":"map","target":"$urls","operation":"download-pdf","out":"$pdfs"}
 
 Pattern: Adding filtered items to existing Collection
   When you need to search, filter, then add results to a persistent collection:
