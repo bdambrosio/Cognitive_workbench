@@ -357,7 +357,7 @@ class InfospaceExecutor:
             
             # Special handling for extract-struct: truncate input since metadata is always at start
             if tool_name == 'extract-struct':
-                # Check if input is JSON from extract-paper-text and extract text field
+                # Check if input is JSON from fetch-text (or extract-paper-text for backward compatibility) and extract text field
                 if isinstance(input_str, str):
                     try:
                         parsed = json.loads(input_str)

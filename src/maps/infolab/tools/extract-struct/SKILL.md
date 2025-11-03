@@ -15,7 +15,7 @@ examples:
 Extracts structured metadata from academic paper text using LLM analysis.
 
 ## Input
-- `paper_text`: Full text or first few pages of paper (from extract-paper-text)
+- `paper_text`: Full text or first few pages of paper (from fetch-text, or text field from fetch-text JSON output)
 
 ## Output
 Returns JSON with:
