@@ -491,6 +491,27 @@ class FastAPIActionDisplayNode:
             # Store as last character used
             self.last_character_name = actual_character_name
             
+            # Acquire conversation lock for User with target character
+            lock_acquired = False
+            lock_request = {
+                'requester': 'User',
+                'target': actual_character_name
+            }
+            for reply in self.session.get(
+                "cognitive/map/conversation/lock/acquire",
+                target=QueryTarget.BEST_MATCHING,
+                consolidation=ConsolidationMode.NONE,
+                payload=json.dumps(lock_request).encode('utf-8'),
+                timeout=5.0
+            ):
+                if reply.ok:
+                    lock_data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
+                    lock_acquired = lock_data.get('lock_acquired', False)
+                break
+            
+            if not lock_acquired:
+                return {"error": f"Could not acquire conversation lock with {actual_character_name}"}
+            
             # Get or create publisher for this character
             if actual_character_name not in self.character_publishers:
                 self.character_publishers[actual_character_name] = self.session.declare_publisher(
@@ -524,6 +545,93 @@ class FastAPIActionDisplayNode:
             self._store_text_input_in_memory(message, actual_character_name)
             
             return {"success": True, "message": f"Sent to {actual_character_name}: {message}"}
+        
+        @self.app.post("/api/end_dialog")
+        async def end_dialog(data: Dict[str, str]):
+            """End dialog with a character - User-only action."""
+            character_name = data.get('character', '')
+            
+            if not character_name:
+                return {"error": "Character name is required"}
+            
+            # Find actual character name (case-insensitive)
+            actual_character_name = None
+            for active_char in self.active_characters:
+                if active_char.lower() == character_name.lower():
+                    actual_character_name = active_char
+                    break
+            
+            if not actual_character_name:
+                return {"error": f"Character '{character_name}' not found. Available: {', '.join(sorted(self.active_characters))}"}
+            
+            # Check if User is locked with this character
+            locked_with = None
+            for reply in self.session.get(
+                f"cognitive/map/conversation/lock/status/User",
+                target=QueryTarget.BEST_MATCHING,
+                consolidation=ConsolidationMode.NONE,
+                timeout=5.0
+            ):
+                if reply.ok:
+                    data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
+                    if data.get('success') and data.get('is_locked'):
+                        locked_with = data.get('locked_with', [])
+                        if actual_character_name not in locked_with:
+                            return {"error": f"User is not in conversation with {actual_character_name}"}
+                        break
+            
+            # Release conversation locks
+            lock_release = {
+                'character1': 'User',
+                'character2': actual_character_name
+            }
+            for reply in self.session.get(
+                "cognitive/map/conversation/lock/release",
+                target=QueryTarget.BEST_MATCHING,
+                consolidation=ConsolidationMode.NONE,
+                payload=json.dumps(lock_release).encode('utf-8'),
+                timeout=5.0
+            ):
+                if reply.ok:
+                    data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
+                    if not data.get('success'):
+                        logger.warning(f"Failed to release conversation lock: {data.get('error', 'Unknown error')}")
+                break
+            
+            # Send close_dialog messages to both User and target character
+            # Close User's dialog with target
+            self.session.put(
+                f"cognitive/User/memory/close_dialog",
+                json.dumps({'entity_name': actual_character_name})
+            )
+            
+            # Close target's dialog with User
+            self.session.put(
+                f"cognitive/{actual_character_name}/memory/close_dialog",
+                json.dumps({'entity_name': 'User'})
+            )
+            
+            logger.info(f"User ended dialog with {actual_character_name}")
+            return {"success": True, "message": f"Dialog ended with {actual_character_name}"}
+        
+        @self.app.get("/api/conversation_status")
+        async def get_conversation_status():
+            """Get User's conversation lock status."""
+            for reply in self.session.get(
+                f"cognitive/map/conversation/lock/status/User",
+                target=QueryTarget.BEST_MATCHING,
+                consolidation=ConsolidationMode.NONE,
+                timeout=3.0
+            ):
+                if reply.ok:
+                    data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
+                    if data.get('success'):
+                        return {
+                            "is_locked": data.get('is_locked', False),
+                            "locked_with": data.get('locked_with', [])
+                        }
+                break
+            return {"is_locked": False, "locked_with": []}
         
         @self.app.post("/api/turn/step")
         async def step_turn():
@@ -1551,11 +1659,19 @@ class FastAPIActionDisplayNode:
                 </div>
                 
                 <div class="input-section">
-                    <h3>Send Text Input</h3>
-                    <input type="text" id="characterInput" placeholder="Character name (optional)" style="width: 150px;">
-                    <textarea id="messageInput" placeholder="Message or Plan (multi-line supported)" style="width: 450px; height: 80px; resize: vertical; background-color: #2b2b2b; color: #ffffff; border: 1px solid #555; padding: 8px; font-family: monospace;"></textarea>
-                    <button onclick="sendText()">Send</button>
-                    <div id="sendResult"></div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                        <h3 style="margin: 0;">Send Text Input</h3>
+                        <div style="display: flex; gap: 10px;">
+                            <button onclick="sendText()" style="background-color: #5fb85f;">Send</button>
+                            <button onclick="endDialog()" style="background-color: #d32f2f;">End Conversation</button>
+                        </div>
+                    </div>
+                    <div id="activeConversation" style="color: #4ecdc4; font-size: 0.9em; margin-bottom: 10px; display: none;">
+                        Active conversation with: <span id="activeConversationPartner"></span>
+                    </div>
+                    <input type="text" id="characterInput" placeholder="Character name (optional)" style="width: 200px; margin-bottom: 8px;">
+                    <textarea id="messageInput" placeholder="Message or Plan (multi-line supported)" style="width: 100%; height: 80px; resize: vertical; background-color: #2b2b2b; color: #ffffff; border: 1px solid #555; padding: 8px; font-family: monospace; box-sizing: border-box;"></textarea>
+                    <div id="sendResult" style="margin-top: 5px;"></div>
                 </div>
             </div>
         </div>
@@ -2674,6 +2790,8 @@ class FastAPIActionDisplayNode:
                 if (result.success) {
                     resultDiv.innerHTML = `<span class="success">${result.message}</span>`;
                     document.getElementById('messageInput').value = '';
+                    // Update conversation indicator
+                    updateConversationIndicator();
                 } else {
                     resultDiv.innerHTML = `<span class="error">Error: ${result.error}</span>`;
                 }
@@ -2681,6 +2799,67 @@ class FastAPIActionDisplayNode:
                 resultDiv.innerHTML = `<span class="error">Error: ${error.message}</span>`;
             }
         }
+        
+        async function endDialog() {
+            const character = document.getElementById('characterInput').value;
+            const resultDiv = document.getElementById('sendResult');
+            
+            if (!character) {
+                resultDiv.innerHTML = '<span class="error">Character name is required</span>';
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/end_dialog', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        character: character
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    resultDiv.innerHTML = `<span class="success">${result.message}</span>`;
+                    // Update conversation indicator
+                    updateConversationIndicator();
+                } else {
+                    resultDiv.innerHTML = `<span class="error">Error: ${result.error}</span>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<span class="error">Error: ${error.message}</span>`;
+            }
+        }
+        
+        async function updateConversationIndicator() {
+            try {
+                const response = await fetch('/api/conversation_status', {
+                    method: 'GET'
+                });
+                
+                const result = await response.json();
+                
+                const indicator = document.getElementById('activeConversation');
+                const partner = document.getElementById('activeConversationPartner');
+                
+                if (result.is_locked && result.locked_with && result.locked_with.length > 0) {
+                    partner.textContent = result.locked_with.join(', ');
+                    indicator.style.display = 'block';
+                } else {
+                    indicator.style.display = 'none';
+                }
+            } catch (error) {
+                console.error('Error updating conversation indicator:', error);
+            }
+        }
+        
+        // Poll conversation status every 5 seconds
+        setInterval(updateConversationIndicator, 5000);
+        // Initial check
+        setTimeout(updateConversationIndicator, 1000);
         
         async function stepTurn() {
             if (commandInProgress) return; // Prevent rapid clicks
@@ -4012,6 +4191,46 @@ class FastAPIActionDisplayNode:
             self.memory_publisher.put(json.dumps(memory_data))
         except Exception as e:
             print(f'❌ Error storing text input in memory: {e}')
+    
+    def _auto_release_user_lock(self, target_character: str):
+        """Auto-release User's previous conversation lock if User is locked with someone else."""
+        for reply in self.session.get(
+            f"cognitive/map/conversation/lock/status/User",
+            target=QueryTarget.BEST_MATCHING,
+            consolidation=ConsolidationMode.NONE,
+            timeout=3.0
+        ):
+            if reply.ok:
+                data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
+                if data.get('success') and data.get('is_locked'):
+                    locked_with = data.get('locked_with', [])
+                    # If User is locked with someone other than target, release it
+                    for locked_char in locked_with:
+                        if locked_char != target_character:
+                            logger.info(f"Auto-releasing User's previous lock with {locked_char}")
+                            lock_release = {
+                                'character1': 'User',
+                                'character2': locked_char
+                            }
+                            # Release lock via queryable
+                            for lock_reply in self.session.get(
+                                "cognitive/map/conversation/lock/release",
+                                target=QueryTarget.BEST_MATCHING,
+                                consolidation=ConsolidationMode.NONE,
+                                payload=json.dumps(lock_release).encode('utf-8'),
+                                timeout=3.0
+                            ):
+                                break
+                            # Close dialogs
+                            self.session.put(
+                                f"cognitive/User/memory/close_dialog",
+                                json.dumps({'entity_name': locked_char})
+                            )
+                            self.session.put(
+                                f"cognitive/{locked_char}/memory/close_dialog",
+                                json.dumps({'entity_name': 'User'})
+                            )
+            break
     
     def _handle_character_announcement(self, action_data: Dict[str, Any], character_name: str):
         """Handle character announcement actions."""
