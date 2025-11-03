@@ -68,7 +68,7 @@ def _flatten_collection(collection_id: str, separator: str = '\n\n') -> str:
     return _flatten_list(content, separator)
 
 
-def _summarize_note(content: str, focus: str = '') -> str:
+def _summarize_note(content: str, focus: str = '', heartbeat=None) -> str:
     """
     Summarize a Note if it exceeds context limits. 
     Chunks content > 16k chars before summarizing.
@@ -92,6 +92,10 @@ Summary:"""
             temperature=0.3,
             is_json=False
         )
+        
+        # Send heartbeat after LLM call
+        if heartbeat:
+            heartbeat()
         
         if not response.success:
             logger.warning(f"summarize failed: {response.error}, truncating to 16000 chars")
@@ -131,6 +135,10 @@ Summary:"""
             is_json=False
         )
         
+        # Send heartbeat after LLM call
+        if heartbeat:
+            heartbeat()
+        
         if response.success and response.text:
             chunk_summaries.append(response.text)
         else:
@@ -143,12 +151,12 @@ Summary:"""
     # If combined summary is still > 16k, recursively summarize it
     if len(combined_summary) > 16000:
         logger.info(f"summarize: combined summary ({len(combined_summary)} chars) still exceeds 16k, recursively summarizing")
-        return _summarize_note(combined_summary, focus)
+        return _summarize_note(combined_summary, focus, heartbeat)
     
     return combined_summary
 
 
-def _preprocess_element(element: any, focus: str = '') -> str:
+def _preprocess_element(element: any, focus: str = '', heartbeat=None) -> str:
     """
     Preprocess a single element for comparison.
     
@@ -183,7 +191,7 @@ def _preprocess_element(element: any, focus: str = '') -> str:
     # Step 5: Summarize if > 16k chars
     if len(content) > 16000:
         logger.info(f"relate: element exceeds 16k ({len(content)} chars), summarizing")
-        summarized = _summarize_note(content, focus)
+        summarized = _summarize_note(content, focus, heartbeat)
         content = str(summarized) if summarized is not None else content[:16000]
     
     # Ensure content is still a string after summarization
@@ -225,13 +233,14 @@ def tool(value, **kwargs):
     comparison_mode = kwargs.get('comparison_mode', 'comprehensive')
     threshold = kwargs.get('threshold', 0.3)
     focus_aspects = kwargs.get('focus_aspects', '')
+    heartbeat = kwargs.get('heartbeat')
     
     # Build focus string for summarization
     focus = focus_aspects if focus_aspects else "key themes, facts, and perspectives for comparison"
     
     # Preprocess each element independently
-    element_a = _preprocess_element(value[0], focus)
-    element_b = _preprocess_element(value[1], focus)
+    element_a = _preprocess_element(value[0], focus, heartbeat)
+    element_b = _preprocess_element(value[1], focus, heartbeat)
     
     # Format for LLM comparison
     formatted_input = f"""## Item A
@@ -271,6 +280,11 @@ Provide a comparison analysis in JSON format with:
         temperature=0.5,
         is_json=True
     )
+    
+    # Send heartbeat after LLM call
+    heartbeat = kwargs.get('heartbeat')
+    if heartbeat:
+        heartbeat()
     
     if not response.success:
         logger.error(f"relate failed: {response.error}")

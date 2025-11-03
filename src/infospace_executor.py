@@ -49,6 +49,11 @@ class InfospaceExecutor:
         self.llm_client = llm_client
         self.available_tools = available_tools
         
+        # Heartbeat publisher for resetting turn timeout
+        self.heartbeat_publisher = self.session.declare_publisher(
+            f"cognitive/map/turn/heartbeat/{agent_name}"
+        )
+        
         # Plan-local state (ephemeral, cleared each plan)
         self.plan_bindings = {}  # $var_name -> resource_id (Note_N or Collection_N)
         
@@ -399,6 +404,12 @@ class InfospaceExecutor:
                 temperature=0.5
             )
             
+            # Send heartbeat after LLM call
+            self.heartbeat_publisher.put(json.dumps({
+                'character': self.agent_name,
+                'timestamp': time.time()
+            }))
+            
             if not llm_response or not llm_response.text:
                 return {'status': 'failed', 'reason': 'LLM returned empty response'}
             
@@ -461,6 +472,16 @@ class InfospaceExecutor:
         if additional_args:
             for key, val in additional_args.items():
                 resolved_args[key] = self._resolve_value(val)
+        
+        # Add heartbeat callback for tools (all tools receive it, LLM-using tools can call it)
+        def heartbeat():
+            """Send heartbeat to reset turn timeout"""
+            self.heartbeat_publisher.put(json.dumps({
+                'character': self.agent_name,
+                'timestamp': time.time()
+            }))
+        
+        resolved_args['heartbeat'] = heartbeat
         
         # Execute tool
         try:

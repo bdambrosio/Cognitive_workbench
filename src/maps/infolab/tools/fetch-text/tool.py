@@ -133,6 +133,9 @@ def _normalize_url(url: str) -> str:
         url = url.replace('/abs/', '/pdf/')
         if not url.endswith('.pdf'):
             url = url + '.pdf'
+    # GitHub: convert /blob/ to /raw/ to get raw content instead of HTML
+    if 'github.com' in url and '/blob/' in url:
+        url = url.replace('/blob/', '/raw/')
     return url
 
 
@@ -165,7 +168,22 @@ def _detect_format(content: bytes, content_type: str, url: str) -> str:
     if content.startswith(b'%PDF'):
         return "pdf"
     
-    # Check URL extension
+    # Check Content-Type header (more reliable than URL extension)
+    if 'pdf' in content_type:
+        return "pdf"
+    if 'markdown' in content_type:
+        return "markdown"
+    if 'html' in content_type:
+        return "html"
+    
+    # Check content for HTML markers (override URL extension if HTML detected)
+    content_start = content[:1024].decode('utf-8', errors='ignore').strip()
+    if content_start.startswith('<!DOCTYPE html>') or content_start.startswith('<!doctype html>'):
+        return "html"
+    if content.startswith(b'<') or b'<html' in content[:1024].lower():
+        return "html"
+    
+    # Check URL extension (least reliable - only if content didn't indicate HTML)
     url_lower = url.lower()
     if url_lower.endswith('.md') or url_lower.endswith('.markdown'):
         return "markdown"
@@ -174,15 +192,8 @@ def _detect_format(content: bytes, content_type: str, url: str) -> str:
     if url_lower.endswith('.txt'):
         return "text"
     
-    # Check Content-Type header
-    if 'pdf' in content_type:
-        return "pdf"
-    if 'markdown' in content_type:
-        return "markdown"
-    if 'html' in content_type:
-        return "html"
+    # Check text/plain with markdown detection
     if 'text/plain' in content_type:
-        # Check if it's markdown by content
         try:
             text_sample = content[:2048].decode('utf-8', errors='ignore')
             if _looks_like_markdown(text_sample):
@@ -191,11 +202,7 @@ def _detect_format(content: bytes, content_type: str, url: str) -> str:
             pass
         return "text"
     
-    # Check content for HTML
-    if content.startswith(b'<') or b'<html' in content[:1024].lower():
-        return "html"
-    
-    # Check content for markdown
+    # Check content for markdown patterns
     try:
         text_sample = content[:2048].decode('utf-8', errors='ignore')
         if _looks_like_markdown(text_sample):
@@ -346,27 +353,10 @@ def _try_playwright_extraction(url: str) -> str:
             browser = p.chromium.launch(headless=True)
             page = browser.new_page()
             page.goto(url, wait_until='networkidle', timeout=30000)
-            html = page.content()
+            # Use inner_text to get rendered text content, not HTML markup
+            full_text = page.inner_text('body')
             browser.close()
-            
-            # Extract text from rendered HTML
-            if HAS_UNSTRUCTURED:
-                with warnings.catch_warnings():
-                    warnings.simplefilter("ignore")
-                    elements = partition_html(text=html)
-                text_parts = [str(e).strip() for e in elements if str(e).strip()]
-                return "\n".join(text_parts)
-            else:
-                class TextExtractor(HTMLParser):
-                    def __init__(self):
-                        super().__init__()
-                        self.text = []
-                    def handle_data(self, data):
-                        if data.strip():
-                            self.text.append(data.strip())
-                parser = TextExtractor()
-                parser.feed(html)
-                return "\n".join(parser.text)
+            return full_text
     except Exception as e:
         logger.warning(f"Playwright extraction failed for {url}: {str(e)}")
         return ""

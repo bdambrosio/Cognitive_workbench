@@ -511,6 +511,12 @@ end your response with:
                 self.handle_turn_complete
             )
             
+            # Subscriber for heartbeat signals (resets timeout)
+            self.turn_heartbeat_subscriber = self.session.declare_subscriber(
+                "cognitive/map/turn/heartbeat/*",
+                self.handle_turn_heartbeat
+            )
+            
             # Queryable for turn status
             self.turn_status_queryable = self.session.declare_queryable(
                 "cognitive/map/turn/status",
@@ -729,6 +735,26 @@ end your response with:
                 
         except Exception as e:
             logger.error(f"Error in delayed turn start: {e}")
+    
+    def handle_turn_heartbeat(self, sample):
+        """Handle heartbeat signals from characters (resets timeout)"""
+        try:
+            # Extract character name from topic
+            topic_parts = str(sample.key_expr).split('/')
+            character_name = topic_parts[-1] if len(topic_parts) > 0 else None
+            
+            if not character_name:
+                return
+            
+            # Reset turn start time if character is active and turn is in progress
+            if (self.turn_state['turn_start_time'] and 
+                character_name in self.turn_state['active_characters'] and
+                character_name not in self.turn_state['completed_characters']):
+                self.turn_state['turn_start_time'] = time.time()
+                logger.debug(f"💓 Heartbeat from {character_name} - timeout reset")
+            
+        except Exception as e:
+            logger.error(f"Error handling turn heartbeat: {e}")
     
     def handle_turn_complete(self, sample):
         """Handle turn completion signals from characters"""
