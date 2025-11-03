@@ -127,7 +127,8 @@ End your response with:
                 {
                     'source': self.entity_name,
                     'text': other,
-                    'timestamp': datetime.now().isoformat(),                    'summary': True
+                    'timestamp': datetime.now().isoformat(),                    
+                    'summary': True
                 }
             ]
         else:
@@ -366,7 +367,7 @@ End your response with:
             bool: True if dialog should end, False if it should continue
         """
         # Build transcript from recent conversation
-        if input_text.strip().endswith('?'):
+        if input_text.strip().endswith('?') or self.entity_name.strip() == 'User':
             return False
         transcript_text = ''
         if self.active:

@@ -5,7 +5,37 @@ llm_config:
   model_name: "qwen/qwen3-235b-a22b-2507"
 
 setting: |
-  A modern Computer Science grad lab cyberspace with workplaces for several graduate students and a postdoc research associate, Jill.
+  Cognitive Workbench, a virtual modern Computer Science /AI grad lab cyberspace with workplaces for several graduate students and a postdoc research associate, Jill.
+  Cognitive Workbench is a research framework for building autonomous agents with persistent memory, goal-directed planning, and tool use. 
+  Characters operate in information spaces (semantic operations over notes, collections, and web content).
+
+  Key capabilities
+  - Autonomous planning - Jill can generate multi-step plans with control flow (conditionals, loops) to achieve goals
+  - Information space operations - Create, search, index, and manipulate structured information (notes, collections)
+  - Extensible tool system - Web search, content summarization, entity extraction, and custom tools
+  - Interactive development - Manual goal setting, plan editing, and step-by-step execution
+  - Parallel execution - Multi-agent scenarios with Zenoh-based communication
+
+  Tool System
+  - Tools are defined as Skill.md files with YAML frontmatter
+
+  - prompt_augmentation - LLM-based tools (summarize, relate, refine, assess, extract-entities)
+  - python - Code execution tools (query-web, render, as-json, as-markdown, revise, text-find, matches, filter-by-predicate)
+  - Built-in tools include: fetch-text (given url), query-web, summarize, relate, refine, assess, extract-entities, render, as-json, as-markdown, revise, text-find, matches, filter-by-predicate, is-empty, is-question, is-positive, word-count, extract-struct, save.
+
+  Tool argument conventions: Most tools use target for input data; query-web uses args.query for the search query.
+
+  Architecture
+  - Shared Zenoh Nodes
+  - FastAPI UI - Web interface for monitoring and interaction
+  - Map Node - World state, spatial resources, turn management
+  - LLM Service (optional) - Centralized LLM API access
+  
+  - Per-Character Nodes
+    - Executive Node - OODA loop, planning, decision-making
+    - Memory Node - Conversation history, entity models (Theory of Mind), RAG storage
+    - Infospace Executor - Primitive execution, tool invocation
+    - All nodes communicate via Zenoh pub/sub and queryables
 
 characters:
   Jill:

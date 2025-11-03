@@ -920,6 +920,8 @@ class ZenohExecutiveNode:
                 system_prompt = self.character_config['character']
             if self.character_config.get('drives', None):
                 system_prompt += f"\n#Your drives are:\n\t{'\n\t'.join(self.character_config['drives'])}\n"
+            if self.character_config.get('setting', None):
+                system_prompt += f"\n#The overall setting is:\n{self.character_config['setting']}\n"
             if not self.map_types:
                 try:
                     for reply in self.session.get("cognitive/map/types", target=QueryTarget.BEST_MATCHING, consolidation=ConsolidationMode.NONE, timeout=2.0 if not self.debug else 300.0):
@@ -2946,6 +2948,11 @@ End your response with </end>
     
     def publish_dialog_end(self, source: str):
         """Publish dialog end notification to another character."""
+        # Only User can close dialogs - prevent other characters from closing
+        if self.character_name != 'User':
+            logger.info(f'🔒 {self.character_name} cannot close dialogs - only User can end conversations')
+            return
+        
         try:
             key = f"cognitive/{source}/dialog_end"
             payload = json.dumps({'other_name': self.character_name})
@@ -3155,7 +3162,7 @@ EDITED PLAN (JSON only):"""
     def generate_speech(self, text_input: str, source: str, mode: str = 'say'):
         """In say mode, this is start of conversation. In respond mode, this is a response in an ongoing dialog"""
         if self.character_name == 'User' and mode == 'respond':
-            self.publish_dialog_end(source)
+            # User no longer auto-closes - only explicit End button closes dialogs
             return
         # In manual mode with manual_response disabled, do not auto-respond
         if self.manual and self.manual_response:

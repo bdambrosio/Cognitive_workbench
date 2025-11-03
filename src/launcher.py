@@ -468,6 +468,7 @@ def main():
                 new_config['activities'] = activities
                 new_config['characters'] = characters_config.copy()
                 new_config['llm_config'] = llm_config
+                new_config['setting'] = setting
                 launcher.add_character(name, new_config)
         elif isinstance(characters_config, list):
             # Handle list format: [{'name': 'Alice', ...}, ...]
@@ -480,6 +481,7 @@ def main():
                     new_config['activities'] = activities
                     new_config['characters'] = characters_config
                     new_config['llm_config'] = llm_config
+                    new_config['setting'] = setting
                     launcher.add_character(name, new_config)
         
     except Exception as e:
