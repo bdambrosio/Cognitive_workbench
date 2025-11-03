@@ -7,6 +7,7 @@
 [![Status: Active Development](https://img.shields.io/badge/status-active%20development-orange.svg)]()
 
 ---
+more at [Devin] ([https://app.devin.ai/wiki/bdambrosio/Cognitive_workbench])
 
 ## What is Cognitive Workbench?
 
