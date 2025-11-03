@@ -443,7 +443,13 @@ Pattern: Optional tool arguments
   Many tools accept optional "focus" or "mode" parameters via "args" field:
   {"type":"summarize","target":"$doc","args":{"focus":"key findings"},"out":"$summary"}
   
-  Using focus is optional - tools work generically without it, but focus can improve precision.
+  IMPORTANT: When a goal specifies a specific topic, theme, or aspect to focus on, ALWAYS include it in args.focus:
+  - Goal: "summarize core block-rank algorithm" → use args.focus: "core block-rank algorithm"
+  - Goal: "extract key findings about transformers" → use args.focus: "key findings about transformers"
+  - Goal mentions what to extract/focus on → include that in args.focus
+  
+  The "expect" field documents the expected outcome. The "args.focus" field guides the tool's behavior for better precision.
+  Both can reference the same topic - expect describes outcome, focus guides processing.
 
 Pattern: Single vs. Multiple Item Processing
   Collections are for handling MULTIPLE Notes together. For single Notes, use tools directly.

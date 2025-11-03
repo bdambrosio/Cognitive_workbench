@@ -100,6 +100,11 @@ Return only valid JSON, no explanation."""
         is_json=True
     )
     
+    # Send heartbeat after LLM call
+    heartbeat = kwargs.get('heartbeat')
+    if heartbeat:
+        heartbeat()
+    
     if not response.success:
         logger.error(f"extract-entities failed: {response.error}")
         return json.dumps({"people": [], "organizations": [], "locations": [], 

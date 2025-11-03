@@ -65,6 +65,11 @@ Answer (true or false):"""
         is_json=False
     )
     
+    # Send heartbeat after LLM call
+    heartbeat = kwargs.get('heartbeat')
+    if heartbeat:
+        heartbeat()
+    
     result = response.text if hasattr(response, 'text') else str(response)
     result = result.strip().lower()
     

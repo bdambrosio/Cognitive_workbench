@@ -110,6 +110,11 @@ Provide a brief summary (3-5 sentences) highlighting key points."""
             is_json=False
         )
         
+        # Send heartbeat after LLM call
+        heartbeat = kwargs.get('heartbeat')
+        if heartbeat:
+            heartbeat()
+        
         if not response.success:
             logger.error(f"summarize failed: {response.error}")
             return f"Error: {response.error}"
@@ -136,6 +141,11 @@ Provide key points (2-4 sentences)."""
             is_json=False
         )
         
+        # Send heartbeat after LLM call
+        heartbeat = kwargs.get('heartbeat')
+        if heartbeat:
+            heartbeat()
+        
         if not response.success:
             logger.error(f"summarize chunk {i+1}/{len(chunks)} failed: {response.error}")
             return f"Error: {response.error}"
@@ -158,6 +168,11 @@ Provide a unified summary (4-6 sentences) that captures the key themes and findi
         temperature=0.3,
         is_json=False
     )
+    
+    # Send heartbeat after LLM call
+    heartbeat = kwargs.get('heartbeat')
+    if heartbeat:
+        heartbeat()
     
     if not response.success:
         logger.error(f"summarize synthesis failed: {response.error}")

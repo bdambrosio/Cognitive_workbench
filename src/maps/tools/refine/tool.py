@@ -56,6 +56,11 @@ Return only the transformed result, no explanation."""
             is_json=False
         )
         
+        # Send heartbeat after LLM call to reset timeout
+        heartbeat = kwargs.get('heartbeat')
+        if heartbeat:
+            heartbeat()
+        
         if not response.success:
             logger.error(f"refine chunk {i+1}/{len(chunks)} failed: {response.error}")
             return f"Error: {response.error}"

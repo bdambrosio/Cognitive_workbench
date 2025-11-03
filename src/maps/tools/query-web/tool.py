@@ -167,7 +167,7 @@ def _html_to_text_extract(html: str, query: str, max_chars: int) -> str:
 # LLM-assisted TL;DR
 # ------------------------------
 
-def _llm_tldr(LLM_client, text: str, query: str, max_chars: int, timeout: float = 10.0) -> str:
+def _llm_tldr(LLM_client, text: str, query: str, max_chars: int, timeout: float = 10.0, heartbeat=None) -> str:
     """
     Your environment should provide LLM_client.generate(...)
     Keep this call shape; fill in your client inside your app.
@@ -192,6 +192,11 @@ Respond only with the JSON, no commentary, no code fences, no reasoning    :
 """]
     try:
         raw = LLM_client.generate(messages=prompt, bindings={"query": query, "text": text}, max_tokens = max_chars, temperature=0.2, is_json=True, timeout=timeout)
+        
+        # Send heartbeat after LLM call
+        if heartbeat:
+            heartbeat()
+        
         # Accept either dict or string JSON
         if isinstance(raw.text, dict):
             if str(raw.text.get("relevant", "")).lower().startswith("true"):
@@ -241,7 +246,7 @@ def _detect_format_from_content(content: str, url: str) -> str:
     # Default to html for web search results
     return "html"
 
-def _process_url(url: str, query: str, client, per_url_timeout: float, max_chars: int) -> Dict[str, Any]:
+def _process_url(url: str, query: str, client, per_url_timeout: float, max_chars: int, heartbeat=None) -> Dict[str, Any]:
     start = time.time()
     html = _http_get(url, timeout=per_url_timeout)
     if not html:
@@ -263,7 +268,7 @@ def _process_url(url: str, query: str, client, per_url_timeout: float, max_chars
         
         # LLM filter for relevance
         remaining_time = max(3.0, per_url_timeout - (time.time() - start) - 1.0)
-        tldr = _llm_tldr(client, extract, query=query, max_chars=max_chars, timeout=remaining_time)
+        tldr = _llm_tldr(client, extract, query=query, max_chars=max_chars, timeout=remaining_time, heartbeat=heartbeat)
         filtered_text = tldr or extract
         
         # Return uniform structure matching fetch-text
@@ -298,7 +303,7 @@ def _create_empty_result(url: str, start_time: float, file_format: str = "html")
 # Public entry point
 # ------------------------------
 
-def llm_search(query: str, client, max_chars: int = 8000, max_urls: int = 10, max_workers: int = 4, wall_time_limit: float = 16.0) -> List[Dict[str, Any]]:
+def llm_search(query: str, client, max_chars: int = 8000, max_urls: int = 10, max_workers: int = 4, wall_time_limit: float = 16.0, heartbeat=None) -> List[Dict[str, Any]]:
     """
     High-level:
       1) Google CSE for initial URL set (two phrasings interleaved).
@@ -326,6 +331,11 @@ Respond only with the rephrased query, no commentary, no code fences, no reasoni
             max_tokens=150,
             temperature=0.2,
         )
+        
+        # Send heartbeat after LLM call
+        if heartbeat:
+            heartbeat()
+        
         if isinstance(rephr, dict):
             rephr = rephr.get("text") or rephr.get("content") or ""
         rephr = str(rephr).strip()
@@ -356,7 +366,7 @@ Respond only with the rephrased query, no commentary, no code fences, no reasoni
                 url = interleaved[idx]
                 idx += 1
                 per_url_timeout = max(3.0, wall_time_limit - (time.time() - t0) - 1.0)
-                fut = ex.submit(_process_url, url, query, client, per_url_timeout, max_chars/4)
+                fut = ex.submit(_process_url, url, query, client, per_url_timeout, max_chars/4, heartbeat)
                 logger.info(f"Submitted task for url: {url}")
                 in_flight.append(fut)
 
@@ -454,7 +464,8 @@ def tool(value, **kwargs):
             max_chars=32000,
             max_urls=10,
             max_workers=4,
-            wall_time_limit=16.0
+            wall_time_limit=16.0,
+            heartbeat=kwargs.get('heartbeat')
         )
     except Exception as e:
         return {
