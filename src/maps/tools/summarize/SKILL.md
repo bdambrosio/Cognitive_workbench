@@ -3,6 +3,7 @@ name: summarize
 description: Compress information while preserving key points and structure
 type: python
 trusted: true
+flattens_collections: true
 parameters:
   - name: focus
     type: string

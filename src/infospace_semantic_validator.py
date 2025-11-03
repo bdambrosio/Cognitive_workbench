@@ -21,7 +21,7 @@ class InfospaceSemanticValidator:
     """
     Validates infospace plans semantically by checking:
     - Parameter flow between actions
-    - Tool preconditions (e.g., extract-paper-text needs pdf_content from download-pdf)
+    - Tool preconditions (e.g., fetch-text accepts URLs directly)
     - Map operation correctness
     - Variable type consistency
     """
@@ -97,14 +97,14 @@ class InfospaceSemanticValidator:
         system_prompt = """You are a semantic plan validator for infospace operations.
 
 Your task is to analyze a plan and identify semantic errors such as:
-- Missing workflow steps (e.g., extract-paper-text requires pdf_content from download-pdf)
-- Parameter mismatches (e.g., map passes Note as 'value' but tool expects 'pdf_content')
-- Missing intermediate steps (e.g., trying to extract text from URLs without downloading PDFs first)
+- Missing workflow steps (e.g., fetch-text accepts URLs directly, no download step needed)
+- Parameter mismatches (e.g., map passes Note as 'value' but tool expects specific parameter)
+- Missing intermediate steps (e.g., trying to extract text from URLs without proper URL extraction)
 - Incorrect variable usage (e.g., using Collection where Note expected, or vice versa)
 
 For each error found, provide a clear, actionable repair suggestion in the format:
 ACTION <index>: <error description>
-REPAIR: <specific fix, e.g., "Insert download-pdf step before extract-paper-text">
+REPAIR: <specific fix, e.g., "Use fetch-text with URL directly instead of download-pdf + extract-paper-text">
 
 If the plan is valid, output: VALID
 
@@ -126,9 +126,9 @@ Output ONLY the validation results, no additional commentary."""
 # VALIDATION NOTES:
 
 - 'map' operation passes each Note from the Collection as 'value' parameter to the tool
-- Tools may require specific parameters (e.g., pdf_content, url) that must come from previous steps
+- Tools may require specific parameters (e.g., url_or_content) that must come from previous steps
 - Check tool SKILL.md documentation for required parameters and usage patterns
-- Check for missing intermediate steps (e.g., download-pdf before extract-paper-text)
+- fetch-text accepts URLs directly - no intermediate download step needed
 
 Analyze this plan and identify any semantic errors."""
         

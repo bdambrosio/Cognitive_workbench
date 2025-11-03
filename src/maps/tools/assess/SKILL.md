@@ -3,6 +3,7 @@ name: assess
 description: Test Note content against natural language predicate using LLM (returns boolean)
 type: python
 trusted: true
+flattens_collections: true
 parameters:
   - name: predicate
     type: string

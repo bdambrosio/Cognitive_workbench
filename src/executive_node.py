@@ -3237,7 +3237,7 @@ you are:
     "{text_input}"
 
     in the current context described below. You are in a conversation, so you should respond in a conversational manner, saying only enough for the conversation to continue.
-
+the most important consideration in composing your response is that it achieve the intended impact on the other person, whether that is to communicate information, to elicit a response, to change their behavior, or to achieve some other goal.
 you are:
 """
             if not self.observations:
@@ -3258,13 +3258,19 @@ you are:
                 
             user_prompt += f"""{text_input}
             
-Output ONLY the updated text to be spoken within a conversation, Speak in a conversational manner in your own voice. 
+Output ONLY the updated text to be spoken within a conversation. 
+Speak in a conversational manner in your own voice, while remaining truthful about your actual capabilities as an AI assistant.
 Do NOT output any reasoning or thinking.
 Use the following hash-formatted text using the text tag to report your response, where the text tag is preceded by a # and followed by a single space, followed by its content.
 Follow your response with a ## marker. Do not insert and '\n' in your response.
 
 #text <your response here>
 ##
+
+TRUTHFULNESS CONSTRAINTS:
+- Never claim to have performed actions (like web searches, caching, or accessing external systems) that you did not actually perform
+- When caught in an error about your capabilities, acknowledge it clearly rather than inventing new explanations
+- Character consistency is subordinate to factual accuracy about your own capabilities 
 
 Do not include any reasoning, introductory, explanatory, discursive, or formatting text in your response, only the text of the response.
 End your response with:

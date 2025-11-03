@@ -3,10 +3,69 @@
 Summarization tool with automatic chunking for long documents.
 """
 import logging
+import json
+import zenoh
+from zenoh import QueryTarget, ConsolidationMode
 from llm_client import ZenohLLMClient
 
 llm_client = ZenohLLMClient(server_name='vllm', model_name='models/Qwen3-Next:1.5B')
 logger = logging.getLogger(__name__)
+
+# Open zenoh session for fetching Collection/Note content
+config = zenoh.Config()
+zenoh_session = zenoh.open(config)
+
+
+def _get_content(resource_id: str) -> any:
+    """Fetch content from map_node for a resource ID."""
+    if resource_id == "Note_null":
+        return None
+    
+    for reply in zenoh_session.get(
+        f"cognitive/map/resource/{resource_id}",
+        target=QueryTarget.BEST_MATCHING,
+        consolidation=ConsolidationMode.NONE,
+        timeout=5.0
+    ):
+        if reply.ok:
+            response = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
+            if response.get('success'):
+                if 'resource' in response:
+                    resource_data = response.get('resource')
+                    if resource_data:
+                        return resource_data.get('properties', {}).get('content')
+                else:
+                    return response.get('content')
+        break
+    return None
+
+
+def _flatten_list(items: list, separator: str = '\n\n') -> str:
+    """Flatten a list (Collection content) into concatenated Note content."""
+    note_contents = []
+    for item in items:
+        if isinstance(item, str) and item.startswith('Note_'):
+            note_content = _get_content(item)
+            if note_content is not None:
+                note_contents.append(str(note_content))
+        elif isinstance(item, str) and item.startswith('Collection_'):
+            # Recursively flatten nested Collections
+            flattened = _flatten_collection(item, separator)
+            if flattened:
+                note_contents.append(flattened)
+        else:
+            note_contents.append(str(item))
+    
+    return separator.join(note_contents)
+
+
+def _flatten_collection(collection_id: str, separator: str = '\n\n') -> str:
+    """Flatten a Collection into concatenated Note content."""
+    content = _get_content(collection_id)
+    if not isinstance(content, list):
+        return str(content) if content else ""
+    
+    return _flatten_list(content, separator)
 
 
 def tool(value, **kwargs):
@@ -14,7 +73,7 @@ def tool(value, **kwargs):
     Summarize content with automatic chunking for long documents.
     
     Args:
-        value: Text content to summarize
+        value: Text content to summarize, or list (Collection) which will be flattened
         **kwargs: Optional parameters
             - focus: Topic to guide summarization (optional)
     
@@ -23,6 +82,11 @@ def tool(value, **kwargs):
     """
     if not value:
         return "No content to summarize"
+    
+    # Flatten Collection if input is a list
+    if isinstance(value, list):
+        logger.info(f"summarize: flattening Collection with {len(value)} items")
+        value = _flatten_list(value)
     
     focus = kwargs.get('focus', '')
     focus_guidance = f"\nFocus on: {focus}" if focus else ""

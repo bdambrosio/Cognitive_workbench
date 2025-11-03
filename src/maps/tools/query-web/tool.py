@@ -217,28 +217,82 @@ def _is_mostly_numbers(text: str) -> bool:
     digits = sum(1 for c in alnum if c.isdigit())
     return digits / len(alnum) > 0.5
 
+def _detect_format_from_content(content: str, url: str) -> str:
+    """Detect format from content and URL (simplified version for query-web)."""
+    url_lower = url.lower()
+    
+    # Check URL extension
+    if url_lower.endswith('.pdf'):
+        return "pdf"
+    if url_lower.endswith(('.md', '.markdown')):
+        return "markdown"
+    if url_lower.endswith(('.html', '.htm')):
+        return "html"
+    if url_lower.endswith('.txt'):
+        return "text"
+    
+    # Check content (first 1024 chars)
+    content_sample = content[:1024].lower()
+    if content.startswith('%PDF'):
+        return "pdf"
+    if content.startswith('<') or '<html' in content_sample:
+        return "html"
+    
+    # Default to html for web search results
+    return "html"
+
 def _process_url(url: str, query: str, client, per_url_timeout: float, max_chars: int) -> Dict[str, Any]:
     start = time.time()
     html = _http_get(url, timeout=per_url_timeout)
     if not html:
-        return {"url": url, "domain": _extract_domain(url), "extract": "", "elapsed_ms": int((time.time()-start)*1000)}
+        return _create_empty_result(url, start)
+    
     try:
+        # Detect format
+        file_format = _detect_format_from_content(html, url)
+        
+        # Extract filtered text (query-relevant excerpts)
         extract = _html_to_text_extract(html, query=query, max_chars=max_chars)
         if not extract or len(extract) < 16:
-            return {"url": url, "domain": _extract_domain(url), "extract": "", "elapsed_ms": int((time.time()-start)*1000)}
+            return _create_empty_result(url, start, file_format)
         
-        # Reject garbage content (frequency dumps, logs, etc.)
+        # Reject garbage content
         if _is_mostly_numbers(extract):
             logger.warning(f"Rejected mostly-numeric content from {url}")
-            return {"url": url, "domain": _extract_domain(url), "extract": "", "elapsed_ms": int((time.time()-start)*1000)}
+            return _create_empty_result(url, start, file_format)
         
-        # Calculate remaining time for LLM call (leave 1s buffer)
+        # LLM filter for relevance
         remaining_time = max(3.0, per_url_timeout - (time.time() - start) - 1.0)
         tldr = _llm_tldr(client, extract, query=query, max_chars=max_chars, timeout=remaining_time)
-        return {"url": url, "domain": _extract_domain(url), "extract": tldr or extract, "elapsed_ms": int((time.time()-start)*1000)}
+        filtered_text = tldr or extract
+        
+        # Return uniform structure matching fetch-text
+        return {
+            "text": filtered_text,
+            "format": file_format,
+            "metadata": {
+                "source_url": url,
+                "domain": _extract_domain(url),
+                "elapsed_ms": int((time.time() - start) * 1000)
+            },
+            "char_count": len(filtered_text)
+        }
     except Exception:
         traceback.print_exc()
-        return {"url": url, "domain": _extract_domain(url), "extract": "", "elapsed_ms": int((time.time()-start)*1000)}
+        return _create_empty_result(url, start)
+
+def _create_empty_result(url: str, start_time: float, file_format: str = "html") -> Dict[str, Any]:
+    """Create empty result with uniform structure."""
+    return {
+        "text": "",
+        "format": file_format,
+        "metadata": {
+            "source_url": url,
+            "domain": _extract_domain(url),
+            "elapsed_ms": int((time.time() - start_time) * 1000)
+        },
+        "char_count": 0
+    }
 
 # ------------------------------
 # Public entry point
@@ -313,7 +367,7 @@ Respond only with the rephrased query, no commentary, no code fences, no reasoni
                     try:
                         item = fut.result()
                         logger.info(f"Completed task: {item}")
-                        if item.get("extract"):
+                        if item.get("text"):
                             results.append(item)
                     except Exception:
                         pass
@@ -328,7 +382,7 @@ Respond only with the rephrased query, no commentary, no code fences, no reasoni
                             # Wait with timeout - if it completes, get result
                             item = fut.result(timeout=0.1)
                             logger.info(f"Completed task: {item}")
-                            if item.get("extract"):
+                            if item.get("text"):
                                 results.append(item)
                             still.append(None)
                         except concurrent.futures.TimeoutError:
@@ -342,12 +396,12 @@ Respond only with the rephrased query, no commentary, no code fences, no reasoni
         for fut in in_flight:
             fut.cancel()
 
-    # 3) Optional basic re-rank: prefer domains with extract length and query hits
+    # 3) Optional basic re-rank: prefer domains with text length and query hits
     ql = query.lower()
     def _score(it):
-        ext = it.get("extract", "")
-        hit = 2 if ql[:32] in ext.lower() else 0
-        return (len(ext), hit)
+        text = it.get("text", "")
+        hit = 2 if ql[:32] in text.lower() else 0
+        return (len(text), hit)
 
     results.sort(key=_score, reverse=True)
     return results
@@ -415,18 +469,11 @@ def tool(value, **kwargs):
             'count': 0
         })
     
-    # Return structured JSON for better processing in infospace
+    # Return structured JSON matching fetch-text format (uniform structure)
     result_items = []
     for result in results:
-        url = result.get('url', '')
-        domain = result.get('domain', _extract_domain(url))
-        extract = result.get('extract', 'No content available')
-        
-        result_items.append({
-            'domain': domain,
-            'url': url,
-            'content': extract
-        })
+        # Result already has uniform structure from _process_url
+        result_items.append(result)
     
     return json.dumps({
         'query': value,

@@ -392,18 +392,27 @@ Pattern: Persisting Collections
   {"type":"create-collection","value":["$methodology_summary","$gaps_analysis"],"name":"constitutional-ai-findings","out":"$findings"}
   {"type":"persist","target":"$findings"}
 
-Pattern: Downloading PDFs from web search results
-  When query-web returns results with JSON objects containing URLs:
-  1. Query web to get results
+Pattern: Searching the web for information
+  When query-web is provided with an information-specific query:
+  1. Query web to get results (already has filtered excerpts)
+  2. Expand to get individual result items (optional, if you need to process each result individually)
+  
+  Example:
+  {"type":"query-web","args":{"query":"KV cache replacement algorithms"},"out":"$results","expect":"should find papers"}
+  {"type":"expand","target":"$results","out":"$items"} (optional)
+
+Pattern: Fetching full text from URLs in web search results
+  When query-web returns results with URLs and you want full text content:
+  1. Query web to get results (already has filtered excerpts)
   2. Expand to get individual result items
   3. Use map with as-json to extract URL field from each item
-  4. Use map with download-pdf to download each PDF
+  4. Use map with fetch-text to get full text from each URL
   
   Example:
   {"type":"query-web","args":{"query":"attention mechanism papers"},"out":"$results","expect":"should find papers"}
   {"type":"expand","target":"$results","out":"$items"}
-  {"type":"map","target":"$items","operation":"as-json","args":{"field":"url"},"out":"$urls"}
-  {"type":"map","target":"$urls","operation":"download-pdf","out":"$pdfs"}
+  {"type":"map","target":"$items","operation":"as-json","args":{"field":"metadata.source_url"},"out":"$urls"}
+  {"type":"map","target":"$urls","operation":"fetch-text","out":"$full_texts"}
 
 Pattern: Adding filtered items to existing Collection
   When you need to search, filter, then add results to a persistent collection:

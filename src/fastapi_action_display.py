@@ -2682,15 +2682,6 @@ class FastAPIActionDisplayNode:
             }
         }
         
-        // Allow Shift+Enter to send message, Enter for new line
-        document.getElementById('messageInput').addEventListener('keypress', function(e) {
-            if (e.key === 'Enter' && e.shiftKey) {
-                e.preventDefault(); // Prevent default to avoid new line
-                sendText();
-            }
-            // Regular Enter key will create new line (default behavior)
-        });
-        
         async function stepTurn() {
             if (commandInProgress) return; // Prevent rapid clicks
             commandInProgress = true;

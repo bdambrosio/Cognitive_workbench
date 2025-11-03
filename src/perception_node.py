@@ -29,6 +29,7 @@ import argparse
 import os
 from pathlib import Path
 from typing import Dict, Any
+from zenoh import QueryTarget, ConsolidationMode
 from llm_client import ZenohLLMClient
 
 # Configure logging with unbuffered output
@@ -115,6 +116,68 @@ class ZenohPerceptionNode:
         logger.info(f'   - Subscribing to: cognitive/{character_name}/perception/action_result')
         logger.info(f'   - Publishing to: cognitive/{character_name}/perception/action_anomaly')
     
+    def _get_content(self, resource_id: str) -> any:
+        """Fetch content from map_node for a resource ID."""
+        if resource_id == "Note_null":
+            return None
+        
+        for reply in self.session.get(
+            f"cognitive/map/resource/{resource_id}",
+            target=QueryTarget.BEST_MATCHING,
+            consolidation=ConsolidationMode.NONE,
+            timeout=5.0
+        ):
+            if reply.ok:
+                response = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
+                if response.get('success'):
+                    if 'resource' in response:
+                        resource_data = response.get('resource')
+                        if resource_data:
+                            return resource_data.get('properties', {}).get('content')
+                    else:
+                        return response.get('content')
+            break
+        return None
+    
+    def _flatten_collection(self, collection_id: str, separator: str = '\n\n') -> str:
+        """Flatten a Collection into concatenated Note content."""
+        content = self._get_content(collection_id)
+        if not isinstance(content, list):
+            return str(content) if content else ""
+        
+        note_contents = []
+        for item in content:
+            if isinstance(item, str) and item.startswith('Note_'):
+                note_content = self._get_content(item)
+                if note_content is not None:
+                    note_contents.append(str(note_content))
+            elif isinstance(item, str) and item.startswith('Collection_'):
+                # Recursively flatten nested Collections
+                flattened = self._flatten_collection(item, separator)
+                if flattened:
+                    note_contents.append(flattened)
+            else:
+                note_contents.append(str(item))
+        
+        return separator.join(note_contents)
+    
+    def _resolve_update_text(self, update_text: str) -> str:
+        """Resolve Note/Collection IDs to actual content. Returns content string."""
+        if not isinstance(update_text, str):
+            return str(update_text) if update_text else ""
+        
+        # Check if it's a Note ID
+        if update_text.startswith('Note_'):
+            content = self._get_content(update_text)
+            return str(content) if content is not None else ""
+        
+        # Check if it's a Collection ID
+        if update_text.startswith('Collection_'):
+            return self._flatten_collection(update_text)
+        
+        # Not a Note/Collection ID, return as-is (physical world action result)
+        return update_text
+    
     def sense_data_callback(self, sample):
         """Handle incoming sense data from the environment."""
         try:
@@ -142,30 +205,33 @@ class ZenohPerceptionNode:
             
             action_type = action.get('type', 'unknown')
             
+            # Resolve Note/Collection IDs to actual content
+            resolved_text = self._resolve_update_text(update_text)
+            
             if self.debug:
                 logger.info(f'Received action_result: type={action_type}, '
-                           f'expect={expect[:50]}..., result={update_text[:50]}...')
+                           f'expect={expect[:50]}..., result={resolved_text[:50]}...')
             
             # Compare expectation against actual result using LLM
-            if self.llm_client and expect and update_text:
-                prompt_text = f"""Compare the expected outcome against the actual result for an action.
+            if self.llm_client and expect and resolved_text:
+                prompt_text = """Does the actual result satisfy the expectation for the action?
 #Action:
 {{$action_text}}
 
-#Expected: 
+#Expectation: 
 {{$expect_text}}
 
 #Actual Result:
 {{$update_text}}
 
-Are these significantly different? Answer 'yes' or 'no', followed by a brief explanation (max 20 words).
+Answer 'yes' or 'no', followed by a brief explanation (max 20 words). Include no other text, reasoning, or formatting
 """
                 response = self.llm_client.generate(
                     [prompt_text],
                     bindings={
                         "action_text": action,
                         "expect_text": expect,
-                        "update_text": update_text
+                        "update_text": resolved_text
                     },
                     max_tokens=100,
                     temperature=0.3,
@@ -175,13 +241,13 @@ Are these significantly different? Answer 'yes' or 'no', followed by a brief exp
                     # Publish action anomaly with LLM comparison
                     anomaly_payload = {
                         'action': action,
-                        'update_text': update_text,
+                        'update_text': resolved_text,
                         'response': response.text
                     }
                     self.action_anomaly_publisher.put(json.dumps(anomaly_payload))
                     
-                    if response.text.strip().lower().startswith('yes'):
-                        logger.warning(f'Significant expectation mismatch for {action_type}: {response.text}')
+                    if response.text.strip().lower().startswith('no'):
+                        logger.warning(f'Outcome failed to meet expectation {action_type}: {response.text}')
                     else:
                         logger.info(f'Expectation match for {action_type}: {response.text}')
             

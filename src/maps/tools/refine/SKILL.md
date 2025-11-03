@@ -3,6 +3,7 @@ name: refine
 description: Transform Note content using natural language instruction via LLM
 type: python
 trusted: true
+flattens_collections: true
 parameters:
   - name: instruction
     type: string
