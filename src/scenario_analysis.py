@@ -176,9 +176,9 @@ def main():
     map_types, resource_type_str, map_process = _ensure_map_types(session, scenario)
 
     # Helper: run per character
-    def process_character(name: str, data: dict):
+    def process_character(name: str, data: dict, explicit: bool = False):
         logger.info(f"Processing character: {name}")
-        if data.get('manual', False):
+        if data.get('manual', False) and not explicit:
             logger.info(f"Skipping manual character: {name}")
             return
         character_desc = (data.get('character', '') + '\n' + data.get('status', '')).strip()
@@ -226,11 +226,12 @@ def main():
 
     # Character selection
     names = list(characters.keys()) if args.character == 'all' else [args.character]
+    explicit = args.character != 'all'
     try:
         for cname in names:
             if cname not in characters:
                 raise KeyError(f"Character not in scenario: {cname}")
-            process_character(cname, characters[cname])
+            process_character(cname, characters[cname], explicit=explicit)
     except Exception as e:
         logger.error(f"Scenario run failed: {e}")
         sys.exit(1)

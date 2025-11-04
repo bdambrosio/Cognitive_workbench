@@ -499,10 +499,22 @@ end your response with:
     def setup_turn_management(self):
         """Set up turn management system"""
         try:
-            # Publisher for turn "GO" signals
+            # === ZENOH PUBLICATION ===
+            # NAME: turn_go
+            # TOPIC: cognitive/map/turn/go
+            # DESCRIPTION: Signal to all characters to start their turn
+            # PAYLOAD: {"turn_number": int, "active_characters": list[str], "timestamp": float}
+            # TRIGGERS: (internal turn management - characters begin OODA loop)
+            # ========================
             self.turn_publisher = self.session.declare_publisher("cognitive/map/turn/go")
             
-            # Publisher for unified turn state updates (comprehensive UI state - replaces step_complete and turn_status)
+            # === ZENOH PUBLICATION ===
+            # NAME: turn_state_update
+            # TOPIC: cognitive/map/turn_state_update
+            # DESCRIPTION: Comprehensive turn state and UI button states
+            # PAYLOAD: {"type": str, "turn": dict, "buttons": dict, "timestamp": float}
+            # TRIGGERS: (UI updates)
+            # ========================
             self.turn_state_update_publisher = self.session.declare_publisher("cognitive/map/turn_state_update")
             
             # Subscriber for turn completion signals
@@ -550,10 +562,24 @@ end your response with:
                 self.handle_time_delay_setting
             )
             
+            # === ZENOH PUBLICATION ===
+            # NAME: time_advanced
+            # TOPIC: cognitive/map/time_advanced
+            # DESCRIPTION: Simulation time advanced (hybrid mode - max proposal or fixed increment)
+            # PAYLOAD: {"old_time_info": dict, "new_time_info": dict, "minutes_advanced": int}
+            # TRIGGERS: MorningBriefing (daily@morning), WeeklyPlanning (weekly@morning), EndOfDayReview (daily@night)
+            # ========================
             self.time_advanced_publisher = self.session.declare_publisher(
                 "cognitive/map/time_advanced"
             )
-            # Publisher for scenario completion
+            
+            # === ZENOH PUBLICATION ===
+            # NAME: scenario_complete
+            # TOPIC: cognitive/map/scenario_complete
+            # DESCRIPTION: Scenario reached completion condition (max_turns reached)
+            # PAYLOAD: {"reason": str, "max_turns": int, "turn_number": int}
+            # TRIGGERS: PrepareStatusReport, ArchiveCompletedWork
+            # ========================
             self.scenario_complete_publisher = self.session.declare_publisher(
                 "cognitive/map/scenario_complete"
             )
@@ -2515,6 +2541,13 @@ end your response with:
                 'timestamp': datetime.now().isoformat()
             }
             
+            # === ZENOH PUBLICATION (ad-hoc) ===
+            # NAME: agent_detected
+            # TOPIC: cognitive/{character}/sense/visual/agent_detected
+            # DESCRIPTION: Character detected another character within line of sight
+            # PAYLOAD: {"agent_name": str, "position": tuple, "distance": float, "timestamp": str}
+            # TRIGGERS: (social activities - greet, approach, converse)
+            # ========================
             topic = f"cognitive/{observer_agent_name}/sense/visual/agent_detected"
             self.session.put(topic, json.dumps(event_data).encode('utf-8'))
             

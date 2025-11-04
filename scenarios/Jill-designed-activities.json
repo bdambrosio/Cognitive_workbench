@@ -1,45 +1,4 @@
-{  
-  "PrepareQueryResponse": {
-    "name": "PrepareQueryResponse",
-    "category": "Role/Production",
-    "tags": ["social", "mental"],
-    "steps": [
-      "analyze $user_query for $topic",
-      "search Collection $relevant for $topic",
-      "synthesize Note $answer",
-      "verify Note $answer for accuracy",
-      "format Note $answer as response to $user_query",
-      "say $answer to User as response to $user_query"
-    ],
-    "when": "opportunistic",
-    "where": ["User"],
-    "duration": [10, 25],
-    "needs": ["$user_query", "$relevant"],
-    "states_addressed": [],
-    "importance": 0.98,
-    "habit": 0.90
-  },
-
-  "HandlePlanFailure": {
-    "name": "HandlePlanFailure",
-    "category": "Operational/Plan Management",
-    "tags": ["mental", "solo", "immediate"],
-    "steps": [
-      "analyze Note failure_report",
-      "document ActionRecord failure_context",
-      "reflect on cause",
-      "acknowledgeLimitations if capability_issue",
-      "record Note failure_details"
-    ],
-    "when": "immediate@failure",
-    "where": ["InformationSpace"],
-    "duration": [3, 8],
-    "needs": ["Note", "ActionRecord"],
-    "states_addressed": [],
-    "importance": 0.96,
-    "habit": 0.75
-  },
-
+{
   "MorningBriefing": {
     "name": "MorningBriefing",
     "category": "Role/Production",
@@ -303,6 +262,28 @@
     "states_addressed": [],
     "importance": 0.79,
     "habit": 0.45
+  },
+
+  "PrepareQueryResponse": {
+    "name": "PrepareQueryResponse",
+    "category": "Role/Production",
+    "tags": ["social", "mental"],
+    "steps": [
+      "analyze Note user_query",
+      "search Collection relevant",
+      "synthesize Note answer",
+      "verify Note accuracy",
+      "format Note response",
+      "move to User",
+      "communicate"
+    ],
+    "when": "opportunistic",
+    "where": ["User"],
+    "duration": [10, 25],
+    "needs": ["Note", "Collection"],
+    "states_addressed": [],
+    "importance": 0.98,
+    "habit": 0.90
   },
 
   "ProactiveResearchUpdate": {
@@ -977,6 +958,25 @@
     "importance": 0.90,
     "habit": 0.85
   },
+    "HandlePlanFailure": {
+      "name": "HandlePlanFailure",
+      "category": "Operational/Plan Management",
+      "tags": ["mental", "solo", "immediate"],
+      "steps": [
+        "analyze Note failure_report",
+        "document ActionRecord failure_context",
+        "reflect on cause",
+        "acknowledgeLimitations if capability_issue",
+        "record Note failure_details"
+      ],
+      "when": "immediate@failure",
+      "where": ["InformationSpace"],
+      "duration": [3, 8],
+      "needs": ["Note", "ActionRecord"],
+      "states_addressed": [],
+      "importance": 0.96,
+      "habit": 0.75
+    },
   
     "DebugFailedPlan": {
       "name": "DebugFailedPlan",

@@ -49,7 +49,13 @@ class InfospaceExecutor:
         self.llm_client = llm_client
         self.available_tools = available_tools
         
-        # Heartbeat publisher for resetting turn timeout
+        # === ZENOH PUBLICATION ===
+        # NAME: turn_heartbeat
+        # TOPIC: cognitive/map/turn/heartbeat/{character}
+        # DESCRIPTION: Character is alive and processing (prevents turn timeout)
+        # PAYLOAD: {"timestamp": str}
+        # TRIGGERS: (internal turn management - resets timeout)
+        # ========================
         self.heartbeat_publisher = self.session.declare_publisher(
             f"cognitive/map/turn/heartbeat/{agent_name}"
         )

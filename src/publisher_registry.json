@@ -1,0 +1,194 @@
+[
+  {
+    "name": "action",
+    "topic": "cognitive/{character}/action",
+    "description": "Character completed an action (move, communicate, search, etc)",
+    "payload": "{\"type\": str, \"result\": Any, \"timestamp\": str, \"action_record\": dict}",
+    "triggers": "EndOfDayReview, AssessPerformance, ReviewErrors",
+    "source_file": "/home/bruce/Downloads/Cognitive_workbench/src/executive_node.py"
+  },
+  {
+    "name": "agent_detected",
+    "topic": "cognitive/{character}/sense/visual/agent_detected",
+    "description": "Character detected another character within line of sight",
+    "payload": "{\"agent_name\": str, \"position\": tuple, \"distance\": float, \"timestamp\": str}",
+    "triggers": "(social activities - greet, approach, converse)",
+    "source_file": "/home/bruce/Downloads/Cognitive_workbench/src/map_node.py"
+  },
+  {
+    "name": "character_shutdown",
+    "topic": "cognitive/{character}/shutdown",
+    "description": "Character shutting down gracefully",
+    "payload": "{\"character_name\": str, \"timestamp\": str, \"type\": \"shutdown\"}",
+    "triggers": "PrepareStatusReport, ArchiveCompletedWork, SaveMemoryState",
+    "source_file": "/home/bruce/Downloads/Cognitive_workbench/src/executive_node.py"
+  },
+  {
+    "name": "current_activity",
+    "topic": "cognitive/{character}/current_activity",
+    "description": "Activity pattern changed (started, completed, switched)",
+    "payload": "{\"activity\": str, \"status\": str, \"timestamp\": str}",
+    "triggers": "EvaluateMethodology, OptimizeWorkflow",
+    "source_file": "/home/bruce/Downloads/Cognitive_workbench/src/executive_node.py"
+  },
+  {
+    "name": "current_plan",
+    "topic": "cognitive/{character}/current_plan",
+    "description": "Plan state changed (started, step completed, failed, completed)",
+    "payload": "{\"status\": str, \"plan\": dict, \"step_index\": int, \"failure_reason\": str}",
+    "triggers": "HandlePlanFailure, DebugFailedPlan, RepairPlan, LearnFromFailure",
+    "source_file": "/home/bruce/Downloads/Cognitive_workbench/src/executive_node.py"
+  },
+  {
+    "name": "current_state",
+    "topic": "cognitive/{character}/current_state",
+    "description": "Physiological state update (hunger, thirst, fatigue)",
+    "payload": "{\"character\": str, \"timestamp\": str, \"state\": {\"hunger\": {\"value\": float}, \"thirst\": {\"value\": float}, \"fatigue\": {\"value\": float}}}",
+    "triggers": "(state threshold activities - eating, drinking, resting)",
+    "source_file": "/home/bruce/Downloads/Cognitive_workbench/src/executive_node.py"
+  },
+  {
+    "name": "decided_action",
+    "topic": "cognitive/{character}/decided_action",
+    "description": "Character decided on next action (before execution)",
+    "payload": "{\"action\": str, \"rationale\": str, \"timestamp\": str}",
+    "triggers": "EvaluateMethodology, AssessPerformance",
+    "source_file": "/home/bruce/Downloads/Cognitive_workbench/src/executive_node.py"
+  },
+  {
+    "name": "dialog_end",
+    "topic": "cognitive/{character}/dialog_end",
+    "description": "User ended conversation with character",
+    "payload": "{\"other_name\": str}",
+    "triggers": "HandlePlanFailure (conversation interrupted), ResumePreviousActivity",
+    "source_file": "/home/bruce/Downloads/Cognitive_workbench/src/executive_node.py"
+  },
+  {
+    "name": "goal",
+    "topic": "cognitive/{character}/goal",
+    "description": "New goal set (from UI or autonomous)",
+    "payload": "{\"goal\": str, \"source\": str, \"timestamp\": str}",
+    "triggers": "WeeklyPlanning, AssessKnowledgeGaps",
+    "source_file": "/home/bruce/Downloads/Cognitive_workbench/src/executive_node.py"
+  },
+  {
+    "name": "memory_close_dialog",
+    "topic": "cognitive/{character}/memory/close_dialog",
+    "description": "Memory node notified to close dialog context",
+    "payload": "{\"entity_name\": str}",
+    "triggers": "(internal memory cleanup)",
+    "source_file": "/home/bruce/Downloads/Cognitive_workbench/src/executive_node.py"
+  },
+  {
+    "name": "memory_store",
+    "topic": "cognitive/{character}/memory/store",
+    "description": "Store memory (conversation, observation, reflection)",
+    "payload": "{\"type\": str, \"content\": Any, \"timestamp\": str}",
+    "triggers": "OrganizeResearchNotes, UpdateKnowledgeBase",
+    "source_file": "/home/bruce/Downloads/Cognitive_workbench/src/executive_node.py"
+  },
+  {
+    "name": "perception_action_result",
+    "topic": "cognitive/{character}/perception/action_result",
+    "description": "Result of perception action (sense, observe)",
+    "payload": "{\"action\": str, \"result\": Any, \"timestamp\": str}",
+    "triggers": "(internal perception processing)",
+    "source_file": "/home/bruce/Downloads/Cognitive_workbench/src/executive_node.py"
+  },
+  {
+    "name": "plan_log",
+    "topic": "cognitive/{character}/planning/plan_log",
+    "description": "Plan execution log entry for analytics",
+    "payload": "{\"plan_id\": str, \"step\": dict, \"result\": Any, \"timestamp\": str}",
+    "triggers": "DebugFailedPlan, BuildPlanLibrary, ReviewPlanQuality",
+    "source_file": "/home/bruce/Downloads/Cognitive_workbench/src/executive_node.py"
+  },
+  {
+    "name": "scenario_complete",
+    "topic": "cognitive/map/scenario_complete",
+    "description": "Scenario reached completion condition (max_turns reached)",
+    "payload": "{\"reason\": str, \"max_turns\": int, \"turn_number\": int}",
+    "triggers": "PrepareStatusReport, ArchiveCompletedWork",
+    "source_file": "/home/bruce/Downloads/Cognitive_workbench/src/map_node.py"
+  },
+  {
+    "name": "situation_request_update",
+    "topic": "cognitive/{character}/situation/request_update",
+    "description": "Character requests situation update from situation node",
+    "payload": "{\"timestamp\": str}",
+    "triggers": "(internal)",
+    "source_file": "/home/bruce/Downloads/Cognitive_workbench/src/executive_node.py"
+  },
+  {
+    "name": "situation_update",
+    "topic": "cognitive/{character}/situation/update",
+    "description": "Updated situation awareness (location, visible entities, adjacent characters)",
+    "payload": "{\"views\": list, \"location\": tuple, \"timestamp\": str}",
+    "triggers": "(internal - executive consumes for planning)",
+    "source_file": "/home/bruce/Downloads/Cognitive_workbench/src/situation_node.py"
+  },
+  {
+    "name": "time_advanced",
+    "topic": "cognitive/map/time_advanced",
+    "description": "Simulation time advanced (hybrid mode - max proposal or fixed increment)",
+    "payload": "{\"old_time_info\": dict, \"new_time_info\": dict, \"minutes_advanced\": int}",
+    "triggers": "MorningBriefing (daily@morning), WeeklyPlanning (weekly@morning), EndOfDayReview (daily@night)",
+    "source_file": "/home/bruce/Downloads/Cognitive_workbench/src/map_node.py"
+  },
+  {
+    "name": "time_proposal",
+    "topic": "cognitive/map/time_proposal",
+    "description": "Character proposes time advancement",
+    "payload": "{\"character\": str, \"minutes\": int, \"reason\": str}",
+    "triggers": "(internal time management)",
+    "source_file": "/home/bruce/Downloads/Cognitive_workbench/src/executive_node.py"
+  },
+  {
+    "name": "turn_complete",
+    "topic": "cognitive/map/turn/complete/{character}",
+    "description": "Character completed their turn",
+    "payload": "{\"character\": str, \"timestamp\": str}",
+    "triggers": "(internal turn management)",
+    "source_file": "/home/bruce/Downloads/Cognitive_workbench/src/executive_node.py"
+  },
+  {
+    "name": "turn_go",
+    "topic": "cognitive/map/turn/go",
+    "description": "Signal to all characters to start their turn",
+    "payload": "{\"turn_number\": int, \"active_characters\": list[str], \"timestamp\": float}",
+    "triggers": "(internal turn management - characters begin OODA loop)",
+    "source_file": "/home/bruce/Downloads/Cognitive_workbench/src/map_node.py"
+  },
+  {
+    "name": "turn_heartbeat",
+    "topic": "cognitive/map/turn/heartbeat/{character}",
+    "description": "Character is alive and processing (prevents turn timeout)",
+    "payload": "{\"timestamp\": str}",
+    "triggers": "(internal turn management - resets timeout)",
+    "source_file": "/home/bruce/Downloads/Cognitive_workbench/src/infospace_executor.py"
+  },
+  {
+    "name": "turn_state_update",
+    "topic": "cognitive/map/turn_state_update",
+    "description": "Comprehensive turn state and UI button states",
+    "payload": "{\"type\": str, \"turn\": dict, \"buttons\": dict, \"timestamp\": float}",
+    "triggers": "(UI updates)",
+    "source_file": "/home/bruce/Downloads/Cognitive_workbench/src/map_node.py"
+  },
+  {
+    "name": "turn_stop",
+    "topic": "cognitive/map/turn/stop",
+    "description": "Turn stopped due to state threshold, plan failure, or manual stop",
+    "payload": "{\"character\": str, \"reason\": str, \"metric\": str, \"value\": float}",
+    "triggers": "HandlePlanFailure, AssessPerformance",
+    "source_file": "/home/bruce/Downloads/Cognitive_workbench/src/executive_node.py"
+  },
+  {
+    "name": "world_state_update",
+    "topic": "cognitive/map/world_state/update",
+    "description": "Character requests world state update",
+    "payload": "{\"character\": str, \"timestamp\": str}",
+    "triggers": "(internal map sync)",
+    "source_file": "/home/bruce/Downloads/Cognitive_workbench/src/executive_node.py"
+  }
+]
