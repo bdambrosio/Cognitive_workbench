@@ -294,7 +294,7 @@ def create_activities(context, map_types, resource_type_str, character_name, cha
                                    "primitive_tools": resource_type_str.strip(),
                                    "setting": context},
                     [SystemMessage(content=ACTIVITIES_TEMPLATE)],
-                    max_tokens=8000,
+                    max_tokens=12000,
                     temp=0.7,
                     stops=['</end>'],
                     is_json=True,
@@ -539,6 +539,54 @@ class ActivityManager:
     def has_active_activity(self) -> bool:
         """Check if an activity is currently in progress"""
         return self.current_activity is not None and self.current_activity_state is not None
+    
+    def get_available_activities(self) -> list:
+        """Return list of activity names for UI"""
+        if not self.activities:
+            return []
+        return sorted(list(self.activities.keys()))
+    
+    def set_activity_manually(self, activity_name: str) -> tuple:
+        """Manually set an activity by name, return (first_step, activity)"""
+        if not self.activities or activity_name not in self.activities:
+            logger.warning(f"Activity {activity_name} not found")
+            return None, None
+        
+        # Complete current activity if any
+        if self.has_active_activity():
+            self._complete_activity()
+        
+        # Build situation and instantiate selected activity
+        situation = self._format_situation_data()
+        selected = self.activities[activity_name]
+        instantiated = self._instantiate_activity(selected, situation)
+        self.current_activity = instantiated
+        
+        # Initialize activity state
+        start_state = {}
+        if hasattr(self.executive_node, 'self_state'):
+            start_state = {k: v.copy() for k, v in self.executive_node.self_state.items()}
+        
+        start_time = situation.get('datetime')
+        if not start_time:
+            if hasattr(self, 'current_time') and self.current_time:
+                start_time = self.current_time
+            else:
+                start_time = 'unknown'
+        
+        if isinstance(start_time, datetime) and start_time.tzinfo is not None:
+            start_time = start_time.replace(tzinfo=None)
+        
+        self.current_activity_state = {
+            'start_time': start_time,
+            'current_step_index': 0,
+            'status': 'active',
+            'start_state': start_state
+        }
+        
+        first_step = self.activity_step()
+        logger.info(f"🎯 {self.executive_node.character_name} manually selected activity: {instantiated['name']}")
+        return first_step, self.current_activity
         
     def select_activity(self, active_goal: dict=None):
         """Select NEW activity only - returns (first_step, activity) tuple"""

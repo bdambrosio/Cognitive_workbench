@@ -135,32 +135,87 @@ class ZenohExecutiveNode:
             self.situation_callback
         )
         
-        # Publisher for actions (character-specific)
+        # === ZENOH PUBLICATION ===
+        # NAME: action
+        # TOPIC: cognitive/{character}/action
+        # DESCRIPTION: Character completed an action (move, communicate, search, etc)
+        # PAYLOAD: {"type": str, "result": Any, "timestamp": str, "action_record": dict}
+        # TRIGGERS: EndOfDayReview, AssessPerformance, ReviewErrors
+        # ========================
         self.action_publisher = self.session.declare_publisher(f"cognitive/{character_name}/action")
 
-        # Publisher for map update requests (character-specific)
+        # === ZENOH PUBLICATION ===
+        # NAME: situation_request_update
+        # TOPIC: cognitive/{character}/situation/request_update
+        # DESCRIPTION: Character requests situation update from situation node
+        # PAYLOAD: {"timestamp": str}
+        # TRIGGERS: (internal)
+        # ========================
         self.map_update_request_publisher = self.session.declare_publisher(f"cognitive/{character_name}/situation/request_update")
-        # Publisher for plan logs (analytics)
+        
+        # === ZENOH PUBLICATION ===
+        # NAME: plan_log
+        # TOPIC: cognitive/{character}/planning/plan_log
+        # DESCRIPTION: Plan execution log entry for analytics
+        # PAYLOAD: {"plan_id": str, "step": dict, "result": Any, "timestamp": str}
+        # TRIGGERS: DebugFailedPlan, BuildPlanLibrary, ReviewPlanQuality
+        # ========================
         self.plan_log_publisher = self.session.declare_publisher(
             f"cognitive/{character_name}/planning/plan_log"
         )
         
-        # Publisher for memory storage (character-specific)
+        # === ZENOH PUBLICATION ===
+        # NAME: memory_store
+        # TOPIC: cognitive/{character}/memory/store
+        # DESCRIPTION: Store memory (conversation, observation, reflection)
+        # PAYLOAD: {"type": str, "content": Any, "timestamp": str}
+        # TRIGGERS: OrganizeResearchNotes, UpdateKnowledgeBase
+        # ========================
         self.memory_publisher = self.session.declare_publisher(f"cognitive/{character_name}/memory/store")
         
-        
-        # Publisher for goals (character-specific)
+        # === ZENOH PUBLICATION ===
+        # NAME: goal
+        # TOPIC: cognitive/{character}/goal
+        # DESCRIPTION: New goal set (from UI or autonomous)
+        # PAYLOAD: {"goal": str, "source": str, "timestamp": str}
+        # TRIGGERS: WeeklyPlanning, AssessKnowledgeGaps
+        # ========================
         self.goal_publisher = self.session.declare_publisher(f"cognitive/{character_name}/goal")
         
-        # Publisher for decided actions (character-specific) 
+        # === ZENOH PUBLICATION ===
+        # NAME: decided_action
+        # TOPIC: cognitive/{character}/decided_action
+        # DESCRIPTION: Character decided on next action (before execution)
+        # PAYLOAD: {"action": str, "rationale": str, "timestamp": str}
+        # TRIGGERS: EvaluateMethodology, AssessPerformance
+        # ========================
         self.decided_action_publisher = self.session.declare_publisher(f"cognitive/{character_name}/decided_action")
         
-        # Publisher for current plans (character-specific)
+        # === ZENOH PUBLICATION ===
+        # NAME: current_plan
+        # TOPIC: cognitive/{character}/current_plan
+        # DESCRIPTION: Plan state changed (started, step completed, failed, completed)
+        # PAYLOAD: {"status": str, "plan": dict, "step_index": int, "failure_reason": str}
+        # TRIGGERS: HandlePlanFailure, DebugFailedPlan, RepairPlan, LearnFromFailure
+        # ========================
         self.current_plan_publisher = self.session.declare_publisher(f"cognitive/{character_name}/current_plan")
         
-        # Publisher for current activities (character-specific)
+        # === ZENOH PUBLICATION ===
+        # NAME: current_activity
+        # TOPIC: cognitive/{character}/current_activity
+        # DESCRIPTION: Activity pattern changed (started, completed, switched)
+        # PAYLOAD: {"activity": str, "status": str, "timestamp": str}
+        # TRIGGERS: EvaluateMethodology, OptimizeWorkflow
+        # ========================
         self.current_activity_publisher = self.session.declare_publisher(f"cognitive/{character_name}/current_activity")
-        # Publisher for current internal state (character-specific)
+        
+        # === ZENOH PUBLICATION ===
+        # NAME: current_state
+        # TOPIC: cognitive/{character}/current_state
+        # DESCRIPTION: Physiological state update (hunger, thirst, fatigue)
+        # PAYLOAD: {"character": str, "timestamp": str, "state": {"hunger": {"value": float}, "thirst": {"value": float}, "fatigue": {"value": float}}}
+        # TRIGGERS: (state threshold activities - eating, drinking, resting)
+        # ========================
         self.current_state_publisher = self.session.declare_publisher(f"cognitive/{character_name}/current_state")
         
         # Backward compatibility properties
@@ -281,15 +336,47 @@ class ZenohExecutiveNode:
             "cognitive/map/turn/go",
             self.turn_callback
         )
+        
+        # === ZENOH PUBLICATION ===
+        # NAME: turn_complete
+        # TOPIC: cognitive/map/turn/complete/{character}
+        # DESCRIPTION: Character completed their turn
+        # PAYLOAD: {"character": str, "timestamp": str}
+        # TRIGGERS: (internal turn management)
+        # ========================
         self.turn_complete_publisher = self.session.declare_publisher(
             f"cognitive/map/turn/complete/{character_name}"
         )
+        
+        # === ZENOH PUBLICATION ===
+        # NAME: time_proposal
+        # TOPIC: cognitive/map/time_proposal
+        # DESCRIPTION: Character proposes time advancement
+        # PAYLOAD: {"character": str, "minutes": int, "reason": str}
+        # TRIGGERS: (internal time management)
+        # ========================
         self.time_proposal_publisher = self.session.declare_publisher(
             "cognitive/map/time_proposal"
         )
+        
+        # === ZENOH PUBLICATION ===
+        # NAME: world_state_update
+        # TOPIC: cognitive/map/world_state/update
+        # DESCRIPTION: Character requests world state update
+        # PAYLOAD: {"character": str, "timestamp": str}
+        # TRIGGERS: (internal map sync)
+        # ========================
         self.world_state_update_publisher = self.session.declare_publisher(
             "cognitive/map/world_state/update"
         )
+        
+        # === ZENOH PUBLICATION ===
+        # NAME: perception_action_result
+        # TOPIC: cognitive/{character}/perception/action_result
+        # DESCRIPTION: Result of perception action (sense, observe)
+        # PAYLOAD: {"action": str, "result": Any, "timestamp": str}
+        # TRIGGERS: (internal perception processing)
+        # ========================
         self.perception_action_result_publisher = self.session.declare_publisher(
             f"cognitive/{character_name}/perception/action_result"
         )
@@ -314,6 +401,19 @@ class ZenohExecutiveNode:
             f"cognitive/{character_name}/dialog_end",
             self._dialog_end_callback
         )
+        
+        # Subscriber for manual activity selection (character-specific)
+        self.activity_selection_subscriber = self.session.declare_subscriber(
+            f"cognitive/{character_name}/activity/set",
+            self._activity_selection_callback
+        )
+        
+        # Queryable for activity list (character-specific)
+        self.activity_list_queryable = self.session.declare_queryable(
+            f"cognitive/{character_name}/activity/list",
+            self._activity_list_query_handler
+        )
+        
         # Shutdown flags
         self.shutdown_requested = False
         self._shutting_down = False
@@ -322,11 +422,10 @@ class ZenohExecutiveNode:
         self.uses = {} # cache of uses
         self.activities = {} # dictionary of all available activities for initializing activity manager
         try:
-            if self.character_config.get('activities', True):
-                self.activities = json.load(open(f'../scenarios/{self.character_name}-activities.json'))
+            self.activities = json.load(open(f'../scenarios/{self.character_name}-activities.json'))
+            logger.info(f'📚 Loaded {len(self.activities)} activities for {self.character_name}')
         except Exception as e:
-            if not self.manual:
-                logger.error(f'Error loading activities for {self.character_name}: {e}')
+            logger.error(f'Error loading activities for {self.character_name}: {e}')
 
         logger.info(f'🧠 Zenoh Executive Node initialized for character: {character_name}')
         logger.info(f'   - Subscribing to: cognitive/{character_name}/sense_data')
@@ -1434,6 +1533,13 @@ end your response with </end>
                         # Finalize current plan and publish plan log
                         self._plan_completed()
                         # Publish stop to map turn controller and UI reflects via turn_status
+                        # === ZENOH PUBLICATION (ad-hoc) ===
+                        # NAME: turn_stop
+                        # TOPIC: cognitive/map/turn/stop
+                        # DESCRIPTION: Turn stopped due to state threshold, plan failure, or manual stop
+                        # PAYLOAD: {"character": str, "reason": str, "metric": str, "value": float}
+                        # TRIGGERS: HandlePlanFailure, AssessPerformance
+                        # ========================
                         self.session.put("cognitive/map/turn/stop", json.dumps({"character": self.character_name, "reason": "state_threshold", "metric": key, "value": val}).encode())
                         # Clear plan/activity state
                         self.current_plan = None
@@ -2946,6 +3052,56 @@ End your response with </end>
         except Exception as e:
             logger.error(f'Error in end dialog callback: {e}')
     
+    def _activity_selection_callback(self, sample):
+        """Handle manual activity selection from UI."""
+        try:
+            data = json.loads(sample.payload.to_bytes().decode('utf-8'))
+            activity_name = data.get('activity_name')
+            
+            if not activity_name:
+                logger.error(f'No activity_name in manual selection request')
+                return
+            
+            logger.info(f'🎯 {self.character_name} received manual activity selection: {activity_name}')
+            
+            if not self.activity_manager:
+                logger.error(f'No activity_manager available for {self.character_name}')
+                return
+            
+            # Set the activity manually
+            step, activity = self.activity_manager.set_activity_manually(activity_name)
+            
+            if activity:
+                # Clear current plan and goal to start fresh with new activity
+                self.current_plan = None
+                self.current_goal = None
+                self._publish_current_activity()
+                logger.info(f'✅ {self.character_name} activity set to: {activity_name}')
+            else:
+                logger.error(f'Failed to set activity {activity_name} for {self.character_name}')
+        except Exception as e:
+            logger.error(f'Error in activity selection callback: {e}')
+    
+    def _activity_list_query_handler(self, query):
+        """Handle query for available activities list."""
+        try:
+            activities = []
+            if self.activity_manager:
+                activities = self.activity_manager.get_available_activities()
+            
+            response = {
+                'success': True,
+                'activities': activities
+            }
+            query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
+        except Exception as e:
+            logger.error(f'Error handling activity list query: {e}')
+            response = {
+                'success': False,
+                'activities': []
+            }
+            query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
+    
     def publish_dialog_end(self, source: str):
         """Publish dialog end notification to another character."""
         # Only User can close dialogs - prevent other characters from closing
@@ -2954,12 +3110,27 @@ End your response with </end>
             return
         
         try:
+            # === ZENOH PUBLICATION (ad-hoc) ===
+            # NAME: dialog_end
+            # TOPIC: cognitive/{character}/dialog_end
+            # DESCRIPTION: User ended conversation with character
+            # PAYLOAD: {"other_name": str}
+            # TRIGGERS: HandlePlanFailure (conversation interrupted), ResumePreviousActivity
+            # ========================
             key = f"cognitive/{source}/dialog_end"
             payload = json.dumps({'other_name': self.character_name})
             self.session.put(key, payload)
             
             # Release conversation lock with this character
             self._release_conversation_lock(source)
+            
+            # === ZENOH PUBLICATION (ad-hoc) ===
+            # NAME: memory_close_dialog
+            # TOPIC: cognitive/{character}/memory/close_dialog
+            # DESCRIPTION: Memory node notified to close dialog context
+            # PAYLOAD: {"entity_name": str}
+            # TRIGGERS: (internal memory cleanup)
+            # ========================
             key = f"cognitive/{source}/memory/close_dialog"
             payload = json.dumps({'entity_name': self.character_name})
             self.session.put(key, payload)
@@ -4583,6 +4754,13 @@ End your response with:
             
             # Publish shutdown event for cleanup
             try:
+                # === ZENOH PUBLICATION (ad-hoc) ===
+                # NAME: character_shutdown
+                # TOPIC: cognitive/{character}/shutdown
+                # DESCRIPTION: Character shutting down gracefully
+                # PAYLOAD: {"character_name": str, "timestamp": str, "type": "shutdown"}
+                # TRIGGERS: PrepareStatusReport, ArchiveCompletedWork, SaveMemoryState
+                # ========================
                 shutdown_data = {
                     'character_name': self.character_name,
                     'timestamp': datetime.now().isoformat(),

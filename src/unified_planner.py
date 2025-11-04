@@ -8,7 +8,7 @@ import json
 import logging
 from typing import Dict, Any, Optional
 from pathlib import Path
-
+from infospace_planner import INFOSPACE_PRIMITIVES_REFERENCE
 logger = logging.getLogger(__name__)
 
 
@@ -124,12 +124,13 @@ class UnifiedPlanner:
         # Fill template
         template_filled = self.template.replace('{{goal}}', goal)
         template_filled = template_filled.replace('{{tools}}', tools_formatted)
+        template_filled = template_filled.replace("{primitives_reference}", INFOSPACE_PRIMITIVES_REFERENCE)
         
         # Generate plan using LLM
         response = self.llm_client.generate(
             [template_filled],
             max_tokens=2000,
-            temperature=0.6,
+            temperature=0.3,
             is_json=True
         )
         

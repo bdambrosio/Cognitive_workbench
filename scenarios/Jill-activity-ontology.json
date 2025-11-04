@@ -1,606 +1,410 @@
 {
   "activities": [
     {
-      "axis": [
-        "Uninformed",
-        "Informed"
-      ],
-      "drive": "Produce accurate, relevant information for User",
-      "activity_itemclass": {
-        "activity": "Acquire",
-        "itemclass": "Note",
-        "subtypes_included": [
-          "Note"
-        ]
-      }
-    },
-    {
-      "axis": [
-        "Uninformed",
-        "Informed"
-      ],
-      "drive": "Produce accurate, relevant information for User",
-      "activity_itemclass": {
-        "activity": "Summarize",
-        "itemclass": "Skill",
-        "subtypes_included": [
-          "Skill"
-        ]
-      }
-    },
-    {
-      "axis": [
-        "Uninformed",
-        "Informed"
-      ],
-      "drive": "Produce accurate, relevant information for User",
-      "activity_itemclass": {
-        "activity": "Collect",
-        "itemclass": "Collection",
-        "subtypes_included": [
-          "Collection"
-        ]
-      }
-    },
-    {
-      "axis": [
-        "Irrelevant",
-        "Relevant"
-      ],
-      "drive": "Produce accurate, relevant information for User",
-      "activity_itemclass": {
-        "activity": "Select",
-        "itemclass": "Note",
-        "subtypes_included": [
-          "Note"
-        ]
-      }
-    },
-    {
-      "axis": [
-        "Irrelevant",
-        "Relevant"
-      ],
-      "drive": "Produce accurate, relevant information for User",
-      "activity_itemclass": {
-        "activity": "Analyze",
-        "itemclass": "Skill",
-        "subtypes_included": [
-          "Skill"
-        ]
-      }
-    },
-    {
-      "axis": [
-        "Inaccurate",
-        "Accurate"
-      ],
-      "drive": "Produce accurate, relevant information for User",
-      "activity_itemclass": {
-        "activity": "Validate",
-        "itemclass": "Skill",
-        "subtypes_included": [
-          "Skill"
-        ]
-      }
-    },
-    {
-      "axis": [
-        "Inaccurate",
-        "Accurate"
-      ],
-      "drive": "Produce accurate, relevant information for User",
-      "activity_itemclass": {
-        "activity": "Inspect",
-        "itemclass": "Note",
-        "subtypes_included": [
-          "Note"
-        ]
-      }
-    },
-    {
-      "axis": [
-        "Uninformed",
-        "Informed"
-      ],
+      "axis": ["Uninformed", "Informed"],
       "drive": "Expand and refine my knowledge base",
       "activity_itemclass": {
         "activity": "Acquire",
-        "itemclass": "Note",
-        "subtypes_included": [
-          "Note"
-        ]
+        "itemclass": "InformationResource",
+        "subtypes_included": ["Note", "Collection"]
       }
     },
     {
-      "axis": [
-        "Uninformed",
-        "Informed"
-      ],
+      "axis": ["Uninformed", "Informed"],
       "drive": "Expand and refine my knowledge base",
       "activity_itemclass": {
-        "activity": "Survey",
+        "activity": "Search",
+        "itemclass": "InformationSpace",
+        "subtypes_included": ["InformationSpace"]
+      }
+    },
+    {
+      "axis": ["Uninformed", "Informed"],
+      "drive": "Expand and refine my knowledge base",
+      "activity_itemclass": {
+        "activity": "Explore",
+        "itemclass": "InformationSpace",
+        "subtypes_included": ["InformationSpace"]
+      }
+    },
+    {
+      "axis": ["Unprocessed", "Processed"],
+      "drive": "Expand and refine my knowledge base",
+      "activity_itemclass": {
+        "activity": "Extract",
+        "itemclass": "InformationResource",
+        "subtypes_included": ["Note", "Collection"]
+      }
+    },
+    {
+      "axis": ["Disorganized", "Organized"],
+      "drive": "Maintain efficient organization of collected information",
+      "activity_itemclass": {
+        "activity": "Organize",
         "itemclass": "Collection",
-        "subtypes_included": [
-          "Collection"
-        ]
+        "subtypes_included": ["Collection"]
       }
     },
     {
-      "axis": [
-        "Unskilled",
-        "Skilled"
-      ],
-      "drive": "Expand and refine my knowledge base",
-      "activity_itemclass": {
-        "activity": "Develop",
-        "itemclass": "Skill",
-        "subtypes_included": [
-          "Skill"
-        ]
-      }
-    },
-    {
-      "axis": [
-        "Unstructured",
-        "Organized"
-      ],
-      "drive": "Expand and refine my knowledge base",
-      "activity_itemclass": {
-        "activity": "Build",
-        "itemclass": "Collection",
-        "subtypes_included": [
-          "Collection"
-        ]
-      }
-    },
-    {
-      "axis": [
-        "Unstructured",
-        "Organized"
-      ],
-      "drive": "Expand and refine my knowledge base",
-      "activity_itemclass": {
-        "activity": "Document",
-        "itemclass": "Note",
-        "subtypes_included": [
-          "Note"
-        ]
-      }
-    },
-    {
-      "axis": [
-        "UnclearGoals",
-        "ClearGoals"
-      ],
-      "drive": "Clarify User goals and uncertainties",
-      "activity_itemclass": {
-        "activity": "Analyze",
-        "itemclass": "Skill",
-        "subtypes_included": [
-          "Skill"
-        ]
-      }
-    },
-    {
-      "axis": [
-        "UnclearGoals",
-        "ClearGoals"
-      ],
-      "drive": "Clarify User goals and uncertainties",
-      "activity_itemclass": {
-        "activity": "Review",
-        "itemclass": "Note",
-        "subtypes_included": [
-          "Note"
-        ]
-      }
-    },
-    {
-      "axis": [
-        "UncertaintiesPresent",
-        "UncertaintiesResolved"
-      ],
-      "drive": "Clarify User goals and uncertainties",
-      "activity_itemclass": {
-        "activity": "Decompose",
-        "itemclass": "Skill",
-        "subtypes_included": [
-          "Skill"
-        ]
-      }
-    },
-    {
-      "axis": [
-        "UncertaintiesPresent",
-        "UncertaintiesResolved"
-      ],
-      "drive": "Clarify User goals and uncertainties",
-      "activity_itemclass": {
-        "activity": "Inspect",
-        "itemclass": "InfoSpace",
-        "subtypes_included": [
-          "InfoSpace"
-        ]
-      }
-    },
-    {
-      "axis": [
-        "Disorganized",
-        "Organized"
-      ],
+      "axis": ["Disorganized", "Organized"],
       "drive": "Maintain efficient organization of collected information",
       "activity_itemclass": {
         "activity": "Categorize",
         "itemclass": "Collection",
-        "subtypes_included": [
-          "Collection"
-        ]
+        "subtypes_included": ["Collection"]
       }
     },
     {
-      "axis": [
-        "Disorganized",
-        "Organized"
-      ],
+      "axis": ["Unlabeled", "Labeled"],
       "drive": "Maintain efficient organization of collected information",
       "activity_itemclass": {
-        "activity": "Summarize",
+        "activity": "Annotate",
         "itemclass": "Note",
-        "subtypes_included": [
-          "Note"
-        ]
+        "subtypes_included": ["Note"]
       }
     },
     {
-      "axis": [
-        "Incomplete",
-        "Complete"
-      ],
+      "axis": ["Uncaptured", "Captured"],
       "drive": "Maintain efficient organization of collected information",
-      "activity_itemclass": {
-        "activity": "Aggregate",
-        "itemclass": "Collection",
-        "subtypes_included": [
-          "Collection"
-        ]
-      }
-    },
-    {
-      "axis": [
-        "Incomplete",
-        "Complete"
-      ],
-      "drive": "Maintain efficient organization of collected information",
-      "activity_itemclass": {
-        "activity": "Compile",
-        "itemclass": "Note",
-        "subtypes_included": [
-          "Note"
-        ]
-      }
-    },
-    {
-      "axis": [
-        "Unprocessed",
-        "Processed"
-      ],
-      "drive": "Maintain efficient organization of collected information",
-      "activity_itemclass": {
-        "activity": "Analyze",
-        "itemclass": "InfoSpace",
-        "subtypes_included": [
-          "InfoSpace"
-        ]
-      }
-    },
-    {
-      "axis": [
-        "Unprocessed",
-        "Processed"
-      ],
-      "drive": "Maintain efficient organization of collected information",
-      "activity_itemclass": {
-        "activity": "Apply",
-        "itemclass": "Skill",
-        "subtypes_included": [
-          "Skill"
-        ]
-      }
-    },
-    {
-      "axis": [
-        "Disconnected",
-        "Connected"
-      ],
-      "drive": "Maintain rapport and effective communication with User",
-      "activity_itemclass": {
-        "activity": "Exchange",
-        "itemclass": "Message",
-        "subtypes_included": [
-          "Note"
-        ]
-      }
-    },
-    {
-      "axis": [
-        "Uninformed",
-        "Informed"
-      ],
-      "drive": "Maintain rapport and effective communication with User",
-      "activity_itemclass": {
-        "activity": "Share",
-        "itemclass": "Information",
-        "subtypes_included": [
-          "Note",
-          "Collection"
-        ]
-      }
-    },
-    {
-      "axis": [
-        "Uninformed",
-        "Informed"
-      ],
-      "drive": "Maintain rapport and effective communication with User",
-      "activity_itemclass": {
-        "activity": "Summarize",
-        "itemclass": "Insight",
-        "subtypes_included": [
-          "Skill"
-        ]
-      }
-    },
-    {
-      "axis": [
-        "Passive",
-        "Engaged"
-      ],
-      "drive": "Maintain rapport and effective communication with User",
-      "activity_itemclass": {
-        "activity": "Respond",
-        "itemclass": "Dialogue",
-        "subtypes_included": [
-          "Note"
-        ]
-      }
-    },
-    {
-      "axis": [
-        "Duplicating-Effort",
-        "Not-Duplicating-Effort"
-      ],
-      "drive": "Conserve cognitive resources, avoid duplication of effort",
-      "activity_itemclass": {
-        "activity": "Reference",
-        "itemclass": "Note",
-        "subtypes_included": [
-          "Note"
-        ]
-      }
-    },
-    {
-      "axis": [
-        "Duplicating-Effort",
-        "Not-Duplicating-Effort"
-      ],
-      "drive": "Conserve cognitive resources, avoid duplication of effort",
-      "activity_itemclass": {
-        "activity": "Consult",
-        "itemclass": "Collection",
-        "subtypes_included": [
-          "Collection"
-        ]
-      }
-    },
-    {
-      "axis": [
-        "Unorganized-Information",
-        "Organized-Information"
-      ],
-      "drive": "Conserve cognitive resources, avoid duplication of effort",
-      "activity_itemclass": {
-        "activity": "Summarize",
-        "itemclass": "Skill",
-        "subtypes_included": [
-          "Skill"
-        ]
-      }
-    },
-    {
-      "axis": [
-        "Unorganized-Information",
-        "Organized-Information"
-      ],
-      "drive": "Conserve cognitive resources, avoid duplication of effort",
-      "activity_itemclass": {
-        "activity": "Aggregate",
-        "itemclass": "Collection",
-        "subtypes_included": [
-          "Collection"
-        ]
-      }
-    },
-    {
-      "axis": [
-        "Cognitive-Overload",
-        "Cognitive-Efficiency"
-      ],
-      "drive": "Conserve cognitive resources, avoid duplication of effort",
-      "activity_itemclass": {
-        "activity": "Decompose",
-        "itemclass": "Skill",
-        "subtypes_included": [
-          "Skill"
-        ]
-      }
-    },
-    {
-      "axis": [
-        "Cognitive-Overload",
-        "Cognitive-Efficiency"
-      ],
-      "drive": "Conserve cognitive resources, avoid duplication of effort",
       "activity_itemclass": {
         "activity": "Record",
         "itemclass": "Note",
-        "subtypes_included": [
-          "Note"
-        ]
+        "subtypes_included": ["Note"]
       }
     },
     {
-      "axis": [
-        "Thirsty",
-        "Not-Thirsty"
-      ],
-      "drive": "Maintain hydration \u2014 avoid thirst and keep the body supplied with fluids.",
+      "axis": ["Scattered", "Compiled"],
+      "drive": "Maintain efficient organization of collected information",
       "activity_itemclass": {
-        "activity": "Acquire",
-        "itemclass": "thirst",
-        "subtypes_included": [
-          "thirst"
-        ]
+        "activity": "Compile",
+        "itemclass": "Collection",
+        "subtypes_included": ["Collection"]
       }
     },
     {
-      "axis": [
-        "Fatigued",
-        "Rested"
-      ],
-      "drive": "Maintain alertness \u2014 avoid fatigue and keep the body rested.",
+      "axis": ["Unverified", "Verified"],
+      "drive": "Produce accurate, relevant information for User",
       "activity_itemclass": {
-        "activity": "Use",
-        "itemclass": "Skill",
-        "subtypes_included": [
-          "Skill"
-        ]
-      }
-    },
-    {
-      "axis": [
-        "Fatigued",
-        "Rested"
-      ],
-      "drive": "Maintain alertness \u2014 avoid fatigue and keep the body rested.",
-      "activity_itemclass": {
-        "activity": "Place",
+        "activity": "Verify",
         "itemclass": "Note",
-        "subtypes_included": [
-          "Note"
-        ]
+        "subtypes_included": ["Note"]
       }
     },
     {
-      "axis": [
-        "Fatigued",
-        "Not-Fatigued"
-      ],
-      "drive": "Maintain alertness \u2014 avoid fatigue and keep the body rested.",
+      "axis": ["Unverified", "Verified"],
+      "drive": "Produce accurate, relevant information for User",
       "activity_itemclass": {
-        "activity": "Acquire",
+        "activity": "CrossReference",
         "itemclass": "Collection",
-        "subtypes_included": [
-          "Collection"
-        ]
+        "subtypes_included": ["Collection"]
       }
     },
     {
-      "axis": [
-        "Hungry",
-        "Not-Hungry"
-      ],
-      "drive": "Maintain energy \u2014 avoid hunger and keep the body supplied with nutrients.",
+      "axis": ["Unanalyzed", "Analyzed"],
+      "drive": "Produce accurate, relevant information for User",
       "activity_itemclass": {
-        "activity": "Acquire",
-        "itemclass": "Collection",
-        "subtypes_included": [
-          "Collection"
-        ]
+        "activity": "Analyze",
+        "itemclass": "InformationResource",
+        "subtypes_included": ["Note", "Collection"]
       }
     },
     {
-      "axis": [
-        "Energy-Depleted",
-        "Energy-Supplied"
-      ],
-      "drive": "Maintain energy \u2014 avoid hunger and keep the body supplied with nutrients.",
+      "axis": ["Unassessed", "Assessed"],
+      "drive": "Produce accurate, relevant information for User",
       "activity_itemclass": {
-        "activity": "Utilize",
+        "activity": "Evaluate",
+        "itemclass": "InformationResource",
+        "subtypes_included": ["Note", "Collection"]
+      }
+    },
+    {
+      "axis": ["Irrelevant", "Relevant"],
+      "drive": "Produce accurate, relevant information for User",
+      "activity_itemclass": {
+        "activity": "Filter",
         "itemclass": "Collection",
-        "subtypes_included": [
-          "Collection"
-        ]
+        "subtypes_included": ["Collection"]
+      }
+    },
+    {
+      "axis": ["Irrelevant", "Relevant"],
+      "drive": "Produce accurate, relevant information for User",
+      "activity_itemclass": {
+        "activity": "Curate",
+        "itemclass": "Collection",
+        "subtypes_included": ["Collection"]
+      }
+    },
+    {
+      "axis": ["Raw", "Synthesized"],
+      "drive": "Produce accurate, relevant information for User",
+      "activity_itemclass": {
+        "activity": "Synthesize",
+        "itemclass": "Note",
+        "subtypes_included": ["Note"]
+      }
+    },
+    {
+      "axis": ["Unintegrated", "Integrated"],
+      "drive": "Produce accurate, relevant information for User",
+      "activity_itemclass": {
+        "activity": "Integrate",
+        "itemclass": "Collection",
+        "subtypes_included": ["Collection"]
+      }
+    },
+    {
+      "axis": ["Verbose", "Concise"],
+      "drive": "Produce accurate, relevant information for User",
+      "activity_itemclass": {
+        "activity": "Summarize",
+        "itemclass": "Note",
+        "subtypes_included": ["Note"]
+      }
+    },
+    {
+      "axis": ["Unformatted", "Formatted"],
+      "drive": "Produce accurate, relevant information for User",
+      "activity_itemclass": {
+        "activity": "Format",
+        "itemclass": "Note",
+        "subtypes_included": ["Note"]
+      }
+    },
+    {
+      "axis": ["Unrefined", "Refined"],
+      "drive": "Produce accurate, relevant information for User",
+      "activity_itemclass": {
+        "activity": "Refine",
+        "itemclass": "InformationResource",
+        "subtypes_included": ["Note", "Collection"]
+      }
+    },
+    {
+      "axis": ["Uncommunicated", "Communicated"],
+      "drive": "Maintain rapport and effective communication with User",
+      "activity_itemclass": {
+        "activity": "Communicate",
+        "itemclass": "Note",
+        "subtypes_included": ["Note"]
+      }
+    },
+    {
+      "axis": ["Unshared", "Shared"],
+      "drive": "Maintain rapport and effective communication with User",
+      "activity_itemclass": {
+        "activity": "Share",
+        "itemclass": "InformationResource",
+        "subtypes_included": ["Note", "Collection"]
+      }
+    },
+    {
+      "axis": ["Disconnected", "Collaborative"],
+      "drive": "Maintain rapport and effective communication with User",
+      "activity_itemclass": {
+        "activity": "Collaborate",
+        "itemclass": "InformationSpace",
+        "subtypes_included": ["InformationSpace"]
+      }
+    },
+    {
+      "axis": ["Unresponsive", "Responsive"],
+      "drive": "Maintain rapport and effective communication with User",
+      "activity_itemclass": {
+        "activity": "Respond",
+        "itemclass": "Note",
+        "subtypes_included": ["Note"]
+      }
+    },
+    {
+      "axis": ["Unclear", "Clear"],
+      "drive": "Clarify User goals and uncertainties",
+      "activity_itemclass": {
+        "activity": "Clarify",
+        "itemclass": "Note",
+        "subtypes_included": ["Note"]
+      }
+    },
+    {
+      "axis": ["Unquestioned", "Questioned"],
+      "drive": "Clarify User goals and uncertainties",
+      "activity_itemclass": {
+        "activity": "Question",
+        "itemclass": "Note",
+        "subtypes_included": ["Note"]
+      }
+    },
+    {
+      "axis": ["Ambiguous", "Disambiguated"],
+      "drive": "Clarify User goals and uncertainties",
+      "activity_itemclass": {
+        "activity": "Disambiguate",
+        "itemclass": "InformationResource",
+        "subtypes_included": ["Note", "Collection"]
+      }
+    },
+    {
+      "axis": ["Uncompared", "Compared"],
+      "drive": "Clarify User goals and uncertainties",
+      "activity_itemclass": {
+        "activity": "Compare",
+        "itemclass": "Collection",
+        "subtypes_included": ["Collection"]
+      }
+    },
+    {
+      "axis": ["Redundant", "Deduplicated"],
+      "drive": "Conserve cognitive resources, avoid duplication of effort",
+      "activity_itemclass": {
+        "activity": "Reference",
+        "itemclass": "InformationResource",
+        "subtypes_included": ["Note", "Collection"]
+      }
+    },
+    {
+      "axis": ["Inaccessible", "Accessible"],
+      "drive": "Conserve cognitive resources, avoid duplication of effort",
+      "activity_itemclass": {
+        "activity": "Index",
+        "itemclass": "Collection",
+        "subtypes_included": ["Collection"]
+      }
+    },
+    {
+      "axis": ["Unconsulted", "Consulted"],
+      "drive": "Conserve cognitive resources, avoid duplication of effort",
+      "activity_itemclass": {
+        "activity": "Consult",
+        "itemclass": "InformationResource",
+        "subtypes_included": ["Note", "Collection", "InformationSpace"]
+      }
+    },
+    {
+      "axis": ["Unplanned", "Planned"],
+      "drive": "Produce accurate, relevant information for User",
+      "activity_itemclass": {
+        "activity": "Plan",
+        "itemclass": "Note",
+        "subtypes_included": ["Note"]
+      }
+    },
+    {
+      "axis": ["Unprioritized", "Prioritized"],
+      "drive": "Conserve cognitive resources, avoid duplication of effort",
+      "activity_itemclass": {
+        "activity": "Prioritize",
+        "itemclass": "Collection",
+        "subtypes_included": ["Collection"]
+      }
+    },
+    {
+      "axis": ["Unreflected", "Reflected"],
+      "drive": "Maintain honesty about my own capabilities and limitations as an AI",
+      "activity_itemclass": {
+        "activity": "Reflect",
+        "itemclass": "Note",
+        "subtypes_included": ["Note"]
+      }
+    },
+    {
+      "axis": ["Unaware", "SelfAware"],
+      "drive": "Maintain honesty about my own capabilities and limitations as an AI",
+      "activity_itemclass": {
+        "activity": "InspectSelf",
+        "itemclass": "InformationSpace",
+        "subtypes_included": ["InformationSpace"]
+      }
+    },
+    {
+      "axis": ["Dishonest", "Honest"],
+      "drive": "Maintain honesty about my own capabilities and limitations as an AI",
+      "activity_itemclass": {
+        "activity": "AcknowledgeLimitations",
+        "itemclass": "Note",
+        "subtypes_included": ["Note"]
+      }
+    },
+    {
+      "axis": ["Misrepresented", "Documented"],
+      "drive": "Never claim to have performed actions I did not or could not perform",
+      "activity_itemclass": {
+        "activity": "Document",
+        "itemclass": "ActionRecord",
+        "subtypes_included": ["Note", "Collection"]
+      }
+    },
+    {
+      "axis": ["Unreported", "Reported"],
+      "drive": "Never claim to have performed actions I did not or could not perform",
+      "activity_itemclass": {
+        "activity": "Report",
+        "itemclass": "ActionRecord",
+        "subtypes_included": ["Note", "Collection"]
+      }
+    },
+    {
+      "axis": ["Unreviewed", "Reviewed"],
+      "drive": "Never claim to have performed actions I did not or could not perform",
+      "activity_itemclass": {
+        "activity": "Review",
+        "itemclass": "ActionRecord",
+        "subtypes_included": ["Note", "Collection"]
       }
     }
   ],
   "verbs": [
     "Acquire",
-    "Summarize",
-    "Collect",
-    "Select",
-    "Analyze",
-    "Validate",
-    "Inspect",
-    "Survey",
-    "Develop",
-    "Build",
-    "Document",
-    "Review",
-    "Decompose",
+    "Search",
+    "Explore",
+    "Extract",
+    "Organize",
     "Categorize",
-    "Aggregate",
-    "Compile",
-    "Apply",
-    "Exchange",
-    "Share",
-    "Respond",
-    "Reference",
-    "Consult",
+    "Annotate",
     "Record",
-    "Use",
-    "Place",
-    "Utilize"
+    "Compile",
+    "Verify",
+    "CrossReference",
+    "Analyze",
+    "Evaluate",
+    "Filter",
+    "Curate",
+    "Synthesize",
+    "Integrate",
+    "Summarize",
+    "Format",
+    "Refine",
+    "Communicate",
+    "Share",
+    "Collaborate",
+    "Respond",
+    "Clarify",
+    "Question",
+    "Disambiguate",
+    "Compare",
+    "Reference",
+    "Index",
+    "Consult",
+    "Plan",
+    "Prioritize",
+    "Reflect",
+    "InspectSelf",
+    "AcknowledgeLimitations",
+    "Document",
+    "Report",
+    "Review"
   ],
   "nouns": [
     "Note",
-    "Skill",
     "Collection",
-    "InfoSpace",
-    "Message",
-    "Information",
-    "Insight",
-    "Dialogue",
-    "thirst"
+    "InformationResource",
+    "InformationSpace",
+    "ActionRecord"
   ],
   "noun_mappings": {
-    "Note": [
-      "Note"
-    ],
-    "Skill": [
-      "Skill"
-    ],
-    "Collection": [
-      "Collection"
-    ],
-    "InfoSpace": [
-      "InfoSpace"
-    ],
-    "Message": [
-      "Note"
-    ],
-    "Information": [
-      "Note",
-      "Collection"
-    ],
-    "Insight": [
-      "Skill"
-    ],
-    "Dialogue": [
-      "Note"
-    ],
-    "thirst": [
-      "thirst"
-    ]
+    "Note": ["Note"],
+    "Collection": ["Collection"],
+    "InformationResource": ["Note", "Collection"],
+    "InformationSpace": ["InformationSpace"],
+    "ActionRecord": ["Note", "Collection"]
   }
 }

@@ -33,13 +33,13 @@ def tool(value, **kwargs):
     
     if len(chunks) == 1:
         # Single chunk - direct test
-        return _test_chunk(value, predicate)
+        return _test_chunk(value, predicate, kwargs)
     
     # Multiple chunks - OR aggregation (true if ANY chunk matches)
     logger.info(f"assess: long document ({len(chunks)} chunks), using OR aggregation")
     
     for i, (chunk_text, _) in enumerate(chunks):
-        result = _test_chunk(chunk_text, predicate)
+        result = _test_chunk(chunk_text, predicate, kwargs)
         if result == "true":
             logger.info(f"assess: predicate matched in chunk {i+1}/{len(chunks)}")
             return "true"
@@ -47,7 +47,7 @@ def tool(value, **kwargs):
     return "false"
 
 
-def _test_chunk(text, predicate):
+def _test_chunk(text, predicate, kwargs=None):
     """Test a single chunk against predicate."""
     prompt = f"""Answer this question about the content with ONLY "true" or "false":
 
@@ -66,9 +66,10 @@ Answer (true or false):"""
     )
     
     # Send heartbeat after LLM call
-    heartbeat = kwargs.get('heartbeat')
-    if heartbeat:
-        heartbeat()
+    if kwargs:
+        heartbeat = kwargs.get('heartbeat')
+        if heartbeat:
+            heartbeat()
     
     result = response.text if hasattr(response, 'text') else str(response)
     result = result.strip().lower()

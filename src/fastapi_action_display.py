@@ -984,6 +984,59 @@ class FastAPIActionDisplayNode:
                     
             except Exception as e:
                 return {"success": False, "message": f"Error: {str(e)}", "no_interaction": False}
+        
+        @self.app.get("/api/activities/{character_name}")
+        async def get_activities(character_name: str):
+            """Get list of available activities for a character."""
+            try:
+                if not hasattr(self, 'session'):
+                    return {"success": False, "message": "Zenoh session not available"}
+                
+                query_key = f"cognitive/{character_name}/activity/list"
+                
+                replies = self.session.get(query_key, target=QueryTarget.BEST_MATCHING, consolidation=ConsolidationMode.NONE, timeout=5.0 if not self.debug else 300.0)
+                for reply in replies:
+                    if hasattr(reply, 'ok') and reply.ok is not None:
+                        payload_bytes = reply.ok.payload.to_bytes()
+                        response = json.loads(payload_bytes.decode('utf-8'))
+                        
+                        if response.get('success'):
+                            return {
+                                "success": True,
+                                "activities": response.get('activities', [])
+                            }
+                    break
+                
+                return {"success": False, "message": "No response from executive_node"}
+                    
+            except Exception as e:
+                logger.error(f"Error fetching activities for {character_name}: {e}")
+                return {"success": False, "message": f"Error: {str(e)}"}
+        
+        @self.app.post("/api/activity/set")
+        async def set_activity(request: Request):
+            """Set a character's activity manually."""
+            try:
+                data = await request.json()
+                character_name = data.get('character_name')
+                activity_name = data.get('activity_name')
+                
+                if not character_name or not activity_name:
+                    return {"success": False, "message": "Missing character_name or activity_name"}
+                
+                if not hasattr(self, 'session'):
+                    return {"success": False, "message": "Zenoh session not available"}
+                
+                # Publish activity selection to executive_node
+                topic = f"cognitive/{character_name}/activity/set"
+                payload = json.dumps({"activity_name": activity_name})
+                self.session.put(topic, payload)
+                
+                return {"success": True, "message": f"Activity {activity_name} set for {character_name}"}
+                    
+            except Exception as e:
+                logger.error(f"Error setting activity: {e}")
+                return {"success": False, "message": f"Error: {str(e)}"}
 
     
     async def _initiate_shutdown(self):
@@ -1533,6 +1586,30 @@ class FastAPIActionDisplayNode:
             color: #6ab7ff;
             border-bottom: 1px solid #6ab7ff;
         }
+        
+        /* Activities list styles */
+        .activities-list {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        
+        .activity-item {
+            padding: 6px 8px;
+            background: #1a1a1a;
+            border: 1px solid #404040;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 12px;
+            color: #e0e0e0;
+        }
+        
+        .activity-item:hover {
+            background: #2a2a2a;
+            border-color: #00d4ff;
+            color: #00d4ff;
+        }
     </style>
 </head>
 <body>
@@ -1557,6 +1634,7 @@ class FastAPIActionDisplayNode:
                     <div class="character-data-tab" data-tab="view">View</div>
                     <div class="character-data-tab" data-tab="state">State</div>
                     <div class="character-data-tab" data-tab="relations">Relations</div>
+                    <div class="character-data-tab" data-tab="activities">Activities</div>
                 </div>
                 
                 <!-- Character data content -->
@@ -1595,6 +1673,13 @@ class FastAPIActionDisplayNode:
                     <div class="character-data-panel" id="relationsPanel">
                         <div id="relationsData" style="color: #888; font-style: italic; text-align: center; padding: 20px;">
                             No relations data available
+                        </div>
+                    </div>
+                    
+                    <!-- Activities tab content -->
+                    <div class="character-data-panel" id="activitiesPanel">
+                        <div id="activitiesData" style="color: #888; font-style: italic; text-align: center; padding: 20px;">
+                            No activities available
                         </div>
                     </div>
                 </div>
@@ -1957,6 +2042,11 @@ class FastAPIActionDisplayNode:
                 document.getElementById('relationsPanel').classList.add('active');
                 if (activeCharacter) {
                     updateRelationsDataDisplay(activeCharacter);
+                }
+            } else if (tabName === 'activities') {
+                document.getElementById('activitiesPanel').classList.add('active');
+                if (activeCharacter) {
+                    updateActivitiesDataDisplay(activeCharacter);
                 }
             }
         }
@@ -2455,6 +2545,66 @@ class FastAPIActionDisplayNode:
             });
             html += '</div>';
             relationsDataDiv.innerHTML = html;
+        }
+        
+        async function updateActivitiesDataDisplay(characterName) {
+            const activitiesDataDiv = document.getElementById('activitiesData');
+            
+            if (!activitiesDataDiv) return;
+            
+            activitiesDataDiv.innerHTML = '<div style="color: #888; font-style: italic; text-align: center; padding: 20px;">Loading...</div>';
+            
+            try {
+                const response = await fetch(`/api/activities/${characterName}`);
+                const data = await response.json();
+                
+                if (data.success && data.activities && data.activities.length > 0) {
+                    let html = '<div class="activities-list">';
+                    data.activities.forEach(activityName => {
+                        html += `<div class="activity-item" onclick="selectActivity('${characterName}', '${activityName}')">${activityName}</div>`;
+                    });
+                    html += '</div>';
+                    activitiesDataDiv.innerHTML = html;
+                } else {
+                    activitiesDataDiv.innerHTML = '<div style="color: #888; font-style: italic; text-align: center; padding: 20px;">No activities available</div>';
+                }
+            } catch (error) {
+                console.error(`Error fetching activities for ${characterName}:`, error);
+                activitiesDataDiv.innerHTML = '<div style="color: #ff6b6b; text-align: center; padding: 20px;">Error loading activities</div>';
+            }
+        }
+        
+        async function selectActivity(characterName, activityName) {
+            try {
+                const response = await fetch('/api/activity/set', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        character_name: characterName,
+                        activity_name: activityName
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    console.log(`✅ Activity ${activityName} set for ${characterName}`);
+                    const resultDiv = document.getElementById('turnResult');
+                    if (resultDiv) {
+                        resultDiv.innerHTML = `<span class="success">Activity set: ${activityName}</span>`;
+                    }
+                } else {
+                    console.error(`Failed to set activity: ${result.message}`);
+                    const resultDiv = document.getElementById('turnResult');
+                    if (resultDiv) {
+                        resultDiv.innerHTML = `<span class="error">Error: ${result.message}</span>`;
+                    }
+                }
+            } catch (error) {
+                console.error(`Error setting activity:`, error);
+            }
         }
         
         async function toggleRelationAccordion(characterName, targetCharacter) {

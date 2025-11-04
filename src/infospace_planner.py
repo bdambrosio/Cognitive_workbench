@@ -475,18 +475,23 @@ Pattern: Universal LLM Transformations (refine, assess)
 
 # REQUIRED FIELDS FOR TOOLS:
 
-Tools REQUIRING 'expect' field (uncertain outcomes - must include expect):
-- query-web, search, load (infospace primitives)
-- summarize, relate, refine, assess, extract-entities, filter-by-predicate (LLM-based tools)
+ALL tools that produce output MUST include 'out' field with $variable syntax.
 
-Tools with OPTIONAL 'expect' field:
+Tools REQUIRING 'target', 'out', AND 'expect':
+- summarize, relate, refine, assess, extract-entities, filter-by-predicate (LLM-based tools)
+- search, load (infospace primitives)
+
+Tools REQUIRING 'args.query', 'out', AND 'expect':
+- query-web
+
+Tools REQUIRING 'out' (expect optional):
 - expand, map, index, as-json, as-markdown, text-find, matches
 
-Tools WITHOUT 'expect' field (deterministic/internal):
-- create-note, create-collection, add, flatten, coerce, persist, focus, say, display, think
+Tools WITHOUT 'out' (side effects only):
+- persist, focus, say, display, think
 
-IMPORTANT: Always include 'expect' field for tools listed above as REQUIRING it. Example:
-{"type":"refine","target":"$text","args":{"instruction":"extract citations"},"out":"$citations","expect":"should find DOI list"}
+Example:
+{"type":"summarize","target":"$doc","out":"$summary","expect":"should extract key points"}
 
 {{tools}}
 
@@ -543,7 +548,7 @@ CONSTRAINTS
 - All JSON must be syntactically valid (no comments or trailing commas).
 - Keep plans concise (recommended: 12 steps or fewer).
 - Output only valid JSON.
-- REQUIRED FIELDS: Tools requiring 'expect' (query-web, search, load, summarize, relate, refine, assess, extract-entities, filter-by-predicate) MUST include 'expect' field in every action.
+- REQUIRED FIELDS: All output-producing tools MUST include 'out' field. Tools with uncertain outcomes (query-web, search, load, summarize, relate, refine, assess, extract-entities, filter-by-predicate) MUST also include 'expect' field.
 - Note: 'display' and 'think' accept either 'value' or 'target' (both work).
 
 EFFICIENCY RULES
@@ -573,48 +578,6 @@ class InfospacePlanner:
         self.llm_client = llm_client
         self.available_tools = available_tools or {}
         self.logger = logger or logging.getLogger(__name__)
-        self.template = self._build_template()
-    
-    def _build_template(self) -> str:
-        """
-        Build the complete template with dynamically loaded tool definitions.
-        
-        Returns:
-            Complete template string with tools section populated
-        """
-        tools_section = self._build_tools_section()
-        template = INFOSPACE_PLAN_TEMPLATE.replace("{{tools}}", tools_section)
-        template = template.replace("{primitives_reference}", INFOSPACE_PRIMITIVES_REFERENCE)
-        return template
-    
-    def _build_tools_section(self) -> str:
-        """
-        Build tools section from loaded tool metadata.
-        Format matches primitive definitions for consistency.
-        
-        Returns:
-            Formatted tools section string
-        """
-        if not self.available_tools:
-            return "# No tools currently available"
-        
-        lines = []
-        for tool_name in sorted(self.available_tools.keys()):
-            tool = self.available_tools[tool_name]
-            description = tool.get('description', 'No description')
-            examples = tool.get('examples', [])
-            
-            # Tool header: name — description
-            lines.append(f"{tool_name} — {description}")
-            
-            # Add examples
-            for example in examples:
-                lines.append(example)
-            
-            # Blank line between tools
-            lines.append("")
-        
-        return "\n".join(lines)
     
     def _validate_plan(self, plan: Dict) -> Dict:
         """

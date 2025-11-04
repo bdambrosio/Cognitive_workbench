@@ -117,8 +117,14 @@ class ZenohSituationNode:
             f"cognitive/{character_name}/situation/request_update",
             self.map_update_callback
         )
-                
-        # Publisher for situation updates (character-specific)
+        
+        # === ZENOH PUBLICATION ===
+        # NAME: situation_update
+        # TOPIC: cognitive/{character}/situation/update
+        # DESCRIPTION: Updated situation awareness (location, visible entities, adjacent characters)
+        # PAYLOAD: {"views": list, "location": tuple, "timestamp": str}
+        # TRIGGERS: (internal - executive consumes for planning)
+        # ========================
         self.situation_publisher = self.session.declare_publisher(f"cognitive/{character_name}/situation/update")
         
         # Queryable for situation data (character-specific)
