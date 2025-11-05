@@ -13,7 +13,7 @@ from typing import Dict, List, Any, Optional
 from utils.llm_api import LLM
 from Messages import SystemMessage, UserMessage
 from utils.tool_loader import load_tools, parse_yaml_frontmatter
-
+from templates import INFOSPACE_PRIMITIVES_REFERENCE
 logger = logging.getLogger(__name__)
 
 
@@ -81,11 +81,11 @@ class InfospaceSemanticValidator:
             Empty string if plan is valid.
         """
         if 'plan' not in plan:
-            return "ERROR: Plan missing 'plan' field"
+            return "ACTION 0: \nREPAIR: Insert missing 'plan' field key at start of plan"
         
         actions = plan['plan']
         if not isinstance(actions, list):
-            return "ERROR: Plan must be array"
+            return "ACTION 0: \nREPAIR: 'plan' field value must be a list of actions"
         
         # Build tool documentation context
         tool_context = self._build_tool_context()
@@ -99,19 +99,20 @@ class InfospaceSemanticValidator:
 Your task is to analyze a plan and identify semantic errors such as:
 - Missing workflow steps (e.g., fetch-text accepts URLs directly, no download step needed)
 - Parameter mismatches (e.g., map passes Note as 'value' but tool expects specific parameter)
-- Missing intermediate steps (e.g., trying to extract text from URLs without proper URL extraction)
+- Missing intermediate steps (e.g., trying to fetch text from URLs without proper URL extraction)
 - Incorrect variable usage (e.g., using Collection where Note expected, or vice versa)
 
-For each error found, provide a clear, actionable repair suggestion in the format:
-ACTION <index>: <error description>
-REPAIR: <specific fix, e.g., "Use fetch-text with URL directly instead of download-pdf + extract-paper-text">
+For each error found, provide a clear, actionable repair instruction in the format:
+
+ACTION <index>: <action to repair>
+REPAIR: <repair instruction>
 
 If the plan is valid, output: VALID
 
-Output ONLY the validation results, no additional commentary."""
+Output ONLY 'VALID' OR the ACTION and REPAIR statements, no additional introductory, reasoning, code fences, or commentary."""
         
-        # Import primitives reference from planner
-        from infospace_planner import INFOSPACE_PRIMITIVES_REFERENCE
+        # Import primitives reference from templates
+
         
         user_prompt = f"""{INFOSPACE_PRIMITIVES_REFERENCE}
 
@@ -130,7 +131,13 @@ Output ONLY the validation results, no additional commentary."""
 - Check tool SKILL.md documentation for required parameters and usage patterns
 - fetch-text accepts URLs directly - no intermediate download step needed
 
-Analyze this plan and identify any semantic errors."""
+Analyze this plan and identify any semantic errors. 
+For each error found, provide a clear, actionable repair instruction in the format:
+
+ACTION <index>: <action to repair>
+REPAIR: <repair instruction>
+
+Output VALID -or- the ACTION and REPAIR statements only, no additional introductory, reasoning, code fences, or commentary."""
         
         try:
             response = self.llm.ask(
@@ -145,7 +152,7 @@ Analyze this plan and identify any semantic errors."""
             result_text = result_text.strip()
             
             # Check if valid
-            if result_text.upper().startswith('VALID'):
+            if 'VALID' in result_text.upper():
                 return ""
             
             # Format repair suggestions
@@ -228,14 +235,15 @@ Analyze this plan and identify any semantic errors."""
     
     def _format_repair_suggestions(self, validation_text: str, plan: Dict) -> str:
         """Format validation results into actionable repair suggestions."""
-        lines = []
-        lines.append("SEMANTIC VALIDATION ERRORS FOUND:")
-        lines.append("")
-        lines.append(validation_text)
-        lines.append("")
-        lines.append("# To repair, use 'edit:' command with the suggestions above")
         
-        return "\n".join(lines)
+        lines = validation_text.split('\n')
+        formatted_lines = []
+        for line in lines:
+            line = line.strip()
+            if line.startswith('ACTION') or line.startswith('REPAIR'):
+                formatted_lines.append(line)
+
+        return "\n".join(formatted_lines)
 
 
 def validate_plan_semantically(plan: Dict[str, Any], tools_dir: Optional[str] = None) -> str:
