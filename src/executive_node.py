@@ -265,7 +265,8 @@ class ZenohExecutiveNode:
                 self.session,
                 self.map_name,
                 self.llm_client,
-                self.available_tools
+                self.available_tools,
+                self
             )
             logger.info(f'🧩 Infospace executor initialized for {character_name}')
             
@@ -509,7 +510,10 @@ class ZenohExecutiveNode:
                                 logger.info(f'🎯 {self.character_name} oriented to goal: {self.current_goal.to_string()}')
                                 action, status = self.plan_and_initiate_execution(goal)
                         elif self.text_input_queue:
-                            self._process_text_input()
+                            # Don't process text_input if awaiting ask response
+                            # Let ask handler in _execute_next_step grab the response
+                            if not (self.is_infospace and self.plan_state and self.plan_state.get('awaiting_ask')):
+                                self._process_text_input()
                         self._run_ooda_loop()
                     except Exception as e:
                         traceback.print_exc()
@@ -1649,6 +1653,41 @@ end your response with </end>
         
         logger.debug(f'🔄 {self.character_name} executing plan step {idx + 1}/{len(plan)}: {stype} action')
 
+        # Check if awaiting ask response (must be checked before executing any action)
+        if self.plan_state and self.plan_state.get('awaiting_ask'):
+            awaiting = self.plan_state['awaiting_ask']
+            
+            # Get response from text_input_queue or use empty string
+            if self.text_input_queue:
+                # Extract response
+                response_sense = self.text_input_queue.pop(0)
+                content = response_sense['content']
+                try:
+                    content_data = json.loads(content)
+                    response_text = content_data.get('text', '')
+                    source = content_data.get('source', 'unknown')
+                except (json.JSONDecodeError, TypeError):
+                    response_text = content
+                    source = 'console'
+            else:
+                # No response - use empty string
+                response_text = ''
+                source = 'timeout'
+            
+            # Create Note with response text and bind Note ID
+            if self.is_infospace:
+                note_id = self.infospace_executor._persist_note(response_text, 'ask-response')
+                if note_id:
+                    self.infospace_executor._bind_variable(awaiting['out_var'], note_id)
+                    logger.info(f"✅ Created Note {note_id} for ask response → ${awaiting['out_var']}")
+                else:
+                    logger.error(f"Failed to create Note for ask response")
+            
+            logger.info(f"❓ {self.character_name} Ask received response from {source}: '{response_text[:50]}...' → ${awaiting['out_var']}")
+            
+            # Clear suspension state and continue with current action
+            del self.plan_state['awaiting_ask']
+        
         # Primitive actions (spec-compliant + infospace primitives)
         executable_primitives = {
             # Physical world primitives
@@ -1658,6 +1697,16 @@ end your response with </end>
             'extract', 'filter', 'merge', 'coerce',
             'aggregate', 'sort', 'group_by', 'compare', 'map', 'flatten', 'add', 'expand'
         }
+        
+        # Special handling for 'ask' - initial execution sets up suspension
+        if stype == 'ask':
+            # Only execute ask if not already awaiting response (initial execution)
+            # If awaiting response, the check above already handled it
+            if not self.plan_state.get('awaiting_ask'):
+                # Normal execution - executor will set up awaiting_ask state
+                current['idx'] = idx + 1
+                return step
+        
         if stype in executable_primitives:
             current['idx'] = idx + 1
             return step
@@ -1817,7 +1866,7 @@ end your response with </end>
                 # Data operations
                 'flatten', 'add', 'expand',
                 # Communication
-                'say', 'display', 'think'
+                'say', 'display', 'think', 'ask'
             }
             
             # Route infospace-specific actions to infospace executor
