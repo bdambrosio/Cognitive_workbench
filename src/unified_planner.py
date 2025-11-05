@@ -8,7 +8,7 @@ import json
 import logging
 from typing import Dict, Any, Optional
 from pathlib import Path
-from infospace_planner import INFOSPACE_PRIMITIVES_REFERENCE
+
 logger = logging.getLogger(__name__)
 
 
@@ -118,6 +118,8 @@ class UnifiedPlanner:
     
     def _generate_infospace_plan(self, goal: str, context: Dict) -> Dict:
         """Generate infospace plan."""
+        from templates import INFOSPACE_PRIMITIVES_REFERENCE
+        
         # Format tools for template
         tools_formatted = self._format_tools()
         

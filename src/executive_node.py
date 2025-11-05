@@ -257,6 +257,8 @@ class ZenohExecutiveNode:
         
         if self.is_infospace:
             from infospace_executor import InfospaceExecutor
+            from infospace_semantic_validator import InfospaceSemanticValidator
+            from pathlib import Path
             
             self.infospace_executor = InfospaceExecutor(
                 character_name,
@@ -266,6 +268,17 @@ class ZenohExecutiveNode:
                 self.available_tools
             )
             logger.info(f'🧩 Infospace executor initialized for {character_name}')
+            
+            # Initialize semantic validator
+            maps_base = Path(__file__).parent / 'maps'
+            tools_dir = maps_base / self.map_name / 'tools'
+            if not tools_dir.exists():
+                tools_dir = maps_base / 'tools'
+            
+            self.semantic_validator = InfospaceSemanticValidator(
+                tools_dir=str(tools_dir) if tools_dir.exists() else None
+            )
+            logger.info(f'🔍 Semantic validator initialized for {character_name}')
         
         # Internal state
         self.action_counter = 0
@@ -1272,27 +1285,17 @@ class ZenohExecutiveNode:
                         logger.info(f'📋 {self.character_name} generated new plan: {json.dumps(plan_candidate, indent=2)}')
                         
                         # Semantic validation (logs only, doesn't reject) - after syntactic validation passes
-                        try:
-                            from infospace_semantic_validator import validate_plan_semantically
-                            from pathlib import Path
-                            
-                            # Determine tools directory
-                            maps_base = Path(__file__).parent / 'maps'
-                            tools_dir = maps_base / self.map_name / 'tools'
-                            if not tools_dir.exists():
-                                tools_dir = maps_base / 'tools'
-                            
-                            repair_suggestions = validate_plan_semantically(
-                                plan_candidate,
-                                tools_dir=str(tools_dir) if tools_dir.exists() else None
-                            )
+                        if hasattr(self, 'semantic_validator'):
+                            repair_suggestions = self.semantic_validator.validate(plan_candidate)
                             
                             if repair_suggestions:
                                 logger.warning(f'🔍 {self.character_name} Semantic validation issues:\n{repair_suggestions}')
+                                self.current_plan = plan_candidate
+                                self.parse_and_edit_plan(repair_suggestions)
+                                final_repair_review = self.semantic_validator.validate(self.current_plan)
+                                logger.warning(f'🔍 {self.character_name} Edited plan: {final_repair_review}')
                             else:
                                 logger.info(f'✅ {self.character_name} Semantic validation passed')
-                        except Exception as e:
-                            logger.warning(f'{self.character_name} Semantic validation error: {e}')
                 except Exception as e:
                     logger.error(f'Invalid plan structure from planner: {e}')
                     plan_candidate = None
