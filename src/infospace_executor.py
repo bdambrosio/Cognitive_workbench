@@ -32,7 +32,7 @@ class InfospaceExecutor:
     Design principle: Content is opaque. Field-based operations delegated to tools.
     """
     
-    def __init__(self, agent_name: str, session, map_name: str, llm_client, available_tools: Dict[str, Dict]):
+    def __init__(self, agent_name: str, session, map_name: str, llm_client, available_tools: Dict[str, Dict], executive_node=None):
         """
         Initialize infospace executor.
         
@@ -42,12 +42,14 @@ class InfospaceExecutor:
             map_name: Name of the map (for Zenoh topics)
             llm_client: LLM client for tool execution
             available_tools: Dict of tool_name -> metadata (from tool_loader)
+            executive_node: Reference to ZenohExecutiveNode (for ask action)
         """
         self.agent_name = agent_name
         self.session = session
         self.map_name = map_name
         self.llm_client = llm_client
         self.available_tools = available_tools
+        self.executive_node = executive_node
         
         # === ZENOH PUBLICATION ===
         # NAME: turn_heartbeat
@@ -189,6 +191,7 @@ class InfospaceExecutor:
             'say': self._execute_say,
             'display': self._execute_display,
             'think': self._execute_think,
+            'ask': self._execute_ask,
             # Phase 2: Data Operations (whole-value only)
             'coerce': self._execute_coerce,
             'map': self._execute_map,
@@ -1048,6 +1051,47 @@ class InfospaceExecutor:
         
         logger.info(f"Think: {value}")
         return {'status': 'success', 'value': value}
+    
+    def _execute_ask(self, action: Dict) -> Dict:
+        """
+        Ask user a question and suspend plan execution until response received.
+        Suspension logic handled in executive_node._execute_next_step().
+        
+        Required: type, value, out
+        Optional: target (defaults to 'User')
+        """
+        out_var = action.get('out')
+        if not out_var:
+            return {'status': 'failed', 'reason': 'ask requires out field'}
+        
+        question_text = self._resolve_value(action.get('value'))
+        if question_text is None:
+            return {'status': 'failed', 'reason': 'ask requires value'}
+        
+        target = action.get('target', 'User')
+        
+        # Publish question via action_data (same format as say, appears in main UI)
+        action_data = {
+            'type': 'ask',
+            'action_id': f'action_{self.executive_node.action_counter}',
+            'timestamp': datetime.now().isoformat(),
+            'text': str(question_text),
+            'source': self.agent_name,
+            'target': target
+        }
+        self.executive_node.action_publisher.put(json.dumps(action_data))
+        self.executive_node.action_counter += 1
+        
+        # Enter step mode so user can respond and click Step/Run
+        self.session.put("cognitive/map/turn/step", b"")
+        
+        # Set suspension state in plan_state for _execute_next_step to handle
+        self.executive_node.plan_state['awaiting_ask'] = {
+            'out_var': out_var
+        }
+        
+        logger.info(f"❓ Ask: '{question_text}' → awaiting response for ${out_var} (step mode enabled)")
+        return {'status': 'success', 'value': question_text}
     
     # ==================== Phase 2: Data Operations ====================
     
@@ -2002,9 +2046,10 @@ class InfospaceExecutor:
     def _resolve_value(self, value: Any) -> Any:
         """
         Resolve $variable to its content value.
+        Supports both entire variable references and template strings with embedded variables.
         
         Args:
-            value: Can be a literal value, or "$variable" string
+            value: Can be a literal value, "$variable" string, or template string with embedded "$variable" patterns
             
         Returns:
             Resolved content value (fetches from map_node if resource ID)
@@ -2012,23 +2057,54 @@ class InfospaceExecutor:
         if not isinstance(value, str):
             return value
         
-        if not value.startswith('$'):
+        # Find all $variable patterns in the string
+        pattern = r'\$(\w+)'
+        matches = re.findall(pattern, value)
+        
+        # If no variable patterns found, return as-is
+        if not matches:
             return value
         
-        var_name = value[1:]
-        if var_name not in self.plan_bindings:
-            error_msg = f"Unbound variable: {value}"
-            logger.error(error_msg)
-            raise ValueError(error_msg)
+        # If entire string is a single variable reference (starts with $)
+        if value.startswith('$') and len(matches) == 1 and value == f'${matches[0]}':
+            var_name = matches[0]
+            if var_name not in self.plan_bindings:
+                error_msg = f"Unbound variable: {value}"
+                logger.error(error_msg)
+                raise ValueError(error_msg)
+            
+            resource_id = self.plan_bindings[var_name]
+            
+            # If it's a resource ID, fetch content from map_node
+            if isinstance(resource_id, str) and (resource_id.startswith('Note_') or resource_id.startswith('Collection_')):
+                return self._get_content(resource_id)
+            
+            # Otherwise return as-is
+            return resource_id
         
-        resource_id = self.plan_bindings[var_name]
+        # Template string with embedded variables - substitute each
+        result = value
+        for var_name in set(matches):  # Use set to process each unique variable once
+            var_ref = f'${var_name}'
+            if var_name in self.plan_bindings:
+                resource_id = self.plan_bindings[var_name]
+                logger.debug(f"Resolving template variable {var_ref} → {resource_id}")
+                
+                # If it's a resource ID, fetch content from map_node
+                if isinstance(resource_id, str) and (resource_id.startswith('Note_') or resource_id.startswith('Collection_')):
+                    resolved_content = self._get_content(resource_id)
+                    if resolved_content is None:
+                        logger.warning(f"Could not resolve content for {var_ref} (resource_id: {resource_id}), leaving as-is")
+                        continue
+                    logger.debug(f"Fetched content for {var_ref}: {str(resolved_content)[:50]}...")
+                else:
+                    resolved_content = resource_id
+                
+                result = result.replace(var_ref, str(resolved_content))
+            else:
+                logger.debug(f"Variable {var_ref} not in plan_bindings, leaving as-is")
         
-        # If it's a resource ID, fetch content from map_node
-        if isinstance(resource_id, str) and (resource_id.startswith('Note_') or resource_id.startswith('Collection_')):
-            return self._get_content(resource_id)
-        
-        # Otherwise return as-is (shouldn't happen in new model, but handle gracefully)
-        return resource_id
+        return result
     
     def _get_kind(self, var_name: str) -> Optional[str]:
         """

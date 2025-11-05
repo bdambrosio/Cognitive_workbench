@@ -1052,6 +1052,25 @@ Postconditions: message displayed to user
 Examples:
   {"type":"say","target":"user","value":"literal text or $variable"}
 
+## ask
+Description: Ask user a question and wait for response (suspends plan execution)
+Input: target: literal "User" (optional), value: literal or $variable question text
+Output: out: variable name → bound to response text (raw string, not Note)
+Parameters:
+  - target (optional): string "User" (default)
+  - value (required): literal string or $variable referencing question text
+  - out (required): variable name to bind response to (no $ prefix)
+Preconditions: if value is $variable, it must be bound
+Postconditions: 
+  - Question displayed to user in main UI area (not popup)
+  - Plan execution suspends until user responds or 3-turn timeout
+  - out variable bound to raw response text string (empty string on timeout)
+  - Response is NOT wrapped in Note - use directly or create-note if needed
+Examples:
+  {"type":"ask","target":"User","value":"What is your research question?","out":"user_answer"}
+  {"type":"ask","value":"What year are you interested in?","out":"year"}
+  {"type":"ask","value":"$prompt_text","out":"response"}
+
 ## display
 Description: Show formatted content in popup (for documents/formatted output)
 Input: value: $variable → Note (or target: $variable, both accepted)

@@ -287,6 +287,7 @@ class InfospacePlanner:
             'say': ['target', 'value'],
             'display': ['value'],  # Accepts target or value (both allowed)
             'think': ['value'],  # Accepts target or value (both allowed)
+            'ask': ['value', 'out'],
         }
         
         required = required_fields.get(action_type, [])
