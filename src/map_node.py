@@ -3383,6 +3383,50 @@ end your response with:
         
         return ' '.join(content_parts)
     
+    def _create_chunks(self, text, chunk_size=512, overlap=128):
+        """
+        Split text into overlapping chunks for embedding.
+        
+        Args:
+            text: String content to chunk
+            chunk_size: Target chunk size in characters
+            overlap: Overlap between chunks in characters
+            
+        Returns:
+            List of chunk strings
+        """
+        if len(text) <= chunk_size:
+            return [text]
+        
+        chunks = []
+        start = 0
+        
+        while start < len(text):
+            end = start + chunk_size
+            
+            # If not the first chunk, try to find a good boundary
+            if start > 0 and end < len(text):
+                # Look for sentence boundary near the end
+                search_start = max(start, end - 100)
+                sentence_end = max(
+                    text.rfind('. ', search_start, end),
+                    text.rfind('.\n', search_start, end),
+                    text.rfind('\n\n', search_start, end)
+                )
+                if sentence_end > start:
+                    end = sentence_end + 1
+            
+            chunks.append(text[start:end])
+            
+            # Move start forward by chunk_size minus overlap
+            start = start + chunk_size - overlap
+            
+            # Break if we've covered the text
+            if end >= len(text):
+                break
+        
+        return chunks
+    
     def handle_index_request(self, sample):
         """
         Handle request to create/update searchable vector store.
@@ -3414,16 +3458,31 @@ end your response with:
             return
         
         note_ids = collection.get('properties', {}).get('content', [])
-        # Fetch content for each Note
-        items_to_index = []
+        # Fetch content for each Note and chunk it
+        chunks_to_index = []
         for note_id in note_ids:
             note = self.world_map.get_resource_by_name(note_id)
             if note:
                 content = note.get('properties', {}).get('content')
                 if content is not None:
-                    items_to_index.append(content)
+                    # Extract content for embedding
+                    content_str = self._extract_content_for_embedding(content, fields)
+                    
+                    # Create chunks with overlap
+                    chunks = self._create_chunks(content_str, chunk_size=512, overlap=128)
+                    
+                    # Store each chunk with metadata
+                    for i, chunk in enumerate(chunks):
+                        chunks_to_index.append({
+                            'chunk': chunk,
+                            'original_content': content,
+                            'source_note_id': note_id,
+                            'chunk_index': i,
+                            'chunk_total': len(chunks),
+                            'is_complete_note': len(chunks) == 1
+                        })
         
-        logger.info(f"Index request from {agent_name}: indexing {collection_id} ({len(items_to_index)} items)")
+        logger.info(f"Index request from {agent_name}: indexing {collection_id} ({len(note_ids)} notes → {len(chunks_to_index)} chunks)")
         
         # Create or get store - use Collection ID as store name
         if collection_id not in self.vector_stores:
@@ -3432,18 +3491,24 @@ end your response with:
         
         store = self.vector_stores[collection_id]
         
-        # Index each item
+        # Index each chunk
         indexed_count = 0
-        for item in items_to_index:
+        for item in chunks_to_index:
             if index_type in ['semantic', 'hybrid']:
-                # Extract content to embed
-                content = self._extract_content_for_embedding(item, fields)
+                # Generate embedding for chunk
+                embedding = self._generate_embedding(item['chunk'])
                 
-                # Generate embedding
-                embedding = self._generate_embedding(content)
+                # Store chunk with metadata
+                metadata = {
+                    'timestamp': time.time(),
+                    'source_note_id': item['source_note_id'],
+                    'chunk_index': item['chunk_index'],
+                    'chunk_total': item['chunk_total'],
+                    'is_complete_note': item['is_complete_note']
+                }
                 
-                # Store with metadata
-                store.add(item, embedding, metadata={'timestamp': time.time()})
+                # Store chunk text as document, original content for reference
+                store.add(item['chunk'], embedding, metadata=metadata, original_content=item['original_content'])
                 indexed_count += 1
         
         # Track that this Collection is indexed (store name = collection_id)
@@ -3487,7 +3552,8 @@ end your response with:
             'query': str,
             'mode': 'semantic' | 'keyword' | 'hybrid',
             'limit': int,
-            'threshold': float (optional, default 0.0)
+            'threshold': float (optional, default 0.0),
+            'return_mode': 'chunks' | 'notes' (optional, default 'chunks')
         }
         """
         request = json.loads(sample.payload.to_bytes().decode('utf-8'))
@@ -3497,8 +3563,9 @@ end your response with:
         mode = request.get('mode', 'semantic')
         limit = request.get('limit', 5)
         threshold = request.get('threshold', 0.0)
+        return_mode = request.get('return_mode', 'chunks')
         
-        logger.info(f"Search request from {agent_name}: '{query}' in {collection_id}")
+        logger.info(f"Search request from {agent_name}: '{query}' in {collection_id} (return_mode={return_mode})")
         
         # Check if Collection is indexed (store exists)
         if collection_id not in self.vector_stores:
@@ -3513,16 +3580,49 @@ end your response with:
                 # Generate query embedding
                 query_embedding = self._generate_embedding(query)
                 
-                # Search
-                results = store.search(query_embedding, limit, threshold)
+                # Search for chunks (get more than limit for notes mode deduplication)
+                search_limit = limit * 3 if return_mode == 'notes' else limit
+                chunk_results = store.search(query_embedding, search_limit, threshold)
+                
+                if return_mode == 'notes':
+                    # Deduplicate by source_note_id, keeping best score per note
+                    note_scores = {}
+                    note_chunks = {}
+                    for result in chunk_results:
+                        source_note_id = result['metadata'].get('source_note_id')
+                        if source_note_id:
+                            score = result['score']
+                            if source_note_id not in note_scores or score > note_scores[source_note_id]:
+                                note_scores[source_note_id] = score
+                                note_chunks[source_note_id] = result
+                    
+                    # Sort by score and limit
+                    sorted_notes = sorted(note_scores.items(), key=lambda x: x[1], reverse=True)[:limit]
+                    
+                    # Return original content for each note
+                    results = []
+                    for note_id, score in sorted_notes:
+                        result = note_chunks[note_id]
+                        results.append({
+                            'document': result.get('original_content', result['document']),
+                            'score': score,
+                            'metadata': {
+                                'source_note_id': note_id,
+                                'return_mode': 'notes'
+                            }
+                        })
+                    
+                    logger.info(f"Search found {len(chunk_results)} chunks → {len(results)} unique notes")
+                else:
+                    # Return chunks as-is
+                    results = chunk_results
+                    logger.info(f"Search found {len(results)} chunk results")
                 
                 response = {
                     'status': 'success',
                     'results': results,
                     'count': len(results)
                 }
-                
-                logger.info(f"Search found {len(results)} results")
             else:
                 # Keyword/hybrid not implemented in Phase 1
                 response = {
@@ -3697,10 +3797,11 @@ class FAISSStore:
         self.index = faiss.IndexFlatIP(dimension)  # Inner product (cosine similarity)
         self.documents = []
         self.metadata = []
+        self.original_contents = []
         self.logger = logger
         self.np = np
     
-    def add(self, document, embedding, metadata=None):
+    def add(self, document, embedding, metadata=None, original_content=None):
         """Add document with embedding to store"""
         import faiss
         
@@ -3711,6 +3812,7 @@ class FAISSStore:
         self.index.add(embedding_array)
         self.documents.append(document)
         self.metadata.append(metadata or {})
+        self.original_contents.append(original_content if original_content is not None else document)
     
     def search(self, query_embedding, limit=5, threshold=0.0):
         """Search for similar documents"""
@@ -3742,7 +3844,8 @@ class FAISSStore:
             results.append({
                 'document': self.documents[idx],
                 'score': float(score),
-                'metadata': self.metadata[idx]
+                'metadata': self.metadata[idx],
+                'original_content': self.original_contents[idx]
             })
         
         return results
@@ -3756,7 +3859,8 @@ class FAISSStore:
         with open(f"{path}.meta", 'wb') as f:
             pickle.dump({
                 'documents': self.documents,
-                'metadata': self.metadata
+                'metadata': self.metadata,
+                'original_contents': self.original_contents
             }, f)
     
     def load(self, path):
@@ -3769,6 +3873,7 @@ class FAISSStore:
             data = pickle.load(f)
             self.documents = data['documents']
             self.metadata = data['metadata']
+            self.original_contents = data.get('original_contents', self.documents)
 
 
 def signal_handler(signum, frame):

@@ -162,18 +162,18 @@ class ZenohPerceptionNode:
         return separator.join(note_contents)
     
     def _resolve_update_text(self, update_text: str) -> str:
-        """Resolve Note/Collection IDs to actual content. Returns content string."""
+        """Resolve Note/Collection IDs to actual content. Returns truncated content string."""
         if not isinstance(update_text, str):
             return str(update_text) if update_text else ""
         
         # Check if it's a Note ID
         if update_text.startswith('Note_'):
-            content = self._get_content(update_text)
+            content = self._get_content(update_text)[:2000]
             return str(content) if content is not None else ""
         
         # Check if it's a Collection ID
         if update_text.startswith('Collection_'):
-            return self._flatten_collection(update_text)
+            return self._flatten_collection(update_text)[:2000]
         
         # Not a Note/Collection ID, return as-is (physical world action result)
         return update_text
@@ -201,6 +201,8 @@ class ZenohPerceptionNode:
             
             action = action_result.get('action', {})
             update_text = action_result.get('update_text', '')
+            if update_text and len(update_text) > 2000:
+                update_text = update_text[:2000] + '...'
             expect = action_result.get('expect', '')
             
             action_type = action.get('type', 'unknown')

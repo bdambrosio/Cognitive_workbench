@@ -1,94 +1,180 @@
 ---
 name: summarize
-description: Compress information while preserving key points and structure
+description: Compress information with focus-aware adaptive compression and styling
 type: python
 trusted: true
 flattens_collections: true
 parameters:
   - name: focus
     type: string
-    description: Optional topic to guide summarization
+    description: Optional topic to guide summarization (enables leaky focus filtering)
+  - name: style
+    type: string
+    description: Output style - 'technical' (default), 'executive', or 'comprehensive'
+  - name: compression_ratio
+    type: float
+    description: Compression factor (default 3.0), applied to focused content
 examples:
-  - '{"type":"summarize","target":"$doc","args":{"focus":"key points"},"out":"$summary","expect":"should capture main findings"}'
-  - '{"type":"summarize","target":"$results","out":"$summary","expect":"should condense results"}'
+  - '{"type":"summarize","target":"$doc","out":"$summary","expect":"should provide balanced summary"}'
+  - '{"type":"summarize","target":"$papers","args":{"focus":"attention mechanisms","style":"technical"},"out":"$summary","expect":"should focus on attention"}'
+  - '{"type":"summarize","target":"$reports","args":{"style":"executive"},"out":"$brief","expect":"should provide executive summary"}'
+  - '{"type":"summarize","target":"$data","args":{"focus":"cost analysis","compression_ratio":2.0},"out":"$detailed","expect":"should provide detailed cost analysis"}'
 ---
 
 # Summarize Content
 
-Extract essential information from text, documents, or structured data while maintaining accuracy and context.
+Extract essential information with focus-aware compression and adaptive styling. Automatically filters content by relevance and scales output appropriately.
 
 ## Purpose
 
-Transform verbose or detailed content into concise summaries appropriate for the target use case. Preserves factual accuracy while reducing cognitive load.
+Transform verbose content into concise summaries using information-theoretic compression. Compression ratio applies to *relevant* content (after focus filtering), not raw input size.
 
 ## Input Format
 
 Accepts:
 - Plain text (single document or passage)
 - Structured data (JSON/dict with fields to summarize)
-- Lists of items (creates consolidated summary)
+- Collections (flattened and processed as unified content)
 
-## Optional Parameters
+## Optional Parameters (All Optional)
 
-- **focus** - A topic or query to guide summarization. When provided, emphasize information relevant to this focus while still maintaining accuracy.
+- **focus** (string) - Topic to guide summarization. When provided:
+  - Applies leaky relevance filter to content (40% threshold - lenient)
+  - Compression ratio applies to focused content only
+  - Example: "attention mechanisms", "deployment strategies"
 
-## Output Format
+- **style** (string) - Output style, default: "technical"
+  - **"executive"**: High-level overview, 300-500 words max, focuses on key findings
+  - **"technical"**: Balanced detail preservation (DEFAULT), uses compression_ratio directly
+  - **"comprehensive"**: Low compression (2:1), preserves nuance and technical details
 
-Returns a summary with:
-- **Key points** - Most important information (2-5 bullets)
-- **Context** - Brief background if relevant
-- **Actionable items** - Decisions, next steps, or implications (if present)
+- **compression_ratio** (float) - Compression factor, default: 3.0
+  - Applied to effective content size (after focus filtering if focus provided)
+  - 3.0 = reduce to 33% of input (~1500 words → ~500 words)
+  - Lower values (2.0) = more detail retained
+  - Higher values (5.0) = more aggressive compression
+  - Overrides style-based compression defaults
 
-## Summarization Guidelines
+## How It Works
 
-### Length Scaling
-- **Brief** (default): 3-5 sentences, highlights only
-- **Standard**: 1-2 short paragraphs, includes context
-- **Detailed**: Multiple paragraphs, preserves nuance
+1. **Content Measurement**: Estimates input tokens (~4 chars/token)
+2. **Focus Filtering** (if focus provided): 
+   - Rates each chunk for relevance (0-10 scale)
+   - Keeps chunks scoring ≥4 (leaky threshold - permissive)
+   - Recomputes effective input size from filtered chunks
+3. **Target Calculation**: Applies compression ratio to effective input
+4. **Hierarchical Summarization**: Map-reduce pattern for long documents
+5. **Length Control**: LLM prompted with target token count
 
-### Content Priorities
-1. **Focus relevance** - if 'focus' parameter provided, prioritize information related to that topic
-2. **Facts over opinions** - unless opinions are the subject
-3. **Novel information** - what's new or unexpected
-4. **Actionable insights** - what can be done with this
-5. **Critical context** - minimum background needed to understand
+## Output Characteristics by Style
 
-### Quality Checks
-- Accuracy: No hallucination or inference beyond source
-- Completeness: Captures all major themes
-- Clarity: Self-contained without source
-- Brevity: Removes redundancy and filler
+### Technical (default)
+- Preserves methodology, technical details, caveats
+- Uses compression_ratio directly (default 3:1)
+- Best for: Research, analysis, documentation
+- Example output: ~33% of input length
 
-## Example Usage
+### Executive
+- High-level findings and implications only
+- Fixed cap: 300-500 words regardless of input size
+- Best for: Decision-makers, presentations, briefs
+- Example: 8 papers → 1 page summary
 
-**Input (verbose):**
+### Comprehensive
+- Low compression (2:1), preserves nuance
+- Detailed technical content and supporting evidence
+- Best for: Deep analysis, technical reviews
+- Example output: ~50% of input length
+
+## Leaky Focus Filter Details
+
+When focus is provided, content filtering is intentionally **lenient**:
+
+**Inclusion criteria (score ≥4/10):**
+- Explicitly mentions focus topic (score 7-10)
+- Provides context for understanding focus (score 5-6)
+- Discusses related concepts (score 4-6)
+- Contains cross-references to focus topic (score 4-5)
+
+**Why leaky is important:**
+- Preserves surrounding context for comprehension
+- Avoids losing important related information
+- Handles ambiguous relevance gracefully
+- Better to include than risk false negatives
+
+**Typical inclusion rates:** 30-50% of chunks (not 80-90%)
+
+## Example Usage Patterns
+
+### Default: Balanced Technical Summary
+```json
+{"type":"summarize","target":"$papers","out":"$summary"}
 ```
-The research paper discusses three approaches to neural scaling. 
-The first approach focuses on parameter count... [3 more paragraphs]
+→ 3:1 compression, technical style, no filtering
+→ Input: 30K tokens → Output: ~10K tokens
+
+### Executive Brief with Focus
+```json
+{"type":"summarize","target":"$reports",
+ "args":{"focus":"cost analysis","style":"executive"},
+ "out":"$brief"}
+```
+→ Filters for cost-related content (leaky)
+→ Caps output at 500 words regardless of input size
+→ Input: 50K tokens → Filtered: 15K tokens → Output: 400 words
+
+### Detailed Focused Analysis
+```json
+{"type":"summarize","target":"$papers",
+ "args":{"focus":"transformer attention","compression_ratio":2.5},
+ "out":"$detailed"}
+```
+→ Filters for attention content
+→ Low compression (2.5:1 = 40% of focused content)
+→ Input: 40K tokens → Filtered: 12K tokens → Output: ~5K tokens
+
+### Comprehensive Review
+```json
+{"type":"summarize","target":"$document",
+ "args":{"style":"comprehensive"},
+ "out":"$full_analysis"}
+```
+→ 2:1 compression, preserves nuance
+→ Input: 20K tokens → Output: ~10K tokens
+
+## Information-Theoretic Design
+
+**Key insight:** Compression ratio applies to *relevant* information, not raw input.
+
+**Without focus:**
+```
+8 papers (100K tokens) → 3:1 compression → 33K token summary
+(Proportional coverage of all 8 papers)
 ```
 
-**Output (brief):**
-Neural scaling research identifies three approaches: parameter scaling (most common, diminishing returns above 100B), data scaling (underexplored, limited by quality), and compute-optimal scaling (Chinchilla findings suggest balanced approach). Key finding: current models may be over-parameterized and under-trained.
-
-**Input with focus:**
+**With focus="attention mechanisms":**
 ```
-Input: "Google released Gemini 2.0 with improved multimodal capabilities..."
-Focus: "new capabilities"
+8 papers (100K tokens) 
+→ Leaky filter keeps 3 papers + relevant sections (30K tokens)
+→ 3:1 compression on 30K → 10K token summary
+(Focused, detailed coverage of attention topics)
 ```
 
-**Output (brief, focused):**
-Gemini 2.0 introduces native image and video understanding, real-time audio processing, and enhanced code generation with 50% faster inference compared to 1.5 Pro.
+**Result:** Focus dramatically improves signal-to-noise ratio in output.
 
-## Special Handling
+## Observability
 
-- **Multiple sources**: Synthesize across sources, note agreements/conflicts
-- **Technical content**: Preserve technical accuracy, define jargon if needed
-- **Temporal data**: Maintain chronological clarity
-- **Structured data**: Preserve hierarchical relationships in flattened form
+Each summarization logs:
+```
+summarize: input=45000t, focus=yes, filtered=18000t (40%), 
+target=6000t, style=technical, ratio=3.0, output=6200t
+```
 
-## Error Handling
+Monitor inclusion_pct: if consistently >75%, focus may be too broad.
 
-If input is:
-- Already concise: Return original with note
-- Empty/null: Return "No content to summarize"
-- Malformed: Attempt best-effort summary, flag issues
+## Edge Cases
+
+- **Focus yields 0 chunks**: Falls back to full content with warning
+- **Very short input (<4K tokens)**: Minimal compression applied
+- **Filter error**: Includes chunk by default (fail-safe)
+- **Target <300 tokens**: Floor applied for readability

@@ -161,7 +161,7 @@ def _html_to_text_extract(html: str, query: str, max_chars: int) -> str:
     joined = "\n".join(str(e).strip() for e in elements if str(e).strip())
     kws = query.split()
     kw_weights = _compute_keyword_weights(kws)
-    return _extract_subtext(joined, kws, kw_weights, max_chars=max_chars)
+    return _extract_subtext(joined, kws, kw_weights, max_chars=max_chars), joined
 
 # ------------------------------
 # LLM-assisted TL;DR
@@ -187,7 +187,8 @@ You should respond with only the actual relevant content, no commentary, no code
 This may require rewriting passages of mostly irrelevant content to eliminate irrelevant or peripherally relevantinformation.
 If there is no relevant content, set relevant to 'false'.
 Respond only with the JSON, no commentary, no code fences, no reasoning    :
-{"relevant":<true / false>, "extract":"<only relevant content>"}
+{"relevant":<true / false>, 
+ "extract":"<only relevant content>"}
 
 """]
     try:
@@ -257,7 +258,7 @@ def _process_url(url: str, query: str, client, per_url_timeout: float, max_chars
         file_format = _detect_format_from_content(html, url)
         
         # Extract filtered text (query-relevant excerpts)
-        extract = _html_to_text_extract(html, query=query, max_chars=max_chars)
+        extract, full_text = _html_to_text_extract(html, query=query, max_chars=max_chars)
         if not extract or len(extract) < 16:
             return _create_empty_result(url, start, file_format)
         
@@ -272,8 +273,9 @@ def _process_url(url: str, query: str, client, per_url_timeout: float, max_chars
         filtered_text = tldr or extract
         
         # Return uniform structure matching fetch-text
-        return {
-            "text": filtered_text,
+        if filtered_text:
+            return {
+            "text": full_text,
             "format": file_format,
             "metadata": {
                 "source_url": url,

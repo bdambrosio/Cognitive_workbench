@@ -983,12 +983,17 @@ Parameters:
   - query (required): string search text or $variable referencing query
   - mode (optional): string mode (default: "semantic")
   - limit (optional): integer max results (default: 10)
+  - return_mode (optional): "chunks" or "notes" (default: "chunks")
+    - "chunks": Returns matching text chunks (granular results, may have multiple chunks from same Note)
+    - "notes": Returns original Notes (deduplicated, one Note per source even if multiple chunks match)
   - out (required): $variable name for resulting Collection
   - expect (required): string describing expected results
 Preconditions: source Collection must be indexed (call index first)
 Postconditions: out variable bound to Collection containing matching Notes
 Examples:
   {"type":"search","source":"$collection","query":"search text","mode":"semantic","limit":5,"out":"$results","expect":"should return 3-5 relevant items"}
+  {"type":"search","source":"$collection","query":"attention mechanisms","return_mode":"chunks","limit":10,"out":"$chunks","expect":"should return relevant text passages"}
+  {"type":"search","source":"$papers","query":"transformer architecture","return_mode":"notes","limit":5,"out":"$relevant_papers","expect":"should return 5 papers discussing transformers"}
 
 ## focus
 Description: Change current location or approach a resource
