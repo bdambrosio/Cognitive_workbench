@@ -410,7 +410,8 @@ class InfospaceExecutor:
                 messages=[full_prompt],
                 bindings={},
                 max_tokens=1000,
-                temperature=0.5
+                temperature=0.3,
+                log=True
             )
             
             # Send heartbeat after LLM call
@@ -865,7 +866,7 @@ class InfospaceExecutor:
         Query indexed Collection.
         
         Required: source, query, out
-        Optional: mode, limit, threshold
+        Optional: mode, limit, threshold, return_mode
         
         Argument types:
         - source: $variable (indexed Collection to search)
@@ -873,6 +874,7 @@ class InfospaceExecutor:
         - mode: literal string ('semantic' or 'keyword', default 'semantic')
         - limit: int (max results to return, default 5)
         - threshold: float (minimum similarity score, default 0.0)
+        - return_mode: literal string ('chunks' or 'notes', default 'chunks')
         - out: literal string (variable name to store results)
         """
         source_arg = action.get('source')
@@ -880,6 +882,7 @@ class InfospaceExecutor:
         mode = action.get('mode', 'semantic')
         limit = action.get('limit', 5)
         threshold = action.get('threshold', 0.0)
+        return_mode = action.get('return_mode', 'chunks')
         out_var = action.get('out')
         
         if not source_arg or not query or not out_var:
@@ -907,7 +910,8 @@ class InfospaceExecutor:
             'query': query,
             'mode': mode,
             'limit': limit,
-            'threshold': threshold
+            'threshold': threshold,
+            'return_mode': return_mode
         }
         
         self.session.put(
@@ -933,7 +937,39 @@ class InfospaceExecutor:
         # Create Notes for each search result
         note_ids = []
         for i, result in enumerate(results):
-            note_id = self._persist_note(result, f'search_result_{i}')
+            if return_mode == 'chunks':
+                # For chunks mode: store only chunk text, preserve metadata in properties
+                chunk_content = result.get('document', '')
+                metadata = result.get('metadata', {})
+                
+                # Extract relevant metadata for properties
+                properties = {
+                    'source_note_id': metadata.get('source_note_id'),
+                    'chunk_index': metadata.get('chunk_index'),
+                    'chunk_total': metadata.get('chunk_total'),
+                    'is_complete_note': metadata.get('is_complete_note', False),
+                    'score': result.get('score'),
+                    'return_mode': 'chunks'
+                }
+                # Remove None values
+                properties = {k: v for k, v in properties.items() if v is not None}
+                
+                note_id = self._persist_note(chunk_content, f'search_result_{i}', properties=properties)
+            else:
+                # For notes mode: store original note content (deduplicated, full document)
+                note_content = result.get('document', '')
+                metadata = result.get('metadata', {})
+                
+                # Store source reference in properties
+                properties = {
+                    'source_note_id': metadata.get('source_note_id'),
+                    'score': result.get('score'),
+                    'return_mode': 'notes'
+                }
+                properties = {k: v for k, v in properties.items() if v is not None}
+                
+                note_id = self._persist_note(note_content, f'search_result_{i}', properties=properties)
+            
             if note_id:
                 note_ids.append(note_id)
         
@@ -1176,6 +1212,12 @@ class InfospaceExecutor:
         if not isinstance(note_ids, list):
             return {'status': 'failed', 'reason': 'map target must be a Collection'}
         
+        # Primitives that can be used in map operations
+        primitive_handlers = {
+            'add': self._execute_add,
+            'remove': self._execute_remove,
+        }
+        
         # Apply operation to each Note
         result_note_ids = []
         for i, note_id in enumerate(note_ids):
@@ -1187,9 +1229,24 @@ class InfospaceExecutor:
             
             # Apply operation based on type
             if isinstance(operation, str):
-                # Tool name - apply to content
-                result = self._apply_operation_to_value(operation, content, 
-                                                       f"map item {i}", additional_args)
+                # Check if it's a primitive
+                if operation in primitive_handlers:
+                    # Construct action dict for primitive
+                    primitive_action = {'type': operation}
+                    primitive_action.update(additional_args)
+                    
+                    # For add/remove: map item becomes 'value', target comes from args
+                    if operation in ['add', 'remove']:
+                        primitive_action['value'] = note_id
+                        if 'out' not in primitive_action:
+                            primitive_action['out'] = additional_args.get('target', out_var)
+                    
+                    # Execute primitive
+                    result = primitive_handlers[operation](primitive_action)
+                else:
+                    # Tool name - apply to content
+                    result = self._apply_operation_to_value(operation, content, 
+                                                           f"map item {i}", additional_args)
             elif isinstance(operation, dict):
                 if 'tool' in operation:
                     # Dict with tool name and args
@@ -1201,16 +1258,23 @@ class InfospaceExecutor:
                 else:
                     return {'status': 'failed', 'reason': 'operation dict must have "tool" field'}
             else:
-                return {'status': 'failed', 'reason': 'operation must be string (tool name) or dict'}
+                return {'status': 'failed', 'reason': 'operation must be string (tool/primitive name) or dict'}
             
             # Handle result
             if result.get('status') == 'success':
                 result_value = result.get('value')
-                # Create Note for result
-                if result_value is None:
+                # For mutation primitives like add/remove, result is the mutated Collection ID
+                if isinstance(operation, str) and operation in ['add', 'remove']:
+                    # Mutation primitive - result is the mutated collection
+                    # Store it to use as final output (will be same for all iterations)
+                    if isinstance(result_value, str) and result_value.startswith('Collection_'):
+                        # Keep reference to mutated collection (will overwrite each iteration, but that's fine)
+                        result_note_ids.append(result_value)
+                elif result_value is None:
                     if not filter_null:
                         result_note_ids.append("Note_null")
                 else:
+                    # Create Note for result
                     result_note_id = self._persist_note(result_value, f'map_result_{i}')
                     if result_note_id and not (filter_null and result_value is None):
                         result_note_ids.append(result_note_id)
@@ -1220,16 +1284,32 @@ class InfospaceExecutor:
                 if not filter_null:
                     result_note_ids.append("Note_null")
         
-        # Create Collection in map_node
-        operation_str = operation if isinstance(operation, str) else 'operation'
-        collection_id = self._create_collection(result_note_ids, f'map_{operation_str}')
-        if collection_id:
-            self._bind_variable(out_var, collection_id)
-            logger.info(f"Mapped {len(note_ids)} → {len(result_note_ids)} Notes, created {collection_id} → ${out_var}")
-            return {'status': 'success', 'value': collection_id}
+        # Handle result based on operation type
+        if isinstance(operation, str) and operation in ['add', 'remove']:
+            # Mutation primitive - bind to the mutated collection (from args.target)
+            mutation_target = additional_args.get('target')
+            if mutation_target:
+                target_var = mutation_target[1:] if mutation_target.startswith('$') else mutation_target
+                if target_var in self.plan_bindings:
+                    mutated_collection_id = self.plan_bindings[target_var]
+                    self._bind_variable(out_var, mutated_collection_id)
+                    logger.info(f"Mapped {len(note_ids)} items via {operation} → ${out_var} = {mutated_collection_id}")
+                    return {'status': 'success', 'value': mutated_collection_id}
+                else:
+                    return {'status': 'failed', 'reason': f'Mutation target {mutation_target} not bound'}
+            else:
+                return {'status': 'failed', 'reason': f'{operation} requires target in args'}
         else:
-            logger.error(f"Failed to create Collection for map results")
-            return {'status': 'failed', 'reason': 'Failed to create result Collection'}
+            # Tool operation - create result Collection
+            operation_str = operation if isinstance(operation, str) else 'operation'
+            collection_id = self._create_collection(result_note_ids, f'map_{operation_str}')
+            if collection_id:
+                self._bind_variable(out_var, collection_id)
+                logger.info(f"Mapped {len(note_ids)} → {len(result_note_ids)} Notes, created {collection_id} → ${out_var}")
+                return {'status': 'success', 'value': collection_id}
+            else:
+                logger.error(f"Failed to create Collection for map results")
+                return {'status': 'failed', 'reason': 'Failed to create result Collection'}
     
     def _execute_flatten(self, action: Dict) -> Dict:
         """
@@ -1325,6 +1405,9 @@ class InfospaceExecutor:
             note_id = self.plan_bindings[var_name]
             if not isinstance(note_id, str) or not note_id.startswith('Note_'):
                 return {'status': 'failed', 'reason': f'Variable {var_name} is not a Note'}
+        elif isinstance(value_arg, str) and value_arg.startswith('Note_'):
+            # Direct Note ID (e.g., from map operation)
+            note_id = value_arg
         else:
             # Literal - create Note for it
             note_id = self._persist_note(value_arg, 'add_item')

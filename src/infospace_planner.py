@@ -79,6 +79,24 @@ Pattern: Adding filtered items to existing Collection
   {"type":"map","target":"$new_papers","operation":"add","args":{"target":"$papers"},"out":"$papers"}
   {"type":"persist","target":"$papers"}
 
+Pattern: Semantic search with chunking (index/search)
+  The index primitive automatically chunks long Notes into overlapping segments for better semantic matching.
+  Use return_mode to control what search returns:
+  
+  return_mode: "chunks" (DEFAULT) - Returns matching text passages (granular, may include multiple chunks from same Note)
+  Use when: You want relevant excerpts/passages, not full documents
+  
+  return_mode: "notes" - Returns original complete Notes (deduplicated by source)
+  Use when: You want full documents that mention the query topic
+  
+  Example - Find relevant passages:
+  {"type":"index","source":"$documents"}
+  {"type":"search","source":"$documents","query":"transformer attention","return_mode":"chunks","limit":10,"out":"$passages","expect":"should return relevant text excerpts"}
+  
+  Example - Find relevant documents:
+  {"type":"index","source":"$papers"}
+  {"type":"search","source":"$papers","query":"block-rank algorithm","return_mode":"notes","limit":5,"out":"$relevant_papers","expect":"should return papers discussing block-rank"}
+
 Pattern: Multi-item tool application
   When you need to apply a tool to *two or more* Notes (e.g., compare, analyze together):
   1. Create a Collection containing the Notes

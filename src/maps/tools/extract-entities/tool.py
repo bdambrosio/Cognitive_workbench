@@ -28,9 +28,11 @@ def tool(value, **kwargs):
     # Check if segmentation needed
     chunks = _segment_text(value, max_chunk_size=16000)
     
+    heartbeat = kwargs.get('heartbeat')
+    
     if len(chunks) == 1:
         # Single chunk - direct extraction
-        return _extract_from_chunk(value)
+        return _extract_from_chunk(value, heartbeat)
     
     # Multiple chunks - extract and merge
     logger.info(f"extract-entities: long document ({len(chunks)} chunks), extracting and merging")
@@ -47,7 +49,7 @@ def tool(value, **kwargs):
     
     # Extract from each chunk
     for i, (chunk_text, _) in enumerate(chunks):
-        chunk_result = _extract_from_chunk(chunk_text)
+        chunk_result = _extract_from_chunk(chunk_text, heartbeat)
         
         # Parse JSON result
         chunk_entities = json.loads(chunk_result)
@@ -77,16 +79,16 @@ def tool(value, **kwargs):
     return json.dumps(result, indent=2)
 
 
-def _extract_from_chunk(text):
+def _extract_from_chunk(text, heartbeat=None):
     """Extract entities from a single chunk of text."""
     prompt = f"""Extract entities from the following text. Return JSON with these fields:
-- people: list of person names
-- organizations: list of organizations/companies
-- locations: list of places
-- topics: list of main topics/subjects
-- dates: list of dates or temporal references
-- key_concepts: list of important concepts
-- relationships: list of {{subject, predicate, object}} triples
+    - people: list of person names
+    - organizations: list of organizations/companies
+    - locations: list of places
+    - topics: list of main topics/subjects
+    - dates: list of dates or temporal references
+    - key_concepts: list of important concepts
+    - relationships: list of {{subject, predicate, object}} triples
 
 Text:
 {text}
@@ -100,8 +102,7 @@ Return only valid JSON, no explanation."""
         is_json=True
     )
     
-    # Send heartbeat after LLM call
-    heartbeat = kwargs.get('heartbeat')
+    # Send heartbeat after LLM call (prevents timeout during long operations)
     if heartbeat:
         heartbeat()
     
