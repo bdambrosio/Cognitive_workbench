@@ -801,6 +801,10 @@ Examples:
   {"type":"flatten","target":"$collection","separator":"\\n---\\n","out":"$combined"}
 
 ## expand
+⚠️ CRITICAL: Works on Notes ONLY. If you have multiple Notes in a Collection,
+use map to expand each Note: {"type":"map","target":"$collection","operation":"expand","out":"$expanded_items"}
+then use flatten if you need to combine the expanded Notes into a single Note.
+
 Description: Expand a Note containing JSON array into a Collection of Notes
 Input: target: $variable → Note (must contain JSON with array field)
 Output: out: $variable → Collection (one Note per array item)

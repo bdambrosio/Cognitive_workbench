@@ -428,6 +428,12 @@ class ZenohExecutiveNode:
             self._activity_list_query_handler
         )
         
+        # Queryable for sync plan execution (character-specific)
+        self.sync_plan_execution_queryable = self.session.declare_queryable(
+            f"cognitive/{character_name}/execute_plan_sync",
+            self._sync_plan_execution_handler
+        )
+        
         # Shutdown flags
         self.shutdown_requested = False
         self._shutting_down = False
@@ -1695,7 +1701,9 @@ end your response with </end>
             # Infospace primitives - Phase 1 & 2
             'apply', 'display', 'create-note', 'create-collection', 'persist', 'load', 'index', 'organize', 'search',
             'extract', 'filter', 'merge', 'coerce',
-            'aggregate', 'sort', 'group_by', 'compare', 'map', 'flatten', 'add', 'expand'
+            'aggregate', 'sort', 'group_by', 'compare', 'map', 'flatten', 'add', 'expand',
+            # Set operations
+            'union', 'intersection', 'difference', 'remove', 'size'
         }
         
         # Special handling for 'ask' - initial execution sets up suspension
@@ -1829,6 +1837,43 @@ end your response with </end>
             current['idx'] = idx + 1
             return self._execute_next_step(step_stack)
     
+    def _publish_action_result(self, action: Dict[str, Any], result: Dict[str, Any], action_type: str = None, timestamp: datetime = None):
+        """
+        Publish action result for UI display.
+        Can be called from both turn-based (_act) and sync execution.
+        
+        Args:
+            action: Action dict that was executed
+            result: Result dict from execution
+            action_type: Optional action type (defaults to action.get('type'))
+            timestamp: Optional timestamp (defaults to now)
+        """
+        if timestamp is None:
+            timestamp = datetime.now()
+        
+        if action_type is None:
+            action_type = action.get('type', '')
+        
+        result_value = str(result.get('value', '')) if result.get('value') else ''
+        display_value = result_value if self.is_infospace else result_value[:200]
+        
+        action_data = {
+            'type': action_type,
+            'action_id': self.action_counter,
+            'timestamp': timestamp.isoformat(),
+            'target': action.get('target', ''),
+            'out': action.get('out', ''),
+            'status': result.get('status', 'unknown'),
+            'value': display_value
+        }
+        
+        # Add 'text' field for say/display/think actions (memory_node expects this)
+        if action_type.lower() in ('say', 'display', 'think'):
+            action_data['text'] = display_value
+            action_data['source'] = self.character_name
+        
+        self.action_publisher.put(json.dumps(action_data))
+        self.action_counter += 1
 
     def _act(self, action: Dict[str, Any]) -> bool:
         """Act: Execute the chosen action. Returns True if action succeeded, False if it failed."""
@@ -1865,6 +1910,8 @@ end your response with </end>
                 'index', 'organize', 'search',
                 # Data operations
                 'flatten', 'add', 'expand',
+                # Set operations
+                'union', 'intersection', 'difference', 'remove', 'size',
                 # Communication
                 'say', 'display', 'think', 'ask'
             }
@@ -1898,25 +1945,7 @@ end your response with </end>
                 self.action_history.append(action_record)
                 
                 # Publish action for UI display
-                result_value = str(result.get('value', '')) if result.get('value') else ''
-                display_value = result_value if self.is_infospace else result_value[:200]
-                
-                action_data = {
-                    'type': action_type,
-                    'action_id': self.action_counter,
-                    'timestamp': now_ts.isoformat(),
-                    'target': action.get('target', ''),
-                    'out': action.get('out', ''),
-                    'status': result.get('status', 'unknown'),
-                    'value': display_value
-                }
-                
-                # Add 'text' field for say/display/think actions (memory_node expects this)
-                if action_type in ('say', 'display', 'think'):
-                    action_data['text'] = display_value
-                    action_data['source'] = self.character_name
-                
-                self.action_publisher.put(json.dumps(action_data))
+                self._publish_action_result(action, result, action_type, now_ts)
                 
                 # Publish to perception_node for expectation monitoring
                 if action.get('expect') and result.get('status') == 'success':
@@ -1925,8 +1954,6 @@ end your response with </end>
                         'update_text': str(result.get('value', '')),
                         'expect': action.get('expect')
                     }))
-                
-                self.action_counter += 1
                 
                 # Return success/failure based on result
                 success = result.get('status') == 'success'
@@ -3151,6 +3178,56 @@ End your response with </end>
             response = {
                 'success': False,
                 'activities': []
+            }
+            query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
+    
+    def _sync_plan_execution_handler(self, query):
+        """Handle query for synchronous plan execution."""
+        try:
+            if not self.is_infospace or not self.infospace_executor:
+                response = {
+                    'success': False,
+                    'error': 'Sync plan execution only available for infospace characters'
+                }
+                query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
+                return
+            
+            # Parse plan from query payload
+            payload = query.payload.to_bytes().decode('utf-8')
+            request_data = json.loads(payload)
+            plan = request_data.get('plan')
+            max_steps = request_data.get('max_steps', 1000)
+            
+            if not plan:
+                response = {
+                    'success': False,
+                    'error': 'Plan is required'
+                }
+                query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
+                return
+            
+            # Execute plan synchronously
+            result = self.infospace_executor.execute_plan_sync(plan, max_steps=max_steps)
+            
+            # Return result
+            response = {
+                'success': result.get('status') == 'success',
+                'status': result.get('status'),
+                'reason': result.get('reason'),
+                'executed_steps': result.get('executed_steps', 0),
+                'bindings': result.get('bindings', {}),
+                'suspended': result.get('status') == 'suspended',
+                'suspension_reason': result.get('reason') if result.get('status') == 'suspended' else None
+            }
+            query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
+            
+        except Exception as e:
+            logger.error(f'Error handling sync plan execution query: {e}')
+            import traceback
+            logger.error(traceback.format_exc())
+            response = {
+                'success': False,
+                'error': str(e)
             }
             query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
     

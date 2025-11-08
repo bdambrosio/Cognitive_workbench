@@ -83,14 +83,17 @@ Provide a detailed summary (8-12 sentences) preserving key themes, facts, and pe
 
 Content:
 {content}
-
+Do not include any introductory, reasoning, or explanatory text in your response. Only provide the summary, followed by the </end> tag.
+End your response with:
+</end>
 Summary:"""
         
         response = llm_client.generate(
             messages=[prompt],
             max_tokens=1000,
             temperature=0.3,
-            is_json=False
+            is_json=False,
+            stops=['</end>']
         )
         
         # Send heartbeat after LLM call
@@ -126,13 +129,17 @@ This is chunk {i+1} of {len(chunks)}.
 Content:
 {chunk}
 
+Do not include any introductory, reasoning, or explanatory text in your response. Only provide the summary, followed by the </end> tag.
+End your response with:
+</end>
 Summary:"""
         
         response = llm_client.generate(
             messages=[prompt],
             max_tokens=1000,
             temperature=0.3,
-            is_json=False
+            is_json=False,
+            stops=['</end>']
         )
         
         # Send heartbeat after LLM call
@@ -272,13 +279,17 @@ Provide a comparison analysis in JSON format with:
 - unique_to_second: array of strings (unique to Item B)
 - contradictions: array of objects with "aspect", "first", "second" fields
 - relationship: string describing relationship type
-- summary: string summary of comparison"""
+- summary: string summary of comparison
+Do not include any introductory, reasoning, or explanatory text in your response. Only provide the JSON.
+
+"""
     
     response = llm_client.generate(
         messages=[prompt],
         max_tokens=1000,
         temperature=0.5,
-        is_json=True
+        is_json=True,
+        stops=['</end>']
     )
     
     # Send heartbeat after LLM call

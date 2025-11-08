@@ -5,16 +5,15 @@ Summarization tool with focus-aware compression and adaptive styling.
 import logging
 import json
 import zenoh
+import time
+import uuid
 from zenoh import QueryTarget, ConsolidationMode
 from llm_client import ZenohLLMClient
 
 llm_client = ZenohLLMClient(server_name='vllm', model_name='models/Qwen3-Next:1.5B')
 logger = logging.getLogger(__name__)
 
-# Leaky filter threshold (4/10 = 40% relevance)
-LEAKY_THRESHOLD = 4
-
-# Open zenoh session for fetching Collection/Note content
+# Open zenoh session for fetching Collection/Note content and calling map_node
 config = zenoh.Config()
 zenoh_session = zenoh.open(config)
 
@@ -76,170 +75,148 @@ def _estimate_tokens(text):
     return len(text) // 4
 
 
-def _segment_for_filtering(text, max_size=2048):
-    """
-    Segment text into small chunks for filtering, preferring paragraph boundaries.
-    Falls back to sentence then word boundaries for oversized paragraphs.
-    Returns list of chunk strings.
-    """
-    if len(text) <= max_size:
-        return [text]
+def _wait_for_response(topic: str, timeout: float = 10.0):
+    """Wait for response on Zenoh topic."""
+    response_data = None
+    start_time = time.time()
     
-    # Split by paragraphs first
-    paragraphs = text.split('\n\n')
+    def response_handler(sample):
+        nonlocal response_data
+        if not response_data:  # Only take first response
+            response_data = json.loads(sample.payload.to_bytes().decode('utf-8'))
     
-    chunks = []
-    current_chunk = []
-    current_size = 0
+    subscriber = zenoh_session.declare_subscriber(topic, response_handler)
     
-    for para in paragraphs:
-        para_size = len(para)
-        
-        # If paragraph exceeds max_size, split it further
-        if para_size > max_size:
-            # Flush current chunk if it has content
-            if current_chunk:
-                chunks.append('\n\n'.join(current_chunk))
-                current_chunk = []
-                current_size = 0
-            
-            # Split oversized paragraph by sentences
-            sentences = para.split('. ')
-            sentence_chunk = []
-            sentence_size = 0
-            
-            for sentence in sentences:
-                sentence_len = len(sentence)
-                
-                # If sentence itself exceeds max_size, split by words
-                if sentence_len > max_size:
-                    words = sentence.split(' ')
-                    word_chunk = []
-                    word_size = 0
-                    
-                    for word in words:
-                        word_len = len(word) + 1  # +1 for space
-                        
-                        if word_size + word_len > max_size and word_chunk:
-                            chunks.append(' '.join(word_chunk))
-                            word_chunk = [word]
-                            word_size = word_len
-                        else:
-                            word_chunk.append(word)
-                            word_size += word_len
-                    
-                    if word_chunk:
-                        chunks.append(' '.join(word_chunk))
-                    
-                elif sentence_size + sentence_len > max_size and sentence_chunk:
-                    chunks.append('. '.join(sentence_chunk))
-                    sentence_chunk = [sentence]
-                    sentence_size = sentence_len
-                else:
-                    sentence_chunk.append(sentence)
-                    sentence_size += sentence_len + 2  # +2 for '. '
-            
-            if sentence_chunk:
-                chunks.append('. '.join(sentence_chunk))
-        
-        # Normal paragraph handling
-        elif current_size + para_size > max_size and current_chunk:
-            chunks.append('\n\n'.join(current_chunk))
-            current_chunk = [para]
-            current_size = para_size
-        else:
-            current_chunk.append(para)
-            current_size += para_size + 2  # +2 for '\n\n'
+    try:
+        while not response_data and (time.time() - start_time) < timeout:
+            time.sleep(0.1)
+    finally:
+        subscriber.undeclare()
     
-    # Add final chunk
-    if current_chunk:
-        chunks.append('\n\n'.join(current_chunk))
-    
-    return chunks
+    return response_data
 
 
-def _score_relevance(chunk_text, focus, heartbeat=None):
-    """
-    Score chunk relevance to focus topic (0-10).
-    Returns score, defaults to 5 if scoring fails.
-    """
-    filter_prompt = f"""Rate the relevance of this section to the topic: "{focus}"
-
-Score 0-10 where:
-- 0-3: Not relevant
-- 4-6: Somewhat relevant or provides useful context
-- 7-10: Highly relevant
-
-If a section is directly relevant to "{focus}", or provides context, discusses related concepts, or contains cross-references, score it >= 4.
-
-Section:
-{chunk_text}
-
-Respond with ONLY a number 0-10, followed by the </end> tag. End your response with:
-</end>
-"""
+def _create_temp_collection(text_content: str, map_name: str = 'infolab') -> str:
+    """Create temporary Collection with text content for indexing."""
+    # Create a Note with the text content
+    note_id = None
+    for reply in zenoh_session.get(
+        "cognitive/map/note/create",
+        target=QueryTarget.BEST_MATCHING,
+        consolidation=ConsolidationMode.NONE,
+        payload=json.dumps({
+            'character_name': 'summarize_tool',
+            'content': text_content,
+            'format': 'text',
+            'source_skill': 'summarize_temp'
+        }).encode('utf-8'),
+        timeout=5.0
+    ):
+        if reply.ok:
+            response = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
+            if response.get('success'):
+                note_id = response.get('info_id')
+                break
+        break
     
-    response = llm_client.generate(
-        messages=[filter_prompt],
-        max_tokens=5,
-        temperature=0.1,
-        is_json=False,
-        stops=['</end>']
+    if not note_id:
+        logger.error("Failed to create temporary Note")
+        return None
+    
+    # Create Collection containing the Note
+    collection_id = None
+    for reply in zenoh_session.get(
+        "cognitive/map/collection/create",
+        target=QueryTarget.BEST_MATCHING,
+        consolidation=ConsolidationMode.NONE,
+        payload=json.dumps({
+            'character_name': 'summarize_tool',
+            'content': [note_id],
+            'format': 'list',
+            'source_skill': 'summarize_temp',
+            'collection_name': f'summarize_temp_{uuid.uuid4().hex[:8]}'
+        }).encode('utf-8'),
+        timeout=5.0
+    ):
+        if reply.ok:
+            response = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
+            if response.get('success'):
+                collection_id = response.get('info_id')
+                break
+        break
+    
+    if not collection_id:
+        logger.error("Failed to create temporary Collection")
+        return None
+    
+    return collection_id
+
+
+def _index_collection(collection_id: str, map_name: str = 'infolab') -> bool:
+    """Index a Collection via map_node."""
+    request = {
+        'agent_name': 'summarize_tool',
+        'collection_id': collection_id,
+        'index_type': 'semantic',
+        'fields': {'content': 'embed'}
+    }
+    
+    # Publish index request
+    zenoh_session.put(
+        f"map/{map_name}/index_request/summarize_tool",
+        json.dumps(request)
     )
     
-    if heartbeat:
-        heartbeat()
+    # Wait for response
+    response = _wait_for_response(
+        f"map/{map_name}/index_response/summarize_tool",
+        timeout=15.0
+    )
     
-    if not response.success:
-        logger.warning(f"Filter failed, including chunk by default: {response.error}")
-        return 5  # Default: include
+    if not response:
+        logger.error("Index request timeout")
+        return False
     
-    # Parse score
-    score_text = response.text.strip()
-    score = 5  # default if parsing fails
-    for char in score_text:
-        if char.isdigit():
-            score = int(char)
-            break
+    if response.get('status') != 'success':
+        logger.error(f"Index failed: {response.get('reason')}")
+        return False
     
-    return score
+    return True
 
 
-def _apply_leaky_filter(text, focus, heartbeat=None):
-    """
-    Apply leaky relevance filter to text using fine-grained chunks.
+def _search_collection(collection_id: str, query: str, limit: int, map_name: str = 'infolab') -> list:
+    """Search indexed Collection and return chunk results."""
+    request = {
+        'agent_name': 'summarize_tool',
+        'collection_id': collection_id,
+        'query': query,
+        'mode': 'semantic',
+        'limit': limit,
+        'threshold': 0.0,
+        'return_mode': 'chunks'
+    }
     
-    Args:
-        text: Full text string (flattened Collection)
-        focus: Topic to filter by
-        heartbeat: Optional heartbeat callback
+    # Publish search request
+    zenoh_session.put(
+        f"map/{map_name}/search_request/summarize_tool",
+        json.dumps(request)
+    )
     
-    Returns:
-        Filtered text string (concatenated filtered chunks)
-    """
-    # Segment into small filter chunks (2048 chars, paragraph boundaries)
-    filter_chunks = _segment_for_filtering(text, max_size=2048)
+    # Wait for response
+    response = _wait_for_response(
+        f"map/{map_name}/search_response/summarize_tool",
+        timeout=10.0
+    )
     
-    logger.debug(f"Filtering {len(filter_chunks)} small chunks at 2048-char granularity")
+    if not response:
+        logger.error("Search request timeout")
+        return []
     
-    # Filter each small chunk
-    filtered_parts = []
-    included_count = 0
+    if response.get('status') != 'success':
+        logger.error(f"Search failed: {response.get('reason')}")
+        return []
     
-    for i, chunk in enumerate(filter_chunks):
-        score = _score_relevance(chunk, focus, heartbeat)
-        
-        if score >= LEAKY_THRESHOLD:
-            filtered_parts.append(chunk)
-            included_count += 1
-            logger.debug(f"Chunk {i+1}/{len(filter_chunks)} included (score={score})")
-        else:
-            logger.debug(f"Chunk {i+1}/{len(filter_chunks)} excluded (score={score})")
-    
-    logger.info(f"Filter kept {included_count}/{len(filter_chunks)} small chunks ({int(included_count/len(filter_chunks)*100)}%)")
-    
-    # Reassemble into larger text
-    return "\n\n".join(filtered_parts)
+    return response.get('results', [])
 
 
 def _compute_target_length(effective_tokens, style, compression_ratio):
@@ -293,22 +270,73 @@ def tool(value, **kwargs):
     # Measure input
     input_tokens = _estimate_tokens(value)
     
-    # Apply leaky focus filter if focus provided (filter before segmentation for fine granularity)
+    # Apply focus filtering via index+search if focus provided
     effective_tokens = input_tokens
     inclusion_pct = 100
     
     if focus:
-        logger.info(f"summarize: applying leaky focus filter for '{focus}'")
-        filtered_text = _apply_leaky_filter(value, focus, heartbeat)
+        logger.info(f"summarize: applying semantic search filter for '{focus}'")
         
-        if not filtered_text or not filtered_text.strip():
-            logger.warning(f"Focus '{focus}' yielded no content, using all content")
+        # Get map_name from kwargs (default to 'infolab' for infospace)
+        map_name = kwargs.get('map_name', 'infolab')
+        
+        # Create temporary Collection with content
+        temp_collection_id = _create_temp_collection(value, map_name)
+        if not temp_collection_id:
+            logger.warning(f"Failed to create temp collection, using all content")
             filtered_text = value
         else:
-            # Recompute effective tokens from filtered text
-            effective_tokens = _estimate_tokens(filtered_text)
-            inclusion_pct = int((effective_tokens / input_tokens) * 100) if input_tokens > 0 else 100
-        value = filtered_text
+            try:
+                # Index the Collection
+                if not _index_collection(temp_collection_id, map_name):
+                    logger.warning(f"Failed to index temp collection, using all content")
+                    filtered_text = value
+                else:
+                    # Compute target length to determine how many chunks to retrieve
+                    target_tokens = int(_compute_target_length(effective_tokens, style, compression_ratio))
+                    avg_chunk_tokens = 128  # Based on paragraph-first chunking
+                    target_chunks = max(1, int(target_tokens / avg_chunk_tokens))
+                    limit = target_chunks * 3  # 3x overshoot
+                    
+                    # Search for relevant chunks
+                    search_results = _search_collection(temp_collection_id, focus, limit, map_name)
+                    
+                    if not search_results:
+                        logger.warning(f"Search returned no results for '{focus}', using all content")
+                        filtered_text = value
+                    else:
+                        # Extract chunk content from search results
+                        chunk_contents = []
+                        cumulative_tokens = 0
+                        max_content_tokens = target_tokens * 3  # Allow up to 3x target for LLM
+                        
+                        for result in search_results:
+                            # Extract chunk text from result (search returns 'document' field)
+                            chunk_text = result.get('document', '')
+                            if not chunk_text:
+                                continue
+                            
+                            chunk_tokens = _estimate_tokens(chunk_text)
+                            if cumulative_tokens + chunk_tokens > max_content_tokens:
+                                break
+                            
+                            chunk_contents.append(chunk_text)
+                            cumulative_tokens += chunk_tokens
+                        
+                        if chunk_contents:
+                            filtered_text = "\n\n".join(chunk_contents)
+                            effective_tokens = _estimate_tokens(filtered_text)
+                            inclusion_pct = int((effective_tokens / input_tokens) * 100) if input_tokens > 0 else 100
+                            logger.info(f"Retrieved {len(chunk_contents)} chunks ({effective_tokens}t, {inclusion_pct}% of input)")
+                        else:
+                            logger.warning(f"No chunks extracted from search results, using all content")
+                            filtered_text = value
+            finally:
+                # Note: Temporary Collection cleanup could be added here if needed
+                # For now, leaving it (map_node may clean up unused resources)
+                pass
+            
+            value = filtered_text
     
     # Check if segmentation needed (after filtering)
     chunks = _segment_text(value, max_chunk_size=16000)

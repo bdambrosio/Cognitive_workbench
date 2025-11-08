@@ -122,32 +122,42 @@ def _compute_keyword_weights(keywords: List[str]) -> Dict[str, int]:
     return weights
 
 def _extract_subtext(text: str, keywords: List[str], keyword_weights: Dict[str, int], max_chars: int) -> str:
-    # very simple paragraph-ish splitting; unstructured already normalizes blocks
-    blocks = [blk.strip() for blk in text.split("\n") if blk.strip()]
+    # Split on paragraph boundaries (double newlines or more)
+    # Preserve paragraph structure by treating paragraphs as units
+    paragraphs = []
+    for para in text.split("\n\n"):
+        para = para.strip()
+        if para:  # Only keep non-empty paragraphs
+            paragraphs.append(para)
+    
+    # Score paragraphs (not individual lines)
     score = []
-    for blk in blocks:
+    for para in paragraphs:
         s = 0
-        low = blk.lower()
+        low = para.lower()
         for kw, w in keyword_weights.items():
             if kw.lower() in low:
                 s += w
-        score.append((s, blk))
+        score.append((s, para))
 
     score.sort(key=lambda x: x[0], reverse=True)
     acc = []
     total = 0
     max_score = sum(keyword_weights.values()) if keyword_weights else 1
-    # favor high-signal blocks while staying within char budget
-    for s, blk in score:
+    # favor high-signal paragraphs while staying within char budget
+    for s, para in score:
         if s <= 0:
             continue
-        if total + len(blk) + 1 > max_chars and s < max_score // 6:
+        # Account for double newline separator when adding paragraphs
+        separator_len = 2 if acc else 0
+        if total + len(para) + separator_len > max_chars and s < max_score // 6:
             continue
-        acc.append(blk)
-        total += len(blk) + 1
+        acc.append(para)
+        total += len(para) + separator_len
         if total >= 2*max_chars:
             break
-    result = "\n".join(acc)
+    # Join paragraphs with double newlines to preserve structure
+    result = "\n\n".join(acc)
     if len(result) > max_chars:
         logger.warning(f"Extracted text exceeds max_chars: {len(result)} > {max_chars}")
         result = result[:int(max_chars)]
@@ -158,7 +168,8 @@ def _html_to_text_extract(html: str, query: str, max_chars: int) -> str:
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         elements = partition_html(text=html)
-    joined = "\n".join(str(e).strip() for e in elements if str(e).strip())
+    # Join elements with double newlines to preserve paragraph structure
+    joined = "\n\n".join(str(e).strip() for e in elements if str(e).strip())
     kws = query.split()
     kw_weights = _compute_keyword_weights(kws)
     return _extract_subtext(joined, kws, kw_weights, max_chars=max_chars), joined
@@ -172,7 +183,7 @@ def _llm_tldr(LLM_client, text: str, query: str, max_chars: int, timeout: float 
     Your environment should provide LLM_client.generate(...)
     Keep this call shape; fill in your client inside your app.
     """
-    prompt = ["Your task is to analyze the following Text to identify content directly relevant to the Query.\n",
+    prompt = ["Your task is to analyze the following Text to identify if it is relevant to the Query.\n",
               """Query:
 {{$query}}
 
@@ -181,14 +192,13 @@ Text:
 {{$text}}
 
 
-Respond using the following JSON format. 
-If there is relevant content, set relevant to 'true' and set extract to the relevant content. 
-You should respond with only the actual relevant content, no commentary, no code fences, no reasoning. 
-This may require rewriting passages of mostly irrelevant content to eliminate irrelevant or peripherally relevantinformation.
-If there is no relevant content, set relevant to 'false'.
-Respond only with the JSON, no commentary, no code fences, no reasoning    :
-{"relevant":<true / false>, 
- "extract":"<only relevant content>"}
+Respond using the following JSON format:
+
+{"relevant":<true / false>}
+
+If the text is relevant to the query, set relevant to 'true' , else set relevant to 'false'.
+Respond only with the JSON, no commentary, no code fences, no reasoning:
+
 
 """]
     try:
@@ -201,15 +211,15 @@ Respond only with the JSON, no commentary, no code fences, no reasoning    :
         # Accept either dict or string JSON
         if isinstance(raw.text, dict):
             if str(raw.text.get("relevant", "")).lower().startswith("true"):
-                return raw.text.get("extract", "")
+                return True
             else:
                 logger.error(f"No relevant content found for query: {query}")
-                return ""
-        return ""
+                return False
+        return False
     except Exception as e:
         logger.error(f"LLM TLDR failed: {e}")
         traceback.print_exc()
-        return ""
+        return False
 
 # ------------------------------
 # URL processing
@@ -270,12 +280,12 @@ def _process_url(url: str, query: str, client, per_url_timeout: float, max_chars
         # LLM filter for relevance
         remaining_time = max(3.0, per_url_timeout - (time.time() - start) - 1.0)
         tldr = _llm_tldr(client, extract, query=query, max_chars=max_chars, timeout=remaining_time, heartbeat=heartbeat)
-        filtered_text = tldr or extract
+        filtered_text = extract
         
         # Return uniform structure matching fetch-text
-        if filtered_text:
+        if tldr:
             return {
-            "text": full_text,
+            "text": filtered_text,
             "format": file_format,
             "metadata": {
                 "source_url": url,
@@ -305,14 +315,14 @@ def _create_empty_result(url: str, start_time: float, file_format: str = "html")
 # Public entry point
 # ------------------------------
 
-def llm_search(query: str, client, max_chars: int = 8000, max_urls: int = 10, max_workers: int = 4, wall_time_limit: float = 16.0, heartbeat=None) -> List[Dict[str, Any]]:
+def llm_search(query: str, client, max_chars: int = 8000, max_urls: int = 10, max_workers: int = 6, wall_time_limit: float = 10.0, heartbeat=None) -> List[Dict[str, Any]]:
     """
     High-level:
       1) Google CSE for initial URL set (two phrasings interleaved).
       2) Concurrently fetch + extract + LLM TL;DR relevant slices.
       3) Return list of {domain, url, extract, elapsed_ms} (only those with content).
     """
-    t0 = time.time()
+
 
     # 1) Build two phrasings: original and LLM-rephrased (like your old flow)
     q_orig = query
@@ -324,30 +334,38 @@ def llm_search(query: str, client, max_chars: int = 8000, max_urls: int = 10, ma
     # LLM rephrase
     rephr = ""
     try:
-        rephr = client.generate(
-            prompt=[f"""Rephrase the following query as a best-practice google search query. 
-Keep any dates, times, locations, keywords, and subject specifiers and any other significant details that narrow the search. 
-Respond only with the rephrased query, no commentary, no code fences, no reasoning.
+        response = client.generate(
+            messages=[f"""Rephrase the following query as a best-practice google search query. 
+
 #Query:
-{query}"""],
+{query}
+
+Keep any dates, times, locations, keywords, and subject specifiers and any other significant details that narrow the search. 
+Respond only with the rephrased query followed by the </end> tag, no commentary, no code fences, no reasoning.
+End your response with:
+</end>
+"""],
             max_tokens=150,
-            temperature=0.2,
+            temperature=0.4,
+            is_json=False,
+            stops=['</end>']
         )
         
         # Send heartbeat after LLM call
         if heartbeat:
             heartbeat()
         
-        if isinstance(rephr, dict):
-            rephr = rephr.get("text") or rephr.get("content") or ""
-        rephr = str(rephr).strip()
-    except Exception:
-        rephr = ""
+        rephrase = response.text
+    except Exception as e:
+        logger.error(f"LLM rephrasing failed: {e}")
+        traceback.print_exc()
+        rephrase = ""
 
-    urls_rephr = _google_search(rephr)[:max_urls] if rephr else []
+    if rephrase:
+        urls_rephr = _google_search(rephrase)[:max_urls] if rephr else []
+    else:
+        urls_rephr = []
 
-    # de-dup + interleave
-    set_rephr = set(urls_rephr)
     urls = [v for v in zip_longest(urls_orig, urls_rephr) for v in v if v]
     # keep order but de-dup
     seen = set()
@@ -361,13 +379,14 @@ Respond only with the rephrased query, no commentary, no code fences, no reasoni
     results: List[Dict[str, Any]] = []
     in_flight = []
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as ex:
+        t0 = time.time()
         idx = 0
         while (idx < len(interleaved) or in_flight) and (time.time() - t0) < wall_time_limit:
             # launch new tasks while under budget
             while idx < len(interleaved) and len(in_flight) < max_workers and (time.time() - t0) < wall_time_limit:
                 url = interleaved[idx]
                 idx += 1
-                per_url_timeout = max(3.0, wall_time_limit - (time.time() - t0) - 1.0)
+                per_url_timeout = max(5.0, wall_time_limit - (time.time() - t0 - 1.0))
                 fut = ex.submit(_process_url, url, query, client, per_url_timeout, max_chars/4, heartbeat)
                 logger.info(f"Submitted task for url: {url}")
                 in_flight.append(fut)
@@ -379,9 +398,11 @@ Respond only with the rephrased query, no commentary, no code fences, no reasoni
                     try:
                         item = fut.result()
                         logger.info(f"Completed task: {item}")
-                        if item.get("text"):
+                        if item and item.get("text"):
                             results.append(item)
-                    except Exception:
+                    except Exception as e:
+                        logger.error(f"Error processing task: {e}")
+                        traceback.print_exc()
                         pass
                     still.append(None)
                 else:
@@ -389,12 +410,13 @@ Respond only with the rephrased query, no commentary, no code fences, no reasoni
                     remaining_time = wall_time_limit - (time.time() - t0)
                     if remaining_time <= 0:
                         fut.cancel()
+                        still.append(None)
                     else:
                         try:
                             # Wait with timeout - if it completes, get result
                             item = fut.result(timeout=0.1)
                             logger.info(f"Completed task: {item}")
-                            if item.get("text"):
+                            if item and item.get("text"):
                                 results.append(item)
                             still.append(None)
                         except concurrent.futures.TimeoutError:
@@ -464,9 +486,9 @@ def tool(value, **kwargs):
             query=value,
             client=llm_client,
             max_chars=32000,
-            max_urls=10,
-            max_workers=4,
-            wall_time_limit=16.0,
+            max_urls=7,
+            max_workers=6,
+            wall_time_limit=12.0,
             heartbeat=kwargs.get('heartbeat')
         )
     except Exception as e:

@@ -55,6 +55,9 @@ if _debug_env:
 # LLM client import
 from llm_client import ZenohLLMClient
 
+# Infospace resource manager
+from infospace_resource_manager import InfospaceResourceManager
+
 
 class MapNode:
     def __init__(self, map_file: str, world_name: str = None, setting: str = None, max_turns: int = None, server_name: str = 'openai', model_name: str = 'gpt-4.1'):
@@ -78,13 +81,8 @@ class MapNode:
         self.lock_request_counts = {}  # (requester, target) -> count of failed attempts
         self.lock_timeout_threshold = 3  # Number of failed attempts before timeout
         
-        # Note instance management (dynamic resources in infospace)
-        self.note_counter = 0  # Counter for generating unique Note IDs
-        
-        # Collection instance management (dynamic resources in infospace)
-        self.collection_counter = 0  # Counter for generating unique Collection IDs
-        self.named_collections = {}  # name -> collection_id mapping for stable references
-        self.collection_indexes = {}  # Track indexed Collections: {collection_id: collection_id} (store name = collection_id)
+        # Infospace resource manager (initialized after world_map loads)
+        self.resource_manager = None
         
         # Persistence setup
         self.world_file = Path(f"data/world/{self.world_name}_world.json")
@@ -130,10 +128,6 @@ class MapNode:
         except Exception:
             self.max_turns = None
         
-        # Vector store management (for infospace memory)
-        self.vector_stores = {}  # store_name -> FAISSStore
-        self.embedder = None     # Lazy-loaded sentence-transformer
-
         # Load the map module
         self.load_map_module()
         
@@ -171,8 +165,17 @@ class MapNode:
             self.world_map = MapClass(map_module)
             logger.info(f"{MapClass.__name__} created successfully: {self.world_map.width}x{self.world_map.height}")
             
+            # Initialize resource manager after world_map is ready
+            self.resource_manager = InfospaceResourceManager(
+                self.world_map, self.session, self.world_name, self.agent_registry
+            )
+            logger.info("Infospace resource manager initialized")
+            
             # Load existing world data if available
             self.load_world_data()
+            
+            # Initialize system collections (must be after load_world_data)
+            self.resource_manager.initialize_system_collections()
             
             # Create distinguished note_null system resource
             self.create_note_null()
@@ -1072,8 +1075,8 @@ end your response with:
             
             # If not found and doesn't look like an ID, try named_collections
             if not resource and not resource_name.startswith(('Note_', 'Collection_')):
-                if resource_name in self.named_collections:
-                    collection_id = self.named_collections[resource_name]
+                if resource_name in self.resource_manager.named_collections:
+                    collection_id = self.resource_manager.named_collections[resource_name]
                     resource = self.world_map.resource_registry.get(collection_id)
                     logger.info(f"📚 Resolved collection name '{resource_name}' → {collection_id}")
             
@@ -1402,81 +1405,23 @@ end your response with:
             source_value = payload.get('source_value', '')
             extra_props = payload.get('properties', {}) or {}
             
-            if not character_name:
-                raise ValueError("Missing character_name in payload")
-            if content is None:  # Allow empty string but not None
-                raise ValueError("Missing content in payload")
+            # Call resource manager to create note
+            success, note_id, error_msg, location = self.resource_manager.create_note(
+                character_name, content, format_type, source_skill, source_value, extra_props
+            )
             
-            # Get agent location
-            canonical_character_name = character_name.capitalize()
-            if canonical_character_name not in self.agent_registry:
-                raise ValueError(f"Agent for character '{character_name}' not found")
-            
-            agent = self.agent_registry[canonical_character_name]
-            location = (agent.x, agent.y)
-            
-            # Generate unique Note ID
-            self.note_counter += 1
-            info_id = f"Note_{self.note_counter}"
-            
-            # Create Note resource data structure
-            # Note: Assumes infospace has Note resource type in registry
-            try:
-                note_type = self.world_map.resource_types.Note
-            except AttributeError:
-                # Fallback if Note type not in registry
-                logger.error("Note resource type not found in world_map.resource_types")
-                raise ValueError("Note resource type not available in this map")
-            
-            info_data = {
-                'name': info_id,
-                'type': note_type,
-                'location': location,
-                'description': f"Note artifact created by {source_skill}",
-                'remove_on_take': False,  # Note is not consumable
-                'properties': {
-                    'content': content,
-                    'format': format_type,
-                    'created_by': canonical_character_name,
-                    'created_at': datetime.now().isoformat(),
-                    'source_skill': source_skill,
-                    'source_value': source_value
+            if success:
+                response = {
+                    'success': True,
+                    'info_id': note_id,
+                    'location': list(location)
                 }
-            }
+            else:
+                response = {
+                    'success': False,
+                    'error': error_msg
+                }
             
-            # Compute defaults for metadata
-            try:
-                if isinstance(content, (dict, list)):
-                    content_str = json.dumps(content, sort_keys=True)
-                    info_data['properties']['content_type'] = 'json'
-                else:
-                    content_str = str(content)
-                    info_data['properties']['content_type'] = 'text'
-                info_data['properties']['length'] = len(content_str)
-                info_data['properties']['fingerprint'] = hashlib.sha1(content_str.encode('utf-8')).hexdigest()
-            except Exception as e:
-                logger.warning(f"Failed to compute Note metadata: {e}")
-            
-            # Merge allowed metadata fields from extra_props
-            allowed_fields = {'kind', 'parent_id', 'order', 'span', 'section', 'source', 'entity', 'edge'}
-            for key in allowed_fields:
-                if key in extra_props:
-                    info_data['properties'][key] = extra_props[key]
-            
-            # Register in resource_registry
-            self.world_map.resource_registry[info_id] = info_data
-            
-            # Place in spatial grid
-            x, y = location
-            self.world_map.patches[x][y].resources[info_id] = info_data
-            
-            logger.info(f"📝 Created Note instance: {info_id} at ({x}, {y}) by {canonical_character_name}")
-            
-            response = {
-                'success': True,
-                'info_id': info_id,
-                'location': [x, y]
-            }
             query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
             
         except Exception as e:
@@ -1528,79 +1473,23 @@ end your response with:
             collection_name = payload.get('collection_name', '')
             extra_props = payload.get('properties', {}) or {}
             
-            if not character_name:
-                raise ValueError("Missing character_name in payload")
-            if content is None:  # Allow empty list but not None
-                content = []
+            # Call resource manager to create collection
+            success, collection_id, error_msg, location = self.resource_manager.create_collection(
+                character_name, content, format_type, source_skill, source_value, collection_name, extra_props
+            )
             
-            # Get agent location
-            canonical_character_name = character_name.capitalize()
-            if canonical_character_name not in self.agent_registry:
-                raise ValueError(f"Agent for character '{character_name}' not found")
-            
-            agent = self.agent_registry[canonical_character_name]
-            location = (agent.x, agent.y)
-            
-            # Generate unique Collection ID
-            self.collection_counter += 1
-            info_id = f"Collection_{self.collection_counter}"
-            
-            # Create Collection resource data structure
-            # Note: Assumes infospace has Collection resource type in registry
-            try:
-                collection_type = self.world_map.resource_types.Collection
-            except AttributeError:
-                # Fallback if Collection type not in registry
-                logger.error("Collection resource type not found in world_map.resource_types")
-                raise ValueError("Collection resource type not available in this map")
-            
-            info_data = {
-                'name': info_id,
-                'type': collection_type,
-                'location': location,
-                'description': f"Collection artifact{' created by ' + source_skill if source_skill else ''}",
-                'remove_on_take': False,  # Collection is not consumable
-                'properties': {
-                    'content': content,
-                    'format': format_type,
-                    'created_by': canonical_character_name,
-                    'created_at': datetime.now().isoformat(),
-                    'source_skill': source_skill,
-                    'source_value': source_value,
-                    'item_count': len(content) if isinstance(content, (list, dict)) else 0,
-                    'collection_name': collection_name  # Store stable name for referencing
+            if success:
+                response = {
+                    'success': True,
+                    'info_id': collection_id,
+                    'location': list(location)
                 }
-            }
-            
-            # Merge allowed metadata fields from extra_props
-            allowed_fields = {'kind', 'doc_meta', 'chunking', 'indexes'}
-            for key in allowed_fields:
-                if key in extra_props:
-                    info_data['properties'][key] = extra_props[key]
-            
-            # If declared as document, set chunk_count convenience
-            if info_data['properties'].get('kind') == 'document':
-                info_data['properties']['chunk_count'] = info_data['properties'].get('item_count', 0)
-            
-            # Register in resource_registry
-            self.world_map.resource_registry[info_id] = info_data
-            
-            # Place in spatial grid
-            x, y = location
-            self.world_map.patches[x][y].resources[info_id] = info_data
-            
-            # Register named collection if name provided
-            if collection_name:
-                self.named_collections[collection_name] = info_id
-                logger.info(f"📚 Created named Collection: '{collection_name}' = {info_id} at ({x}, {y}) by {canonical_character_name} ({info_data['properties']['item_count']} items)")
             else:
-                logger.info(f"📚 Created Collection instance: {info_id} at ({x}, {y}) by {canonical_character_name} ({info_data['properties']['item_count']} items)")
+                response = {
+                    'success': False,
+                    'error': error_msg
+                }
             
-            response = {
-                'success': True,
-                'info_id': info_id,
-                'location': [x, y]
-            }
             query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
             
         except Exception as e:
@@ -1643,55 +1532,23 @@ end your response with:
             operation = payload.get('operation', 'add')  # 'add' or 'update'
             content = payload.get('content')  # For update operation
             
-            if not collection_id:
-                raise ValueError("Missing collection_id in payload")
+            # Call resource manager
+            success, item_count, error_msg = self.resource_manager.add_to_collection(
+                collection_id, note_id, agent_name, operation, content
+            )
             
-            # Fetch Collection from resource_registry
-            collection = self.world_map.resource_registry.get(collection_id)
-            if not collection:
-                raise ValueError(f"Collection {collection_id} not found")
-            
-            # Mutate the Collection's content list
-            content_list = collection['properties'].get('content', [])
-            if not isinstance(content_list, list):
-                raise ValueError(f"Collection {collection_id} content is not a list")
-            
-            if operation == 'update' and content is not None:
-                # Update: replace entire content
-                if not isinstance(content, list):
-                    raise ValueError("Update content must be a list")
-                collection['properties']['content'] = content
-                collection['properties']['item_count'] = len(content)
-                logger.info(f"📚 Updated {collection_id} content (now {len(content)} items) by {agent_name}")
+            if success:
+                response = {
+                    'success': True,
+                    'collection_id': collection_id,
+                    'item_count': item_count
+                }
             else:
-                # Add: append single note
-                if not note_id:
-                    raise ValueError("Missing note_id for add operation")
-                content_list.append(note_id)
-                collection['properties']['item_count'] = len(content_list)
-                logger.info(f"📚 Added {note_id} to {collection_id} (now {len(content_list)} items) by {agent_name}")
-                
-                # Auto-update associated index (if Collection is indexed)
-                if collection_id in self.collection_indexes:
-                    # Collection is indexed - store name = collection_id
-                    if collection_id in self.vector_stores:
-                        # Fetch Note content
-                        note = self.world_map.get_resource_by_name(note_id)
-                        if note:
-                            note_content = note.get('properties', {}).get('content')
-                            if note_content is not None:
-                                # Generate embedding and add to store
-                                store = self.vector_stores[collection_id]
-                                content_text = self._extract_content_for_embedding(note_content, {})
-                                embedding = self._generate_embedding(content_text)
-                                store.add(note_content, embedding, metadata={'timestamp': time.time()})
-                                logger.info(f"  ↳ Updated index for {collection_id} with new item")
+                response = {
+                    'success': False,
+                    'error': error_msg
+                }
             
-            response = {
-                'success': True,
-                'collection_id': collection_id,
-                'item_count': collection['properties']['item_count']
-            }
             query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
             
         except Exception as e:
@@ -1729,25 +1586,20 @@ end your response with:
             resource_id = payload.get('resource_id') or payload.get('collection_id')
             character_name = payload.get('character_name')
             
-            if not resource_id:
-                raise ValueError("Missing resource_id in payload")
+            # Call resource manager
+            success, error_msg = self.resource_manager.mark_persistent(resource_id, character_name)
             
-            # Fetch resource from resource_registry
-            resource = self.world_map.resource_registry.get(resource_id)
-            if not resource:
-                raise ValueError(f"Resource {resource_id} not found")
+            if success:
+                response = {
+                    'success': True,
+                    'resource_id': resource_id
+                }
+            else:
+                response = {
+                    'success': False,
+                    'error': error_msg
+                }
             
-            # Mark as persistent
-            resource['properties']['persistent'] = True
-            resource['properties']['persisted_at'] = datetime.now().isoformat()
-            resource['properties']['persisted_by'] = character_name
-            
-            logger.info(f"💾 Marked {resource_id} as persistent by {character_name}")
-            
-            response = {
-                'success': True,
-                'resource_id': resource_id
-            }
             query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
             
         except Exception as e:
@@ -2930,81 +2782,8 @@ end your response with:
                     else:
                         logger.info("📂 No world state in saved data")
                     
-                    # Restore Note instances (dynamic resources)
-                    if 'note_instances' in world_data:
-                        try:
-                            # Restore counter
-                            self.note_counter = world_data.get('note_counter', 0)
-                            
-                            # Get Note type from resource registry
-                            try:
-                                note_type = self.world_map.resource_types.Note
-                            except AttributeError:
-                                logger.warning("Note type not available in this map, skipping Note restoration")
-                                note_type = None
-                            
-                            if note_type:
-                                instances = world_data['note_instances']
-                                for info_id, info_data in instances.items():
-                                    # Reconstruct resource_data structure
-                                    resource_data = {
-                                        'name': info_data['name'],
-                                        'type': note_type,
-                                        'location': tuple(info_data['location']),
-                                        'description': info_data['description'],
-                                        'remove_on_take': False,
-                                        'properties': info_data.get('properties', {})
-                                    }
-                                    
-                                    # Register in resource_registry
-                                    self.world_map.resource_registry[info_id] = resource_data
-                                    
-                                    # Place in spatial grid
-                                    x, y = info_data['location']
-                                    self.world_map.patches[x][y].resources[info_id] = resource_data
-                                
-                                logger.info(f"📂 Restored {len(instances)} Note instances, counter at {self.note_counter}")
-                        except Exception as e:
-                            logger.error(f"Error restoring Note instances: {e}")
-                    
-                    # Restore persistent Collection instances
-                    if 'collection_instances' in world_data:
-                        try:
-                            # Restore counter
-                            self.collection_counter = world_data.get('collection_counter', 0)
-                            
-                            # Get Collection type from resource registry
-                            try:
-                                collection_type = self.world_map.resource_types.Collection
-                            except AttributeError:
-                                logger.warning("Collection type not available in this map, skipping Collection restoration")
-                                collection_type = None
-                            
-                            if collection_type:
-                                instances = world_data['collection_instances']
-                                for info_id, info_data in instances.items():
-                                    # Reconstruct resource_data structure
-                                    resource_data = {
-                                        'name': info_data['name'],
-                                        'type': collection_type,
-                                        'location': tuple(info_data['location']),
-                                        'description': info_data['description'],
-                                        'remove_on_take': False,
-                                        'properties': info_data.get('properties', {})
-                                    }
-                                    
-                                    # Register in resource_registry
-                                    self.world_map.resource_registry[info_id] = resource_data
-                                    
-                                    # Place in spatial grid
-                                    x, y = info_data['location']
-                                    self.world_map.patches[x][y].resources[info_id] = resource_data
-                                
-                                logger.info(f"📂 Restored {len(instances)} persistent Collection instances, counter at {self.collection_counter}")
-                        except Exception as e:
-                            logger.error(f"Error restoring Collection instances: {e}")
-                    else:
-                        logger.info("📂 No persistent Collections in saved data")
+                    # Restore Note and Collection instances (via resource manager)
+                    self.resource_manager.load_resources(world_data)
                     
                     logger.info(f"📂 Loaded world data for '{self.world_name}'")
                     
@@ -3043,45 +2822,12 @@ end your response with:
                 }
                 world_data['agents'].append(agent_data)
             
-            # Save Note and persistent Collection instances
-            note_instances = {}
-            collection_instances = {}
-            for resource_id, resource_data in self.world_map.resource_registry.items():
-                # Check resource type
-                resource_type = resource_data.get('type')
-                type_name = getattr(resource_type, 'name', str(resource_type))
-                
-                if type_name == 'Note':
-                    # Save Notes marked as persistent
-                    if resource_data.get('properties', {}).get('persistent'):
-                        info_serialized = {
-                            'name': resource_data.get('name'),
-                            'location': resource_data.get('location'),
-                            'description': resource_data.get('description'),
-                            'properties': resource_data.get('properties', {})
-                        }
-                        note_instances[resource_id] = info_serialized
-                        logger.debug(f"Saving persistent Note {resource_id}")
-                    else:
-                        logger.debug(f"Skipping Note {resource_id} (not marked persistent)")
-                elif type_name == 'Collection':
-                    # Save Collections marked as persistent
-                    if resource_data.get('properties', {}).get('persistent'):
-                        info_serialized = {
-                            'name': resource_data.get('name'),
-                            'location': resource_data.get('location'),
-                            'description': resource_data.get('description'),
-                            'properties': resource_data.get('properties', {})
-                        }
-                        collection_instances[resource_id] = info_serialized
-                        logger.debug(f"Saving persistent Collection {resource_id}")
-                    else:
-                        logger.debug(f"Skipping Collection {resource_id} (not marked persistent)")
-            
-            world_data['note_instances'] = note_instances
-            world_data['note_counter'] = self.note_counter
-            world_data['collection_instances'] = collection_instances
-            world_data['collection_counter'] = self.collection_counter
+            # Save Note and Collection instances (via resource manager)
+            resource_data = self.resource_manager.save_resources()
+            world_data['note_instances'] = resource_data['note_instances']
+            world_data['note_counter'] = resource_data['note_counter']
+            world_data['collection_instances'] = resource_data['collection_instances']
+            world_data['collection_counter'] = resource_data['collection_counter']
             
             # Save world map state
             # TODO: Add world map modifications (resources, terrain changes, etc.)
@@ -3329,104 +3075,6 @@ end your response with:
         
         logger.info("Map node shutdown complete")
     
-    # ==================== Infospace Vector Store Support ====================
-    
-    def _init_embedder(self):
-        """Lazy-initialize sentence-transformer model for embeddings"""
-        if self.embedder:
-            return
-        
-        from sentence_transformers import SentenceTransformer
-        
-        # Use lightweight model for local embeddings
-        logger.info("Loading sentence-transformer model (all-MiniLM-L6-v2)...")
-        self.embedder = SentenceTransformer('all-MiniLM-L6-v2')
-        logger.info("Sentence-transformer model loaded")
-    
-    def _generate_embedding(self, text):
-        """Generate embedding vector for text"""
-        self._init_embedder()
-        
-        # Convert to string if needed
-        if not isinstance(text, str):
-            text = str(text)
-        
-        embedding = self.embedder.encode(text, convert_to_tensor=False)
-        return embedding.tolist()
-    
-    def _extract_content_for_embedding(self, item, fields):
-        """
-        Extract content from item for embedding based on field specifications.
-        
-        Args:
-            item: The data item (dict, string, or other)
-            fields: Dict mapping field names to actions (embed, keyword, store)
-            
-        Returns:
-            String content to embed
-        """
-        if isinstance(item, str):
-            return item
-        
-        if not isinstance(item, dict):
-            return str(item)
-        
-        # Collect fields marked for embedding
-        content_parts = []
-        for field_name, action in fields.items():
-            if action == 'embed' and field_name in item:
-                content_parts.append(str(item[field_name]))
-        
-        # If no specific fields, use whole item
-        if not content_parts:
-            return json.dumps(item)
-        
-        return ' '.join(content_parts)
-    
-    def _create_chunks(self, text, chunk_size=512, overlap=128):
-        """
-        Split text into overlapping chunks for embedding.
-        
-        Args:
-            text: String content to chunk
-            chunk_size: Target chunk size in characters
-            overlap: Overlap between chunks in characters
-            
-        Returns:
-            List of chunk strings
-        """
-        if len(text) <= chunk_size:
-            return [text]
-        
-        chunks = []
-        start = 0
-        
-        while start < len(text):
-            end = start + chunk_size
-            
-            # If not the first chunk, try to find a good boundary
-            if start > 0 and end < len(text):
-                # Look for sentence boundary near the end
-                search_start = max(start, end - 100)
-                sentence_end = max(
-                    text.rfind('. ', search_start, end),
-                    text.rfind('.\n', search_start, end),
-                    text.rfind('\n\n', search_start, end)
-                )
-                if sentence_end > start:
-                    end = sentence_end + 1
-            
-            chunks.append(text[start:end])
-            
-            # Move start forward by chunk_size minus overlap
-            start = start + chunk_size - overlap
-            
-            # Break if we've covered the text
-            if end >= len(text):
-                break
-        
-        return chunks
-    
     def handle_index_request(self, sample):
         """
         Handle request to create/update searchable vector store.
@@ -3447,97 +3095,27 @@ end your response with:
         index_type = request.get('index_type', 'semantic')
         fields = request.get('fields', {})
         
-        if not collection_id:
-            logger.error("Index request missing collection_id")
-            return
+        # Call resource manager
+        success, indexed_count, error_msg = self.resource_manager.index_collection(
+            agent_name, collection_id, index_type, fields
+        )
         
-        # Fetch Collection and dereference locally
-        collection = self.world_map.get_resource_by_name(collection_id)
-        if not collection:
-            logger.warning(f"Collection {collection_id} not found")
-            return
-        
-        note_ids = collection.get('properties', {}).get('content', [])
-        # Fetch content for each Note and chunk it
-        chunks_to_index = []
-        for note_id in note_ids:
-            note = self.world_map.get_resource_by_name(note_id)
-            if note:
-                content = note.get('properties', {}).get('content')
-                if content is not None:
-                    # Extract content for embedding
-                    content_str = self._extract_content_for_embedding(content, fields)
-                    
-                    # Create chunks with overlap
-                    chunks = self._create_chunks(content_str, chunk_size=512, overlap=128)
-                    
-                    # Store each chunk with metadata
-                    for i, chunk in enumerate(chunks):
-                        chunks_to_index.append({
-                            'chunk': chunk,
-                            'original_content': content,
-                            'source_note_id': note_id,
-                            'chunk_index': i,
-                            'chunk_total': len(chunks),
-                            'is_complete_note': len(chunks) == 1
-                        })
-        
-        logger.info(f"Index request from {agent_name}: indexing {collection_id} ({len(note_ids)} notes → {len(chunks_to_index)} chunks)")
-        
-        # Create or get store - use Collection ID as store name
-        if collection_id not in self.vector_stores:
-            self.vector_stores[collection_id] = FAISSStore(dimension=384, logger=logger)
-            logger.info(f"Created vector store for {collection_id}")
-        
-        store = self.vector_stores[collection_id]
-        
-        # Index each chunk
-        indexed_count = 0
-        for item in chunks_to_index:
-            if index_type in ['semantic', 'hybrid']:
-                # Generate embedding for chunk
-                embedding = self._generate_embedding(item['chunk'])
-                
-                # Store chunk with metadata
-                metadata = {
-                    'timestamp': time.time(),
-                    'source_note_id': item['source_note_id'],
-                    'chunk_index': item['chunk_index'],
-                    'chunk_total': item['chunk_total'],
-                    'is_complete_note': item['is_complete_note']
-                }
-                
-                # Store chunk text as document, original content for reference
-                store.add(item['chunk'], embedding, metadata=metadata, original_content=item['original_content'])
-                indexed_count += 1
-        
-        # Track that this Collection is indexed (store name = collection_id)
-        if collection_id not in self.collection_indexes:
-            self.collection_indexes[collection_id] = collection_id  # Store ID is Collection ID
-            logger.info(f"Tracking: {collection_id} is indexed for auto-updates")
-        
-        # Record index info on the Collection
-        try:
-            props = collection.setdefault('properties', {})
-            indexes = props.get('indexes', {})
-            indexes[index_type] = collection_id
-            props['indexes'] = indexes
-            props['indexed_at'] = datetime.now().isoformat()
-        except Exception as e:
-            logger.warning(f"Failed to record index info on Collection: {e}")
+        if success:
+            response = {
+                'status': 'success',
+                'collection_id': collection_id,
+                'indexed_count': indexed_count
+            }
+        else:
+            response = {
+                'status': 'error',
+                'reason': error_msg
+            }
         
         # Publish response
-        response = {
-            'status': 'success',
-            'collection_id': collection_id,
-            'indexed_count': indexed_count
-        }
-        
         response_topic = f"map/{self.world_name}/index_response/{agent_name}"
         time.sleep(0.05)
         self.session.put(response_topic, json.dumps(response))
-        
-        logger.info(f"Indexed {indexed_count} items for {collection_id}")
     
     def handle_search_request(self, sample):
         """
@@ -3565,70 +3143,22 @@ end your response with:
         threshold = request.get('threshold', 0.0)
         return_mode = request.get('return_mode', 'chunks')
         
-        logger.info(f"Search request from {agent_name}: '{query}' in {collection_id} (return_mode={return_mode})")
+        # Call resource manager
+        success, results, error_msg = self.resource_manager.search_collection(
+            agent_name, collection_id, query, mode, limit, threshold, return_mode
+        )
         
-        # Check if Collection is indexed (store exists)
-        if collection_id not in self.vector_stores:
+        if success:
             response = {
-                'status': 'error',
-                'reason': f"Collection '{collection_id}' is not indexed. Use 'index' primitive first."
+                'status': 'success',
+                'results': results,
+                'count': len(results)
             }
         else:
-            store = self.vector_stores[collection_id]
-            
-            if mode == 'semantic':
-                # Generate query embedding
-                query_embedding = self._generate_embedding(query)
-                
-                # Search for chunks (get more than limit for notes mode deduplication)
-                search_limit = limit * 3 if return_mode == 'notes' else limit
-                chunk_results = store.search(query_embedding, search_limit, threshold)
-                
-                if return_mode == 'notes':
-                    # Deduplicate by source_note_id, keeping best score per note
-                    note_scores = {}
-                    note_chunks = {}
-                    for result in chunk_results:
-                        source_note_id = result['metadata'].get('source_note_id')
-                        if source_note_id:
-                            score = result['score']
-                            if source_note_id not in note_scores or score > note_scores[source_note_id]:
-                                note_scores[source_note_id] = score
-                                note_chunks[source_note_id] = result
-                    
-                    # Sort by score and limit
-                    sorted_notes = sorted(note_scores.items(), key=lambda x: x[1], reverse=True)[:limit]
-                    
-                    # Return original content for each note
-                    results = []
-                    for note_id, score in sorted_notes:
-                        result = note_chunks[note_id]
-                        results.append({
-                            'document': result.get('original_content', result['document']),
-                            'score': score,
-                            'metadata': {
-                                'source_note_id': note_id,
-                                'return_mode': 'notes'
-                            }
-                        })
-                    
-                    logger.info(f"Search found {len(chunk_results)} chunks → {len(results)} unique notes")
-                else:
-                    # Return chunks as-is
-                    results = chunk_results
-                    logger.info(f"Search found {len(results)} chunk results")
-                
-                response = {
-                    'status': 'success',
-                    'results': results,
-                    'count': len(results)
-                }
-            else:
-                # Keyword/hybrid not implemented in Phase 1
-                response = {
-                    'status': 'error',
-                    'reason': f"Mode '{mode}' not yet implemented"
-                }
+            response = {
+                'status': 'error',
+                'reason': error_msg
+            }
         
         # Publish response
         response_topic = f"map/{self.world_name}/search_response/{agent_name}"
@@ -3783,97 +3313,6 @@ end your response with:
         self.session.put(response_topic, json.dumps(response))
 
 
-class FAISSStore:
-    """
-    FAISS-based vector store for semantic search.
-    Stores documents with embeddings and metadata.
-    """
-    
-    def __init__(self, dimension=384, logger=None):
-        import faiss
-        import numpy as np
-        
-        self.dimension = dimension
-        self.index = faiss.IndexFlatIP(dimension)  # Inner product (cosine similarity)
-        self.documents = []
-        self.metadata = []
-        self.original_contents = []
-        self.logger = logger
-        self.np = np
-    
-    def add(self, document, embedding, metadata=None, original_content=None):
-        """Add document with embedding to store"""
-        import faiss
-        
-        # Normalize for cosine similarity
-        embedding_array = self.np.array([embedding], dtype='float32')
-        faiss.normalize_L2(embedding_array)
-        
-        self.index.add(embedding_array)
-        self.documents.append(document)
-        self.metadata.append(metadata or {})
-        self.original_contents.append(original_content if original_content is not None else document)
-    
-    def search(self, query_embedding, limit=5, threshold=0.0):
-        """Search for similar documents"""
-        import faiss
-        
-        # Check if index has documents
-        if self.index.ntotal == 0 or len(self.documents) == 0:
-            return []
-        
-        query_array = self.np.array([query_embedding], dtype='float32')
-        faiss.normalize_L2(query_array)
-        
-        # Ensure k > 0 for FAISS
-        k = min(limit, len(self.documents))
-        if k <= 0:
-            return []
-        
-        # Search
-        scores, indices = self.index.search(query_array, k)
-        
-        # Filter by threshold and format results
-        results = []
-        for score, idx in zip(scores[0], indices[0]):
-            if idx < 0:  # FAISS returns -1 for no match
-                continue
-            if score < threshold:
-                continue
-            
-            results.append({
-                'document': self.documents[idx],
-                'score': float(score),
-                'metadata': self.metadata[idx],
-                'original_content': self.original_contents[idx]
-            })
-        
-        return results
-    
-    def save(self, path):
-        """Persist to disk"""
-        import faiss
-        import pickle
-        
-        faiss.write_index(self.index, f"{path}.faiss")
-        with open(f"{path}.meta", 'wb') as f:
-            pickle.dump({
-                'documents': self.documents,
-                'metadata': self.metadata,
-                'original_contents': self.original_contents
-            }, f)
-    
-    def load(self, path):
-        """Load from disk"""
-        import faiss
-        import pickle
-        
-        self.index = faiss.read_index(f"{path}.faiss")
-        with open(f"{path}.meta", 'rb') as f:
-            data = pickle.load(f)
-            self.documents = data['documents']
-            self.metadata = data['metadata']
-            self.original_contents = data.get('original_contents', self.documents)
 
 
 def signal_handler(signum, frame):

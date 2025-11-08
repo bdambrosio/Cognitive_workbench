@@ -43,7 +43,11 @@ Instruction: {instruction}
 Content:
 {chunk_text}
 
-Return only the transformed result, no explanation."""
+Return only the transformed result, no explanation.
+Do not include any introductory, reasoning, code fences, or explanatory text in your response. Only provide the transformed result, followed by the </end> tag.
+End your response with:
+</end>
+"""
         
         # Calculate max_tokens based on chunk size
         max_tokens = len(chunk_text) // 2
@@ -52,8 +56,9 @@ Return only the transformed result, no explanation."""
         response = llm_client.generate(
             messages=[prompt],
             max_tokens=max_tokens,
-            temperature=0.5,
-            is_json=False
+            temperature=0.4,
+            is_json=False,
+            stops=['</end>']
         )
         
         # Send heartbeat after LLM call to reset timeout
