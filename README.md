@@ -66,6 +66,8 @@ Set your API key (if using OpenAI/OpenRouter):
 export OPENAI_API_KEY='your-key-here'
 ```
 
+Note: Semantic indexing uses `sentence-transformers` (model `all-MiniLM-L6-v2`) and FAISS. These are installed via `src/requirements.txt`.
+
 ### Launch
 
 ```bash
@@ -74,6 +76,8 @@ python3 launcher.py ../scenarios/jill.yaml --ui
 ```
 
 A browser tab will open at `localhost:3000` with the interactive UI. Click **Step** to advance the simulation, or enter goals in the chat interface.
+
+On startup, if existing world data is found, you'll be prompted: "Reuse existing world? (y/n)". Answering "n" will trigger a confirmation before deleting world, per-character memory/situation, and character RAG stores.
 
 ---
 
@@ -87,6 +91,8 @@ Agents can operate over **semantic information** rather than just physical actio
 - **Collections**: Ordered sets of Notes/Collections
 - **Primitives**: create-note, create-collection, load, persist, index, search, map, flatten, coerce, add, expand, say, display, think, if, while, wait, focus
 - **Operations**: index (RAG embeddings), search (semantic), coerce (flatten nested lists), map (apply operation to each item)
+
+Notes and Collections are spatial resources with IDs like `Note_#` and `Collection_#`. Searching requires indexing a Collection first.
 
 Example agent goal: *"Search the web for transformer papers, create a collection, index it, and find papers about attention mechanisms"*
 
@@ -139,6 +145,24 @@ Built-in tools include: query-web, summarize, relate, refine, assess, extract-en
 All nodes communicate via **Zenoh** pub/sub and queryables.
 
 ---
+
+## Persistence and Save/Restore
+
+- Notes and Collections are saved only if their `properties.persistent` is `True`.
+- The system `Notes` collection is recreated on each startup (it is not persistent).
+- Persistent Collections are cleaned on restore: any `note_id` that doesn't exist is removed. During saves, the system logs warnings for non-persistent notes referenced by persistent Collections, including a 200-character content snippet to aid manual recovery.
+- Auto-save runs every ~2 minutes. The Map Node and Memory Node also save during graceful shutdown.
+- The UI Shutdown button performs "Save and Shutdown": it triggers a full save across nodes, then requests a centralized shutdown.
+
+### How to persist
+- Use the `persist` primitive or publish to `cognitive/map/collection/persist` with `{"resource_id": "Note_# or Collection_#", "character_name": "..."}`.
+- Persistence is explicit; unflagged resources will not carry over in reuse mode.
+
+### Data files
+- World: `data/world/{world_name}_world.json`
+- Memory: `data/memory/{CharacterName}_memory.json`
+- Situation: `data/situation/{CharacterName}_situation.json`
+- RAG stores: `data/rag_stores/{CharacterName}`
 
 ## Example Usage
 
@@ -198,7 +222,8 @@ Characters navigate a 2D world, manage physiological states (hunger, thirst), se
 
 **Known limitations:**
 - Plan validation can be strict (use `edit:` to iterate)
-- World save/load is fragile
+- Resources must be explicitly marked persistent to survive reuse mode
+- Persistent Collections drop non-persistent items on restore (see save-time warnings for recovery)
 - Debugging requires disabling timeouts
 - Documentation incomplete (see `Docs/` for details)
 
@@ -210,6 +235,11 @@ Characters navigate a 2D world, manage physiological states (hunger, thirst), se
 - [Infospace Architecture](Docs/SPACEMAP_ARCHITECTURE.md)
 - [Map Node API](Docs/MAP_NODE_API_ANALYSIS.md)
 - Research context and claims: See [BACKGROUND.md](BACKGROUND.md)
+
+- [Collection Spatial Resource Implementation](Docs/COLLECTION_SPATIAL_RESOURCE_IMPLEMENTATION.md)
+- [Collection Semantics](Docs/INFOSPACE_COLLECTION_SEMANTICS.md)
+- [Save/Load Analysis](Docs/SAVE_LOAD_ANALYSIS.md)
+- [Resource Browser](Docs/RESOURCE_BROWSER.md)
 
 ---
 
