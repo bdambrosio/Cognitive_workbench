@@ -68,6 +68,9 @@ class InfospaceExecutor:
         # Agent state (persistent across plans)
         self.agent_position = None
         
+        # Suspension state for sync execution
+        self._sync_suspension_state = None
+        
         logger.info(f"InfospaceExecutor initialized for {agent_name} with {len(available_tools)} tools")
     
     def clear_plan_state(self):
@@ -401,7 +404,11 @@ class InfospaceExecutor:
                 for key, val in additional_args.items():
                     prompt_parts.append(f"{key}: {val}\n")
             
-            prompt_parts.append("\n# OUTPUT\nProvide the result directly, following the tool's output format:")
+            prompt_parts.append("""\n# OUTPUT\nProvide the result directly, following the tool's output format. 
+Do not include any introductory, reasoning, or explanatory text in your response. 
+Only provide the result, followed by the </end> tag. 
+End your response with: 
+</end>""")
             
             full_prompt = "".join(prompt_parts)
             
@@ -411,7 +418,7 @@ class InfospaceExecutor:
                 bindings={},
                 max_tokens=1000,
                 temperature=0.3,
-                log=True
+                stops=['</end>']
             )
             
             # Send heartbeat after LLM call
@@ -423,8 +430,13 @@ class InfospaceExecutor:
             if not llm_response or not llm_response.text:
                 return {'status': 'failed', 'reason': 'LLM returned empty response'}
             
-            result_text = llm_response.text
+            result_text = llm_response.text.strip()
             logger.info(f"Prompt tool '{tool_name}' completed ({len(result_text)} chars)")
+            
+            # Check for null indicator - return Note_null resource ID instead of string
+            if result_text.lower() == 'note-null' or result_text.lower() == 'null':
+                logger.info(f"Prompt tool '{tool_name}' returned null indicator, using Note_null resource")
+                return {'status': 'success', 'value': 'Note_null'}
             
             return {'status': 'success', 'value': result_text}
             
@@ -435,17 +447,61 @@ class InfospaceExecutor:
     def _execute_python_tool(self, tool_name: str, input_value: Any,
                             tool_info: Dict, additional_args: Dict) -> Dict:
         """
-        Execute a Python-based tool by importing and calling tool() function.
+        Execute a Python-based tool or plan-based tool.
         
         Args:
             tool_name: Name of the tool
             input_value: Input data to process
-            tool_info: Tool metadata including python_file path
+            tool_info: Tool metadata including python_file or plan_data
             additional_args: Optional parameters passed as **kwargs
             
         Returns:
             Result dict with 'status' and 'value'
         """
+        tool_type = tool_info.get('type')
+        
+        # Handle plan-based tools
+        if tool_type == 'plan':
+            plan_data = tool_info.get('plan_data')
+            if not plan_data:
+                return {'status': 'failed', 'reason': f'Plan tool {tool_name} missing plan_data'}
+            
+            # Bind input to plan's input variable (convention: $input)
+            # Create a wrapper plan that binds input, then executes the tool plan
+            if input_value is not None:
+                input_note_id = self._persist_note(input_value, f'{tool_name}_input')
+                if input_note_id:
+                    initial_bindings = {'input': input_note_id}
+                else:
+                    initial_bindings = {}
+            else:
+                initial_bindings = {}
+            
+            # Execute plan synchronously with initial bindings
+            result = self.execute_plan_sync(plan_data, initial_bindings=initial_bindings)
+            
+            if result.get('status') == 'suspended':
+                # Plan suspended (ask/wait) - return suspension
+                return result
+            
+            if result.get('status') != 'success':
+                return {'status': 'failed', 'reason': f'Plan tool execution failed: {result.get("reason")}'}
+            
+            # Extract output from plan's 'out' variable (from plan_data)
+            out_var = plan_data.get('out', 'result')
+            if out_var.startswith('$'):
+                out_var = out_var[1:]
+            
+            # Get output from isolated executor's bindings (returned in result)
+            bindings = result.get('bindings', {})
+            if out_var in bindings:
+                output_note_id = bindings[out_var]
+                output_content = self._get_content(output_note_id)
+                return {'status': 'success', 'value': output_content}
+            else:
+                return {'status': 'failed', 'reason': f'Plan tool output variable ${out_var} not bound'}
+        
+        # Handle Python-based tools
         # Check trust flag
         if not tool_info.get('trusted', False):
             return {'status': 'failed', 
@@ -492,6 +548,10 @@ class InfospaceExecutor:
             }))
         
         resolved_args['heartbeat'] = heartbeat
+        
+        # Add map_name and llm_client to kwargs for tools that need them
+        resolved_args['map_name'] = self.map_name
+        resolved_args['llm_client'] = self.llm_client
         
         # Execute tool
         try:
@@ -666,6 +726,10 @@ class InfospaceExecutor:
             Note ID if successful, None if failed
         """
         if value is None:
+            return "Note_null"
+        
+        # If value is already Note_null resource ID, return it directly
+        if isinstance(value, str) and value == "Note_null":
             return "Note_null"
         
         format_type = 'json' if isinstance(value, (dict, list)) else 'text'
@@ -960,12 +1024,16 @@ class InfospaceExecutor:
                 note_content = result.get('document', '')
                 metadata = result.get('metadata', {})
                 
-                # Store source reference in properties
+                # Store source reference in properties (standardized format matching chunks mode)
                 properties = {
                     'source_note_id': metadata.get('source_note_id'),
+                    'chunk_index': None,  # Not applicable for full notes
+                    'chunk_total': 1,  # Single complete note
+                    'is_complete_note': True,  # Always true for notes mode
                     'score': result.get('score'),
                     'return_mode': 'notes'
                 }
+                # Remove None values (chunk_index will be omitted)
                 properties = {k: v for k, v in properties.items() if v is not None}
                 
                 note_id = self._persist_note(note_content, f'search_result_{i}', properties=properties)
@@ -1478,10 +1546,18 @@ class InfospaceExecutor:
         if not isinstance(note_id, str) or not note_id.startswith('Note_'):
             return {'status': 'failed', 'reason': f'Variable {note_var} is not a Note'}
         
+        # Check for null Note
+        if note_id == 'Note_null':
+            return {'status': 'failed', 'reason': 'Cannot expand null Note'}
+        
         # Get Note content
         content = self._get_content(note_id)
         if content is None:
             return {'status': 'failed', 'reason': f'Note {note_id} has no content'}
+        
+        # Check for null content indicator
+        if isinstance(content, str) and content.strip().lower() in ['note-null', 'null']:
+            return {'status': 'failed', 'reason': 'Cannot expand null content'}
         
         # Parse JSON
         if isinstance(content, str):
@@ -2285,6 +2361,506 @@ class InfospaceExecutor:
         subscriber.undeclare()
         
         return response_data[0]
+    
+    def execute_plan_sync(self, plan: Dict, max_steps: int = 1000, max_depth: int = 10, initial_bindings: Dict = None) -> Dict:
+        """
+        Execute a plan synchronously without turn taking.
+        
+        Creates an isolated executor instance to prevent state leakage and enable recursion.
+        
+        Args:
+            plan: Plan dict with 'plan' key containing list of actions
+            max_steps: Maximum number of steps to execute (prevents infinite loops)
+            max_depth: Maximum recursion depth for nested plans (prevents stack overflow)
+            initial_bindings: Optional dict of variable bindings to initialize in isolated executor
+            
+        Returns:
+            Dict with:
+            - 'status': 'success', 'failed', or 'suspended'
+            - 'reason': Error message or suspension reason
+            - 'executed_steps': Number of steps executed
+            - 'continue': Callback function if suspended (for ask/wait)
+        """
+        # Create isolated executor instance
+        isolated_executor = InfospaceExecutor(
+            agent_name=self.agent_name,
+            session=self.session,
+            map_name=self.map_name,
+            llm_client=self.llm_client,
+            available_tools=self.available_tools,
+            executive_node=self.executive_node
+        )
+        
+        # Copy initial bindings if provided
+        if initial_bindings:
+            isolated_executor.plan_bindings.update(initial_bindings)
+        
+        return isolated_executor._execute_plan_sync_internal(plan, max_steps, max_depth)
+    
+    def _execute_plan_sync_internal(self, plan: Dict, max_steps: int, max_depth: int) -> Dict:
+        """
+        Internal synchronous plan execution implementation.
+        
+        Uses frame-based stack for control flow (if/while) and supports suspension (ask/wait).
+        """
+        # Extract plan steps
+        if isinstance(plan, dict) and 'plan' in plan:
+            plan_steps = plan['plan']
+        else:
+            plan_steps = plan if isinstance(plan, list) else []
+        
+        if not plan_steps:
+            return {'status': 'failed', 'reason': 'Plan has no steps', 'executed_steps': 0}
+        
+        # Initialize step stack (simple list-based)
+        step_stack = []
+        main_frame = {
+            'plan': plan_steps,
+            'idx': 0,
+            'type': 'main'
+        }
+        step_stack.append(main_frame)
+        
+        executed_steps = 0
+        
+        # Main execution loop
+        while step_stack and executed_steps < max_steps:
+            if not step_stack:
+                break
+            
+            current = step_stack[-1]
+            plan_steps = current['plan']
+            idx = current['idx']
+            
+            # Check if frame is complete
+            if idx >= len(plan_steps):
+                # Frame complete - handle while loop re-evaluation
+                frame_type = current.get('type')
+                step_stack.pop()
+                
+                if frame_type == 'while':
+                    # While loop body complete - re-evaluate condition
+                    parent = step_stack[-1] if step_stack else None
+                    if parent:
+                        cond = current.get('condition')
+                        outcome = self._evaluate_condition(cond)
+                        if outcome:
+                            # Re-enter loop
+                            iteration_count = current.get('iteration_count', 0) + 1
+                            if iteration_count < current.get('max_iterations', 15):
+                                step_stack.append({
+                                    'plan': current['plan'],
+                                    'idx': 0,
+                                    'type': 'while',
+                                    'condition': cond,
+                                    'return_to': current['return_to'],
+                                    'iteration_count': iteration_count,
+                                    'max_iterations': 15
+                                })
+                            else:
+                                parent['idx'] = current['return_to']
+                        else:
+                            # Exit loop
+                            parent['idx'] = current['return_to']
+                elif step_stack:
+                    # Regular frame - continue with parent
+                    parent = step_stack[-1]
+                    parent['idx'] = current.get('return_to', parent['idx'])
+                continue
+            
+            # Get current step
+            step = plan_steps[idx]
+            stype = step.get('type')
+            
+            # Handle control flow
+            if stype == 'if':
+                cond = step.get('condition')
+                then_body = step.get('then', [])
+                else_body = step.get('else', [])
+                
+                outcome = self._evaluate_condition(cond)
+                branch = 'then' if outcome else ('else' if else_body else None)
+                
+                if branch:
+                    step_stack.append({
+                        'plan': step[branch],
+                        'idx': 0,
+                        'type': f'if_{branch}',
+                        'return_to': idx + 1
+                    })
+                else:
+                    current['idx'] = idx + 1
+                continue
+            
+            elif stype == 'while':
+                body = step.get('body', [])
+                if not isinstance(body, list):
+                    logger.error('While body must be a list; skipping')
+                    current['idx'] = idx + 1
+                    continue
+                
+                cond = step.get('condition')
+                outcome = self._evaluate_condition(cond)
+                
+                if outcome:
+                    # Enter loop
+                    iteration_count = current.get('iteration_count', 0)
+                    if iteration_count >= current.get('max_iterations', 15):
+                        logger.warning('While loop exceeded max iterations')
+                        current['idx'] = idx + 1
+                        continue
+                    
+                    step_stack.append({
+                        'plan': body,
+                        'idx': 0,
+                        'type': 'while',
+                        'condition': cond,
+                        'return_to': idx + 1,
+                        'iteration_count': 0,
+                        'max_iterations': 15
+                    })
+                else:
+                    # Skip loop
+                    current['idx'] = idx + 1
+                continue
+            
+            elif stype == 'wait':
+                cond = step.get('condition')
+                outcome = self._evaluate_condition(cond)
+                
+                if outcome:
+                    # Condition met - continue
+                    current['idx'] = idx + 1
+                    continue
+                else:
+                    # Condition not met - suspend
+                    # Store state for continuation
+                    self._sync_suspension_state = {
+                        'step_stack': step_stack,
+                        'executed_steps': executed_steps,
+                        'max_steps': max_steps,
+                        'max_depth': max_depth,
+                        'plan': plan
+                    }
+                    
+                    def continue_wait():
+                        """Continue execution after wait condition becomes true"""
+                        if not self._sync_suspension_state:
+                            return {'status': 'failed', 'reason': 'No suspension state to continue'}
+                        state = self._sync_suspension_state
+                        self._sync_suspension_state = None
+                        return self._resume_sync_execution(state)
+                    
+                    return {
+                        'status': 'suspended',
+                        'reason': 'wait',
+                        'action': step,
+                        'condition': cond,
+                        'executed_steps': executed_steps,
+                        'continue': continue_wait
+                    }
+            
+            # Execute action
+            try:
+                result = self.execute_action(step)
+                executed_steps += 1
+                
+                # Publish action result for UI display (if executive_node available)
+                if self.executive_node:
+                    self.executive_node._publish_action_result(step, result, stype, datetime.now())
+                
+                # Check for suspension (ask action)
+                if stype == 'ask' and result.get('status') == 'success':
+                    # Ask action sets up suspension state - return continuation
+                    out_var = step.get('out')
+                    
+                    # Store state for continuation
+                    self._sync_suspension_state = {
+                        'step_stack': step_stack,
+                        'executed_steps': executed_steps,
+                        'max_steps': max_steps,
+                        'max_depth': max_depth,
+                        'plan': plan,
+                        'out_var': out_var
+                    }
+                    
+                    def continue_ask(response_value):
+                        """Continue execution after ask response received"""
+                        if not self._sync_suspension_state:
+                            return {'status': 'failed', 'reason': 'No suspension state to continue'}
+                        state = self._sync_suspension_state
+                        self._sync_suspension_state = None
+                        
+                        # Bind response to variable
+                        if response_value:
+                            response_note_id = self._persist_note(response_value, 'ask-response')
+                            if response_note_id:
+                                self._bind_variable(state['out_var'], response_note_id)
+                        else:
+                            self._bind_variable(state['out_var'], "Note_null")
+                        
+                        # Continue execution
+                        return self._resume_sync_execution(state)
+                    
+                    return {
+                        'status': 'suspended',
+                        'reason': 'ask',
+                        'action': step,
+                        'out_var': out_var,
+                        'executed_steps': executed_steps,
+                        'continue': continue_ask
+                    }
+                
+                # Handle while loop completion (checked in frame completion logic above)
+                
+                # Advance step index
+                if result.get('status') == 'failed':
+                    # Action failed - log but continue
+                    logger.warning(f"Step {executed_steps} failed: {result.get('reason')}")
+                
+                current['idx'] = idx + 1
+                
+            except Exception as e:
+                logger.error(f"Error executing step {executed_steps}: {e}")
+                logger.error(traceback.format_exc())
+                return {
+                    'status': 'failed',
+                    'reason': f'Execution error at step {executed_steps}: {str(e)}',
+                    'executed_steps': executed_steps
+                }
+        
+        # Execution complete
+        if executed_steps >= max_steps:
+            return {
+                'status': 'failed',
+                'reason': f'Max steps ({max_steps}) exceeded',
+                'executed_steps': executed_steps
+            }
+        
+        return {
+            'status': 'success',
+            'executed_steps': executed_steps,
+            'bindings': self.plan_bindings.copy()  # Return final bindings for output extraction
+        }
+    
+    def _resume_sync_execution(self, state: Dict) -> Dict:
+        """Resume execution from suspension state"""
+        step_stack = state['step_stack']
+        executed_steps = state['executed_steps']
+        max_steps = state['max_steps']
+        max_depth = state['max_depth']
+        plan = state['plan']
+        
+        # Advance past the suspended step
+        if step_stack:
+            current = step_stack[-1]
+            current['idx'] += 1
+        
+        # Continue execution loop
+        while step_stack and executed_steps < max_steps:
+            if not step_stack:
+                break
+            
+            current = step_stack[-1]
+            plan_steps = current['plan']
+            idx = current['idx']
+            
+            # Check if frame is complete
+            if idx >= len(plan_steps):
+                # Frame complete - handle while loop re-evaluation
+                frame_type = current.get('type')
+                step_stack.pop()
+                
+                if frame_type == 'while':
+                    # While loop body complete - re-evaluate condition
+                    parent = step_stack[-1] if step_stack else None
+                    if parent:
+                        cond = current.get('condition')
+                        outcome = self._evaluate_condition(cond)
+                        if outcome:
+                            # Re-enter loop
+                            iteration_count = current.get('iteration_count', 0) + 1
+                            if iteration_count < current.get('max_iterations', 15):
+                                step_stack.append({
+                                    'plan': current['plan'],
+                                    'idx': 0,
+                                    'type': 'while',
+                                    'condition': cond,
+                                    'return_to': current['return_to'],
+                                    'iteration_count': iteration_count,
+                                    'max_iterations': 15
+                                })
+                            else:
+                                parent['idx'] = current['return_to']
+                        else:
+                            # Exit loop
+                            parent['idx'] = current['return_to']
+                elif step_stack:
+                    # Regular frame - continue with parent
+                    parent = step_stack[-1]
+                    parent['idx'] = current.get('return_to', parent['idx'])
+                continue
+            
+            # Get current step
+            step = plan_steps[idx]
+            stype = step.get('type')
+            
+            # Handle control flow (same as main execution)
+            if stype == 'if':
+                cond = step.get('condition')
+                then_body = step.get('then', [])
+                else_body = step.get('else', [])
+                
+                outcome = self._evaluate_condition(cond)
+                branch = 'then' if outcome else ('else' if else_body else None)
+                
+                if branch:
+                    step_stack.append({
+                        'plan': step[branch],
+                        'idx': 0,
+                        'type': f'if_{branch}',
+                        'return_to': idx + 1
+                    })
+                else:
+                    current['idx'] = idx + 1
+                continue
+            
+            elif stype == 'while':
+                body = step.get('body', [])
+                if not isinstance(body, list):
+                    logger.error('While body must be a list; skipping')
+                    current['idx'] = idx + 1
+                    continue
+                
+                cond = step.get('condition')
+                outcome = self._evaluate_condition(cond)
+                
+                if outcome:
+                    iteration_count = current.get('iteration_count', 0)
+                    if iteration_count >= current.get('max_iterations', 15):
+                        logger.warning('While loop exceeded max iterations')
+                        current['idx'] = idx + 1
+                        continue
+                    
+                    step_stack.append({
+                        'plan': body,
+                        'idx': 0,
+                        'type': 'while',
+                        'condition': cond,
+                        'return_to': idx + 1,
+                        'iteration_count': 0,
+                        'max_iterations': 15
+                    })
+                else:
+                    current['idx'] = idx + 1
+                continue
+            
+            elif stype == 'wait':
+                cond = step.get('condition')
+                outcome = self._evaluate_condition(cond)
+                
+                if outcome:
+                    current['idx'] = idx + 1
+                    continue
+                else:
+                    # Suspend again
+                    self._sync_suspension_state = {
+                        'step_stack': step_stack,
+                        'executed_steps': executed_steps,
+                        'max_steps': max_steps,
+                        'max_depth': max_depth,
+                        'plan': plan
+                    }
+                    
+                    def continue_wait():
+                        if not self._sync_suspension_state:
+                            return {'status': 'failed', 'reason': 'No suspension state to continue'}
+                        state = self._sync_suspension_state
+                        self._sync_suspension_state = None
+                        return self._resume_sync_execution(state)
+                    
+                    return {
+                        'status': 'suspended',
+                        'reason': 'wait',
+                        'action': step,
+                        'condition': cond,
+                        'executed_steps': executed_steps,
+                        'continue': continue_wait
+                    }
+            
+            # Execute action
+            try:
+                result = self.execute_action(step)
+                executed_steps += 1
+                
+                # Publish action result for UI display (if executive_node available)
+                if self.executive_node:
+                    self.executive_node._publish_action_result(step, result, stype, datetime.now())
+                
+                # Check for ask suspension
+                if stype == 'ask' and result.get('status') == 'success':
+                    out_var = step.get('out')
+                    self._sync_suspension_state = {
+                        'step_stack': step_stack,
+                        'executed_steps': executed_steps,
+                        'max_steps': max_steps,
+                        'max_depth': max_depth,
+                        'plan': plan,
+                        'out_var': out_var
+                    }
+                    
+                    def continue_ask(response_value):
+                        if not self._sync_suspension_state:
+                            return {'status': 'failed', 'reason': 'No suspension state to continue'}
+                        state = self._sync_suspension_state
+                        self._sync_suspension_state = None
+                        
+                        if response_value:
+                            response_note_id = self._persist_note(response_value, 'ask-response')
+                            if response_note_id:
+                                self._bind_variable(state['out_var'], response_note_id)
+                        else:
+                            self._bind_variable(state['out_var'], "Note_null")
+                        
+                        return self._resume_sync_execution(state)
+                    
+                    return {
+                        'status': 'suspended',
+                        'reason': 'ask',
+                        'action': step,
+                        'out_var': out_var,
+                        'executed_steps': executed_steps,
+                        'continue': continue_ask
+                    }
+                
+                # While loop completion handled in frame completion logic above
+                
+                if result.get('status') == 'failed':
+                    logger.warning(f"Step {executed_steps} failed: {result.get('reason')}")
+                
+                current['idx'] = idx + 1
+                
+            except Exception as e:
+                logger.error(f"Error executing step {executed_steps}: {e}")
+                logger.error(traceback.format_exc())
+                return {
+                    'status': 'failed',
+                    'reason': f'Execution error at step {executed_steps}: {str(e)}',
+                    'executed_steps': executed_steps
+                }
+        
+        if executed_steps >= max_steps:
+            return {
+                'status': 'failed',
+                'reason': f'Max steps ({max_steps}) exceeded',
+                'executed_steps': executed_steps
+            }
+        
+        return {
+            'status': 'success',
+            'executed_steps': executed_steps,
+            'bindings': self.plan_bindings.copy()  # Return final bindings for output extraction
+        }
     
     def test_primitives(self):
         """Test all infospace primitives with minimal synthetic actions"""

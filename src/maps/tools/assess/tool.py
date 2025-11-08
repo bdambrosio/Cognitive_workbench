@@ -56,13 +56,18 @@ Question: {predicate}
 Content:
 {text}
 
+Do not include any introductory, reasoning, or explanatory text in your response. Only provide the summary, followed by the </end> tag.
+End your response with:
+</end>
+
 Answer (true or false):"""
     
     response = llm_client.generate(
         [prompt],
         max_tokens=10,
         temperature=0.0,
-        is_json=False
+        is_json=False,
+        stops=['</end>']
     )
     
     # Send heartbeat after LLM call

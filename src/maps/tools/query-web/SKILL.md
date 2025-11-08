@@ -9,24 +9,26 @@ examples:
 ---
 
 # Web Search Tool
-
-Searches the web for current information on any topic using Google Custom Search Engine with LLM-powered content extraction.
-
-## Features
-- Concurrent fetching for speed
-- LLM-based content extraction and summarization
-- Query rephrasing for better results
-- Domain-aware ranking
-
 ## Input
 - Query string (e.g., "weather forecast Berkeley CA October 2025")
-
 ## Output
 - JSON with query and results array. Each result has uniform structure:
-  - `text`: Filtered, query-relevant excerpt (LLM-summarized, not full text)
-  - `format`: Detected format ("html", "pdf", "markdown", "text")
-  - `metadata`: Contains `source_url`, `domain`, `elapsed_ms`
-  - `char_count`: Character count of excerpt
+{
+  "query": "weather forecast Berkeley CA October 2025",
+  "results": [
+    {
+      "text": "Station List\nNational Weather Service Marine Forecast ...",
+      "format": "html",
+      "metadata": {
+        "source_url": "https://www.ndbc.noaa.gov/data/Forecasts/FZUS56.KMTR.html",
+        "domain": "www.ndbc.noaa.gov",
+        "elapsed_ms": 1206
+      },
+      "char_count": 112
+    },
+    ...
+  ]
+}
 
 ## Configuration
 Requires `GOOGLE_API_KEY` and `GOOGLE_CX` environment variables.

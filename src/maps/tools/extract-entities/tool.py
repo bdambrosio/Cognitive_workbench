@@ -93,7 +93,10 @@ def _extract_from_chunk(text, heartbeat=None):
 Text:
 {text}
 
-Return only valid JSON, no explanation."""
+Return only valid JSON, no explanation.
+Do not include any introductory, reasoning, code fences,or explanatory text in your response. Only provide the JSON, followed by the </end> tag.
+
+"""
     
     response = llm_client.generate(
         messages=[prompt],

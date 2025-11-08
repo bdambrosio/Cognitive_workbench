@@ -546,6 +546,82 @@ class FastAPIActionDisplayNode:
             
             return {"success": True, "message": f"Sent to {actual_character_name}: {message}"}
         
+        @self.app.post("/api/execute_plan_sync")
+        async def execute_plan_sync(data: Dict[str, Any]):
+            """Execute a plan synchronously via executive_node."""
+            character_name = data.get('character', '')
+            plan = data.get('plan')
+            
+            if not plan:
+                return {"success": False, "error": "Plan is required"}
+            
+            # If no character specified, use last character
+            if not character_name:
+                if not self.last_character_name:
+                    return {"success": False, "error": "No character specified and no previous character"}
+                character_name = self.last_character_name
+            
+            # Find actual character name (case-insensitive)
+            actual_character_name = None
+            for active_char in self.active_characters:
+                if active_char.lower() == character_name.lower():
+                    actual_character_name = active_char
+                    break
+            
+            if not actual_character_name:
+                return {"success": False, "error": f"Character '{character_name}' not found. Available: {', '.join(sorted(self.active_characters))}"}
+            
+            # Store as last character used
+            self.last_character_name = actual_character_name
+            
+            # Query executive_node for sync plan execution
+            try:
+                request_payload = json.dumps({
+                    'plan': plan,
+                    'max_steps': 1000
+                }).encode('utf-8')
+                
+                response_received = False
+                result = None
+                
+                for reply in self.session.get(
+                    f"cognitive/{actual_character_name}/execute_plan_sync",
+                    target=QueryTarget.BEST_MATCHING,
+                    consolidation=ConsolidationMode.NONE,
+                    payload=request_payload,
+                    timeout=300.0  # 5 minutes for long-running plans
+                ):
+                    if reply.ok:
+                        result = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
+                        response_received = True
+                        break
+                
+                if not response_received:
+                    return {"success": False, "error": "No response from executive_node"}
+                
+                if result.get('success'):
+                    return {
+                        "success": True,
+                        "status": result.get('status'),
+                        "executed_steps": result.get('executed_steps', 0),
+                        "bindings": result.get('bindings', {}),
+                        "suspended": result.get('suspended', False),
+                        "suspension_reason": result.get('suspension_reason')
+                    }
+                else:
+                    return {
+                        "success": False,
+                        "error": result.get('error', 'Unknown error'),
+                        "status": result.get('status'),
+                        "reason": result.get('reason')
+                    }
+                    
+            except Exception as e:
+                logger.error(f'Error executing sync plan: {e}')
+                import traceback
+                logger.error(traceback.format_exc())
+                return {"success": False, "error": str(e)}
+        
         @self.app.post("/api/end_dialog")
         async def end_dialog(data: Dict[str, str]):
             """End dialog with a character - User-only action."""
@@ -1746,7 +1822,15 @@ class FastAPIActionDisplayNode:
                 <div class="input-section">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
                         <h3 style="margin: 0;">Send Text Input</h3>
-                        <div style="display: flex; gap: 10px;">
+                        <div style="display: flex; gap: 10px; align-items: center;">
+                            <label style="display: flex; align-items: center; gap: 5px; font-size: 0.9em;">
+                                <input type="radio" name="executionMode" value="turn" checked id="modeTurn">
+                                Turn-based
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 5px; font-size: 0.9em;">
+                                <input type="radio" name="executionMode" value="sync" id="modeSync">
+                                Sync
+                            </label>
                             <button onclick="sendText()" style="background-color: #5fb85f;">Send</button>
                             <button onclick="endDialog()" style="background-color: #d32f2f;">End Conversation</button>
                         </div>
@@ -2917,12 +3001,66 @@ class FastAPIActionDisplayNode:
             const character = document.getElementById('characterInput').value;
             const message = document.getElementById('messageInput').value;
             const resultDiv = document.getElementById('sendResult');
+            const mode = document.querySelector('input[name="executionMode"]:checked').value;
             
             if (!message) {
                 resultDiv.innerHTML = '<span class="error">Message is required</span>';
                 return;
             }
             
+            // Check if sync mode and message looks like JSON plan
+            if (mode === 'sync') {
+                try {
+                    // Strip 'plan:' prefix if present
+                    let jsonText = message.trim();
+                    if (jsonText.toLowerCase().startsWith('plan:')) {
+                        jsonText = jsonText.substring(5).trim();
+                    }
+                    
+                    // Parse JSON
+                    const parsed = JSON.parse(jsonText);
+                    
+                    // Extract plan structure (handle both {"plan": [...]} and [...] formats)
+                    let planStructure = null;
+                    if (parsed && typeof parsed === 'object') {
+                        if (Array.isArray(parsed)) {
+                            // Array format: [...]
+                            planStructure = parsed;
+                        } else if (parsed.plan) {
+                            // Object with plan key: {"plan": [...]}
+                            planStructure = parsed.plan;
+                        }
+                    }
+                    
+                    if (planStructure && Array.isArray(planStructure)) {
+                        // Execute sync plan with clean structure
+                        const response = await fetch('/api/execute_plan_sync', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                                character: character,
+                                plan: planStructure
+                            })
+                        });
+                        
+                        const result = await response.json();
+                        
+                        if (result.success) {
+                            resultDiv.innerHTML = `<span class="success">Plan executed: ${result.executed_steps} steps completed</span>`;
+                            document.getElementById('messageInput').value = '';
+                        } else {
+                            resultDiv.innerHTML = `<span class="error">Plan execution failed: ${result.error || result.reason}</span>`;
+                        }
+                        return;
+                    }
+                } catch (e) {
+                    // Not valid JSON, fall through to regular text input
+                }
+            }
+            
+            // Regular text input (turn-based or non-plan sync)
             try {
                 const response = await fetch('/api/text_input', {
                     method: 'POST',
