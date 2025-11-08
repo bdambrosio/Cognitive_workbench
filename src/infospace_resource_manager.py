@@ -850,25 +850,42 @@ class InfospaceResourceManager:
             type_name = resource_type.name if hasattr(resource_type, 'name') else str(resource_type)
             
             if type_name == 'Note':
-                # Save all Notes (persistence logic happens elsewhere)
-                info_serialized = {
-                    'name': resource_data.get('name'),
-                    'location': list(resource_data.get('location', (0, 0))),
-                    'description': resource_data.get('description'),
-                    'properties': resource_data.get('properties', {})
-                }
-                note_instances[resource_id] = info_serialized
-                logger.debug(f"Saving Note {resource_id}")
+                # Save persistent Notes only
+                if resource_data.get('properties', {}).get('persistent', False):
+                    info_serialized = {
+                        'name': resource_data.get('name'),
+                        'location': list(resource_data.get('location', (0, 0))),
+                        'description': resource_data.get('description'),
+                        'properties': resource_data.get('properties', {})
+                    }
+                    note_instances[resource_id] = info_serialized
+                    logger.debug(f"Saving persistent Note {resource_id}")
             elif type_name == 'Collection':
-                # Save all Collections (persistence logic happens elsewhere)
-                info_serialized = {
-                    'name': resource_data.get('name'),
-                    'location': list(resource_data.get('location', (0, 0))),
-                    'description': resource_data.get('description'),
-                    'properties': resource_data.get('properties', {})
-                }
-                collection_instances[resource_id] = info_serialized
-                logger.debug(f"Saving Collection {resource_id}")
+                # Save persistent Collections only
+                if resource_data.get('properties', {}).get('persistent', False):
+                    info_serialized = {
+                        'name': resource_data.get('name'),
+                        'location': list(resource_data.get('location', (0, 0))),
+                        'description': resource_data.get('description'),
+                        'properties': resource_data.get('properties', {})
+                    }
+                    collection_instances[resource_id] = info_serialized
+                    logger.debug(f"Saving persistent Collection {resource_id}")
+        
+        # Scan persistent Collections for non-persistent Notes before save (for logging)
+        for collection_id, coll_serialized in collection_instances.items():
+            coll_props = coll_serialized.get('properties', {})
+            if coll_props.get('persistent', False):
+                content = coll_props.get('content', [])
+                full_coll_data = self.world_map.resource_registry.get(collection_id)
+                if full_coll_data:
+                    for note_id in content:
+                        if isinstance(note_id, str) and note_id.startswith('Note_'):
+                            note_data = self.world_map.resource_registry.get(note_id)
+                            if note_data and not note_data.get('properties', {}).get('persistent', False):
+                                note_content = note_data.get('properties', {}).get('content', '')
+                                content_str = str(note_content)[:200] + ('...' if len(str(note_content)) > 200 else '')
+                                logger.warning(f"Non-persistent Note '{note_id}' in persistent Collection '{collection_id}': {content_str} (consider persisting before save)")
         
         return {
             'note_instances': note_instances,
@@ -965,4 +982,17 @@ class InfospaceResourceManager:
                     logger.info(f"📂 Restored {len(instances)} Collection instances, counter at {self.collection_counter}")
             except Exception as e:
                 logger.error(f"Error restoring Collection instances: {e}")
+            
+            # Cleanup dangling note_ids in restored persistent Collections
+            for info_id, info_data in instances.items():
+                resource_data = self.world_map.resource_registry.get(info_id)
+                if resource_data and resource_data.get('properties', {}).get('persistent', False):
+                    content = resource_data['properties'].setdefault('content', [])
+                    original_len = len(content)
+                    content = [nid for nid in content if isinstance(nid, str) and nid.startswith('Note_') and self.world_map.resource_registry.get(nid)]
+                    resource_data['properties']['content'] = content
+                    resource_data['properties']['item_count'] = len(content)
+                    removed_count = original_len - len(content)
+                    if removed_count > 0:
+                        logger.warning(f"Cleaned {removed_count} dangling note_ids from restored persistent Collection '{info_id}'")
 

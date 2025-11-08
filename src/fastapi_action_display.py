@@ -1797,7 +1797,7 @@ class FastAPIActionDisplayNode:
                         <button onclick="saveAll()" style="background: #95e1d3; color: #1a1a1a; margin-right: 10px;">Save</button>
                         <button onclick="exportToObsidian()" style="background: #7c3aed; color: white; margin-right: 10px;">Obsidian</button>
                         <button onclick="openResourceBrowser()" style="background: #0e639c; color: white; margin-right: 10px;">🔍 Browser</button>
-                        <button onclick="showShutdownDialog()" style="background: #ff4757; color: white;">Shutdown</button>
+                        <button onclick="shutdownWithSave()" style="background: #ff4757; color: white;">Shutdown</button>
                     </div>
                     <div style="margin-bottom: 15px; padding: 10px; background: #333; border-radius: 5px;">
                         <label for="timeSlider" style="display: block; margin-bottom: 5px; font-size: 14px; color: #ccc;">
@@ -3309,66 +3309,18 @@ class FastAPIActionDisplayNode:
             window.open('http://localhost:3001', '_blank');
         }
         
-        function showShutdownDialog() {
-            const choice = confirm("Save data before shutdown?\\n\\nOK = Save & Shutdown\\nCancel = Shutdown without saving\\n\\n(Press ESC or close dialog to cancel shutdown)");
-            
-            if (choice === true) {
-                // User chose "OK" - Save & Shutdown
-                saveAndShutdown();
-            } else if (choice === false) {
-                // User chose "Cancel" - Shutdown without saving
-                if (confirm("Shutdown without saving? All unsaved data will be lost.")) {
-                    shutdownOnly();
-                }
-            }
-            // If user closes dialog or presses ESC, do nothing (cancel)
-        }
-        
-        async function saveAndShutdown() {
-            const resultDiv = document.getElementById('turnResult');
-            resultDiv.innerHTML = '<span style="color: orange;">SAVING data...</span>';
-            
-            try {
-                const response = await fetch('/api/save_and_shutdown', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    }
-                });
-                
-                const result = await response.json();
-                
-                if (result.success) {
-                    resultDiv.innerHTML = '<span style="color: orange;">SHUTTING DOWN system...</span>';
-                } else {
-                    resultDiv.innerHTML = `<span class="error">Save failed: ${result.message}</span>`;
-                }
-            } catch (error) {
-                resultDiv.innerHTML = `<span class="error">Error: ${error.message}</span>`;
-            }
-        }
-        
-        async function shutdownOnly() {
-            const resultDiv = document.getElementById('turnResult');
-            resultDiv.innerHTML = '<span style="color: orange;">SHUTTING DOWN system...</span>';
-            
-            try {
-                const response = await fetch('/api/shutdown', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    }
-                });
-                
-                const result = await response.json();
-                
-                if (result.success) {
-                    resultDiv.innerHTML = '<span style="color: orange;">SYSTEM SHUTDOWN initiated</span>';
-                } else {
-                    resultDiv.innerHTML = `<span class="error">Shutdown failed: ${result.message}</span>`;
-                }
-            } catch (error) {
-                resultDiv.innerHTML = `<span class="error">Error: ${error.message}</span>`;
+        function shutdownWithSave() {
+            if (confirm('Save and shutdown the system?')) {
+                fetch('/api/save_and_shutdown', {method: 'POST'})
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            alert('Save initiated, shutting down...');
+                        } else {
+                            alert('Error: ' + data.message);
+                        }
+                    })
+                    .catch(err => alert('Error: ' + err));
             }
         }
         

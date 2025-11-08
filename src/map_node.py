@@ -171,11 +171,11 @@ class MapNode:
             )
             logger.info("Infospace resource manager initialized")
             
+            # Initialize system collections before loading world data to ensure it exists for restored notes
+            self.resource_manager.initialize_system_collections()
+            
             # Load existing world data if available
             self.load_world_data()
-            
-            # Initialize system collections (must be after load_world_data)
-            self.resource_manager.initialize_system_collections()
             
             # Create distinguished note_null system resource
             self.create_note_null()

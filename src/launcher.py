@@ -374,7 +374,7 @@ class CharacterLauncher:
                 self.logger.error(f'  ❌ Error sending SIGTERM to {name} process {process.pid}: {e}')
         
         # Step 2: Wait for graceful shutdown (standard timeout)
-        shutdown_timeout = 15  # 15 seconds total
+        shutdown_timeout = 10  # 10 seconds total
         self.logger.info(f'⏳ Waiting up to {shutdown_timeout}s for graceful shutdown...')
         
         start_time = time.time()
@@ -515,57 +515,68 @@ def main():
             if world_file.exists():
                 print(f"\nFound existing world data for '{world_name}'")
                 reuse = input("Reuse existing world? (y/n): ").strip().lower()
-                if reuse != 'y':
-                    print("Creating new world...")
-                    # Remove existing world file
-                    try:
-                        world_file.unlink()
-                        print(f"Removed existing world data for '{world_name}'")
-                    except Exception as e:
-                        print(f"Failed to remove existing world data: {e}")
-                    
-                    # Remove existing character data for characters in current config
-                    data_dir = Path("data")
-                    if data_dir.exists():
-                        character_names = [char.name for char in launcher.characters]
+                if reuse in ['n', 'no']:
+                    confirm_delete = input("Are you sure you want to delete existing world data and create new? (y/n): ").strip().lower()
+                    if confirm_delete == 'y':
+                        print("Creating new world...")
+                        # Remove existing world file
+                        try:
+                            world_file.unlink()
+                            print(f"Removed existing world data for '{world_name}'")
+                        except Exception as e:
+                            print(f"Failed to remove existing world data: {e}")
                         
-                        memory_dir = data_dir / "memory"
-                        if memory_dir.exists():
-                            for mem_file in memory_dir.glob("*_memory.json"):
-                                char_name = mem_file.stem.replace('_memory', '')
-                                if char_name in character_names:
-                                    try:
-                                        mem_file.unlink()
-                                        print(f"Removed existing memory data: {mem_file.name}")
-                                    except Exception:
-                                        pass
-                        
-                        situation_dir = data_dir / "situation"
-                        if situation_dir.exists():
-                            for sit_file in situation_dir.glob("*_situation.json"):
-                                char_name = sit_file.stem.replace('_situation', '')
-                                if char_name in character_names:
-                                    try:
-                                        sit_file.unlink()
-                                        print(f"Removed existing situation data: {sit_file.name}")
-                                    except Exception:
-                                        pass
-                        
-                        # Remove RAG stores for characters in current config
-                        rag_stores_dir = data_dir / "rag_stores"
-                        if rag_stores_dir.exists():
-                            for char_name in character_names:
-                                char_rag_dir = rag_stores_dir / char_name
-                                if char_rag_dir.exists():
-                                    try:
-                                        import shutil
-                                        shutil.rmtree(char_rag_dir)
-                                        print(f"Removed existing RAG store: {char_name}")
-                                    except Exception as e:
-                                        print(f"Failed to remove RAG store for {char_name}: {e}")
-                else:
+                        # Remove existing character data for characters in current config
+                        data_dir = Path("data")
+                        if data_dir.exists():
+                            character_names = [char.name for char in launcher.characters]
+                            
+                            memory_dir = data_dir / "memory"
+                            if memory_dir.exists():
+                                for mem_file in memory_dir.glob("*_memory.json"):
+                                    char_name = mem_file.stem.replace('_memory', '')
+                                    if char_name in character_names:
+                                        try:
+                                            mem_file.unlink()
+                                            print(f"Removed existing memory data: {mem_file.name}")
+                                        except Exception:
+                                            pass
+                            
+                            situation_dir = data_dir / "situation"
+                            if situation_dir.exists():
+                                for sit_file in situation_dir.glob("*_situation.json"):
+                                    char_name = sit_file.stem.replace('_situation', '')
+                                    if char_name in character_names:
+                                        try:
+                                            sit_file.unlink()
+                                            print(f"Removed existing situation data: {sit_file.name}")
+                                        except Exception:
+                                            pass
+                            
+                            # Remove RAG stores for characters in current config
+                            rag_stores_dir = data_dir / "rag_stores"
+                            if rag_stores_dir.exists():
+                                for char_name in character_names:
+                                    char_rag_dir = rag_stores_dir / char_name
+                                    if char_rag_dir.exists():
+                                        try:
+                                            import shutil
+                                            shutil.rmtree(char_rag_dir)
+                                            print(f"Removed existing RAG store: {char_name}")
+                                        except Exception as e:
+                                            print(f"Failed to remove RAG store for {char_name}: {e}")
+                        else:
+                            print(f"Reusing existing world '{world_name}'")
+                    elif confirm_delete == 'n':
+                        reuse = 'y'
+                        print(f"Reusing existing world '{world_name}'")
+                elif reuse == 'y':
                     print(f"Reusing existing world '{world_name}'")
-        launcher.launch_all_characters(effective_map_file, args.ui, args.resource_browser, server_name, model_name, ui_port=args.ui_port, setting=setting, scenario_name=scenario_name)
+                else:
+                    # Invalid or empty, default to reuse
+                    print(f"Reusing existing world '{world_name}'")
+
+            launcher.launch_all_characters(effective_map_file, args.ui, args.resource_browser, server_name, model_name, ui_port=args.ui_port, setting=setting, scenario_name=scenario_name)
         
         # Monitor processes
         launcher.monitor_processes()
