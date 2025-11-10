@@ -11,13 +11,14 @@ from typing import Dict, List, Any
 logger = logging.getLogger(__name__)
 
 # Phase 1 & 2 Template - Core + Data Operations
-INFOSPACE_PLAN_TEMPLATE = """TASK: Generate a JSON format plan for the Goal below using the ACTIONS, CONDITIONS, and TOOLS listed below.
+INFOSPACE_PLAN_TEMPLATE = """
+# PLAN SPECIFICATION
 
-#Goal:
-{{goal}}
-
-#OUTPUT: only valid JSON — no reasoning, no prose, no code fences.
-
+The following section defines the canonical JSON plan format, available actions, 
+type system, and semantic and efficiency rules used by all planning tasks.  
+It serves as a shared reference for both plan generation and plan validation.  
+Do not interpret it as an instruction to produce or modify a plan — it describes the 
+language in which plans are written and evaluated.
 # PLAN FORMAT
 
 {
@@ -60,7 +61,7 @@ CONSTRAINTS
 - All JSON must be syntactically valid (no comments or trailing commas).
 - Keep plans concise (recommended: 12 steps or fewer).
 - Output only valid JSON.
-- REQUIRED FIELDS: All output-producing tools MUST include 'out' field. Tools with uncertain outcomes (query-web, search, load, summarize, relate, refine, assess, extract-entities, filter-by-predicate) MUST also include 'expect' field.
+- REQUIRED FIELDS: All output-producing tools MUST include 'out' field. Tools with uncertain outcomes (query-web, semantic-scholar, search, load, summarize, relate, refine, assess, extract-entities, filter-collection) MUST also include 'expect' field.
 - Note: 'display' and 'think' accept either 'value' or 'target' (both work).
 
 EFFICIENCY RULES
@@ -68,6 +69,12 @@ EFFICIENCY RULES
 - Create Collections only when you need to process 2+ Notes together
 - REMEMBER: expand, refine, as-json work on Notes ONLY, not Collections
 - Use map to apply Note operations to each item in a Collection
+
+TOOL SELECTION RULES
+- For academic papers (research, citations, scholarly articles): Use semantic-scholar first
+- For general web content, news, documentation, tutorials: Use query-web
+- semantic-scholar provides: abstracts, citations, authors, venue, PDF URLs (when available)
+- query-web provides: broad web coverage, recent content, mixed-quality sources
 
 # COMMON PATTERNS:
 
@@ -79,18 +86,35 @@ Pattern: Persist Collection
   {"type":"create-collection","value":["$methodology_summary","$gaps_analysis"],"name":"constitutional-ai-findings","out":"$findings"}
   {"type":"persist","target":"$findings"}
 
-Pattern: Searching the web for information
+Pattern: Searching academic papers
+  semantic-scholar → expand → (optional: filter/map to extract PDFs) → fetch-text for full papers
+  
+  Example - Find papers with abstracts:
+  {"type":"semantic-scholar","args":{"query":"transformer architecture"},"out":"$papers","expect":"should find 5+ papers"}
+  {"type":"expand","target":"$papers","out":"$items"}
+  {"type":"summarize","target":"$items","out":"$summary"}
+
+Pattern: Fetching full text from academic papers
+  semantic-scholar → expand → map to extract PDF URLs → filter → map with fetch-text
+  
+  Example - Get full paper texts:
+  {"type":"semantic-scholar","args":{"query":"attention mechanisms"},"out":"$papers","expect":"should find papers with PDFs"}
+  {"type":"expand","target":"$papers","out":"$items"}
+  {"type":"map","target":"$items","operation":"as-json","args":{"field":"metadata.pdf_url"},"out":"$urls"}
+  {"type":"map","target":"$urls","operation":"fetch-text","out":"$full_texts"}
+
+Pattern: Searching the web for general information
   query-web → expand(Note) → map(Collection) (optional: use map with as-json to extract URL field from each item) → map with fetch-text to get full text from each URL
   
   Example:
-  {"type":"query-web","args":{"query":"KV cache replacement algorithms"},"out":"$results","expect":"should find papers"}
+  {"type":"query-web","args":{"query":"Python asyncio tutorial"},"out":"$results","expect":"should find documentation"}
   {"type":"expand","target":"$results","out":"$items"} (optional)
 
-Pattern: Fetching full text from URLs in web search results
+Pattern: Fetching full text from web search results
   query-web → expand → map with as-json → map with fetch-text
   
   Example:
-  {"type":"query-web","args":{"query":"attention mechanism papers"},"out":"$results","expect":"should find papers"}
+  {"type":"query-web","args":{"query":"FastAPI best practices"},"out":"$results","expect":"should find guides"}
   {"type":"expand","target":"$results","out":"$items"}
   {"type":"map","target":"$items","operation":"as-json","args":{"field":"metadata.source_url"},"out":"$urls"}
   {"type":"map","target":"$urls","operation":"fetch-text","out":"$full_texts"}
@@ -111,12 +135,22 @@ Pattern: Working with Multiple Search Results
   {"type":"expand","target":"$results2","out":"$items2"},
   {"type":"union","target":"$items1","value":"$items2","out":"$all_items"}
   
+Pattern: Combining academic and web sources
+  When paper databases insufficient, supplement with web search:
+  
+  Example:
+  {"type":"semantic-scholar","args":{"query":"GPT-4 architecture"},"out":"$s2_results","expect":"should find published papers"}
+  {"type":"expand","target":"$s2_results","out":"$s2_items"}
+  {"type":"query-web","args":{"query":"GPT-4 technical report"},"out":"$web_results","expect":"should find OpenAI docs"}
+  {"type":"expand","target":"$web_results","out":"$web_items"}
+  {"type":"union","target":"$s2_items","value":"$web_items","out":"$all_sources"}
+
 Pattern: Adding filtered items to existing Collection
-  load → query-web → expand → map with add to append each item → persist
+  load → search → expand → map with add to append each item → persist
   
   Example - Add new research papers to existing collection:
   {"type":"load","resource_id":"papers","out":"$papers","expect":"should have existing paper collection"}
-  {"type":"query-web","args":{"query":"LLM agents 2025"},"out":"$results","expect":"should find recent papers"}
+  {"type":"semantic-scholar","args":{"query":"LLM agents 2025"},"out":"$results","expect":"should find recent papers"}
   {"type":"expand","target":"$results","out":"$new_papers"}
   {"type":"map","target":"$new_papers","operation":"add","args":{"target":"$papers"},"out":"$papers"}
 
@@ -186,7 +220,7 @@ Pattern: Universal LLM Transformations (refine, assess)
 ├─────────────────────────┼──────┼────────────┤
 │ expand, as-json, refine │  ✓   │     ❌     │
 │ summarize, relate       │  ✓   │     ✓      │
-│ map, flatten            │  ❌   │     ✓      │
+│ map, flatten            │  ❌  │     ✓      │
 │ create-collection       │  N/A │    N/A     │
 └─────────────────────────┴──────┴────────────┘
 
@@ -207,24 +241,20 @@ Minimal Example (say hello):
   ]
 }
 
-Research Example (working with multiple search results):
+Research Example (academic paper search):
 {
   "plan": [
-    {"type": "query-web","args":{"query":"machine learning papers 2024"},"out": "$results1","expect":"should find ML papers"},
-    {"type": "expand","target": "$results1","out": "$items1"},
-    {"type": "query-web","args":{"query":"neural network papers 2024"},"out": "$results2","expect":"should find NN papers"},
-    {"type": "expand","target": "$results2","out": "$items2"},
-    {"type": "union","target": "$items1","value": "$items2","out": "$all_items"},
-    {"type": "flatten","target": "$all_items","out": "$combined_text"},
-    {"type": "summarize","target": "$combined_text","out": "$summary","expect":"should provide overview of both topics"},
+    {"type": "semantic-scholar","args":{"query":"machine learning interpretability"},"out": "$papers","expect":"should find ML papers"},
+    {"type": "expand","target": "$papers","out": "$items"},
+    {"type": "summarize","target": "$items","out": "$summary","expect":"should provide overview of interpretability methods"},
     {"type": "display","value": "$summary"}
   ]
 }
 
+# END OF PLAN SPECIFICATION
+The next section will contain task-specific instructions (e.g., generation, validation, or editing).  
 
-Respond only with the complete JSON plan for the goal, no other text.
 """
-
 
 class InfospacePlanner:
     """
@@ -245,42 +275,53 @@ class InfospacePlanner:
         self.available_tools = available_tools or {}
         self.logger = logger or logging.getLogger(__name__)
     
-    def _validate_plan(self, plan: Dict) -> Dict:
+    def _validate_plan(self, plan: Dict) -> str:
         """
         Validate plan structure.
         Check required fields per action type.
         
         Returns:
-            Dict with 'valid' (bool) and 'reason' (str if invalid)
+            String with ACTION/REPAIR format errors (empty if valid)
         """
+        errors = []
+        logger.info(f"Validating plan")
         if 'plan' not in plan:
-            return {'valid': False, 'reason': 'Missing plan field'}
+            errors.append("ACTION 0:\nREPAIR: Insert missing 'plan' field key at start of plan")
+            return "\n".join(errors)
         
         actions = plan['plan']
         if not isinstance(actions, list):
-            return {'valid': False, 'reason': 'Plan must be array'}
+            errors.append("ACTION 0:\nREPAIR: 'plan' field value must be a list of actions")
+            return "\n".join(errors)
         
         if len(actions) > 12:
             self.logger.warning(f'Plan has {len(actions)} steps (recommended max: 12)')
         
-        # Validate each action
+        # Validate each action - collect all errors
         for i, action in enumerate(actions):
             if not isinstance(action, dict):
-                return {'valid': False, 'reason': f'Action {i} is not dict'}
+                errors.append(f"ACTION {i}:\nREPAIR: Action must be a dict/object with 'type' field")
+                continue
             
             if 'type' not in action:
-                return {'valid': False, 'reason': f'Action {i} missing type'}
+                errors.append(f"ACTION {i}:\nREPAIR: Add 'type' field specifying action or tool name")
+                continue
             
             # Check required fields per type
             action_type = action['type']
-            validation = self._validate_action_fields(action_type, action)
-            if not validation['valid']:
-                return {'valid': False, 'reason': f'Action {i} ({action_type}): {validation["reason"]}'}
+            validation_error = self._validate_action_fields(action_type, action, i)
+            if validation_error:
+                errors.append(validation_error)
         
-        return {'valid': True}
+        return "\n".join(errors)
     
-    def _validate_action_fields(self, action_type: str, action: Dict) -> Dict:
-        """Validate required fields for action type"""
+    def _validate_action_fields(self, action_type: str, action: Dict, action_index: int) -> str:
+        """
+        Validate required fields for action type.
+        
+        Returns:
+            String in ACTION/REPAIR format if error found, empty string if valid
+        """
         # Known primitive action types with their required fields
         required_fields = {
             'apply': ['target', 'out'],
@@ -314,60 +355,71 @@ class InfospacePlanner:
         if not required:
             # Validate tool name exists in available_tools if provided
             if self.available_tools and action_type not in self.available_tools:
-                return {'valid': False, 'reason': f'Unknown tool name: {action_type}'}
+                return f"ACTION {action_index}: {action_type}\nREPAIR: Unknown tool name '{action_type}'. Check available tools or use correct primitive name"
             
-            # Tool names should have 'target' and 'out' fields per template examples
-            # Exception: query-web uses args.query instead of target
-            if action_type == 'query-web':
-                if 'args' not in action or 'query' not in action.get('args', {}):
-                    return {'valid': False, 'reason': f'Missing required field: args.query'}
+            # Check if tool has custom parameter source (e.g., args.query)
+            tool_info = self.available_tools.get(action_type, {})
+            param_source = tool_info.get('parameter_source')
+            
+            if param_source and param_source.startswith('args.'):
+                # Tool uses args.* for input parameter
+                param_name = param_source.split('.', 1)[1]
+                if 'args' not in action or param_name not in action.get('args', {}):
+                    return f"ACTION {action_index}: {action_type}\nREPAIR: Add 'args' field with '{param_name}' parameter: \"args\": {{\"{param_name}\": \"your input\"}}"
                 if 'out' not in action:
-                    return {'valid': False, 'reason': f'Missing required field: out'}
+                    return f"ACTION {action_index}: {action_type}\nREPAIR: Add 'out' field with $variable syntax: \"out\": \"$results\""
                 if 'expect' not in action:
-                    return {'valid': False, 'reason': f'Missing required field: expect'}
+                    return f"ACTION {action_index}: {action_type}\nREPAIR: Add 'expect' field describing expected outcome: \"expect\": \"should find relevant results\""
                 # Validate out field uses $variable syntax
                 out_val = action.get('out', '')
                 if not isinstance(out_val, str) or not out_val.startswith('$'):
-                    return {'valid': False, 'reason': f'out field must use $variable syntax, got: {out_val}'}
-                return {'valid': True}
+                    return f"ACTION {action_index}: {action_type}\nREPAIR: 'out' field must use $variable syntax, change \"{out_val}\" to \"${out_val}\""
+                return ""
             
             # LLM-based tools require expect
-            llm_tools = ['summarize', 'relate', 'refine', 'assess', 'extract-entities', 'filter-by-predicate']
+            llm_tools = ['summarize', 'relate', 'refine', 'assess', 'extract-entities', 'filter-collection']
             if action_type in llm_tools:
                 if 'target' not in action:
-                    return {'valid': False, 'reason': f'Missing required field: target'}
+                    return f"ACTION {action_index}: {action_type}\nREPAIR: Add 'target' field referencing the variable to process: \"target\": \"$variable_name\""
                 if 'out' not in action:
-                    return {'valid': False, 'reason': f'Missing required field: out'}
+                    return f"ACTION {action_index}: {action_type}\nREPAIR: Add 'out' field with $variable syntax: \"out\": \"$result\""
                 if 'expect' not in action:
-                    return {'valid': False, 'reason': f'Missing required field: expect'}
+                    return f"ACTION {action_index}: {action_type}\nREPAIR: Add 'expect' field describing expected outcome: \"expect\": \"should extract/transform...\""
                 out_val = action.get('out', '')
                 if not isinstance(out_val, str) or not out_val.startswith('$'):
-                    return {'valid': False, 'reason': f'out field must use $variable syntax, got: {out_val}'}
-                return {'valid': True}
+                    return f"ACTION {action_index}: {action_type}\nREPAIR: 'out' field must use $variable syntax, change \"{out_val}\" to \"${out_val}\""
+                return ""
             
             # Other tools need target and out
             if 'target' not in action:
-                return {'valid': False, 'reason': f'Missing required field: target'}
+                return f"ACTION {action_index}: {action_type}\nREPAIR: Add 'target' field referencing the variable to process: \"target\": \"$variable_name\""
             if 'out' not in action:
-                return {'valid': False, 'reason': f'Missing required field: out'}
+                return f"ACTION {action_index}: {action_type}\nREPAIR: Add 'out' field with $variable syntax: \"out\": \"$result\""
             # Validate out field uses $variable syntax
             out_val = action.get('out', '')
             if not isinstance(out_val, str) or not out_val.startswith('$'):
-                return {'valid': False, 'reason': f'out field must use $variable syntax, got: {out_val}'}
-            return {'valid': True}
+                return f"ACTION {action_index}: {action_type}\nREPAIR: 'out' field must use $variable syntax, change \"{out_val}\" to \"${out_val}\""
+            return ""
         
+        # Check required fields for known primitives
         for field in required:
             if field not in action:
                 # Special handling: display and think accept either value or target
                 if field == 'value' and action_type in ['display', 'think']:
                     if 'target' not in action:
-                        return {'valid': False, 'reason': f'Missing required field: value or target'}
+                        return f"ACTION {action_index}: {action_type}\nREPAIR: Add 'value' or 'target' field (either works for {action_type})"
                 else:
-                    return {'valid': False, 'reason': f'Missing required field: {field}'}
+                    return f"ACTION {action_index}: {action_type}\nREPAIR: Add required field '{field}'"
         
-        return {'valid': True}
+        # Validate 'out' field format if present
+        if 'out' in action:
+            out_val = action.get('out', '')
+            if not isinstance(out_val, str) or not out_val.startswith('$'):
+                return f"ACTION {action_index}: {action_type}\nREPAIR: 'out' field must use $variable syntax, change \"{out_val}\" to \"${out_val}\""
+        
+        return ""
     
-    def verify_plan(self, plan: Dict) -> Dict:
+    def verify_plan(self, plan: Dict) -> str:
         """
         Validate plan structure.
         Public instance method for plan validation.
@@ -376,7 +428,7 @@ class InfospacePlanner:
             plan: Plan dict with 'plan' key
             
         Returns:
-            Dict with 'valid' (bool) and 'reason' (str if invalid)
+            String with ACTION/REPAIR format errors (empty if valid)
         """
         return self._validate_plan(plan)
 

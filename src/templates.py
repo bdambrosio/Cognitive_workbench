@@ -766,7 +766,7 @@ Variables: Use "$variable" to reference Note/Collection content previously bound
 Literals: Use plain strings/values (no $) for literal data or names
 Names: Output variable names in "out" fields use plain strings (no $)
 Tools/Resources: Can be literal "tool-name/resource-name" or "$variable" holding name
-Resource IDs: Cannot be referenced directly - use "load" action first to bind to variable
+Resource IDs: Can be literal "Note_X" or "Collection_X" for persist action, otherwise use "load" action first to bind to variable
 
 # PRIMITIVES:
 
@@ -805,18 +805,21 @@ Examples:
 use map to expand each Note: {"type":"map","target":"$collection","operation":"expand","out":"$expanded_items"}
 then use flatten if you need to combine the expanded Notes into a single Note.
 
-Description: Expand a Note containing JSON array into a Collection of Notes
-Input: target: $variable → Note (must contain JSON with array field)
-Output: out: $variable → Collection (one Note per array item)
+Description: Expand a Note into a Collection of Notes. Handles two cases:
+  1. JSON with array field: Extracts array from specified field (default "results")
+  2. Plain text: Splits on newlines and filters empty lines
+Input: target: $variable → Note (JSON with array field OR plain text)
+Output: out: $variable → Collection (one Note per array item or line)
 Parameters:
-  - target (required): $variable referencing Note with JSON content
-  - field (optional): string field name containing array (default: "results")
+  - target (required): $variable referencing Note with JSON array or plain text
+  - field (optional): string field name containing array (default: "results") - only used for JSON
   - out (required): $variable name for resulting Collection
-Preconditions: target variable must be bound to Note containing JSON with array field
-Postconditions: out variable bound to Collection with one Note per array element
+Preconditions: target variable must be bound to Note containing JSON with array field OR plain text
+Postconditions: out variable bound to Collection with one Note per array element or line
 Examples:
-  {"type":"expand","target":"$search_results","out":"$results_collection"}
-  {"type":"expand","target":"$data","field":"items","out":"$items_collection"}
+  {"type":"expand","target":"$search_results","out":"$results_collection"}  # JSON array
+  {"type":"expand","target":"$data","field":"items","out":"$items_collection"}  # JSON array with custom field
+  {"type":"expand","target":"$text_note","out":"$lines"}  # Plain text (splits on newlines)
 
 ## coerce
 Description: Convert data format or structure (whole-value operations only)
@@ -940,15 +943,17 @@ Examples:
 
 ## persist
 Description: Mark Note or Collection as persistent (saved to filesystem)
-Input: target: $variable → Note or Collection
+Input: target: $variable → Note or Collection, or literal Note_ID/Collection_ID
 Output: none (mutates resource)
 Parameters:
-  - target (required): $variable referencing Note or Collection
-Preconditions: target variable must be bound to Note or Collection
+  - target (required): $variable referencing Note or Collection, or literal resource ID (e.g., "Note_123", "Collection_456")
+Preconditions: if target is $variable, it must be bound to Note or Collection; if literal, resource must exist
 Postconditions: Note or Collection marked persistent, saved to filesystem
 Examples:
   {"type":"persist","target":"$collection"}
   {"type":"persist","target":"$note"}
+  {"type":"persist","target":"Note_123"}
+  {"type":"persist","target":"Collection_456"}
 
 ## load
 Description: Retrieve a persistent Note or Collection by resource ID or name

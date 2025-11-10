@@ -1,15 +1,15 @@
----
-name: filter-by-predicate
-description: Evaluate complex criteria on each item in a collection and return matching items
-type: prompt_augmentation
+--- 
+name: filter-collection
+description: Evaluate complex criteria on each item in a Collection and return a new Collection of matching items
+type: python
 parameters: predicate (required) - filtering condition to evaluate
 examples:
-  - '{"type":"filter-by-predicate","target":"$collection","args":{"predicate":"contains technical content"},"out":"$filtered","expect":"should return technical papers only"}'
+  - '{"type":"filter-collection","target":"$collection","args":{"predicate":"contains technical content"},"out":"$filtered","expect":"should return technical papers only"}'
 ---
 
-# Filter By Predicate
+# Filter Collection By Predicate
 
-Apply flexible, natural-language filtering criteria to Collections. Evaluates each item against specified conditions and returns only matching items.
+Apply flexible, natural-language filtering criteria to Collections. Evaluates each item against specified conditions and returns a new Collection containing only matching items.
 
 ## Purpose
 
@@ -21,30 +21,23 @@ Enable complex filtering that goes beyond simple field comparisons:
 
 ## Input Format
 
-Expects a Collection (list) of items. Each item can be:
-- Plain text strings
-- Structured objects (dicts with fields)
-- Mixed types
+Expects a Collection (list of note_ids or sub-collections). Each item is evaluated individually.
+
 ```json
-[
-  {"id": "item1", "content": "...", ...},
-  {"id": "item2", "content": "...", ...},
-  "plain text item",
-  {...}
-]
+["Note_1", "Note_2", "Collection_3"]
 ```
 
 ## Output Format
 
-Returns filtered list containing only items matching the predicate:
+Returns ID of new Collection containing only items matching the predicate:
+
 ```json
-[
-  {"id": "item1", "content": "..."},
-  {"id": "item3", "content": "..."}
-]
+"Collection_5"
 ```
 
-Empty list if no matches: `[]`
+The new Collection will have `item_count` reflecting the number of matches.
+
+Empty result: New empty Collection (`[]`).
 
 ## Parameters
 
@@ -204,8 +197,9 @@ Write predicates as natural language conditions. The tool evaluates each item's 
 ## Implementation Notes
 
 Tool should:
-1. Iterate through input list
-2. Evaluate each item against predicate
-3. Collect matches (or non-matches if mode='exclude')
-4. Return filtered list in same structure as input
-5. Preserve item structure exactly (no modifications to matched items)
+1. Fetch full content for each note_id/sub-collection in input
+2. Evaluate each item against predicate using LLM
+3. Collect matching note_ids
+4. Create new Collection with filtered list
+5. Return the new Collection ID
+6. Preserve original item structure and metadata

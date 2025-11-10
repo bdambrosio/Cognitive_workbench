@@ -1,13 +1,20 @@
+from __future__ import annotations
 """
 Unified Planner - Single planner for both infospace and physical worlds.
 
 Handles plan generation with pluggable primitive sets and tool libraries.
 """
 
+# Type checking imports
+from typing import TYPE_CHECKING, List
+if TYPE_CHECKING:
+    from executive_node import ZenohExecutiveNode
 import json
 import logging
 from typing import Dict, Any, Optional
 from pathlib import Path
+from infospace_planner import INFOSPACE_PLAN_TEMPLATE
+from templates import INFOSPACE_PRIMITIVES_REFERENCE, PLAN_TEMPLATE
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +28,7 @@ class UnifiedPlanner:
     
     def __init__(self, 
                  llm_client,
+                 character: ZenohExecutiveNode,
                  world_type: str,  # 'infospace' or 'physical'
                  map_name: str,
                  logger_instance=None):
@@ -34,6 +42,7 @@ class UnifiedPlanner:
             logger_instance: Optional logger
         """
         self.llm_client = llm_client
+        self.character = character
         self.world_type = world_type
         self.map_name = map_name
         self.logger = logger_instance or logger
@@ -89,23 +98,14 @@ class UnifiedPlanner:
     def _load_template(self) -> str:
         """Load appropriate planning template."""
         if self.world_type == 'infospace':
-            from infospace_planner import INFOSPACE_PLAN_TEMPLATE
-            return INFOSPACE_PLAN_TEMPLATE
+            formatted_tools = self._format_tools()
+            template = INFOSPACE_PLAN_TEMPLATE.replace('{{tools}}', formatted_tools)
+            template = template.replace('{primitives_reference}', INFOSPACE_PRIMITIVES_REFERENCE)
+            return template
         else:
-            from templates import PLAN_TEMPLATE
             return PLAN_TEMPLATE
     
     def generate_plan(self, goal: str, context: Dict) -> Dict:
-        """
-        Generate plan for goal.
-        
-        Args:
-            goal: String goal description
-            context: Dict with character state, situation, variables, etc.
-            
-        Returns:
-            Plan dict with 'plan' array of actions, or error dict
-        """
         self.logger.info(f"Generating {self.world_type} plan for goal: {goal}")
         
         # Route to appropriate planner
@@ -121,16 +121,23 @@ class UnifiedPlanner:
         from templates import INFOSPACE_PRIMITIVES_REFERENCE
         
         # Format tools for template
+        logger.info(f"generating infospace plan for {self.character.character_name}")
         tools_formatted = self._format_tools()
         
-        # Fill template
-        template_filled = self.template.replace('{{goal}}', goal)
-        template_filled = template_filled.replace('{{tools}}', tools_formatted)
-        template_filled = template_filled.replace("{primitives_reference}", INFOSPACE_PRIMITIVES_REFERENCE)
+        user_prompt = f""""\n\nTASK: Generate a JSON format plan for the Goal below adhering strictly to the plan specification and output requirements above.
+
+#GOAL: {goal}
+
+# OUTPUT REQUIREMENTS
+- Respond with the plan as valid JSON only — no prose, markdown, reasoning, code fences, or commentary.
+- Close all brackets and quote marks; ensure valid JSON.
+- Do not include trailing commas.
+
+"""
         
         # Generate plan using LLM
         response = self.llm_client.generate(
-            [template_filled],
+            [self.template, user_prompt],
             max_tokens=2000,
             temperature=0.3,
             is_json=True
@@ -158,6 +165,7 @@ class UnifiedPlanner:
         if not character:
             return {'error': 'No character in context'}
         
+        logger.info(f"Generating physical plan for goal: {goal}")
         # Format tools for template (add to context)
         tools_formatted = self._format_tools()
         
@@ -236,7 +244,12 @@ class UnifiedPlanner:
         if self.world_type == 'infospace':
             if self.infospace_planner:
                 plan = plan_json if isinstance(plan_json, dict) else json.loads(plan_json)
-                return self.infospace_planner.verify_plan(plan)
+                error_string = self.infospace_planner.verify_plan(plan)
+                # Convert string format to dict for backward compatibility
+                if error_string:
+                    return {'valid': False, 'reason': error_string, 'error_string': error_string}
+                else:
+                    return {'valid': True}
             else:
                 return {'valid': False, 'reason': 'Infospace planner not initialized'}
         else:

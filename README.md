@@ -124,9 +124,9 @@ parameters: query (required)
 
 Types:
 - **prompt_augmentation**: LLM-based tools (summarize, relate, refine, assess, extract-entities)
-- **python**: Code execution tools (query-web, render, as-json, as-markdown, revise, text-find, matches, filter-by-predicate)
+- **python**: Code execution tools (query-web, render, as-json, as-markdown, revise, text-find, matches, filter-collection)
 
-Built-in tools include: query-web, summarize, relate, refine, assess, extract-entities, render, as-json, as-markdown, revise, text-find, matches, filter-by-predicate, is-empty, is-question, is-positive, word-count, download-pdf, extract-paper-text, extract-struct, save.
+Built-in tools include: query-web, summarize, relate, refine, assess, extract-entities, render, as-json, as-markdown, revise, text-find, matches, filter-collection, is-empty, is-question, is-positive, word-count, download-pdf, extract-paper-text, extract-struct, save.
 
 **Tool argument conventions**: Most tools use `target` for input data; `query-web` uses `args.query` for the search query.
 

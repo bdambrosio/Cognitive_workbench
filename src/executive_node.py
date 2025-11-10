@@ -249,6 +249,7 @@ class ZenohExecutiveNode:
         world_type = 'infospace' if self.is_infospace else 'physical'
         self.planner = UnifiedPlanner(
             llm_client=self.llm_client,
+            character=self,
             world_type=world_type,
             map_name=self.map_name,
             logger_instance=logger
@@ -276,9 +277,7 @@ class ZenohExecutiveNode:
             if not tools_dir.exists():
                 tools_dir = maps_base / 'tools'
             
-            self.semantic_validator = InfospaceSemanticValidator(
-                tools_dir=str(tools_dir) if tools_dir.exists() else None
-            )
+            self.semantic_validator = InfospaceSemanticValidator(character=self, tools_dir=str(tools_dir) if tools_dir.exists() else None, prefix_prompt=self.planner.template)
             logger.info(f'🔍 Semantic validator initialized for {character_name}')
         
         # Internal state
@@ -1233,10 +1232,7 @@ class ZenohExecutiveNode:
                             logger.error(f'Invalid memory format in conversation history: {memory}')
                             goal_prompt += f"\t{memory}\n"
 
-            if self.action_history and (self.action_history[-1].action['type'].lower() == 'say' or self.action_history[-1].action['type'].lower() == 'response'):
-                directive = f"""\nrespond only with the JSON plan, no other text.\nend your response with </end>"""
-            else:
-                directive = f"""\nrespond only with the JSON plan, no other text.\nend your response with </end>"""
+            directive = f"""\nrespond only with the JSON plan, no other text.\nend your response with </end>"""
 
             self.current_plan_prompt = system_prompt + user_prompt + goal_prompt
             # Capture percepts at plan start (before LLM call)
@@ -1282,9 +1278,18 @@ class ZenohExecutiveNode:
                         validation = self.planner.verify_plan(plan_candidate)
                         valid = validation.get('valid', False) if isinstance(validation, dict) else validation
                         if not valid:
-                            reason = validation.get('reason', 'Unknown validation error') if isinstance(validation, dict) else 'Validation failed'
-                            logger.error(f'Invalid plan JSON from planner: {reason}')
-                            plan_candidate = None
+                            error_string = validation.get('error_string', validation.get('reason', 'Unknown validation error'))
+                            logger.error(f'Invalid plan JSON from planner: {error_string}')
+                            # Call plan editor to fix validation errors
+                            self.current_plan = plan_candidate
+                            self.parse_and_edit_plan(error_string)
+                            # Re-validate after edit
+                            validation = self.planner.verify_plan(self.current_plan)
+                            valid = validation.get('valid', False) if isinstance(validation, dict) else validation
+                            if valid:
+                                plan_candidate = self.current_plan
+                            else:
+                                plan_candidate = None
                     else:
                         valid = plan_module.verify_plan(plan_candidate)
                         if not valid:
@@ -1722,8 +1727,12 @@ end your response with </end>
         # Check if step type is a tool (direct tool invocation)
         if self.is_infospace and stype in self.available_tools:
             # Convert tool invocation to apply format for execution
-            # Special handling: query-web uses args.query, others use target/value
-            if stype == 'query-web':
+            # Check if tool has custom parameter source (e.g., args.query)
+            tool_info = self.available_tools.get(stype, {})
+            param_source = tool_info.get('parameter_source')
+            
+            if param_source and param_source.startswith('args.'):
+                # Tool uses args.* for input, pass args directly
                 tool_step = {
                     'type': 'apply',
                     'target': stype,
@@ -1733,6 +1742,7 @@ end your response with </end>
                     'expect': step.get('expect')
                 }
             else:
+                # Standard tool: uses target/value for input
                 tool_step = {
                     'type': 'apply',
                     'target': stype,
@@ -3384,26 +3394,9 @@ End your response with </end>
             
             # Build prompt with planning language spec
             if self.is_infospace:
-                import infospace_planner
-                plan_template = infospace_planner.INFOSPACE_PLAN_TEMPLATE
+                plan_template = self.planner.template
                 
-                # Format available tools
-                tools_text = ""
-                if self.available_tools:
-                    tools_text = "\n\nAVAILABLE TOOLS:\n"
-                    for tool_name in sorted(self.available_tools.keys()):
-                        tool_info = self.available_tools[tool_name]
-                        description = tool_info.get('description', 'No description')
-                        examples = tool_info.get('examples', [])
-                        tools_text += f"{tool_name} — {description}\n"
-                        for example in examples:
-                            tools_text += f"{example}\n"
-                        tools_text += "\n"
-                
-                prompt = f"""You are editing an infospace plan.
-
-{plan_template}
-{tools_text}
+                prompt = f"""\n\nTASK:You are editing an infospace plan.
 
 INSTRUCTION: {instruction}
 
@@ -3413,6 +3406,8 @@ CURRENT PLAN:
 Return ONLY the edited plan as valid JSON, with no explanation or commentary.
 
 EDITED PLAN:"""
+                response = self.llm_client.generate([plan_template, prompt], temperature=0.3, is_json=True)
+
             else:
                 prompt = f"""Edit the following plan according to the instruction provided.
 Return ONLY valid JSON in the same format, with no explanation or commentary.
@@ -3425,7 +3420,7 @@ CURRENT PLAN:
 
 EDITED PLAN (JSON only):"""
             
-            response = self.llm_client.generate([prompt], temperature=0.3, is_json=True)
+                response = self.llm_client.generate([prompt], temperature=0.3, is_json=True)
             if not response or not response.success:
                 logger.error(f'❌ {self.character_name} LLM failed to edit plan')
                 return

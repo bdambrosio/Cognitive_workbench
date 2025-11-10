@@ -369,7 +369,7 @@ REQ_KEYS = {
     "refine": {"type", "target", "args", "out", "expect"},
     "assess": {"type", "target", "args", "out", "expect"},
     "extract-entities": {"type", "target", "out", "expect"},
-    "filter-by-predicate": {"type", "target", "args", "out", "expect"},
+    "filter-collection": {"type", "target", "args", "out", "expect"},
 }
 
 OPTIONAL_KEYS = {

@@ -287,14 +287,19 @@ class InfospaceExecutor:
         if not target:
             return {'status': 'failed', 'reason': 'apply requires target'}
         
-        # Special handling for query-web: extract query from args.query and use as value
-        if target == 'query-web' and 'query' in additional_args:
-            value = self._resolve_value(additional_args.get('query'))
-            # Remove query from args since it's now the main value
-            additional_args = {k: v for k, v in additional_args.items() if k != 'query'}
-        
         # Get tool info and route by type
         tool_info = self._get_tool_info(target)
+        
+        # Handle tools with custom parameter sources (e.g., args.query)
+        if tool_info:
+            param_source = tool_info.get('parameter_source')
+            if param_source and param_source.startswith('args.'):
+                # Extract parameter from args dict (e.g., 'args.query' -> additional_args['query'])
+                param_name = param_source.split('.', 1)[1]
+                if param_name in additional_args:
+                    value = self._resolve_value(additional_args.get(param_name))
+                    # Remove from args since it's now the main value
+                    additional_args = {k: v for k, v in additional_args.items() if k != param_name}
         
         if not tool_info:
             return {'status': 'failed', 'reason': f'Tool not found: {target}'}
@@ -316,7 +321,14 @@ class InfospaceExecutor:
         # Bind result if output variable specified
         result_value = result.get('value')
         if out_var:
-            # Persist result as Note
+            # Special handling for filter-collection: returns Collection ID directly
+            if target == 'filter-collection' and isinstance(result_value, str) and result_value.startswith('Collection_'):
+                # Result is already a Collection ID - bind directly
+                self._bind_variable(out_var, result_value)
+                logger.info(f"Tool '{target}' executed, Collection {result_value} → ${out_var}")
+                return {'status': 'success', 'value': result_value}
+            
+            # Default: Persist result as Note
             info_id = self._persist_note(result_value, f'apply_{target}')
             if info_id:
                 self._bind_variable(out_var, info_id)
@@ -406,9 +418,7 @@ class InfospaceExecutor:
             
             prompt_parts.append("""\n# OUTPUT\nProvide the result directly, following the tool's output format. 
 Do not include any introductory, reasoning, or explanatory text in your response. 
-Only provide the result, followed by the </end> tag. 
-End your response with: 
-</end>""")
+Only provide the result, followed by the </end> tag.""")
             
             full_prompt = "".join(prompt_parts)
             
@@ -466,16 +476,21 @@ End your response with:
             if not plan_data:
                 return {'status': 'failed', 'reason': f'Plan tool {tool_name} missing plan_data'}
             
-            # Bind input to plan's input variable (convention: $input)
-            # Create a wrapper plan that binds input, then executes the tool plan
+            # Build initial bindings for plan tool
+            initial_bindings = {}
+            
+            # Bind main input to $input variable
             if input_value is not None:
                 input_note_id = self._persist_note(input_value, f'{tool_name}_input')
                 if input_note_id:
-                    initial_bindings = {'input': input_note_id}
-                else:
-                    initial_bindings = {}
-            else:
-                initial_bindings = {}
+                    initial_bindings['input'] = input_note_id
+            
+            # Bind args dict values to named variables
+            for key, val in additional_args.items():
+                resolved_val = self._resolve_value(val)
+                arg_note_id = self._persist_note(resolved_val, f'{tool_name}_{key}')
+                if arg_note_id:
+                    initial_bindings[key] = arg_note_id
             
             # Execute plan synchronously with initial bindings
             result = self.execute_plan_sync(plan_data, initial_bindings=initial_bindings)
@@ -552,6 +567,7 @@ End your response with:
         # Add map_name and llm_client to kwargs for tools that need them
         resolved_args['map_name'] = self.map_name
         resolved_args['llm_client'] = self.llm_client
+        resolved_args['agent_name'] = self.agent_name
         
         # Execute tool
         try:
@@ -767,24 +783,35 @@ End your response with:
         Required: target
         
         Once marked persistent, Note or Collection is saved to filesystem on next persist cycle.
+        
+        Target can be:
+        - $variable referencing a Note or Collection
+        - Literal Note_ID (e.g., "Note_123") or Collection_ID (e.g., "Collection_456")
         """
         target_arg = action.get('target')
         
         if not target_arg:
             return {'status': 'failed', 'reason': 'persist requires target'}
         
-        if not isinstance(target_arg, str) or not target_arg.startswith('$'):
-            return {'status': 'failed', 'reason': 'persist target must be $variable'}
+        if not isinstance(target_arg, str):
+            return {'status': 'failed', 'reason': 'persist target must be string'}
         
-        resource_var = target_arg[1:]
-        
-        if resource_var not in self.plan_bindings:
-            return {'status': 'failed', 'reason': f'Variable not bound: {resource_var}'}
-        
-        resource_id = self.plan_bindings[resource_var]
-        
-        if not isinstance(resource_id, str) or not (resource_id.startswith('Collection_') or resource_id.startswith('Note_')):
-            return {'status': 'failed', 'reason': f'Variable {resource_var} is not a Note or Collection'}
+        # Check if target is a variable reference
+        if target_arg.startswith('$'):
+            resource_var = target_arg[1:]
+            
+            if resource_var not in self.plan_bindings:
+                return {'status': 'failed', 'reason': f'Variable not bound: {resource_var}'}
+            
+            resource_id = self.plan_bindings[resource_var]
+            
+            if not isinstance(resource_id, str) or not (resource_id.startswith('Collection_') or resource_id.startswith('Note_')):
+                return {'status': 'failed', 'reason': f'Variable {resource_var} is not a Note or Collection'}
+        else:
+            # Treat as literal resource ID
+            resource_id = target_arg
+            if not (resource_id.startswith('Collection_') or resource_id.startswith('Note_')):
+                return {'status': 'failed', 'reason': f'Target must be $variable or literal Note_ID/Collection_ID, got: {target_arg}'}
         
         from zenoh import QueryTarget, ConsolidationMode
         for reply in self.session.get(
@@ -1511,17 +1538,23 @@ End your response with:
     
     def _execute_expand(self, action: Dict) -> Dict:
         """
-        Expand a Note containing JSON with an array field into a Collection of Notes.
+        Expand a Note into a Collection of Notes.
+        
+        Handles two cases:
+        1. JSON with array field: Extracts array from specified field (default 'results')
+        2. Plain text: Splits on newlines and filters empty lines
         
         Required: target, out
-        Optional: field (default: 'results')
+        Optional: field (default: 'results') - only used for JSON case
         
         Argument types:
-        - target: $variable (Note containing JSON with array)
-        - field: literal string (name of array field, default 'results')
+        - target: $variable (Note containing JSON with array or plain text)
+        - field: literal string (name of array field, default 'results') - ignored for plain text
         - out: variable name for resulting Collection
         
-        Example: Expand query-web results into separate Notes
+        Examples:
+        - Expand query-web results: {"type":"expand","target":"$results","out":"$items"}
+        - Expand text lines: {"type":"expand","target":"$text_note","out":"$lines"}
         """
         error = self._validate_required_fields(action, 'target', 'out')
         if error:
@@ -1559,23 +1592,44 @@ End your response with:
         if isinstance(content, str) and content.strip().lower() in ['note-null', 'null']:
             return {'status': 'failed', 'reason': 'Cannot expand null content'}
         
-        # Parse JSON
+        array_data = None
+        
+        # Try JSON parsing first (for structured data)
         if isinstance(content, str):
-            content_obj = json.loads(content)
+            try:
+                content_obj = json.loads(content)
+            except (json.JSONDecodeError, ValueError):
+                content_obj = None
         elif isinstance(content, dict):
             content_obj = content
         else:
-            return {'status': 'failed', 'reason': 'Note content must be JSON string or dict'}
+            content_obj = None
         
-        # Extract array field
-        if field_name not in content_obj:
-            return {'status': 'failed', 'reason': f'JSON does not have field: {field_name}'}
+        # If JSON parsing succeeded, try to extract array field
+        if content_obj:
+            if field_name in content_obj:
+                array_data = content_obj[field_name]
+                if isinstance(array_data, list):
+                    # Successfully extracted JSON array
+                    pass
+                else:
+                    array_data = None
+            else:
+                array_data = None
         
-        array_data = content_obj[field_name]
-        if not isinstance(array_data, list):
-            return {'status': 'failed', 'reason': f'Field {field_name} is not an array'}
+        # If no JSON array found, try plain text line splitting
+        if array_data is None:
+            if isinstance(content, str):
+                # Split on newlines and filter empty lines
+                lines = [line.strip() for line in content.split('\n')]
+                array_data = [line for line in lines if line]  # Filter empty lines
+            else:
+                return {'status': 'failed', 'reason': f'Note content must be JSON with "{field_name}" array field or plain text'}
         
-        # Create Note for each array element
+        if not array_data:
+            return {'status': 'failed', 'reason': 'No items to expand (empty array or no non-empty lines)'}
+        
+        # Create Note for each array element/line
         note_ids = []
         for i, item in enumerate(array_data):
             item_note_id = self._persist_note(item, f'expand_item_{i}')
@@ -1589,7 +1643,8 @@ End your response with:
         
         # Bind to out variable
         self._bind_variable(out_var, collection_id)
-        logger.info(f"Expanded {note_id}.{field_name} ({len(note_ids)} items) → ${out_var}")
+        source_desc = f"{note_id}.{field_name}" if content_obj and field_name in content_obj else f"{note_id} (lines)"
+        logger.info(f"Expanded {source_desc} ({len(note_ids)} items) → ${out_var}")
         
         return {'status': 'success', 'value': collection_id}
     
