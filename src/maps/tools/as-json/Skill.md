@@ -31,32 +31,26 @@ Accepts a Note containing JSON (clean or embedded):
 
 **Optional:**
 - **field** - Field name to extract (searches recursively, e.g., "url", "title", "email")
-- **all** - If true, returns array of all matching fields; if false/omitted, returns first match (default: false)
+- **all** - If true, returns all matching fields, one per line; if false/omitted, returns first match (default: false)
 
 ## Output Format
 
 - **No field**: Full parsed JSON as formatted text
 - **With field (all=false)**: First matching field value as text
-- **With field (all=true)**: Array of all matching field values
+- **With field (all=true)**: all matching field values, one per line
 - **Field not found**: note-null
 - **JSON not identified**: FAIL (hard error)
 
 ## Usage Examples
 
 **Extract JSON from LLM response:**
-```json
 {"type":"as-json","target":"$llm_response","out":"$parsed"}
-```
 
 **Extract first matching field:**
-```json
 {"type":"as-json","target":"$response","args":{"field":"title"},"out":"$title"}
-```
 
 **Extract all matching fields:**
-```json
 {"type":"as-json","target":"$response","args":{"field":"url","all":true},"out":"$all_urls"}
-```
 
 ## Guidelines
 
@@ -72,51 +66,51 @@ Accepts a Note containing JSON (clean or embedded):
 **Example 1: Extract first match**
 
 Input:
-```json
 {"results": [
   {"url": "https://example.com/1", "title": "First"},
   {"url": "https://example.com/2", "title": "Second"}
 ]}
-```
 
-Field: "url"
+field: "url"
 
-Output: `https://example.com/1`
+Output: 
+https://example.com/1
 
 **Example 2: Extract all matches**
 
 Input:
-```json
 {"results": [
   {"url": "https://example.com/1", "title": "First"},
   {"url": "https://example.com/2", "title": "Second"}
 ]}
-```
 
-Field: "url", all: true
+field: "url", all: true
 
-Output: `["https://example.com/1", "https://example.com/2"]`
+Output: 
+https://example.com/1
+https://example.com/2
 
 **Example 3: Strip code fence**
 
 Input:
-```
 Here's the data:
 ```json
 {"status": "success", "count": 42}
 ```
-```
 
-Field: "count"
+field: "count"
 
-Output: `42`
+Output: 
+42
 
 **Example 4: Missing field returns null**
 
-Input: `{"name": "Alice"}`
+Input: 
+{"name": "Alice"}
 
 Field: "email"
 
-Output: note-null
+Output: 
+note-null
 
 Output ONLY the selected information as shown above, no introductory, explanatory, reasoning, code fences, etc.

@@ -32,7 +32,7 @@
 - `contains-pattern` - uses `value`
 - `word-count` - uses `value`
 - `is-positive` - uses `value`
-- `filter-by-predicate` - uses `value`
+- `filter-collection` - uses `value` (Collection input, Collection output)
 - `is-question` - uses `value`
 - `extract-entities` - uses `value`
 
@@ -90,7 +90,7 @@
 11. ✅ `contains-pattern` - operates on existing text
 12. ✅ `word-count` - operates on existing text
 13. ✅ `is-positive` - operates on existing value
-14. ✅ `filter-by-predicate` - operates on existing Collection
+14. ✅ `filter-collection` - operates on existing Collection, returns new Collection
 15. ✅ `is-question` - operates on existing text
 16. ✅ `extract-entities` - operates on existing content
 

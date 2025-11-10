@@ -2807,7 +2807,7 @@ class FastAPIActionDisplayNode:
                     }
                     if (actionData.value) {
                         // Check if value is a resource ID (Note_X or Collection_X)
-                        const isResourceId = /^(Note_|Collection_)\d+$/.test(actionData.value);
+                        const isResourceId = /^(Note_|Collection_)\\d+$/.test(actionData.value);
                         if (typeLower === 'createnote') {
                             if (isResourceId) {
                                 actionDetails.push(`Created: <a href="#" class="resource-link" data-resource-id="${actionData.value}">${actionData.value}</a>`);

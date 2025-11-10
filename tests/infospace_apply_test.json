@@ -45,12 +45,12 @@
     },
     {
       "type": "apply",
-      "target": "filter-by-predicate",
+      "target": "filter-collection",
       "value": "$items",
       "args": {
         "predicate": "mentions Python"
       },
-      "reason": "Test filtering",
+      "reason": "Test filtering Collection items",
       "out": "filtered"
     },
     {

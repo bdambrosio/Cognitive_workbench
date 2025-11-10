@@ -86,3 +86,85 @@ Should return: `def tool(...)`
 **Cause**: Tool defines `execute()` but not `tool()`
 **Fix**: Add `tool()` wrapper function (see pattern above)
 
+---
+
+## Plan Tool Requirements
+
+**Plan tools use a `plan.json` file to define reusable plan sequences.**
+
+### Structure
+
+Plan tools must have:
+- `SKILL.md` or `Skill.md` with `type: plan` in frontmatter
+- `plan.json` or `tool.json` file with plan definition
+
+### plan.json Format
+
+```json
+{
+  "plan": [
+    {"type": "action_name", "...": "..."}
+  ],
+  "out": "$result"
+}
+```
+
+**Required fields:**
+- `plan`: Array of plan actions (primitives or tool invocations)
+- `out`: Output variable name (with or without `$` prefix)
+
+### Parameter Passing
+
+Plan tools receive parameters as bound variables:
+
+**Main input** → `$input` variable
+**Args dict entries** → `$key` variables (one per key)
+
+**Example invocation:**
+```json
+{
+  "type": "compare-papers",
+  "target": "$paper1",
+  "args": {"baseline": "$paper2", "focus": "methodology"},
+  "out": "$comparison"
+}
+```
+
+**Variables available inside the plan tool:**
+- `$input` = content of `$paper1`
+- `$baseline` = content of `$paper2`
+- `$focus` = `"methodology"`
+
+**Example plan.json:**
+```json
+{
+  "plan": [
+    {"type": "create-collection", "value": ["$input", "$baseline"], "out": "$both"},
+    {"type": "relate", "target": "$both", "args": {"focus": "$focus"}, "out": "$result"}
+  ],
+  "out": "$result"
+}
+```
+
+### Best Practices
+
+1. **Document parameters** in SKILL.md frontmatter:
+   ```yaml
+   ---
+   name: compare-papers
+   type: plan
+   description: Compare two papers
+   parameters:
+     - name: input
+       description: First paper (main input)
+     - name: baseline
+       description: Second paper for comparison
+     - name: focus
+       description: Aspect to focus on (optional)
+   ---
+   ```
+
+2. **Use descriptive variable names** in args instead of generic names
+3. **Keep plan tools focused** - compose smaller plan tools rather than large monolithic ones
+4. **Test with literal values** before using in larger plans
+

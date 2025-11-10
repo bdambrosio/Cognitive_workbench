@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 Semantic Plan Validator for Infospace Plans
 
@@ -5,9 +6,14 @@ Validates plans semantically using LLM to check parameter flow, tool preconditio
 and workflow correctness. Outputs actionable repair suggestions.
 """
 
+# Type checking imports
+from typing import TYPE_CHECKING, List
+if TYPE_CHECKING:
+    from executive_node import ZenohExecutiveNode
 import json
 import logging
 from pathlib import Path
+import traceback
 from typing import Dict, List, Any, Optional
 
 from utils.llm_api import LLM
@@ -26,7 +32,7 @@ class InfospaceSemanticValidator:
     - Variable type consistency
     """
     
-    def __init__(self, tools_dir: Optional[str] = None, llm_server: str = "vllm", llm_model: str = "Qwen/Qwen3--Next-80B-A3B-FP8"):
+    def __init__(self, character: ZenohExecutiveNode, tools_dir: Optional[str] = None, llm_server: str = "vllm", llm_model: str = "Qwen/Qwen3--Next-80B-A3B-FP8", prefix_prompt: str = ""):
         """
         Initialize validator.
         
@@ -37,11 +43,13 @@ class InfospaceSemanticValidator:
             llm_model: LLM model name
         """
         self.llm = LLM(server_name=llm_server, model_name=llm_model)
+        self.character = character
         
         # Load tools: ALWAYS load base tools first, then map-specific if provided
         # Matches unified_planner._load_tools() logic
         maps_base = Path(__file__).parent / 'maps'
         self.available_tools = {}
+        self.prefix_prompt = prefix_prompt
         
         # Load base tools first
         base_tools_dir = maps_base / 'tools'
@@ -80,6 +88,7 @@ class InfospaceSemanticValidator:
             Clear text repair suggestions that can be passed to 'edit:' command.
             Empty string if plan is valid.
         """
+        logger.info(f"Validating plan for {self.character.character_name}")
         if 'plan' not in plan:
             return "ACTION 0: \nREPAIR: Insert missing 'plan' field key at start of plan"
         
@@ -87,41 +96,19 @@ class InfospaceSemanticValidator:
         if not isinstance(actions, list):
             return "ACTION 0: \nREPAIR: 'plan' field value must be a list of actions"
         
-        # Build tool documentation context
-        tool_context = self._build_tool_context()
         
         # Build plan context
         plan_json = json.dumps(plan, indent=2)
         
         # LLM validation prompt
-        system_prompt = """You are a semantic plan validator for infospace operations.
-
+        user_prompt = """\n\n#TASK: You are a semantic plan validator for infospace operations.
 Your task is to analyze a plan and identify semantic errors such as:
 - Missing workflow steps (e.g., fetch-text accepts URLs directly, no download step needed)
 - Parameter mismatches (e.g., map passes Note as 'value' but tool expects specific parameter)
 - Missing intermediate steps (e.g., trying to fetch text from URLs without proper URL extraction)
 - Incorrect variable usage (e.g., using Collection where Note expected, or vice versa)
 
-For each error found, provide a clear, actionable repair instruction in the format:
-
-ACTION <index>: <action to repair>
-REPAIR: <repair instruction>
-
-If the plan is valid, output: VALID
-
-Output ONLY 'VALID' OR the ACTION and REPAIR statements, no additional introductory, reasoning, code fences, or commentary."""
-        
-        # Import primitives reference from templates
-
-        
-        user_prompt = f"""{INFOSPACE_PRIMITIVES_REFERENCE}
-
-# AVAILABLE TOOLS AND THEIR REQUIREMENTS:
-
-{tool_context}
-
-# PLAN TO VALIDATE:
-
+#Plan to validate:
 {plan_json}
 
 # VALIDATION NOTES:
@@ -137,12 +124,24 @@ For each error found, provide a clear, actionable repair instruction in the form
 ACTION <index>: <action to repair>
 REPAIR: <repair instruction>
 
-Output VALID -or- the ACTION and REPAIR statements only, no additional introductory, reasoning, code fences, or commentary."""
+Output VALID -or- the ACTION and REPAIR statements only, no additional introductory, reasoning, code fences, or commentary.
+For each error found, provide a clear, concise, actionable repair instruction in the format:
+
+ACTION <index>: <action to repair>
+REPAIR: <repair instruction>
+
+If the plan is valid, output: VALID
+
+Output ONLY 'VALID' OR the ACTION and REPAIR statements, no additional introductory, reasoning, code fences, or commentary.
+
+"""
+
+        user_prompt = user_prompt.replace('{plan_json}', plan_json)
         
         try:
             response = self.llm.ask(
                 {},
-                [SystemMessage(content=system_prompt), UserMessage(content=user_prompt)],
+                [SystemMessage(content=self.prefix_prompt), UserMessage(content=user_prompt)],
                 max_tokens=200,
                 stops=['</end>'],
                 log=True
@@ -160,6 +159,7 @@ Output VALID -or- the ACTION and REPAIR statements only, no additional introduct
             
         except Exception as e:
             logger.error(f"Semantic validation error: {e}")
+            traceback.print_exc()
             return f"ERROR: Validation failed: {e}"
     
     def _build_tool_context(self) -> str:
@@ -246,21 +246,6 @@ Output VALID -or- the ACTION and REPAIR statements only, no additional introduct
         return "\n".join(formatted_lines)
 
 
-def validate_plan_semantically(plan: Dict[str, Any], tools_dir: Optional[str] = None) -> str:
-    """
-    Public interface for semantic plan validation.
-    
-    Args:
-        plan: Plan dict with 'plan' key
-        tools_dir: Optional map-specific tools directory path
-        
-    Returns:
-        Repair suggestions text (empty if valid)
-    """
-    validator = InfospaceSemanticValidator(tools_dir=tools_dir)
-    return validator.validate(plan)
-
-
 if __name__ == "__main__":
     import sys
     
@@ -283,7 +268,7 @@ if __name__ == "__main__":
         plan = json.load(f)
     
     # Validate
-    validator = InfospaceSemanticValidator(tools_dir=tools_dir)
+    validator = InfospaceSemanticValidator(character=None, tools_dir=tools_dir)
     result = validator.validate(plan)
     
     if result:
