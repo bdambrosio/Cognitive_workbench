@@ -321,8 +321,9 @@ class InfospaceExecutor:
         # Bind result if output variable specified
         result_value = result.get('value')
         if out_var:
-            # Special handling for filter-collection: returns Collection ID directly
-            if target == 'filter-collection' and isinstance(result_value, str) and result_value.startswith('Collection_'):
+            # Special handling for Level 4 tools: return Collection ID directly
+            level4_tools = ['filter-collection', 'query-web', 'semantic-scholar']
+            if target in level4_tools and isinstance(result_value, str) and result_value.startswith('Collection_'):
                 # Result is already a Collection ID - bind directly
                 self._bind_variable(out_var, result_value)
                 logger.info(f"Tool '{target}' executed, Collection {result_value} → ${out_var}")
@@ -519,8 +520,10 @@ Only provide the result, followed by the </end> tag.""")
         # Handle Python-based tools
         # Check trust flag
         if not tool_info.get('trusted', False):
+            tool_path = tool_info.get('path', 'unknown')
+            skill_md_path = f"{tool_path}/SKILL.md" if tool_path != 'unknown' else f"tools/{tool_name}/SKILL.md"
             return {'status': 'failed', 
-                   'reason': f'Untrusted Python tool: {tool_name}. Set trusted: true in SKILL.md'}
+                   'reason': f'Untrusted Python tool: {tool_name}. Add "trusted: true" to frontmatter in {skill_md_path}'}
         
         # Get Python file path
         python_file = tool_info.get('python_file')
@@ -796,22 +799,11 @@ Only provide the result, followed by the </end> tag.""")
         if not isinstance(target_arg, str):
             return {'status': 'failed', 'reason': 'persist target must be string'}
         
-        # Check if target is a variable reference
-        if target_arg.startswith('$'):
-            resource_var = target_arg[1:]
-            
-            if resource_var not in self.plan_bindings:
-                return {'status': 'failed', 'reason': f'Variable not bound: {resource_var}'}
-            
-            resource_id = self.plan_bindings[resource_var]
-            
-            if not isinstance(resource_id, str) or not (resource_id.startswith('Collection_') or resource_id.startswith('Note_')):
-                return {'status': 'failed', 'reason': f'Variable {resource_var} is not a Note or Collection'}
-        else:
-            # Treat as literal resource ID
-            resource_id = target_arg
-            if not (resource_id.startswith('Collection_') or resource_id.startswith('Note_')):
-                return {'status': 'failed', 'reason': f'Target must be $variable or literal Note_ID/Collection_ID, got: {target_arg}'}
+        # Resolve to resource ID (handles both $var and literal IDs)
+        resource_id = self._resolve_id(target_arg)
+        
+        if not isinstance(resource_id, str) or not (resource_id.startswith('Collection_') or resource_id.startswith('Note_')):
+            return {'status': 'failed', 'reason': f'Target must be a Note or Collection ID, got: {resource_id}'}
         
         from zenoh import QueryTarget, ConsolidationMode
         for reply in self.session.get(
@@ -1593,32 +1585,32 @@ Only provide the result, followed by the </end> tag.""")
             return {'status': 'failed', 'reason': 'Cannot expand null content'}
         
         array_data = None
+        is_json = False
         
-        # Try JSON parsing first (for structured data)
+        # Try JSON extraction first (prioritize structured data)
+        # Use robust extraction that handles code fences, preambles, trailing text
         if isinstance(content, str):
-            try:
-                content_obj = json.loads(content)
-            except (json.JSONDecodeError, ValueError):
-                content_obj = None
+            # Robust extraction (strips code fences, preambles, trailing text)
+            content_obj = self._extract_json_from_text(content)
+            is_json = (content_obj is not None)
         elif isinstance(content, dict):
             content_obj = content
+            is_json = True
         else:
             content_obj = None
+            is_json = False
         
-        # If JSON parsing succeeded, try to extract array field
-        if content_obj:
+        # If content is valid JSON, extract array field (do NOT fall back to text)
+        if is_json and content_obj:
             if field_name in content_obj:
                 array_data = content_obj[field_name]
-                if isinstance(array_data, list):
-                    # Successfully extracted JSON array
-                    pass
-                else:
-                    array_data = None
+                if not isinstance(array_data, list):
+                    return {'status': 'failed', 'reason': f'Field "{field_name}" exists but is not an array'}
             else:
-                array_data = None
+                return {'status': 'failed', 'reason': f'JSON content missing "{field_name}" array field'}
         
-        # If no JSON array found, try plain text line splitting
-        if array_data is None:
+        # Only if NOT JSON (parse failed), fall back to plain text line splitting
+        elif not is_json:
             if isinstance(content, str):
                 # Split on newlines and filter empty lines
                 lines = [line.strip() for line in content.split('\n')]
@@ -1826,17 +1818,10 @@ Only provide the result, followed by the </end> tag.""")
         if not isinstance(collection_id, str) or not collection_id.startswith('Collection_'):
             return {'status': 'failed', 'reason': f'Variable {collection_var} is not a Collection'}
         
-        # Resolve value to Note ID
-        if isinstance(value_arg, str) and value_arg.startswith('$'):
-            var_name = value_arg[1:]
-            if var_name not in self.plan_bindings:
-                return {'status': 'failed', 'reason': f'Note variable not bound: {var_name}'}
-            note_id = self.plan_bindings[var_name]
-            if not isinstance(note_id, str) or not note_id.startswith('Note_'):
-                return {'status': 'failed', 'reason': f'Variable {var_name} is not a Note'}
-        else:
-            # Literal value - treat as Note ID
-            note_id = value_arg if isinstance(value_arg, str) else str(value_arg)
+        # Resolve value to Note ID (handles both $var and literal Note IDs)
+        note_id = self._resolve_id(value_arg)
+        if not isinstance(note_id, str) or not note_id.startswith('Note_'):
+            return {'status': 'failed', 'reason': f'Value must be a Note ID, got: {note_id}'}
         
         # Get current Collection content
         note_ids = self._dereference_collection(collection_var)
@@ -2257,6 +2242,94 @@ Only provide the result, followed by the </end> tag.""")
             'content_type': content_type
         }
     
+    def _extract_json_from_text(self, text: str) -> Optional[Any]:
+        """
+        Extract JSON from text with code fences, preambles, and trailing text.
+        Based on repair_json logic from llm_api.py.
+        
+        Returns parsed dict/list or None if no valid JSON found.
+        """
+        if not isinstance(text, str):
+            return None
+        
+        # Remove code fences first (common in LLM responses)
+        cleaned = text.replace("```json", "").replace("```", "").strip()
+        
+        # Find JSON boundaries (first { to last })
+        if not cleaned.startswith('{') and '{' in cleaned:
+            start = cleaned.find('{')
+            end = cleaned.rfind('}')
+            if start >= 0 and end > start:
+                cleaned = cleaned[start:end+1]
+        
+        # Remove newlines outside of string values
+        in_string = False
+        result = []
+        i = 0
+        while i < len(cleaned):
+            if cleaned[i] == '"' and (i == 0 or cleaned[i-1] != '\\'):
+                in_string = not in_string
+            if not in_string and cleaned[i] == '\n':
+                i += 1
+                continue
+            result.append(cleaned[i])
+            i += 1
+        cleaned = ''.join(result)
+        
+        # Find first complete JSON object by brace counting
+        brace_count = 0
+        json_end = 0
+        for i, char in enumerate(cleaned):
+            if char == '{':
+                brace_count += 1
+            elif char == '}':
+                brace_count -= 1
+                if brace_count == 0:
+                    json_end = i + 1
+                    break
+        if json_end > 0:
+            cleaned = cleaned[:json_end]
+        
+        # Parse extracted JSON
+        try:
+            return json.loads(cleaned)
+        except (json.JSONDecodeError, ValueError):
+            return None
+    
+    def _resolve_id(self, value: Any) -> Any:
+        """
+        Resolve $variable or literal to resource ID (Note_X or Collection_X).
+        Does NOT fetch content - returns the ID string for ID-expecting operations.
+        
+        Args:
+            value: Can be "$variable" string, literal Note/Collection ID, or resource name
+            
+        Returns:
+            Resource ID string (Note_X or Collection_X format), or original value if not resolvable
+        """
+        if not isinstance(value, str):
+            return value
+        
+        # If $variable, lookup in bindings and return ID (no content fetch)
+        if value.startswith('$'):
+            var_name = value[1:]
+            if var_name not in self.plan_bindings:
+                error_msg = f"Unbound variable: {value}"
+                logger.error(error_msg)
+                raise ValueError(error_msg)
+            
+            resource_id = self.plan_bindings[var_name]
+            # Return ID directly (no _get_content call)
+            return resource_id
+        
+        # If starts with Note_ or Collection_, validate and return as-is (literal ID)
+        if value.startswith('Note_') or value.startswith('Collection_'):
+            # Could optionally validate existence via map_node query here
+            return value
+        
+        # Otherwise return as-is (could be a name for load operation)
+        return value
+    
     def _resolve_value(self, value: Any) -> Any:
         """
         Resolve $variable to its content value.
@@ -2275,8 +2348,14 @@ Only provide the result, followed by the </end> tag.""")
         pattern = r'\$(\w+)'
         matches = re.findall(pattern, value)
         
-        # If no variable patterns found, return as-is
+        # If no variable patterns found, check if it's a literal Note/Collection ID
         if not matches:
+            # If literal ID format, fetch its content
+            if value.startswith('Note_') or value.startswith('Collection_'):
+                content = self._get_content(value)
+                if content is not None:
+                    return content
+                logger.warning(f"Could not fetch content for literal ID {value}, returning as-is")
             return value
         
         # If entire string is a single variable reference (starts with $)

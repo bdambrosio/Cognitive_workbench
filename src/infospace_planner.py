@@ -34,6 +34,12 @@ language in which plans are written and evaluated.
 
 # SEMANTIC RULES
 
+Planning Language Architecture (4 Levels):
+1. Resource & Control: Primitives operating on Note/Collection IDs (create-note, create-collection, persist, load, add, remove, union, intersection, difference, size, if, while, wait)
+2. Text Operations: Primitives and tools operating on unstructured text Notes (expand, flatten, say, display, think, filter-collection, refine, assess, summarize, relate)
+3. Coercion: Tools that extract structure from text (as-json, as-markdown)
+4. Structured Operations: Tools that produce/consume Collections of structured Notes (query-web, semantic-scholar, filter-structured, project, join)
+
 Type System:
 - Note: typed object storing a single value/data structure. Persists across restarts.
   - All Notes have envelope schema: {name, created, creator, content, content_type}
@@ -54,6 +60,7 @@ Argument Conventions:
 - Variable references: Use "$variable" to resolve Note/Collection content
 - Output names: In "out" fields, use "$variable" syntax (e.g., "out":"$result")
 - Tools: Use tool name directly as action type (e.g., {"type":"tool-name",...})
+- Resource names: Case-sensitive (e.g., "Notes" is the system collection of all Notes, not "notes")
 
 CONSTRAINTS
 - Use only primitives / tools listed in the AVAILABLE ACTIONS and TOOLS sections.
@@ -86,72 +93,58 @@ Pattern: Persist Collection
   {"type":"create-collection","value":["$methodology_summary","$gaps_analysis"],"name":"constitutional-ai-findings","out":"$findings"}
   {"type":"persist","target":"$findings"}
 
-Pattern: Searching academic papers
-  semantic-scholar → expand → (optional: filter/map to extract PDFs) → fetch-text for full papers
+Pattern: Searching academic papers (Level 4 tool - returns Collection directly)
+  semantic-scholar → map/filter/summarize (no expand needed)
   
   Example - Find papers with abstracts:
   {"type":"semantic-scholar","args":{"query":"transformer architecture"},"out":"$papers","expect":"should find 5+ papers"}
-  {"type":"expand","target":"$papers","out":"$items"}
-  {"type":"summarize","target":"$items","out":"$summary"}
+  {"type":"summarize","target":"$papers","out":"$summary"}
 
 Pattern: Fetching full text from academic papers
-  semantic-scholar → expand → map to extract PDF URLs → filter → map with fetch-text
+  semantic-scholar → map to extract PDF URLs → map with fetch-text
   
   Example - Get full paper texts:
   {"type":"semantic-scholar","args":{"query":"attention mechanisms"},"out":"$papers","expect":"should find papers with PDFs"}
-  {"type":"expand","target":"$papers","out":"$items"}
-  {"type":"map","target":"$items","operation":"as-json","args":{"field":"metadata.pdf_url"},"out":"$urls"}
+  {"type":"map","target":"$papers","operation":"as-json","args":{"field":"metadata.pdf_url"},"out":"$urls"}
   {"type":"map","target":"$urls","operation":"fetch-text","out":"$full_texts"}
 
-Pattern: Searching the web for general information
-  query-web → expand(Note) → map(Collection) (optional: use map with as-json to extract URL field from each item) → map with fetch-text to get full text from each URL
+Pattern: Searching the web for general information (Level 4 tool - returns Collection directly)
+  query-web → map (no expand needed)
   
   Example:
   {"type":"query-web","args":{"query":"Python asyncio tutorial"},"out":"$results","expect":"should find documentation"}
-  {"type":"expand","target":"$results","out":"$items"} (optional)
+  {"type":"summarize","target":"$results","out":"$summary"}
 
 Pattern: Fetching full text from web search results
-  query-web → expand → map with as-json → map with fetch-text
+  query-web → map with as-json → map with fetch-text
   
   Example:
   {"type":"query-web","args":{"query":"FastAPI best practices"},"out":"$results","expect":"should find guides"}
-  {"type":"expand","target":"$results","out":"$items"}
-  {"type":"map","target":"$items","operation":"as-json","args":{"field":"metadata.source_url"},"out":"$urls"}
+  {"type":"map","target":"$results","operation":"as-json","args":{"field":"metadata.source_url"},"out":"$urls"}
   {"type":"map","target":"$urls","operation":"fetch-text","out":"$full_texts"}
 
 Pattern: Working with Multiple Search Results
-  When combining results from multiple queries:
+  When combining results from multiple Level 4 tools (query-web, semantic-scholar):
   
-  ❌ WRONG - Cannot expand a Collection:
+  ✅ RIGHT - Level 4 tools return Collections, use union directly (NO expand):
   {"type":"query-web","args":{"query":"..."},"out":"$results1","expect":"..."},
   {"type":"query-web","args":{"query":"..."},"out":"$results2","expect":"..."},
-  {"type":"create-collection","value":["$results1","$results2"],"out":"$combined"},
-  {"type":"expand","target":"$combined","out":"$items"}  // ERROR: expand needs Note, not Collection
-  
-  ✅ RIGHT - Expand each Note first:
-  {"type":"query-web","args":{"query":"..."},"out":"$results1","expect":"..."},
-  {"type":"expand","target":"$results1","out":"$items1"},
-  {"type":"query-web","args":{"query":"..."},"out":"$results2","expect":"..."},
-  {"type":"expand","target":"$results2","out":"$items2"},
-  {"type":"union","target":"$items1","value":"$items2","out":"$all_items"}
+  {"type":"union","target":"$results1","value":"$results2","out":"$all_items"}
   
 Pattern: Combining academic and web sources
-  When paper databases insufficient, supplement with web search:
+  When paper databases insufficient, supplement with web search (Level 4 tools return Collections directly):
   
   Example:
   {"type":"semantic-scholar","args":{"query":"GPT-4 architecture"},"out":"$s2_results","expect":"should find published papers"}
-  {"type":"expand","target":"$s2_results","out":"$s2_items"}
   {"type":"query-web","args":{"query":"GPT-4 technical report"},"out":"$web_results","expect":"should find OpenAI docs"}
-  {"type":"expand","target":"$web_results","out":"$web_items"}
-  {"type":"union","target":"$s2_items","value":"$web_items","out":"$all_sources"}
+  {"type":"union","target":"$s2_results","value":"$web_results","out":"$all_sources"}
 
 Pattern: Adding filtered items to existing Collection
-  load → search → expand → map with add to append each item → persist
+  load → semantic-scholar/query-web (returns Collection) → map with add to append each item → persist
   
   Example - Add new research papers to existing collection:
   {"type":"load","resource_id":"papers","out":"$papers","expect":"should have existing paper collection"}
-  {"type":"semantic-scholar","args":{"query":"LLM agents 2025"},"out":"$results","expect":"should find recent papers"}
-  {"type":"expand","target":"$results","out":"$new_papers"}
+  {"type":"semantic-scholar","args":{"query":"LLM agents 2025"},"out":"$new_papers","expect":"should find recent papers"}
   {"type":"map","target":"$new_papers","operation":"add","args":{"target":"$papers"},"out":"$papers"}
 
 Pattern: Semantic search with chunking (index/search)
@@ -245,8 +238,7 @@ Research Example (academic paper search):
 {
   "plan": [
     {"type": "semantic-scholar","args":{"query":"machine learning interpretability"},"out": "$papers","expect":"should find ML papers"},
-    {"type": "expand","target": "$papers","out": "$items"},
-    {"type": "summarize","target": "$items","out": "$summary","expect":"should provide overview of interpretability methods"},
+    {"type": "summarize","target": "$papers","out": "$summary","expect":"should provide overview of interpretability methods"},
     {"type": "display","value": "$summary"}
   ]
 }
@@ -336,6 +328,8 @@ class InfospacePlanner:
             'flatten': ['target', 'out'],
             'coerce': ['target', 'operation', 'out'],
             'add': ['target', 'value', 'out'],
+            'remove': ['target', 'value', 'out'],
+            'size': ['target', 'out'],
             'union': ['target', 'value', 'out'],
             'intersection': ['target', 'value', 'out'],
             'difference': ['target', 'value', 'out'],

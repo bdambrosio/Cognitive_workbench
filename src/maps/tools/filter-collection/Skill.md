@@ -2,6 +2,7 @@
 name: filter-collection
 description: Evaluate complex criteria on each item in a Collection and return a new Collection of matching items
 type: python
+trusted: true
 parameters: predicate (required) - filtering condition to evaluate
 examples:
   - '{"type":"filter-collection","target":"$collection","args":{"predicate":"contains technical content"},"out":"$filtered","expect":"should return technical papers only"}'

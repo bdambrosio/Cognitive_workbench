@@ -805,6 +805,8 @@ Examples:
 use map to expand each Note: {"type":"map","target":"$collection","operation":"expand","out":"$expanded_items"}
 then use flatten if you need to combine the expanded Notes into a single Note.
 
+⚠️ NOTE: Level 4 tools (query-web, semantic-scholar) return Collections directly - NO expand needed.
+
 Description: Expand a Note into a Collection of Notes. Handles two cases:
   1. JSON with array field: Extracts array from specified field (default "results")
   2. Plain text: Splits on newlines and filters empty lines
@@ -817,7 +819,7 @@ Parameters:
 Preconditions: target variable must be bound to Note containing JSON with array field OR plain text
 Postconditions: out variable bound to Collection with one Note per array element or line
 Examples:
-  {"type":"expand","target":"$search_results","out":"$results_collection"}  # JSON array
+  {"type":"expand","target":"$search_results","out":"$results_collection"}  # JSON array from Level 2/3 tool
   {"type":"expand","target":"$data","field":"items","out":"$items_collection"}  # JSON array with custom field
   {"type":"expand","target":"$text_note","out":"$lines"}  # Plain text (splits on newlines)
 
@@ -957,16 +959,17 @@ Examples:
 
 ## load
 Description: Retrieve a persistent Note or Collection by resource ID or name
-Input: resource_id: literal string → resource ID or name
+Input: resource_id: literal string → resource ID or name (case-sensitive)
 Output: out: $variable → Note or Collection
 Parameters:
-  - resource_id (required): string resource ID (e.g., "Note_123") or name
+  - resource_id (required): string resource ID (e.g., "Note_123") or name (case-sensitive)
   - out (required): $variable name for resulting Note/Collection
   - expect (required): string describing expected content
 Preconditions: resource must exist in persistent storage
 Postconditions: out variable bound to loaded Note or Collection
 Examples:
   {"type":"load","resource_id":"Note_123","out":"$my_note","expect":"should contain previous data"}
+  {"type":"load","resource_id":"Notes","out":"$all_notes","expect":"should contain system collection of all Notes"}
   {"type":"load","resource_id":"papers","out":"$papers","expect":"should have saved papers"}
 
 ## index
