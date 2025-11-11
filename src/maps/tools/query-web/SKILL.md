@@ -2,33 +2,28 @@
 name: query-web
 type: python
 trusted: true
-description: Search the web using Google CSE + LLM extraction and return formatted results with relevant content and URLs. Returns a Note containing a JSON array of results.
+description: Search the web using Google CSE + LLM extraction. Returns a Collection of structured Notes (Level 4 tool).
 parameters:
   source: args.query
 examples:
   - '{"type":"query-web","args":{"query":"transformer architecture papers"},"out":"$results","expect":"should find recent papers on transformers"}'
 ---
 
-# Web Search Tool
+# Web Search Tool (Level 4)
 ## Input
 - Query string (e.g., "weather forecast Berkeley CA October 2025")
 ## Output
-- JSON with query and results array. Each result has uniform structure:
+- Collection ID containing one structured Note per search result
+- Each Note contains JSON with uniform structure:
 {
-  "query": "weather forecast Berkeley CA October 2025",
-  "results": [
-    {
-      "text": "Station List\nNational Weather Service Marine Forecast ...",
-      "format": "html",
-      "metadata": {
-        "source_url": "https://www.ndbc.noaa.gov/data/Forecasts/FZUS56.KMTR.html",
-        "domain": "www.ndbc.noaa.gov",
-        "elapsed_ms": 1206
-      },
-      "char_count": 112
-    },
-    ...
-  ]
+  "text": "Station List\nNational Weather Service Marine Forecast ...",
+  "format": "html",
+  "metadata": {
+    "source_url": "https://www.ndbc.noaa.gov/data/Forecasts/FZUS56.KMTR.html",
+    "domain": "www.ndbc.noaa.gov",
+    "elapsed_ms": 1206
+  },
+  "char_count": 112
 }
 
 ## Configuration
@@ -61,29 +56,26 @@ Requires `GOOGLE_API_KEY` and `GOOGLE_CX` environment variables.
 
 ## Common Workflows
 
-### Pattern 1: Search for user consumption
-When user needs direct answer, summarize results with query as focus:
+### Pattern 1: Search and summarize for user
+When user needs direct answer, summarize Collection directly:
 ```json
 {"type":"query-web","args":{"query":"what are transformers in AI"},"out":"$results","expect":"should find transformers"}
 {"type":"summarize","target":"$results","args":{"focus":"what are transformers"},"out":"$summary"}
 {"type":"say","target":"user","value":"$summary"}
 ```
 
-### Pattern 2: Search and form a collection from result
-When results need a collection split into individual notes per URL:
+### Pattern 2: Search and process Collection
+Results are already a Collection - use map/filter directly (NO expand needed):
 ```json
 {"type":"query-web","args":{"query":"transformer papers"},"out":"$results","expect":"should find papers"}
-{"type":"expand","target":"$results","out":"$notes_collection"}
+{"type":"filter-collection","target":"$results","args":{"predicate":"contains arxiv.org"},"out":"$arxiv_only"}
 ```
 
 ### Pattern 3: Get full text from search results
-When you need complete text (not just excerpts), use fetch-text:
+Extract URLs and fetch full text (NO expand needed):
 ```json
 {"type":"query-web","args":{"query":"transformer papers"},"out":"$results","expect":"should find papers"}
-{"type":"expand","target":"$results","out":"$items"}
-{"type":"map","target":"$items","operation":"as-json","args":{"field":"metadata.source_url"},"out":"$urls"}
+{"type":"map","target":"$results","operation":"as-json","args":{"field":"metadata.source_url"},"out":"$urls"}
 {"type":"map","target":"$urls","operation":"fetch-text","out":"$full_texts"}
 ```
-
-Note: Do NOT create a collection with only the web-search result Note and try to index/search it - this returns the same single item. Use Pattern 1 (summarize) or Pattern 2 (expand) instead.
 

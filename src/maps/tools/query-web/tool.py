@@ -18,9 +18,15 @@ from typing import List, Dict, Any, Optional
 import requests
 import urllib.parse as en
 import warnings
+import zenoh
+from zenoh import QueryTarget, ConsolidationMode
 
 import wordfreq as wf
 from unstructured.partition.html import partition_html
+
+# Open zenoh session for creating Notes and Collections
+config = zenoh.Config()
+zenoh_session = zenoh.open(config)
 
 # ------------------------------
 # Logging setup
@@ -30,6 +36,57 @@ logger.setLevel(logging.INFO)
 
 # Suppress verbose warnings from unstructured
 warnings.filterwarnings('ignore', category=UserWarning, module='unstructured')
+
+# ------------------------------
+# Zenoh helpers for creating Notes/Collections
+# ------------------------------
+
+def _create_note(content: Any, agent_name: str, source_skill: str = 'query-web') -> str:
+    """Create a Note via Zenoh and return its ID."""
+    for reply in zenoh_session.get(
+        "cognitive/map/note/create",
+        target=QueryTarget.BEST_MATCHING,
+        consolidation=ConsolidationMode.NONE,
+        payload=json.dumps({
+            'character_name': agent_name,
+            'content': content,
+            'format': 'json' if isinstance(content, dict) else 'text',
+            'source_skill': source_skill,
+            'source_value': str(content)[:100]
+        }).encode('utf-8'),
+        timeout=5.0
+    ):
+        if reply.ok:
+            response = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
+            if response.get('success'):
+                return response.get('info_id')
+        break
+    return None
+
+def _create_collection(note_ids: List[str], agent_name: str, source_skill: str = 'query-web') -> str:
+    """Create a Collection via Zenoh and return its ID."""
+    for reply in zenoh_session.get(
+        "cognitive/map/collection/create",
+        target=QueryTarget.BEST_MATCHING,
+        consolidation=ConsolidationMode.NONE,
+        payload=json.dumps({
+            'character_name': agent_name,
+            'content': note_ids,
+            'format': 'list',
+            'source_skill': source_skill,
+            'source_value': f'{len(note_ids)} search results'
+        }).encode('utf-8'),
+        timeout=5.0
+    ):
+        if reply.ok:
+            response = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
+            if response.get('success'):
+                collection_id = response.get('info_id')
+                logger.info(f"Created Collection {collection_id} with {len(note_ids)} items")
+                return collection_id
+        break
+    logger.error("Failed to create Collection via Zenoh")
+    return None
 
 # ------------------------------
 # Small utilities
@@ -178,7 +235,7 @@ def _html_to_text_extract(html: str, query: str, max_chars: int) -> str:
 # LLM-assisted TL;DR
 # ------------------------------
 
-def _llm_tldr(LLM_client, text: str, query: str, max_chars: int, timeout: float = 10.0, heartbeat=None) -> str:
+def _llm_tldr(LLM_client, text: str, query: str, max_chars: int, timeout: float = 12.0, heartbeat=None) -> str:
     """
     Your environment should provide LLM_client.generate(...)
     Keep this call shape; fill in your client inside your app.
@@ -213,7 +270,7 @@ Respond only with the JSON, no commentary, no code fences, no reasoning:
             if str(raw.text.get("relevant", "")).lower().startswith("true"):
                 return True
             else:
-                logger.error(f"No relevant content found for query: {query}")
+                logger.warning(f"No relevant content found for query: {query}")
                 return False
         return False
     except Exception as e:
@@ -315,7 +372,7 @@ def _create_empty_result(url: str, start_time: float, file_format: str = "html")
 # Public entry point
 # ------------------------------
 
-def llm_search(query: str, client, max_chars: int = 8000, max_urls: int = 10, max_workers: int = 6, wall_time_limit: float = 10.0, heartbeat=None) -> List[Dict[str, Any]]:
+def llm_search(query: str, client, max_chars: int = 8000, max_urls: int = 10, max_workers: int = 6, wall_time_limit: float = 15.0, heartbeat=None) -> List[Dict[str, Any]]:
     """
     High-level:
       1) Google CSE for initial URL set (two phrasings interleaved).
@@ -335,7 +392,9 @@ def llm_search(query: str, client, max_chars: int = 8000, max_urls: int = 10, ma
     rephr = ""
     try:
         response = client.generate(
-            messages=[f"""Rephrase the following query as a best-practice google search query. 
+            messages=[f"""Rephrase the following google searchquery. 
+Generate a significant rephrasing of the query that is likely to find different results from the original query. 
+Be sure to keep, or better, sharpen the semantic intent of the query.
 
 #Query:
 {query}
@@ -386,7 +445,7 @@ End your response with:
             while idx < len(interleaved) and len(in_flight) < max_workers and (time.time() - t0) < wall_time_limit:
                 url = interleaved[idx]
                 idx += 1
-                per_url_timeout = max(5.0, wall_time_limit - (time.time() - t0 - 1.0))
+                per_url_timeout = max(8.0, wall_time_limit - (time.time() - t0 - 1.0))
                 fut = ex.submit(_process_url, url, query, client, per_url_timeout, max_chars/4, heartbeat)
                 logger.info(f"Submitted task for url: {url}")
                 in_flight.append(fut)
@@ -450,15 +509,22 @@ def tool(value, **kwargs):
     
     Args:
         value: Search query string
-        **kwargs: Optional llm_client (will create if not provided)
+        **kwargs: agent_name (required), llm_client (optional)
     
     Returns:
-        Markdown-formatted string with search results
+        Collection ID containing structured Note for each search result
     """
     if not isinstance(value, str):
         return {
             'status': 'failed',
             'reason': 'Query must be a string'
+        }
+    
+    agent_name = kwargs.get('agent_name')
+    if not agent_name:
+        return {
+            'status': 'failed',
+            'reason': 'agent_name required in kwargs'
         }
     
     # Get or create LLM client
@@ -486,9 +552,9 @@ def tool(value, **kwargs):
             query=value,
             client=llm_client,
             max_chars=32000,
-            max_urls=7,
+            max_urls=10,
             max_workers=6,
-            wall_time_limit=12.0,
+            wall_time_limit=15.0,
             heartbeat=kwargs.get('heartbeat')
         )
     except Exception as e:
@@ -498,23 +564,31 @@ def tool(value, **kwargs):
         }
     
     if not results:
-        return json.dumps({
-            'query': value,
-            'results': [],
-            'count': 0
-        })
+        # Return empty Collection for no results
+        empty_coll_id = _create_collection([], agent_name)
+        if not empty_coll_id:
+            return {'status': 'failed', 'reason': 'Failed to create empty Collection'}
+        return empty_coll_id
     
-    # Return structured JSON matching fetch-text format (uniform structure)
-    result_items = []
+    # Create a Note for each result (each is structured JSON)
+    note_ids = []
     for result in results:
-        # Result already has uniform structure from _process_url
-        result_items.append(result)
+        note_id = _create_note(result, agent_name)
+        if note_id:
+            note_ids.append(note_id)
+        else:
+            logger.warning(f"Failed to create Note for result: {result.get('url', 'unknown')}")
     
-    return json.dumps({
-        'query': value,
-        'results': result_items,
-        'count': len(result_items)
-    }, indent=2)
+    if not note_ids:
+        return {'status': 'failed', 'reason': 'Failed to create any Notes from search results'}
+    
+    # Create Collection containing all result Notes
+    collection_id = _create_collection(note_ids, agent_name)
+    if not collection_id:
+        return {'status': 'failed', 'reason': 'Failed to create Collection'}
+    
+    logger.info(f"query-web created Collection {collection_id} with {len(note_ids)} results for query: {value}")
+    return collection_id
 
 if __name__ == "__main__":
     from llm_client import ZenohLLMClient

@@ -120,8 +120,12 @@ def tool(value: Any, **kwargs) -> str:
         # LLM evaluation
         prompt = f"Does this match '{predicate}'? Respond 'true' or 'false' only.\n\nContent: {content_str}"
         try:
-            result = llm_client.generate(prompt, max_tokens=10).strip().lower()
-            matches = (result == 'true')
+            response = llm_client.generate([prompt], max_tokens=10)
+            if not response.success:
+                logger.error(f"LLM evaluation failed for {note_id}: {response.error}")
+                continue
+            result = response.text.strip().lower()
+            matches = True if 'true' in result else False
         except Exception as e:
             logger.error(f"LLM evaluation failed for {note_id}: {e}")
             continue
