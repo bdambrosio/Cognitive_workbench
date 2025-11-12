@@ -764,7 +764,7 @@ INFOSPACE_PRIMITIVES_REFERENCE = """# INFOSPACE PRIMITIVES AND CONDITIONS
 
 Variables: Use "$variable" to reference Note/Collection content previously bound
 Literals: Use plain strings/values (no $) for literal data or names
-Names: Output variable names in "out" fields use plain strings (no $)
+Names: Output variable names in "out" fields use "$variable" syntax (e.g., "out": "$result")
 Tools/Resources: Can be literal "tool-name/resource-name" or "$variable" holding name
 Resource IDs: Can be literal "Note_X" or "Collection_X" for persist action, otherwise use "load" action first to bind to variable
 
@@ -776,15 +776,15 @@ Input: target: $variable → Collection (must be Collection)
 Output: out: $variable → Collection (same length or filtered)
 Parameters:
   - target (required): $variable referencing Collection
-  - operation (required): tool-name string or {"tool":"name","args":{}} object
+  - operation (required): tool-name string, primitive name, or {"tool":"name","args":{}} dict
   - filter_null (optional): boolean, exclude null/failed results (default: true)
   - out (required): $variable name for resulting Collection
 Preconditions: target variable must be bound to Collection
 Postconditions: out variable bound to Collection with transformed items (failures excluded by default)
 Examples:
   {"type":"map","target":"$collection","operation":"tool-name","out":"$result_collection"}
-  {"type":"map","target":"$collection","operation":"tool-name","filter_null":false,"out":"$all_results"}
-  {"type":"map","target":"$new_items","operation":"add","args":{"target":"$existing_collection"},"out":"$existing_collection"}
+  {"type":"map","target":"$collection","operation":"add","args":{"target":"$existing"},"out":"$existing"}
+  {"type":"map","target":"$collection","operation":{"tool":"tool-name","args":{"param":"value"}},"out":"$results"}
 
 ## flatten
 Description: Convert Collection to single Note by concatenating items
