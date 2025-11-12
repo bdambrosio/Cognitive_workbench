@@ -2,11 +2,13 @@
 name: semantic-scholar
 type: python
 trusted: true
-description: Search academic papers using Semantic Scholar API. Returns a Collection of structured Notes (Level 4 tool).
+description: Search academic papers. Returns Collection of JSON Notes with fields text, metadata.title, metadata.authors, metadata.year, metadata.citations, metadata.pdf_url, metadata.venue (Level 4 tool).
 parameters:
   source: args.query
 examples:
   - '{"type":"semantic-scholar","args":{"query":"transformer architecture"},"out":"$papers","expect":"should find papers on transformers"}'
+  - '{"type":"project","target":"$papers","fields":["metadata.title","metadata.year"],"out":"$titles"}'
+  - '{"type":"filter-structured","target":"$papers","where":"metadata.citations > 100","out":"$high_impact"}'
 ---
 
 # Semantic Scholar Search Tool (Level 4)
@@ -53,10 +55,10 @@ Results are already a Collection - summarize directly (NO expand needed):
 ```
 
 ### Pattern 2: Get full text from papers
-Extract PDF URLs and fetch full text (NO expand needed):
+Extract PDF URLs using project, then fetch full text:
 ```json
 {"type":"semantic-scholar","args":{"query":"GPT architecture"},"out":"$papers","expect":"should find GPT papers"}
-{"type":"map","target":"$papers","operation":"as-json","args":{"field":"metadata.pdf_url"},"out":"$urls"}
+{"type":"project","target":"$papers","fields":["metadata.pdf_url"],"out":"$urls"}
 {"type":"map","target":"$urls","operation":"fetch-text","out":"$full_texts"}
 ```
 

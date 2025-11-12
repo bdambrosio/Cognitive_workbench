@@ -915,6 +915,81 @@ Examples:
   {"type":"remove","target":"$collection","value":"$note_id","out":"$collection"}
   {"type":"remove","target":"$collection","value":"Note_123","out":"$collection"}
 
+## project
+Description: Extract specific fields from structured Notes (SQL SELECT fields), preserving nested structure
+Input: target: $variable → Collection of JSON Notes
+Output: out: $variable → Collection (projected Notes with only specified fields in nested format)
+Parameters:
+  - target (required): $variable referencing Collection
+  - fields (required): list of field paths (e.g., ["title", "metadata.year"])
+  - out (required): $variable name for resulting Collection
+Preconditions: target must be Collection of dict/JSON Notes
+Postconditions: out variable bound to Collection with projected Notes (nested structure preserved)
+Examples:
+  {"type":"project","target":"$papers","fields":["title","year"],"out":"$titles_and_years"}
+  {"type":"project","target":"$results","fields":["metadata.url","metadata.domain"],"out":"$urls"}
+
+## pluck
+Description: Extract single field value from each Note in Collection (for tools needing scalar values)
+Input: target: $variable → Collection of JSON Notes
+Output: out: $variable → Collection (Notes containing extracted scalar values)
+Parameters:
+  - target (required): $variable referencing Collection
+  - field (required): field path to extract (e.g., "metadata.url", "title")
+  - out (required): $variable name for resulting Collection
+Preconditions: target must be Collection of dict/JSON Notes
+Postconditions: out variable bound to Collection with Notes containing field values
+Examples:
+  {"type":"pluck","target":"$papers","field":"metadata.pdf_url","out":"$urls"}
+  {"type":"pluck","target":"$results","field":"text","out":"$texts"}
+
+## filter-structured
+Description: Filter Collection by JSON field predicates (SQL WHERE - deterministic, no LLM)
+Input: target: $variable → Collection of JSON Notes
+Output: out: $variable → Collection (filtered Notes matching predicate)
+Parameters:
+  - target (required): $variable referencing Collection
+  - where (required): predicate string (e.g., "year > 2020", "citations >= 100 AND year < 2025")
+  - out (required): $variable name for resulting Collection
+Preconditions: target must be Collection of dict/JSON Notes
+Postconditions: out variable bound to Collection with matching Notes
+Examples:
+  {"type":"filter-structured","target":"$papers","where":"year > 2020","out":"$recent"}
+  {"type":"filter-structured","target":"$papers","where":"citations >= 100 AND year < 2025","out":"$high_impact"}
+
+## sort
+Description: Sort Collection by field value (SQL ORDER BY)
+Input: target: $variable → Collection of JSON Notes
+Output: out: $variable → Collection (sorted Notes)
+Parameters:
+  - target (required): $variable referencing Collection
+  - by (required): field path to sort by (e.g., "year", "metadata.citations")
+  - order (optional): "asc" or "desc" (default: "asc")
+  - out (required): $variable name for resulting Collection
+Preconditions: target must be Collection of dict/JSON Notes
+Postconditions: out variable bound to sorted Collection
+Examples:
+  {"type":"sort","target":"$papers","by":"year","order":"desc","out":"$newest_first"}
+  {"type":"sort","target":"$papers","by":"metadata.citations","order":"desc","out":"$most_cited"}
+
+## join
+Description: Join two Collections on key field (SQL JOIN)
+Input: target: $variable → Collection A (left), value: $variable → Collection B (right)
+Output: out: $variable → Collection (joined Notes with merged fields)
+Parameters:
+  - target (required): $variable referencing left Collection
+  - value (required): $variable referencing right Collection
+  - args.on (required): join key field name (if same in both)
+  - args.type (optional): "inner", "left", "right", or "outer" (default: "inner")
+  - args.left_key (optional): left key field if different from right
+  - args.right_key (optional): right key field if different from left
+  - out (required): $variable name for resulting Collection
+Preconditions: both Collections must contain dict/JSON Notes
+Postconditions: out variable bound to Collection with joined Notes
+Examples:
+  {"type":"join","target":"$papers","value":"$citations","args":{"on":"paper_id"},"out":"$enriched"}
+  {"type":"join","target":"$papers","value":"$authors","args":{"left_key":"author_id","right_key":"id","type":"left"},"out":"$with_authors"}
+
 ## create-note
 Description: Create a persistent Note object and bind to variable
 Input: value: literal or $variable → any content

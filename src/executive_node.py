@@ -1707,6 +1707,8 @@ end your response with </end>
             'apply', 'display', 'create-note', 'create-collection', 'persist', 'load', 'index', 'organize', 'search',
             'extract', 'filter', 'merge', 'coerce',
             'aggregate', 'sort', 'group_by', 'compare', 'map', 'flatten', 'add', 'expand',
+            # Level 4: Structured data primitives
+            'project', 'pluck', 'filter-structured', 'join',
             # Set operations
             'union', 'intersection', 'difference', 'remove', 'size'
         }
@@ -1922,6 +1924,8 @@ end your response with </end>
                 'flatten', 'add', 'expand',
                 # Set operations
                 'union', 'intersection', 'difference', 'remove', 'size',
+                # Level 4: Structured data operations
+                'project', 'pluck', 'filter-structured', 'sort', 'join',
                 # Communication
                 'say', 'display', 'think', 'ask'
             }

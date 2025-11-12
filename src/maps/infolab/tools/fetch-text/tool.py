@@ -32,15 +32,47 @@ warnings.filterwarnings('ignore', category=UserWarning, module='unstructured')
 def tool(url_or_content: str, **kwargs) -> str:
     """
     Fetch text from URL or base64 PDF. Auto-detects format and extracts all text.
+    Collection-aware: If input is Collection ID, fetches first item's URL.
     
     Args:
-        url_or_content: URL string or base64-encoded PDF content
+        url_or_content: URL string, base64-encoded PDF content, or Collection ID
         
     Returns:
         JSON string with text, format, metadata, page_count (if PDF), char_count
     """
     if not url_or_content or not isinstance(url_or_content, str):
         return json.dumps({"error": "url_or_content parameter required"})
+    
+    # Check if input is Collection ID - extract first item
+    if url_or_content.startswith('Collection_'):
+        try:
+            from infospace_resource_manager import InfospaceResourceManager
+            resource_mgr = kwargs.get('resource_manager')
+            if not resource_mgr:
+                # Try to get from world_map
+                world_map = kwargs.get('world_map')
+                if world_map and hasattr(world_map, 'resource_registry'):
+                    collection = world_map.resource_registry.get(url_or_content)
+                    if collection and collection.get('type') == 'collection':
+                        note_ids = collection.get('content', [])
+                        if len(note_ids) == 0:
+                            return json.dumps({"error": "Collection is empty"})
+                        if len(note_ids) > 1:
+                            logger.warning(f"fetch-text: Collection {url_or_content} has {len(note_ids)} items, using first")
+                        first_note_id = note_ids[0]
+                        # Get Note content
+                        note = world_map.resource_registry.get(first_note_id)
+                        if note:
+                            url_or_content = note.get('content', '')
+                        else:
+                            return json.dumps({"error": f"Note {first_note_id} not found"})
+                    else:
+                        return json.dumps({"error": f"Collection {url_or_content} not found"})
+                else:
+                    return json.dumps({"error": "Cannot resolve Collection without world_map"})
+        except Exception as e:
+            logger.error(f"Failed to resolve Collection: {e}")
+            return json.dumps({"error": f"Failed to resolve Collection: {e}"})
     
     # Check if input is base64 PDF (backward compatibility)
     if _is_base64_pdf(url_or_content):

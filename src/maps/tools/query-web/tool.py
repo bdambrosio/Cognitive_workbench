@@ -437,10 +437,24 @@ End your response with:
     # 2) Concurrent process with a global wall-time budget
     results: List[Dict[str, Any]] = []
     in_flight = []
-    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as ex:
+    ex = concurrent.futures.ThreadPoolExecutor(max_workers=max_workers)
+    try:
         t0 = time.time()
         idx = 0
-        while (idx < len(interleaved) or in_flight) and (time.time() - t0) < wall_time_limit:
+        while idx < len(interleaved) or in_flight:
+            # Check timeout - if exceeded, harvest done tasks and exit
+            if (time.time() - t0) >= wall_time_limit:
+                logger.warning(f"Wall time limit {wall_time_limit}s exceeded, collecting completed results")
+                for fut in in_flight:
+                    if fut.done():
+                        try:
+                            item = fut.result()
+                            if item and item.get("text"):
+                                results.append(item)
+                        except Exception:
+                            pass
+                break
+            
             # launch new tasks while under budget
             while idx < len(interleaved) and len(in_flight) < max_workers and (time.time() - t0) < wall_time_limit:
                 url = interleaved[idx]
@@ -465,29 +479,22 @@ End your response with:
                         pass
                     still.append(None)
                 else:
-                    # Check if we should timeout this future
-                    remaining_time = wall_time_limit - (time.time() - t0)
-                    if remaining_time <= 0:
-                        fut.cancel()
+                    try:
+                        # Wait with timeout - if it completes, get result
+                        item = fut.result(timeout=0.1)
+                        logger.info(f"Completed task: {item}")
+                        if item and item.get("text"):
+                            results.append(item)
                         still.append(None)
-                    else:
-                        try:
-                            # Wait with timeout - if it completes, get result
-                            item = fut.result(timeout=0.1)
-                            logger.info(f"Completed task: {item}")
-                            if item and item.get("text"):
-                                results.append(item)
-                            still.append(None)
-                        except concurrent.futures.TimeoutError:
-                            still.append(fut)
-                        except Exception:
-                            still.append(None)
+                    except concurrent.futures.TimeoutError:
+                        still.append(fut)
+                    except Exception:
+                        still.append(None)
             in_flight = [f for f in still if f is not None]
             time.sleep(0.05 if len(in_flight) < max_workers else 0.2)
-
-        # cancel remaining if wall time exceeded
-        for fut in in_flight:
-            fut.cancel()
+    finally:
+        # Shutdown without waiting for slow threads
+        ex.shutdown(wait=False)
 
     # 3) Optional basic re-rank: prefer domains with text length and query hits
     ql = query.lower()

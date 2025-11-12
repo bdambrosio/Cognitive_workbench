@@ -2,11 +2,13 @@
 name: query-web
 type: python
 trusted: true
-description: Search the web using Google CSE + LLM extraction. Returns a Collection of structured Notes (Level 4 tool).
+description: Search web using Google CSE. Returns Collection of JSON Notes with fields text, metadata.source_url, metadata.domain, format, char_count (Level 4 tool).
 parameters:
   source: args.query
 examples:
   - '{"type":"query-web","args":{"query":"transformer architecture papers"},"out":"$results","expect":"should find recent papers on transformers"}'
+  - '{"type":"project","target":"$results","fields":["metadata.source_url","metadata.domain"],"out":"$urls"}'
+  - '{"type":"filter-structured","target":"$results","where":"char_count > 1000","out":"$long_articles"}'
 ---
 
 # Web Search Tool (Level 4)
@@ -29,28 +31,19 @@ examples:
 ## Configuration
 Requires `GOOGLE_API_KEY` and `GOOGLE_CX` environment variables.
 
-## Examples
+## Example Note Structure
 
-**Query:** "transformer architecture papers"
-
-**Returns:**
+Each Note in the returned Collection contains:
 ```json
 {
-  "query": "transformer architecture papers",
-  "results": [
-    {
-      "text": "The dominant sequence transduction models are based on complex recurrent or convolutional neural networks...",
-      "format": "html",
-      "metadata": {
-        "source_url": "https://arxiv.org/abs/1706.03762",
-        "domain": "arxiv.org",
-        "elapsed_ms": 1234
-      },
-      "char_count": 523
-    },
-    ...
-  ],
-  "count": 10
+  "text": "The dominant sequence transduction models are based on...",
+  "format": "html",
+  "metadata": {
+    "source_url": "https://arxiv.org/abs/1706.03762",
+    "domain": "arxiv.org",
+    "elapsed_ms": 1234
+  },
+  "char_count": 523
 }
 ```
 
@@ -72,10 +65,10 @@ Results are already a Collection - use map/filter directly (NO expand needed):
 ```
 
 ### Pattern 3: Get full text from search results
-Extract URLs and fetch full text (NO expand needed):
+Extract URLs using project, then fetch full text:
 ```json
 {"type":"query-web","args":{"query":"transformer papers"},"out":"$results","expect":"should find papers"}
-{"type":"map","target":"$results","operation":"as-json","args":{"field":"metadata.source_url"},"out":"$urls"}
+{"type":"project","target":"$results","fields":["metadata.source_url"],"out":"$urls"}
 {"type":"map","target":"$urls","operation":"fetch-text","out":"$full_texts"}
 ```
 

@@ -207,6 +207,12 @@ class InfospaceExecutor:
             'intersection': self._execute_intersection,
             'difference': self._execute_difference,
             'remove': self._execute_remove,
+            # Level 4: Structured data operations
+            'project': self._execute_project,
+            'pluck': self._execute_pluck,
+            'filter-structured': self._execute_filter_structured,
+            'sort': self._execute_sort,
+            'join': self._execute_join,
         }
         
         handler = handlers.get(action_type)
@@ -1858,6 +1864,436 @@ Only provide the result, followed by the </end> tag.""")
             break
         
         return {'status': 'failed', 'reason': 'No response from map_node'}
+    
+    def _execute_project(self, action: Dict) -> Dict:
+        """
+        Extract specific fields from each Note in a Collection (SQL SELECT fields).
+        
+        Required: target, out
+        Optional: fields (list of field paths like "title" or "metadata.year")
+        """
+        error = self._validate_required_fields(action, 'target', 'out')
+        if error:
+            return {'status': 'failed', 'reason': error}
+        
+        target_arg = action.get('target')
+        out_var = action.get('out')
+        fields = action.get('fields', action.get('args', {}).get('fields'))
+        
+        if not isinstance(target_arg, str) or not target_arg.startswith('$'):
+            return {'status': 'failed', 'reason': 'project target must be $variable'}
+        
+        if not fields:
+            return {'status': 'failed', 'reason': 'project requires fields list'}
+        
+        if not isinstance(fields, list):
+            return {'status': 'failed', 'reason': 'fields must be a list'}
+        
+        collection_var = target_arg[1:]
+        note_ids = self._dereference_collection(collection_var)
+        
+        if not isinstance(note_ids, list):
+            return {'status': 'failed', 'reason': 'project target must be a Collection'}
+        
+        # Project each Note
+        projected_ids = []
+        for note_id in note_ids:
+            content = self._get_content(note_id)
+            if content is None:
+                continue
+            
+            # Extract fields from JSON content
+            if not isinstance(content, dict):
+                logger.warning(f"Cannot project from non-dict Note {note_id}")
+                continue
+            
+            projected = {}
+            for field in fields:
+                # Handle nested fields like "metadata.year"
+                value = content
+                parts = field.split('.')
+                for part in parts:
+                    if isinstance(value, dict) and part in value:
+                        value = value[part]
+                    else:
+                        value = None
+                        break
+                
+                if value is not None:
+                    # Preserve nested structure in projected Note
+                    if len(parts) == 1:
+                        projected[parts[0]] = value
+                    else:
+                        # Rebuild nested structure
+                        current = projected
+                        for i, part in enumerate(parts[:-1]):
+                            if part not in current:
+                                current[part] = {}
+                            current = current[part]
+                        current[parts[-1]] = value
+            
+            # Create new Note with projected fields
+            projected_id = self._persist_note(projected, 'project_result')
+            if projected_id:
+                projected_ids.append(projected_id)
+        
+        # Create result Collection
+        collection_id = self._create_collection(projected_ids, f'project_{collection_var}')
+        if collection_id:
+            self._bind_variable(out_var, collection_id)
+            logger.info(f"Projected {len(projected_ids)} items with fields {fields} → ${out_var}")
+            return {'status': 'success', 'value': collection_id}
+        
+        return {'status': 'failed', 'reason': 'Failed to create projected Collection'}
+    
+    def _execute_pluck(self, action: Dict) -> Dict:
+        """
+        Extract a single field value from each Note in a Collection.
+        Returns Collection of Notes, each containing the extracted scalar value.
+        
+        Required: target, field, out
+        Example: Extract URLs from structured Notes for use with tools
+        """
+        error = self._validate_required_fields(action, 'target', 'field', 'out')
+        if error:
+            return {'status': 'failed', 'reason': error}
+        
+        target_arg = action.get('target')
+        field = action.get('field', action.get('args', {}).get('field'))
+        out_var = action.get('out')
+        
+        if not isinstance(target_arg, str) or not target_arg.startswith('$'):
+            return {'status': 'failed', 'reason': 'pluck target must be $variable'}
+        
+        if not field:
+            return {'status': 'failed', 'reason': 'pluck requires field parameter'}
+        
+        collection_var = target_arg[1:]
+        note_ids = self._dereference_collection(collection_var)
+        
+        if not isinstance(note_ids, list):
+            return {'status': 'failed', 'reason': 'pluck target must be a Collection'}
+        
+        # Extract field value from each Note
+        plucked_ids = []
+        for note_id in note_ids:
+            content = self._get_content(note_id)
+            if not isinstance(content, dict):
+                logger.warning(f"Cannot pluck from non-dict Note {note_id}")
+                continue
+            
+            # Navigate nested fields
+            value = content
+            for part in field.split('.'):
+                if isinstance(value, dict) and part in value:
+                    value = value[part]
+                else:
+                    value = None
+                    break
+            
+            if value is not None:
+                # Create Note with scalar value
+                plucked_id = self._persist_note(value, 'pluck_result')
+                if plucked_id:
+                    plucked_ids.append(plucked_id)
+        
+        # Create result Collection
+        collection_id = self._create_collection(plucked_ids, f'pluck_{collection_var}')
+        if collection_id:
+            self._bind_variable(out_var, collection_id)
+            logger.info(f"Plucked '{field}' from {len(plucked_ids)} items → ${out_var}")
+            return {'status': 'success', 'value': collection_id}
+        
+        return {'status': 'failed', 'reason': 'Failed to create plucked Collection'}
+    
+    def _execute_filter_structured(self, action: Dict) -> Dict:
+        """
+        Filter Collection based on JSON field predicates (SQL WHERE - deterministic).
+        
+        Required: target, where, out
+        Example where: "year > 2020" or "citations >= 100 AND year < 2025"
+        """
+        error = self._validate_required_fields(action, 'target', 'where', 'out')
+        if error:
+            return {'status': 'failed', 'reason': error}
+        
+        target_arg = action.get('target')
+        where_clause = action.get('where', action.get('args', {}).get('where'))
+        out_var = action.get('out')
+        
+        if not isinstance(target_arg, str) or not target_arg.startswith('$'):
+            return {'status': 'failed', 'reason': 'filter-structured target must be $variable'}
+        
+        if not where_clause:
+            return {'status': 'failed', 'reason': 'filter-structured requires where clause'}
+        
+        collection_var = target_arg[1:]
+        note_ids = self._dereference_collection(collection_var)
+        
+        if not isinstance(note_ids, list):
+            return {'status': 'failed', 'reason': 'filter-structured target must be a Collection'}
+        
+        # Parse where clause (simple expression evaluator)
+        def eval_predicate(content: dict, predicate: str) -> bool:
+            """Safely evaluate predicate on JSON content."""
+            # Replace field references with dict access
+            # Support: field > value, field < value, field == value, field >= value, field <= value
+            # Support AND, OR operators
+            
+            tokens = predicate.replace('>=', ' >= ').replace('<=', ' <= ').replace('==', ' == ').replace('>', ' > ').replace('<', ' < ').replace('!=', ' != ').split()
+            
+            # Simple recursive evaluation
+            def evaluate_simple(field, op, value_str):
+                # Navigate nested fields
+                val = content
+                for part in field.split('.'):
+                    if isinstance(val, dict) and part in val:
+                        val = val[part]
+                    else:
+                        return False
+                
+                # Parse value
+                try:
+                    if value_str.startswith('"') and value_str.endswith('"'):
+                        value = value_str[1:-1]
+                    elif value_str in ['true', 'True']:
+                        value = True
+                    elif value_str in ['false', 'False']:
+                        value = False
+                    else:
+                        value = float(value_str) if '.' in value_str else int(value_str)
+                except:
+                    value = value_str
+                
+                # Evaluate
+                if op == '>': return val > value
+                elif op == '<': return val < value
+                elif op == '>=': return val >= value
+                elif op == '<=': return val <= value
+                elif op == '==': return val == value
+                elif op == '!=': return val != value
+                return False
+            
+            # Handle AND/OR (simple left-to-right evaluation)
+            if ' AND ' in predicate:
+                parts = predicate.split(' AND ')
+                return all(eval_predicate(content, p.strip()) for p in parts)
+            elif ' OR ' in predicate:
+                parts = predicate.split(' OR ')
+                return any(eval_predicate(content, p.strip()) for p in parts)
+            
+            # Simple comparison
+            if len(tokens) >= 3:
+                return evaluate_simple(tokens[0], tokens[1], tokens[2])
+            return False
+        
+        # Filter each Note
+        filtered_ids = []
+        for note_id in note_ids:
+            content = self._get_content(note_id)
+            if not isinstance(content, dict):
+                continue
+            
+            try:
+                if eval_predicate(content, where_clause):
+                    filtered_ids.append(note_id)
+            except Exception as e:
+                logger.warning(f"Predicate evaluation failed for {note_id}: {e}")
+                continue
+        
+        # Create result Collection
+        collection_id = self._create_collection(filtered_ids, f'filtered_{collection_var}')
+        if collection_id:
+            self._bind_variable(out_var, collection_id)
+            logger.info(f"Filtered {len(filtered_ids)}/{len(note_ids)} items with '{where_clause}' → ${out_var}")
+            return {'status': 'success', 'value': collection_id}
+        
+        return {'status': 'failed', 'reason': 'Failed to create filtered Collection'}
+    
+    def _execute_sort(self, action: Dict) -> Dict:
+        """
+        Sort Collection by field value (SQL ORDER BY).
+        
+        Required: target, by, out
+        Optional: order ("asc" or "desc", default "asc")
+        """
+        error = self._validate_required_fields(action, 'target', 'by', 'out')
+        if error:
+            return {'status': 'failed', 'reason': error}
+        
+        target_arg = action.get('target')
+        sort_field = action.get('by', action.get('args', {}).get('by'))
+        out_var = action.get('out')
+        order = action.get('order', action.get('args', {}).get('order', 'asc'))
+        
+        if not isinstance(target_arg, str) or not target_arg.startswith('$'):
+            return {'status': 'failed', 'reason': 'sort target must be $variable'}
+        
+        if not sort_field:
+            return {'status': 'failed', 'reason': 'sort requires by field'}
+        
+        if order not in ['asc', 'desc']:
+            return {'status': 'failed', 'reason': 'sort order must be "asc" or "desc"'}
+        
+        collection_var = target_arg[1:]
+        note_ids = self._dereference_collection(collection_var)
+        
+        if not isinstance(note_ids, list):
+            return {'status': 'failed', 'reason': 'sort target must be a Collection'}
+        
+        # Extract sort keys
+        items_with_keys = []
+        for note_id in note_ids:
+            content = self._get_content(note_id)
+            if not isinstance(content, dict):
+                continue
+            
+            # Navigate to sort field
+            value = content
+            for part in sort_field.split('.'):
+                if isinstance(value, dict) and part in value:
+                    value = value[part]
+                else:
+                    value = None
+                    break
+            
+            if value is not None:
+                items_with_keys.append((note_id, value))
+        
+        # Sort
+        try:
+            sorted_items = sorted(items_with_keys, key=lambda x: x[1], reverse=(order == 'desc'))
+            sorted_ids = [note_id for note_id, _ in sorted_items]
+        except Exception as e:
+            return {'status': 'failed', 'reason': f'Sort failed: {e}'}
+        
+        # Create result Collection
+        collection_id = self._create_collection(sorted_ids, f'sorted_{collection_var}')
+        if collection_id:
+            self._bind_variable(out_var, collection_id)
+            logger.info(f"Sorted {len(sorted_ids)} items by {sort_field} ({order}) → ${out_var}")
+            return {'status': 'success', 'value': collection_id}
+        
+        return {'status': 'failed', 'reason': 'Failed to create sorted Collection'}
+    
+    def _execute_join(self, action: Dict) -> Dict:
+        """
+        Join two Collections on a key field (SQL JOIN).
+        
+        Required: target (left), value (right), out
+        Args: on (join key), type (inner/left/right/outer), left_key, right_key
+        """
+        error = self._validate_required_fields(action, 'target', 'value', 'out')
+        if error:
+            return {'status': 'failed', 'reason': error}
+        
+        left_arg = action.get('target')
+        right_arg = action.get('value')
+        out_var = action.get('out')
+        args = action.get('args', {})
+        
+        join_key = args.get('on')
+        join_type = args.get('type', 'inner')
+        left_key = args.get('left_key', join_key)
+        right_key = args.get('right_key', join_key)
+        
+        if not isinstance(left_arg, str) or not left_arg.startswith('$'):
+            return {'status': 'failed', 'reason': 'join target must be $variable'}
+        
+        if not isinstance(right_arg, str) or not right_arg.startswith('$'):
+            return {'status': 'failed', 'reason': 'join value must be $variable'}
+        
+        if not join_key and not (left_key and right_key):
+            return {'status': 'failed', 'reason': 'join requires on key or left_key/right_key'}
+        
+        if join_type not in ['inner', 'left', 'right', 'outer']:
+            return {'status': 'failed', 'reason': 'join type must be inner/left/right/outer'}
+        
+        left_var = left_arg[1:]
+        right_var = right_arg[1:]
+        
+        left_ids = self._dereference_collection(left_var)
+        right_ids = self._dereference_collection(right_var)
+        
+        if not isinstance(left_ids, list) or not isinstance(right_ids, list):
+            return {'status': 'failed', 'reason': 'join requires two Collections'}
+        
+        # Build right index
+        right_index = {}
+        for note_id in right_ids:
+            content = self._get_content(note_id)
+            if not isinstance(content, dict):
+                continue
+            
+            # Navigate to right key
+            key_value = content
+            for part in right_key.split('.'):
+                if isinstance(key_value, dict) and part in key_value:
+                    key_value = key_value[part]
+                else:
+                    key_value = None
+                    break
+            
+            if key_value is not None:
+                if key_value not in right_index:
+                    right_index[key_value] = []
+                right_index[key_value].append(content)
+        
+        # Join
+        joined_ids = []
+        matched_left = set()
+        
+        for left_note_id in left_ids:
+            left_content = self._get_content(left_note_id)
+            if not isinstance(left_content, dict):
+                continue
+            
+            # Navigate to left key
+            key_value = left_content
+            for part in left_key.split('.'):
+                if isinstance(key_value, dict) and part in key_value:
+                    key_value = key_value[part]
+                else:
+                    key_value = None
+                    break
+            
+            if key_value is None:
+                if join_type in ['left', 'outer']:
+                    joined_id = self._persist_note(left_content, 'join_result')
+                    if joined_id:
+                        joined_ids.append(joined_id)
+                continue
+            
+            if key_value in right_index:
+                matched_left.add(key_value)
+                for right_content in right_index[key_value]:
+                    merged = {**left_content, **right_content}
+                    joined_id = self._persist_note(merged, 'join_result')
+                    if joined_id:
+                        joined_ids.append(joined_id)
+            else:
+                if join_type in ['left', 'outer']:
+                    joined_id = self._persist_note(left_content, 'join_result')
+                    if joined_id:
+                        joined_ids.append(joined_id)
+        
+        # Handle right/outer join - add unmatched right items
+        if join_type in ['right', 'outer']:
+            for key_value, right_contents in right_index.items():
+                if key_value not in matched_left:
+                    for right_content in right_contents:
+                        joined_id = self._persist_note(right_content, 'join_result')
+                        if joined_id:
+                            joined_ids.append(joined_id)
+        
+        # Create result Collection
+        collection_id = self._create_collection(joined_ids, f'join_{left_var}_{right_var}')
+        if collection_id:
+            self._bind_variable(out_var, collection_id)
+            logger.info(f"Joined {len(left_ids)} + {len(right_ids)} items on {left_key}/{right_key} ({join_type}) → ${out_var} ({len(joined_ids)} results)")
+            return {'status': 'success', 'value': collection_id}
+        
+        return {'status': 'failed', 'reason': 'Failed to create joined Collection'}
     
     # ==================== Operation Application Helpers ====================
     
