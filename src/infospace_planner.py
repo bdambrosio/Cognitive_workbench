@@ -38,7 +38,9 @@ Planning Language Architecture (4 Levels):
 1. Resource & Control: Primitives operating on Note/Collection IDs (create-note, create-collection, persist, load, add, remove, union, intersection, difference, size, if, while, wait)
 2. Text Operations: Primitives and tools operating on unstructured text Notes (expand, flatten, say, display, think, filter-collection, refine, assess, summarize, relate)
 3. Coercion: Tools that extract structure from text (as-json, as-markdown)
-4. Structured Operations: Tools that produce/consume Collections of structured Notes (query-web, semantic-scholar, filter-structured, project, join)
+4. Structured Operations: Tools/primitives that produce/consume Collections of structured Notes
+   - Tools: query-web, semantic-scholar (produce Collections)
+   - Primitives: project, pluck, filter-structured, sort, join (SQL-like operations on Collections)
 
 Type System:
 - Note: typed object storing a single value/data structure. Persists across restarts.
@@ -86,58 +88,15 @@ TOOL SELECTION RULES
 # COMMON PATTERNS:
 
 Pattern: Persisting Collections
-Pattern: Persist Collection
   create-collection → persist → (optional: use name parameter for named Collection)
 
   Example - Save research findings:
   {"type":"create-collection","value":["$methodology_summary","$gaps_analysis"],"name":"constitutional-ai-findings","out":"$findings"}
   {"type":"persist","target":"$findings"}
 
-Pattern: Searching academic papers (Level 4 tool - returns Collection directly)
-  semantic-scholar → map/filter/summarize (no expand needed)
-  
-  Example - Find papers with abstracts:
-  {"type":"semantic-scholar","args":{"query":"transformer architecture"},"out":"$papers","expect":"should find 5+ papers"}
-  {"type":"summarize","target":"$papers","out":"$summary"}
-
-Pattern: Fetching full text from academic papers
-  semantic-scholar → map to extract PDF URLs → map with fetch-text
-  
-  Example - Get full paper texts:
-  {"type":"semantic-scholar","args":{"query":"attention mechanisms"},"out":"$papers","expect":"should find papers with PDFs"}
-  {"type":"map","target":"$papers","operation":"as-json","args":{"field":"metadata.pdf_url"},"out":"$urls"}
-  {"type":"map","target":"$urls","operation":"fetch-text","out":"$full_texts"}
-
-Pattern: Searching the web for general information (Level 4 tool - returns Collection directly)
-  query-web → map (no expand needed)
-  
-  Example:
-  {"type":"query-web","args":{"query":"Python asyncio tutorial"},"out":"$results","expect":"should find documentation"}
-  {"type":"summarize","target":"$results","out":"$summary"}
-
-Pattern: Fetching full text from web search results
-  query-web → map with as-json → map with fetch-text
-  
-  Example:
-  {"type":"query-web","args":{"query":"FastAPI best practices"},"out":"$results","expect":"should find guides"}
-  {"type":"map","target":"$results","operation":"as-json","args":{"field":"metadata.source_url"},"out":"$urls"}
-  {"type":"map","target":"$urls","operation":"fetch-text","out":"$full_texts"}
-
-Pattern: Working with Multiple Search Results
-  When combining results from multiple Level 4 tools (query-web, semantic-scholar):
-  
-  ✅ RIGHT - Level 4 tools return Collections, use union directly (NO expand):
-  {"type":"query-web","args":{"query":"..."},"out":"$results1","expect":"..."},
-  {"type":"query-web","args":{"query":"..."},"out":"$results2","expect":"..."},
-  {"type":"union","target":"$results1","value":"$results2","out":"$all_items"}
-  
-Pattern: Combining academic and web sources
-  When paper databases insufficient, supplement with web search (Level 4 tools return Collections directly):
-  
-  Example:
-  {"type":"semantic-scholar","args":{"query":"GPT-4 architecture"},"out":"$s2_results","expect":"should find published papers"}
-  {"type":"query-web","args":{"query":"GPT-4 technical report"},"out":"$web_results","expect":"should find OpenAI docs"}
-  {"type":"union","target":"$s2_results","value":"$web_results","out":"$all_sources"}
+Pattern: Combining Multiple Collections
+  Use union to merge results from multiple sources:
+  {"type":"union","target":"$collection1","value":"$collection2","out":"$combined"}
 
 Pattern: Adding filtered items to existing Collection
   load → semantic-scholar/query-web (returns Collection) → map with add to append each item → persist
@@ -194,6 +153,26 @@ Pattern: Universal LLM Transformations (refine, assess)
   Use refine for ad-hoc transformations without specialized tools.
   Use assess for complex boolean conditions.  
   refine → assess → (optional: use target to apply to Collection)
+
+Pattern: Level 4 Structured Data Operations (SQL-like)
+  Use project, pluck, filter-structured, sort, join on Collections of JSON Notes:
+  
+  project - Extract specific fields from structured Notes (preserves nested structure):
+  {"type":"project","target":"$collection","fields":["field1","nested.field2"],"out":"$subset"}
+  
+  pluck - Extract single field value from each Note (for tools needing scalar values):
+  {"type":"pluck","target":"$collection","field":"metadata.url","out":"$urls"}
+  
+  filter-structured - Deterministic WHERE clause for structured Notes (no LLM):
+  {"type":"filter-structured","target":"$collection","where":"field > 100","out":"$filtered"}
+  {"type":"filter-structured","target":"$collection","where":"year > 2020 AND citations >= 50","out":"$recent_cited"}
+  
+  sort - Order structured Notes by field value:
+  {"type":"sort","target":"$collection","by":"field","order":"desc","out":"$sorted"}
+  
+  join - Merge two Collections of structured Notes on key:
+  {"type":"join","target":"$left","value":"$right","args":{"on":"id"},"out":"$merged"}
+  {"type":"join","target":"$left","value":"$right","args":{"left_key":"paper_id","right_key":"id","type":"left"},"out":"$merged"}
 
 # TOOLS - use tool names directly as action types. Tools available to the agent are listed below.
 
@@ -341,6 +320,12 @@ class InfospacePlanner:
             'display': ['value'],  # Accepts target or value (both allowed)
             'think': ['value'],  # Accepts target or value (both allowed)
             'ask': ['value', 'out'],
+            # Level 4: Structured data operations
+            'project': ['target', 'fields', 'out'],
+            'pluck': ['target', 'field', 'out'],
+            'filter-structured': ['target', 'where', 'out'],
+            'sort': ['target', 'by', 'out'],
+            'join': ['target', 'value', 'out'],
         }
         
         required = required_fields.get(action_type, [])

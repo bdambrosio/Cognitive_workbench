@@ -185,6 +185,10 @@ class InfospaceResourceManager:
             
             # Mark as indexed for auto-indexing when notes are added
             self.collection_indexes[collection_id] = collection_id
+            
+            # Create initial empty vector store so auto-indexing works during Note restoration
+            self.vector_stores[collection_id] = FAISSStore(dimension=384)
+            
             logger.info(f"📚 System 'Notes' collection created and marked for indexing: {collection_id}")
         else:
             logger.error(f"❌ Failed to create system 'Notes' collection: {error_msg}")
