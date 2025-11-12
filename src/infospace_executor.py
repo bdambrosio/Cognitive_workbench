@@ -1271,16 +1271,15 @@ Only provide the result, followed by the </end> tag.""")
         Optional: filter_null (bool), args (dict)
         
         operation can be:
-        - String: tool name to apply to each item
-        - Dict with "type": inline action (e.g., {"type": "extract", "field": "score"})
-        - Dict with "tool": tool name with additional args
+        - String: tool name or primitive name (e.g., "tool-name", "add", "remove")
+        - Dict: {"tool": "name", "args": {...}} for tool with additional arguments
         
         Argument types:
         - target: $variable (Collection to map over)
-        - operation: string or dict
-        - args: dict of additional arguments (for tool operations)
-        - filter_null: bool (exclude null/None results)
-        - out: variable name for result Collection
+        - operation: string or dict (string for tool/primitive, dict for tool with args)
+        - args: dict of additional arguments (merged with operation args if dict)
+        - filter_null: bool (exclude null/None results, default: true)
+        - out: $variable name for result Collection
         """
         # Validate required fields
         error = self._validate_required_fields(action, 'target', 'operation', 'out')
