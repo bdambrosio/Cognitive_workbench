@@ -1068,7 +1068,7 @@ class ZenohExecutiveNode:
             if entity_context:
                 user_prompt += f'\n#Your most recent thoughts include:'
                 for i, memory in enumerate(entity_context['conversation_history']):  # Use last 2 memories
-                    user_prompt += f"\n\t{memory['source']}: {memory['text']}"
+                    user_prompt += f"\n\t{memory['source']}: {memory['text'][:600]}..."
                 user_prompt += '\n'
             # get inventory and cache exact ids
             inventory = []
@@ -1253,7 +1253,8 @@ class ZenohExecutiveNode:
                 if self.is_infospace:
                     context = {
                         'variables': self.infospace_executor.plan_bindings if self.infospace_executor else {},
-                        'situation': user_prompt
+                        'situation': user_prompt,
+                        'executor': self.infospace_executor  # Pass executor for incremental planner
                     }
                 else:
                     context = {
@@ -1273,8 +1274,9 @@ class ZenohExecutiveNode:
                 logger.info(f'🤖 {self.character_name} New Plan candidate: {json.dumps(plan_candidate, indent=2)}')
                 valid = False
                 try:
-                    # Validate with appropriate validator
-                    if self.is_infospace:
+                    # Validate with appropriate validator (skip if already executed)
+                    skip_validation = plan_candidate.get('skip_validation', False)
+                    if self.is_infospace and not skip_validation:
                         validation = self.planner.verify_plan(plan_candidate)
                         valid = validation.get('valid', False) if isinstance(validation, dict) else validation
                         if not valid:
@@ -1290,6 +1292,9 @@ class ZenohExecutiveNode:
                                 plan_candidate = self.current_plan
                             else:
                                 plan_candidate = None
+                    elif skip_validation:
+                        logger.info(f"Skipping validation for incremental planner (already executed)")
+                        valid = True
                     else:
                         valid = plan_module.verify_plan(plan_candidate)
                         if not valid:
@@ -3589,7 +3594,7 @@ End your response with:
                 timeout = 20.0 if self.shutdown_requested else None
                 response = self.llm_client.generate(
                     messages=[system_prompt, user_prompt],
-                    max_tokens=200,
+                    max_tokens=400,
                     temperature=0.7,
                     timeout=timeout,
                     stops=['</end>']

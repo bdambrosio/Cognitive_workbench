@@ -12,6 +12,7 @@ from urllib.parse import urljoin, urlparse
 from html.parser import HTMLParser
 import pymupdf
 import warnings
+import os
 
 try:
     from unstructured.partition.html import partition_html
@@ -74,24 +75,34 @@ def tool(url_or_content: str, **kwargs) -> str:
             logger.error(f"Failed to resolve Collection: {e}")
             return json.dumps({"error": f"Failed to resolve Collection: {e}"})
     
-    # Check if input is base64 PDF (backward compatibility)
-    if _is_base64_pdf(url_or_content):
-        return _process_base64_pdf(url_or_content)
+    # Check if input is local absolute file path
+    if url_or_content.startswith('/') and os.path.isfile(url_or_content):
+        try:
+            with open(url_or_content, 'rb') as f:
+                content = f.read()
+            content_type = None
+            final_url = url_or_content
+        except OSError as e:
+            logger.error(f"File read failed: {str(e)}")
+            return json.dumps({"error": f"Failed to read file {url_or_content}: {str(e)}"})
+    else:
+        # Check if input is base64 PDF (backward compatibility)
+        if _is_base64_pdf(url_or_content):
+            return _process_base64_pdf(url_or_content)
+        
+        # Otherwise treat as URL
+        url = _extract_url(url_or_content)
+        if not url:
+            return json.dumps({"error": f"Invalid URL or content: {url_or_content[:100]}"})
+        
+        # Download and detect format
+        content, content_type, final_url = _download_from_url(url)
+        if not content:
+            return json.dumps({"error": f"Failed to download from {url}"})
     
-    # Otherwise treat as URL
-    url = _extract_url(url_or_content)
-    if not url:
-        return json.dumps({"error": f"Invalid URL or content: {url_or_content[:100]}"})
-    
-    # Download and detect format
-    content, content_type, final_url = _download_from_url(url)
-    if not content:
-        return json.dumps({"error": f"Failed to download from {url}"})
-    
-    # Detect format
+    # Now detect format and extract (common for both file and URL)
     file_format = _detect_format(content, content_type, final_url)
     
-    # Extract text based on format
     if file_format == "pdf":
         return _extract_pdf_text(content, final_url)
     elif file_format == "html":
@@ -377,9 +388,13 @@ def _extract_html_text(content: bytes, url: str) -> str:
 
 def _try_playwright_extraction(url: str) -> str:
     """Try extracting text using playwright (for SPAs)."""
+    if not url.startswith(('http://', 'https://')):
+        logger.info(f"Skipping playwright for non-URL: {url}")
+        return ""
+
     if not HAS_PLAYWRIGHT:
         return ""
-    
+
     try:
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True)
