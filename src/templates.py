@@ -587,13 +587,13 @@ Meta-spec (strictly observe these rules in your output):
   "plan": [
     { "type": "move", "target": "…"},
     { "type": "say", "target": "…", "value": "…" },
-    { "type": "scan", "target": "type_name - must be one of ALLOWED SCAN TARGETS", "out": "variable_name to assign the scan result to", "expect": "…" },
+    { "type": "scan", "target": "type_name - must be one of ALLOWED SCAN TARGETS", "out": "$variable_name", "expect": "…" },
     { "type": "wait", "condition": "..." },
     { "type": "think", "value": "…" },
     { "type": "take", "target": "…", "expect": "…"},
     { "type": "inspect", "target": "…", "reason": "…", "expect": "…"},
-    { "type": "use", "target": "…", "reason": "…", "out": "variable_name to assign the use result to", "expect": "…"},
-    { "type": "use", "target": "skill_name", "value": "input text for skill", "reason": "…", "out": "variable_name to assign the use result to", "expect": "…"},
+    { "type": "use", "target": "…", "reason": "…", "out": "$variable_name", "expect": "…"},
+    { "type": "use", "target": "skill_name", "value": "input text for skill", "reason": "…", "out": "$variable_name", "expect": "…"},
     { "type": "place", "target": "…", "expect": "…"},
     { "type": "while", "condition": "…" , "body": [ /* steps */ ]},
     { "type": "if", "condition": "…", "then": [ /* steps */ ], "else": [ /* steps */ ] }
@@ -605,10 +605,10 @@ PLAN_TEMPLATE_B = """
 Example workflow using scan and variables:
 {
   "plan": [
-    { "type": "scan", "target": "Berries", "out": "found_berries", "expect": "will find nearby berries" },
+    { "type": "scan", "target": "Berries", "out": "$found_berries", "expect": "will find nearby berries" },
     { "type": "move", "target": "$found_berries" },
     { "type": "take", "target": "$found_berries", "expect": "will obtain berries for consumption" },
-    { "type": "use", "target": "$found_berries", "reason": "eat to reduce hunger", "out": "hunger_reduction", "expect": "hunger will decrease" }
+    { "type": "use", "target": "$found_berries", "reason": "eat to reduce hunger", "out": "$hunger_reduction", "expect": "hunger will decrease" }
   ]
 }
 
@@ -622,12 +622,12 @@ Do not output macros; always expand patterns into primitive steps in the final J
 Worked example using a loop to approach a distant target:
 {
   "plan": [
-    { "type": "scan", "target": "Berries", "out": "found_berries", "expect": "will locate berries in area" },
+    { "type": "scan", "target": "Berries", "out": "$found_berries", "expect": "will locate berries in area" },
     { "type": "while", "condition": { "type": "notnear", "target": "$found_berries" }, "body": [
       { "type": "move", "target": "$found_berries" }
     ]},
     { "type": "take", "target": "$found_berries", "expect": "will add berries to inventory" },
-    { "type": "use", "target": "$found_berries", "reason": "eat to reduce hunger", "out": "hunger_reduction", "expect": "will reduce hunger" }
+    { "type": "use", "target": "$found_berries", "reason": "eat to reduce hunger", "out": "$hunger_reduction", "expect": "will reduce hunger" }
   ]
 }
 
@@ -636,7 +636,7 @@ When using a Skill resource (cognitive tools), include the "value" field with th
 {
   "plan": [
     { "type": "move", "target": "question-decomposer" },
-    { "type": "use", "target": "question-decomposer", "value": "Should we adopt microservices architecture?", "reason": "break down complex decision into sub-questions", "out": "decomposition_result", "expect": "will receive structured decomposition" }
+    { "type": "use", "target": "question-decomposer", "value": "Should we adopt microservices architecture?", "reason": "break down complex decision into sub-questions", "out": "$decomposition_result", "expect": "will receive structured decomposition" }
   ]
 }
 
@@ -669,7 +669,7 @@ expect, where needed, should be a very terse (4-8 words) description of the expe
  - "say": { "type": "say", "target": "character_name", "value": "text to speak" } 
      for speaking to another character you can see. Use this to seek information, respond, inform the other character, or to maintain 'social chatter' to stay aligned.
      For a 'say' act, speak only for yourself, and do not include any other introductory, explanatory, discursive, or formatting text in your response.
- - "scan": { "type": "scan", "target": "type_name", "out": "variable_name to assign the scan result to", "expect": "expected outcome" }
+ - "scan": { "type": "scan", "target": "type_name", "out": "$variable_name", "expect": "expected outcome" }
      Scan for the nearest matching instance of a type. The scan target must be one of the ALLOWED SCAN TARGETS above. Only scan may use these  names; other actions should target instances or $variables.
  - "wait": { "type": "wait", "condition": "..." }
      Wait for a condition to be true. The condition must be one of the Condition actions listed earlier.
@@ -681,7 +681,7 @@ expect, where needed, should be a very terse (4-8 words) description of the expe
      Remove a resource from your personal inventory and place it in the setting at your current location.
  - "inspect": { "type": "inspect", "target": "resource_name", "reason": "what is it you are hoping to learn? - 5 words max", "expect": "expected outcome" } 
      Inspect a resource or character to learn something about it. Must be 'near' the resource or character to inspect it. reason focuses the inspection on some specific aspect of the resource or character.
- - "use": { "type": "use", "target": "resource_name", "reason": "what outcome do you hope to achieve? - 5 words max", "out": "variable_name to assign the use result to", "expect": "expected outcome" } 
+ - "use": { "type": "use", "target": "resource_name", "reason": "what outcome do you hope to achieve? - 5 words max", "out": "$variable_name", "expect": "expected outcome" } 
      Using a resource or infrastructure. You must be 'near' the resource or infrastructure to use it. 
      "use" on a path will move you one step along it to a new location.
      You may want to inspect a resource first to learn the effect of using it. Some resources are consumables; using edible resources (e.g., Berries) can reduce hunger.
@@ -1159,9 +1159,9 @@ Postconditions:
   - out variable bound to raw response text string (empty string on timeout)
   - Response is NOT wrapped in Note - use directly or create-note if needed
 Examples:
-  {"type":"ask","target":"User","value":"What is your research question?","out":"user_answer"}
-  {"type":"ask","value":"What year are you interested in?","out":"year"}
-  {"type":"ask","value":"$prompt_text","out":"response"}
+  {"type":"ask","target":"User","value":"What is your research question?","out":"$user_answer"}
+  {"type":"ask","value":"What year are you interested in?","out":"$year"}
+  {"type":"ask","value":"$prompt_text","out":"$response"}
 
 ## display
 Description: Show formatted content in popup (for documents/formatted output)

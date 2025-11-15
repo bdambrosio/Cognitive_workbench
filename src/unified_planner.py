@@ -11,11 +11,12 @@ if TYPE_CHECKING:
     from executive_node import ZenohExecutiveNode
 import json
 import logging
+import traceback
 from typing import Dict, Any, Optional
 from pathlib import Path
 from infospace_planner import INFOSPACE_PLAN_TEMPLATE
 from templates import INFOSPACE_PRIMITIVES_REFERENCE, PLAN_TEMPLATE
-
+# IncrementalPlanner imported conditionally to avoid SGLang initialization for non-Jill characters
 logger = logging.getLogger(__name__)
 
 
@@ -120,7 +121,33 @@ class UnifiedPlanner:
         """Generate infospace plan."""
         from templates import INFOSPACE_PRIMITIVES_REFERENCE
         
-        # Format tools for template
+        # Try incremental planner only for Jill (SGLang backend is singleton)
+        executor = context.get('executor')
+        character_name = self.character.character_name if hasattr(self.character, 'character_name') else None
+        
+        if executor and character_name == 'Jill':
+            try:
+                # Import only for Jill to avoid SGLang initialization for other characters
+                from incremental_planner import IncrementalPlanner, HAS_SGLANG
+                
+                if HAS_SGLANG:
+                    self.logger.info("Using incremental SGLang planner for Jill")
+                    incremental_planner = IncrementalPlanner(
+                        executor=executor,
+                        available_tools=self.available_tools,
+                        primitives_reference=INFOSPACE_PRIMITIVES_REFERENCE,
+                        logger_instance=self.logger
+                    )
+                    plan_result = incremental_planner.generate_plan(goal=goal, max_steps=8)
+                    if not plan_result.get('error'):
+                        return plan_result
+                    else:
+                        self.logger.warning(f"Incremental planner failed: {plan_result.get('error')}, falling back")
+            except Exception as e:
+                self.logger.warning(f"Incremental planner error: {e}, falling back to standard planner")
+                traceback.print_exc()
+        
+        # Fallback to standard single-shot planning
         logger.info(f"generating infospace plan for {self.character.character_name}")
         tools_formatted = self._format_tools()
         

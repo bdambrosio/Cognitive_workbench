@@ -163,6 +163,42 @@ class InfospaceExecutor:
         logger.warning(f"No response for {resource_id}")
         return None
     
+    def get_resource_metadata(self, resource_id: str) -> Optional[Dict]:
+        """
+        Fetch metadata from map_node for a given resource ID.
+        
+        Args:
+            resource_id: Note_N or Collection_N ID
+            
+        Returns:
+            Dict with metadata (item_count, source_skill, etc.), or None if not found
+        """
+        if resource_id == "Note_null":
+            return None
+        
+        # Query map_node for the resource
+        from zenoh import QueryTarget, ConsolidationMode
+        for reply in self.session.get(
+            f"cognitive/map/resource/{resource_id}",
+            target=QueryTarget.BEST_MATCHING,
+            consolidation=ConsolidationMode.NONE,
+            timeout=5.0
+        ):
+            if reply.ok:
+                response = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
+                if response.get('success'):
+                    if 'resource' in response:
+                        # Format 1: extract properties from resource
+                        resource_data = response.get('resource')
+                        if resource_data:
+                            return resource_data.get('properties', {})
+                    else:
+                        # Format 2: metadata is in response
+                        return response.get('metadata', {})
+            break
+        
+        return None
+    
     def execute_action(self, action: Dict) -> Dict:
         """
         Execute a single infospace action.
@@ -215,10 +251,24 @@ class InfospaceExecutor:
             'join': self._execute_join,
         }
         
+        # Validate 'out' field has $ prefix if present
+        if 'out' in action:
+            out_val = action['out']
+            if isinstance(out_val, str) and out_val and not out_val.startswith('$'):
+                error_msg = f"Invalid 'out' field: '{out_val}' must start with $ (use '${out_val}')"
+                logger.error(error_msg)
+                return {'status': 'failed', 'reason': error_msg}
+        
+        logger.info(f"Attempting to execute tool '{json.dumps(action)}' directly")
         handler = handlers.get(action_type)
         if not handler:
-            logger.error(f"Unknown action type: {action_type}")
-            return {'status': 'failed', 'reason': f'Unknown action: {action_type}'}
+            # Check if it's a dynamic tool (not a primitive)
+            if action_type in self.available_tools:
+                # Route to apply logic for tool execution
+                return self._execute_apply(action)
+            else:
+                logger.error(f"Unknown action type: {action_type}")
+                return {'status': 'failed', 'reason': f'Unknown action: {action_type}'}
         
         try:
             return handler(action)
@@ -275,8 +325,12 @@ class InfospaceExecutor:
         """
         Apply tool to input data.
         
-        Required: type, target, out
-        Optional: value (input), reason (documentation), args (additional arguments)
+        Supports two formats:
+        1. Standard: {"type": "apply", "target": "tool-name", "value": ..., "out": "$var"}
+        2. Direct:   {"type": "tool-name", "args": {...}, "out": "$var"}
+        
+        Required: type, out
+        Optional: target (format 1), value (input), reason (documentation), args (additional arguments)
         
         Argument types:
         - target: literal string (tool name) OR $variable (resolves to tool name)
@@ -284,14 +338,25 @@ class InfospaceExecutor:
         - args: dict of additional arguments (resolved if they're variables)
         - out: literal string (variable name, no $ prefix)
         """
-        target = self._resolve_value(action.get('target'))
-        value = self._resolve_value(action.get('value', ''))
+        # Handle direct tool call format (type is the tool name)
+        action_type = action.get('type')
+        
+        # Check if this is direct tool call format (type is the tool name)
+        if action_type in self.available_tools:
+            # Direct format: type is the tool name, target field is the input data
+            target = action_type  # Tool name
+            value = self._resolve_value(action.get('target', action.get('value', '')))  # Input data
+        else:
+            # Standard apply format: target is the tool name
+            target = self._resolve_value(action.get('target'))
+            value = self._resolve_value(action.get('value', ''))
+        
         reason = action.get('reason', '')
         additional_args = action.get('args', {})
         out_var = action.get('out')
         
         if not target:
-            return {'status': 'failed', 'reason': 'apply requires target'}
+            return {'status': 'failed', 'reason': 'apply requires target or tool name in type'}
         
         # Get tool info and route by type
         tool_info = self._get_tool_info(target)
@@ -332,14 +397,18 @@ class InfospaceExecutor:
             if target in level4_tools and isinstance(result_value, str) and result_value.startswith('Collection_'):
                 # Result is already a Collection ID - bind directly
                 self._bind_variable(out_var, result_value)
-                logger.info(f"Tool '{target}' executed, Collection {result_value} → ${out_var}")
+                # out_var might already have $ prefix, normalize for display
+                display_var = out_var if out_var.startswith('$') else f"${out_var}"
+                logger.info(f"Tool '{target}' executed, Collection {result_value} → {display_var}")
                 return {'status': 'success', 'value': result_value}
             
             # Default: Persist result as Note
             info_id = self._persist_note(result_value, f'apply_{target}')
             if info_id:
                 self._bind_variable(out_var, info_id)
-                logger.info(f"Tool '{target}' executed, Note {info_id} → ${out_var}")
+                # out_var might already have $ prefix, normalize for display
+                display_var = out_var if out_var.startswith('$') else f"${out_var}"
+                logger.info(f"Tool '{target}' executed, Note {info_id} → {display_var}")
                 return {'status': 'success', 'value': info_id}
             else:
                 logger.error(f"Failed to persist result from '{target}'")

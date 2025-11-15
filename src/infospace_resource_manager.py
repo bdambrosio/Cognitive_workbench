@@ -750,7 +750,17 @@ class InfospaceResourceManager:
             if para:  # Only keep non-empty paragraphs
                 paragraphs.append(para)
         
-        # If no paragraph breaks found, treat entire text as one paragraph
+        # If no paragraph breaks found, try escaped '\n\n' strings (for JSON content)
+        if not paragraphs:
+            escaped_paragraphs = []
+            for para in re.split(r'\\n\\n+', text):
+                para = para.strip()
+                if para:
+                    escaped_paragraphs.append(para)
+            if len(escaped_paragraphs) > 1:
+                paragraphs = escaped_paragraphs
+        
+        # If still no paragraph breaks found, treat entire text as one paragraph
         if not paragraphs:
             paragraphs = [text.strip()] if text.strip() else []
         
@@ -825,6 +835,17 @@ class InfospaceResourceManager:
                         end = sentence_end + 2
                     else:
                         end = sentence_end + 1
+                else:
+                    # Sentence boundary not found - try literal '\n' string (escaped newline)
+                    escaped_newline_end = para.rfind('\\n', search_start, end)
+                    if escaped_newline_end > start:
+                        end = escaped_newline_end + 2  # Include the '\n' string
+                    else:
+                        # Try word boundary (space)
+                        space_end = para.rfind(' ', search_start, end)
+                        if space_end > start:
+                            end = space_end + 1  # Include the space
+                        # Otherwise fall back to hard character count limit (end already set)
             
             chunks.append(para[start:end])
             

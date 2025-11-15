@@ -38,7 +38,7 @@ Requires exactly 2 elements:
 
 Optional focus argument for targeted comparison:
 ```json
-{"type":"compare-notes","target":"$notes_to_compare","args":{"focus":"methodology differences"},"out":"comparison"}
+{"type":"compare-notes","target":"$notes_to_compare","args":{"focus":"methodology differences"},"out":"$comparison"}
 ```
 
 ## Output Format

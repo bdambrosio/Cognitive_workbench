@@ -436,8 +436,8 @@ End your response with:
 
     # 2) Concurrent process with a global wall-time budget
     results: List[Dict[str, Any]] = []
-    in_flight = []
     ex = concurrent.futures.ThreadPoolExecutor(max_workers=max_workers)
+    in_flight = []
     try:
         t0 = time.time()
         idx = 0

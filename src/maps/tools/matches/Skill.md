@@ -40,17 +40,17 @@ Returns a Note containing:
 
 **Simple substring check:**
 ```json
-{"type":"contains-pattern","target":"$text","args":{"pattern":"error"},"out":"has_error"}
+{"type":"contains-pattern","target":"$text","args":{"pattern":"error"},"out":"$has_error"}
 ```
 
 **Regex pattern match:**
 ```json
-{"type":"contains-pattern","target":"$email","args":{"pattern":"^[a-z]+@example\\.com$","match_type":"regex"},"out":"is_valid_email"}
+{"type":"contains-pattern","target":"$email","args":{"pattern":"^[a-z]+@example\\.com$","match_type":"regex"},"out":"$is_valid_email"}
 ```
 
 **Exact match:**
 ```json
-{"type":"contains-pattern","target":"$status","args":{"pattern":"complete","match_type":"exact"},"out":"is_complete"}
+{"type":"contains-pattern","target":"$status","args":{"pattern":"complete","match_type":"exact"},"out":"$is_complete"}
 ```
 
 ## Match Types
