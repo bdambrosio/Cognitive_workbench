@@ -1189,15 +1189,18 @@ Only provide the result, followed by the </end> tag.""")
         """
         # Accept both value and target (target preferred for consistency with other primitives)
         target_arg = action.get('value') or action.get('target')
+        logger.warning(f"display: target_arg='{target_arg}' (type={type(target_arg).__name__})")
         
         # Resolve variable if it's a $variable
         value = self._resolve_value(target_arg)
+        logger.warning(f"display: resolved value (len={len(str(value)) if value else 0}): {str(value)[:200]}")
         
         # If resolved value is a resource ID (literal string like "Note_20"), dereference it
         if isinstance(value, str) and (value.startswith('Note_') or value.startswith('Collection_')):
             content = self._get_content(value)
             if content is not None:
                 value = content
+                logger.warning(f"display: dereferenced resource to content (len={len(str(value))})")
         
         if value is None:
             return {'status': 'failed', 'reason': 'display requires value or target'}
@@ -1205,23 +1208,23 @@ Only provide the result, followed by the </end> tag.""")
         # Always display to User
         target = 'User'
         
-        # Send message to target's sense_data (mirrors physical space send_text_input)
-        sense_data = {
-            'timestamp': datetime.now().isoformat(),
-            'sequence_id': 0,
-            'mode': 'text',
-            'content': json.dumps({
-                'source': self.agent_name,
-                'text': str(value)
-            })
+        # Publish display action to trigger FastAPI modal (not sense_data!)
+        display_action = {
+            'type': 'display',
+            'character': self.agent_name,
+            'target': target,
+            'text': str(value),
+            'value': str(value),
+            'timestamp': datetime.now().isoformat()
         }
         
+        # Publish to action channel so FastAPI can show modal
         self.session.put(
-            f"cognitive/{target}/sense_data",
-            json.dumps(sense_data)
+            f"cognitive/{self.agent_name}/action",
+            json.dumps(display_action)
         )
         
-        logger.info(f"Display [{target}]: {value}")
+        logger.warning(f"Display [{target}]: published {len(str(value))} chars to action channel for modal")
         return {'status': 'success', 'value': value}
     
     def _execute_think(self, action: Dict) -> Dict:

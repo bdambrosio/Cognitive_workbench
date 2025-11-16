@@ -10,10 +10,99 @@ Note: SGLang backend must be configured before use:
 import json
 import logging
 import traceback
+import time
+import re
 from pathlib import Path
 from typing import Dict, List, Any, Optional
 
 logger = logging.getLogger(__name__)
+
+# Setup OpenTelemetry tracing
+try:
+    from opentelemetry import trace
+    from opentelemetry.sdk.trace import TracerProvider
+    from opentelemetry.sdk.trace.export import ConsoleSpanExporter, SimpleSpanProcessor
+    HAS_OTEL = True
+except ImportError:
+    HAS_OTEL = False
+    logger.info("opentelemetry not available, tracing disabled")
+
+def setup_tracing(service_name: str):
+    """Setup OpenTelemetry tracing with console exporter."""
+    if not HAS_OTEL:
+        return None
+    provider = TracerProvider()
+    processor = SimpleSpanProcessor(ConsoleSpanExporter())
+    provider.add_span_processor(processor)
+    trace.set_tracer_provider(provider)
+    return trace.get_tracer(service_name)
+
+def tokenize_len(tokenizer, text: str) -> int:
+    """Count tokens in text using tokenizer."""
+    if tokenizer and text:
+        return len(tokenizer.encode(text))
+    return 0
+
+class GenTracer:
+    """Context manager for tracing gen() calls with input/output metrics."""
+    def __init__(self, tracer, tokenizer=None):
+        self.tracer = tracer
+        self.tokenizer = tokenizer
+    
+    def span_gen(self, name: str, stage: str, step: int, input_delta: str):
+        return _GenSpan(self.tracer, self.tokenizer, name, stage, step, input_delta)
+
+class _GenSpan:
+    def __init__(self, tracer, tokenizer, name: str, stage: str, step: int, input_delta: str):
+        self.tracer = tracer
+        self.tokenizer = tokenizer
+        self.name = name
+        self.stage = stage
+        self.step = step
+        self.input_delta = input_delta
+        self._span = None
+        self._t0 = None
+        # slots to fill by caller before exit
+        self.state = None
+        self.slot = None
+
+    def __enter__(self):
+        self._span = self.tracer.start_span(
+            f"gen:{self.name}",
+            attributes={
+                "stage": self.stage,
+                "step": self.step,
+                "input.delta.len": len(self.input_delta),
+                "input.delta.preview": self.input_delta[:2000],
+            },
+        )
+        self._t0 = time.time()
+        if self.tokenizer:
+            self._span.set_attribute("input.delta.tok", tokenize_len(self.tokenizer, self.input_delta))
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        dur_ms = (time.time() - self._t0) * 1000.0
+        self._span.set_attribute("duration.ms", dur_ms)
+
+        if self.state is not None and self.slot:
+            try:
+                out = self.state[self.slot]
+            except (KeyError, TypeError):
+                out = ""
+            self._span.set_attribute("output.len", len(out))
+            self._span.add_event("output.text", {"text": out[:4000]})
+            if self.tokenizer:
+                self._span.set_attribute("output.tok", tokenize_len(self.tokenizer, out))
+
+        if exc:
+            self._span.record_exception(exc)
+        self._span.end()
+        # don't suppress exceptions
+        return False
+tracer = setup_tracing("sgl-planner")
+# If you can get a tokenizer from the backend, pass it in; otherwise omit.
+gen_tracer = GenTracer(tracer, tokenizer=None)  # or tokenizer=your_tokenizer
 
 # Try to import SGLang
 try:
@@ -34,6 +123,44 @@ try:
 except ImportError:
     HAS_SGLANG = False
     logger.warning("SGLang not available - incremental planner disabled")
+
+
+INCREMENTAL_PLAN_SPECIFICATIONS = """
+# INFOSPACE TYPE SYSTEM & RULES
+
+Types:
+- Note: Single value/document (persists across restarts)
+- Collection: List of Note/Collection IDs (session-local only)
+- Variables: Plan-local names referencing Notes/Collections
+
+Variable Syntax:
+- ALWAYS use "$variable" for references (target, value, source, out fields)
+- Correct: {"value": "$my_variable"}
+- Wrong: {"value": "my_variable"}
+- Literal strings: Use directly without $ (e.g., "hello")
+
+Operation Compatibility:
+┌─────────────────────────┬──────┬────────────┐
+│ Operation               │ Note │ Collection │
+├─────────────────────────┼──────┼────────────┤
+│ expand, as-json, refine │  ✓   │     ❌     │
+│ summarize, relate       │  ✓   │     ✓      │
+│ map, flatten            │  ❌  │     ✓      │
+└─────────────────────────┴──────┴────────────┘
+
+Efficiency Rules:
+- Use tools directly on Notes for single items
+- Create Collections only for 2+ Notes together
+- expand, refine, as-json work on Notes ONLY, not Collections
+- Use map to apply Note operations to each Collection item
+
+Tool Selection:
+- Academic papers: semantic-scholar (provides abstracts, citations, PDFs)
+- General web: query-web (broad coverage, recent content)
+- Single URL fetch: fetch-text (NOT for query-web/semantic-scholar results)
+- as-markdown: EXTRACT existing markdown from mixed text (NOT for converting TO markdown)
+- as-json: EXTRACT existing JSON from mixed text (NOT for converting TO JSON)
+"""
 
 
 def build_tool_catalog(available_tools: Dict[str, Dict], primitives_reference: str) -> Dict[str, Dict]:
@@ -163,51 +290,76 @@ def load_skill_docs(tool_names: List[str], available_tools: Dict[str, Dict]) -> 
     lines.append("Full documentation for selected tools with examples, patterns, and output schemas:\n")
     
     for tool_name in tool_names:
+        logger.warning(f"Stage 1.5: Processing {tool_name}")
+        
         # Skip primitives (no SKILL.md files)
         if tool_name not in available_tools:
+            logger.warning(f"Stage 1.5: {tool_name} not in available_tools (primitive, skipping)")
             continue
             
         tool_meta = available_tools[tool_name]
-        tool_path = tool_meta.get('tool_path')
+        # Use 'path' field which is the tool directory (not 'python_file' which is tool.py)
+        tool_dir_path = tool_meta.get('path')
+        logger.warning(f"Stage 1.5: {tool_name} path = {tool_dir_path}")
         
-        if not tool_path:
+        if not tool_dir_path:
+            logger.warning(f"Stage 1.5: {tool_name} has no path field, skipping")
             continue
         
+        # Resolve to absolute path
+        tool_dir = Path(tool_dir_path).resolve()
+        logger.warning(f"Stage 1.5: {tool_name} tool_dir = {tool_dir}")
+        
         # Look for SKILL.md or Skill.md in tool directory
-        tool_dir = Path(tool_path).parent
         skill_file = None
         for variant in ['SKILL.md', 'Skill.md', 'skill.md']:
             candidate = tool_dir / variant
             if candidate.exists():
                 skill_file = candidate
+                logger.warning(f"Stage 1.5: {tool_name} found {variant} at {skill_file}")
                 break
         
         if not skill_file:
-            logger.debug(f"No SKILL.md found for {tool_name} in {tool_dir}")
+            logger.warning(f"Stage 1.5: No SKILL.md found for {tool_name} in {tool_dir}")
             continue
         
         try:
             with open(skill_file, 'r', encoding='utf-8') as f:
                 content = f.read()
+            logger.warning(f"Stage 1.5: {tool_name} loaded {len(content)} chars from {skill_file}")
             
-            # Remove YAML frontmatter (between --- markers)
-            if content.startswith('---'):
-                parts = content.split('---', 2)
-                if len(parts) >= 3:
-                    content = parts[2].strip()
+            # Robust frontmatter stripping using regex
+            # Match first complete frontmatter block: --- ... ---
+            original_len = len(content)
+            frontmatter_match = re.search(r'^---\s*\n(.*?)\n---\s*\n', content, re.DOTALL)
+            if frontmatter_match:
+                # Extract content after the closing ---
+                content = content[frontmatter_match.end():].strip()
+                logger.warning(f"Stage 1.5: {tool_name} stripped frontmatter, {original_len} -> {len(content)} chars")
+            else:
+                logger.warning(f"Stage 1.5: {tool_name} no frontmatter found, using full content")
+            
+            if not content:
+                logger.warning(f"Stage 1.5: {tool_name} content empty after stripping, skipping")
+                continue
             
             lines.append(f"\n## {tool_name.upper()}")
             lines.append(content)
             lines.append("\n" + "="*80 + "\n")
+            logger.warning(f"Stage 1.5: {tool_name} added to docs ({len(content)} chars)")
             
         except Exception as e:
-            logger.warning(f"Failed to load SKILL.md for {tool_name}: {e}")
+            logger.warning(f"Stage 1.5: Failed to load SKILL.md for {tool_name}: {e}")
+            traceback.print_exc()
             continue
     
     if len(lines) <= 2:  # Only header, no docs loaded
+        logger.warning("Stage 1.5: No docs loaded for any tools")
         return ""
     
-    return "\n".join(lines)
+    total_docs = "\n".join(lines)
+    logger.warning(f"Stage 1.5: Returning {len(total_docs)} total chars of docs")
+    return total_docs
 
 
 def sgl_to_infospace_action(tool_name: str, args_json: str, step: int, available_tools: Dict[str, Dict]) -> Dict:
@@ -230,12 +382,19 @@ def sgl_to_infospace_action(tool_name: str, args_json: str, step: int, available
         traceback.print_exc()
         args = {}
     
-    # Normalize 'out' field: ensure $ prefix
-    if "out" in args:
-        out_val = args["out"]
-        if isinstance(out_val, str) and out_val and not out_val.startswith('$'):
-            args["out"] = f"${out_val}"
-            logger.debug(f"Normalized 'out' field: '{out_val}' -> '${out_val}'")
+    # Normalize variable references: ensure $ prefix for common variable fields
+    # These fields typically reference variables (not literal values)
+    variable_fields = ['out', 'target', 'value', 'source']
+    for field in variable_fields:
+        if field in args:
+            val = args[field]
+            # Only normalize if it looks like a variable name (alphanumeric + underscore)
+            # Skip if it's already prefixed with $, or if it looks like a resource ID, or contains special chars
+            if isinstance(val, str) and val and not val.startswith('$'):
+                # Check if it looks like a variable (not a URL, path, or resource ID)
+                if re.match(r'^[a-zA-Z_]\w*$', val) and not val.startswith(('Note_', 'Collection_', 'http://', 'https://')):
+                    args[field] = f"${val}"
+                    logger.warning(f"Normalized '{field}' field: '{val}' -> '${val}'")
     
     # Build action
     action = {"type": tool_name}
@@ -281,12 +440,12 @@ def sgl_to_infospace_action(tool_name: str, args_json: str, step: int, available
                        "expand", "flatten", "query-web", "semantic-scholar", "summarize",
                        "refine", "assess", "relate", "extract-entities", "filter-collection",
                        "fetch-text", "as-json", "as-markdown"]
-    if tool_name in output_producing and "out" not in args:
+    if tool_name in output_producing and "out" not in action:
         action["out"] = f"$step_{step}_result"
     
     # Add expect if needed
     uncertain_tools = ["query-web", "semantic-scholar", "search", "load"]
-    if tool_name in uncertain_tools and "expect" not in args:
+    if tool_name in uncertain_tools and "expect" not in action:
         action["expect"] = f"should get result from {tool_name}"
     
     return action
@@ -358,6 +517,7 @@ if HAS_SGLANG:
             "You are a planning-and-acting assistant for information space operations.\n"
             "You can choose tools/primitives, call them via JSON arguments, "
             "and iteratively refine your plan until the goal is satisfied.\n\n"
+            f"{INCREMENTAL_PLAN_SPECIFICATIONS}\n\n"
             "You will work in repeated cycles:\n"
             "Stage 1 (once): Analyze goal and select relevant tools.\n"
             "Stage 2 (loop): Pick a single tool and JSON args.\n"
@@ -369,6 +529,8 @@ if HAS_SGLANG:
             f"Goal: {goal}\n\n"
             f"Tool catalog:\n{tools_catalog_text}\n\n"
             "Stage 1: Analyze goal and select relevant tools.\n"
+            "Include tools you might need AND related/supporting tools.\n"
+            "Err on the side of including MORE tools for better context.\n"
             "Respond:\n"
             "ANALYSIS: <text>\n"
             "SELECTED_TOOLS_JSON: <json list>\n"
@@ -401,10 +563,17 @@ if HAS_SGLANG:
             "Stage 2 FORMAT:\n"
             "  TOOL_NAME: <name>\n"
             "  TOOL_ARGS_JSON: <json object>\n\n"
+            "CRITICAL: Variable references MUST start with $ (dollar sign):\n"
+            "  - Correct: {\"value\": \"$my_variable\"}\n"
+            "  - Wrong: {\"value\": \"my_variable\"}\n"
+            "  - Fields like 'value', 'target', 'source', 'out' typically reference variables\n\n"
             "Stage 3 FORMAT:\n"
             "  THOUGHTS: <text>\n"
             "  DONE: <YES or NO>\n"
-            "  UPDATED_GOAL: <text>\n\n"
+            "  UPDATED_GOAL: <text>\n"
+            "  REQUEST_TOOLS: <optional: json list of tool names you need docs for, or leave blank>\n\n"
+            "If you realize you need a tool not initially selected, add it to REQUEST_TOOLS.\n"
+            "You'll receive its full documentation before the next step.\n\n"
             "Follow these formats exactly."
         )
         s += assistant("Understood.\n")
@@ -441,6 +610,9 @@ if HAS_SGLANG:
                 f"Tool `{tool_name}` with args:\n{tool_args_json}\n\n"
                 f"Result:\n{tool_result}\n\n"
                 "Respond using Stage 3 FORMAT.\n"
+                "IMPORTANT: Only set DONE: YES when ALL goal requirements are met.\n"
+                "- If goal mentions 'display', 'show', or 'present', you MUST use display primitive before marking done.\n"
+                "- If goal mentions 'save' or 'store', you MUST persist before marking done.\n"
             )
             
             s += assistant(
@@ -450,11 +622,30 @@ if HAS_SGLANG:
                 + gen(f"done_{step}", max_tokens=8, stop="\n")
                 + "\nUPDATED_GOAL: "
                 + gen(f"updated_goal_{step}", max_tokens=256, stop="\n")
+                + "\nREQUEST_TOOLS: "
+                + gen(f"request_tools_{step}", max_tokens=64, stop="\n")
                 + "\n"
             )
             print(f"THOUGHTS: {s[f'thoughts_{step}']}")
             print(f"DONE: {s[f'done_{step}']}")
             print(f"UPDATED_GOAL: {s[f'updated_goal_{step}']}")
+            print(f"REQUEST_TOOLS: {s[f'request_tools_{step}']}")
+            
+            # Stage 3.5: Dynamic tool loading (if requested)
+            requested_tools_raw = s[f"request_tools_{step}"].strip()
+            if requested_tools_raw and requested_tools_raw.lower() not in ["", "[]", "none", "null"]:
+                try:
+                    requested_tools = json.loads(requested_tools_raw)
+                    if isinstance(requested_tools, list) and requested_tools:
+                        logger.warning(f"Step {step}: LLM requested additional tools: {requested_tools}")
+                        expanded_docs = load_skill_docs(requested_tools, executor.available_tools)
+                        if expanded_docs:
+                            s += user(f"ADDITIONAL TOOL DOCUMENTATION:\n{expanded_docs}")
+                            s += assistant("I have reviewed the additional tool documentation.\n")
+                            logger.info(f"Stage 3.5: Loaded docs for {len(requested_tools)} additional tools: {requested_tools}")
+                except (json.JSONDecodeError, TypeError, ValueError) as e:
+                    logger.warning(f"Step {step}: Failed to parse REQUEST_TOOLS: {e}")
+            
             # Check if done
             done_raw = s[f"done_{step}"].strip().upper()
             if done_raw.startswith("YES"):
