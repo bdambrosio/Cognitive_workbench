@@ -290,25 +290,25 @@ def load_skill_docs(tool_names: List[str], available_tools: Dict[str, Dict]) -> 
     lines.append("Full documentation for selected tools with examples, patterns, and output schemas:\n")
     
     for tool_name in tool_names:
-        logger.warning(f"Stage 1.5: Processing {tool_name}")
+        logger.debug(f"Stage 1.5: Processing {tool_name}")
         
         # Skip primitives (no SKILL.md files)
         if tool_name not in available_tools:
-            logger.warning(f"Stage 1.5: {tool_name} not in available_tools (primitive, skipping)")
+            logger.debug(f"Stage 1.5: {tool_name} not in available_tools (primitive, skipping)")
             continue
             
         tool_meta = available_tools[tool_name]
         # Use 'path' field which is the tool directory (not 'python_file' which is tool.py)
         tool_dir_path = tool_meta.get('path')
-        logger.warning(f"Stage 1.5: {tool_name} path = {tool_dir_path}")
+        logger.debug(f"Stage 1.5: {tool_name} path = {tool_dir_path}")
         
         if not tool_dir_path:
-            logger.warning(f"Stage 1.5: {tool_name} has no path field, skipping")
+            logger.debug(f"Stage 1.5: {tool_name} has no path field, skipping")
             continue
         
         # Resolve to absolute path
         tool_dir = Path(tool_dir_path).resolve()
-        logger.warning(f"Stage 1.5: {tool_name} tool_dir = {tool_dir}")
+        logger.debug(f"Stage 1.5: {tool_name} tool_dir = {tool_dir}")
         
         # Look for SKILL.md or Skill.md in tool directory
         skill_file = None
@@ -316,17 +316,17 @@ def load_skill_docs(tool_names: List[str], available_tools: Dict[str, Dict]) -> 
             candidate = tool_dir / variant
             if candidate.exists():
                 skill_file = candidate
-                logger.warning(f"Stage 1.5: {tool_name} found {variant} at {skill_file}")
+                logger.debug(f"Stage 1.5: {tool_name} found {variant} at {skill_file}")
                 break
         
         if not skill_file:
-            logger.warning(f"Stage 1.5: No SKILL.md found for {tool_name} in {tool_dir}")
+            logger.debug(f"Stage 1.5: No SKILL.md found for {tool_name} in {tool_dir}")
             continue
         
         try:
             with open(skill_file, 'r', encoding='utf-8') as f:
                 content = f.read()
-            logger.warning(f"Stage 1.5: {tool_name} loaded {len(content)} chars from {skill_file}")
+            logger.debug(f"Stage 1.5: {tool_name} loaded {len(content)} chars from {skill_file}")
             
             # Robust frontmatter stripping using regex
             # Match first complete frontmatter block: --- ... ---
@@ -335,18 +335,18 @@ def load_skill_docs(tool_names: List[str], available_tools: Dict[str, Dict]) -> 
             if frontmatter_match:
                 # Extract content after the closing ---
                 content = content[frontmatter_match.end():].strip()
-                logger.warning(f"Stage 1.5: {tool_name} stripped frontmatter, {original_len} -> {len(content)} chars")
+                logger.debug(f"Stage 1.5: {tool_name} stripped frontmatter, {original_len} -> {len(content)} chars")
             else:
-                logger.warning(f"Stage 1.5: {tool_name} no frontmatter found, using full content")
+                logger.debug(f"Stage 1.5: {tool_name} no frontmatter found, using full content")
             
             if not content:
-                logger.warning(f"Stage 1.5: {tool_name} content empty after stripping, skipping")
+                logger.debug(f"Stage 1.5: {tool_name} content empty after stripping, skipping")
                 continue
             
             lines.append(f"\n## {tool_name.upper()}")
             lines.append(content)
             lines.append("\n" + "="*80 + "\n")
-            logger.warning(f"Stage 1.5: {tool_name} added to docs ({len(content)} chars)")
+            logger.info(f"Stage 1.5: Loaded docs for {tool_name} ({len(content)} chars)")
             
         except Exception as e:
             logger.warning(f"Stage 1.5: Failed to load SKILL.md for {tool_name}: {e}")
@@ -354,11 +354,11 @@ def load_skill_docs(tool_names: List[str], available_tools: Dict[str, Dict]) -> 
             continue
     
     if len(lines) <= 2:  # Only header, no docs loaded
-        logger.warning("Stage 1.5: No docs loaded for any tools")
+        logger.debug("Stage 1.5: No docs loaded for any tools")
         return ""
     
     total_docs = "\n".join(lines)
-    logger.warning(f"Stage 1.5: Returning {len(total_docs)} total chars of docs")
+    logger.info(f"Stage 1.5: Returning {len(total_docs)} total chars of docs")
     return total_docs
 
 
@@ -384,7 +384,14 @@ def sgl_to_infospace_action(tool_name: str, args_json: str, step: int, available
     
     # Normalize variable references: ensure $ prefix for common variable fields
     # These fields typically reference variables (not literal values)
-    variable_fields = ['out', 'target', 'value', 'source']
+    # Exception: 'target' in say/display is a character name (literal), not a variable
+    variable_fields = ['out', 'source']
+    if tool_name not in ['say', 'display']:
+        variable_fields.extend(['target', 'value'])
+    else:
+        # For say/display, only 'value' might be a variable reference
+        variable_fields.append('value')
+    
     for field in variable_fields:
         if field in args:
             val = args[field]
@@ -394,7 +401,7 @@ def sgl_to_infospace_action(tool_name: str, args_json: str, step: int, available
                 # Check if it looks like a variable (not a URL, path, or resource ID)
                 if re.match(r'^[a-zA-Z_]\w*$', val) and not val.startswith(('Note_', 'Collection_', 'http://', 'https://')):
                     args[field] = f"${val}"
-                    logger.warning(f"Normalized '{field}' field: '{val}' -> '${val}'")
+                    logger.debug(f"Normalized '{field}' field: '{val}' -> '${val}'")
     
     # Build action
     action = {"type": tool_name}
@@ -533,9 +540,9 @@ if HAS_SGLANG:
         system_parts.append(f"\n{INCREMENTAL_PLAN_SPECIFICATIONS}\n")
         system_parts.append(
             "You will work in repeated cycles:\n"
-            "Stage 1 (once): Analyze goal and select relevant tools.\n"
-            "Stage 2 (loop): Pick a single tool and JSON args.\n"
-            "Stage 3 (loop): Reflect on result, decide if DONE, update goal if needed.\n\n"
+            "Stage 1 (once): Analyze goal, select relevant tools, decompose into FIRST_TASK.\n"
+            "Stage 2 (loop): Pick a single tool and JSON args for CURRENT_TASK.\n"
+            "Stage 3 (loop): Reflect on result, decide if goal done, set NEXT_TASK.\n\n"
             "ALWAYS follow formatting instructions exactly."
         )
         
@@ -547,9 +554,11 @@ if HAS_SGLANG:
             "Stage 1: Analyze goal and select relevant tools. Be concise in your analysis. Don't redundantly name tools you plan to include in the SELECTED_FIELDS_JSON field of your response.\n"
             "Include tools you might need AND related/supporting tools.\n"
             "Err on the side of including MORE tools for better context.\n"
+            "Then, decompose the goal into a FIRST high-level task/subgoal to focus on.\n"
             "Respond:\n"
             "ANALYSIS: <text>\n"
             "SELECTED_TOOLS_JSON: <json list>\n"
+            "FIRST_TASK: <high-level subgoal to tackle first>\n"
         )
         
         s += assistant(
@@ -557,10 +566,13 @@ if HAS_SGLANG:
             + gen("stage1_analysis", max_tokens=256, stop="\n")
             + "\nSELECTED_TOOLS_JSON: "
             + gen("selected_tools_json", max_tokens=256, stop="\n")
+            + "\nFIRST_TASK: "
+            + gen("first_task", max_tokens=128, stop="\n")
             + "\n"
         )
         print(f"Stage 1: Analysis + tool selection\n{s['stage1_analysis']}")
         print(f"SELECTED_TOOLS_JSON: {s['selected_tools_json']}")
+        print(f"FIRST_TASK: {s['first_task']}")
         
         # Stage 1.5: Load and inject detailed docs for selected tools
         try:
@@ -585,8 +597,8 @@ if HAS_SGLANG:
             "  - Fields like 'value', 'target', 'source', 'out' typically reference variables\n\n"
             "Stage 3 FORMAT:\n"
             "  THOUGHTS: <text>\n"
-            "  DONE: <YES or NO>\n"
-            "  UPDATED_GOAL: <text>\n"
+            "  DONE: <YES or NO - is the entire GOAL satisfied?>\n"
+            "  NEXT_TASK: <next high-level subgoal, or blank if DONE=YES>\n"
             "  REQUEST_TOOLS: <optional: json list of tool names you need docs for, or leave blank>\n\n"
             "If you realize you need a tool not initially selected, add it to REQUEST_TOOLS.\n"
             "You'll receive its full documentation before the next step.\n\n"
@@ -595,12 +607,13 @@ if HAS_SGLANG:
         s += assistant("Understood.\n")
         
         # Main loop
-        current_goal = goal
+        current_task = s["first_task"].strip()
         for step in range(max_steps):
             # Stage 2: Choose tool + args
             s += user(
-                f"STAGE 2 (step {step}):\n"
-                f"CURRENT_GOAL: {current_goal}\n"
+                f"STAGE 2 (step {step + 1}/{max_steps}):\n"
+                f"GOAL: {goal}\n"
+                f"CURRENT_TASK: {current_task}\n"
                 "Choose tool and JSON args using Stage 2 FORMAT.\n"
             )
             
@@ -622,13 +635,18 @@ if HAS_SGLANG:
             
             # Stage 3: Reflect
             s += user(
-                f"STAGE 3 (step {step}):\n"
+                f"STAGE 3 (step {step + 1}/{max_steps}):\n"
                 f"Tool `{tool_name}` with args:\n{tool_args_json}\n\n"
                 f"Result:\n{tool_result}\n\n"
                 "Respond using Stage 3 FORMAT. Be concise.\n"
-                "IMPORTANT: Only set DONE: YES when ALL goal requirements are met.\n"
-                "- If goal mentions 'display', 'show', or 'present', you MUST use display primitive before marking done.\n"
-                "- If goal mentions 'save' or 'store', you MUST persist before marking done.\n"
+                "IMPORTANT:\n"
+                "- DONE: YES ONLY when:\n"
+                "  1. You have EXECUTED all required actions (not just planned them)\n"
+                "  2. If goal requires display/present: You have CALLED the display primitive this step\n"
+                "  3. If goal requires save/store: You have CALLED persist this step\n"
+                "- Thinking 'I should display' ≠ displayed. You must execute the action first.\n"
+                "- Ask yourself: Have I DETERMINED AN ANSWER to the user's question?\n"
+                "- Gathering data ≠ answering. You must synthesize and present findings.\n"
             )
             
             s += assistant(
@@ -636,15 +654,15 @@ if HAS_SGLANG:
                 + gen(f"thoughts_{step}", max_tokens=128, stop="\n")
                 + "\nDONE: "
                 + gen(f"done_{step}", max_tokens=8, stop="\n")
-                + "\nUPDATED_GOAL: "
-                + gen(f"updated_goal_{step}", max_tokens=256, stop="\n")
+                + "\nNEXT_TASK: "
+                + gen(f"next_task_{step}", max_tokens=128, stop="\n")
                 + "\nREQUEST_TOOLS (tools you may need but didn't initially select): "
                 + gen(f"request_tools_{step}", max_tokens=64, stop="\n")
                 + "\n"
             )
             print(f"THOUGHTS: {s[f'thoughts_{step}']}")
             print(f"DONE: {s[f'done_{step}']}")
-            print(f"UPDATED_GOAL: {s[f'updated_goal_{step}']}")
+            print(f"NEXT_TASK: {s[f'next_task_{step}']}")
             print(f"REQUEST_TOOLS: {s[f'request_tools_{step}']}")
             
             # Stage 3.5: Dynamic tool loading (if requested)
@@ -653,7 +671,7 @@ if HAS_SGLANG:
                 try:
                     requested_tools = json.loads(requested_tools_raw)
                     if isinstance(requested_tools, list) and requested_tools:
-                        logger.warning(f"Step {step}: LLM requested additional tools: {requested_tools}")
+                        logger.info(f"Step {step}: LLM requested additional tools: {requested_tools}")
                         expanded_docs = load_skill_docs(requested_tools, executor.available_tools)
                         if expanded_docs:
                             s += user(f"ADDITIONAL TOOL DOCUMENTATION:\n{expanded_docs}")
@@ -668,13 +686,17 @@ if HAS_SGLANG:
                 s["final_answer"] = s[f"thoughts_{step}"]
                 return
             
-            # Update goal
-            current_goal = s[f"updated_goal_{step}"]
-            s["current_goal"] = current_goal
+            # Update current task for next iteration
+            next_task_raw = s[f"next_task_{step}"].strip()
+            if next_task_raw and next_task_raw.lower() not in ["", "none", "null", "n/a"]:
+                current_task = next_task_raw
+                logger.info(f"Step {step}: Next task: {current_task}")
+            else:
+                logger.warning(f"Step {step}: No NEXT_TASK provided, keeping current task")
         
         # Max steps reached
         s["final_answer"] = (
-            f"Max steps reached. Last goal: {current_goal}\n"
+            f"Max steps reached. Last task: {current_task}\n"
             f"Last thoughts: {s[f'thoughts_{max_steps-1}']}"
         )
 

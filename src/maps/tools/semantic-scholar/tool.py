@@ -76,6 +76,10 @@ def search_papers(query: str, limit: int = 6) -> List[Dict[str, Any]]:
     api_key = os.getenv("SEMANTIC_SCHOLAR_API_KEY") or None
     
     try:
+        # Allow nested event loops (needed when running inside FastAPI/uvloop)
+        import nest_asyncio
+        nest_asyncio.apply()
+        
         from semanticscholar import SemanticScholar
         api_key=None
         sch = SemanticScholar(api_key=api_key)
