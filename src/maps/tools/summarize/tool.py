@@ -7,6 +7,7 @@ import json
 import zenoh
 import time
 import uuid
+import traceback
 from zenoh import QueryTarget, ConsolidationMode
 from llm_client import ZenohLLMClient
 
@@ -94,6 +95,98 @@ def _wait_for_response(topic: str, timeout: float = 10.0):
         subscriber.undeclare()
     
     return response_data
+
+
+def _semantic_filter_direct(text_content: str, focus: str, target_tokens: int) -> str:
+    """
+    Directly embed and search text chunks without creating temp Collections.
+    Uses local embedding model to avoid Zenoh overhead.
+    
+    Args:
+        text_content: Full text to filter
+        focus: Query string for semantic filtering
+        target_tokens: Approx number of tokens needed in result
+        
+    Returns:
+        Filtered text containing most relevant chunks
+    """
+    try:
+        from sentence_transformers import SentenceTransformer
+        import numpy as np
+        
+        # Initialize embedder (cached at module level would be better, but KISS)
+        embedder = SentenceTransformer('all-MiniLM-L6-v2')
+        
+        # Chunk the text (paragraph-first, then sentences)
+        chunks = []
+        paragraphs = [p.strip() for p in text_content.split('\n\n') if p.strip()]
+        
+        for para in paragraphs:
+            if len(para) < 1024:  # Small enough, use as-is
+                chunks.append(para)
+            else:
+                # Split long paragraphs by sentences
+                sentences = para.split('. ')
+                current_chunk = []
+                current_len = 0
+                for sent in sentences:
+                    sent_len = len(sent)
+                    if current_len + sent_len > 512 and current_chunk:
+                        chunks.append('. '.join(current_chunk) + '.')
+                        current_chunk = [sent]
+                        current_len = sent_len
+                    else:
+                        current_chunk.append(sent)
+                        current_len += sent_len
+                if current_chunk:
+                    chunks.append('. '.join(current_chunk) + ('.' if not chunks[-1].endswith('.') else ''))
+        
+        if not chunks:
+            return text_content
+        
+        # Generate embeddings for all chunks and query
+        logger.info(f"summarize: embedding {len(chunks)} chunks for semantic filtering")
+        chunk_embeddings = embedder.encode(chunks, convert_to_tensor=False, show_progress_bar=False)
+        query_embedding = embedder.encode([focus], convert_to_tensor=False, show_progress_bar=False)[0]
+        
+        # Compute similarity scores (cosine similarity via normalized dot product)
+        chunk_embeddings_norm = chunk_embeddings / np.linalg.norm(chunk_embeddings, axis=1, keepdims=True)
+        query_embedding_norm = query_embedding / np.linalg.norm(query_embedding)
+        similarities = np.dot(chunk_embeddings_norm, query_embedding_norm)
+        
+        # Get top chunks by similarity
+        avg_chunk_tokens = 128
+        target_chunks = max(1, int(target_tokens / avg_chunk_tokens))
+        limit = min(len(chunks), target_chunks * 3)  # 3x overshoot
+        
+        top_indices = np.argsort(similarities)[::-1][:limit]
+        
+        # Collect chunks up to max tokens
+        selected_chunks = []
+        cumulative_tokens = 0
+        max_tokens = target_tokens * 3
+        
+        for idx in top_indices:
+            chunk = chunks[idx]
+            chunk_tokens = len(chunk) // 4  # rough estimate
+            if cumulative_tokens + chunk_tokens > max_tokens:
+                break
+            selected_chunks.append((idx, chunk))  # Keep index for ordering
+            cumulative_tokens += chunk_tokens
+        
+        # Sort by original order to maintain coherence
+        selected_chunks.sort(key=lambda x: x[0])
+        filtered_text = '\n\n'.join([chunk for _, chunk in selected_chunks])
+        
+        inclusion_pct = int(100 * len(filtered_text) / len(text_content)) if text_content else 0
+        logger.info(f"summarize: semantic filter kept {len(selected_chunks)}/{len(chunks)} chunks ({inclusion_pct}%)")
+        
+        return filtered_text
+        
+    except Exception as e:
+        logger.warning(f"Semantic filtering failed: {e}, using all content")
+        traceback.print_exc()
+        return text_content
 
 
 def _create_temp_collection(text_content: str, map_name: str = 'infolab') -> str:
@@ -277,66 +370,13 @@ def tool(value, **kwargs):
     if focus:
         logger.info(f"summarize: applying semantic search filter for '{focus}'")
         
-        # Get map_name from kwargs (default to 'infolab' for infospace)
-        map_name = kwargs.get('map_name', 'infolab')
+        # Use direct embedding approach (no temp Collections/Zenoh overhead)
+        target_tokens = int(_compute_target_length(effective_tokens, style, compression_ratio))
+        filtered_text = _semantic_filter_direct(value, focus, target_tokens)
         
-        # Create temporary Collection with content
-        temp_collection_id = _create_temp_collection(value, map_name)
-        if not temp_collection_id:
-            logger.warning(f"Failed to create temp collection, using all content")
-            filtered_text = value
-        else:
-            try:
-                # Index the Collection
-                if not _index_collection(temp_collection_id, map_name):
-                    logger.warning(f"Failed to index temp collection, using all content")
-                    filtered_text = value
-                else:
-                    # Compute target length to determine how many chunks to retrieve
-                    target_tokens = int(_compute_target_length(effective_tokens, style, compression_ratio))
-                    avg_chunk_tokens = 128  # Based on paragraph-first chunking
-                    target_chunks = max(1, int(target_tokens / avg_chunk_tokens))
-                    limit = target_chunks * 3  # 3x overshoot
-                    
-                    # Search for relevant chunks
-                    search_results = _search_collection(temp_collection_id, focus, limit, map_name)
-                    
-                    if not search_results:
-                        logger.warning(f"Search returned no results for '{focus}', using all content")
-                        filtered_text = value
-                    else:
-                        # Extract chunk content from search results
-                        chunk_contents = []
-                        cumulative_tokens = 0
-                        max_content_tokens = target_tokens * 3  # Allow up to 3x target for LLM
-                        
-                        for result in search_results:
-                            # Extract chunk text from result (search returns 'document' field)
-                            chunk_text = result.get('document', '')
-                            if not chunk_text:
-                                continue
-                            
-                            chunk_tokens = _estimate_tokens(chunk_text)
-                            if cumulative_tokens + chunk_tokens > max_content_tokens:
-                                break
-                            
-                            chunk_contents.append(chunk_text)
-                            cumulative_tokens += chunk_tokens
-                        
-                        if chunk_contents:
-                            filtered_text = "\n\n".join(chunk_contents)
-                            effective_tokens = _estimate_tokens(filtered_text)
-                            inclusion_pct = int((effective_tokens / input_tokens) * 100) if input_tokens > 0 else 100
-                            logger.info(f"Retrieved {len(chunk_contents)} chunks ({effective_tokens}t, {inclusion_pct}% of input)")
-                        else:
-                            logger.warning(f"No chunks extracted from search results, using all content")
-                            filtered_text = value
-            finally:
-                # Note: Temporary Collection cleanup could be added here if needed
-                # For now, leaving it (map_node may clean up unused resources)
-                pass
-            
-            value = filtered_text
+        effective_tokens = _estimate_tokens(filtered_text)
+        inclusion_pct = int((effective_tokens / input_tokens) * 100) if input_tokens > 0 else 100
+        value = filtered_text
     
     # Check if segmentation needed (after filtering)
     chunks = _segment_text(value, max_chunk_size=16000)
