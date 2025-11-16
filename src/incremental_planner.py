@@ -501,23 +501,37 @@ def execute_infospace_action(action: Dict, executor, agent_name: str) -> str:
 
 if HAS_SGLANG:
     @function
-    def tool_planner_infospace(s, goal: str, tools_catalog_text: str, executor, max_steps: int = 8):
+    def tool_planner_infospace(s, goal: str, character_context: str, recent_context: str, 
+                              tools_catalog_text: str, executor, max_steps: int = 8):
         """
         SGLang incremental planner for infospace goals.
         
         Args:
             s: SGLang state
             goal: Goal text
+            character_context: Character description + drives
+            recent_context: Recent thoughts/memories + last action
             tools_catalog_text: Formatted tool catalog
             executor: InfospaceExecutor instance (with _plan_actions attribute)
             max_steps: Maximum planning steps
         """
         # Stage 1: Analysis + tool selection
-        s += system(
-            "You are a planning-and-acting assistant for information space operations.\n"
-            "You can choose tools/primitives, call them via JSON arguments, "
-            "and iteratively refine your plan until the goal is satisfied.\n\n"
-            f"{INCREMENTAL_PLAN_SPECIFICATIONS}\n\n"
+        system_parts = [
+            "You are a planning-and-acting assistant for information space operations.",
+            "You can choose tools/primitives, call them via JSON arguments,",
+            "and iteratively refine your plan until the goal is satisfied.\n"
+        ]
+        
+        # Add character context if available
+        if character_context:
+            system_parts.append(f"\n# CHARACTER CONTEXT\n{character_context}\n")
+        
+        # Add recent context if available
+        if recent_context:
+            system_parts.append(f"{recent_context}\n")
+        
+        system_parts.append(f"\n{INCREMENTAL_PLAN_SPECIFICATIONS}\n")
+        system_parts.append(
             "You will work in repeated cycles:\n"
             "Stage 1 (once): Analyze goal and select relevant tools.\n"
             "Stage 2 (loop): Pick a single tool and JSON args.\n"
@@ -525,10 +539,12 @@ if HAS_SGLANG:
             "ALWAYS follow formatting instructions exactly."
         )
         
+        s += system("".join(system_parts))
+        
         s += user(
             f"Goal: {goal}\n\n"
             f"Tool catalog:\n{tools_catalog_text}\n\n"
-            "Stage 1: Analyze goal and select relevant tools.\n"
+            "Stage 1: Analyze goal and select relevant tools. Be concise in your analysis. Don't redundantly name tools you plan to include in the SELECTED_FIELDS_JSON field of your response.\n"
             "Include tools you might need AND related/supporting tools.\n"
             "Err on the side of including MORE tools for better context.\n"
             "Respond:\n"
@@ -609,20 +625,20 @@ if HAS_SGLANG:
                 f"STAGE 3 (step {step}):\n"
                 f"Tool `{tool_name}` with args:\n{tool_args_json}\n\n"
                 f"Result:\n{tool_result}\n\n"
-                "Respond using Stage 3 FORMAT.\n"
+                "Respond using Stage 3 FORMAT. Be concise.\n"
                 "IMPORTANT: Only set DONE: YES when ALL goal requirements are met.\n"
                 "- If goal mentions 'display', 'show', or 'present', you MUST use display primitive before marking done.\n"
                 "- If goal mentions 'save' or 'store', you MUST persist before marking done.\n"
             )
             
             s += assistant(
-                "THOUGHTS: "
-                + gen(f"thoughts_{step}", max_tokens=256, stop="\n")
+                "THOUGHTS (Be concise): "
+                + gen(f"thoughts_{step}", max_tokens=128, stop="\n")
                 + "\nDONE: "
                 + gen(f"done_{step}", max_tokens=8, stop="\n")
                 + "\nUPDATED_GOAL: "
                 + gen(f"updated_goal_{step}", max_tokens=256, stop="\n")
-                + "\nREQUEST_TOOLS: "
+                + "\nREQUEST_TOOLS (tools you may need but didn't initially select): "
                 + gen(f"request_tools_{step}", max_tokens=64, stop="\n")
                 + "\n"
             )
@@ -693,12 +709,13 @@ class IncrementalPlanner:
         print (self.tools_catalog_text)
         self.logger.info(f"IncrementalPlanner initialized with {len(self.tools)} tools")
     
-    def generate_plan(self, goal: str, max_steps: int = 8) -> Dict:
+    def generate_plan(self, goal: str, context: Dict = None, max_steps: int = 8) -> Dict:
         """
         Generate plan incrementally using SGLang.
         
         Args:
             goal: Goal text
+            context: Optional dict with character_context, recent_context
             max_steps: Maximum planning steps
             
         Returns:
@@ -714,9 +731,18 @@ class IncrementalPlanner:
             # Attach plan_actions list to executor for tracking
             self.executor._plan_actions = []
             
+            # Extract context components
+            character_context = ""
+            recent_context = ""
+            if context:
+                character_context = context.get('character_context', '')
+                recent_context = context.get('recent_context', '')
+            
             # Run SGLang planner
             state = tool_planner_infospace.run(
                 goal=goal,
+                character_context=character_context,
+                recent_context=recent_context,
                 tools_catalog_text=self.tools_catalog_text,
                 executor=self.executor,
                 max_steps=max_steps

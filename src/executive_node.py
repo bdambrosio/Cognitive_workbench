@@ -1220,6 +1220,7 @@ class ZenohExecutiveNode:
             system_prompt = self._update_system_prompt()
             user_prompt = self.observations['dynamic']
             goal_prompt = f"\n\nYour current goal is: {goal.to_string()}"
+            entity_context = None
             target = goal.actors[1] if len(goal.actors) > 1 else None
             if target:
                 entity_context = self.get_entity_context(target, 10)
@@ -1251,9 +1252,37 @@ class ZenohExecutiveNode:
                 
                 # Build context
                 if self.is_infospace:
+                    # Gather character context for incremental planner
+                    character_context = system_prompt  # Character description + drives
+                    
+                    # Get character's own entity context for recent thoughts
+                    self_entity_context = self.get_entity_context(self.character_name, 10)
+                    
+                    # Add recent thoughts/memories if available
+                    recent_context = ""
+                    if self_entity_context and self_entity_context.get('conversation_history'):
+                        recent_context += "\n# Recent thoughts:\n"
+                        for memory in self_entity_context['conversation_history'][:3]:  # Last 3
+                            if isinstance(memory, dict):
+                                recent_context += f"  {memory.get('source', '')}: {memory.get('text', '')[:200]}...\n"
+                    
+                    # Add dialog with target if goal involves another character
+                    if entity_context and entity_context.get('conversation_history'):
+                        recent_context += f"\n# Recent dialog with {target}:\n"
+                        for memory in entity_context['conversation_history'][:3]:  # Last 3
+                            if isinstance(memory, dict):
+                                recent_context += f"  {memory.get('source', '')}: {memory.get('text', '')[:200]}...\n"
+                    
+                    # Add last action if available
+                    if self.action_history:
+                        last_action = self.action_history[-1]
+                        result_str = self._truncate_result(last_action.result)
+                        recent_context += f"\n# Last action:\n  {last_action.action.get('type')}: {last_action.action.get('target')} - {result_str}\n"
+                    
                     context = {
                         'variables': self.infospace_executor.plan_bindings if self.infospace_executor else {},
-                        'situation': user_prompt,
+                        'character_context': character_context,
+                        'recent_context': recent_context,
                         'executor': self.infospace_executor  # Pass executor for incremental planner
                     }
                 else:

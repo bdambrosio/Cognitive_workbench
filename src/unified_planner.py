@@ -138,7 +138,7 @@ class UnifiedPlanner:
                         primitives_reference=INFOSPACE_PRIMITIVES_REFERENCE,
                         logger_instance=self.logger
                     )
-                    plan_result = incremental_planner.generate_plan(goal=goal, max_steps=8)
+                    plan_result = incremental_planner.generate_plan(goal=goal, context=context, max_steps=8)
                     if not plan_result.get('error'):
                         return plan_result
                     else:
