@@ -1147,11 +1147,11 @@ Examples:
 ## ask
 Description: Ask user a question and wait for response (suspends plan execution)
 Input: target: literal "User" (optional), value: literal or $variable question text
-Output: out: variable name → bound to response text (raw string, not Note)
+Output: out: $variable → bound to response text (raw string, not Note)
 Parameters:
   - target (optional): string "User" (default)
   - value (required): literal string or $variable referencing question text
-  - out (required): variable name to bind response to (no $ prefix)
+  - out (required): $variable name to bind response to
 Preconditions: if value is $variable, it must be bound
 Postconditions: 
   - Question displayed to user in main UI area (not popup)

@@ -1939,6 +1939,14 @@ class FastAPIActionDisplayNode:
                     console.log('Non-JSON message received:', event.data);
                     return;
                 }
+                
+                // Handle display modal actions
+                if (data.type === 'action' && data.is_display_modal) {
+                    console.log('📺 Display modal action received:', data);
+                    showDisplayModal(data);
+                    return;
+                }
+                
                 if (data.type === 'action') {
                     addActionEntry(data);
                     // Check if this is an announcement to create a character tab
@@ -3614,6 +3622,15 @@ class FastAPIActionDisplayNode:
             if action_data.get('type') == 'announcement':
                 self._handle_character_announcement(action_data, character_name)
                 # Send announcement to web clients so tabs can be created
+                self._send_to_websockets(action_data, character_name)
+                return
+            
+            # Handle display actions - trigger UI modal
+            if action_data.get('type') == 'display':
+                logger.info(f"📺 Display action from {character_name}: {len(action_data.get('text', ''))} chars")
+                # Add display flag for UI to trigger modal
+                action_data['is_display_modal'] = True
+                # Send to web clients to trigger modal
                 self._send_to_websockets(action_data, character_name)
                 return
             

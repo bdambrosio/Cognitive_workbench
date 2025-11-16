@@ -1,6 +1,6 @@
 ---
 name: as-markdown
-description: Identify and extract structure from markdown content, stripping noise
+description: Extract markdown document structure and content from mixed/embedded text (NOT for converting plain text TO markdown)
 type: prompt_augmentation
 parameters: element (optional) - type to extract (headers|lists|links|code|section|all)
 examples:

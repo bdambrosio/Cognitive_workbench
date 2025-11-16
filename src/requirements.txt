@@ -16,6 +16,8 @@ networkx>=3.5
 
 # AI/ML and LLM clients
 openai>=1.98.0
+opentelemetry-api>=1.38.0
+opentelemetry-sdk>=1.38.0
 tqdm>=4.67.0
 sentence-transformers>=2.7.0
 txtai>=6.1.0
