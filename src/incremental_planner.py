@@ -110,14 +110,15 @@ try:
     from sglang import function, system, user, assistant, gen
     sgl.set_default_backend(
         sgl.Runtime(
-            model_path="/home/bruce/vllm/models/Qwen3-Coder-30B-A3B-Instruct",
-            tokenizer_path="/home/bruce/vllm/models/Qwen3-Coder-30B-A3B-Instruct",
-            device="cuda",
-            dtype="auto",
-            tp_size=1,
-            mem_fraction_static=0.8,
-            tool_call_parser="qwen",
-        )
+                    model_path="/home/bruce/vllm/models/Qwen3-Coder-30B-A3B-Instruct",
+                    tokenizer_path="/home/bruce/vllm/models/Qwen3-Coder-30B-A3B-Instruct",
+                    device="cuda",
+                    context_length=24768,
+                    cuda_graph_max_bs=4,
+                    dtype="auto",          # or "bf16"
+                    tp_size=1,             # if you’re using a single GPU
+                    mem_fraction_static=0.95,
+                    tool_call_parser="qwen"       )
     )
     HAS_SGLANG = True
 except ImportError:
@@ -605,7 +606,7 @@ if HAS_SGLANG:
             "Follow these formats exactly."
         )
         s += assistant("Understood.\n")
-        
+
         # Main loop
         current_task = s["first_task"].strip()
         for step in range(max_steps):
@@ -684,6 +685,7 @@ if HAS_SGLANG:
             done_raw = s[f"done_{step}"].strip().upper()
             if done_raw.startswith("YES"):
                 s["final_answer"] = s[f"thoughts_{step}"]
+                print (f"full trace:\n{s}")
                 return
             
             # Update current task for next iteration
@@ -699,6 +701,7 @@ if HAS_SGLANG:
             f"Max steps reached. Last task: {current_task}\n"
             f"Last thoughts: {s[f'thoughts_{max_steps-1}']}"
         )
+        print (f"full trace:\n{s}")
 
 
 class IncrementalPlanner:
