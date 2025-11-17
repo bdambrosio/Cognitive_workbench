@@ -1334,7 +1334,9 @@ class ZenohExecutiveNode:
                         logger.info(f'📋 {self.character_name} generated new plan: {json.dumps(plan_candidate, indent=2)}')
                         
                         # Semantic validation (logs only, doesn't reject) - after syntactic validation passes
-                        if hasattr(self, 'semantic_validator'):
+                        # Skip if already executed (incremental planner)
+                        skip_validation = plan_candidate.get('skip_validation', False)
+                        if hasattr(self, 'semantic_validator') and not skip_validation:
                             repair_suggestions = self.semantic_validator.validate(plan_candidate)
                             
                             if repair_suggestions:

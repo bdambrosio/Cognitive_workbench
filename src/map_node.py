@@ -240,13 +240,14 @@ class MapNode:
 ##
 
 Response with the datetime in isoformat.
-Do not include any other text, reasoning, introductory, expository, or markdown.
+Do not include any other text, reasoning, code-fence, introductory, expository, or markdown.
 end your response with: 
 </end>
             """
             response = self.llm_client.generate([prompt], max_tokens=50, stops=['</end>'])
             try:
-                self.world_map.datetime = datetime.fromisoformat(response.text.strip())
+                text = response.text.strip().replace('```json', '').replace('```', '')
+                self.world_map.datetime = datetime.fromisoformat(text)
                 logger.info(f"Setting datetime to: {self.world_map.datetime}")
             except Exception as e:
                 logger.error(f"Failed to set datetime: {e}")
