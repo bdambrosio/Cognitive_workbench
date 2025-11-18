@@ -104,6 +104,15 @@ Agents generate **structured JSON plans** with:
 - **Control flow**: Conditionals (`if`), loops (`while`), error handling
 - **Variables**: Plan-local bindings (`$note`, `$results`)
 
+**Planning modes:**
+
+1. **Standard planning** (default): Single-shot plan generation from goal
+2. **Incremental planning** (Jill): Iterative planning with action execution feedback
+   - Uses SGLang for multi-stage planning (analyze → execute → reflect → iterate)
+   - Executes actions during planning for real-time feedback
+   - Automatically handles type compatibility and tool selection
+   - Returns plans with `skip_validation: true` (already executed)
+
 Plans can be:
 - Auto-generated from natural language goals
 - Manually edited via `edit:` command
@@ -150,7 +159,8 @@ All nodes communicate via **Zenoh** pub/sub and queryables.
 
 - Notes and Collections are saved only if their `properties.persistent` is `True`.
 - The system `Notes` collection is recreated on each startup (it is not persistent).
-- Persistent Collections are cleaned on restore: any `note_id` that doesn't exist is removed. During saves, the system logs warnings for non-persistent notes referenced by persistent Collections, including a 200-character content snippet to aid manual recovery.
+- Persistent Collections are cleaned on restore: any `note_id` that doesn't exist is removed.
+- **Auto-persistence**: When a Collection is persisted, all Notes in it are automatically persisted if not already persistent.
 - Auto-save runs every ~2 minutes. The Map Node and Memory Node also save during graceful shutdown.
 - The UI Shutdown button performs "Save and Shutdown": it triggers a full save across nodes, then requests a centralized shutdown.
 
@@ -209,6 +219,8 @@ Characters navigate a 2D world, manage physiological states (hunger, thirst), se
 **Active features:**
 - ✅ Infospace primitives (12+ primitives: create-note, create-collection, load, persist, index, search, map, flatten, coerce, add, expand, say, display, think, if, while, wait, focus)
 - ✅ Tool system (20+ built-in tools)
+- ✅ Incremental planner (SGLang-based iterative planning with execution feedback)
+- ✅ Evaluation framework (test library with compliance tracking)
 - ✅ Web UI with plan editing, resizable display, collapsible logs
 - ✅ Note/Collection viewer
 - ✅ Multi-agent parallelism
@@ -229,11 +241,70 @@ Characters navigate a 2D world, manage physiological states (hunger, thirst), se
 
 ---
 
+## Incremental Planner
+
+The incremental planner (enabled for Jill) uses **SGLang** for iterative planning with real-time execution feedback:
+
+- **Multi-stage planning**: Analyze goal → Execute action → Reflect on result → Iterate
+- **Type-aware**: Automatically respects Note vs Collection operation compatibility
+- **Execution feedback**: Actions execute during planning, allowing course correction
+- **Compliance tracking**: Monitors type violations and tool usage during execution
+
+**Requirements:**
+- SGLang backend configured (see `src/incremental_planner.py`)
+- Currently enabled for Jill character only
+
+**How it works:**
+1. Planner analyzes goal and selects relevant tools
+2. Executes single action via infospace executor
+3. Reflects on result and decides next step
+4. Repeats until goal satisfied or max steps reached
+5. Returns completed plan with `skip_validation: true`
+
+## Evaluation Framework (Test Library)
+
+The evaluation framework tests planner compliance with infospace type system rules:
+
+**Location:** `tests/eval/` directory
+
+**Features:**
+- **YAML test files**: Define test goals, tool allowlists, setup steps
+- **Compliance tracking**: Monitors type violations, tool misuse, compatibility checks
+- **Interactive UI**: 🧪 Test button in web UI for real-time test execution
+- **Metrics logging**: Results stored in `{character}-plans.jsonl` with compliance data
+
+**Usage:**
+
+1. **Via Web UI** (recommended):
+   - Click 🧪 **Test** button
+   - Select character and test file
+   - Click **▶️ Run Test**
+   - View compliance results in real-time
+
+2. **Test file format:**
+   ```yaml
+   name: "Test Name"
+   description: "What this test validates"
+   allowed_tools: ["create-note", "summarize"]  # Optional restriction
+   setup_goals: ["goal: Create initial data"]    # Optional setup
+   test_goal: "goal: Your test scenario"
+   ```
+
+**Available tests:**
+- `Test_1.1_Note_collection_compatibility.yaml` - Type compatibility rules
+- `Test_1.2_Complex_workflow.yaml` - Multi-step workflows
+- `Test_2.0_Create_emergent_capabilities_mini_corpus.yaml` - Collection operations
+- `Test_2.1_Argument_extraction_and_Stance_classification.yaml` - Tool chaining
+- `Test_2.2_Unresolved_question_extraction.yaml` - Question detection
+
+See [tests/eval/README.md](tests/eval/README.md) for detailed documentation.
+
 ## Documentation
 
 - [Implementation Status](Docs/IMPLEMENTATION_STATUS.md)
 - [Infospace Architecture](Docs/SPACEMAP_ARCHITECTURE.md)
 - [Map Node API](Docs/MAP_NODE_API_ANALYSIS.md)
+- [Evaluation Framework](tests/eval/README.md)
 - Research context and claims: See [BACKGROUND.md](BACKGROUND.md)
 
 - [Collection Spatial Resource Implementation](Docs/COLLECTION_SPATIAL_RESOURCE_IMPLEMENTATION.md)
