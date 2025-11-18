@@ -5,6 +5,7 @@ Semantic Scholar academic paper search tool.
 import json
 import logging
 import os
+import requests
 from typing import List, Dict, Any
 import zenoh
 from zenoh import QueryTarget, ConsolidationMode
@@ -14,6 +15,7 @@ logger = logging.getLogger(__name__)
 # Open zenoh session for creating Notes and Collections
 config = zenoh.Config()
 zenoh_session = zenoh.open(config)
+ss_api_key = os.getenv("SEMANTIC_SCHOLAR_API_KEY") or None
 
 def _create_note(content: Any, agent_name: str, source_skill: str = 'semantic-scholar') -> str:
     """Create a Note via Zenoh and return its ID."""
@@ -75,99 +77,36 @@ def search_papers(query: str, limit: int = 6) -> List[Dict[str, Any]]:
     """
     api_key = os.getenv("SEMANTIC_SCHOLAR_API_KEY") or None
     
-    try:
-        # Allow nested event loops (needed when running inside FastAPI/uvloop)
-        import nest_asyncio
-        nest_asyncio.apply()
-        
-        from semanticscholar import SemanticScholar
-        api_key=None
-        sch = SemanticScholar(api_key=api_key)
-        
-        # Specify all fields upfront to batch fetch in single request
-        fields = ['paperId', 'title', 'abstract', 'authors', 'year', 
-                  'citationCount', 'venue', 'openAccessPdf', 'externalIds']
-        
-        papers_iter = sch.search_paper(query, limit=limit, fields=fields)
-        
-        # Iterate only up to limit to prevent pagination
-        results = []
-        for paper in papers_iter:
-            if len(results) >= limit-1:
-                break
-            # Extract available fields
-            abstract = paper.abstract or "No abstract available"
-            title = paper.title or "Untitled"
-            authors = [a.name for a in (paper.authors or [])]
-            year = paper.year or 0
-            citations = paper.citationCount or 0
-            venue = paper.venue or ""
-            paper_id = paper.paperId or ""
-            
-            # Get PDF URL - check openAccessPdf first, then externalIds
-            pdf_url = None
-            if hasattr(paper, 'openAccessPdf') and paper.openAccessPdf:
-                pdf_url = paper.openAccessPdf.get('url')
-            
-            # Get DOI if available
-            doi = None
-            if hasattr(paper, 'externalIds') and paper.externalIds:
-                doi = paper.externalIds.get('DOI')
-                # Try ArXiv URL as fallback
-                if not pdf_url and 'ArXiv' in paper.externalIds:
-                    arxiv_id = paper.externalIds['ArXiv']
-                    pdf_url = f"https://arxiv.org/pdf/{arxiv_id}.pdf"
-            
-            # Build uniform result structure
-            result = {
-                "text": abstract,
-                "format": "paper",
-                "metadata": {
-                    "title": title,
-                    "authors": authors,
-                    "year": year,
-                    "citations": citations,
-                    "venue": venue,
-                    "paper_id": paper_id,
-                    "doi": doi,
-                    "pdf_url": pdf_url
-                },
-                "char_count": len(abstract)
-            }
-            results.append(result)
-        
-        return results
-        
-    except ImportError:
-        # Fallback to direct API calls if library not available
-        logger.warning("semanticscholar library not installed, using direct API")
-        return _search_papers_direct(query, limit, api_key)
-    except Exception as e:
-        logger.error(f"Semantic Scholar search failed: {e}")
-        return _search_papers_direct(query, limit, api_key)
+    # Use direct API calls instead of async library to avoid uvloop conflicts
+    # The semanticscholar library uses asyncio which conflicts with FastAPI's uvloop
+    logger.info(f"Using direct API for Semantic Scholar search: {query}")
+    return _search_papers_direct(query, limit, api_key)
 
 def _search_papers_direct(query: str, limit: int, api_key: str = None) -> List[Dict[str, Any]]:
     """
-    Direct API call fallback if library not available.
+    Direct API call to Semantic Scholar.
     """
-    import requests
+    import subprocess
+    import urllib.parse
     
-    url = "https://api.semanticscholar.org/graph/v1/paper/search"
-    params = {
-        "query": query,
-        "limit": limit,
-        "fields": "paperId,title,abstract,authors,year,citationCount,venue,openAccessPdf,externalIds"
-    }
-    
+    # Define the API endpoint URL
+    url = f"http://api.semanticscholar.org/graph/v1/paper/search?query={query}&limit={limit}&fields=paperId,title"
+
+    # Define the query parameters
+    query_params = {"fields": "title,year,abstract,citationCount"}
+
+    # Directly define the API key (Reminder: Securely handle API keys in production environments)
+    api_key = "your api key goes here"  # Replace with the actual API key
+
+    # Define headers with API key
     headers = {}
-    if api_key:
-        headers["x-api-key"] = api_key
-    
-    try:
-        response = requests.get(url, params=params, headers=headers, timeout=10)
-        response.raise_for_status()
-        data = response.json()
-        
+
+    # Send the API request
+    response = requests.get(url, params=query_params, headers=headers)
+    # Check response status
+    if response.status_code == 200:
+        data = response.json()   
+        logger.info(f"Found {len(data.get('data', []))} papers")
         results = []
         for paper in data.get("data", []):
             abstract = paper.get("abstract", "No abstract available")
@@ -210,13 +149,17 @@ def _search_papers_direct(query: str, limit: int, api_key: str = None) -> List[D
                 "char_count": len(abstract)
             }
             results.append(result)
+            logger.info(f"Found paper: {title}")
         
         return results
-        
-    except Exception as e:
-        logger.error(f"Direct API search failed: {e}")
+    else:
+        print("Status:", response.status_code)
+        print("Headers:")
+        for k, v in response.headers.items():
+            print(f"{k}: {v}")
+        logger.error(f"Failed to search Semantic Scholar: {response.status_code}")
         return []
-
+        
 def tool(value, **kwargs):
     """
     Semantic Scholar search tool.
@@ -275,6 +218,6 @@ def tool(value, **kwargs):
 
 if __name__ == "__main__":
     # Test
-    result = tool("transformer architecture")
+    result = tool("transformer architecture", agent_name='Jill')
     print(result)
 

@@ -1,0 +1,21 @@
+# Test 2.2: Unresolved Question Extraction and Thematic Grouping
+# Tests that the planner can:
+# - scan corpus for open problems / unresolved questions
+# - represent them explicitly as Notes
+# - group them into thematic Collections
+
+name: "Unresolved Questions and Thematic Grouping (Emergent Capabilities)"
+description: "Extract unresolved questions from the corpus and group them by theme into Collections."
+
+test_goal: >
+  goal: From the Infospace collection "emergent-capabilities-mini-corpus",
+  extract unresolved research questions about emergent capabilities,
+  store each question as a separate Note, and group them into thematic Collections
+  (e.g., 'measurement', 'scaling laws', 'interpretability').
+
+expected_metrics:
+  plan_completed: true
+  min_question_recall: 0.75        # fraction of gold unresolved questions recovered
+  min_group_purity: 0.7            # alignment between discovered groups and gold themes
+  min_questions_grouped: 0.9       # fraction of extracted questions assigned to some theme
+  type_violations: 0

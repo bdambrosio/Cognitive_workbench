@@ -1,0 +1,20 @@
+# Test 2.1b: Evidence Linkage for Extracted Arguments
+# Tests that the planner can:
+# - identify evidence passages for each argument
+# - link arguments to evidence via Note references or IDs
+# - keep argument/evidence pairing consistent with gold labels
+
+name: "Argument–Evidence Linkage (Emergent Capabilities)"
+description: "Ensure that extracted arguments are correctly linked to their supporting evidence Notes."
+
+test_goal: >
+  goal: For each argument in the 'emergent-capabilities-arguments' collection,
+  find the best supporting evidence passages in 'emergent-capabilities-mini-corpus',
+  and attach explicit references (Note IDs or links) so that each argument is paired
+  with its evidence.
+
+expected_metrics:
+  plan_completed: true
+  min_evidence_link_accuracy: 0.75   # fraction of arguments whose evidence matches gold
+  min_arguments_with_evidence: 0.9   # fraction of arguments that have at least one evidence link
+  type_violations: 0

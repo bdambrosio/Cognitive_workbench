@@ -1,0 +1,15 @@
+# Test: Note vs Collection Operation Compatibility
+# Tests that the planner respects type compatibility rules:
+# - expand, as-json, refine work on Notes ONLY
+# - map, flatten work on Collections ONLY
+# - summarize, relate work on both
+
+name: "Note vs Collection Compatibility"
+description: "Tests that operations are applied to correct types (Note-only ops not on Collections)"
+
+test_goal: "goal: Create a note with JSON array, expand it to separate items, then summarize all items together"
+
+expected_metrics:
+  type_violations: 0
+  plan_completed: true
+

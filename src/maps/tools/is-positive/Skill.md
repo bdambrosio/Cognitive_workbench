@@ -28,7 +28,7 @@ Returns boolean:
 - `True` if value > 0
 - `False` otherwise
 
-## Example
+## Examples
 
 Input: 5
 Output: True

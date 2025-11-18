@@ -1,0 +1,22 @@
+# Test 2.1a: Argument Extraction & Stance Classification (Single Topic)
+# Tests that the planner can:
+# - search within a small Infospace corpus
+# - extract distinct arguments
+# - classify stance (pro / con / neutral)
+# - store arguments in structured Notes/Collections
+
+name: "Argument Extraction and Stance Classification (Emergent Capabilities)"
+description: "From a small labeled corpus on emergent capabilities, extract arguments and classify them by stance (pro/contra/neutral)."
+
+test_goal: >
+  goal: Using the existing Infospace collection "emergent-capabilities-mini-corpus",
+  find the main arguments for and against emergent capabilities, classify their stance,
+  and write them into separate 'pros' and 'cons' collections, plus a 'neutral' collection
+  for background or mixed positions.
+
+expected_metrics:
+  plan_completed: true
+  # Fractions compared to gold labels for this corpus
+  min_argument_recall: 0.8      # fraction of gold arguments recovered (semantic match)
+  min_stance_accuracy: 0.8      # correct pro/contra/neutral labels for matched arguments
+  type_violations: 0            # Note/Collection compatibility errors reported by validator
