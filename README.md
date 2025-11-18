@@ -29,6 +29,7 @@ Built for researchers exploring cognitive architectures, tool-augmented LLMs, an
 ### Prerequisites
 - Python 3.10+
 - OpenAI API key, or local LLM server (vLLM/Ollama), or OpenRouter account
+- Uses sglang internally for incremental planning. Hardcoded to use Qwen3-Coder-30B, I need to fix that.
 
 ### Installation
 
@@ -45,7 +46,7 @@ source zenoh_venv/bin/activate  # On Windows: zenoh_venv\Scripts\activate
 pip install -r src/requirements.txt
 ```
 
-### Configure LLM
+### Configure LLM - this llm used for misc content processing and planning by other than Jill
 
 Edit `scenarios/jill.yaml` to set your LLM provider:
 
@@ -69,6 +70,8 @@ export OPENAI_API_KEY='your-key-here'
 Note: Semantic indexing uses `sentence-transformers` (model `all-MiniLM-L6-v2`) and FAISS. These are installed via `src/requirements.txt`.
 
 ### Launch
+
+There are a number of .yaml files in the scenarions dir, but Jill is the infospace research asst I am focused on right now, others may or may not work
 
 ```bash
 cd src
@@ -193,7 +196,8 @@ Jill will:
 2. Execute each step
 3. Display results in the UI
 
-### Interactive Planning
+### Interactive Planning (doesn't work with Jill / incremental planning, but you can just enter a new goal. 
+Right now incremental planner runs uninterruptibly till it thinks it is done or reaches its step limit.
 
 ```
 goal: create a note about AI safety
