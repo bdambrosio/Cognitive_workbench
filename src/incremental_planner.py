@@ -132,7 +132,11 @@ INCREMENTAL_PLAN_SPECIFICATIONS = """
 
 Types:
 - Note: Single value/document (persists across restarts)
+  - Can be named (e.g., "my-note") for stable referencing via load
+  - Named Notes can be loaded by name or by ID (e.g., "Note_123")
 - Collection: List of Note/Collection IDs (session-local only)
+  - Can be named (e.g., "my-collection") for stable referencing via load
+  - Named Collections can be loaded by name or by ID (e.g., "Collection_456")
 - Variables: Plan-local names referencing Notes/Collections
 
 Variable Syntax:
@@ -199,17 +203,19 @@ def build_tool_catalog(available_tools: Dict[str, Dict], primitives_reference: s
             "schema_hint": {"value": "array of $variables", "name": "string (optional)", "out": "$variable"}
         },
         "create-note": {
-            "description": "Create a persistent Note object and bind to variable",
-            "full_description": "Create a persistent Note object and bind to variable. Notes store any content (text, JSON, etc.)",
+            "description": "Create a persistent Note object and bind to variable. IMPORTANT: The 'name' parameter (optional) creates a named Note that can be loaded by name later. Variable names in 'out' (e.g., '$my_note') are just bindings, NOT note names.",
+            "full_description": "Create a persistent Note object and bind to variable. Notes store any content (text, JSON, etc.). The optional 'name' parameter registers the Note with a stable name for later loading (e.g., load by 'important-note' name). Variable names like '$my_note' are temporary bindings during plan execution, not persistent names.",
             "parameters": {
                 "value": "required: literal value or $variable referencing content",
+                "name": "optional: string name for named Note (separate from variable name)",
                 "out": "required: $variable name for resulting Note"
             },
             "examples": [
                 '{"type":"create-note","value":"some data","out":"$my_note"}',
-                '{"type":"create-note","value":"$variable","out":"$new_note"}'
+                '{"type":"create-note","value":"$variable","out":"$new_note"}',
+                '{"type":"create-note","value":"important data","name":"important-note","out":"$my_note"}'
             ],
-            "schema_hint": {"value": "any content", "out": "$variable"}
+            "schema_hint": {"value": "any content", "name": "string (optional)", "out": "$variable"}
         },
     }
     
@@ -227,8 +233,8 @@ def build_tool_catalog(available_tools: Dict[str, Dict], primitives_reference: s
             "schema_hint": PRIMITIVE_DOCS["create-collection"]["schema_hint"]
         },
         "load": {
-            "description": "Load persistent Note or Collection by ID",
-            "schema_hint": {"resource_id": "string", "out": "$variable", "expect": "string"}
+            "description": "Load persistent Note or Collection by ID or name. Can load named Notes/Collections by name (e.g., 'my-note') or by ID (e.g., 'Note_123').",
+            "schema_hint": {"resource_id": "string (ID or name)", "out": "$variable", "expect": "string"}
         },
         "persist": {
             "description": "Mark Note/Collection as persistent",
@@ -437,12 +443,14 @@ def sgl_to_infospace_action(tool_name: str, args_json: str, step: int, available
     # Normalize variable references: ensure $ prefix for common variable fields
     # These fields typically reference variables (not literal values)
     # Exception: 'target' in say/display is a character name (literal), not a variable
+    # Exception: 'value' in create-note/add/say/display/think/ask accepts literals, so don't normalize
+    # These primitives accept both literals and variables - trust LLM to add $ when needed
     variable_fields = ['out', 'source']
-    if tool_name not in ['say', 'display']:
+    # Primitives that accept literal values in 'value' field (don't normalize)
+    literal_value_primitives = ['create-note', 'add', 'say', 'display', 'think', 'ask']
+    if tool_name not in literal_value_primitives:
         variable_fields.extend(['target', 'value'])
-    else:
-        # For say/display, only 'value' might be a variable reference
-        variable_fields.append('value')
+    # For literal_value_primitives, 'value' accepts literals, so don't normalize
     
     for field in variable_fields:
         if field in args:
@@ -605,6 +613,78 @@ def execute_infospace_action(action: Dict, executor, agent_name: str) -> str:
 
 if HAS_SGLANG:
     @function
+    def stage0_resource_retrieval(s, goal: str, executor):
+        """
+        Stage 0: Generate search queries from goal and retrieve relevant resources.
+        
+        Args:
+            s: SGLang state
+            goal: Goal text
+            executor: InfospaceExecutor instance
+            
+        Returns:
+            Formatted string with available resources to inject into Stage 1 prompt
+        """
+        s += system(
+            "You are helping extract search queries from a goal statement. "
+            "Focus on WHAT the goal is about (topics, concepts, data) rather than HOW to achieve it (actions, steps). "
+            "Generate 1-2 concise search queries that would help find relevant Notes or Collections."
+        )
+        s += user(f"Goal: {goal}\n\nGenerate 1-2 concise search queries (one per line, no numbering):")
+        s += assistant(gen("queries", max_tokens=128, stop="\n\n"))
+        
+        try:
+            queries_text = s["queries"].strip()
+            # Parse queries (one per line)
+            queries = [q.strip() for q in queries_text.split('\n') if q.strip()][:2]
+            
+            if not queries:
+                return ""
+            
+            # Search for resources
+            search_result = executor.search_resources(queries, k_notes=3, k_collections=2, threshold=0.3)
+            
+            if search_result.get('status') != 'success':
+                logger.warning(f"Stage 0: Resource search failed: {search_result.get('reason')}")
+                return ""
+            
+            notes = search_result.get('notes', [])
+            collections = search_result.get('collections', [])
+            
+            if not notes and not collections:
+                return ""
+            
+            # Format results for prompt injection
+            lines = ["# Available Notes / Collections (may be relevant)\n"]
+            
+            if notes:
+                lines.append("## Notes:")
+                for note in notes:
+                    name = note.get('name', note.get('resource_id', ''))
+                    resource_id = note.get('resource_id', '')
+                    lines.append(f"- {resource_id} (\"{name}\"): Use `load` primitive to reference by name or ID")
+            
+            if collections:
+                lines.append("\n## Collections:")
+                for coll in collections:
+                    name = coll.get('name', coll.get('resource_id', ''))
+                    resource_id = coll.get('resource_id', '')
+                    item_count = coll.get('item_count', 0)
+                    lines.append(f"- {resource_id} (\"{name}\"): {item_count} items. Use `load` primitive to reference by name or ID")
+            
+            lines.append("\nTo use these resources, reference by name (e.g., \"my-note\") or ID (e.g., \"Note_42\") in `load` actions.")
+            
+            result_text = "\n".join(lines)
+            logger.info(f"Stage 0: Found {len(notes)} Notes and {len(collections)} Collections")
+            return result_text
+            
+        except Exception as e:
+            logger.warning(f"Stage 0: Error in resource retrieval: {e}")
+            import traceback
+            traceback.print_exc()
+            return ""
+    
+    @function
     def tool_planner_infospace(s, goal: str, character_context: str, recent_context: str, 
                               tools_catalog_text: str, executor, max_steps: int = 16):
         """
@@ -619,6 +699,14 @@ if HAS_SGLANG:
             executor: InfospaceExecutor instance (with _plan_actions attribute)
             max_steps: Maximum planning steps
         """
+        # Stage 0: Resource retrieval (if executor available)
+        available_resources_text = ""
+        if executor:
+            try:
+                available_resources_text = stage0_resource_retrieval.run(goal=goal, executor=executor)
+            except Exception as e:
+                logger.warning(f"Stage 0: Failed to retrieve resources: {e}")
+        
         # Stage 1: Analysis + tool selection
         system_parts = [
             "You are a planning-and-acting assistant for information space operations.",
@@ -634,6 +722,10 @@ if HAS_SGLANG:
         if recent_context:
             system_parts.append(f"{recent_context}\n")
         
+        # Add available resources from Stage 0
+        if available_resources_text:
+            system_parts.append(f"\n{available_resources_text}\n")
+        
         system_parts.append(f"\n{INCREMENTAL_PLAN_SPECIFICATIONS}\n")
         system_parts.append(
             "You will work in repeated cycles:\n"
@@ -648,13 +740,14 @@ if HAS_SGLANG:
         s += user(
             f"Goal: {goal}\n\n"
             f"Tool catalog:\n{tools_catalog_text}\n\n"
-            "Stage 1: Analyze goal and select relevant tools. Be concise in your analysis. Don't redundantly name tools you plan to include in the SELECTED_FIELDS_JSON field of your response.\n"
+            "Stage 1: Analyze goal and identify relevant tools. Be concise in your analysis.\n"
             "Include tools you might need AND related/supporting tools.\n"
-            "Err on the side of including MORE tools for better context.\n"
+            "Err on the side of including additional tools in SELECTED_TOOLS_JSON for better coverage.\n"
             "Then, decompose the goal into a FIRST high-level task/subgoal to focus on.\n"
-            "Respond:\n"
+            "In doing so, consider the tools you have selected, the goal you are trying to achieve, and the downstream tasks that will be required to achieve the goal.\n"
+            "Respond with the following fields:\n"
             "ANALYSIS: <text>\n"
-            "SELECTED_TOOLS_JSON: <json list>\n"
+            "SELECTED_TOOLS_JSON: <json list of tool names>\n"
             "FIRST_TASK: <high-level subgoal to tackle first>\n"
         )
         
@@ -667,13 +760,18 @@ if HAS_SGLANG:
             + gen("first_task", max_tokens=128, stop="\n")
             + "\n"
         )
-        print(f"Stage 1: Analysis + tool selection\n{s['stage1_analysis']}")
-        print(f"SELECTED_TOOLS_JSON: {s['selected_tools_json']}")
-        print(f"FIRST_TASK: {s['first_task']}")
+        
+        try:
+            logger.info(f"Stage 1: Analysis + tool selection\n{s['stage1_analysis']}")
+            logger.info(f"SELECTED_TOOLS_JSON: {s['selected_tools_json']}")
+            logger.info(f"FIRST_TASK: {s['first_task']}")
+        except KeyError as e:
+            logger.warning(f"Stage 1 values not available: {e}")
         
         # Stage 1.5: Load and inject detailed docs for selected tools
         try:
-            selected_tools = json.loads(s['selected_tools_json'])
+            selected_tools_json = s['selected_tools_json']
+            selected_tools = json.loads(selected_tools_json)
             if isinstance(selected_tools, list) and selected_tools:
                 expanded_docs = load_skill_docs(selected_tools, executor.available_tools)
                 if expanded_docs:
@@ -688,10 +786,6 @@ if HAS_SGLANG:
             "Stage 2 FORMAT:\n"
             "  TOOL_NAME: <name>\n"
             "  TOOL_ARGS_JSON: <json object>\n\n"
-            "CRITICAL: Variable references MUST start with $ (dollar sign):\n"
-            "  - Correct: {\"value\": \"$my_variable\"}\n"
-            "  - Wrong: {\"value\": \"my_variable\"}\n"
-            "  - Fields like 'value', 'target', 'source', 'out' typically reference variables\n\n"
             "Stage 3 FORMAT:\n"
             "  THOUGHTS: <text>\n"
             "  DONE: <YES or NO - is the entire GOAL satisfied?>\n"
@@ -727,7 +821,7 @@ if HAS_SGLANG:
             tool_args_json = s[f"tool_args_{step}"].strip()
             action = sgl_to_infospace_action(tool_name, tool_args_json, step, executor.available_tools)
             tool_result = execute_infospace_action(action, executor, executor.agent_name)
-            
+            logger.info(f"Stage 2: Choose tool + args\n{tool_name} -> {tool_args_json}")
             logger.info(f"Step {step}: {tool_name} -> {tool_result[:100]}")
             
             # Stage 3: Reflect
@@ -736,14 +830,8 @@ if HAS_SGLANG:
                 f"Tool `{tool_name}` with args:\n{tool_args_json}\n\n"
                 f"Result:\n{tool_result[:512]}\n\n"
                 "Respond using Stage 3 FORMAT. Be concise.\n"
-                "IMPORTANT:\n"
-                "- DONE: YES ONLY when:\n"
-                "  1. You have EXECUTED all required actions (not just planned them)\n"
-                "  2. If goal requires display/present: You have CALLED the display primitive this step\n"
-                "  3. If goal requires save/store: You have CALLED persist this step\n"
-                "- Thinking 'I should display' ≠ displayed. You must execute the action first.\n"
-                "- Ask yourself: Have I DETERMINED AN ANSWER to the user's question?\n"
-                "- Gathering data ≠ answering. You must synthesize and present findings.\n"
+                "DONE: YES only when you have EXECUTED all required actions (not just planned them). "
+                "Thinking about an action ≠ executing it. You must actually call display/persist/etc.\n"
             )
             
             s += assistant(
@@ -757,10 +845,42 @@ if HAS_SGLANG:
                 + gen(f"request_tools_{step}", max_tokens=64, stop="\n")
                 + "\n"
             )
-            print(f"THOUGHTS: {s[f'thoughts_{step}']}")
-            print(f"DONE: {s[f'done_{step}']}")
-            print(f"NEXT_TASK: {s[f'next_task_{step}']}")
-            print(f"REQUEST_TOOLS: {s[f'request_tools_{step}']}")
+            logger.info(f"THOUGHTS: {s[f'thoughts_{step}']}")
+            logger.info(f"DONE: {s[f'done_{step}']}")
+            logger.info(f"NEXT_TASK: {s[f'next_task_{step}']}")
+            logger.info(f"REQUEST_TOOLS: {s[f'request_tools_{step}']}")
+            
+            # Stage 3.1: Update resource indexes with commentary
+            # Track resources created in this step and update their indexes
+            thoughts_text = s[f'thoughts_{step}'].strip()
+            if thoughts_text:
+                # Find resource created in this step (from the action we just executed)
+                resource_id = None
+                if action.get('type') in ['create-note', 'create-collection']:
+                    out_var = action.get('out', '')
+                    if out_var:
+                        resource_id = executor.plan_bindings.get(out_var.lstrip('$'))
+                
+                # Update index with commentary if resource was created
+                if resource_id and (resource_id.startswith('Note_') or resource_id.startswith('Collection_')):
+                    try:
+                        from zenoh import QueryTarget, ConsolidationMode
+                        payload = {
+                            'resource_id': resource_id,
+                            'commentary': thoughts_text
+                        }
+                        for reply in executor.session.get(
+                            "cognitive/map/resource/update_commentary",
+                            target=QueryTarget.BEST_MATCHING,
+                            consolidation=ConsolidationMode.NONE,
+                            timeout=2.0,
+                            payload=json.dumps(payload).encode('utf-8')
+                        ):
+                            if reply.ok:
+                                logger.debug(f"Stage 3.1: Updated commentary for {resource_id}")
+                            break
+                    except Exception as e:
+                        logger.debug(f"Stage 3.1: Failed to update commentary for {resource_id}: {e}")
             
             # Stage 3.5: Dynamic tool loading (if requested)
             requested_tools_raw = s[f"request_tools_{step}"].strip()
@@ -781,7 +901,7 @@ if HAS_SGLANG:
             done_raw = s[f"done_{step}"].strip().upper()
             if done_raw.startswith("YES"):
                 s["final_answer"] = s[f"thoughts_{step}"]
-                print (f"full trace:\n{s}")
+                #print (f"full trace:\n{s}")
                 return
             
             # Update current task for next iteration
@@ -797,7 +917,8 @@ if HAS_SGLANG:
             f"Max steps reached. Last task: {current_task}\n"
             f"Last thoughts: {s[f'thoughts_{max_steps-1}']}"
         )
-        print (f"full trace:\n{s}")
+        #logger.info(f"full trace:\n{s}")
+        return s
 
 
 class IncrementalPlanner:
@@ -827,7 +948,6 @@ class IncrementalPlanner:
         # Build tool catalog
         self.tools = build_tool_catalog(available_tools, primitives_reference)
         self.tools_catalog_text = tool_catalog_text(self.tools)
-        print (self.tools_catalog_text)
         self.logger.info(f"IncrementalPlanner initialized with {len(self.tools)} tools")
     
     def generate_plan(self, goal: str, context: Dict = None, max_steps: int = 16) -> Dict:

@@ -996,12 +996,14 @@ Input: value: literal or $variable → any content
 Output: out: $variable → Note (newly created)
 Parameters:
   - value (required): literal value or $variable referencing content
+  - name (optional): string name for named Note (can be loaded by name via load)
   - out (required): $variable name for resulting Note
 Preconditions: none (creates new Note)
 Postconditions: out variable bound to new Note with persistent ID
 Examples:
   {"type":"create-note","value":"some data","out":"$my_note"}
   {"type":"create-note","value":"$variable","out":"$new_note"}
+  {"type":"create-note","value":"important data","name":"important-note","out":"$my_note"}
 
 ## create-collection
 Description: Create a session-local Collection object and bind to variable

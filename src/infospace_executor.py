@@ -712,10 +712,13 @@ Only provide the result, followed by the </end> tag.""")
         Create a Note object as persistent spatial resource.
         
         Required: value, out
-        Optional: properties (dict of extra metadata)
+        Optional: name (stable name for Note), properties (dict of extra metadata)
+        
+        Named Notes can be loaded by name (e.g., "my-note") or by ID (e.g., "Note_123").
         """
         value_arg = action.get('value')
         out_var = action.get('out')
+        note_name = action.get('name', '')
         extra_props = action.get('properties')
         
         if not out_var:
@@ -728,7 +731,7 @@ Only provide the result, followed by the </end> tag.""")
             logger.info(f"Created null Note → ${out_var} = Note_null")
             return {'status': 'success', 'value': "Note_null"}
         
-        info_id = self._persist_note(value, 'create-note-primitive', extra_props)
+        info_id = self._persist_note(value, 'create-note-primitive', extra_props, note_name)
         if info_id:
             self._bind_variable(out_var, info_id)
             logger.info(f"Created Note {info_id} → ${out_var}")
@@ -807,7 +810,7 @@ Only provide the result, followed by the </end> tag.""")
     
     # ==================== Storage Operations ====================
     
-    def _persist_note(self, value: Any, source_context: str, properties: Optional[Dict] = None) -> Optional[str]:
+    def _persist_note(self, value: Any, source_context: str, properties: Optional[Dict] = None, note_name: str = '') -> Optional[str]:
         """
         Helper to persist a Note to map_node as a spatial resource.
         
@@ -815,6 +818,7 @@ Only provide the result, followed by the </end> tag.""")
             value: Content to persist
             source_context: Description for logging (e.g., 'save_primitive', 'apply_result')
             properties: Optional dict of extra properties to attach
+            note_name: Optional stable name for referencing
             
         Returns:
             Note ID if successful, None if failed
@@ -834,7 +838,8 @@ Only provide the result, followed by the </end> tag.""")
             'content': value,
             'format': format_type,
             'source_skill': source_context,
-            'source_value': str(value)[:100]
+            'source_value': str(value)[:100],
+            'note_name': note_name
         }
         if properties:
             payload_dict['properties'] = properties
@@ -904,6 +909,53 @@ Only provide the result, followed by the </end> tag.""")
         logger.error(f"Persist request failed for {resource_id}")
         return {'status': 'failed', 'reason': 'Failed to mark resource as persistent'}
     
+    def search_resources(self, queries: List[str], k_notes: int = 3, k_collections: int = 2, threshold: float = 0.3) -> Dict:
+        """
+        Search for relevant Notes and Collections using embedding-based retrieval.
+        Used by Stage 0 of incremental planner.
+        
+        Args:
+            queries: List of search query strings
+            k_notes: Number of Notes to return
+            k_collections: Number of Collections to return
+            threshold: Minimum similarity score
+            
+        Returns:
+            Dict with 'notes' and 'collections' lists, or error dict
+        """
+        from zenoh import QueryTarget, ConsolidationMode
+        
+        payload = {
+            'queries': queries,
+            'k_notes': k_notes,
+            'k_collections': k_collections,
+            'threshold': threshold
+        }
+        
+        for reply in self.session.get(
+            "cognitive/map/resource/search",
+            target=QueryTarget.BEST_MATCHING,
+            consolidation=ConsolidationMode.NONE,
+            timeout=5.0,
+            payload=json.dumps(payload).encode('utf-8')
+        ):
+            if reply.ok:
+                response = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
+                if response.get('success'):
+                    return {
+                        'status': 'success',
+                        'notes': response.get('notes', []),
+                        'collections': response.get('collections', [])
+                    }
+                else:
+                    return {
+                        'status': 'failed',
+                        'reason': response.get('error', 'Search failed')
+                    }
+            break
+        
+        return {'status': 'failed', 'reason': 'No response from map_node'}
+    
     def _execute_load(self, action: Dict) -> Dict:
         """
         Load a persistent Note or Collection by resource ID or name.
@@ -921,6 +973,15 @@ Only provide the result, followed by the </end> tag.""")
         
         if not out_var:
             return {'status': 'failed', 'reason': 'load requires out'}
+            
+        # Resolve variable if resource_id starts with $
+        if isinstance(resource_id, str) and resource_id.startswith('$'):
+            var_name = resource_id[1:]
+            if var_name in self.plan_bindings:
+                resource_id = self.plan_bindings[var_name]
+                logger.debug(f"Resolved load resource_id: ${var_name} -> {resource_id}")
+            else:
+                return {'status': 'failed', 'reason': f'Variable not bound: {var_name}'}
         
         # Query map_node for the resource
         from zenoh import QueryTarget, ConsolidationMode
@@ -945,7 +1006,9 @@ Only provide the result, followed by the </end> tag.""")
                     
                     # Bind the actual resource ID to variable
                     self._bind_variable(out_var, actual_id)
-                    logger.info(f"Loaded {resource_id} → ${out_var}")
+                    # Determine resource type for logging
+                    resource_type = "Collection" if actual_id.startswith('Collection_') else "Note" if actual_id.startswith('Note_') else "Resource"
+                    logger.info(f"Loaded {resource_id} → ${out_var} ({resource_type})")
                     return {'status': 'success', 'value': actual_id}
                 else:
                     return {'status': 'failed', 'reason': f'Resource not found: {resource_id}'}
@@ -1380,6 +1443,9 @@ Only provide the result, followed by the </end> tag.""")
         primitive_handlers = {
             'add': self._execute_add,
             'remove': self._execute_remove,
+            'display': self._execute_display,
+            'say': self._execute_say,
+            'think': self._execute_think,
         }
         
         # Apply operation to each Note
@@ -1404,6 +1470,10 @@ Only provide the result, followed by the </end> tag.""")
                         primitive_action['value'] = note_id
                         if 'out' not in primitive_action:
                             primitive_action['out'] = additional_args.get('target', out_var)
+                    # For side-effect primitives (display, say, think): map item becomes 'value' or 'target'
+                    elif operation in ['display', 'say', 'think']:
+                        # Use 'value' field (display/say/think accept both value and target)
+                        primitive_action['value'] = note_id
                     
                     # Execute primitive
                     result = primitive_handlers[operation](primitive_action)
@@ -1434,6 +1504,10 @@ Only provide the result, followed by the </end> tag.""")
                     if isinstance(result_value, str) and result_value.startswith('Collection_'):
                         # Keep reference to mutated collection (will overwrite each iteration, but that's fine)
                         result_note_ids.append(result_value)
+                # For side-effect primitives (display, say, think): no result Note needed
+                elif isinstance(operation, str) and operation in ['display', 'say', 'think']:
+                    # Side-effect only - don't create result Note, but don't treat as failure
+                    pass
                 elif result_value is None:
                     if not filter_null:
                         result_note_ids.append("Note_null")
@@ -1463,6 +1537,17 @@ Only provide the result, followed by the </end> tag.""")
                     return {'status': 'failed', 'reason': f'Mutation target {mutation_target} not bound'}
             else:
                 return {'status': 'failed', 'reason': f'{operation} requires target in args'}
+        elif isinstance(operation, str) and operation in ['display', 'say', 'think']:
+            # Side-effect primitives - create empty Collection (side effects executed, no result Notes)
+            operation_str = operation if isinstance(operation, str) else 'operation'
+            collection_id = self._create_collection([], f'map_{operation_str}')
+            if collection_id:
+                self._bind_variable(out_var, collection_id)
+                logger.info(f"Mapped {len(note_ids)} items via {operation} (side effects executed), created {collection_id} → ${out_var}")
+                return {'status': 'success', 'value': collection_id}
+            else:
+                logger.error(f"Failed to create Collection for map results")
+                return {'status': 'failed', 'reason': 'Failed to create result Collection'}
         else:
             # Tool operation - create result Collection
             operation_str = operation if isinstance(operation, str) else 'operation'

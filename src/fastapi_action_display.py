@@ -461,6 +461,17 @@ class FastAPIActionDisplayNode:
                 with open(test_file, 'r') as f:
                     test_config = yaml.safe_load(f)
                 
+                # Log test start to UI action log (direct UI entry, bypasses action_data pub/sub)
+                test_name = test_config.get('name', Path(test_file).stem)
+                test_action_data = {
+                    'type': 'evaluation_test_start',
+                    'test_name': test_name,
+                    'test_file': test_file,
+                    'timestamp': datetime.now().isoformat()
+                }
+                self.tracer.log_action(test_action_data, character)
+                self._send_to_websockets(test_action_data, character)
+                
                 # Enable compliance tracking via Zenoh message
                 self.session.put(
                     f"cognitive/{character}/enable_compliance_tracking",
@@ -2043,6 +2054,7 @@ class FastAPIActionDisplayNode:
         let lastReadyData = null;
         let activeCharacter = null;
         let commandInProgress = false; // Prevent rapid button clicks
+        let lastSelectedTestCharacter = null; // Sticky character selection for test runner
         
         // Sidebar resizer state
         let isResizing = false;
@@ -3504,6 +3516,16 @@ class FastAPIActionDisplayNode:
                 charSelect.innerHTML += `<option value="${charName}">${charName}</option>`;
             }
             
+            // Restore sticky character selection if available
+            if (lastSelectedTestCharacter) {
+                charSelect.value = lastSelectedTestCharacter;
+            }
+            
+            // Save selection when changed
+            charSelect.onchange = () => {
+                lastSelectedTestCharacter = charSelect.value || null;
+            };
+            
             // Request test file list from server
             if (ws && ws.readyState === WebSocket.OPEN) {
                 ws.send(JSON.stringify({
@@ -3565,6 +3587,9 @@ class FastAPIActionDisplayNode:
                 alert('Please select a test file');
                 return;
             }
+            
+            // Save character selection for sticky behavior
+            lastSelectedTestCharacter = character;
             
             const statusDiv = document.getElementById('testStatus');
             statusDiv.innerHTML = '<div style="color: #f39c12;">⏳ Running test...</div>';
