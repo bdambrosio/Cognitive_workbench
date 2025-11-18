@@ -1,6 +1,6 @@
 # Zenoh Cognitive Framework
 
-A simplified cognitive framework using Zenoh for communication, replacing ROS2 complexity with clean Python applications that can run on separate cores.
+A simplified cognitive framework using Zenoh for communication, replacing ROS2 complexity with clean Python applications that can run on separate cores. For contributor responsibilities and workflows, see the [Repository Guidelines](AGENTS.md).
 
 ## 🚀 Features
 
