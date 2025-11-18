@@ -14,6 +14,7 @@ test_goal: >
   topic="emergent_capabilities", stance in {pro, con, neutral},
   and role in {argument, evidence, background}.
   Ensure the collection is indexed so it can be searched efficiently later.
+  Verify that the collection can be retrieved by name "emergent-capabilities-mini-corpus" using the load primitive.
 
 expected_metrics:
   plan_completed: true

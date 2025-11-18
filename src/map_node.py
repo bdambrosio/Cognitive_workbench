@@ -339,6 +339,18 @@ end your response with:
             self.handle_collection_add
         )
         
+        # Resource search queryable for Stage 0 retrieval
+        self.resource_search_queryable = self.session.declare_queryable(
+            "cognitive/map/resource/search",
+            self.handle_resource_search
+        )
+        
+        # Resource commentary update queryable for Stage 3
+        self.resource_commentary_queryable = self.session.declare_queryable(
+            "cognitive/map/resource/update_commentary",
+            self.handle_resource_commentary_update
+        )
+        
         # Collection persist queryable (mark Collection as persistent)
         self.collection_persist_queryable = self.session.declare_queryable(
             "cognitive/map/collection/persist",
@@ -1074,12 +1086,16 @@ end your response with:
             if not resource and resource_name in self.world_map.resource_registry:
                 resource = self.world_map.resource_registry[resource_name]
             
-            # If not found and doesn't look like an ID, try named_collections
+            # If not found and doesn't look like an ID, try named collections and named notes
             if not resource and not resource_name.startswith(('Note_', 'Collection_')):
                 if resource_name in self.resource_manager.named_collections:
                     collection_id = self.resource_manager.named_collections[resource_name]
                     resource = self.world_map.resource_registry.get(collection_id)
                     logger.info(f"📚 Resolved collection name '{resource_name}' → {collection_id}")
+                elif resource_name in self.resource_manager.named_notes:
+                    note_id = self.resource_manager.named_notes[resource_name]
+                    resource = self.world_map.resource_registry.get(note_id)
+                    logger.info(f"📝 Resolved note name '{resource_name}' → {note_id}")
             
             if resource:
                 # Create JSON-safe version of resource
@@ -1287,19 +1303,110 @@ end your response with:
                 else:
                     # Proceed with actual removal (either rule allows or no rule exists)
                     resource_id = resource['name']  # The 'name' field contains the resource_id
-                    success = self.world_map.remove_resource(resource_id)
-                    if success:
+                    
+                    # For infospace Notes/Collections, delete from registry completely
+                    # (world_map.remove_resource() only removes from patches, keeps in registry)
+                    if resource_id.startswith('Note_') or resource_id.startswith('Collection_'):
+                        # Remove from patches if it has a location
+                        loc = resource.get('location')
+                        if isinstance(loc, (list, tuple)) and len(loc) == 2:
+                            x, y = loc
+                            if 0 <= x < self.world_map.width and 0 <= y < self.world_map.height:
+                                if resource_id in self.world_map.patches[x][y].resources:
+                                    del self.world_map.patches[x][y].resources[resource_id]
+                        
+                        # Delete from registry
+                        if resource_id in self.world_map.resource_registry:
+                            del self.world_map.resource_registry[resource_id]
+                            logger.info(f"Deleted {resource_id} from resource_registry")
+                        
+                        # Clean up resource manager state
+                        if self.resource_manager:
+                            if resource_id.startswith('Collection_'):
+                                # Remove from named collections if present
+                                if resource_id in self.resource_manager.named_collections.values():
+                                    # Find and remove the name mapping
+                                    name_to_remove = None
+                                    for name, coll_id in self.resource_manager.named_collections.items():
+                                        if coll_id == resource_id:
+                                            name_to_remove = name
+                                            break
+                                    if name_to_remove:
+                                        del self.resource_manager.named_collections[name_to_remove]
+                                
+                                # Clean up vector stores and indexes
+                                if resource_id in self.resource_manager.vector_stores:
+                                    del self.resource_manager.vector_stores[resource_id]
+                                if resource_id in self.resource_manager.collection_indexes:
+                                    del self.resource_manager.collection_indexes[resource_id]
+                            elif resource_id.startswith('Note_'):
+                                # Remove from named notes if present
+                                if resource_id in self.resource_manager.named_notes.values():
+                                    # Find and remove the name mapping
+                                    name_to_remove = None
+                                    for name, note_id in self.resource_manager.named_notes.items():
+                                        if note_id == resource_id:
+                                            name_to_remove = name
+                                            break
+                                    if name_to_remove:
+                                        del self.resource_manager.named_notes[name_to_remove]
+                        
+                        # For Notes, remove from system collection if resource_manager exists
+                        if resource_id.startswith('Note_') and self.resource_manager:
+                            # Remove from system Notes collection
+                            if self.resource_manager.system_notes_collection_id:
+                                system_coll_id = self.resource_manager.system_notes_collection_id
+                                # Query the collection and remove the note
+                                from zenoh import QueryTarget, ConsolidationMode
+                                for reply in self.session.get(
+                                    f"cognitive/map/resource/{system_coll_id}",
+                                    target=QueryTarget.BEST_MATCHING,
+                                    consolidation=ConsolidationMode.NONE,
+                                    timeout=2.0
+                                ):
+                                    if reply.ok:
+                                        coll_data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
+                                        if coll_data.get('success') and 'content' in coll_data:
+                                            content = coll_data['content']
+                                            if isinstance(content, list) and resource_id in content:
+                                                content.remove(resource_id)
+                                                # Update the collection
+                                                for update_reply in self.session.get(
+                                                    f"cognitive/map/collection/add",
+                                                    target=QueryTarget.BEST_MATCHING,
+                                                    consolidation=ConsolidationMode.NONE,
+                                                    timeout=2.0,
+                                                    payload=json.dumps({
+                                                        'collection_id': system_coll_id,
+                                                        'content': content,
+                                                        'agent_name': 'system',
+                                                        'operation': 'update'
+                                                    }).encode('utf-8')
+                                                ):
+                                                    break
+                                    break
+                        
                         response = {
                             'success': True,
                             'removed': True,
-                            'message': f"Resource '{resource_name}' removed successfully"
+                            'message': f"Resource '{resource_name}' deleted successfully"
                         }
-                        logger.info(f"Resource '{resource_name}' removed from map")
+                        logger.info(f"Resource '{resource_name}' deleted from map")
                     else:
-                        response = {
-                            'success': False,
-                            'error': f"Failed to remove resource '{resource_name}'"
-                        }
+                        # For non-infospace resources, use standard remove_resource
+                        success = self.world_map.remove_resource(resource_id)
+                        if success:
+                            response = {
+                                'success': True,
+                                'removed': True,
+                                'message': f"Resource '{resource_name}' removed successfully"
+                            }
+                            logger.info(f"Resource '{resource_name}' removed from map")
+                        else:
+                            response = {
+                                'success': False,
+                                'error': f"Failed to remove resource '{resource_name}'"
+                            }
             
             query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
         except Exception as e:
@@ -1381,6 +1488,7 @@ end your response with:
             "format": "text|json",  # Content format
             "source_skill": str,  # Name of skill that created this
             "source_value": str,  # Input value to the skill
+            "note_name": str,  # Optional stable name for referencing
             "properties": dict,  # Optional extra metadata (kind, parent_id, order, span, section, source, entity, edge)
         }
         
@@ -1404,11 +1512,12 @@ end your response with:
             format_type = payload.get('format', 'text')
             source_skill = payload.get('source_skill', '')
             source_value = payload.get('source_value', '')
+            note_name = payload.get('note_name', '')
             extra_props = payload.get('properties', {}) or {}
             
             # Call resource manager to create note
             success, note_id, error_msg, location = self.resource_manager.create_note(
-                character_name, content, format_type, source_skill, source_value, extra_props
+                character_name, content, format_type, source_skill, source_value, note_name, extra_props
             )
             
             if success:
@@ -1605,6 +1714,139 @@ end your response with:
             
         except Exception as e:
             logger.error(f"Error persisting Collection: {e}")
+            error_response = {
+                'success': False,
+                'error': str(e)
+            }
+            query.reply(query.key_expr, json.dumps(error_response).encode('utf-8'))
+    
+    def handle_resource_search(self, query):
+        """
+        Handle resource search query for Stage 0 retrieval.
+        
+        Topic: cognitive/map/resource/search
+        Payload: {
+            "queries": [str],  # List of search queries
+            "k_notes": int,  # Number of Notes to return (default 3)
+            "k_collections": int,  # Number of Collections to return (default 2)
+            "threshold": float  # Minimum similarity score (default 0.3)
+        }
+        
+        Returns: {
+            "success": bool,
+            "notes": [{"resource_id": str, "name": str, "score": float}],
+            "collections": [{"resource_id": str, "name": str, "score": float, "item_count": int}]
+        }
+        """
+        try:
+            # Parse payload
+            if not query.payload:
+                raise ValueError("No payload provided")
+            
+            payload_bytes = query.payload.to_bytes()
+            payload_str = payload_bytes.decode('utf-8')
+            payload = json.loads(payload_str)
+            
+            queries = payload.get('queries', [])
+            k_notes = payload.get('k_notes', 3)
+            k_collections = payload.get('k_collections', 2)
+            threshold = payload.get('threshold', 0.3)
+            
+            if not queries:
+                response = {
+                    'success': True,
+                    'notes': [],
+                    'collections': []
+                }
+                query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
+                return
+            
+            # Search both indexes for each query, merge results
+            all_notes = {}
+            all_collections = {}
+            
+            for query_text in queries:
+                # Search Notes
+                note_results = self.resource_manager.resource_indexer.search_notes(
+                    query_text, k=k_notes, threshold=threshold
+                )
+                for result in note_results:
+                    resource_id = result['resource_id']
+                    # Keep highest score if duplicate
+                    if resource_id not in all_notes or result['score'] > all_notes[resource_id]['score']:
+                        all_notes[resource_id] = result
+                
+                # Search Collections
+                collection_results = self.resource_manager.resource_indexer.search_collections(
+                    query_text, k=k_collections, threshold=threshold
+                )
+                for result in collection_results:
+                    resource_id = result['resource_id']
+                    # Keep highest score if duplicate
+                    if resource_id not in all_collections or result['score'] > all_collections[resource_id]['score']:
+                        all_collections[resource_id] = result
+            
+            # Sort by score and take top k
+            notes_list = sorted(all_notes.values(), key=lambda x: x['score'], reverse=True)[:k_notes]
+            collections_list = sorted(all_collections.values(), key=lambda x: x['score'], reverse=True)[:k_collections]
+            
+            response = {
+                'success': True,
+                'notes': notes_list,
+                'collections': collections_list
+            }
+            
+            query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
+            
+        except Exception as e:
+            logger.error(f"Error handling resource search: {e}")
+            import traceback
+            traceback.print_exc()
+            error_response = {
+                'success': False,
+                'error': str(e),
+                'notes': [],
+                'collections': []
+            }
+            query.reply(query.key_expr, json.dumps(error_response).encode('utf-8'))
+    
+    def handle_resource_commentary_update(self, query):
+        """
+        Handle updating resource index with Stage 3 commentary.
+        
+        Topic: cognitive/map/resource/update_commentary
+        Payload: {
+            "resource_id": str,  # Note or Collection ID
+            "commentary": str  # Stage 3 reflection commentary
+        }
+        
+        Returns: {
+            "success": bool
+        }
+        """
+        try:
+            # Parse payload
+            if not query.payload:
+                raise ValueError("No payload provided")
+            
+            payload_bytes = query.payload.to_bytes()
+            payload_str = payload_bytes.decode('utf-8')
+            payload = json.loads(payload_str)
+            
+            resource_id = payload.get('resource_id')
+            commentary = payload.get('commentary', '')
+            
+            if not resource_id:
+                raise ValueError("Missing resource_id")
+            
+            # Call resource manager to update commentary
+            self.resource_manager.update_resource_commentary(resource_id, commentary)
+            
+            response = {'success': True}
+            query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
+            
+        except Exception as e:
+            logger.error(f"Error updating resource commentary: {e}")
             error_response = {
                 'success': False,
                 'error': str(e)

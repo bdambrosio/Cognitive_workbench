@@ -108,6 +108,345 @@ class FAISSStore:
             self.original_contents = data.get('original_contents', self.documents)
 
 
+class ResourceIndexer:
+    """
+    Indexes Notes and Collections for semantic retrieval.
+    
+    Maintains separate FAISS indexes for Notes and Collections to enable
+    type-filtered search. Stores embedding text in resource metadata for
+    restart recovery.
+    """
+    
+    def __init__(self, resource_manager):
+        """
+        Initialize resource indexer.
+        
+        Args:
+            resource_manager: InfospaceResourceManager instance (for embedder and world_map access)
+        """
+        self.resource_manager = resource_manager
+        self.notes_index = FAISSStore(dimension=384, logger=logger)
+        self.collections_index = FAISSStore(dimension=384, logger=logger)
+        
+        # Track resource_id -> index position for updates
+        self.note_id_to_index = {}  # resource_id -> index position
+        self.collection_id_to_index = {}  # resource_id -> index position
+        
+        # Base directory for persistence
+        from pathlib import Path
+        self.index_dir = Path("data/vector")
+        self.index_dir.mkdir(parents=True, exist_ok=True)
+    
+    def _build_embedding_text_note(self, resource_id: str, resource_data: Dict, commentary: str = "") -> str:
+        """
+        Build embedding text for a Note.
+        
+        Format: "{name_or_id}\n{source_skill} on {source_value}\n{commentary}\n{content_preview}"
+        """
+        props = resource_data.get('properties', {})
+        name = props.get('note_name') or resource_id
+        source_skill = props.get('source_skill', '')
+        source_value = props.get('source_value', '')
+        content = props.get('content', '')
+        
+        # Build content preview (first 200 chars)
+        if isinstance(content, (dict, list)):
+            content_preview = json.dumps(content)[:200]
+        else:
+            content_preview = str(content)[:200]
+        
+        parts = [name]
+        if source_skill:
+            parts.append(f"{source_skill} on {source_value}" if source_value else source_skill)
+        if commentary:
+            parts.append(commentary)
+        if content_preview:
+            parts.append(content_preview)
+        
+        return "\n".join(parts)
+    
+    def _build_embedding_text_collection(self, resource_id: str, resource_data: Dict, commentary: str = "") -> str:
+        """
+        Build embedding text for a Collection.
+        
+        Format: "{name_or_id}\n{source_skill} on {source_value}\n{item_count} items\n{commentary}\n{first_3_summaries}"
+        """
+        props = resource_data.get('properties', {})
+        name = props.get('collection_name') or resource_id
+        source_skill = props.get('source_skill', '')
+        source_value = props.get('source_value', '')
+        item_count = props.get('item_count', 0)
+        content = props.get('content', [])
+        
+        parts = [name]
+        if source_skill:
+            parts.append(f"{source_skill} on {source_value}" if source_value else source_skill)
+        parts.append(f"{item_count} items")
+        if commentary:
+            parts.append(commentary)
+        
+        # Add first few item summaries if available
+        if isinstance(content, list) and len(content) > 0:
+            item_summaries = []
+            for i, note_id in enumerate(content[:3]):
+                if isinstance(note_id, str) and note_id.startswith('Note_'):
+                    note = self.resource_manager.world_map.get_resource_by_name(note_id)
+                    if note:
+                        note_content = note.get('properties', {}).get('content', '')
+                        if isinstance(note_content, (dict, list)):
+                            preview = json.dumps(note_content)[:100]
+                        else:
+                            preview = str(note_content)[:100]
+                        item_summaries.append(preview)
+            if item_summaries:
+                parts.append("Items: " + " | ".join(item_summaries))
+        
+        return "\n".join(parts)
+    
+    def index_note(self, resource_id: str, commentary: str = "") -> bool:
+        """
+        Index a Note resource.
+        
+        Args:
+            resource_id: Note ID (e.g., "Note_42")
+            commentary: Optional Stage 3 commentary to include
+            
+        Returns:
+            True if indexed successfully
+        """
+        resource = self.resource_manager.world_map.get_resource_by_name(resource_id)
+        if not resource:
+            logger.warning(f"ResourceIndexer: Note {resource_id} not found")
+            return False
+        
+        # Build embedding text
+        embedding_text = self._build_embedding_text_note(resource_id, resource, commentary)
+        
+        # Store embedding text in resource properties for restart recovery
+        if 'properties' not in resource:
+            resource['properties'] = {}
+        resource['properties']['embedding_text'] = embedding_text
+        
+        # Generate embedding
+        self.resource_manager._init_embedder()
+        embedding = self.resource_manager._generate_embedding(embedding_text)
+        
+        # Check if already indexed (update vs. add)
+        if resource_id in self.note_id_to_index:
+            # Update existing entry (FAISS doesn't support updates, so we'd need to rebuild)
+            # For now, we'll just re-add (FAISS allows duplicates, we'll handle dedup in search)
+            logger.debug(f"ResourceIndexer: Updating index for Note {resource_id}")
+        
+        # Add to index
+        metadata = {
+            'resource_id': resource_id,
+            'name': resource.get('properties', {}).get('note_name', resource_id),
+            'type': 'Note'
+        }
+        self.notes_index.add(embedding_text, embedding, metadata, original_content=resource)
+        
+        # Track index position
+        self.note_id_to_index[resource_id] = len(self.notes_index.documents) - 1
+        
+        logger.debug(f"ResourceIndexer: Indexed Note {resource_id}")
+        return True
+    
+    def index_collection(self, resource_id: str, commentary: str = "") -> bool:
+        """
+        Index a Collection resource.
+        
+        Args:
+            resource_id: Collection ID (e.g., "Collection_15")
+            commentary: Optional Stage 3 commentary to include
+            
+        Returns:
+            True if indexed successfully
+        """
+        resource = self.resource_manager.world_map.get_resource_by_name(resource_id)
+        if not resource:
+            logger.warning(f"ResourceIndexer: Collection {resource_id} not found")
+            return False
+        
+        # Build embedding text
+        embedding_text = self._build_embedding_text_collection(resource_id, resource, commentary)
+        
+        # Store embedding text in resource properties for restart recovery
+        if 'properties' not in resource:
+            resource['properties'] = {}
+        resource['properties']['embedding_text'] = embedding_text
+        
+        # Generate embedding
+        self.resource_manager._init_embedder()
+        embedding = self.resource_manager._generate_embedding(embedding_text)
+        
+        # Add to index
+        metadata = {
+            'resource_id': resource_id,
+            'name': resource.get('properties', {}).get('collection_name', resource_id),
+            'type': 'Collection',
+            'item_count': resource.get('properties', {}).get('item_count', 0)
+        }
+        self.collections_index.add(embedding_text, embedding, metadata, original_content=resource)
+        
+        # Track index position
+        self.collection_id_to_index[resource_id] = len(self.collections_index.documents) - 1
+        
+        logger.debug(f"ResourceIndexer: Indexed Collection {resource_id}")
+        return True
+    
+    def search_notes(self, query: str, k: int = 3, threshold: float = 0.3) -> List[Dict]:
+        """
+        Search Notes index.
+        
+        Args:
+            query: Search query text
+            k: Number of results to return
+            threshold: Minimum similarity score
+            
+        Returns:
+            List of result dicts with resource_id, name, score, metadata
+        """
+        if self.notes_index.index.ntotal == 0:
+            return []
+        
+        self.resource_manager._init_embedder()
+        query_embedding = self.resource_manager._generate_embedding(query)
+        
+        results = self.notes_index.search(query_embedding, limit=k, threshold=threshold)
+        
+        # Format results
+        formatted = []
+        for r in results:
+            formatted.append({
+                'resource_id': r['metadata']['resource_id'],
+                'name': r['metadata'].get('name', r['metadata']['resource_id']),
+                'score': r['score'],
+                'type': 'Note'
+            })
+        
+        return formatted
+    
+    def search_collections(self, query: str, k: int = 2, threshold: float = 0.3) -> List[Dict]:
+        """
+        Search Collections index.
+        
+        Args:
+            query: Search query text
+            k: Number of results to return
+            threshold: Minimum similarity score
+            
+        Returns:
+            List of result dicts with resource_id, name, score, metadata
+        """
+        if self.collections_index.index.ntotal == 0:
+            return []
+        
+        self.resource_manager._init_embedder()
+        query_embedding = self.resource_manager._generate_embedding(query)
+        
+        results = self.collections_index.search(query_embedding, limit=k, threshold=threshold)
+        
+        # Format results
+        formatted = []
+        for r in results:
+            formatted.append({
+                'resource_id': r['metadata']['resource_id'],
+                'name': r['metadata'].get('name', r['metadata']['resource_id']),
+                'score': r['score'],
+                'type': 'Collection',
+                'item_count': r['metadata'].get('item_count', 0)
+            })
+        
+        return formatted
+    
+    def save_indexes(self, world_name: str):
+        """Save indexes to disk."""
+        notes_path = self.index_dir / f"{world_name}_notes.index"
+        collections_path = self.index_dir / f"{world_name}_collections.index"
+        
+        try:
+            self.notes_index.save(str(notes_path))
+            self.collections_index.save(str(collections_path))
+            logger.info(f"ResourceIndexer: Saved indexes to {self.index_dir}")
+        except Exception as e:
+            logger.error(f"ResourceIndexer: Failed to save indexes: {e}")
+    
+    def load_indexes(self, world_name: str):
+        """Load indexes from disk."""
+        notes_path = self.index_dir / f"{world_name}_notes.index"
+        collections_path = self.index_dir / f"{world_name}_collections.index"
+        
+        try:
+            if notes_path.with_suffix('.faiss').exists():
+                self.notes_index.load(str(notes_path))
+                # Rebuild id_to_index mapping
+                for i, doc in enumerate(self.notes_index.documents):
+                    if i < len(self.notes_index.metadata):
+                        resource_id = self.notes_index.metadata[i].get('resource_id')
+                        if resource_id:
+                            self.note_id_to_index[resource_id] = i
+                logger.info(f"ResourceIndexer: Loaded notes index ({len(self.notes_index.documents)} entries)")
+            
+            if collections_path.with_suffix('.faiss').exists():
+                self.collections_index.load(str(collections_path))
+                # Rebuild id_to_index mapping
+                for i, doc in enumerate(self.collections_index.documents):
+                    if i < len(self.collections_index.metadata):
+                        resource_id = self.collections_index.metadata[i].get('resource_id')
+                        if resource_id:
+                            self.collection_id_to_index[resource_id] = i
+                logger.info(f"ResourceIndexer: Loaded collections index ({len(self.collections_index.documents)} entries)")
+        except Exception as e:
+            logger.warning(f"ResourceIndexer: Failed to load indexes: {e}")
+    
+    def reindex_persistent_resources(self):
+        """
+        Re-index all persistent resources using saved embedding_text.
+        Called on restart to rebuild indexes from metadata.
+        """
+        reindexed = 0
+        for resource_id, resource_data in self.resource_manager.world_map.resource_registry.items():
+            resource_type = resource_data.get('type')
+            type_name = resource_type.name if hasattr(resource_type, 'name') else str(resource_type)
+            
+            if type_name == 'Note':
+                props = resource_data.get('properties', {})
+                if props.get('persistent', False):
+                    embedding_text = props.get('embedding_text')
+                    if embedding_text:
+                        # Re-index using saved text
+                        self.resource_manager._init_embedder()
+                        embedding = self.resource_manager._generate_embedding(embedding_text)
+                        metadata = {
+                            'resource_id': resource_id,
+                            'name': props.get('note_name', resource_id),
+                            'type': 'Note'
+                        }
+                        self.notes_index.add(embedding_text, embedding, metadata, original_content=resource_data)
+                        self.note_id_to_index[resource_id] = len(self.notes_index.documents) - 1
+                        reindexed += 1
+            
+            elif type_name == 'Collection':
+                props = resource_data.get('properties', {})
+                if props.get('persistent', False):
+                    embedding_text = props.get('embedding_text')
+                    if embedding_text:
+                        # Re-index using saved text
+                        self.resource_manager._init_embedder()
+                        embedding = self.resource_manager._generate_embedding(embedding_text)
+                        metadata = {
+                            'resource_id': resource_id,
+                            'name': props.get('collection_name', resource_id),
+                            'type': 'Collection',
+                            'item_count': props.get('item_count', 0)
+                        }
+                        self.collections_index.add(embedding_text, embedding, metadata, original_content=resource_data)
+                        self.collection_id_to_index[resource_id] = len(self.collections_index.documents) - 1
+                        reindexed += 1
+        
+        logger.info(f"ResourceIndexer: Re-indexed {reindexed} persistent resources")
+
+
 class InfospaceResourceManager:
     """
     Manages Notes, Collections, and indexing for infospace maps.
@@ -141,6 +480,8 @@ class InfospaceResourceManager:
         
         # Named collections registry (name -> collection_id)
         self.named_collections = {}
+        # Named notes registry (name -> note_id)
+        self.named_notes = {}
         
         # Indexing infrastructure
         self.collection_indexes = {}  # collection_id -> collection_id (marks indexed)
@@ -149,8 +490,26 @@ class InfospaceResourceManager:
         # Embedding model (lazy loaded)
         self.embedder = None
         
+        # Resource indexer for Stage 0 retrieval
+        self.resource_indexer = ResourceIndexer(self)
+        
         # System collections
         self.system_notes_collection_id = None  # ID of the "Notes" system collection
+    
+    def update_resource_commentary(self, resource_id: str, commentary: str):
+        """
+        Update index with Stage 3 commentary for a resource.
+        
+        Args:
+            resource_id: Note or Collection ID
+            commentary: Stage 3 reflection commentary
+        """
+        if resource_id.startswith('Note_'):
+            self.resource_indexer.index_note(resource_id, commentary=commentary)
+        elif resource_id.startswith('Collection_'):
+            self.resource_indexer.index_collection(resource_id, commentary=commentary)
+        else:
+            logger.warning(f"update_resource_commentary: Invalid resource_id format: {resource_id}")
     
     def _init_embedder(self):
         """Lazy init embedding model"""
@@ -219,7 +578,8 @@ class InfospaceResourceManager:
     # ==================== Note Creation ====================
     
     def create_note(self, character_name: str, content: Any, format_type: str,
-                   source_skill: str, source_value: str, extra_props: Dict) -> Tuple[bool, Optional[str], Optional[str], Optional[Tuple[int, int]]]:
+                   source_skill: str, source_value: str, note_name: str,
+                   extra_props: Dict) -> Tuple[bool, Optional[str], Optional[str], Optional[Tuple[int, int]]]:
         """
         Create a Note resource.
         
@@ -229,6 +589,7 @@ class InfospaceResourceManager:
             format_type: Content format ('text' or 'json')
             source_skill: Skill that created this note
             source_value: Input value to the skill
+            note_name: Optional stable name for referencing
             extra_props: Extra metadata properties
             
         Returns:
@@ -271,7 +632,8 @@ class InfospaceResourceManager:
                 'created_by': canonical_character_name,
                 'created_at': datetime.now().isoformat(),
                 'source_skill': source_skill,
-                'source_value': source_value
+                'source_value': source_value,
+                'note_name': note_name
             }
         }
         
@@ -299,10 +661,18 @@ class InfospaceResourceManager:
         x, y = location
         self.world_map.patches[x][y].resources[note_id] = note_data
         
-        logger.info(f"📝 Created Note instance: {note_id} at ({x}, {y}) by {canonical_character_name}")
+        # Register named note if name provided
+        if note_name:
+            self.named_notes[note_name] = note_id
+            logger.info(f"📝 Created named Note: '{note_name}' = {note_id} at ({x}, {y}) by {canonical_character_name}")
+        else:
+            logger.info(f"📝 Created Note instance: {note_id} at ({x}, {y}) by {canonical_character_name}")
         
         # Auto-add to system "Notes" collection
         self.add_note_to_system_collection(note_id)
+        
+        # Index the Note immediately (for Stage 0 retrieval)
+        self.resource_indexer.index_note(note_id, commentary="")
         
         return True, note_id, None, location
     
@@ -397,6 +767,9 @@ class InfospaceResourceManager:
             logger.info(f"📚 Created named Collection: '{collection_name}' = {collection_id} at ({x}, {y}) by {canonical_character_name} ({collection_data['properties']['item_count']} items)")
         else:
             logger.info(f"📚 Created Collection instance: {collection_id} at ({x}, {y}) by {canonical_character_name} ({collection_data['properties']['item_count']} items)")
+        
+        # Index the Collection immediately (for Stage 0 retrieval)
+        self.resource_indexer.index_collection(collection_id, commentary="")
         
         return True, collection_id, None, location
     
@@ -932,6 +1305,9 @@ class InfospaceResourceManager:
                                 note_data['properties']['persisted_by'] = 'System'
                                 logger.info(f"💾 Auto-persisted Note '{note_id}' added to persistent Collection '{collection_id}' after Collection was persisted")
         
+        # Save resource indexes
+        self.resource_indexer.save_indexes(self.world_name)
+        
         return {
             'note_instances': note_instances,
             'note_counter': self.note_counter,
@@ -978,6 +1354,11 @@ class InfospaceResourceManager:
                         # Place in spatial grid
                         x, y = info_data['location']
                         self.world_map.patches[x][y].resources[info_id] = resource_data
+                        
+                        # Restore named note mapping if present
+                        note_name = info_data.get('properties', {}).get('note_name')
+                        if note_name:
+                            self.named_notes[note_name] = info_id
                         
                         # Add to system "Notes" collection
                         self.add_note_to_system_collection(info_id)
@@ -1040,4 +1421,8 @@ class InfospaceResourceManager:
                     removed_count = original_len - len(content)
                     if removed_count > 0:
                         logger.warning(f"Cleaned {removed_count} dangling note_ids from restored persistent Collection '{info_id}'")
+        
+        # Load resource indexes and re-index persistent resources
+        self.resource_indexer.load_indexes(self.world_name)
+        self.resource_indexer.reindex_persistent_resources()
 

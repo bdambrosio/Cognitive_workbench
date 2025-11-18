@@ -59,6 +59,11 @@ class ResourceBrowser:
         async def get_resource(resource_id: str):
             """Get specific resource content."""
             return self.query_resource(resource_id)
+        
+        @self.app.delete("/api/resource/{resource_id}")
+        async def delete_resource(resource_id: str):
+            """Delete a resource."""
+            return self.delete_resource_via_zenoh(resource_id)
     
     def query_resources(self) -> Dict:
         """Query map_node for resource list."""
@@ -96,6 +101,18 @@ class ResourceBrowser:
                 return data
         
         return {'success': False, 'error': f'Resource {resource_id} not found'}
+    
+    def delete_resource_via_zenoh(self, resource_id: str) -> Dict:
+        """Delete resource via Zenoh query to map_node."""
+        key = f"cognitive/map/resource/remove/{resource_id}"
+        logger.info(f"Deleting resource: {key}")
+        
+        for reply in self.session.get(key, timeout=2.0):
+            if reply.ok:
+                data = json.loads(reply.ok.payload.to_string())
+                return data
+        
+        return {'success': False, 'error': f'No response from map_node for deletion'}
     
     def get_html(self) -> str:
         """Generate HTML UI."""
@@ -232,6 +249,33 @@ class ResourceBrowser:
         }
         .copy-btn:hover { background: #4e4e52; }
         
+        .context-menu {
+            position: fixed;
+            background: #252526;
+            border: 1px solid #3e3e42;
+            border-radius: 3px;
+            padding: 4px 0;
+            z-index: 1000;
+            min-width: 150px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+            display: none;
+        }
+        .context-menu-item {
+            padding: 6px 16px;
+            cursor: pointer;
+            font-size: 13px;
+            color: #d4d4d4;
+        }
+        .context-menu-item:hover {
+            background: #2a2d2e;
+        }
+        .context-menu-item.delete {
+            color: #f48771;
+        }
+        .context-menu-item.delete:hover {
+            background: #3a1f1a;
+        }
+        
         ::-webkit-scrollbar { width: 10px; }
         ::-webkit-scrollbar-track { background: #1e1e1e; }
         ::-webkit-scrollbar-thumb { background: #424242; border-radius: 5px; }
@@ -264,9 +308,14 @@ class ResourceBrowser:
         </div>
     </div>
     
+    <div id="context-menu" class="context-menu">
+        <div class="context-menu-item delete" onclick="handleDelete()">Delete</div>
+    </div>
+    
     <script>
         let currentResources = {notes: [], collections: []};
         let selectedResource = null;
+        let contextMenuResource = null;
         
         async function refreshResources() {
             try {
@@ -294,16 +343,64 @@ class ResourceBrowser:
             notesList.innerHTML = currentResources.notes
                 .map(r => {
                     const resId = r.id || r.name;
-                    return `<div class="resource-item" onclick="selectResource('${resId}')">${resId}</div>`;
+                    return `<div class="resource-item" onclick="selectResource('${resId}')" oncontextmenu="showContextMenu(event, '${resId}'); return false;">${resId}</div>`;
                 })
                 .join('');
             
             collectionsList.innerHTML = currentResources.collections
                 .map(r => {
                     const resId = r.id || r.name;
-                    return `<div class="resource-item" onclick="selectResource('${resId}')">${resId}</div>`;
+                    return `<div class="resource-item" onclick="selectResource('${resId}')" oncontextmenu="showContextMenu(event, '${resId}'); return false;">${resId}</div>`;
                 })
                 .join('');
+        }
+        
+        function showContextMenu(event, resourceId) {
+            const menu = document.getElementById('context-menu');
+            contextMenuResource = resourceId;
+            menu.style.display = 'block';
+            menu.style.left = event.pageX + 'px';
+            menu.style.top = event.pageY + 'px';
+            
+            // Close menu on click outside
+            setTimeout(() => {
+                document.addEventListener('click', function closeMenu() {
+                    menu.style.display = 'none';
+                    document.removeEventListener('click', closeMenu);
+                });
+            }, 0);
+        }
+        
+        async function handleDelete() {
+            if (!contextMenuResource) return;
+            
+            const resourceId = contextMenuResource;
+            if (!confirm(`Delete ${resourceId}?`)) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/resource/${resourceId}`, {
+                    method: 'DELETE'
+                });
+                const data = await response.json();
+                
+                if (data.success) {
+                    // Clear selection if deleted resource was selected
+                    if (selectedResource === resourceId) {
+                        selectedResource = null;
+                        document.getElementById('content-display').innerHTML = '<div class="empty-state"><p>← Select a resource to view its content</p></div>';
+                    }
+                    // Refresh resource list
+                    refreshResources();
+                } else {
+                    alert('Error: ' + (data.error || 'Failed to delete resource'));
+                }
+            } catch (e) {
+                alert('Failed to delete resource: ' + e.message);
+            }
+            
+            document.getElementById('context-menu').style.display = 'none';
         }
         
         async function selectResource(resourceId) {
