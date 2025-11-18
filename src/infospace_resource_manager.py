@@ -132,6 +132,10 @@ class ResourceIndexer:
         self.note_id_to_index = {}  # resource_id -> index position
         self.collection_id_to_index = {}  # resource_id -> index position
         
+        # Track deleted resources (for filtering search results)
+        self.deleted_note_ids = set()
+        self.deleted_collection_ids = set()
+        
         # Base directory for persistence
         from pathlib import Path
         self.index_dir = Path("data/vector")
@@ -312,17 +316,33 @@ class ResourceIndexer:
         self.resource_manager._init_embedder()
         query_embedding = self.resource_manager._generate_embedding(query)
         
-        results = self.notes_index.search(query_embedding, limit=k, threshold=threshold)
+        results = self.notes_index.search(query_embedding, limit=k * 2, threshold=threshold)  # Get extra to filter deleted
         
-        # Format results
+        # Format results and filter deleted resources
         formatted = []
         for r in results:
+            resource_id = r['metadata']['resource_id']
+            # Skip deleted resources
+            if resource_id in self.deleted_note_ids:
+                continue
+            # Verify resource still exists
+            resource = self.resource_manager.world_map.get_resource_by_name(resource_id)
+            if not resource:
+                # Mark as deleted for future searches
+                self.deleted_note_ids.add(resource_id)
+                continue
+            
             formatted.append({
-                'resource_id': r['metadata']['resource_id'],
-                'name': r['metadata'].get('name', r['metadata']['resource_id']),
+                'resource_id': resource_id,
+                'name': r['metadata'].get('name', resource_id),
                 'score': r['score'],
-                'type': 'Note'
+                'type': 'Note',
+                'metadata': r['metadata'],
+                'original_content': r.get('original_content', resource)
             })
+            
+            if len(formatted) >= k:
+                break
         
         return formatted
     
@@ -344,18 +364,34 @@ class ResourceIndexer:
         self.resource_manager._init_embedder()
         query_embedding = self.resource_manager._generate_embedding(query)
         
-        results = self.collections_index.search(query_embedding, limit=k, threshold=threshold)
+        results = self.collections_index.search(query_embedding, limit=k * 2, threshold=threshold)  # Get extra to filter deleted
         
-        # Format results
+        # Format results and filter deleted resources
         formatted = []
         for r in results:
+            resource_id = r['metadata']['resource_id']
+            # Skip deleted resources
+            if resource_id in self.deleted_collection_ids:
+                continue
+            # Verify resource still exists
+            resource = self.resource_manager.world_map.get_resource_by_name(resource_id)
+            if not resource:
+                # Mark as deleted for future searches
+                self.deleted_collection_ids.add(resource_id)
+                continue
+            
             formatted.append({
-                'resource_id': r['metadata']['resource_id'],
-                'name': r['metadata'].get('name', r['metadata']['resource_id']),
+                'resource_id': resource_id,
+                'name': r['metadata'].get('name', resource_id),
                 'score': r['score'],
                 'type': 'Collection',
-                'item_count': r['metadata'].get('item_count', 0)
+                'item_count': r['metadata'].get('item_count', 0),
+                'metadata': r['metadata'],
+                'original_content': r.get('original_content', resource)
             })
+            
+            if len(formatted) >= k:
+                break
         
         return formatted
     
@@ -401,8 +437,8 @@ class ResourceIndexer:
     
     def reindex_persistent_resources(self):
         """
-        Re-index all persistent resources using saved embedding_text.
-        Called on restart to rebuild indexes from metadata.
+        Re-index persistent resources that are missing from loaded indexes.
+        Called on restart to fill gaps (avoids double-indexing).
         """
         reindexed = 0
         for resource_id, resource_data in self.resource_manager.world_map.resource_registry.items():
@@ -412,39 +448,43 @@ class ResourceIndexer:
             if type_name == 'Note':
                 props = resource_data.get('properties', {})
                 if props.get('persistent', False):
-                    embedding_text = props.get('embedding_text')
-                    if embedding_text:
-                        # Re-index using saved text
-                        self.resource_manager._init_embedder()
-                        embedding = self.resource_manager._generate_embedding(embedding_text)
-                        metadata = {
-                            'resource_id': resource_id,
-                            'name': props.get('note_name', resource_id),
-                            'type': 'Note'
-                        }
-                        self.notes_index.add(embedding_text, embedding, metadata, original_content=resource_data)
-                        self.note_id_to_index[resource_id] = len(self.notes_index.documents) - 1
-                        reindexed += 1
+                    # Only re-index if not already in loaded index
+                    if resource_id not in self.note_id_to_index:
+                        embedding_text = props.get('embedding_text')
+                        if embedding_text:
+                            # Re-index using saved text
+                            self.resource_manager._init_embedder()
+                            embedding = self.resource_manager._generate_embedding(embedding_text)
+                            metadata = {
+                                'resource_id': resource_id,
+                                'name': props.get('note_name', resource_id),
+                                'type': 'Note'
+                            }
+                            self.notes_index.add(embedding_text, embedding, metadata, original_content=resource_data)
+                            self.note_id_to_index[resource_id] = len(self.notes_index.documents) - 1
+                            reindexed += 1
             
             elif type_name == 'Collection':
                 props = resource_data.get('properties', {})
                 if props.get('persistent', False):
-                    embedding_text = props.get('embedding_text')
-                    if embedding_text:
-                        # Re-index using saved text
-                        self.resource_manager._init_embedder()
-                        embedding = self.resource_manager._generate_embedding(embedding_text)
-                        metadata = {
-                            'resource_id': resource_id,
-                            'name': props.get('collection_name', resource_id),
-                            'type': 'Collection',
-                            'item_count': props.get('item_count', 0)
-                        }
-                        self.collections_index.add(embedding_text, embedding, metadata, original_content=resource_data)
-                        self.collection_id_to_index[resource_id] = len(self.collections_index.documents) - 1
-                        reindexed += 1
+                    # Only re-index if not already in loaded index
+                    if resource_id not in self.collection_id_to_index:
+                        embedding_text = props.get('embedding_text')
+                        if embedding_text:
+                            # Re-index using saved text
+                            self.resource_manager._init_embedder()
+                            embedding = self.resource_manager._generate_embedding(embedding_text)
+                            metadata = {
+                                'resource_id': resource_id,
+                                'name': props.get('collection_name', resource_id),
+                                'type': 'Collection',
+                                'item_count': props.get('item_count', 0)
+                            }
+                            self.collections_index.add(embedding_text, embedding, metadata, original_content=resource_data)
+                            self.collection_id_to_index[resource_id] = len(self.collections_index.documents) - 1
+                            reindexed += 1
         
-        logger.info(f"ResourceIndexer: Re-indexed {reindexed} persistent resources")
+        logger.info(f"ResourceIndexer: Re-indexed {reindexed} missing persistent resources")
 
 
 class InfospaceResourceManager:
@@ -510,6 +550,24 @@ class InfospaceResourceManager:
             self.resource_indexer.index_collection(resource_id, commentary=commentary)
         else:
             logger.warning(f"update_resource_commentary: Invalid resource_id format: {resource_id}")
+    
+    def remove_resource_from_index(self, resource_id: str):
+        """
+        Mark a resource as deleted in the index (for filtering search results).
+        
+        Args:
+            resource_id: Note or Collection ID to mark as deleted
+        """
+        if resource_id.startswith('Note_'):
+            self.resource_indexer.deleted_note_ids.add(resource_id)
+            # Remove from tracking
+            if resource_id in self.resource_indexer.note_id_to_index:
+                del self.resource_indexer.note_id_to_index[resource_id]
+        elif resource_id.startswith('Collection_'):
+            self.resource_indexer.deleted_collection_ids.add(resource_id)
+            # Remove from tracking
+            if resource_id in self.resource_indexer.collection_id_to_index:
+                del self.resource_indexer.collection_id_to_index[resource_id]
     
     def _init_embedder(self):
         """Lazy init embedding model"""

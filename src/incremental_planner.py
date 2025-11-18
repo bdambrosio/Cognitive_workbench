@@ -654,7 +654,7 @@ if HAS_SGLANG:
             if not notes and not collections:
                 return ""
             
-            # Format results for prompt injection
+            # Format results for prompt injection with descriptions
             lines = ["# Available Notes / Collections (may be relevant)\n"]
             
             if notes:
@@ -662,7 +662,29 @@ if HAS_SGLANG:
                 for note in notes:
                     name = note.get('name', note.get('resource_id', ''))
                     resource_id = note.get('resource_id', '')
-                    lines.append(f"- {resource_id} (\"{name}\"): Use `load` primitive to reference by name or ID")
+                    resource_data = note.get('original_content', {})
+                    props = resource_data.get('properties', {}) if resource_data else {}
+                    
+                    # Build description from metadata
+                    desc_parts = []
+                    source_skill = props.get('source_skill', '')
+                    source_value = props.get('source_value', '')
+                    if source_skill:
+                        if source_value:
+                            desc_parts.append(f"Created via {source_skill} on {source_value}")
+                        else:
+                            desc_parts.append(f"Created via {source_skill}")
+                    
+                    # Add commentary if available
+                    commentary = props.get('embedding_text', '').split('\n')
+                    # Commentary is usually after source_skill line, extract relevant part
+                    if len(commentary) > 2:
+                        commentary_text = '\n'.join(commentary[2:]).strip()[:150]  # Skip name and source lines
+                        if commentary_text:
+                            desc_parts.append(commentary_text)
+                    
+                    description = ". ".join(desc_parts) if desc_parts else "No description available"
+                    lines.append(f"- {resource_id} (\"{name}\"): {description}")
             
             if collections:
                 lines.append("\n## Collections:")
@@ -670,7 +692,28 @@ if HAS_SGLANG:
                     name = coll.get('name', coll.get('resource_id', ''))
                     resource_id = coll.get('resource_id', '')
                     item_count = coll.get('item_count', 0)
-                    lines.append(f"- {resource_id} (\"{name}\"): {item_count} items. Use `load` primitive to reference by name or ID")
+                    resource_data = coll.get('original_content', {})
+                    props = resource_data.get('properties', {}) if resource_data else {}
+                    
+                    # Build description from metadata
+                    desc_parts = [f"{item_count} items"]
+                    source_skill = props.get('source_skill', '')
+                    source_value = props.get('source_value', '')
+                    if source_skill:
+                        if source_value:
+                            desc_parts.append(f"created via {source_skill} on {source_value}")
+                        else:
+                            desc_parts.append(f"created via {source_skill}")
+                    
+                    # Add commentary if available
+                    commentary = props.get('embedding_text', '').split('\n')
+                    if len(commentary) > 3:  # Skip name, source, item_count lines
+                        commentary_text = '\n'.join(commentary[3:]).strip()[:150]
+                        if commentary_text:
+                            desc_parts.append(commentary_text)
+                    
+                    description = ". ".join(desc_parts)
+                    lines.append(f"- {resource_id} (\"{name}\"): {description}")
             
             lines.append("\nTo use these resources, reference by name (e.g., \"my-note\") or ID (e.g., \"Note_42\") in `load` actions.")
             
@@ -820,6 +863,13 @@ if HAS_SGLANG:
             tool_name = s[f"tool_name_{step}"].strip()
             tool_args_json = s[f"tool_args_{step}"].strip()
             action = sgl_to_infospace_action(tool_name, tool_args_json, step, executor.available_tools)
+            
+            # Track resource bindings before execution
+            out_var = action.get('out', '')
+            resource_id_before = None
+            if out_var:
+                resource_id_before = executor.plan_bindings.get(out_var.lstrip('$'))
+            
             tool_result = execute_infospace_action(action, executor, executor.agent_name)
             logger.info(f"Stage 2: Choose tool + args\n{tool_name} -> {tool_args_json}")
             logger.info(f"Step {step}: {tool_name} -> {tool_result[:100]}")
@@ -851,18 +901,21 @@ if HAS_SGLANG:
             logger.info(f"REQUEST_TOOLS: {s[f'request_tools_{step}']}")
             
             # Stage 3.1: Update resource indexes with commentary
-            # Track resources created in this step and update their indexes
+            # Track ANY resource created in this step (not just explicit create-note/create-collection)
             thoughts_text = s[f'thoughts_{step}'].strip()
             if thoughts_text:
-                # Find resource created in this step (from the action we just executed)
+                # Check if a new resource was bound in this step
+                out_var = action.get('out', '')
                 resource_id = None
-                if action.get('type') in ['create-note', 'create-collection']:
-                    out_var = action.get('out', '')
-                    if out_var:
-                        resource_id = executor.plan_bindings.get(out_var.lstrip('$'))
+                if out_var:
+                    resource_id_after = executor.plan_bindings.get(out_var.lstrip('$'))
+                    # If resource_id changed (new resource created) or didn't exist before
+                    if resource_id_after and resource_id_after != resource_id_before:
+                        if resource_id_after.startswith('Note_') or resource_id_after.startswith('Collection_'):
+                            resource_id = resource_id_after
                 
                 # Update index with commentary if resource was created
-                if resource_id and (resource_id.startswith('Note_') or resource_id.startswith('Collection_')):
+                if resource_id:
                     try:
                         from zenoh import QueryTarget, ConsolidationMode
                         payload = {
@@ -877,7 +930,7 @@ if HAS_SGLANG:
                             payload=json.dumps(payload).encode('utf-8')
                         ):
                             if reply.ok:
-                                logger.debug(f"Stage 3.1: Updated commentary for {resource_id}")
+                                logger.debug(f"Stage 3.1: Updated commentary for {resource_id} (created via {action.get('type')})")
                             break
                     except Exception as e:
                         logger.debug(f"Stage 3.1: Failed to update commentary for {resource_id}: {e}")
