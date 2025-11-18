@@ -108,16 +108,17 @@ gen_tracer = GenTracer(tracer, tokenizer=None)  # or tokenizer=your_tokenizer
 try:
     import sglang as sgl
     from sglang import function, system, user, assistant, gen
+    model_path="/home/bruce/vllm/models/Qwen3-Coder-30B-A3B-Instruct"
     sgl.set_default_backend(
         sgl.Runtime(
-                    model_path="/home/bruce/vllm/models/Qwen3-Coder-30B-A3B-Instruct",
-                    tokenizer_path="/home/bruce/vllm/models/Qwen3-Coder-30B-A3B-Instruct",
+                    model_path=model_path,
+                    tokenizer_path=model_path,
                     device="cuda",
-                    context_length=24768,
+                    context_length=32768,
                     cuda_graph_max_bs=4,
                     dtype="auto",          # or "bf16"
                     tp_size=1,             # if you’re using a single GPU
-                    mem_fraction_static=0.95,
+                    mem_fraction_static=0.82,
                     tool_call_parser="qwen"       )
     )
     HAS_SGLANG = True
@@ -161,6 +162,12 @@ Tool Selection:
 - Single URL fetch: fetch-text (NOT for query-web/semantic-scholar results)
 - as-markdown: EXTRACT existing markdown from mixed text (NOT for converting TO markdown)
 - as-json: EXTRACT existing JSON from mixed text (NOT for converting TO JSON)
+
+Boolean Tools (return true/false):
+- is-empty: Check if text is null/empty/whitespace
+- is-positive: Check if number is > 0
+- is-question: Check if text contains a question
+Result shows as Note with boolean content (True/False) - inspect actual value when needed
 """
 
 
@@ -174,14 +181,50 @@ def build_tool_catalog(available_tools: Dict[str, Dict], primitives_reference: s
     
     # Add infospace primitives (from reference doc)
     # Key primitives that need to be in catalog
-    primitive_tools = {
+    # Expanded primitive documentation from INFOSPACE_PRIMITIVES_REFERENCE
+    PRIMITIVE_DOCS = {
+        "create-collection": {
+            "description": "Create a Collection object and bind to variable. IMPORTANT: The 'name' parameter (optional) creates a named Collection that can be loaded by name later. Variable names in 'out' (e.g., '$my_collection') are just bindings, NOT collection names.",
+            "full_description": "Create a session-local Collection object and bind to variable. Collections store references to Notes. The optional 'name' parameter registers the Collection with a stable name for later loading (e.g., load by 'research' name). Variable names like '$my_collection' are temporary bindings during plan execution, not persistent names.",
+            "parameters": {
+                "value": "required: array of $variables or empty array",
+                "name": "optional: string name for named Collection (separate from variable name)",
+                "out": "required: $variable name for resulting Collection"
+            },
+            "examples": [
+                '{"type":"create-collection","value":["$note1","$note2"],"out":"$my_collection"}',
+                '{"type":"create-collection","name":"research","value":[],"out":"$papers"}',
+                '{"type":"create-collection","value":"$note","out":"$single_item"}'
+            ],
+            "schema_hint": {"value": "array of $variables", "name": "string (optional)", "out": "$variable"}
+        },
         "create-note": {
-            "description": "Create a persistent Note object",
+            "description": "Create a persistent Note object and bind to variable",
+            "full_description": "Create a persistent Note object and bind to variable. Notes store any content (text, JSON, etc.)",
+            "parameters": {
+                "value": "required: literal value or $variable referencing content",
+                "out": "required: $variable name for resulting Note"
+            },
+            "examples": [
+                '{"type":"create-note","value":"some data","out":"$my_note"}',
+                '{"type":"create-note","value":"$variable","out":"$new_note"}'
+            ],
             "schema_hint": {"value": "any content", "out": "$variable"}
         },
+    }
+    
+    primitive_tools = {
+        "create-note": {
+            "description": PRIMITIVE_DOCS["create-note"]["description"],
+            "full_description": PRIMITIVE_DOCS["create-note"].get("full_description"),
+            "examples": PRIMITIVE_DOCS["create-note"].get("examples", []),
+            "schema_hint": PRIMITIVE_DOCS["create-note"]["schema_hint"]
+        },
         "create-collection": {
-            "description": "Create a Collection of Notes",
-            "schema_hint": {"value": "array of $variables", "out": "$variable"}
+            "description": PRIMITIVE_DOCS["create-collection"]["description"],
+            "full_description": PRIMITIVE_DOCS["create-collection"].get("full_description"),
+            "examples": PRIMITIVE_DOCS["create-collection"].get("examples", []),
+            "schema_hint": PRIMITIVE_DOCS["create-collection"]["schema_hint"]
         },
         "load": {
             "description": "Load persistent Note or Collection by ID",
@@ -260,9 +303,17 @@ def tool_catalog_text(tools: Dict[str, Dict]) -> str:
     """Format tool catalog for LLM prompt."""
     lines = []
     for name, meta in sorted(tools.items()):
-        lines.append(f"- {name}: {meta['description']}")
+        # Use expanded description if available (from PRIMITIVE_DOCS)
+        description = meta.get('full_description') or meta.get('description', 'No description')
+        lines.append(f"- {name}: {description}")
         schema = json.dumps(meta['schema_hint'])
         lines.append(f"  expected_args_schema: {schema}")
+        
+        # Add examples for primitives with expanded docs
+        if 'examples' in meta and meta['examples']:
+            lines.append(f"  examples:")
+            for ex in meta['examples']:
+                lines.append(f"    {ex}")
     
     # Add critical workflows to prevent common mistakes
     lines.append("\n# CRITICAL WORKFLOWS:")
@@ -478,6 +529,40 @@ def execute_infospace_action(action: Dict, executor, agent_name: str) -> str:
         
         result = executor.execute_action(action)
         
+        # Track action in executive_node.action_history if available (for plan completion summary)
+        if hasattr(executor, 'executive_node') and executor.executive_node:
+            from datetime import datetime
+            executive_node = executor.executive_node
+            now_ts = datetime.now()
+            executive_node.step_counter += 1
+            
+            # Import ActionRecord from executive_node (avoid circular import by importing here)
+            from executive_node import ActionRecord
+            
+            action_record = ActionRecord(
+                action=action,
+                result=result.get('value', '') if result.get('status') == 'success' else result.get('reason', 'failed'),
+                timestamp=now_ts,
+                step_id=executive_node.step_counter,
+                plan_id=getattr(executive_node, 'current_plan_id', None),
+                requested_target=action.get('target', ''),
+                started_at=now_ts,
+                ended_at=datetime.now(),
+                outcome_status=result.get('status', 'unknown')
+            )
+            # Snapshot physiology if method available
+            if hasattr(executive_node, '_snapshot_physiology'):
+                executive_node._snapshot_physiology(action_record)
+            executive_node.action_history.append(action_record)
+            
+            # Publish action result for UI display
+            if hasattr(executive_node, '_publish_action_result'):
+                executive_node._publish_action_result(action, result, action.get('type', ''), now_ts)
+        
+        # Track compliance if evaluator is active
+        if hasattr(executor, '_compliance_tracker') and executor._compliance_tracker:
+            executor._compliance_tracker.check_action(action, result, executor.plan_bindings)
+        
         if result.get('status') == 'success':
             bound_var = action.get('out', '')
             if bound_var:
@@ -496,6 +581,17 @@ def execute_infospace_action(action: Dict, executor, agent_name: str) -> str:
                                 info_parts.append(f"from {source_skill}")
                             return f"[SUCCESS] Bound {bound_var} to {resource_id} ({', '.join(info_parts)})"
                     
+                    # For Notes, try to show simple content (booleans, short strings)
+                    elif resource_id.startswith('Note_'):
+                        # Fetch content for simple types to aid reflection
+                        content = executor._get_content(resource_id)
+                        if isinstance(content, bool):
+                            return f"[SUCCESS] Bound {bound_var} to {resource_id} (value: {content})"
+                        elif isinstance(content, (int, float)):
+                            return f"[SUCCESS] Bound {bound_var} to {resource_id} (value: {content})"
+                        elif isinstance(content, str) and len(content) <= 50:
+                            return f"[SUCCESS] Bound {bound_var} to {resource_id} (value: '{content}')"
+                    
                     return f"[SUCCESS] Bound {bound_var} to {resource_id}"
             return f"[SUCCESS] {action['type']} completed"
         else:
@@ -510,7 +606,7 @@ def execute_infospace_action(action: Dict, executor, agent_name: str) -> str:
 if HAS_SGLANG:
     @function
     def tool_planner_infospace(s, goal: str, character_context: str, recent_context: str, 
-                              tools_catalog_text: str, executor, max_steps: int = 8):
+                              tools_catalog_text: str, executor, max_steps: int = 16):
         """
         SGLang incremental planner for infospace goals.
         
@@ -638,7 +734,7 @@ if HAS_SGLANG:
             s += user(
                 f"STAGE 3 (step {step + 1}/{max_steps}):\n"
                 f"Tool `{tool_name}` with args:\n{tool_args_json}\n\n"
-                f"Result:\n{tool_result}\n\n"
+                f"Result:\n{tool_result[:512]}\n\n"
                 "Respond using Stage 3 FORMAT. Be concise.\n"
                 "IMPORTANT:\n"
                 "- DONE: YES ONLY when:\n"
@@ -734,7 +830,7 @@ class IncrementalPlanner:
         print (self.tools_catalog_text)
         self.logger.info(f"IncrementalPlanner initialized with {len(self.tools)} tools")
     
-    def generate_plan(self, goal: str, context: Dict = None, max_steps: int = 8) -> Dict:
+    def generate_plan(self, goal: str, context: Dict = None, max_steps: int = 16) -> Dict:
         """
         Generate plan incrementally using SGLang.
         

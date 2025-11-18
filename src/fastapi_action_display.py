@@ -399,6 +399,135 @@ class FastAPIActionDisplayNode:
         print(f'Received signal {signum}, initiating shutdown...')
         self.shutdown_requested = True
     
+    async def _handle_websocket_message(self, websocket, msg: Dict):
+        """Handle incoming websocket messages (test-related commands)."""
+        import yaml
+        msg_type = msg.get('type', '')
+        
+        if msg_type == 'list_test_files':
+            # List available test files from tests/eval/ directory
+            # Get absolute path: fastapi_action_display.py is in src/, tests/ is sibling to src/
+            script_dir = Path(__file__).resolve().parent  # src/
+            test_dir = script_dir.parent / 'tests' / 'eval'  # workspace/tests/eval
+            test_files = []
+            logger.info(f"🧪 Script location: {Path(__file__).resolve()}")
+            logger.info(f"🧪 Looking for test files in: {test_dir}")
+            logger.info(f"🧪 Directory exists: {test_dir.exists()}")
+            if test_dir.exists():
+                yaml_files = list(test_dir.glob('*.yaml'))
+                logger.info(f"🧪 Found {len(yaml_files)} YAML files: {[f.name for f in yaml_files]}")
+                for test_file in yaml_files:
+                    test_files.append({
+                        'name': test_file.name,
+                        'path': str(test_file)
+                    })
+            else:
+                logger.warning(f"🧪 Test directory does not exist: {test_dir}")
+            
+            await websocket.send_text(json.dumps({
+                'type': 'test_files_list',
+                'files': test_files
+            }))
+        
+        elif msg_type == 'get_test_details':
+            # Load and return test file details
+            test_file = msg.get('test_file', '')
+            try:
+                with open(test_file, 'r') as f:
+                    test_config = yaml.safe_load(f)
+                
+                await websocket.send_text(json.dumps({
+                    'type': 'test_details',
+                    'details': {
+                        'name': test_config.get('name', 'Test'),
+                        'description': test_config.get('description', ''),
+                        'allowed_tools': test_config.get('allowed_tools'),
+                        'test_goal': test_config.get('test_goal', '')
+                    }
+                }))
+            except Exception as e:
+                await websocket.send_text(json.dumps({
+                    'type': 'error',
+                    'message': f'Failed to load test file: {str(e)}'
+                }))
+        
+        elif msg_type == 'run_test':
+            # Run a test by sending goals to character with evaluation mode
+            character = msg.get('character', '')
+            test_file = msg.get('test_file', '')
+            
+            try:
+                # Load test config
+                with open(test_file, 'r') as f:
+                    test_config = yaml.safe_load(f)
+                
+                # Enable compliance tracking via Zenoh message
+                self.session.put(
+                    f"cognitive/{character}/enable_compliance_tracking",
+                    json.dumps({})
+                )
+                # Give it a moment to register
+                await asyncio.sleep(0.2)
+                
+                # Send setup goals if any (as User text to character's sense_data)
+                for setup_goal in test_config.get('setup_goals', []):
+                    # sense_data_callback expects 'content' field, which can be JSON string or plain text
+                    # Format as JSON string: {"text": "...", "source": "..."}
+                    content_json = json.dumps({
+                        'text': setup_goal,
+                        'source': 'User'
+                    })
+                    sense_data = {
+                        'content': content_json,
+                        'timestamp': datetime.now().isoformat()
+                    }
+                    self.session.put(
+                        f"cognitive/{character}/sense_data",
+                        json.dumps(sense_data)
+                    )
+                    await asyncio.sleep(0.5)
+                
+                # Send main test goal (as User text to character's sense_data)
+                test_goal = test_config.get('test_goal', '')
+                # Format as JSON string: {"text": "...", "source": "..."}
+                content_json = json.dumps({
+                    'text': test_goal,
+                    'source': 'User'
+                })
+                sense_data = {
+                    'content': content_json,
+                    'timestamp': datetime.now().isoformat()
+                }
+                self.session.put(
+                    f"cognitive/{character}/sense_data",
+                    json.dumps(sense_data)
+                )
+                
+                # Give character a moment to receive the goal
+                await asyncio.sleep(0.3)
+                
+                # Automatically trigger a step to start plan execution
+                # This uses the same mechanism as the Step Turn button
+                with self.turn_state_lock:
+                    self.turn_state['mode'] = 'step'
+                self.turn_step_publisher.put(json.dumps({"timestamp": datetime.now().isoformat()}).encode())
+                
+                await websocket.send_text(json.dumps({
+                    'type': 'test_status',
+                    'status': {
+                        'running': True,
+                        'message': 'Test goal sent, step triggered automatically...'
+                    }
+                }))
+                
+            except Exception as e:
+                await websocket.send_text(json.dumps({
+                    'type': 'test_status',
+                    'status': {
+                        'error': str(e)
+                    }
+                }))
+    
     def _setup_routes(self):
         """Setup FastAPI routes."""
         
@@ -452,7 +581,14 @@ class FastAPIActionDisplayNode:
                                 if text == "ping":
                                     # Send pong response
                                     await websocket.send_text("pong")
-                                continue
+                                    continue
+                                
+                                # Try to parse JSON messages
+                                try:
+                                    msg = json.loads(text)
+                                    await self._handle_websocket_message(websocket, msg)
+                                except json.JSONDecodeError:
+                                    pass
                     except Exception:
                         break
             except WebSocketDisconnect:
@@ -1797,6 +1933,7 @@ class FastAPIActionDisplayNode:
                         <button onclick="saveAll()" style="background: #95e1d3; color: #1a1a1a; margin-right: 10px;">Save</button>
                         <button onclick="exportToObsidian()" style="background: #7c3aed; color: white; margin-right: 10px;">Obsidian</button>
                         <button onclick="openResourceBrowser()" style="background: #0e639c; color: white; margin-right: 10px;">🔍 Browser</button>
+                        <button onclick="openTestRunner()" style="background: #f39c12; color: white; margin-right: 10px;">🧪 Test</button>
                         <button onclick="shutdownWithSave()" style="background: #ff4757; color: white;">Shutdown</button>
                     </div>
                     <div style="margin-bottom: 15px; padding: 10px; background: #333; border-radius: 5px;">
@@ -1857,6 +1994,38 @@ class FastAPIActionDisplayNode:
                 <pre id="modalContent"></pre>
             </div>
             <div class="modal-resize-handle" id="modalResizeHandle"></div>
+        </div>
+    </div>
+
+    <!-- Test Runner Modal -->
+    <div id="testModal" class="modal">
+        <div class="modal-content" style="max-width: 600px;">
+            <div class="modal-header">
+                <h2>🧪 Run Evaluation Test</h2>
+                <span class="modal-close" onclick="closeTestModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; margin-bottom: 5px; color: #ccc;">Select Character:</label>
+                    <select id="testCharacterSelect" style="width: 100%; padding: 8px; background: #1a1a1a; color: #e0e0e0; border: 1px solid #555; border-radius: 4px;">
+                        <option value="">-- Select Character --</option>
+                    </select>
+                </div>
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; margin-bottom: 5px; color: #ccc;">Available Test Files:</label>
+                    <select id="testFileSelect" size="8" style="width: 100%; padding: 8px; background: #1a1a1a; color: #e0e0e0; border: 1px solid #555; border-radius: 4px;">
+                        <option value="">Loading...</option>
+                    </select>
+                </div>
+                <div style="margin-bottom: 15px;">
+                    <button onclick="runSelectedTest()" style="background: #27ae60; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; width: 100%;">
+                        ▶️ Run Test
+                    </button>
+                </div>
+                <div id="testStatus" style="margin-top: 15px; padding: 10px; background: #2d2d2d; border-radius: 4px; min-height: 60px; max-height: 200px; overflow-y: auto;">
+                    <div style="color: #888;">Select a test file to see details...</div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -1998,6 +2167,12 @@ class FastAPIActionDisplayNode:
                 } else if (data.type === 'turn_state_update') {
                     // Handle unified turn state update (replaces step_complete)
                     handleTurnStateUpdate(data);
+                } else if (data.type === 'test_files_list') {
+                    updateTestFileList(data.files);
+                } else if (data.type === 'test_details') {
+                    showTestDetails(data.details);
+                } else if (data.type === 'test_status') {
+                    updateTestStatus(data.status);
                 } else if (data.type === 'test') {
                     console.log('Test message received:', data.message);
                     // Add a test entry to the action log
@@ -3315,6 +3490,113 @@ class FastAPIActionDisplayNode:
             // Open Resource Browser in new tab
             // Just open it - browser will show connection error if not running
             window.open('http://localhost:3001', '_blank');
+        }
+        
+        // Test Runner Functions
+        function openTestRunner() {
+            const modal = document.getElementById('testModal');
+            modal.style.display = 'flex';
+            
+            // Populate character dropdown
+            const charSelect = document.getElementById('testCharacterSelect');
+            charSelect.innerHTML = '<option value="">-- Select Character --</option>';
+            for (const [charName, _] of characterTabs) {
+                charSelect.innerHTML += `<option value="${charName}">${charName}</option>`;
+            }
+            
+            // Request test file list from server
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'list_test_files'
+                }));
+            }
+        }
+        
+        function closeTestModal() {
+            const modal = document.getElementById('testModal');
+            modal.style.display = 'none';
+        }
+        
+        function updateTestFileList(testFiles) {
+            const select = document.getElementById('testFileSelect');
+            if (testFiles.length === 0) {
+                select.innerHTML = '<option value="">No test files found</option>';
+            } else {
+                select.innerHTML = testFiles.map(f => 
+                    `<option value="${f.path}">${f.name}</option>`
+                ).join('');
+            }
+            
+            // Add change handler to show test details
+            select.onchange = () => {
+                const selected = select.value;
+                if (selected && ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({
+                        type: 'get_test_details',
+                        test_file: selected
+                    }));
+                }
+            };
+        }
+        
+        function showTestDetails(details) {
+            const statusDiv = document.getElementById('testStatus');
+            statusDiv.innerHTML = `
+                <div style="color: #00d4ff; font-weight: bold; margin-bottom: 8px;">${details.name || 'Test'}</div>
+                <div style="color: #ccc; margin-bottom: 8px; font-size: 12px;">${details.description || 'No description'}</div>
+                <div style="color: #888; font-size: 11px;">
+                    <div>Goal: ${details.test_goal || 'N/A'}</div>
+                </div>
+            `;
+        }
+        
+        function runSelectedTest() {
+            const charSelect = document.getElementById('testCharacterSelect');
+            const fileSelect = document.getElementById('testFileSelect');
+            const character = charSelect.value;
+            const testFile = fileSelect.value;
+            
+            if (!character) {
+                alert('Please select a character');
+                return;
+            }
+            
+            if (!testFile) {
+                alert('Please select a test file');
+                return;
+            }
+            
+            const statusDiv = document.getElementById('testStatus');
+            statusDiv.innerHTML = '<div style="color: #f39c12;">⏳ Running test...</div>';
+            
+            // Send test run request via WebSocket
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'run_test',
+                    character: character,
+                    test_file: testFile
+                }));
+            }
+        }
+        
+        function updateTestStatus(status) {
+            const statusDiv = document.getElementById('testStatus');
+            if (status.error) {
+                statusDiv.innerHTML = `<div style="color: #ff4757;">❌ Error: ${status.error}</div>`;
+            } else if (status.running) {
+                statusDiv.innerHTML = `<div style="color: #f39c12;">⏳ ${status.message}</div>`;
+            } else if (status.complete) {
+                const violations = status.violations || 0;
+                const checks = status.checks || 0;
+                const color = violations === 0 ? '#27ae60' : '#ff4757';
+                statusDiv.innerHTML = `
+                    <div style="color: ${color}; font-weight: bold;">${violations === 0 ? '✅' : '❌'} Test Complete</div>
+                    <div style="color: #ccc; margin-top: 8px; font-size: 12px;">
+                        <div>Type violations: ${violations}</div>
+                        <div>Compatibility checks: ${checks}</div>
+                    </div>
+                `;
+            }
         }
         
         function shutdownWithSave() {

@@ -1,7 +1,8 @@
 ---
 name: is-empty
 description: Check if text is null, empty, or only whitespace
-type: prompt_augmentation
+type: python
+trusted: true
 parameters: none
 examples:
   - '{"type":"if","condition":{"type":"tool_condition","tool":"is-empty","target":"$text"},"then":[...]}'
@@ -9,7 +10,7 @@ examples:
 
 # Is Empty
 
-Check whether a note contains meaningful content or is effectively empty.
+Check whether text contains meaningful content or is effectively empty.
 
 ## Purpose
 
@@ -20,7 +21,9 @@ Check whether a note contains meaningful content or is effectively empty.
 
 ## Input Format
 
-Accepts a single Note.
+Accepts:
+- Plain text string
+- Note content
 
 ## Parameters
 
@@ -28,9 +31,9 @@ None.
 
 ## Output Format
 
-Returns a Note containing:
-- "true" if note is null, empty string, or only whitespace
-- "false" if note contains any non-whitespace content
+Returns boolean:
+- `True` if text is null, empty string, or only whitespace
+- `False` if text contains any non-whitespace content
 
 ## Usage Examples
 

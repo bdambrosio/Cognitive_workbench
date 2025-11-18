@@ -458,6 +458,7 @@ class InfospaceResourceManager:
     def mark_persistent(self, resource_id: str, character_name: str) -> Tuple[bool, Optional[str]]:
         """
         Mark a Note or Collection as persistent.
+        If Collection, also persists all Notes in it that aren't already persistent.
         
         Args:
             resource_id: Resource to mark as persistent
@@ -471,7 +472,23 @@ class InfospaceResourceManager:
         if not resource:
             return False, f"Resource {resource_id} not found"
         
-        # Mark as persistent
+        # If Collection, persist all Notes in it first
+        if resource_id.startswith('Collection_'):
+            content = resource.get('properties', {}).get('content', [])
+            persisted_count = 0
+            for note_id in content:
+                if isinstance(note_id, str) and note_id.startswith('Note_'):
+                    note_resource = self.world_map.resource_registry.get(note_id)
+                    if note_resource and not note_resource.get('properties', {}).get('persistent', False):
+                        note_resource['properties']['persistent'] = True
+                        note_resource['properties']['persisted_at'] = datetime.now().isoformat()
+                        note_resource['properties']['persisted_by'] = character_name
+                        persisted_count += 1
+                        logger.info(f"💾 Auto-persisted Note {note_id} (in Collection {resource_id})")
+            if persisted_count > 0:
+                logger.info(f"💾 Auto-persisted {persisted_count} Notes in Collection {resource_id}")
+        
+        # Mark resource as persistent
         resource['properties']['persistent'] = True
         resource['properties']['persisted_at'] = datetime.now().isoformat()
         resource['properties']['persisted_by'] = character_name
@@ -897,7 +914,8 @@ class InfospaceResourceManager:
                     collection_instances[resource_id] = info_serialized
                     logger.debug(f"Saving persistent Collection {resource_id}")
         
-        # Scan persistent Collections for non-persistent Notes before save (for logging)
+        # Scan persistent Collections for non-persistent Notes before save (for logging edge cases)
+        # Notes should be auto-persisted when Collection is persisted, but check for Notes added after
         for collection_id, coll_serialized in collection_instances.items():
             coll_props = coll_serialized.get('properties', {})
             if coll_props.get('persistent', False):
@@ -908,9 +926,11 @@ class InfospaceResourceManager:
                         if isinstance(note_id, str) and note_id.startswith('Note_'):
                             note_data = self.world_map.resource_registry.get(note_id)
                             if note_data and not note_data.get('properties', {}).get('persistent', False):
-                                note_content = note_data.get('properties', {}).get('content', '')
-                                content_str = str(note_content)[:200] + ('...' if len(str(note_content)) > 200 else '')
-                                logger.warning(f"Non-persistent Note '{note_id}' in persistent Collection '{collection_id}': {content_str} (consider persisting before save)")
+                                # Auto-persist Note added after Collection was persisted
+                                note_data['properties']['persistent'] = True
+                                note_data['properties']['persisted_at'] = datetime.now().isoformat()
+                                note_data['properties']['persisted_by'] = 'System'
+                                logger.info(f"💾 Auto-persisted Note '{note_id}' added to persistent Collection '{collection_id}' after Collection was persisted")
         
         return {
             'note_instances': note_instances,

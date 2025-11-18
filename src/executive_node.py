@@ -421,6 +421,13 @@ class ZenohExecutiveNode:
             self._activity_selection_callback
         )
         
+        # Subscriber for enabling compliance tracking (evaluation mode)
+        if self.is_infospace:
+            self.compliance_tracking_subscriber = self.session.declare_subscriber(
+                f"cognitive/{character_name}/enable_compliance_tracking",
+                self._enable_compliance_tracking_callback
+            )
+        
         # Queryable for activity list (character-specific)
         self.activity_list_queryable = self.session.declare_queryable(
             f"cognitive/{character_name}/activity/list",
@@ -1295,6 +1302,11 @@ class ZenohExecutiveNode:
                         'model_name': os.getenv('CWB_LLM_MODEL', 'llama3.3-70B-instruct')
                     }
                 
+                # Initialize plan identifiers before plan generation (needed for incremental planner action tracking)
+                self.plan_counter += 1
+                self.current_plan_id = f"p_{self.plan_counter}"
+                self.step_counter = 0
+                
                 plan_candidate = self.planner.generate_plan(goal=goal_text, context=context)
             else:
                 plan_candidate = None
@@ -1360,11 +1372,8 @@ class ZenohExecutiveNode:
                     logger.info(f'📋 {self.character_name} assigned LLM-generated plan with {len(plan_candidate["plan"])} steps')
                     self.plan_bindings_cache = {}
                     self.plan_summary_completed = False  # Reset for new plan
-                    # Initialize plan identifiers and control-flow events
-                    self.plan_counter += 1
-                    self.current_plan_id = f"p_{self.plan_counter}"
+                    # Initialize control-flow events (plan_id already set above)
                     self.control_flow_events = []
-                    self.step_counter = 0
                     # Capture simulation time at plan start
                     try:
                         for time_reply in self.session.get("cognitive/map/simulation_time", target=QueryTarget.BEST_MATCHING, consolidation=ConsolidationMode.NONE, timeout=2.0 if not self.debug else 300.0):
@@ -1378,6 +1387,14 @@ class ZenohExecutiveNode:
                         self.current_plan_start_sim_iso = None
                     self._publish_current_plan()
                     self.plan_state = {'step_stack': plan_module.Stack()}
+                    
+                    # If plan was already executed (incremental planner), mark as completed immediately
+                    skip_validation = plan_candidate.get('skip_validation', False)
+                    if skip_validation:
+                        logger.info(f'✅ Incremental planner completed plan execution - summarizing')
+                        self._plan_completed()
+                        return None  # Plan already executed, return None to indicate completion
+                    
                     return self.current_plan
             else:
                 logger.error('Planner call failed or returned no plan')
@@ -2966,6 +2983,25 @@ end your response with </end>
             metrics['plan_score'] = summary['plan_score']/100.0
         else:
             metrics['plan_score'] = 0.0
+        
+        # Add infospace compliance metrics if evaluation mode is active
+        if self.is_infospace and hasattr(self.infospace_executor, '_compliance_tracker'):
+            tracker = self.infospace_executor._compliance_tracker
+            if tracker:
+                compliance_metrics = tracker.get_metrics()
+                metrics['infospace_compliance'] = compliance_metrics
+                
+                # Log eval statistics summary
+                violation_count = len(compliance_metrics.get('type_violations', []))
+                checks_count = compliance_metrics.get('compatibility_checks', 0)
+                
+                if violation_count > 0:
+                    logger.info(f'🧪 EVAL STATS [{self.character_name}]: {violation_count} type violations, {checks_count} compatibility checks')
+                    # Log violation details
+                    for v in compliance_metrics.get('type_violations', []):
+                        logger.info(f'  ❌ {v["operation"]} on {v["variable"]}: expected {v["expected_type"]}, got {v["actual_type"]}')
+                else:
+                    logger.info(f'🧪 EVAL STATS [{self.character_name}]: ✓ No violations, {checks_count} compatibility checks passed')
 
         entry = {
             'activity': self.current_activity['name'] if self.current_activity else 'None',
@@ -3082,6 +3118,7 @@ End your response with </end>
                     self.text_input_queue.pop(0)
                 
         except Exception as e:
+            traceback.print_exc()
             logger.error(f'Error processing sense data: {e}')
     
     def situation_callback(self, sample):
@@ -3210,6 +3247,20 @@ End your response with </end>
                 logger.error(f'Failed to set activity {activity_name} for {self.character_name}')
         except Exception as e:
             logger.error(f'Error in activity selection callback: {e}')
+    
+    def _enable_compliance_tracking_callback(self, sample):
+        """Handle enabling compliance tracking for evaluation mode."""
+        try:
+            if self.is_infospace and hasattr(self, 'infospace_executor'):
+                from infospace_compliance import ComplianceTracker
+                
+                # Create and attach compliance tracker to executor
+                self.infospace_executor._compliance_tracker = ComplianceTracker()
+                logger.info(f'🧪 {self.character_name} compliance tracking enabled')
+            else:
+                logger.warning(f'Cannot enable compliance tracking: not in infospace mode')
+        except Exception as e:
+            logger.error(f'Error enabling compliance tracking: {e}')
     
     def _activity_list_query_handler(self, query):
         """Handle query for available activities list."""
