@@ -1339,6 +1339,9 @@ end your response with:
                                     del self.resource_manager.vector_stores[resource_id]
                                 if resource_id in self.resource_manager.collection_indexes:
                                     del self.resource_manager.collection_indexes[resource_id]
+                                
+                                # Remove from resource indexer
+                                self.resource_manager.remove_resource_from_index(resource_id)
                             elif resource_id.startswith('Note_'):
                                 # Remove from named notes if present
                                 if resource_id in self.resource_manager.named_notes.values():
@@ -1350,6 +1353,9 @@ end your response with:
                                             break
                                     if name_to_remove:
                                         del self.resource_manager.named_notes[name_to_remove]
+                                
+                                # Remove from resource indexer
+                                self.resource_manager.remove_resource_from_index(resource_id)
                         
                         # For Notes, remove from system collection if resource_manager exists
                         if resource_id.startswith('Note_') and self.resource_manager:
