@@ -16,6 +16,7 @@ import hashlib
 from pathlib import Path
 from datetime import datetime, timedelta
 import traceback
+from dataclasses import dataclass
 from typing import Dict, Any, Optional
 from templates import WORLD_STATE_UPDATE_TEMPLATE
 from utils.zenoh_utils import datetime_handler
@@ -24,9 +25,7 @@ from utils.zenoh_utils import datetime_handler
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import zenoh
-from world_map import WorldMap
-from map_agent import MapAgent
-from infospace_map import InfospaceMap
+import infospace
 
 # Configure logging
 # Console handler with WARNING level (less verbose)
@@ -59,11 +58,20 @@ from llm_client import ZenohLLMClient
 from infospace_resource_manager import InfospaceResourceManager
 
 
+@dataclass
+class InfospaceAgent:
+    """Lightweight agent placeholder for infospace runtime."""
+    name: str
+    x: int = 0
+    y: int = 0
+
+
 class MapNode:
-    def __init__(self, map_file: str, world_name: str = None, setting: str = None, max_turns: int = None, server_name: str = 'openai', model_name: str = 'gpt-4.1'):
+    def __init__(self, map_file: Optional[str] = None, world_name: str = None, setting: str = None,
+                 max_turns: int = None, server_name: str = 'openai', model_name: str = 'gpt-4.1'):
         self.map_file = map_file
-        self.world_name = world_name or map_file.replace('.py', '')
-        self.world_map = None
+        derived_world = map_file.replace('.py', '') if map_file else 'infospace'
+        self.world_name = world_name or derived_world
         self.session = None
         self.shutdown_requested = False
         self._shutting_down = False
@@ -73,15 +81,12 @@ class MapNode:
         # Agent registry: character_name -> Agent instance
         self.agent_registry = {}
         
-        # Agent visibility tracking: agent_name -> set of visible agent names
-        self.agent_visibility = {}
-        
         # Conversation lock management
         self.conversation_locks = {}  # character_name -> set of locked_with_character_names
         self.lock_request_counts = {}  # (requester, target) -> count of failed attempts
         self.lock_timeout_threshold = 3  # Number of failed attempts before timeout
         
-        # Infospace resource manager (initialized after world_map loads)
+        # Infospace resource manager
         self.resource_manager = None
         
         # Persistence setup
@@ -144,45 +149,20 @@ class MapNode:
         self.initialize_setting()
         
     def load_map_module(self):
-        """Load the map module from the maps subdirectory"""
+        """Initialize the infospace runtime (no external map files required)."""
         try:
-            maps_dir = os.path.join(os.path.dirname(__file__), 'maps')
-            map_path = os.path.join(maps_dir, self.map_file)
-            
-            if not os.path.exists(map_path):
-                raise FileNotFoundError(f"Map file not found: {map_path}")
-            
-            logger.info(f"Loading map module from: {map_path}")
-            
-            # Load the module dynamically
-            spec = importlib.util.spec_from_file_location("map_module", map_path)
-            map_module = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(map_module)
-            
-            # Determine map class from module attribute (defaults to WorldMap for backward compatibility)
-            MapClass = getattr(map_module, 'map_class', WorldMap)
-            logger.info(f"Creating {MapClass.__name__} instance...")
-            self.world_map = MapClass(map_module)
-            logger.info(f"{MapClass.__name__} created successfully: {self.world_map.width}x{self.world_map.height}")
-            
-            # Initialize resource manager after world_map is ready
-            self.resource_manager = InfospaceResourceManager(
-                self.world_map, self.session, self.world_name, self.agent_registry
-            )
+            infospace.setup_module()
+            logger.info("Initializing infospace runtime (mapless)")
+
+            self.resource_manager = InfospaceResourceManager(self.world_name)
             logger.info("Infospace resource manager initialized")
-            
-            # Initialize system collections before loading world data to ensure it exists for restored notes
+
             self.resource_manager.initialize_system_collections()
-            
-            # Load existing world data if available
             self.load_world_data()
-            
-            # Create distinguished note_null system resource
             self.create_note_null()
-            
         except Exception as e:
             logger.error(traceback.format_exc())
-            logger.error(f"Failed to load map module: {e}")
+            logger.error(f"Failed to initialize infospace runtime: {e}")
             raise
     
     def create_note_null(self):
@@ -193,15 +173,11 @@ class MapNode:
         Created at map initialization and visible to all agents.
         """
         try:
-            # Check if Note resource type exists (only for infospace maps)
-            if not hasattr(self.world_map.scenario_module.resource_types, 'Note'):
-                logger.info("Skipping note_null creation (not an infospace map)")
+            if not hasattr(self.resource_manager.resource_types, 'Note'):
+                logger.info("Skipping note_null creation (note type unavailable)")
                 return
             
-            # Generate unique ID
-            note_id = f"Note_null"
-            
-            # Create Note properties
+            note_id = "Note_null"
             properties = {
                 'content': None,
                 'format': 'json',
@@ -212,20 +188,16 @@ class MapNode:
                 'is_system': True
             }
             
-            # Place at origin (0, 0)
-            x, y = 0, 0
-            
-            # Register in map's resource registry
             resource_data = {
-                'type': self.world_map.scenario_module.resource_types.Note,
-                'location': (x, y),
+                'type': self.resource_manager.resource_types.Note,
+                'location': (0, 0),
                 'properties': properties
             }
             
-            self.world_map.resource_registry[note_id] = resource_data
-            self.world_map.patches[x][y].resources[note_id] = resource_data
+            self.resource_manager.resource_registry[note_id] = resource_data
+            self.resource_manager.add_note_to_system_collection(note_id)
             
-            logger.info(f"Created system resource: {note_id} at ({x}, {y})")
+            logger.info("Created system resource: %s", note_id)
             
         except Exception as e:
             logger.error(f"Failed to create note_null: {e}")
@@ -247,16 +219,17 @@ end your response with:
             response = self.llm_client.generate([prompt], max_tokens=50, stops=['</end>'])
             try:
                 text = response.text.strip().replace('```json', '').replace('```', '')
-                self.world_map.datetime = datetime.fromisoformat(text)
-                logger.info(f"Setting datetime to: {self.world_map.datetime}")
+                new_time = datetime.fromisoformat(text)
+                self.resource_manager.set_simulation_time(new_time)
+                logger.info(f"Setting datetime to: {new_time}")
             except Exception as e:
                 logger.error(f"Failed to set datetime: {e}")
                 logger.error(f"Response: {response.text}")
                 # Use a reasonable default simulation time instead of real-world time
                 default_time = datetime(2024, 6, 15, 12, 0, 0)  # Midday, summer
-                self.world_map.datetime = default_time
-                logger.info(f"Setting datetime to default simulation time: {self.world_map.datetime}")
-            return self.world_map.datetime
+                self.resource_manager.set_simulation_time(default_time)
+                logger.info(f"Setting datetime to default simulation time: {default_time}")
+            return self.resource_manager.simulation_time
     
     def init_zenoh(self):
         """Initialize Zenoh session and set up queryables"""
@@ -285,12 +258,6 @@ end your response with:
     def setup_queryables(self):
         """Set up Zenoh queryables for map services"""
         
-        # Map summary queryable
-        self.map_summary_queryable = self.session.declare_queryable(
-            "cognitive/map/summary",
-            self.handle_map_summary
-        )
-        
         # Resource list queryable
         self.resources_queryable = self.session.declare_queryable(
             "cognitive/map/resources",
@@ -313,12 +280,6 @@ end your response with:
         self.resource_remove_queryable = self.session.declare_queryable(
             "cognitive/map/resource/remove/*",
             self.handle_resource_remove
-        )
-
-        # Resource place queryable
-        self.resource_place_queryable = self.session.declare_queryable(
-            "cognitive/map/resource/place/*",
-            self.handle_resource_place
         )
         
         # Note creation queryable (dynamic resource creation)
@@ -363,53 +324,6 @@ end your response with:
             self.handle_resource_viewer
         )
         
-        # Terrain queryable
-        self.terrain_queryable = self.session.declare_queryable(
-            "cognitive/map/terrain",
-            self.handle_terrain_query
-        )
-        
-        # Random location by resource queryable
-        self.random_location_resource_queryable = self.session.declare_queryable(
-            "cognitive/map/random_location/resource/*",
-            self.handle_random_location_by_resource
-        )
-        
-        # Random location by terrain queryable
-        self.random_location_terrain_queryable = self.session.declare_queryable(
-            "cognitive/map/random_location/terrain/*",
-            self.handle_random_location_by_terrain
-        )
-        
-        # Agent registration queryable
-        self.agent_register_queryable = self.session.declare_queryable(
-            "cognitive/map/agent/register/*",
-            self.handle_agent_register
-        )
-        
-        # Agent look queryable
-        self.agent_look_queryable = self.session.declare_queryable(
-            "cognitive/map/agent/*/look",
-            self.handle_agent_look
-        )
-        
-        # Agent move queryable
-        self.agent_move_queryable = self.session.declare_queryable(
-            "cognitive/map/agent/*/move",
-            self.handle_agent_move
-        )
-        
-        # Agent move-to-resource queryable
-        self.agent_move_to_queryable = self.session.declare_queryable(
-            "cognitive/map/agent/*/move_to",
-            self.handle_agent_move_to
-        )
-        
-        # Agent use_path queryable
-        self.agent_use_path_queryable = self.session.declare_queryable(
-            "cognitive/map/agent/*/use_path",
-            self.handle_agent_use_path
-        )
         
         # Map types queryable
         self.map_types_queryable = self.session.declare_queryable(
@@ -1025,28 +939,10 @@ end your response with:
         except Exception as e:
             logger.error(f"Error publishing turn state update: {e}")
     
-    def handle_map_summary(self, query):
-        """Handle map summary queries"""
-        try:
-            summary = self.world_map.get_map_summary()
-            response = {
-                'success': True,
-                'map_file': self.map_file,
-                'summary': summary
-            }
-            query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
-        except Exception as e:
-            logger.error(f"Error handling map summary query: {e}")
-            error_response = {
-                'success': False,
-                'error': str(e)
-            }
-            query.reply(query.key_expr, json.dumps(error_response).encode('utf-8'))
-    
     def handle_resources_query(self, query):
         """Handle resources list queries"""
         try:
-            resources = self.world_map.get_resource_list()
+            resources = self.resource_manager.get_resource_list()
             
             # Convert ResourceType enums to strings for JSON serialization
             json_safe_resources = []
@@ -1086,23 +982,7 @@ end your response with:
                 # This query should be handled by a more specific queryable, ignore it here
                 return
             
-            # Try direct lookup first (checks resource_registry and patches)
-            resource = self.world_map.get_resource_by_name(resource_name)
-            
-            # If not found, try resource_registry directly (for Note/Collection IDs)
-            if not resource and resource_name in self.world_map.resource_registry:
-                resource = self.world_map.resource_registry[resource_name]
-            
-            # If not found and doesn't look like an ID, try named collections and named notes
-            if not resource and not resource_name.startswith(('Note_', 'Collection_')):
-                if resource_name in self.resource_manager.named_collections:
-                    collection_id = self.resource_manager.named_collections[resource_name]
-                    resource = self.world_map.resource_registry.get(collection_id)
-                    logger.info(f"📚 Resolved collection name '{resource_name}' → {collection_id}")
-                elif resource_name in self.resource_manager.named_notes:
-                    note_id = self.resource_manager.named_notes[resource_name]
-                    resource = self.world_map.resource_registry.get(note_id)
-                    logger.info(f"📝 Resolved note name '{resource_name}' → {note_id}")
+            resource = self.resource_manager.get_resource(resource_name)
             
             if resource:
                 # Create JSON-safe version of resource
@@ -1131,361 +1011,60 @@ end your response with:
             query.reply(query.key_expr, json.dumps(error_response).encode('utf-8'))
     
     def handle_resource_rules_by_name(self, query):
-        """Return the resource_rules entry for a resource type (JSON-safe).
-
-        Topic: cognitive/map/resource_rules/<resource_type_or_instance>
-        If an instance name is provided, the resource is looked up to determine its type.
-        """
+        """Return minimal resource rule metadata for infospace resources."""
         try:
-            # Extract name from query key
             key_parts = str(query.key_expr).split('/')
-            raw_name = key_parts[-1] if len(key_parts) > 0 else None
+            raw_name = key_parts[-1] if key_parts else None
 
             if not raw_name:
                 raise ValueError("No resource name provided")
 
-            # Try to resolve as resource instance first to get exact type
-            type_name = raw_name
-            resource = self.world_map.get_resource_by_name(raw_name)
+            resource = self.resource_manager.get_resource(raw_name)
             if resource:
-                # Extract type from resource instance
                 rtype = resource.get('type')
-                if rtype:
-                    type_name = getattr(rtype, 'name', str(rtype))
-            # If not found as instance, assume raw_name is the type name itself
-
-            rules = getattr(self.world_map, '_resource_rules', None) or {}
-            allocations = rules.get('allocations') or []
-
-            found = None
-            for allocation in allocations:
-                rt = allocation.get('resource_type')
-                rt_name = ''
-                try:
-                    rt_name = rt.name  # Enum or ResourceType
-                except Exception:
-                    rt_name = getattr(rt, 'name', str(rt))
-
-                if isinstance(rt_name, str) and rt_name.lower() == type_name.lower():
-                    # Build JSON-safe object
-                    result = {
-                        'resource_type': rt_name,
-                    }
-                    if 'description' in allocation:
-                        result['description'] = allocation.get('description')
-                    if 'count' in allocation:
-                        result['count'] = allocation.get('count')
-                    if 'requires_property' in allocation:
-                        result['requires_property'] = allocation.get('requires_property')
-                    if 'has_npc' in allocation:
-                        result['has_npc'] = allocation.get('has_npc')
-                    if 'use' in allocation:
-                        # Pass through use effects (list of {need, effect})
-                        result['use'] = allocation.get('use')
-
-                    # terrain_weights: convert enum keys to names
-                    tw = allocation.get('terrain_weights') or {}
-                    if isinstance(tw, dict) and tw:
-                        tw_out = {}
-                        for k, v in tw.items():
-                            key_name = getattr(k, 'name', str(k))
-                            tw_out[str(key_name)] = v
-                        result['terrain_weights'] = tw_out
-
-                    # Optional names list for this type, if defined
-                    names_map = rules.get('names') or {}
-                    try:
-                        if isinstance(names_map, dict) and rt_name in names_map:
-                            result['names'] = names_map[rt_name]
-                    except Exception:
-                        pass
-                    
-                    # For Skill type, include all skill instances with metadata
-                    if rt_name.lower() == 'skill':
-                        skill_instances = []
-                        for resource_id, resource_data in self.world_map.resource_registry.items():
-                            res_type = resource_data.get('type')
-                            res_type_name = getattr(res_type, 'name', str(res_type))
-                            
-                            if res_type_name.lower() == 'skill':
-                                props = resource_data.get('properties', {})
-                                instance_info = {
-                                    'name': resource_data.get('name', resource_id),
-                                    'description': resource_data.get('description', ''),
-                                    'tool_name': props.get('tool_name', ''),
-                                    'tool_type': props.get('tool_type', 'prompt_augmentation')
-                                }
-                                skill_instances.append(instance_info)
-                        
-                        result['skill_instances'] = skill_instances
-                    
-                    # For all resource types, include tool metadata fields if present
-                    tool_metadata_fields = [
-                        'tool_name', 'tool_type', 'tool_path', 'tool_md_content',
-                        'execution_mode', 'value_type', 'result_type', 
-                        'context_injection', 'entry_point', 'input_format', 'output_format'
-                    ]
-                    for field in tool_metadata_fields:
-                        if field in allocation:
-                            result[field] = allocation[field]
-
-                    found = result
-                    break
-
-            if found is None:
-                response = {
-                    'success': False,
-                    'error': f"Resource type '{raw_name}' not found"
-                }
+                type_name = getattr(rtype, 'name', str(rtype)) if rtype else raw_name
             else:
-                response = {
-                    'success': True,
-                    'resource_rules': found
-                }
+                type_name = raw_name
 
-            query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
+            rules_source = getattr(infospace, 'resource_rules', {}) or {}
+            resource_rules = {
+                'resource_type': type_name,
+                'dynamic': True,
+                'allocations': rules_source.get('allocations', [])
+            }
+
+            query.reply(query.key_expr, json.dumps({'success': True, 'resource_rules': resource_rules}).encode('utf-8'))
         except Exception as e:
             logger.error(f"Error handling resource rules query: {e}")
-            error_response = {
-                'success': False,
-                'error': str(e)
-            }
-            query.reply(query.key_expr, json.dumps(error_response).encode('utf-8'))
-    
-    def handle_resource_remove(self, query):
-        """Handle resource removal queries"""
-        try:
-            # Extract resource name from query key
-            key_parts = str(query.key_expr).split('/')
-            resource_name = key_parts[-1] if len(key_parts) > 0 else None
-            
-            if not resource_name:
-                raise ValueError("No resource name provided")
-            
-            # Get resource instance by name (instance-only)
-            resource = self.world_map.get_resource_by_name(resource_name)
-            if not resource:
-                response = {
-                    'success': False,
-                    'error': f"Resource '{resource_name}' not found"
-                }
-            else:
-                # Determine type and consult rules
-                try:
-                    rtype_obj = resource.get('type')
-                    rtype_name = getattr(rtype_obj, 'name', str(rtype_obj))
-                except Exception:
-                    rtype_name = None
-
-                rules = getattr(self.world_map, '_resource_rules', None) or {}
-                allocations = rules.get('allocations') or []
-
-                remove_allowed = None  # None = unknown type
-                for allocation in allocations:
-                    rt = allocation.get('resource_type')
-                    rt_name = ''
-                    try:
-                        rt_name = rt.name
-                    except Exception:
-                        rt_name = getattr(rt, 'name', str(rt))
-                    if rtype_name and isinstance(rt_name, str) and rt_name.lower() == rtype_name.lower():
-                        # Default to True if key missing
-                        remove_allowed = bool(allocation.get('remove_on_take', True))
-                        break
-
-                if remove_allowed is False:
-                    # Policy: do not remove from map, but treat as success
-                    response = {
-                        'success': True,
-                        'removed': False,
-                        'message': f"Removal skipped by policy for '{resource_name}'"
-                    }
-                elif remove_allowed is None and rtype_name:
-                    # Unknown type: skip removal but succeed
-                    response = {
-                        'success': True,
-                        'removed': False,
-                        'message': f"Removal skipped: unknown resource type '{rtype_name}'"
-                    }
-                else:
-                    # Proceed with actual removal (either rule allows or no rule exists)
-                    resource_id = resource['name']  # The 'name' field contains the resource_id
-                    
-                    # For infospace Notes/Collections, delete from registry completely
-                    # (world_map.remove_resource() only removes from patches, keeps in registry)
-                    if resource_id.startswith('Note_') or resource_id.startswith('Collection_'):
-                        # Remove from patches if it has a location
-                        loc = resource.get('location')
-                        if isinstance(loc, (list, tuple)) and len(loc) == 2:
-                            x, y = loc
-                            if 0 <= x < self.world_map.width and 0 <= y < self.world_map.height:
-                                if resource_id in self.world_map.patches[x][y].resources:
-                                    del self.world_map.patches[x][y].resources[resource_id]
-                        
-                        # Delete from registry
-                        if resource_id in self.world_map.resource_registry:
-                            del self.world_map.resource_registry[resource_id]
-                            logger.info(f"Deleted {resource_id} from resource_registry")
-                        
-                        # Clean up resource manager state
-                        if self.resource_manager:
-                            if resource_id.startswith('Collection_'):
-                                # Remove from named collections if present
-                                if resource_id in self.resource_manager.named_collections.values():
-                                    # Find and remove the name mapping
-                                    name_to_remove = None
-                                    for name, coll_id in self.resource_manager.named_collections.items():
-                                        if coll_id == resource_id:
-                                            name_to_remove = name
-                                            break
-                                    if name_to_remove:
-                                        del self.resource_manager.named_collections[name_to_remove]
-                                
-                                # Clean up vector stores and indexes
-                                if resource_id in self.resource_manager.vector_stores:
-                                    del self.resource_manager.vector_stores[resource_id]
-                                if resource_id in self.resource_manager.collection_indexes:
-                                    del self.resource_manager.collection_indexes[resource_id]
-                                
-                                # Remove from resource indexer
-                                self.resource_manager.remove_resource_from_index(resource_id)
-                            elif resource_id.startswith('Note_'):
-                                # Remove from named notes if present
-                                if resource_id in self.resource_manager.named_notes.values():
-                                    # Find and remove the name mapping
-                                    name_to_remove = None
-                                    for name, note_id in self.resource_manager.named_notes.items():
-                                        if note_id == resource_id:
-                                            name_to_remove = name
-                                            break
-                                    if name_to_remove:
-                                        del self.resource_manager.named_notes[name_to_remove]
-                                
-                                # Remove from resource indexer
-                                self.resource_manager.remove_resource_from_index(resource_id)
-                        
-                        # For Notes, remove from system collection if resource_manager exists
-                        if resource_id.startswith('Note_') and self.resource_manager:
-                            # Remove from system Notes collection
-                            if self.resource_manager.system_notes_collection_id:
-                                system_coll_id = self.resource_manager.system_notes_collection_id
-                                # Query the collection and remove the note
-                                from zenoh import QueryTarget, ConsolidationMode
-                                for reply in self.session.get(
-                                    f"cognitive/map/resource/{system_coll_id}",
-                                    target=QueryTarget.BEST_MATCHING,
-                                    consolidation=ConsolidationMode.NONE,
-                                    timeout=2.0
-                                ):
-                                    if reply.ok:
-                                        coll_data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
-                                        if coll_data.get('success') and 'content' in coll_data:
-                                            content = coll_data['content']
-                                            if isinstance(content, list) and resource_id in content:
-                                                content.remove(resource_id)
-                                                # Update the collection
-                                                for update_reply in self.session.get(
-                                                    f"cognitive/map/collection/add",
-                                                    target=QueryTarget.BEST_MATCHING,
-                                                    consolidation=ConsolidationMode.NONE,
-                                                    timeout=2.0,
-                                                    payload=json.dumps({
-                                                        'collection_id': system_coll_id,
-                                                        'content': content,
-                                                        'agent_name': 'system',
-                                                        'operation': 'update'
-                                                    }).encode('utf-8')
-                                                ):
-                                                    break
-                                    break
-                        
-                        response = {
-                            'success': True,
-                            'removed': True,
-                            'message': f"Resource '{resource_name}' deleted successfully"
-                        }
-                        logger.info(f"Resource '{resource_name}' deleted from map")
-                    else:
-                        # For non-infospace resources, use standard remove_resource
-                        success = self.world_map.remove_resource(resource_id)
-                        if success:
-                            response = {
-                                'success': True,
-                                'removed': True,
-                                'message': f"Resource '{resource_name}' removed successfully"
-                            }
-                            logger.info(f"Resource '{resource_name}' removed from map")
-                        else:
-                            response = {
-                                'success': False,
-                                'error': f"Failed to remove resource '{resource_name}'"
-                            }
-            
-            query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
-        except Exception as e:
-            logger.error(f"Error handling resource removal query: {e}")
-            error_response = {
-                'success': False,
-                'error': str(e)
-            }
-            query.reply(query.key_expr, json.dumps(error_response).encode('utf-8'))
-
-    def handle_resource_place(self, query):
-        """Handle resource placement queries. Places resource at agent's current location.
-
-        Topic: cognitive/map/resource/place/<resource_name>
-        Payload (optional): {"character_name": "Name"} to identify agent; if omitted, fails.
-        """
-        try:
-            key_parts = str(query.key_expr).split('/')
-            resource_name = key_parts[-1] if len(key_parts) > 0 else None
-            if not resource_name:
-                raise ValueError("No resource name provided")
-
-            # Parse payload for character name
-            character_name = None
-            if query.payload:
-                try:
-                    payload = query.payload.to_bytes().decode('utf-8')
-                    data = json.loads(payload) if payload else {}
-                    character_name = data.get('character_name')
-                except Exception:
-                    pass
-            if not character_name:
-                response = {'success': False, 'error': 'Missing character_name in payload'}
-                query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
-                return
-
-            canonical_character_name = character_name.capitalize()
-            if canonical_character_name not in self.agent_registry:
-                response = {'success': False, 'error': f"Agent for character '{character_name}' not found"}
-                query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
-                return
-
-            agent = self.agent_registry[canonical_character_name]
-            x, y = agent.x, agent.y
-
-            # Resolve resource by name
-            resource = self.world_map.get_resource_by_name(resource_name)
-            if not resource:
-                response = {'success': False, 'error': f"Resource '{resource_name}' not found"}
-                query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
-                return
-
-            resource_id = resource['name']
-            success = self.world_map.place_resource(resource_id, x, y)
-
-            if success:
-                response = {'success': True, 'message': f"Resource '{resource_name}' placed at ({x},{y})"}
-            else:
-                response = {'success': False, 'error': f"Failed to place resource '{resource_name}'"}
-
-            query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
-        except Exception as e:
-            logger.error(f"Error handling resource placement query: {e}")
             error_response = {'success': False, 'error': str(e)}
             query.reply(query.key_expr, json.dumps(error_response).encode('utf-8'))
     
+    def handle_resource_remove(self, query):
+        """Handle resource removal queries."""
+        try:
+            key_parts = str(query.key_expr).split('/')
+            resource_name = key_parts[-1] if key_parts else None
+
+            if not resource_name:
+                raise ValueError("No resource name provided")
+
+            resource = self.resource_manager.get_resource(resource_name)
+            if not resource:
+                response = {'success': False, 'error': f"Resource '{resource_name}' not found"}
+            else:
+                resource_id = resource.get('name', resource_name)
+                success, error_msg = self.resource_manager.delete_resource(resource_id)
+                if success:
+                    response = {'success': True, 'removed': True, 'resource_id': resource_id}
+                else:
+                    response = {'success': False, 'error': error_msg or 'Unable to remove resource'}
+
+            query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
+        except Exception as e:
+            logger.error(f"Error handling resource removal query: {e}")
+            error_response = {'success': False, 'error': str(e)}
+            query.reply(query.key_expr, json.dumps(error_response).encode('utf-8'))
+
     def handle_create_note(self, query):
         """
         Handle Note resource creation from skill execution.
@@ -1890,7 +1469,7 @@ end your response with:
             resource_id = key_expr.split('/')[-1]
             
             # Fetch resource from registry
-            resource = self.world_map.resource_registry.get(resource_id)
+            resource = self.resource_manager.get_resource(resource_id)
             if not resource:
                 raise ValueError(f"Resource {resource_id} not found")
             
@@ -1934,411 +1513,17 @@ end your response with:
             }
             query.reply(query.key_expr, json.dumps(error_response).encode('utf-8'))
     
-    def handle_terrain_query(self, query):
-        """Handle terrain queries"""
-        try:
-            # Get terrain information
-            terrain_info = {
-                'width': self.world_map.width,
-                'height': self.world_map.height,
-                'terrain_types': [t.name for t in self.world_map.terrain_types]
-            }
-            
-            response = {
-                'success': True,
-                'terrain': terrain_info
-            }
-            query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
-        except Exception as e:
-            logger.error(f"Error handling terrain query: {e}")
-            error_response = {
-                'success': False,
-                'error': str(e)
-            }
-            query.reply(query.key_expr, json.dumps(error_response).encode('utf-8'))
     
-    def handle_random_location_by_resource(self, query):
-        """Handle random location by resource queries"""
-        try:
-            # Extract resource name from query key
-            key_parts = str(query.key_expr).split('/')
-            resource_name = key_parts[-1] if len(key_parts) > 0 else None
-            
-            if not resource_name:
-                raise ValueError("No resource name provided")
-            
-            location = self.world_map.random_location_by_resource(resource_name)
-            if location:
-                response = {
-                    'success': True,
-                    'resource': resource_name,
-                    'location': location
-                }
-            else:
-                response = {
-                    'success': False,
-                    'error': f"No location found for resource '{resource_name}'"
-                }
-            
-            query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
-        except Exception as e:
-            logger.error(f"Error handling random location query: {e}")
-            error_response = {
-                'success': False,
-                'error': str(e)
-            }
-            query.reply(query.key_expr, json.dumps(error_response).encode('utf-8'))
-    
-    def handle_random_location_by_terrain(self, query):
-        """Handle random location by terrain queries"""
-        try:
-            # Extract terrain name from query key
-            key_parts = str(query.key_expr).split('/')
-            terrain_name = key_parts[-1] if len(key_parts) > 0 else None
-            
-            if not terrain_name:
-                raise ValueError("No terrain name provided")
-            
-            location = self.world_map.random_location_by_terrain(terrain_name)
-            if location:
-                response = {
-                    'success': True,
-                    'terrain': terrain_name,
-                    'location': location
-                }
-            else:
-                response = {
-                    'success': False,
-                    'error': f"No location found for terrain '{terrain_name}'"
-                }
-            
-            query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
-        except Exception as e:
-            logger.error(f"Error handling random terrain location query: {e}")
-            error_response = {
-                'success': False,
-                'error': str(e)
-            }
-            query.reply(query.key_expr, json.dumps(error_response).encode('utf-8'))
-    
-    def handle_agent_register(self, query):
-        """Handle agent registration"""
-        try:
-            # Extract character name from query key
-            key_parts = str(query.key_expr).split('/')
-            character_name = key_parts[-1] if len(key_parts) > 0 else None
-            
-            if not character_name:
-                raise ValueError("No character name provided")
-            
-            # Check if agent already exists (case-insensitive)
-            canonical_character_name = character_name.capitalize()
-            if canonical_character_name in self.agent_registry:
-                response = {
-                    'success': False,
-                    'error': f"Agent for character '{character_name}' already registered"
-                }
-            else:
-                # Find a random valid location for the agent
-                location = self.world_map.random_location_by_terrain("Clearing")
-                if not location:
-                    # Fallback to center of map using actual map dimensions
-                    location = (self.world_map.width // 2, self.world_map.height // 2)
-                
-                # Create agent instance
-                agent = MapAgent(location[0], location[1], self.world_map, canonical_character_name)
-                
-                # Register agent with world map
-                self.world_map.register_agent(agent)
-                
-                # Store in our registry
-                self.agent_registry[canonical_character_name] = agent
-                
-                # Initialize visibility tracking for this agent
-                self.agent_visibility[canonical_character_name] = set()
-                
-                response = {
-                    'success': True,
-                    'character_name': canonical_character_name,
-                    'location': location,
-                    'message': f"Agent registered at {location}"
-                }
-                
-                logger.info(f"Agent registered for character '{canonical_character_name}' at {location}")
-            
-            query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
-            
-        except Exception as e:
-            logger.error(f"Error handling agent registration: {e}")
-            error_response = {
-                'success': False,
-                'error': str(e)
-            }
-            query.reply(query.key_expr, json.dumps(error_response).encode('utf-8'))
-    
-    def handle_agent_look(self, query):
-        """Handle agent look command"""
-        try:
-            logger.info(f'Handling agent look command for {query.key_expr}')
-            # Extract character name from query key
-            key_parts = str(query.key_expr).split('/')
-            character_name = key_parts[-2] if len(key_parts) > 1 else None
-            
-            if not character_name:
-                raise ValueError("No character name provided")
-            
-            # Get agent from registry (case-insensitive)
-            canonical_character_name = character_name.capitalize()
-            if canonical_character_name not in self.agent_registry:
-                response = {
-                    'success': False,
-                    'error': f"Agent for character '{character_name}' not found"
-                }
-            else:
-                agent: MapAgent = self.agent_registry[canonical_character_name]
-                
-                # Call agent's look method
-                look_result = agent.look()
-                view = {}
-                for dir in ['Current','North', 'Northeast', 'East', 'Southeast', 
-                        'South', 'Southwest', 'West', 'Northwest']:
-                    dir_obs = self.world_map.extract_direction_info(look_result, dir)
-                    view[dir] = dir_obs
-
-                view_text, resources, characters, paths, percept_summary = self.world_map.hash_direction_info(view, distance_threshold=16)
-                
-                response = {
-                    'success': True,
-                    'character_name': canonical_character_name,
-                    'look_result': view_text,
-                    'location': [agent.x, agent.y],
-                    'characters': list(set(characters)),
-                    'paths': list(set(paths)),
-                }
-            
-            query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
-            logger.info(f'Agent look command handled for {query.key_expr}')
-            
-        except Exception as e:
-            traceback.print_exc()
-            logger.error(f"Error handling agent look: {e}")
-            error_response = {
-                'success': False,
-                'error': str(e)
-            }
-            query.reply(query.key_expr, json.dumps(error_response).encode('utf-8'))
-    
-    def handle_agent_move(self, query):
-        """Handle agent move command"""
-        try:
-            # Extract character name from query key
-            key_parts = str(query.key_expr).split('/')
-            character_name = key_parts[-2] if len(key_parts) > 1 else None
-            
-            if not character_name:
-                raise ValueError("No character name provided")
-            
-            # Parse direction from query payload
-            direction = 'current'  # Default direction
-            try:
-                if query.payload:
-                    payload = query.payload.to_bytes().decode('utf-8')
-                    data = json.loads(payload) if payload else {}
-                    direction = data.get('direction', 'current')
-            except Exception as e:
-                logger.error(f"Could not parse move payload, using default direction: {e}")
-            
-            # Get agent from registry (case-insensitive)
-            canonical_character_name = character_name.capitalize()
-            if canonical_character_name not in self.agent_registry:
-                response = {
-                    'success': False,
-                    'error': f"Agent for character '{character_name}' not found"
-                }
-            else:
-                agent: MapAgent = self.agent_registry[canonical_character_name]
-                
-                # Call agent's move method
-                move_result = agent.move(direction)
-                
-                # Check for visibility changes after movement
-                self.check_visibility_changes(canonical_character_name)
-                
-                response = {
-                    'success': True,
-                    'character_name': canonical_character_name,
-                    'direction': direction,
-                    'move_result': move_result
-                }
-            
-            query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
-            
-        except Exception as e:
-            logger.error(f"Error handling agent move: {e}")
-            error_response = {
-                'success': False,
-                'error': str(e)
-            }
-            query.reply(query.key_expr, json.dumps(error_response).encode('utf-8'))
 
 
-    def handle_agent_move_to(self, query):
-        """Handle agent move-to-resource command (instance-only)."""
-        try:
-            # Extract character name from query key
-            key_parts = str(query.key_expr).split('/')
-            character_name = key_parts[-2] if len(key_parts) > 1 else None
-            if not character_name:
-                raise ValueError("No character name provided")
-
-            canonical_character_name = character_name.capitalize()
-            if canonical_character_name not in self.agent_registry:
-                response = {
-                    'success': False,
-                    'error': f"Agent for character '{character_name}' not found"
-                }
-                query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
-                return
-
-            # Parse payload for resource instance name
-            resource_name = None
-            if query.payload:
-                try:
-                    payload = query.payload.to_bytes().decode('utf-8')
-                    data = json.loads(payload) if payload else {}
-                    resource_name = data.get('resource_name')
-                except Exception:
-                    resource_name = None
-            if not resource_name:
-                response = {'success': False, 'error': 'Missing resource_name in payload'}
-                query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
-                return
-
-            # Resolve instance by name and move
-            resource = self.world_map.get_resource_by_name(resource_name)
-            if not resource:
-                response = {
-                    'success': False,
-                    'error': f"Resource '{resource_name}' not found"
-                }
-                query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
-                return
-
-            resource_id = resource.get('name')
-            agent: MapAgent = self.agent_registry[canonical_character_name]
-            ok = agent.move_to_resource(resource_id)
-
-            if ok:
-                response = {
-                    'success': True,
-                    'location': [agent.x, agent.y]
-                }
-            else:
-                response = {
-                    'success': False,
-                    'error': 'Failed to move to resource'
-                }
-
-            query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
-        except Exception as e:
-            logger.error(f"Error handling agent move_to: {e}")
-            error_response = {
-                'success': False,
-                'error': str(e)
-            }
-            query.reply(query.key_expr, json.dumps(error_response).encode('utf-8'))
-
-
-    def handle_agent_use_path(self, query):
-        """Handle agent use_path command"""
-        try:
-            # Extract character name from query key
-            key_parts = str(query.key_expr).split('/')
-            character_name = key_parts[3] if len(key_parts) > 3 else None
-            if not character_name:
-                raise ValueError("No character name provided")
-
-            canonical_character_name = character_name.capitalize()
-            if canonical_character_name not in self.agent_registry:
-                response = {
-                    'success': False,
-                    'error': f"Agent for character '{character_name}' not found"
-                }
-            else:
-                agent = self.agent_registry[canonical_character_name]
-                # Parse path_id from payload
-                path_id = None
-                if query.payload:
-                    payload = query.payload.to_bytes().decode('utf-8')
-                    try:
-                        data = json.loads(payload)
-                        path_id = data.get('path_id')
-                    except Exception:
-                        path_id = None
-                if not path_id:
-                    response = {'success': False, 'error': 'Missing path_id'}
-                else:
-                    ok = agent.use_path(path_id)
-                    response = {
-                        'success': bool(ok),
-                        'location': [agent.x, agent.y]
-                    }
-
-            query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
-        except Exception as e:
-            logger.error(f"Error handling agent use_path: {e}")
-            error_response = {
-                'success': False,
-                'error': str(e)
-            }
-            query.reply(query.key_expr, json.dumps(error_response).encode('utf-8'))
-    
     def handle_map_types(self, query):
-        """Handle map types query - returns available terrain, infrastructure, property, resource types, and skill instances"""
+        """Handle map types query - returns infospace type metadata."""
         try:
-            # Get map types from the world map - extract enum member names
-            terrain_types = []
-            if self.world_map.terrain_types:
-                if hasattr(self.world_map.terrain_types, '__members__'):
-                    terrain_types = list(self.world_map.terrain_types.__members__.keys())
-                else:
-                    terrain_types = [t.name for t in self.world_map.terrain_types]
-            
+            terrain_types = ['InfoSpace']
             infrastructure_types = []
-            if self.world_map.infrastructure_types:
-                if hasattr(self.world_map.infrastructure_types, '__members__'):
-                    infrastructure_types = list(self.world_map.infrastructure_types.__members__.keys())
-                else:
-                    infrastructure_types = [t.name for t in self.world_map.infrastructure_types]
-            
             property_types = []
-            if self.world_map.property_types:
-                if hasattr(self.world_map.property_types, '__members__'):
-                    property_types = list(self.world_map.property_types.__members__.keys())
-                else:
-                    property_types = [t.name for t in self.world_map.property_types]
-            
-            resource_types = []
-            if self.world_map.resource_types:
-                if hasattr(self.world_map.resource_types, '__members__'):
-                    resource_types = list(self.world_map.resource_types.__members__.keys())
-                else:
-                    resource_types = [t.name for t in self.world_map.resource_types]
-            
-            # Get skill instances with name, description, and type_name
+            resource_types = list(self.resource_manager.resource_types.__members__.keys())
             skills = []
-            for resource_id, resource_data in self.world_map.resource_registry.items():
-                res_type = resource_data.get('type')
-                res_type_name = getattr(res_type, 'name', str(res_type))
-                
-                if res_type_name.lower() == 'skill':
-                    props = resource_data.get('properties', {})
-                    skill_info = {
-                        'name': resource_data.get('name', resource_id),
-                        'description': resource_data.get('description', ''),
-                        'type_name': props.get('tool_name', '')
-                    }
-                    skills.append(skill_info)
             
             response = {
                 'success': True,
@@ -2351,8 +1536,6 @@ end your response with:
             }
             
             query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
-            logger.info(f'🗺️ Map types query: returned {len(terrain_types)} terrain, {len(infrastructure_types)} infrastructure, {len(property_types)} property, {len(resource_types)} resource types, {len(self.agent_registry)} characters, {len(skills)} skills')
-            
         except Exception as e:
             logger.error(f'Error handling map types query: {e}')
             error_response = {
@@ -2406,14 +1589,12 @@ end your response with:
     def handle_simulation_time(self, query):
         """Handle simulation time query - returns current datetime, season, period, and weather"""
         try:
-            # For now, return stub data with constants
-            # TODO: Implement actual time progression and weather simulation
-            if type(self.world_map.datetime) != datetime:
-                # Use a reasonable default simulation time instead of real-world time
-                default_time = datetime(2024, 6, 15, 12, 0, 0)  # Midday, summer
-                self.world_map.datetime = default_time
+            current_time = self.resource_manager.simulation_time
+            if not isinstance(current_time, datetime):
+                current_time = datetime(2024, 6, 15, 12, 0, 0)
+                self.resource_manager.set_simulation_time(current_time)
             
-            time_info = self.calculate_time_info(self.world_map.datetime)
+            time_info = self.calculate_time_info(current_time)
             
             # Stub weather data
             weather = "sunny"  # TODO: Implement weather simulation
@@ -2504,11 +1685,10 @@ end your response with:
             else:
                 logger.info(f"⏰ No time proposals, using default: {advance_minutes}min")
             
-            # Advance the simulation time
             if advance_minutes > 0:
-                old_datetime = self.world_map.datetime
+                old_datetime = self.resource_manager.simulation_time
                 new_datetime = old_datetime + timedelta(minutes=advance_minutes)
-                self.world_map.datetime = new_datetime
+                self.resource_manager.set_simulation_time(new_datetime)
                 
                 # Calculate time_info for old and new times
                 old_time_info = self.calculate_time_info(old_datetime)
@@ -2539,131 +1719,6 @@ end your response with:
         except Exception as e:
             logger.error(f"Error advancing simulation time: {e}")
     
-    def check_visibility_changes(self, moved_agent_name):
-        """Check if the moved agent is now visible to other agents"""
-        try:
-            if moved_agent_name not in self.agent_registry:
-                return
-            
-            moved_agent = self.agent_registry[moved_agent_name]
-            
-            # Get current visibility from moved agent's perspective
-            # This will reveal all agents that can see the moved agent
-            current_visibility = set()
-            
-            # Check each other agent to see if they can see the moved agent
-            for other_agent_name, other_agent in self.agent_registry.items():
-                if other_agent_name == moved_agent_name:
-                    continue
-                
-                # Check if other agent can see the moved agent
-                # We'll use a simple distance-based check for now
-                if self.can_agent_see_agent(other_agent, moved_agent):
-                    current_visibility.add(other_agent_name)
-            
-            # Check for new detections
-            previous_visibility = self.agent_visibility.get(moved_agent_name, set())
-            new_detections = current_visibility - previous_visibility
-            
-            # Publish events for new detections
-            for detecting_agent_name in new_detections:
-                self.publish_agent_detected_event(detecting_agent_name, moved_agent_name)
-            
-            # Update visibility tracking
-            self.agent_visibility[moved_agent_name] = current_visibility
-            
-            if new_detections:
-                logger.info(f"Agent '{moved_agent_name}' is now visible to: {new_detections}")
-                
-        except Exception as e:
-            logger.error(f"Error checking visibility changes for {moved_agent_name}: {e}")
-    
-    def can_agent_see_agent(self, observer_agent, target_agent):
-        """Check if observer_agent can see target_agent"""
-        try:
-            # Get positions
-            observer_pos = (observer_agent.x, observer_agent.y)
-            target_pos = (target_agent.x, target_agent.y)
-            
-            # Calculate distance
-            distance = self.calculate_distance(observer_pos, target_pos)
-            
-            # Simple visibility: within 10 units and line of sight
-            if distance <= 10:
-                # Check line of sight (simplified - just check if path is clear)
-                return self.has_line_of_sight(observer_pos, target_pos)
-            
-            return False
-            
-        except Exception as e:
-            logger.error(f"Error checking agent visibility: {e}")
-            return False
-    
-    def calculate_distance(self, pos1, pos2):
-        """Calculate Manhattan distance between two positions"""
-        return abs(pos1[0] - pos2[0]) + abs(pos1[1] - pos2[1])
-    
-    def has_line_of_sight(self, pos1, pos2):
-        """Check if there's a clear line of sight between two positions"""
-        try:
-            # Simple line of sight check - just make sure it's not blocked by water/mountains
-            x1, y1 = pos1
-            x2, y2 = pos2
-            
-            # Check points along the path
-            steps = max(abs(x2 - x1), abs(y2 - y1))
-            if steps == 0:
-                return True
-            
-            for i in range(1, steps):
-                t = i / steps
-                x = int(x1 + t * (x2 - x1))
-                y = int(y1 + t * (y2 - y1))
-                
-                # Use the map's own visibility logic instead of hardcoded terrain checks
-                if not self.world_map.is_visible(x1, y1, x, y, observer_height=5):
-                    return False
-            
-            return True
-            
-        except Exception as e:
-            logger.error(f"Error checking line of sight: {e}")
-            return True  # Default to visible if error
-    
-    def publish_agent_detected_event(self, observer_agent_name, detected_agent_name):
-        """Publish agent detection event"""
-        try:
-            detected_agent = self.agent_registry[detected_agent_name]
-            observer_agent = self.agent_registry[observer_agent_name]
-            
-            # Calculate distance
-            distance = self.calculate_distance(
-                (observer_agent.x, observer_agent.y),
-                (detected_agent.x, detected_agent.y)
-            )
-            
-            event_data = {
-                'agent_name': detected_agent_name,
-                'position': (detected_agent.x, detected_agent.y),
-                'distance': distance,
-                'timestamp': datetime.now().isoformat()
-            }
-            
-            # === ZENOH PUBLICATION (ad-hoc) ===
-            # NAME: agent_detected
-            # TOPIC: cognitive/{character}/sense/visual/agent_detected
-            # DESCRIPTION: Character detected another character within line of sight
-            # PAYLOAD: {"agent_name": str, "position": tuple, "distance": float, "timestamp": str}
-            # TRIGGERS: (social activities - greet, approach, converse)
-            # ========================
-            topic = f"cognitive/{observer_agent_name}/sense/visual/agent_detected"
-            self.session.put(topic, json.dumps(event_data).encode('utf-8'))
-            
-            logger.info(f"Published visual event: {observer_agent_name} detected {detected_agent_name} at distance {distance}")
-            
-        except Exception as e:
-            logger.error(f"Error publishing agent detected event: {e}")
-    
     def handle_character_announcement(self, sample):
         """Handle character announcement actions to create agents"""
         try:
@@ -2677,35 +1732,11 @@ end your response with:
                     # Check if agent already exists (case-insensitive)
                     canonical_character_name = character_name.capitalize()
                     if canonical_character_name not in self.agent_registry:
-                        # Determine spawn location: default (map center) or scenario-provided resource instance
-                        spawn_x, spawn_y = self.world_map.width // 2, self.world_map.height // 2
-                        character_config = data.get('character_config', {})
-                        if isinstance(character_config, dict):
-                            resource_location_name = character_config.get('location')
-                            if resource_location_name:
-                                resource = self.world_map.get_resource_by_name(resource_location_name)
-                                if resource and isinstance(resource, dict) and 'location' in resource:
-                                    try:
-                                        rx, ry = resource['location']
-                                        spawn_x, spawn_y = int(rx), int(ry)
-                                    except Exception:
-                                        logger.error(f"Invalid resource location for '{resource_location_name}' - defaulting to map center")
-                                else:
-                                    logger.error(f"Resource instance '{resource_location_name}' not found for '{canonical_character_name}' - defaulting to map center")
-
-                        # Create agent at resolved spawn point
-                        agent = MapAgent(spawn_x, spawn_y, self.world_map, canonical_character_name)
-                        
-                        # Register agent with world map
-                        self.world_map.register_agent(agent)
-                        
-                        # Store in our registry
+                        # Infospace agents have no spatial spawn; track logical presence only
+                        agent = InfospaceAgent(name=canonical_character_name)
                         self.agent_registry[canonical_character_name] = agent
                         
-                        # Initialize visibility tracking for this agent
-                        self.agent_visibility[canonical_character_name] = set()
-                        
-                        logger.info(f"Agent created for character '{canonical_character_name}' at ({agent.x},{agent.y})")
+                        logger.info(f"Infospace agent created for '{canonical_character_name}'")
                         
                         # Publish updated button states (character count changed)
                         self._publish_turn_state_update()
@@ -2956,7 +1987,7 @@ end your response with:
                 'current_world_state': self.world_state,
                 'action': json.dumps(action, indent=2) if action else '',
                 'update_text': update_text,
-                'simulation_time': self.world_map.datetime.isoformat() if self.world_map else '',
+                'simulation_time': self.resource_manager.simulation_time.isoformat(),
                 'setting': self.setting or ''
             }
             
@@ -3000,36 +2031,26 @@ end your response with:
                     if 'agents' in world_data:
                         for agent_data in world_data['agents']:
                             character_name = agent_data['character_name']
-                            x, y = agent_data['position']
-                            
-                            # Create agent at saved position
-                            agent = MapAgent(x, y, self.world_map, character_name)
-                            self.world_map.register_agent(agent)
+                            agent = InfospaceAgent(name=character_name)
                             self.agent_registry[character_name] = agent
-                            self.agent_visibility[character_name] = set()
-                            
-                            logger.info(f"📂 Restored agent {character_name} at position ({x}, {y})")
-                    
-                    # Restore world map state if available
-                    if 'world_map' in world_data:
-                        # TODO: Restore world map modifications (resources, terrain changes, etc.)
-                        logger.info("📂 World map state restored")
+                            logger.info(f"📂 Restored infospace agent {character_name}")
                     
                     # Restore simulation time if available
                     if 'simulation_time' in world_data:
                         try:
-                            self.world_map.datetime = datetime.fromisoformat(world_data['simulation_time'])
-                            logger.info(f"📂 Simulation time restored to: {self.world_map.datetime}")
+                            sim_time = datetime.fromisoformat(world_data['simulation_time'])
+                            self.resource_manager.set_simulation_time(sim_time)
+                            logger.info(f"📂 Simulation time restored to: {sim_time}")
                         except Exception as e:
                             logger.error(f"Failed to restore simulation time: {e}, using current time")
                             # Use a reasonable default simulation time instead of real-world time
                             default_time = datetime(2024, 6, 15, 12, 0, 0)  # Midday, summer
-                            self.world_map.datetime = default_time
+                            self.resource_manager.set_simulation_time(default_time)
                     else:
                         logger.info("📂 No simulation time in saved data, using current time")
                         # Use a reasonable default simulation time instead of real-world time
                         default_time = datetime(2024, 6, 15, 12, 0, 0)  # Midday, summer
-                        self.world_map.datetime = default_time
+                        self.resource_manager.set_simulation_time(default_time)
                     
                     # Restore world state if available
                     if 'world_state' in world_data:
@@ -3065,7 +2086,7 @@ end your response with:
                 'world_name': self.world_name,
                 'map_file': self.map_file,
                 'timestamp': datetime.now().isoformat(),
-                'simulation_time': self.world_map.datetime.isoformat(),
+                'simulation_time': self.resource_manager.simulation_time.isoformat(),
                 'world_state': self.world_state,
                 'agents': []
             }
@@ -3084,14 +2105,6 @@ end your response with:
             world_data['note_counter'] = resource_data['note_counter']
             world_data['collection_instances'] = resource_data['collection_instances']
             world_data['collection_counter'] = resource_data['collection_counter']
-            
-            # Save world map state
-            # TODO: Add world map modifications (resources, terrain changes, etc.)
-            world_data['world_map'] = {
-                'width': self.world_map.width,
-                'height': self.world_map.height
-                # Add more world state as needed
-            }
             
             with open(self.world_file, 'w') as f:
                 json.dump(world_data, f, indent=2)
@@ -3309,13 +2322,9 @@ end your response with:
         # Clean up agents
         for character_name, agent in self.agent_registry.items():
             try:
-                self.world_map.unregister_agent(agent)
                 logger.info(f"Unregistered agent for character: {character_name}")
             except Exception as e:
                 logger.error(f"Error unregistering agent for {character_name}: {e}")
-        
-        # Clear visibility tracking
-        self.agent_visibility.clear()
         
         # Close Zenoh session more carefully
         if self.session:
@@ -3440,7 +2449,7 @@ end your response with:
         logger.info(f"Tool request from {agent_name}: {tool_name}")
         
         # Phase 1: Return placeholder response
-        # TODO: Actually execute tools from /maps/skills/ directory
+        # TODO: Actually execute registered infospace tools
         response = {
             'status': 'success',
             'result': f"[Tool {tool_name} executed - placeholder result]"
@@ -3468,7 +2477,7 @@ end your response with:
         logger.info(f"Scan request from {agent_name}: {target}")
         
         # Get all resources and search for matches
-        resources = self.world_map.get_resource_list()
+        resources = self.resource_manager.get_resource_list()
         matching_resources = []
         
         for resource_info in resources:
@@ -3533,7 +2542,7 @@ end your response with:
                 target_x, target_y = target['location']
             else:
                 # Find resource by name
-                resources = self.world_map.get_resource_list()
+                resources = self.resource_manager.get_resource_list()
                 target_resource = None
                 
                 for resource_info in resources:
@@ -3580,8 +2589,8 @@ def signal_handler(signum, frame):
 
 def main():
     parser = argparse.ArgumentParser(description='Shared Map Node')
-    parser.add_argument('-m', '--map-file', required=True, 
-                       help='Map file name (e.g., forest.py)')
+    parser.add_argument('-m', '--map-file', required=False, default=None,
+                       help='Legacy map file name (ignored for infospace runtime)')
     parser.add_argument('-w', '--world-name', 
                        help='World name (defaults to map file name without .py)')
     parser.add_argument('-s', '--setting', 

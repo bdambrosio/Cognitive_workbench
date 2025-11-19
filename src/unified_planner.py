@@ -70,7 +70,7 @@ class UnifiedPlanner:
         """Load base tools + map-specific tools (map overrides base on name collision)."""
         from utils.tool_loader import load_tools
         
-        maps_base = Path(__file__).parent / 'maps'
+        maps_base = Path(__file__).parent
         tools = {}
         
         # Load base tools first

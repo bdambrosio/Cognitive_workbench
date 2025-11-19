@@ -6,6 +6,7 @@ import subprocess
 import sys
 import time
 import traceback
+from pathlib import Path
 
 import zenoh
 from zenoh import ConsolidationMode, QueryTarget
@@ -52,9 +53,17 @@ def _ensure_map_types(session, scenario: dict):
     map_process = None
     try:
         map_args = [sys.executable, 'map_node.py']
+        world_label = None
         map_file = scenario.get('map', None) if isinstance(scenario, dict) else None
         if map_file:
-            map_args.extend(['-m', map_file])
+            candidate = Path(map_file)
+            if candidate.exists():
+                map_args.extend(['-m', str(candidate)])
+            world_label = Path(map_file).stem
+        if not world_label:
+            world_label = scenario.get('scenario_id') if isinstance(scenario, dict) else None
+        if world_label:
+            map_args.extend(['-w', world_label])
         env = os.environ.copy()
         # Respect CWB_DEBUG passthrough
         if env.get('CWB_DEBUG', ''):
@@ -247,5 +256,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
-

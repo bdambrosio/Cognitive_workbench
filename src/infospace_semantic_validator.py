@@ -37,8 +37,8 @@ class InfospaceSemanticValidator:
         Initialize validator.
         
         Args:
-            tools_dir: Optional path to map-specific tools directory (e.g., maps/infolab/tools).
-                      Always loads maps/tools first, then map-specific tools if provided.
+            tools_dir: Optional path to an additional tools directory (e.g., data/tools/custom).
+                      Always loads the default infospace tools first, then custom tools if provided.
             llm_server: LLM server name
             llm_model: LLM model name
         """
@@ -252,8 +252,8 @@ if __name__ == "__main__":
     if len(sys.argv) < 2:
         print("Usage: python3 infospace_semantic_validator.py <plan.json> [tool-dir]")
         print("  plan.json: Path to plan JSON file")
-        print("  tool-dir: Optional map-specific tools directory (e.g., maps/infolab/tools)")
-        print("           Always loads maps/tools base tools first")
+        print("  tool-dir: Optional custom tools directory (e.g., data/tools/custom)")
+        print("           Always loads the built-in infospace tools first")
         sys.exit(1)
     
     plan_path = Path(sys.argv[1])
@@ -277,4 +277,3 @@ if __name__ == "__main__":
     else:
         print("✅ Plan is semantically valid")
         sys.exit(0)
-

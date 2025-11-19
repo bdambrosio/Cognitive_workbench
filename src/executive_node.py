@@ -145,15 +145,6 @@ class ZenohExecutiveNode:
         self.action_publisher = self.session.declare_publisher(f"cognitive/{character_name}/action")
 
         # === ZENOH PUBLICATION ===
-        # NAME: situation_request_update
-        # TOPIC: cognitive/{character}/situation/request_update
-        # DESCRIPTION: Character requests situation update from situation node
-        # PAYLOAD: {"timestamp": str}
-        # TRIGGERS: (internal)
-        # ========================
-        self.map_update_request_publisher = self.session.declare_publisher(f"cognitive/{character_name}/situation/request_update")
-        
-        # === ZENOH PUBLICATION ===
         # NAME: plan_log
         # TOPIC: cognitive/{character}/planning/plan_log
         # DESCRIPTION: Plan execution log entry for analytics
@@ -500,7 +491,6 @@ class ZenohExecutiveNode:
             # Announce character presence
             self._announce_character()
             time.sleep(0.1)
-            self.map_update_request_publisher.put(json.dumps({'type': 'announcement look'}))
             time.sleep(1.0)
             
             # Start OODA loop
@@ -830,7 +820,6 @@ class ZenohExecutiveNode:
             # Tick local physiology/state using global simulation time if available
             self._ooda_housekeeping()
             # Request fresh situation update for UI
-            self.map_update_request_publisher.put(json.dumps({'type': 'ooda observe'}))
             time.sleep(0.1)
             # Observe: Collect current situation and sense data
             observations = self._observe()
@@ -1130,7 +1119,6 @@ class ZenohExecutiveNode:
                 other_characters_str += f"\n\t{other_character_name}: {other_character_desc}"
         character_names = list(self.character_config.get("characters", {}).keys())
 
-        self.map_update_request_publisher.put(json.dumps({'type': 'goal_look'}))
         map_types_str = format_map_types(self.map_types)
         if self.ontology:
             ontology_nouns_str = f"#ABSTRACT NOUNS:\n{'\n'.join(self.ontology['nouns'])}\n"
@@ -2135,15 +2123,10 @@ end your response with </end>
                     action_record.outcome_status = 'failure'
                     action_record.failure_code = 'target_not_visible or 0 distance'
                 # Request situation/map update for UI immediately after move
-                try:
-                    self.map_update_request_publisher.put(json.dumps({'type': 'step_look'}))
-                except Exception:
-                    pass
                 return True
             else:
                 logger.error(f'❌ Cannot move toward "{move_target}" - target not resolved or visible, choosing random direction')
                 self.move(random.choice(cardinal_directions))
-                self.map_update_request_publisher.put(json.dumps({'type': 'step_look'}))
                 self._snapshot_physiology(action_record)
                 action_record.outcome_status = 'success'
                 action_record.failure_code = None
@@ -2700,11 +2683,6 @@ end your response with </end>
             return False
 
         # Request situation/map update for UI after non-move actions that may affect visibility/adjacency
-        try:
-            if action['type'].lower() in ["take", "inspect", "use", "create"]:
-                self.map_update_request_publisher.put(json.dumps({'type': 'step_look'}))
-        except Exception:
-            pass
 
         # Finalize timing and outcome inference
         action_record.ended_at = datetime.now()
