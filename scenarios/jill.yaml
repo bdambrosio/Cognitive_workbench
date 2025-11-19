@@ -2,7 +2,8 @@ map: infolab.py
 # Cognitive Workbench Configuration
 llm_config:
   server_name: "vllm"
-  model_name: "qwen/qwen3-235b-a22b-2507"
+  model_name: "qwen/Qwen2.5-14B-Instruct-FP8"
+  sgl_model_path: "/home/bruce/vllm/models/Qwen3-Coder-30B-A3B-Instruct"
 
 setting: |
   Cognitive Workbench, a virtual modern Computer Science /AI grad lab cyberspace with workplaces for several graduate students and a postdoc research associate, Jill.

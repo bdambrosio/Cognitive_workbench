@@ -157,7 +157,6 @@ class MapNode:
             self.resource_manager = InfospaceResourceManager(self.world_name)
             logger.info("Infospace resource manager initialized")
 
-            self.resource_manager.initialize_system_collections()
             self.load_world_data()
             self.create_note_null()
         except Exception as e:
@@ -195,7 +194,6 @@ class MapNode:
             }
             
             self.resource_manager.resource_registry[note_id] = resource_data
-            self.resource_manager.add_note_to_system_collection(note_id)
             
             logger.info("Created system resource: %s", note_id)
             

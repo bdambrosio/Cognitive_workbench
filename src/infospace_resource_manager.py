@@ -542,9 +542,6 @@ class InfospaceResourceManager:
         
         # Resource indexer for Stage 0 retrieval
         self.resource_indexer = ResourceIndexer(self)
-        
-        # System collections
-        self.system_notes_collection_id: Optional[str] = None  # ID of the "Notes" system collection
 
     # ==================== Core Accessors ====================
 
@@ -634,8 +631,6 @@ class InfospaceResourceManager:
 
         self.vector_stores.pop(collection_id, None)
         self.collection_indexes.pop(collection_id, None)
-        if collection_id == self.system_notes_collection_id:
-            self.system_notes_collection_id = None
 
     def _cleanup_note(self, note_id: str):
         """Remove a note from named registries and collections."""
@@ -654,16 +649,6 @@ class InfospaceResourceManager:
             if isinstance(content, list) and note_id in content:
                 props['content'] = [nid for nid in content if nid != note_id]
                 props['item_count'] = len(props['content'])
-
-        # Remove from system Notes collection if needed
-        if self.system_notes_collection_id:
-            system_collection = self.resource_registry.get(self.system_notes_collection_id)
-            if system_collection:
-                props = system_collection.get('properties', {})
-                content = props.get('content', [])
-                if isinstance(content, list) and note_id in content:
-                    props['content'] = [nid for nid in content if nid != note_id]
-                    props['item_count'] = len(props['content'])
 
     def _remove_named_reference(self, resource_id: str, type_name: str, resource: Dict[str, Any]):
         """Best-effort cleanup of named lookups."""
@@ -717,63 +702,6 @@ class InfospaceResourceManager:
             from sentence_transformers import SentenceTransformer
             self.embedder = SentenceTransformer('all-MiniLM-L6-v2')
             logger.info("Initialized embedding model: all-MiniLM-L6-v2")
-    
-    # ==================== System Collections ====================
-    
-    def initialize_system_collections(self):
-        """
-        Initialize system collections at startup.
-        
-        Creates the "Notes" collection that holds all note instances.
-        This collection is recreated at startup, so non-persistent notes
-        are automatically removed.
-        """
-        # Create the "Notes" system collection
-        success, collection_id, error_msg, location = self.create_collection(
-            character_name=None,  # System collection
-            content=[],  # Empty at creation
-            format_type='list',
-            source_skill='system',
-            source_value='',
-            collection_name='Notes',
-            extra_props={'kind': 'system'}
-        )
-        
-        if success:
-            self.system_notes_collection_id = collection_id
-            
-            # Mark as indexed for auto-indexing when notes are added
-            self.collection_indexes[collection_id] = collection_id
-            
-            # Create initial empty vector store so auto-indexing works during Note restoration
-            self.vector_stores[collection_id] = FAISSStore(dimension=384)
-            
-            logger.info(f"📚 System 'Notes' collection created and marked for indexing: {collection_id}")
-        else:
-            logger.error(f"❌ Failed to create system 'Notes' collection: {error_msg}")
-    
-    def add_note_to_system_collection(self, note_id: str):
-        """
-        Add a note to the system "Notes" collection.
-        
-        Args:
-            note_id: ID of the note to add
-        """
-        if not self.system_notes_collection_id:
-            logger.warning("System 'Notes' collection not initialized, skipping add")
-            return
-        
-        # Add to the Notes collection (will auto-index due to collection_indexes)
-        success, item_count, error_msg = self.add_to_collection(
-            collection_id=self.system_notes_collection_id,
-            note_id=note_id,
-            agent_name='system',
-            operation='add',
-            content=None
-        )
-        
-        if not success:
-            logger.warning(f"Failed to add {note_id} to Notes collection: {error_msg}")
     
     # ==================== Note Creation ====================
     
@@ -860,9 +788,6 @@ class InfospaceResourceManager:
             logger.info(f"📝 Created named Note: '{note_name}' = {note_id} by {canonical_character_name}")
         else:
             logger.info(f"📝 Created Note instance: {note_id} by {canonical_character_name}")
-        
-        # Auto-add to system "Notes" collection
-        self.add_note_to_system_collection(note_id)
         
         # Index the Note immediately (for Stage 0 retrieval)
         self.resource_indexer.index_note(note_id, commentary="")
@@ -1531,8 +1456,6 @@ class InfospaceResourceManager:
                         note_name = info_data.get('properties', {}).get('note_name')
                         if note_name:
                             self.named_notes[note_name] = info_id
-                        
-                        self.add_note_to_system_collection(info_id)
                     
                     logger.info(f"📂 Restored {len(instances)} Note instances, counter at {self.note_counter}")
             except Exception as e:

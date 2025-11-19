@@ -132,11 +132,19 @@ class UnifiedPlanner:
                 
                 if HAS_SGLANG:
                     self.logger.info("Using incremental SGLang planner for Jill")
+                    
+                    # Get SGLang model path from config
+                    sgl_model_path = context.get('sgl_model_path')
+                    if not sgl_model_path and hasattr(self.character, 'character_config'):
+                        llm_config = self.character.character_config.get('llm_config', {})
+                        sgl_model_path = llm_config.get('sgl_model_path')
+                    
                     incremental_planner = IncrementalPlanner(
                         executor=executor,
                         available_tools=self.available_tools,
                         primitives_reference=INFOSPACE_PRIMITIVES_REFERENCE,
-                        logger_instance=self.logger
+                        logger_instance=self.logger,
+                        sgl_model_path=sgl_model_path
                     )
                     plan_result = incremental_planner.generate_plan(goal=goal, context=context, max_steps=24)
                     if not plan_result.get('error'):

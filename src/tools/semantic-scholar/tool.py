@@ -143,7 +143,8 @@ def _search_papers_direct(query: str, limit: int, api_key: str = None) -> List[D
                     "venue": venue,
                     "paper_id": paper_id,
                     "doi": doi,
-                    "pdf_url": pdf_url
+                    "pdf_url": pdf_url,
+                    "uri": pdf_url  # Standardized URI field for consistency with query-web and search primitives
                 },
                 "char_count": len(abstract)
             }
