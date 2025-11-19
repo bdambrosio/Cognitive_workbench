@@ -18,6 +18,18 @@ logger = logging.getLogger(__name__)
 config = zenoh.Config()
 zenoh_session = zenoh.open(config)
 
+# Module-level cached embedder (shared across all summarize tool calls)
+_embedder = None
+
+def _get_embedder():
+    """Get or initialize the shared SentenceTransformer embedder."""
+    global _embedder
+    if _embedder is None:
+        from sentence_transformers import SentenceTransformer
+        _embedder = SentenceTransformer('all-MiniLM-L6-v2')
+        logger.info("Initialized shared embedding model for summarize tool")
+    return _embedder
+
 
 def _get_content(resource_id: str) -> any:
     """Fetch content from map_node for a resource ID."""
@@ -111,11 +123,10 @@ def _semantic_filter_direct(text_content: str, focus: str, target_tokens: int) -
         Filtered text containing most relevant chunks
     """
     try:
-        from sentence_transformers import SentenceTransformer
         import numpy as np
         
-        # Initialize embedder (cached at module level would be better, but KISS)
-        embedder = SentenceTransformer('all-MiniLM-L6-v2')
+        # Use shared module-level embedder
+        embedder = _get_embedder()
         
         # Chunk the text (paragraph-first, then sentences)
         chunks = []
