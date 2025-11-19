@@ -2,12 +2,13 @@
 name: semantic-scholar
 type: python
 trusted: true
-description: Search academic papers. Returns Collection of JSON Notes with fields text, metadata.title, metadata.authors, metadata.year, metadata.citations, metadata.pdf_url, metadata.venue (Level 4 tool).
+description: "Search academic papers. Returns Collection of JSON Notes with fields text, metadata.title, metadata.authors, metadata.year, metadata.citations, metadata.uri (alias: pdf_url), metadata.venue (Level 4 tool)."
 parameters:
   source: args.query
 examples:
   - '{"type":"semantic-scholar","args":{"query":"transformer architecture"},"out":"$papers","expect":"should find papers on transformers"}'
   - '{"type":"project","target":"$papers","fields":["metadata.title","metadata.year"],"out":"$titles"}'
+  - '{"type":"project","target":"$papers","fields":["metadata.uri"],"out":"$urls"}'
   - '{"type":"filter-structured","target":"$papers","where":"metadata.citations > 100","out":"$high_impact"}'
 ---
 
@@ -20,8 +21,8 @@ examples:
 - Collection ID containing one structured Note per paper result
 - Each Note contains JSON with uniform structure:
   - `text` (abstract)
-  - `metadata` (title, authors, pdf_url, citations, year, venue, etc.)
-  - `metadata.pdf_url` may be null for paywalled papers
+  - `metadata` (title, authors, uri/pdf_url, citations, year, venue, etc.)
+  - `metadata.uri` (alias: `metadata.pdf_url`) may be null for paywalled papers
 
 ```json
 {
@@ -34,6 +35,7 @@ examples:
     "citations": 75000,
     "venue": "NeurIPS",
     "pdf_url": "https://arxiv.org/pdf/1706.03762.pdf",
+    "uri": "https://arxiv.org/pdf/1706.03762.pdf",
     "paper_id": "...",
     "doi": "..."
   },
@@ -58,7 +60,7 @@ Results are already a Collection - summarize directly (NO expand needed):
 Extract PDF URLs using project, then fetch full text:
 ```json
 {"type":"semantic-scholar","args":{"query":"GPT architecture"},"out":"$papers","expect":"should find GPT papers"}
-{"type":"project","target":"$papers","fields":["metadata.pdf_url"],"out":"$urls"}
+{"type":"project","target":"$papers","fields":["metadata.uri"],"out":"$urls"}
 {"type":"map","target":"$urls","operation":"fetch-text","out":"$full_texts"}
 ```
 

@@ -62,7 +62,7 @@ Argument Conventions:
 - Variable references: Use "$variable" to resolve Note/Collection content
 - Output names: In "out" fields, use "$variable" syntax (e.g., "out":"$result")
 - Tools: Use tool name directly as action type (e.g., {"type":"tool-name",...})
-- Resource names: Case-sensitive (e.g., "Notes" is the system collection of all Notes, not "notes")
+- Resource names: Case-sensitive
 
 CONSTRAINTS
 - Use only primitives / tools listed in the AVAILABLE ACTIONS and TOOLS sections.
@@ -172,7 +172,7 @@ Pattern: Level 4 Structured Data Operations (SQL-like)
   {"type":"project","target":"$collection","fields":["field1","nested.field2"],"out":"$subset"}
   
   pluck - Extract single field value from each Note (for tools needing scalar values):
-  {"type":"pluck","target":"$collection","field":"metadata.url","out":"$urls"}
+  {"type":"pluck","target":"$collection","field":"metadata.uri","out":"$urls"}
   
   filter-structured - Deterministic WHERE clause for structured Notes (no LLM):
   {"type":"filter-structured","target":"$collection","where":"field > 100","out":"$filtered"}

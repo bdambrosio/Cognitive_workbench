@@ -32,11 +32,12 @@ warnings.filterwarnings('ignore', category=UserWarning, module='unstructured')
 
 def tool(url_or_content: str, **kwargs) -> str:
     """
-    Fetch text from URL or base64 PDF. Auto-detects format and extracts all text.
-    Collection-aware: If input is Collection ID, fetches first item's URL.
+    Fetch text from URL, base64 PDF, Note ID, or Collection ID. Auto-detects format and extracts all text.
+    Collection-aware: If input is Collection ID, fetches first item's content.
+    Note-aware: If input is Note ID, retrieves Note's content directly.
     
     Args:
-        url_or_content: URL string, base64-encoded PDF content, or Collection ID
+        url_or_content: URL string, base64-encoded PDF content, Note ID, or Collection ID
         
     Returns:
         JSON string with text, format, metadata, page_count (if PDF), char_count
@@ -44,33 +45,136 @@ def tool(url_or_content: str, **kwargs) -> str:
     if not url_or_content or not isinstance(url_or_content, str):
         return json.dumps({"error": "url_or_content parameter required"})
     
+    # Check if input is Note ID - retrieve Note content directly
+    if url_or_content.startswith('Note_'):
+        try:
+            resource_mgr = kwargs.get('resource_manager')
+            world_map = kwargs.get('world_map')
+            
+            # Try to get resource manager or world_map
+            if resource_mgr:
+                note_content = resource_mgr.get_resource(url_or_content)
+                if note_content:
+                    content = note_content.get('properties', {}).get('content', '')
+                else:
+                    return json.dumps({"error": f"Note {url_or_content} not found"})
+            elif world_map and hasattr(world_map, 'resource_registry'):
+                note = world_map.resource_registry.get(url_or_content)
+                if note:
+                    content = note.get('properties', {}).get('content', '')
+                else:
+                    return json.dumps({"error": f"Note {url_or_content} not found"})
+            else:
+                # Try Zenoh query as fallback
+                import zenoh
+                from zenoh import QueryTarget, ConsolidationMode
+                config = zenoh.Config()
+                session = zenoh.open(config)
+                try:
+                    for reply in session.get(
+                        f"cognitive/map/resource/{url_or_content}",
+                        target=QueryTarget.BEST_MATCHING,
+                        consolidation=ConsolidationMode.NONE,
+                        timeout=5.0
+                    ):
+                        if reply.ok:
+                            response = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
+                            if response.get('success'):
+                                if 'resource' in response:
+                                    resource_data = response.get('resource')
+                                    content = resource_data.get('properties', {}).get('content', '')
+                                else:
+                                    content = response.get('content', '')
+                                break
+                        else:
+                            return json.dumps({"error": f"Note {url_or_content} not found"})
+                    else:
+                        return json.dumps({"error": f"Note {url_or_content} not found"})
+                finally:
+                    session.close()
+            
+            # If content is structured JSON (from query-web/semantic-scholar), extract text field
+            if isinstance(content, dict):
+                # Check if it's a structured Note with 'text' field
+                if 'text' in content:
+                    # Return the structured content as-is (already has text, format, metadata, char_count)
+                    return json.dumps(content)
+                else:
+                    # Other structured content - return as JSON
+                    return json.dumps({
+                        "text": json.dumps(content),
+                        "format": "json",
+                        "metadata": {"source_id": url_or_content},
+                        "char_count": len(json.dumps(content))
+                    })
+            else:
+                # Plain text content - return as text
+                return json.dumps({
+                    "text": str(content),
+                    "format": "text",
+                    "metadata": {"source_id": url_or_content},
+                    "char_count": len(str(content))
+                })
+        except Exception as e:
+            logger.error(f"Failed to retrieve Note {url_or_content}: {e}")
+            return json.dumps({"error": f"Failed to retrieve Note: {e}"})
+    
     # Check if input is Collection ID - extract first item
     if url_or_content.startswith('Collection_'):
         try:
-            from infospace_resource_manager import InfospaceResourceManager
             resource_mgr = kwargs.get('resource_manager')
-            if not resource_mgr:
-                # Try to get from world_map
-                world_map = kwargs.get('world_map')
-                if world_map and hasattr(world_map, 'resource_registry'):
-                    collection = world_map.resource_registry.get(url_or_content)
-                    if collection and collection.get('type') == 'collection':
-                        note_ids = collection.get('content', [])
-                        if len(note_ids) == 0:
-                            return json.dumps({"error": "Collection is empty"})
-                        if len(note_ids) > 1:
-                            logger.warning(f"fetch-text: Collection {url_or_content} has {len(note_ids)} items, using first")
-                        first_note_id = note_ids[0]
-                        # Get Note content
-                        note = world_map.resource_registry.get(first_note_id)
-                        if note:
-                            url_or_content = note.get('content', '')
-                        else:
-                            return json.dumps({"error": f"Note {first_note_id} not found"})
-                    else:
-                        return json.dumps({"error": f"Collection {url_or_content} not found"})
-                else:
-                    return json.dumps({"error": "Cannot resolve Collection without world_map"})
+            world_map = kwargs.get('world_map')
+            note_ids = []
+            
+            # Try resource_manager first
+            if resource_mgr:
+                collection_resource = resource_mgr.get_resource(url_or_content)
+                if collection_resource:
+                    note_ids = collection_resource.get('properties', {}).get('content', [])
+            
+            # Fallback to world_map
+            if not note_ids and world_map and hasattr(world_map, 'resource_registry'):
+                collection = world_map.resource_registry.get(url_or_content)
+                if collection and collection.get('type') == 'collection':
+                    note_ids = collection.get('content', [])
+            
+            # Fallback to Zenoh query
+            if not note_ids:
+                import zenoh
+                from zenoh import QueryTarget, ConsolidationMode
+                config = zenoh.Config()
+                session = zenoh.open(config)
+                try:
+                    for reply in session.get(
+                        f"cognitive/map/resource/{url_or_content}",
+                        target=QueryTarget.BEST_MATCHING,
+                        consolidation=ConsolidationMode.NONE,
+                        timeout=5.0
+                    ):
+                        if reply.ok:
+                            response = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
+                            if response.get('success'):
+                                if 'resource' in response:
+                                    resource_data = response.get('resource')
+                                    note_ids = resource_data.get('properties', {}).get('content', [])
+                                else:
+                                    note_ids = response.get('content', [])
+                                break
+                finally:
+                    session.close()
+            
+            if not note_ids:
+                return json.dumps({"error": f"Collection {url_or_content} not found or empty"})
+            
+            if len(note_ids) == 0:
+                return json.dumps({"error": "Collection is empty"})
+            
+            if len(note_ids) > 1:
+                logger.warning(f"fetch-text: Collection {url_or_content} has {len(note_ids)} items, using first")
+            
+            first_note_id = note_ids[0]
+            # Recursively call fetch-text with Note ID (handles both structured and plain Notes)
+            return tool(first_note_id, **kwargs)
         except Exception as e:
             logger.error(f"Failed to resolve Collection: {e}")
             return json.dumps({"error": f"Failed to resolve Collection: {e}"})

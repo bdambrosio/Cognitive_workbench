@@ -346,6 +346,7 @@ def _process_url(url: str, query: str, client, per_url_timeout: float, max_chars
             "format": file_format,
             "metadata": {
                 "source_url": url,
+                "uri": url,  # Standardized URI field for consistency with semantic-scholar and search primitives
                 "domain": _extract_domain(url),
                 "elapsed_ms": int((time.time() - start) * 1000)
             },
@@ -362,6 +363,7 @@ def _create_empty_result(url: str, start_time: float, file_format: str = "html")
         "format": file_format,
         "metadata": {
             "source_url": url,
+            "uri": url,  # Standardized URI field for consistency with semantic-scholar and search primitives
             "domain": _extract_domain(url),
             "elapsed_ms": int((time.time() - start_time) * 1000)
         },
@@ -372,7 +374,7 @@ def _create_empty_result(url: str, start_time: float, file_format: str = "html")
 # Public entry point
 # ------------------------------
 
-def llm_search(query: str, client, max_chars: int = 8000, max_urls: int = 10, max_workers: int = 6, wall_time_limit: float = 15.0, heartbeat=None) -> List[Dict[str, Any]]:
+def llm_search(query: str, client, max_chars: int = 8000, max_urls: int = 10, max_workers: int = 6, wall_time_limit: float = 20.0, heartbeat=None) -> List[Dict[str, Any]]:
     """
     High-level:
       1) Google CSE for initial URL set (two phrasings interleaved).
@@ -561,7 +563,7 @@ def tool(value, **kwargs):
             max_chars=32000,
             max_urls=10,
             max_workers=6,
-            wall_time_limit=15.0,
+            wall_time_limit=20.0,
             heartbeat=kwargs.get('heartbeat')
         )
     except Exception as e:
@@ -600,5 +602,5 @@ def tool(value, **kwargs):
 if __name__ == "__main__":
     from llm_client import ZenohLLMClient
     client = ZenohLLMClient(server_name='openai', model_name='gpt-4.1')
-    results = llm_search("What is the weather in Tokyo?", client, max_chars=1000, max_urls=10, max_workers=4, wall_time_limit=16.0)
+    results = llm_search("What is the weather in Tokyo?", client, max_chars=1000, max_urls=10, max_workers=4, wall_time_limit=20.0)
     print(results)

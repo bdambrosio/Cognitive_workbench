@@ -128,26 +128,16 @@ tracer = setup_tracing("sgl-planner")
 gen_tracer = GenTracer(tracer, tokenizer=None)  # or tokenizer=your_tokenizer
 
 # Try to import SGLang
+_SGL_BACKEND_INITIALIZED = False
 try:
     import sglang as sgl
     from sglang import function, system, user, assistant, gen
-    model_path="/home/bruce/vllm/models/Qwen3-Coder-30B-A3B-Instruct"
-    sgl.set_default_backend(
-        sgl.Runtime(
-                    model_path=model_path,
-                    tokenizer_path=model_path,
-                    device="cuda",
-                    context_length=32768,
-                    cuda_graph_max_bs=4,
-                    dtype="auto",          # or "bf16"
-                    tp_size=1,             # if you’re using a single GPU
-                    mem_fraction_static=0.82,
-                    tool_call_parser="qwen"       )
-    )
     HAS_SGLANG = True
 except ImportError:
     HAS_SGLANG = False
     logger.warning("SGLang not available - incremental planner disabled")
+    # Mock function decorator to avoid ImportErrors on definition
+    def function(f): return f
 
 
 INCREMENTAL_PLAN_SPECIFICATIONS = """
@@ -181,9 +171,20 @@ Operation Compatibility:
 └─────────────────────────┴──────┴────────────┘
 
 Search Primitives:
-- search-notes: Global discovery across all Notes (no target needed)
-- search-collections: Global discovery across all Collections (no target needed)
-- search-within-collection: Search within a specific indexed Collection (requires target Collection, must be indexed first)
+- search-notes: Global discovery across all Notes (no target needed). Returns Collection of structured Notes with text preview, metadata.source_id, metadata.uri, metadata.score, metadata.type.
+- search-collections: Global discovery across all Collections (no target needed). Returns Collection of structured Notes with text preview, metadata.source_id, metadata.uri, metadata.score, metadata.type.
+- search-within-collection: Search within a specific indexed Collection (requires target Collection, must be indexed first). Returns Collection of structured Notes with text preview, metadata.source_id, metadata.uri, metadata.score, metadata.type.
+
+All search primitives return structured Notes matching query-web/semantic-scholar format:
+- text: First paragraph preview (200 chars max)
+- format: "text" or "json"
+- metadata.source_id: Original Note/Collection ID
+- metadata.uri: URI field (Note/Collection ID or extracted URI from source)
+- metadata.score: Search relevance score (0.0-1.0)
+- metadata.type: "Note" or "Collection"
+- char_count: Length of text preview
+
+Use project with metadata.uri or metadata.source_id for consistent access across all search results.
 
 Efficiency Rules:
 - Use tools directly on Notes for single items
@@ -235,18 +236,20 @@ def build_tool_catalog(available_tools: Dict[str, Dict], primitives_reference: s
         },
         "create-note": {
             "description": "Create a persistent Note object and bind to variable. IMPORTANT: The 'name' parameter (optional) creates a named Note that can be loaded by name later. Variable names in 'out' (e.g., '$my_note') are just bindings, NOT note names.",
-            "full_description": "Create a persistent Note object and bind to variable. Notes store any content (text, JSON, etc.). The optional 'name' parameter registers the Note with a stable name for later loading (e.g., load by 'important-note' name). Variable names like '$my_note' are temporary bindings during plan execution, not persistent names.",
+            "full_description": "Create a persistent Note object and bind to variable. Notes store any content (text, JSON, etc.). The optional 'name' parameter registers the Note with a stable name for later loading (e.g., load by 'important-note' name). Variable names like '$my_note' are temporary bindings during plan execution, not persistent names. IMPORTANT: For JSON arrays/objects, pass the actual JSON structure (e.g., [\"apple\", \"banana\"] or {\"key\": \"value\"}), NOT a JSON string. The value field accepts Python types directly: strings, numbers, booleans, arrays, objects.",
             "parameters": {
-                "value": "required: literal value or $variable referencing content",
+                "value": "required: literal value (string, number, boolean, array, object) or $variable referencing content. For JSON arrays/objects, use actual JSON structure, not JSON string.",
                 "name": "optional: string name for named Note (separate from variable name)",
                 "out": "required: $variable name for resulting Note"
             },
             "examples": [
                 '{"type":"create-note","value":"some data","out":"$my_note"}',
+                '{"type":"create-note","value":["apple","banana","cherry"],"out":"$array_note"}',
+                '{"type":"create-note","value":{"key":"value"},"out":"$object_note"}',
                 '{"type":"create-note","value":"$variable","out":"$new_note"}',
                 '{"type":"create-note","value":"important data","name":"important-note","out":"$my_note"}'
             ],
-            "schema_hint": {"value": "any content", "name": "string (optional)", "out": "$variable"}
+            "schema_hint": {"value": "any content (string, number, boolean, array, object)", "name": "string (optional)", "out": "$variable"}
         },
     }
     
@@ -272,15 +275,15 @@ def build_tool_catalog(available_tools: Dict[str, Dict], primitives_reference: s
             "schema_hint": {"target": "$variable"}
         },
         "search-notes": {
-            "description": "Global search across all Notes using embedding-based retrieval. Discovers Notes by content/metadata.",
+            "description": "Global search across all Notes using embedding-based retrieval. Returns Collection of structured Notes with text preview (200 chars), metadata.source_id, metadata.uri, metadata.score, metadata.type. Format matches query-web/semantic-scholar for consistent project operations.",
             "schema_hint": {"value": "string (query)", "out": "$variable", "limit": "int (optional, default 5)", "threshold": "float (optional, default 0.3)"}
         },
         "search-collections": {
-            "description": "Global search across all Collections using embedding-based retrieval. Discovers Collections by content/metadata.",
+            "description": "Global search across all Collections using embedding-based retrieval. Returns Collection of structured Notes with text preview (200 chars), metadata.source_id, metadata.uri, metadata.score, metadata.type. Format matches query-web/semantic-scholar for consistent project operations.",
             "schema_hint": {"value": "string (query)", "out": "$variable", "limit": "int (optional, default 3)", "threshold": "float (optional, default 0.3)"}
         },
         "search-within-collection": {
-            "description": "Search within a specific indexed Collection. Requires Collection to be indexed first. Returns matching Notes/chunks from that Collection.",
+            "description": "Search within a specific indexed Collection. Returns Collection of structured Notes with text preview (200 chars), metadata.source_id, metadata.uri, metadata.score, metadata.type. Format matches query-web/semantic-scholar for consistent project operations. Requires Collection to be indexed first.",
             "schema_hint": {"target": "$variable (indexed Collection)", "value": "string (query)", "out": "$variable", "limit": "int (optional, default 5)", "threshold": "float (optional, default 0.0)", "return_mode": "string (optional, 'chunks' or 'notes', default 'chunks')"}
         },
         "index": {
@@ -318,9 +321,12 @@ def build_tool_catalog(available_tools: Dict[str, Dict], primitives_reference: s
     
     # Enhanced descriptions to prevent common confusions
     TOOL_DISAMBIGUATION = {
-        "query-web": "Search web and return Collection with FULL TEXT CONTENT already extracted. Each Note contains 'text' field with complete page content. NO need for fetch-text after this.",
-        "fetch-text": "Fetch text from a SINGLE specific URL (NOT for query-web results - those already have full text). Use ONLY when you have one URL to fetch directly.",
-        "semantic-scholar": "Search academic papers and return Collection with FULL METADATA (abstracts, citations, authors, venue, PDF URLs). NO need for fetch-text after this.",
+        "query-web": "Search web and return Collection of structured Notes. Each Note has text (full content), format, metadata.uri (URL), metadata.domain, char_count. Use project with metadata.uri to extract URLs. NO need for fetch-text after this.",
+        "fetch-text": "Fetch text from a SINGLE specific URL, Note ID, or Collection ID. For Note IDs, retrieves Note content directly. For Collection IDs, uses first Note. Use ONLY when you have one URL/ID to fetch directly.",
+        "semantic-scholar": "Search academic papers and return Collection of structured Notes. Each Note has text (abstract), format, metadata.uri (PDF URL), metadata.title, metadata.authors, metadata.year, metadata.citations, metadata.venue. Use project with metadata.uri to extract URLs. NO need for fetch-text after this.",
+        "search-notes": "Global search across all Notes. Returns Collection of structured Notes with text preview (200 chars), metadata.source_id, metadata.uri, metadata.score, metadata.type. Format matches query-web/semantic-scholar.",
+        "search-collections": "Global search across all Collections. Returns Collection of structured Notes with text preview (200 chars), metadata.source_id, metadata.uri, metadata.score, metadata.type. Format matches query-web/semantic-scholar.",
+        "search-within-collection": "Search within indexed Collection. Returns Collection of structured Notes with text preview (200 chars), metadata.source_id, metadata.uri, metadata.score, metadata.type. Format matches query-web/semantic-scholar.",
     }
     
     # Add available tools from map
@@ -478,6 +484,20 @@ def sgl_to_infospace_action(tool_name: str, args_json: str, step: int, available
         logger.warning(f"Failed to parse args_json: {args_json}")
         traceback.print_exc()
         args = {}
+    
+    # Fix double-nested args: if LLM generated {"args": {...}}, unwrap it
+    # This happens when LLM copies the final action format instead of just the arguments
+    if isinstance(args, dict) and 'args' in args and isinstance(args['args'], dict):
+        # Check if 'args' is the only non-top-level field (or if other fields are top-level)
+        # Core fields that should be at top level
+        top_level_fields = ['out', 'expect', 'resource_id', 'source', 'operation', 'target', 'value']
+        other_fields = {k: v for k, v in args.items() if k != 'args'}
+        # If 'args' contains the actual parameters and other fields are just top-level, unwrap
+        if not other_fields or all(k in top_level_fields for k in other_fields):
+            nested_args = args.pop('args')
+            # Merge nested args into args dict
+            args.update(nested_args)
+            logger.debug(f"Unwrapped double-nested args for {tool_name}")
     
     # Normalize variable references: ensure $ prefix for common variable fields
     # These fields typically reference variables (not literal values)
@@ -937,7 +957,7 @@ if HAS_SGLANG:
                 + gen(f"done_{step}", max_tokens=8, stop="\n")
                 + "\nNEXT_TASK: "
                 + gen(f"next_task_{step}", max_tokens=128, stop="\n")
-                + "\nREQUEST_TOOLS <optional: json list of too>(tools you may need but didn't initially select): \n"
+                + "\nREQUEST_TOOLS <optional: json list of tool names>(tools you may need but didn't initially select): \n"
                 + gen(f"request_tools_{step}", max_tokens=64, stop="\n")
                 + "\n"
             )
@@ -983,18 +1003,17 @@ if HAS_SGLANG:
             
             # Stage 3.5: Dynamic tool loading (if requested)
             requested_tools_raw = s[f"request_tools_{step}"].strip()
-            if requested_tools_raw and requested_tools_raw.lower() not in ["", "[]", "none", "null"]:
-                try:
-                    requested_tools = json.loads(requested_tools_raw)
-                    if isinstance(requested_tools, list) and requested_tools:
-                        logger.info(f"Step {step}: LLM requested additional tools: {requested_tools}")
-                        expanded_docs = load_skill_docs(requested_tools, executor.available_tools)
-                        if expanded_docs:
-                            s += user(f"ADDITIONAL TOOL DOCUMENTATION:\n{expanded_docs}")
-                            s += assistant("I have reviewed the additional tool documentation.\n")
-                            logger.info(f"Stage 3.5: Loaded docs for {len(requested_tools)} additional tools: {requested_tools}")
-                except (json.JSONDecodeError, TypeError, ValueError) as e:
-                    logger.warning(f"Step {step}: Failed to parse REQUEST_TOOLS: {e}")
+            requested_tools = parse_request_tools(requested_tools_raw)
+            if requested_tools:
+                logger.info(f"Step {step}: LLM requested additional tools: {requested_tools}")
+                expanded_docs = load_skill_docs(requested_tools, executor.available_tools)
+                if expanded_docs:
+                    s += user(f"ADDITIONAL TOOL DOCUMENTATION:\n{expanded_docs}")
+                    s += assistant("I have reviewed the additional tool documentation.\n")
+                    logger.info(f"Stage 3.5: Loaded docs for {len(requested_tools)} additional tools: {requested_tools}")
+            elif requested_tools_raw and requested_tools_raw.lower() not in ["", "[]", "none", "null"]:
+                # Log warning only if there was actual content that failed to parse
+                logger.warning(f"Step {step}: Failed to parse REQUEST_TOOLS: {requested_tools_raw[:100]}")
             
             # Check if done
             done_raw = s[f"done_{step}"].strip().upper()
@@ -1020,13 +1039,69 @@ if HAS_SGLANG:
         return s
 
 
+def parse_request_tools(raw_text: str) -> Optional[List[str]]:
+    """
+    Robustly parse REQUEST_TOOLS field from LLM output.
+    
+    Handles:
+    - "REQUEST_TOOLS: " prefix
+    - Markdown code fences (```json ... ```)
+    - Empty/partial responses
+    - Raw JSON arrays
+    
+    Args:
+        raw_text: Raw text from LLM generation
+        
+    Returns:
+        List of tool names if successfully parsed, None otherwise
+    """
+    if not raw_text:
+        return None
+    
+    text = raw_text.strip()
+    
+    # Remove "REQUEST_TOOLS: " prefix if present
+    if text.startswith("REQUEST_TOOLS:"):
+        text = text[len("REQUEST_TOOLS:"):].strip()
+    
+    # Handle empty/placeholder values
+    if not text or text.lower() in ["", "[]", "none", "null", "n/a"]:
+        return None
+    
+    # Extract JSON from markdown code fences
+    # Pattern: ```json ... ``` or ``` ... ```
+    code_fence_match = re.search(r'```(?:json)?\s*\n?(.*?)\n?```', text, re.DOTALL)
+    if code_fence_match:
+        text = code_fence_match.group(1).strip()
+    
+    # Try to parse as JSON
+    try:
+        parsed = json.loads(text)
+        if isinstance(parsed, list):
+            # Filter out non-string items and empty strings
+            tools = [t for t in parsed if isinstance(t, str) and t.strip()]
+            return tools if tools else None
+        return None
+    except (json.JSONDecodeError, TypeError, ValueError):
+        # If parsing fails, try to extract list-like content manually
+        # Look for patterns like ["tool1", "tool2"] or [tool1, tool2]
+        list_match = re.search(r'\[(.*?)\]', text, re.DOTALL)
+        if list_match:
+            content = list_match.group(1)
+            # Extract quoted strings
+            tools = re.findall(r'"([^"]+)"', content)
+            if tools:
+                return tools
+        return None
+
+
 class IncrementalPlanner:
     """
     Incremental planner using SGLang for iterative goal achievement.
     """
     
     def __init__(self, executor, available_tools: Dict[str, Dict], 
-                 primitives_reference: str, logger_instance=None):
+                 primitives_reference: str, logger_instance=None, sgl_model_path: str = None):
         """
         Initialize incremental planner.
         
@@ -1035,6 +1110,7 @@ class IncrementalPlanner:
             available_tools: Dict of tool_name -> metadata
             primitives_reference: Primitives reference text
             logger_instance: Optional logger
+            sgl_model_path: Path to local model for SGLang (required if not already initialized)
         """
         if not HAS_SGLANG:
             raise ImportError("SGLang not available")
@@ -1043,6 +1119,31 @@ class IncrementalPlanner:
         self.available_tools = available_tools
         self.primitives_reference = primitives_reference
         self.logger = logger_instance or logger
+        
+        # Initialize SGLang backend if needed
+        global _SGL_BACKEND_INITIALIZED
+        if not _SGL_BACKEND_INITIALIZED and sgl_model_path:
+            try:
+                self.logger.info(f"Initializing SGLang backend with model: {sgl_model_path}")
+                sgl.set_default_backend(
+                    sgl.Runtime(
+                        model_path=sgl_model_path,
+                        tokenizer_path=sgl_model_path,
+                        device="cuda",
+                        context_length=32768,
+                        cuda_graph_max_bs=4,
+                        dtype="auto",
+                        tp_size=1,
+                        mem_fraction_static=0.82,
+                        tool_call_parser="qwen"
+                    )
+                )
+                _SGL_BACKEND_INITIALIZED = True
+            except Exception as e:
+                self.logger.error(f"Failed to initialize SGLang backend: {e}")
+                raise
+        elif not _SGL_BACKEND_INITIALIZED:
+            self.logger.warning("SGLang backend not initialized and no model path provided!")
         
         # Build tool catalog
         self.tools = build_tool_catalog(available_tools, primitives_reference)

@@ -807,20 +807,23 @@ then use flatten if you need to combine the expanded Notes into a single Note.
 
 ⚠️ NOTE: Level 4 tools (query-web, semantic-scholar) return Collections directly - NO expand needed.
 
-Description: Expand a Note into a Collection of Notes. Handles two cases:
-  1. JSON with array field: Extracts array from specified field (default "results")
-  2. Plain text: Splits on newlines and filters empty lines
-Input: target: $variable → Note (JSON with array field OR plain text)
-Output: out: $variable → Collection (one Note per array item or line)
+Description: Expand a Note into a Collection of Notes. Handles four cases:
+  1. Simple JSON array: Directly uses the array (e.g., [1, 2, 3])
+  2. JSON object with array field: Extracts array from specified field (default "results")
+  3. JSONL format: Multiple JSON objects, one per line (newlines required between objects)
+  4. Plain text: Splits on newlines and filters empty lines
+Input: target: $variable → Note (JSON array, JSON with array field, JSONL, or plain text)
+Output: out: $variable → Collection (one Note per array item, JSONL object, or line)
 Parameters:
-  - target (required): $variable referencing Note with JSON array or plain text
-  - field (optional): string field name containing array (default: "results") - only used for JSON
+  - target (required): $variable referencing Note with JSON array, JSON object with array field, JSONL, or plain text
+  - field (optional): string field name containing array (default: "results") - only used for JSON object case
   - out (required): $variable name for resulting Collection
-Preconditions: target variable must be bound to Note containing JSON with array field OR plain text
-Postconditions: out variable bound to Collection with one Note per array element or line
+Preconditions: target variable must be bound to Note containing JSON array, JSON object with array field, JSONL, or plain text
+Postconditions: out variable bound to Collection with one Note per array element, JSONL object, or line
 Examples:
   {"type":"expand","target":"$search_results","out":"$results_collection"}  # JSON array from Level 2/3 tool
   {"type":"expand","target":"$data","field":"items","out":"$items_collection"}  # JSON array with custom field
+  {"type":"expand","target":"$jsonl_note","out":"$objects"}  # JSONL format (multiple JSON objects, one per line)
   {"type":"expand","target":"$text_note","out":"$lines"}  # Plain text (splits on newlines)
 
 ## coerce
@@ -927,7 +930,7 @@ Preconditions: target must be Collection of dict/JSON Notes
 Postconditions: out variable bound to Collection with projected Notes (nested structure preserved)
 Examples:
   {"type":"project","target":"$papers","fields":["title","year"],"out":"$titles_and_years"}
-  {"type":"project","target":"$results","fields":["metadata.url","metadata.domain"],"out":"$urls"}
+  {"type":"project","target":"$results","fields":["metadata.uri","metadata.domain"],"out":"$urls"}
 
 ## pluck
 Description: Extract single field value from each Note in Collection (for tools needing scalar values)
@@ -935,12 +938,12 @@ Input: target: $variable → Collection of JSON Notes
 Output: out: $variable → Collection (Notes containing extracted scalar values)
 Parameters:
   - target (required): $variable referencing Collection
-  - field (required): field path to extract (e.g., "metadata.url", "title")
+  - field (required): field path to extract (e.g., "metadata.uri", "title")
   - out (required): $variable name for resulting Collection
 Preconditions: target must be Collection of dict/JSON Notes
 Postconditions: out variable bound to Collection with Notes containing field values
 Examples:
-  {"type":"pluck","target":"$papers","field":"metadata.pdf_url","out":"$urls"}
+  {"type":"pluck","target":"$papers","field":"metadata.uri","out":"$urls"}
   {"type":"pluck","target":"$results","field":"text","out":"$texts"}
 
 ## filter-structured
@@ -992,16 +995,18 @@ Examples:
 
 ## create-note
 Description: Create a persistent Note object and bind to variable
-Input: value: literal or $variable → any content
+Input: value: literal (string, number, boolean, array, object) or $variable → any content
 Output: out: $variable → Note (newly created)
 Parameters:
-  - value (required): literal value or $variable referencing content
+  - value (required): literal value (string, number, boolean, array, object) or $variable referencing content. For JSON arrays/objects, use actual JSON structure (e.g., ["apple","banana"] or {"key":"value"}), NOT a JSON string.
   - name (optional): string name for named Note (can be loaded by name via load)
   - out (required): $variable name for resulting Note
 Preconditions: none (creates new Note)
 Postconditions: out variable bound to new Note with persistent ID
 Examples:
   {"type":"create-note","value":"some data","out":"$my_note"}
+  {"type":"create-note","value":["apple","banana","cherry"],"out":"$array_note"}
+  {"type":"create-note","value":{"key":"value","count":42},"out":"$object_note"}
   {"type":"create-note","value":"$variable","out":"$new_note"}
   {"type":"create-note","value":"important data","name":"important-note","out":"$my_note"}
 
@@ -1046,7 +1051,6 @@ Preconditions: resource must exist in persistent storage
 Postconditions: out variable bound to loaded Note or Collection
 Examples:
   {"type":"load","resource_id":"Note_123","out":"$my_note","expect":"should contain previous data"}
-  {"type":"load","resource_id":"Notes","out":"$all_notes","expect":"should contain system collection of all Notes"}
   {"type":"load","resource_id":"papers","out":"$papers","expect":"should have saved papers"}
 
 ## index

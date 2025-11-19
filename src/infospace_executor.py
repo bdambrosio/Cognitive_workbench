@@ -12,7 +12,7 @@ import re
 import traceback
 import importlib.util
 from pathlib import Path
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any, Optional, Tuple
 from datetime import datetime
 
 logger = logging.getLogger(__name__)
@@ -355,6 +355,13 @@ class InfospaceExecutor:
         
         reason = action.get('reason', '')
         additional_args = action.get('args', {})
+        
+        # Fix double-nested args: if args contains only {"args": {...}}, unwrap it
+        if isinstance(additional_args, dict) and len(additional_args) == 1 and 'args' in additional_args:
+            nested_args = additional_args['args']
+            if isinstance(nested_args, dict):
+                additional_args = nested_args
+        
         out_var = action.get('out')
         
         if not target:
@@ -730,16 +737,19 @@ Only provide the result, followed by the </end> tag.""")
         
         if value is None:
             self._bind_variable(out_var, "Note_null")
-            logger.info(f"Created null Note → ${out_var} = Note_null")
+            display_var = self._normalize_var_for_log(out_var)
+            logger.info(f"Created null Note → {display_var} = Note_null")
             return {'status': 'success', 'value': "Note_null"}
         
         info_id = self._persist_note(value, 'create-note-primitive', extra_props, note_name)
         if info_id:
             self._bind_variable(out_var, info_id)
-            logger.info(f"Created Note {info_id} → ${out_var}")
+            display_var = self._normalize_var_for_log(out_var)
+            logger.info(f"Created Note {info_id} → {display_var}")
             return {'status': 'success', 'value': info_id}
         
-        logger.error(f"Note creation failed for ${out_var}")
+        display_var = self._normalize_var_for_log(out_var)
+        logger.error(f"Note creation failed for {display_var}")
         return {'status': 'failed', 'reason': 'Failed to create Note'}
     
     def _execute_create_collection(self, action: Dict) -> Dict:
@@ -804,13 +814,102 @@ Only provide the result, followed by the </end> tag.""")
         if collection_id:
             self._bind_variable(out_var, collection_id)
             name_display = f" '{collection_name}'" if collection_name else ""
-            logger.info(f"Created {collection_id}{name_display} → ${out_var} ({len(note_ids)} items)")
+            display_var = self._normalize_var_for_log(out_var)
+            logger.info(f"Created {collection_id}{name_display} → {display_var} ({len(note_ids)} items)")
             return {'status': 'success', 'value': collection_id}
         
-        logger.error(f"Collection creation failed for ${out_var}")
+        display_var = self._normalize_var_for_log(out_var)
+        logger.error(f"Collection creation failed for {display_var}")
         return {'status': 'failed', 'reason': 'Failed to create Collection'}
     
     # ==================== Storage Operations ====================
+    
+    def _extract_text_preview(self, content: Any, max_chars: int = 200) -> Tuple[str, str]:
+        """
+        Extract first paragraph from content and truncate to max_chars.
+        
+        Args:
+            content: Content to extract preview from (string, dict, list, etc.)
+            max_chars: Maximum characters (default 200)
+            
+        Returns:
+            Tuple of (text_preview, format_type)
+        """
+        # Convert content to string
+        if isinstance(content, (dict, list)):
+            content_str = json.dumps(content)
+            format_type = 'json'
+        else:
+            content_str = str(content) if content is not None else ''
+            format_type = 'text'
+        
+        if not content_str:
+            return ('', format_type)
+        
+        # Extract first paragraph (split on double newlines or single newline)
+        paragraphs = content_str.split('\n\n')
+        if len(paragraphs) == 1:
+            # No double newlines, try single newline
+            paragraphs = content_str.split('\n')
+        
+        first_para = paragraphs[0].strip() if paragraphs else ''
+        
+        # Truncate to max_chars with '...'
+        if len(first_para) > max_chars:
+            preview = first_para[:max_chars - 3] + '...'
+        else:
+            preview = first_para
+        
+        return (preview, format_type)
+    
+    def _build_structured_search_result(self, resource_id: str, resource_result: Dict, 
+                                       resource_metadata: Optional[Dict] = None) -> Dict:
+        """
+        Build structured search result Note matching query-web/semantic-scholar format.
+        
+        Args:
+            resource_id: Note or Collection ID
+            resource_result: Search result dict with 'score', 'type', etc.
+            resource_metadata: Optional metadata from get_resource_metadata()
+            
+        Returns:
+            Structured dict with text, format, metadata, char_count
+        """
+        # Get original content
+        original_content = self._get_content(resource_id)
+        
+        # Extract text preview (first paragraph, 200 chars)
+        text_preview, format_type = self._extract_text_preview(original_content, max_chars=200)
+        
+        # Build metadata
+        metadata = {
+            'source_id': resource_id,
+            'uri': resource_id,  # URI field for consistency (Note/Collection ID can be used as URI)
+            'score': resource_result.get('score', 0.0),
+            'type': resource_result.get('type', 'Note')
+        }
+        
+        # If original Note has a URI in metadata, use that instead (reuse original_content from above)
+        if isinstance(original_content, dict) and 'metadata' in original_content:
+            original_uri = original_content['metadata'].get('uri') or original_content['metadata'].get('url')
+            if original_uri:
+                metadata['uri'] = original_uri
+        
+        # Add optional metadata from original resource
+        if resource_metadata:
+            if 'source_skill' in resource_metadata:
+                metadata['source_skill'] = resource_metadata['source_skill']
+            if 'created_at' in resource_metadata:
+                metadata['created_at'] = resource_metadata['created_at']
+            if 'note_name' in resource_metadata:
+                metadata['note_name'] = resource_metadata['note_name']
+        
+        return {
+            'text': text_preview,
+            'format': format_type,
+            'metadata': metadata,
+            'char_count': len(text_preview)
+        }
     
     def _persist_note(self, value: Any, source_context: str, properties: Optional[Dict] = None, note_name: str = '') -> Optional[str]:
         """
@@ -827,13 +926,13 @@ Only provide the result, followed by the </end> tag.""")
         """
         if value is None:
             return "Note_null"
-        
+
         # If value is already Note_null resource ID, return it directly
         if isinstance(value, str) and value == "Note_null":
             return "Note_null"
-        
+
         format_type = 'json' if isinstance(value, (dict, list)) else 'text'
-        
+
         from zenoh import QueryTarget, ConsolidationMode
         payload_dict = {
             'character_name': self.agent_name,
@@ -1035,7 +1134,8 @@ Only provide the result, followed by the </end> tag.""")
                     self._bind_variable(out_var, actual_id)
                     # Determine resource type for logging
                     resource_type = "Collection" if actual_id.startswith('Collection_') else "Note" if actual_id.startswith('Note_') else "Resource"
-                    logger.info(f"Loaded {resource_id} → ${out_var} ({resource_type})")
+                    display_var = self._normalize_var_for_log(out_var)
+                    logger.info(f"Loaded {resource_id} → {display_var} ({resource_type})")
                     return {'status': 'success', 'value': actual_id}
                 else:
                     return {'status': 'failed', 'reason': f'Resource not found: {resource_id}'}
@@ -1182,45 +1282,44 @@ Only provide the result, followed by the </end> tag.""")
         # Bind results to output variable
         results = response.get('results', [])
         
-        # Create Notes for each search result
+        # Create structured Notes for each search result (matching query-web/semantic-scholar format)
         note_ids = []
         for i, result in enumerate(results):
+            document_content = result.get('document', '')
+            metadata = result.get('metadata', {})
+            score = result.get('score', 0.0)
+            source_note_id = metadata.get('source_note_id')
+            
+            # Extract text preview (first paragraph, 200 chars)
+            text_preview, format_type = self._extract_text_preview(document_content, max_chars=200)
+            
+            # Build structured result with metadata in content.metadata (not properties)
+            structured_result = {
+                'text': text_preview,
+                'format': format_type,
+                'metadata': {
+                    'source_id': source_note_id if source_note_id else f'chunk_{i}',
+                    'uri': source_note_id if source_note_id else f'chunk_{i}',  # URI field for consistency
+                    'score': score,
+                    'type': 'Note',
+                    'return_mode': return_mode
+                },
+                'char_count': len(text_preview)
+            }
+            
+            # Add chunk-specific metadata if in chunks mode
             if return_mode == 'chunks':
-                # For chunks mode: store only chunk text, preserve metadata in properties
-                chunk_content = result.get('document', '')
-                metadata = result.get('metadata', {})
-                
-                # Extract relevant metadata for properties
-                properties = {
-                    'source_note_id': metadata.get('source_note_id'),
-                    'chunk_index': metadata.get('chunk_index'),
-                    'chunk_total': metadata.get('chunk_total'),
-                    'is_complete_note': metadata.get('is_complete_note', False),
-                    'score': result.get('score'),
-                    'return_mode': 'chunks'
-                }
-                # Remove None values
-                properties = {k: v for k, v in properties.items() if v is not None}
-                
-                note_id = self._persist_note(chunk_content, f'search_result_{i}', properties=properties)
+                structured_result['metadata']['chunk_index'] = metadata.get('chunk_index')
+                structured_result['metadata']['chunk_total'] = metadata.get('chunk_total')
+                structured_result['metadata']['is_complete_note'] = metadata.get('is_complete_note', False)
             else:
-                # For notes mode: store original note content (deduplicated, full document)
-                note_content = result.get('document', '')
-                metadata = result.get('metadata', {})
-                
-                # Store source reference in properties (standardized format matching chunks mode)
-                properties = {
-                    'source_note_id': metadata.get('source_note_id'),
-                    'chunk_index': None,  # Not applicable for full notes
-                    'chunk_total': 1,  # Single complete note
-                    'is_complete_note': True,  # Always true for notes mode
-                    'score': result.get('score'),
-                    'return_mode': 'notes'
-                }
-                # Remove None values (chunk_index will be omitted)
-                properties = {k: v for k, v in properties.items() if v is not None}
-                
-                note_id = self._persist_note(note_content, f'search_result_{i}', properties=properties)
+                structured_result['metadata']['is_complete_note'] = True
+            
+            # Remove None values from metadata
+            structured_result['metadata'] = {k: v for k, v in structured_result['metadata'].items() if v is not None}
+            
+            # Create new Note with structured content
+            note_id = self._persist_note(structured_result, f'search-within-collection', note_name=f'search_result_{i}')
             
             if note_id:
                 note_ids.append(note_id)
@@ -1229,7 +1328,8 @@ Only provide the result, followed by the </end> tag.""")
         result_collection_id = self._create_collection(note_ids, 'search_results')
         if result_collection_id:
             self._bind_variable(out_var, result_collection_id)
-            logger.info(f"Search-within-collection found {len(results)} results, created {result_collection_id} with {len(note_ids)} Notes → ${out_var}")
+            display_var = self._normalize_var_for_log(out_var)
+            logger.info(f"Search-within-collection found {len(results)} results, created {result_collection_id} with {len(note_ids)} Notes → {display_var}")
             return {'status': 'success', 'value': result_collection_id}
         else:
             logger.error(f"Failed to create Collection for search results")
@@ -1272,21 +1372,35 @@ Only provide the result, followed by the </end> tag.""")
                 return {'status': 'success', 'value': empty_coll_id}
             return {'status': 'failed', 'reason': 'No Notes found and failed to create empty Collection'}
         
-        # Create Notes for each result (load existing Notes by ID)
+        # Create structured Notes for each search result (matching query-web/semantic-scholar format)
         note_ids = []
         for note_result in notes:
             note_id = note_result.get('resource_id')
             if note_id and note_id.startswith('Note_'):
-                note_ids.append(note_id)
+                # Get metadata for optional fields
+                resource_metadata = self.get_resource_metadata(note_id)
+                
+                # Build structured search result
+                structured_result = self._build_structured_search_result(note_id, note_result, resource_metadata)
+                
+                # Create new Note with structured content
+                result_note_id = self._persist_note(
+                    structured_result,
+                    'search-notes',
+                    note_name=f'search_result_{note_id}'
+                )
+                if result_note_id:
+                    note_ids.append(result_note_id)
         
         if not note_ids:
             return {'status': 'failed', 'reason': 'No valid Note IDs found in search results'}
         
-        # Create Collection containing found Notes
+        # Create Collection containing structured result Notes
         collection_id = self._create_collection(note_ids, 'search_notes_results')
         if collection_id:
             self._bind_variable(out_var, collection_id)
-            logger.info(f"Search-notes found {len(note_ids)} Notes, created {collection_id} → ${out_var}")
+            display_var = self._normalize_var_for_log(out_var)
+            logger.info(f"Search-notes found {len(notes)} Notes, created {collection_id} with {len(note_ids)} structured results → {display_var}")
             return {'status': 'success', 'value': collection_id}
         else:
             return {'status': 'failed', 'reason': 'Failed to create result Collection'}
@@ -1328,21 +1442,35 @@ Only provide the result, followed by the </end> tag.""")
                 return {'status': 'success', 'value': empty_coll_id}
             return {'status': 'failed', 'reason': 'No Collections found and failed to create empty Collection'}
         
-        # Create Collection containing found Collection IDs
-        collection_ids = []
+        # Create structured Notes for each search result (matching query-web/semantic-scholar format)
+        note_ids = []
         for coll_result in collections:
             coll_id = coll_result.get('resource_id')
             if coll_id and coll_id.startswith('Collection_'):
-                collection_ids.append(coll_id)
+                # Get metadata for optional fields
+                resource_metadata = self.get_resource_metadata(coll_id)
+                
+                # Build structured search result
+                structured_result = self._build_structured_search_result(coll_id, coll_result, resource_metadata)
+                
+                # Create new Note with structured content
+                result_note_id = self._persist_note(
+                    structured_result,
+                    'search-collections',
+                    note_name=f'search_result_{coll_id}'
+                )
+                if result_note_id:
+                    note_ids.append(result_note_id)
         
-        if not collection_ids:
+        if not note_ids:
             return {'status': 'failed', 'reason': 'No valid Collection IDs found in search results'}
         
-        # Create Collection containing found Collections (Collections can contain Collections)
-        result_collection_id = self._create_collection(collection_ids, 'search_collections_results')
+        # Create Collection containing structured result Notes
+        result_collection_id = self._create_collection(note_ids, 'search_collections_results')
         if result_collection_id:
             self._bind_variable(out_var, result_collection_id)
-            logger.info(f"Search-collections found {len(collection_ids)} Collections, created {result_collection_id} → ${out_var}")
+            display_var = self._normalize_var_for_log(out_var)
+            logger.info(f"Search-collections found {len(collections)} Collections, created {result_collection_id} with {len(note_ids)} structured results → {display_var}")
             return {'status': 'success', 'value': result_collection_id}
         else:
             return {'status': 'failed', 'reason': 'Failed to create result Collection'}
@@ -1493,7 +1621,8 @@ Only provide the result, followed by the </end> tag.""")
             'out_var': out_var
         }
         
-        logger.info(f"❓ Ask: '{question_text}' → awaiting response for ${out_var} (step mode enabled)")
+        display_var = self._normalize_var_for_log(out_var)
+        logger.info(f"❓ Ask: '{question_text}' → awaiting response for {display_var} (step mode enabled)")
         return {'status': 'success', 'value': question_text}
     
     # ==================== Phase 2: Data Operations ====================
@@ -1531,7 +1660,8 @@ Only provide the result, followed by the </end> tag.""")
         info_id = self._persist_note(result, f'coerce_{operation}')
         if info_id:
             self._bind_variable(out_var, info_id)
-            logger.info(f"Coerced ({operation}) → Note {info_id} → ${out_var}")
+            display_var = self._normalize_var_for_log(out_var)
+            logger.info(f"Coerced ({operation}) → Note {info_id} → {display_var}")
             return {'status': 'success', 'value': info_id}
         else:
             logger.error(f"Failed to persist coerce result")
@@ -1670,7 +1800,8 @@ Only provide the result, followed by the </end> tag.""")
                 if target_var in self.plan_bindings:
                     mutated_collection_id = self.plan_bindings[target_var]
                     self._bind_variable(out_var, mutated_collection_id)
-                    logger.info(f"Mapped {len(note_ids)} items via {operation} → ${out_var} = {mutated_collection_id}")
+                    display_var = self._normalize_var_for_log(out_var)
+                    logger.info(f"Mapped {len(note_ids)} items via {operation} → {display_var} = {mutated_collection_id}")
                     return {'status': 'success', 'value': mutated_collection_id}
                 else:
                     return {'status': 'failed', 'reason': f'Mutation target {mutation_target} not bound'}
@@ -1682,7 +1813,8 @@ Only provide the result, followed by the </end> tag.""")
             collection_id = self._create_collection([], f'map_{operation_str}')
             if collection_id:
                 self._bind_variable(out_var, collection_id)
-                logger.info(f"Mapped {len(note_ids)} items via {operation} (side effects executed), created {collection_id} → ${out_var}")
+                display_var = self._normalize_var_for_log(out_var)
+                logger.info(f"Mapped {len(note_ids)} items via {operation} (side effects executed), created {collection_id} → {display_var}")
                 return {'status': 'success', 'value': collection_id}
             else:
                 logger.error(f"Failed to create Collection for map results")
@@ -1693,7 +1825,8 @@ Only provide the result, followed by the </end> tag.""")
             collection_id = self._create_collection(result_note_ids, f'map_{operation_str}')
             if collection_id:
                 self._bind_variable(out_var, collection_id)
-                logger.info(f"Mapped {len(note_ids)} → {len(result_note_ids)} Notes, created {collection_id} → ${out_var}")
+                display_var = self._normalize_var_for_log(out_var)
+                logger.info(f"Mapped {len(note_ids)} → {len(result_note_ids)} Notes, created {collection_id} → {display_var}")
                 return {'status': 'success', 'value': collection_id}
             else:
                 logger.error(f"Failed to create Collection for map results")
@@ -1742,7 +1875,8 @@ Only provide the result, followed by the </end> tag.""")
         info_id = self._persist_note(flattened, 'flatten')
         if info_id:
             self._bind_variable(out_var, info_id)
-            logger.info(f"Flattened {len(note_ids)} Notes → Note {info_id} → ${out_var}")
+            display_var = self._normalize_var_for_log(out_var)
+            logger.info(f"Flattened {len(note_ids)} Notes → Note {info_id} → {display_var}")
             return {'status': 'success', 'value': info_id}
         else:
             logger.error(f"Failed to persist flatten result")
@@ -1820,7 +1954,8 @@ Only provide the result, followed by the </end> tag.""")
                 if response.get('success'):
                     # Bind to out variable (usually same as target)
                     self._bind_variable(out_var, collection_id)
-                    logger.info(f"Added {note_id} to {collection_id} → ${out_var}")
+                    display_var = self._normalize_var_for_log(out_var)
+                    logger.info(f"Added {note_id} to {collection_id} → {display_var}")
                     return {'status': 'success', 'value': collection_id}
                 else:
                     logger.error(f'Failed to add to Collection: {response.get("error")}')
@@ -1833,22 +1968,24 @@ Only provide the result, followed by the </end> tag.""")
         """
         Expand a Note into a Collection of Notes.
         
-        Handles three cases:
+        Handles four cases:
         1. Simple JSON array: Directly uses the array (e.g., [1, 2, 3])
         2. JSON object with array field: Extracts array from specified field (default 'results')
-        3. Plain text: Splits on newlines and filters empty lines
+        3. JSONL format: Multiple JSON objects, one per line (newlines required between objects)
+        4. Plain text: Splits on newlines and filters empty lines
         
         Required: target, out
         Optional: field (default: 'results') - only used for JSON object case
         
         Argument types:
-        - target: $variable (Note containing JSON array, JSON object with array field, or plain text)
+        - target: $variable (Note containing JSON array, JSON object with array field, JSONL, or plain text)
         - field: literal string (name of array field, default 'results') - only used for JSON object case
         - out: variable name for resulting Collection
         
         Examples:
         - Expand simple JSON array: {"type":"expand","target":"$json_note","out":"$items"} (where note contains [1,2,3])
         - Expand query-web results: {"type":"expand","target":"$results","out":"$items"} (where note contains {"results": [...]})
+        - Expand JSONL: {"type":"expand","target":"$jsonl_note","out":"$items"} (where note contains {"key":"val1"}\n{"key":"val2"})
         - Expand text lines: {"type":"expand","target":"$text_note","out":"$lines"}
         """
         error = self._validate_required_fields(action, 'target', 'out')
@@ -1919,14 +2056,19 @@ Only provide the result, followed by the </end> tag.""")
             else:
                 return {'status': 'failed', 'reason': f'JSON content must be an array or object with "{field_name}" field'}
         
-        # Only if NOT JSON (parse failed), fall back to plain text line splitting
+        # If NOT single JSON, try JSONL format (multiple JSON objects separated by newlines)
         elif not is_json:
             if isinstance(content, str):
-                # Split on newlines and filter empty lines
-                lines = [line.strip() for line in content.split('\n')]
-                array_data = [line for line in lines if line]  # Filter empty lines
+                # Try to detect and parse JSONL format
+                jsonl_array = self._detect_and_parse_jsonl(content)
+                if jsonl_array is not None:
+                    array_data = jsonl_array
+                else:
+                    # Fall back to plain text line splitting
+                    lines = [line.strip() for line in content.split('\n')]
+                    array_data = [line for line in lines if line]  # Filter empty lines
             else:
-                return {'status': 'failed', 'reason': f'Note content must be JSON with "{field_name}" array field or plain text'}
+                return {'status': 'failed', 'reason': f'Note content must be JSON with "{field_name}" array field, JSONL, or plain text'}
         
         if not array_data:
             return {'status': 'failed', 'reason': 'No items to expand (empty array or no non-empty lines)'}
@@ -1953,9 +2095,12 @@ Only provide the result, followed by the </end> tag.""")
                 source_desc = f"{note_id}.{field_name}"
             else:
                 source_desc = f"{note_id} (JSON)"
+        elif isinstance(content, str) and self._detect_and_parse_jsonl(content) is not None:
+            source_desc = f"{note_id} (JSONL)"
         else:
             source_desc = f"{note_id} (lines)"
-        logger.info(f"Expanded {source_desc} ({len(note_ids)} items) → ${out_var}")
+        display_var = self._normalize_var_for_log(out_var)
+        logger.info(f"Expanded {source_desc} ({len(note_ids)} items) → {display_var}")
         
         return {'status': 'success', 'value': collection_id}
     
@@ -1987,7 +2132,8 @@ Only provide the result, followed by the </end> tag.""")
         info_id = self._persist_note(size, 'size_result')
         if info_id:
             self._bind_variable(out_var, info_id)
-            logger.info(f"Size of {collection_var}: {size} → ${out_var}")
+            display_var = self._normalize_var_for_log(out_var)
+            logger.info(f"Size of {collection_var}: {size} → {display_var}")
             return {'status': 'success', 'value': info_id}
         
         return {'status': 'failed', 'reason': 'Failed to persist size result'}
@@ -2026,7 +2172,8 @@ Only provide the result, followed by the </end> tag.""")
         collection_id = self._create_collection(union_ids, 'union_result')
         if collection_id:
             self._bind_variable(out_var, collection_id)
-            logger.info(f"Union {len(target_ids)} + {len(value_ids)} → {len(union_ids)} → ${out_var}")
+            display_var = self._normalize_var_for_log(out_var)
+            logger.info(f"Union {len(target_ids)} + {len(value_ids)} → {len(union_ids)} → {display_var}")
             return {'status': 'success', 'value': collection_id}
         
         return {'status': 'failed', 'reason': 'Failed to create union Collection'}
@@ -2065,7 +2212,8 @@ Only provide the result, followed by the </end> tag.""")
         collection_id = self._create_collection(intersection_ids, 'intersection_result')
         if collection_id:
             self._bind_variable(out_var, collection_id)
-            logger.info(f"Intersection {len(target_ids)} ∩ {len(value_ids)} → {len(intersection_ids)} → ${out_var}")
+            display_var = self._normalize_var_for_log(out_var)
+            logger.info(f"Intersection {len(target_ids)} ∩ {len(value_ids)} → {len(intersection_ids)} → {display_var}")
             return {'status': 'success', 'value': collection_id}
         
         return {'status': 'failed', 'reason': 'Failed to create intersection Collection'}
@@ -2105,7 +2253,8 @@ Only provide the result, followed by the </end> tag.""")
         collection_id = self._create_collection(difference_ids, 'difference_result')
         if collection_id:
             self._bind_variable(out_var, collection_id)
-            logger.info(f"Difference {len(target_ids)} - {len(value_ids)} → {len(difference_ids)} → ${out_var}")
+            display_var = self._normalize_var_for_log(out_var)
+            logger.info(f"Difference {len(target_ids)} - {len(value_ids)} → {len(difference_ids)} → {display_var}")
             return {'status': 'success', 'value': collection_id}
         
         return {'status': 'failed', 'reason': 'Failed to create difference Collection'}
@@ -2170,7 +2319,8 @@ Only provide the result, followed by the </end> tag.""")
                 response = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
                 if response.get('success'):
                     self._bind_variable(out_var, collection_id)
-                    logger.info(f"Removed {note_id} from {collection_id} (now {len(note_ids)} items) → ${out_var}")
+                    display_var = self._normalize_var_for_log(out_var)
+                    logger.info(f"Removed {note_id} from {collection_id} (now {len(note_ids)} items) → {display_var}")
                     return {'status': 'success', 'value': collection_id}
                 else:
                     return {'status': 'failed', 'reason': response.get('error', 'Remove failed')}
@@ -2221,6 +2371,7 @@ Only provide the result, followed by the </end> tag.""")
                 continue
             
             projected = {}
+            all_fields_found = True
             for field in fields:
                 # Handle nested fields like "metadata.year"
                 value = content
@@ -2232,29 +2383,35 @@ Only provide the result, followed by the </end> tag.""")
                         value = None
                         break
                 
-                if value is not None:
-                    # Preserve nested structure in projected Note
-                    if len(parts) == 1:
-                        projected[parts[0]] = value
-                    else:
-                        # Rebuild nested structure
-                        current = projected
-                        for i, part in enumerate(parts[:-1]):
-                            if part not in current:
-                                current[part] = {}
-                            current = current[part]
-                        current[parts[-1]] = value
+                # Check if field is missing or null
+                if value is None:
+                    all_fields_found = False
+                    break
+                
+                # Preserve nested structure in projected Note
+                if len(parts) == 1:
+                    projected[parts[0]] = value
+                else:
+                    # Rebuild nested structure
+                    current = projected
+                    for i, part in enumerate(parts[:-1]):
+                        if part not in current:
+                            current[part] = {}
+                        current = current[part]
+                    current[parts[-1]] = value
             
-            # Create new Note with projected fields
-            projected_id = self._persist_note(projected, 'project_result')
-            if projected_id:
-                projected_ids.append(projected_id)
+            # Only create Note if all fields were found and not null
+            if all_fields_found and projected:
+                projected_id = self._persist_note(projected, 'project_result')
+                if projected_id:
+                    projected_ids.append(projected_id)
         
         # Create result Collection
         collection_id = self._create_collection(projected_ids, f'project_{collection_var}')
         if collection_id:
             self._bind_variable(out_var, collection_id)
-            logger.info(f"Projected {len(projected_ids)} items with fields {fields} → ${out_var}")
+            display_var = self._normalize_var_for_log(out_var)
+            logger.info(f"Projected {len(projected_ids)} items with fields {fields} → {display_var}")
             return {'status': 'success', 'value': collection_id}
         
         return {'status': 'failed', 'reason': 'Failed to create projected Collection'}
@@ -2314,7 +2471,8 @@ Only provide the result, followed by the </end> tag.""")
         collection_id = self._create_collection(plucked_ids, f'pluck_{collection_var}')
         if collection_id:
             self._bind_variable(out_var, collection_id)
-            logger.info(f"Plucked '{field}' from {len(plucked_ids)} items → ${out_var}")
+            display_var = self._normalize_var_for_log(out_var)
+            logger.info(f"Plucked '{field}' from {len(plucked_ids)} items → {display_var}")
             return {'status': 'success', 'value': collection_id}
         
         return {'status': 'failed', 'reason': 'Failed to create plucked Collection'}
@@ -2418,7 +2576,8 @@ Only provide the result, followed by the </end> tag.""")
         collection_id = self._create_collection(filtered_ids, f'filtered_{collection_var}')
         if collection_id:
             self._bind_variable(out_var, collection_id)
-            logger.info(f"Filtered {len(filtered_ids)}/{len(note_ids)} items with '{where_clause}' → ${out_var}")
+            display_var = self._normalize_var_for_log(out_var)
+            logger.info(f"Filtered {len(filtered_ids)}/{len(note_ids)} items with '{where_clause}' → {display_var}")
             return {'status': 'success', 'value': collection_id}
         
         return {'status': 'failed', 'reason': 'Failed to create filtered Collection'}
@@ -2484,7 +2643,8 @@ Only provide the result, followed by the </end> tag.""")
         collection_id = self._create_collection(sorted_ids, f'sorted_{collection_var}')
         if collection_id:
             self._bind_variable(out_var, collection_id)
-            logger.info(f"Sorted {len(sorted_ids)} items by {sort_field} ({order}) → ${out_var}")
+            display_var = self._normalize_var_for_log(out_var)
+            logger.info(f"Sorted {len(sorted_ids)} items by {sort_field} ({order}) → {display_var}")
             return {'status': 'success', 'value': collection_id}
         
         return {'status': 'failed', 'reason': 'Failed to create sorted Collection'}
@@ -2603,7 +2763,8 @@ Only provide the result, followed by the </end> tag.""")
         collection_id = self._create_collection(joined_ids, f'join_{left_var}_{right_var}')
         if collection_id:
             self._bind_variable(out_var, collection_id)
-            logger.info(f"Joined {len(left_ids)} + {len(right_ids)} items on {left_key}/{right_key} ({join_type}) → ${out_var} ({len(joined_ids)} results)")
+            display_var = self._normalize_var_for_log(out_var)
+            logger.info(f"Joined {len(left_ids)} + {len(right_ids)} items on {left_key}/{right_key} ({join_type}) → {display_var} ({len(joined_ids)} results)")
             return {'status': 'success', 'value': collection_id}
         
         return {'status': 'failed', 'reason': 'Failed to create joined Collection'}
@@ -3075,6 +3236,51 @@ Only provide the result, followed by the </end> tag.""")
         except (json.JSONDecodeError, ValueError):
             return None
     
+    def _detect_and_parse_jsonl(self, text: str) -> Optional[List[Dict]]:
+        """
+        Detect and parse JSONL format (multiple JSON objects separated by newlines).
+        
+        Handles surrounding text (code fences, preambles, trailing text) similar to
+        _extract_json_from_text. Requires newlines between JSON objects (standard JSONL).
+        
+        Returns:
+            List of parsed JSON objects if all non-empty lines are valid JSON objects, None otherwise
+        """
+        if not isinstance(text, str):
+            return None
+        
+        # Remove code fences first (common in LLM responses)
+        cleaned = text.replace("```json", "").replace("```", "").strip()
+        
+        # Split into lines
+        lines = cleaned.split('\n')
+        
+        # Try to parse each non-empty line as JSON
+        json_objects = []
+        for line in lines:
+            stripped = line.strip()
+            if not stripped:  # Skip empty lines
+                continue
+            
+            # Try to parse as JSON
+            try:
+                parsed = json.loads(stripped)
+                # Only accept JSON objects (not arrays or primitives)
+                if isinstance(parsed, dict):
+                    json_objects.append(parsed)
+                else:
+                    # Found a non-object JSON value - not JSONL format
+                    return None
+            except (json.JSONDecodeError, ValueError):
+                # Line doesn't parse as JSON - not JSONL format
+                return None
+        
+        # Only return array if we found at least one JSON object
+        if json_objects:
+            return json_objects
+        else:
+            return None
+    
     def _resolve_id(self, value: Any) -> Any:
         """
         Resolve $variable or literal to resource ID (Note_X or Collection_X).
@@ -3208,6 +3414,22 @@ Only provide the result, followed by the </end> tag.""")
         
         self.plan_bindings[var_name] = resource_id
         logger.debug(f"Bound ${var_name} → {resource_id}")
+    
+    def _normalize_var_for_log(self, var_name: str) -> str:
+        """
+        Normalize variable name for logging (ensure single $ prefix).
+        
+        Args:
+            var_name: Variable name that may or may not have $ prefix
+            
+        Returns:
+            Variable name with exactly one $ prefix
+        """
+        if not var_name:
+            return var_name
+        if var_name.startswith('$'):
+            return var_name
+        return f'${var_name}'
     
     def _validate_required_fields(self, action: Dict, *fields) -> Optional[str]:
         """
