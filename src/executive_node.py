@@ -2796,6 +2796,16 @@ end your response with </end>
         goal_text = self.current_goal.to_string() if self.current_goal else "No specific goal"
         plan_text = json.dumps(self.current_plan, indent=2) if self.current_plan else "No plan available"
         
+        # Extract planner's own assessment if available (for incremental planner)
+        planner_assessment = ""
+        if self.current_plan and isinstance(self.current_plan, dict):
+            reasoning = self.current_plan.get('reasoning', '')
+            success = self.current_plan.get('success', None)
+            if reasoning:
+                planner_assessment = f"Planner's final assessment: {reasoning}"
+                if success is not None:
+                    planner_assessment += f" (success={success})"
+        
         # Build compact structured telemetry for selected fields (bindings/evidence/features)
         try:
             telemetry_actions = []
@@ -2834,6 +2844,8 @@ end your response with </end>
         #Structured telemetry (selected fields; JSON):
         {{$telemetry_json}}
         
+        {{$planner_assessment}}
+        
         Please provide JSON object with:
         1. 
         2. a JSON formatted assessment of the plan's success or failure in meeting the goal, in the following format:
@@ -2841,19 +2853,29 @@ end your response with </end>
                 "Summary": str "a concise paragraph summarizing this plan execution, including the goal, actions taken, and observed results",
                 "How": str "concise (8-10 words) explanation how this plan intended to achieve the goal",
                 "outcome": str "concise (20-28 words) explanation of the outcome - did it achieve the goal? If not, where did it fail and why?",
-                "plan_score": int (0-100) "did the plan execute as expected?"
-                "goal_score": int (0-100) "how well the goal was met as measured by goal termination condition"
+                "plan_score": int (0-100) "did the plan execute as expected? (lower if steps failed, even if goal was achieved)"
+                "goal_score": int (0-100) "how well the goal was met as measured by goal termination condition. If planner marked goal as DONE/achieved, use 80-100. If planner marked as incomplete, use 0-60."
             }
-
+        
+        IMPORTANT: The goal_score should reflect whether the GOAL was achieved (not whether all steps succeeded). If the planner explicitly marked the goal as DONE/achieved, the goal_score should be high (80-100) even if some intermediate steps failed. The plan_score can be lower if steps failed, but goal_score reflects goal achievement.
+        
         Do not include any other introductory, explanatory, discursive, or formatting text in your response.
-
+        
         """
+        bindings = {
+            "goal_text": goal_text, 
+            "plan_text": plan_text, 
+            "actions_summary": actions_summary, 
+            "percepts_json": percepts_json, 
+            "telemetry_json": telemetry_json
+        }
+        if planner_assessment:
+            bindings["planner_assessment"] = planner_assessment
+        else:
+            bindings["planner_assessment"] = ""
+        
         response = self.llm_client.generate([summary_prompt], 
-                                            bindings={"goal_text": goal_text, 
-                                                    "plan_text": plan_text, 
-                                                    "actions_summary": actions_summary, 
-                                                    "percepts_json": percepts_json, 
-                                                    "telemetry_json": telemetry_json}, 
+                                            bindings=bindings, 
         max_tokens=500, is_json=True)
         summary = response.text if isinstance(response.text, dict) else None
         self.plan_summary = summary

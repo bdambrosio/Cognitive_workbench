@@ -332,13 +332,18 @@ class ResourceIndexer:
                 self.deleted_note_ids.add(resource_id)
                 continue
             
+            # Extract only serializable fields from resource (avoid ResourceType objects)
+            resource_props = {}
+            if resource:
+                resource_props = resource.get('properties', {}).copy() if resource.get('properties') else {}
+            
             formatted.append({
                 'resource_id': resource_id,
                 'name': r['metadata'].get('name', resource_id),
                 'score': r['score'],
                 'type': 'Note',
                 'metadata': r['metadata'],
-                'original_content': r.get('original_content', resource)
+                'properties': resource_props  # Only include properties, not full resource with ResourceType
             })
             
             if len(formatted) >= k:
@@ -380,6 +385,11 @@ class ResourceIndexer:
                 self.deleted_collection_ids.add(resource_id)
                 continue
             
+            # Extract only serializable fields from resource (avoid ResourceType objects)
+            resource_props = {}
+            if resource:
+                resource_props = resource.get('properties', {}).copy() if resource.get('properties') else {}
+            
             formatted.append({
                 'resource_id': resource_id,
                 'name': r['metadata'].get('name', resource_id),
@@ -387,7 +397,7 @@ class ResourceIndexer:
                 'type': 'Collection',
                 'item_count': r['metadata'].get('item_count', 0),
                 'metadata': r['metadata'],
-                'original_content': r.get('original_content', resource)
+                'properties': resource_props  # Only include properties, not full resource with ResourceType
             })
             
             if len(formatted) >= k:

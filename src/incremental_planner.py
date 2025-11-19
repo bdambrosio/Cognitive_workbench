@@ -12,10 +12,33 @@ import logging
 import traceback
 import time
 import re
+import os
+import sys
 from pathlib import Path
 from typing import Dict, List, Any, Optional
 
+# Configure logging with file handler
+# Add file handler directly to this module's logger (doesn't interfere with root logger config)
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+
+# Only add handlers if they don't already exist (to avoid duplicates on re-import)
+if not logger.handlers:
+    # File handler - ensure logs directory exists
+    try:
+        _log_dir = os.path.join(os.path.dirname(__file__), '..', 'logs')
+        os.makedirs(_log_dir, exist_ok=True)
+        _log_path = os.path.join(_log_dir, 'incremental_planner.log')
+        file_handler = logging.FileHandler(_log_path, mode='w')
+        file_handler.setLevel(logging.INFO)
+        file_handler.setFormatter(logging.Formatter(
+            '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+            '%Y-%m-%d %H:%M:%S'
+        ))
+        logger.addHandler(file_handler)
+    except Exception:
+        # Fall back to console-only if file handler setup fails
+        pass
 
 # Setup OpenTelemetry tracing
 try:
@@ -645,13 +668,20 @@ if HAS_SGLANG:
             search_result = executor.search_resources(queries, k_notes=3, k_collections=2, threshold=0.3)
             
             if search_result.get('status') != 'success':
-                logger.warning(f"Stage 0: Resource search failed: {search_result.get('reason')}")
+                reason = search_result.get('reason', 'Unknown error')
+                # Don't warn if queryable isn't ready yet or if indexes are empty (normal on startup)
+                if 'queryable may not be registered' in reason.lower() or 'no response' in reason.lower():
+                    logger.debug(f"Stage 0: Resource search unavailable (normal on startup): {reason}")
+                else:
+                    logger.warning(f"Stage 0: Resource search failed: {reason}")
                 return ""
             
             notes = search_result.get('notes', [])
             collections = search_result.get('collections', [])
             
             if not notes and not collections:
+                # Empty results are normal when no resources exist yet
+                logger.debug("Stage 0: No relevant resources found (indexes may be empty)")
                 return ""
             
             # Format results for prompt injection with descriptions
@@ -662,8 +692,7 @@ if HAS_SGLANG:
                 for note in notes:
                     name = note.get('name', note.get('resource_id', ''))
                     resource_id = note.get('resource_id', '')
-                    resource_data = note.get('original_content', {})
-                    props = resource_data.get('properties', {}) if resource_data else {}
+                    props = note.get('properties', {})  # Properties extracted separately, no ResourceType
                     
                     # Build description from metadata
                     desc_parts = []
@@ -692,8 +721,7 @@ if HAS_SGLANG:
                     name = coll.get('name', coll.get('resource_id', ''))
                     resource_id = coll.get('resource_id', '')
                     item_count = coll.get('item_count', 0)
-                    resource_data = coll.get('original_content', {})
-                    props = resource_data.get('properties', {}) if resource_data else {}
+                    props = coll.get('properties', {})  # Properties extracted separately, no ResourceType
                     
                     # Build description from metadata
                     desc_parts = [f"{item_count} items"]
@@ -747,6 +775,7 @@ if HAS_SGLANG:
         if executor:
             try:
                 available_resources_text = stage0_resource_retrieval.run(goal=goal, executor=executor)
+                logger.info(f"Stage 0: Available resources: {available_resources_text}")
             except Exception as e:
                 logger.warning(f"Stage 0: Failed to retrieve resources: {e}")
         
@@ -833,9 +862,9 @@ if HAS_SGLANG:
             "  THOUGHTS: <text>\n"
             "  DONE: <YES or NO - is the entire GOAL satisfied?>\n"
             "  NEXT_TASK: <next high-level subgoal, or blank if DONE=YES>\n"
-            "  REQUEST_TOOLS: <optional: json list of tool names you need docs for, or leave blank>\n\n"
-            "If you realize you need a tool not initially selected, add it to REQUEST_TOOLS.\n"
-            "You'll receive its full documentation before the next step.\n\n"
+            "  REQUEST_TOOLS: <json list of tool names>\n\n"
+            "  If you realize you need a tool not initially selected, add it to REQUEST_TOOLS.\n"
+            "  You'll receive its full documentation before the next step.\n\n"
             "Follow these formats exactly."
         )
         s += assistant("Understood.\n")
@@ -880,6 +909,7 @@ if HAS_SGLANG:
                 f"Tool `{tool_name}` with args:\n{tool_args_json}\n\n"
                 f"Result:\n{tool_result[:512]}\n\n"
                 "Respond using Stage 3 FORMAT. Be concise.\n"
+                "Ensure the REQUEST_TOOLS list is a valid JSON list of tool names.\n"
                 "DONE: YES only when you have EXECUTED all required actions (not just planned them). "
                 "Thinking about an action ≠ executing it. You must actually call display/persist/etc.\n"
             )
@@ -891,7 +921,7 @@ if HAS_SGLANG:
                 + gen(f"done_{step}", max_tokens=8, stop="\n")
                 + "\nNEXT_TASK: "
                 + gen(f"next_task_{step}", max_tokens=128, stop="\n")
-                + "\nREQUEST_TOOLS (tools you may need but didn't initially select): "
+                + "\nREQUEST_TOOLS <optional: json list of too>(tools you may need but didn't initially select): \n"
                 + gen(f"request_tools_{step}", max_tokens=64, stop="\n")
                 + "\n"
             )

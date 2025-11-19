@@ -95,11 +95,10 @@ def _search_papers_direct(query: str, limit: int, api_key: str = None) -> List[D
     # Define the query parameters
     query_params = {"fields": "title,year,abstract,citationCount"}
 
-    # Directly define the API key (Reminder: Securely handle API keys in production environments)
-    api_key = "your api key goes here"  # Replace with the actual API key
-
-    # Define headers with API key
+    # Define headers with API key (if provided)
     headers = {}
+    if api_key:
+        headers["x-api-key"] = api_key
 
     # Send the API request
     response = requests.get(url, params=query_params, headers=headers)
