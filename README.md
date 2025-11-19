@@ -28,6 +28,7 @@ We are moving beyond simple ReAct loops. The **Incremental Planner** (powered by
 - **Executes** tools *during* the planning phase to gather information.
 - **Reflects** on the results immediately.
 - **Refines** the plan dynamically based on execution feedback.
+- All within a single SGLang *function*, which means a single continuous evolution of latent state, no recycling of 'context'
 
 This creates a tighter loop between thought and action, allowing agents to handle complex, multi-stage information retrieval tasks that brittle "generate-then-execute" planners fail at.
 *See: `src/incremental_planner.py`*
@@ -42,9 +43,9 @@ Agents in this system don't just "chat"; they build mental models of their inter
 
 ### 3. Information Space ("Infospace")
 We treat information as a spatial environment. Agents don't just "process data"; they inhabit an **Infospace** where:
-- **Notes** and **Collections** are persistent "physical" objects in the agent's world.
+- **Notes** and **Collections** are primitive persistent objects in the agent's world (think items and sets).
 - **Cognitive Operations** (search, index, summarize, relate) are implemented as "spatial" actions, analogous to moving or picking up objects in a physical world.
-- Tools are first-class citizens, discoverable and executable within this space.
+- Tools are first-class citizens, discoverable and executable within this space (adapted from Claude Skills: prompt_augmentation, python, and plan skills are currently supported).
 *See: `src/infospace.py`, `src/infospace_resource_manager.py`*
 
 ---
@@ -90,7 +91,7 @@ pip install -r src/requirements.txt
 ```
 
 ### Configuration
-Edit `scenarios/jill.yaml` to point to your LLM backend (OpenAI, vLLM, etc.).
+Edit `scenarios/jill.yaml` to point to your LLM backend (OpenAI, vLLM, etc.) and the model you want SGLang to load (currently separate).
 
 ### Running an Experiment
 The primary research agent right now is **Jill**, an Infospace assistant using the Incremental Planner.
