@@ -9,8 +9,10 @@ import json
 import logging
 import hashlib
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Dict, Any, Optional, List, Tuple
+
+from infospace_types import InfospaceResources, ResourceTypeRegistry
 
 logger = logging.getLogger(__name__)
 
@@ -122,7 +124,7 @@ class ResourceIndexer:
         Initialize resource indexer.
         
         Args:
-            resource_manager: InfospaceResourceManager instance (for embedder and world_map access)
+            resource_manager: InfospaceResourceManager instance (for embedder and resource access)
         """
         self.resource_manager = resource_manager
         self.notes_index = FAISSStore(dimension=384, logger=logger)
@@ -194,7 +196,7 @@ class ResourceIndexer:
             item_summaries = []
             for i, note_id in enumerate(content[:3]):
                 if isinstance(note_id, str) and note_id.startswith('Note_'):
-                    note = self.resource_manager.world_map.get_resource_by_name(note_id)
+                    note = self.resource_manager.get_resource(note_id)
                     if note:
                         note_content = note.get('properties', {}).get('content', '')
                         if isinstance(note_content, (dict, list)):
@@ -218,7 +220,7 @@ class ResourceIndexer:
         Returns:
             True if indexed successfully
         """
-        resource = self.resource_manager.world_map.get_resource_by_name(resource_id)
+        resource = self.resource_manager.get_resource(resource_id)
         if not resource:
             logger.warning(f"ResourceIndexer: Note {resource_id} not found")
             return False
@@ -266,7 +268,7 @@ class ResourceIndexer:
         Returns:
             True if indexed successfully
         """
-        resource = self.resource_manager.world_map.get_resource_by_name(resource_id)
+        resource = self.resource_manager.get_resource(resource_id)
         if not resource:
             logger.warning(f"ResourceIndexer: Collection {resource_id} not found")
             return False
@@ -326,7 +328,7 @@ class ResourceIndexer:
             if resource_id in self.deleted_note_ids:
                 continue
             # Verify resource still exists
-            resource = self.resource_manager.world_map.get_resource_by_name(resource_id)
+            resource = self.resource_manager.get_resource(resource_id)
             if not resource:
                 # Mark as deleted for future searches
                 self.deleted_note_ids.add(resource_id)
@@ -379,7 +381,7 @@ class ResourceIndexer:
             if resource_id in self.deleted_collection_ids:
                 continue
             # Verify resource still exists
-            resource = self.resource_manager.world_map.get_resource_by_name(resource_id)
+            resource = self.resource_manager.get_resource(resource_id)
             if not resource:
                 # Mark as deleted for future searches
                 self.deleted_collection_ids.add(resource_id)
@@ -451,7 +453,7 @@ class ResourceIndexer:
         Called on restart to fill gaps (avoids double-indexing).
         """
         reindexed = 0
-        for resource_id, resource_data in self.resource_manager.world_map.resource_registry.items():
+        for resource_id, resource_data in self.resource_manager.resource_registry.items():
             resource_type = resource_data.get('type')
             type_name = resource_type.name if hasattr(resource_type, 'name') else str(resource_type)
             
@@ -509,33 +511,31 @@ class InfospaceResourceManager:
     - Persistence helpers
     """
     
-    def __init__(self, world_map, session, world_name, agent_registry):
+    def __init__(self, world_name: str):
         """
         Initialize the resource manager.
         
         Args:
-            world_map: WorldMap or InfospaceMap instance
-            session: Zenoh session for communication
-            world_name: Name of the world (for response topics)
-            agent_registry: Dict mapping character_name -> Agent instance
+            world_name: Name of the world (for persistence/index naming)
         """
-        self.world_map = world_map
-        self.session = session
         self.world_name = world_name
-        self.agent_registry = agent_registry
+        self.resource_types = ResourceTypeRegistry(InfospaceResources)
+        self.resource_registry: Dict[str, Dict[str, Any]] = {}
+        
+        # Simulation clock owned by the manager
+        self.simulation_time = datetime(2024, 6, 15, 12, 0, 0)
         
         # Resource counters
         self.note_counter = 0
         self.collection_counter = 0
         
-        # Named collections registry (name -> collection_id)
-        self.named_collections = {}
-        # Named notes registry (name -> note_id)
-        self.named_notes = {}
+        # Named resource registries
+        self.named_collections: Dict[str, str] = {}
+        self.named_notes: Dict[str, str] = {}
         
         # Indexing infrastructure
-        self.collection_indexes = {}  # collection_id -> collection_id (marks indexed)
-        self.vector_stores = {}  # collection_id -> FAISSStore
+        self.collection_indexes: Dict[str, str] = {}  # collection_id -> collection_id (marks indexed)
+        self.vector_stores: Dict[str, FAISSStore] = {}  # collection_id -> FAISSStore
         
         # Embedding model (lazy loaded)
         self.embedder = None
@@ -544,7 +544,139 @@ class InfospaceResourceManager:
         self.resource_indexer = ResourceIndexer(self)
         
         # System collections
-        self.system_notes_collection_id = None  # ID of the "Notes" system collection
+        self.system_notes_collection_id: Optional[str] = None  # ID of the "Notes" system collection
+
+    # ==================== Core Accessors ====================
+
+    def set_simulation_time(self, new_time: datetime):
+        """Set the shared simulation clock."""
+        self.simulation_time = new_time
+
+    def advance_simulation_minutes(self, minutes: int) -> datetime:
+        """Advance the simulation clock and return the new timestamp."""
+        self.simulation_time += timedelta(minutes=minutes)
+        return self.simulation_time
+
+    def get_resource(self, name_or_id: Optional[str]) -> Optional[Dict[str, Any]]:
+        """Retrieve a resource by ID, stable name, or canonicalized label."""
+        if not name_or_id:
+            return None
+
+        resource_id = self._resolve_resource_id(name_or_id)
+        if resource_id:
+            return self.resource_registry.get(resource_id)
+        return None
+
+    def get_resource_list(self) -> List[Dict[str, Any]]:
+        """Return a list of shallow copies of every registered resource."""
+        resource_list = []
+        for resource_id, resource_data in self.resource_registry.items():
+            item = dict(resource_data)
+            item['id'] = resource_id
+            resource_list.append(item)
+        return resource_list
+
+    def delete_resource(self, resource_id: str) -> Tuple[bool, Optional[str]]:
+        """Remove a resource and clean up associated indexes/mappings."""
+        if not resource_id:
+            return False, "Missing resource_id"
+
+        resource = self.resource_registry.pop(resource_id, None)
+        if not resource:
+            return False, f"Resource {resource_id} not found"
+
+        resource_type = resource.get('type')
+        type_name = getattr(resource_type, 'name', str(resource_type))
+
+        if resource_id.startswith('Collection_'):
+            self._cleanup_collection(resource_id)
+        elif resource_id.startswith('Note_'):
+            self._cleanup_note(resource_id)
+
+        # Remove from name registries
+        self._remove_named_reference(resource_id, type_name, resource)
+
+        # Remove from vector/semantic indexes
+        self.remove_resource_from_index(resource_id)
+
+        return True, None
+
+    def _resolve_resource_id(self, name_or_id: str) -> Optional[str]:
+        """Map IDs or friendly names to canonical resource IDs."""
+        if name_or_id in self.resource_registry:
+            return name_or_id
+        if name_or_id in self.named_notes:
+            return self.named_notes[name_or_id]
+        if name_or_id in self.named_collections:
+            return self.named_collections[name_or_id]
+
+        canonical = name_or_id.capitalize()
+        for resource_id, resource_data in self.resource_registry.items():
+            if str(resource_data.get('name', '')).capitalize() == canonical:
+                return resource_id
+
+            props = resource_data.get('properties', {})
+            if props.get('note_name', '').capitalize() == canonical:
+                return resource_id
+            if props.get('collection_name', '').capitalize() == canonical:
+                return resource_id
+        return None
+
+    def _cleanup_collection(self, collection_id: str):
+        """Remove tracking state for a collection."""
+        name_to_remove = None
+        for name, cid in self.named_collections.items():
+            if cid == collection_id:
+                name_to_remove = name
+                break
+        if name_to_remove:
+            del self.named_collections[name_to_remove]
+
+        self.vector_stores.pop(collection_id, None)
+        self.collection_indexes.pop(collection_id, None)
+        if collection_id == self.system_notes_collection_id:
+            self.system_notes_collection_id = None
+
+    def _cleanup_note(self, note_id: str):
+        """Remove a note from named registries and collections."""
+        name_to_remove = None
+        for name, nid in self.named_notes.items():
+            if nid == note_id:
+                name_to_remove = name
+                break
+        if name_to_remove:
+            del self.named_notes[name_to_remove]
+
+        # Remove from all collections
+        for resource_data in self.resource_registry.values():
+            props = resource_data.get('properties', {})
+            content = props.get('content')
+            if isinstance(content, list) and note_id in content:
+                props['content'] = [nid for nid in content if nid != note_id]
+                props['item_count'] = len(props['content'])
+
+        # Remove from system Notes collection if needed
+        if self.system_notes_collection_id:
+            system_collection = self.resource_registry.get(self.system_notes_collection_id)
+            if system_collection:
+                props = system_collection.get('properties', {})
+                content = props.get('content', [])
+                if isinstance(content, list) and note_id in content:
+                    props['content'] = [nid for nid in content if nid != note_id]
+                    props['item_count'] = len(props['content'])
+
+    def _remove_named_reference(self, resource_id: str, type_name: str, resource: Dict[str, Any]):
+        """Best-effort cleanup of named lookups."""
+        if type_name == 'Collection':
+            props = resource.get('properties', {})
+            collection_name = props.get('collection_name')
+            if collection_name and self.named_collections.get(collection_name) == resource_id:
+                del self.named_collections[collection_name]
+        elif type_name == 'Note':
+            props = resource.get('properties', {})
+            note_name = props.get('note_name')
+            if note_name and self.named_notes.get(note_name) == resource_id:
+                del self.named_notes[note_name]
     
     def update_resource_commentary(self, resource_id: str, commentary: str):
         """
@@ -669,13 +801,8 @@ class InfospaceResourceManager:
         if content is None:
             return False, None, "Missing content", None
         
-        # Get agent location
         canonical_character_name = character_name.capitalize()
-        if canonical_character_name not in self.agent_registry:
-            return False, None, f"Agent for character '{character_name}' not found", None
-        
-        agent = self.agent_registry[canonical_character_name]
-        location = (agent.x, agent.y)
+        location = (0, 0)  # Spatial coordinates removed in infospace mode
         
         # Generate unique Note ID
         self.note_counter += 1
@@ -683,7 +810,7 @@ class InfospaceResourceManager:
         
         # Get Note type from resource registry
         try:
-            note_type = self.world_map.resource_types.Note
+            note_type = self.resource_types.Note
         except AttributeError:
             return False, None, "Note resource type not available in this map", None
         
@@ -724,17 +851,15 @@ class InfospaceResourceManager:
             if key in extra_props:
                 note_data['properties'][key] = extra_props[key]
         
-        # Register in world map
-        self.world_map.resource_registry[note_id] = note_data
-        x, y = location
-        self.world_map.patches[x][y].resources[note_id] = note_data
+        # Register in registry
+        self.resource_registry[note_id] = note_data
         
         # Register named note if name provided
         if note_name:
             self.named_notes[note_name] = note_id
-            logger.info(f"📝 Created named Note: '{note_name}' = {note_id} at ({x}, {y}) by {canonical_character_name}")
+            logger.info(f"📝 Created named Note: '{note_name}' = {note_id} by {canonical_character_name}")
         else:
-            logger.info(f"📝 Created Note instance: {note_id} at ({x}, {y}) by {canonical_character_name}")
+            logger.info(f"📝 Created Note instance: {note_id} by {canonical_character_name}")
         
         # Auto-add to system "Notes" collection
         self.add_note_to_system_collection(note_id)
@@ -770,20 +895,12 @@ class InfospaceResourceManager:
         
         # Handle system collections (character_name=None)
         if character_name is None:
-            # System collection: use fixed location and system creator
             canonical_character_name = 'System'
-            location = (0, 0)
         else:
-            # Regular collection: validate character and get agent location
             if not character_name:
                 return False, None, "Missing character_name", None
-            
             canonical_character_name = character_name.capitalize()
-            if canonical_character_name not in self.agent_registry:
-                return False, None, f"Agent for character '{character_name}' not found", None
-            
-            agent = self.agent_registry[canonical_character_name]
-            location = (agent.x, agent.y)
+        location = (0, 0)  # Spatial coordinates removed in infospace mode
         
         # Generate unique Collection ID
         self.collection_counter += 1
@@ -791,7 +908,7 @@ class InfospaceResourceManager:
         
         # Get Collection type from resource registry
         try:
-            collection_type = self.world_map.resource_types.Collection
+            collection_type = self.resource_types.Collection
         except AttributeError:
             return False, None, "Collection resource type not available in this map", None
         
@@ -824,17 +941,15 @@ class InfospaceResourceManager:
         if collection_data['properties'].get('kind') == 'document':
             collection_data['properties']['chunk_count'] = collection_data['properties'].get('item_count', 0)
         
-        # Register in world map
-        self.world_map.resource_registry[collection_id] = collection_data
-        x, y = location
-        self.world_map.patches[x][y].resources[collection_id] = collection_data
+        # Register in registry
+        self.resource_registry[collection_id] = collection_data
         
         # Register named collection if name provided
         if collection_name:
             self.named_collections[collection_name] = collection_id
-            logger.info(f"📚 Created named Collection: '{collection_name}' = {collection_id} at ({x}, {y}) by {canonical_character_name} ({collection_data['properties']['item_count']} items)")
+            logger.info(f"📚 Created named Collection: '{collection_name}' = {collection_id} by {canonical_character_name} ({collection_data['properties']['item_count']} items)")
         else:
-            logger.info(f"📚 Created Collection instance: {collection_id} at ({x}, {y}) by {canonical_character_name} ({collection_data['properties']['item_count']} items)")
+            logger.info(f"📚 Created Collection instance: {collection_id} by {canonical_character_name} ({collection_data['properties']['item_count']} items)")
         
         # Index the Collection immediately (for Stage 0 retrieval)
         self.resource_indexer.index_collection(collection_id, commentary="")
@@ -860,7 +975,7 @@ class InfospaceResourceManager:
             Tuple of (success, item_count, error_msg)
         """
         # Fetch Collection
-        collection = self.world_map.resource_registry.get(collection_id)
+        collection = self.resource_registry.get(collection_id)
         if not collection:
             return False, None, f"Collection {collection_id} not found"
         
@@ -909,7 +1024,7 @@ class InfospaceResourceManager:
             Tuple of (success, error_msg)
         """
         # Fetch resource
-        resource = self.world_map.resource_registry.get(resource_id)
+        resource = self.resource_registry.get(resource_id)
         if not resource:
             return False, f"Resource {resource_id} not found"
         
@@ -919,7 +1034,7 @@ class InfospaceResourceManager:
             persisted_count = 0
             for note_id in content:
                 if isinstance(note_id, str) and note_id.startswith('Note_'):
-                    note_resource = self.world_map.resource_registry.get(note_id)
+                    note_resource = self.resource_registry.get(note_id)
                     if note_resource and not note_resource.get('properties', {}).get('persistent', False):
                         note_resource['properties']['persistent'] = True
                         note_resource['properties']['persisted_at'] = datetime.now().isoformat()
@@ -961,7 +1076,7 @@ class InfospaceResourceManager:
             return False, None, "Missing collection_id"
         
         # Fetch Collection
-        collection = self.world_map.get_resource_by_name(collection_id)
+        collection = self.get_resource(collection_id)
         if not collection:
             return False, None, f"Collection {collection_id} not found"
         
@@ -1027,7 +1142,7 @@ class InfospaceResourceManager:
             Number of chunks indexed
         """
         # Fetch Note
-        note = self.world_map.get_resource_by_name(note_id)
+        note = self.get_resource(note_id)
         if not note:
             logger.warning(f"Note {note_id} not found, skipping indexing")
             return 0
@@ -1328,7 +1443,7 @@ class InfospaceResourceManager:
         note_instances = {}
         collection_instances = {}
         
-        for resource_id, resource_data in self.world_map.resource_registry.items():
+        for resource_id, resource_data in self.resource_registry.items():
             resource_type = resource_data.get('type')
             type_name = resource_type.name if hasattr(resource_type, 'name') else str(resource_type)
             
@@ -1361,11 +1476,11 @@ class InfospaceResourceManager:
             coll_props = coll_serialized.get('properties', {})
             if coll_props.get('persistent', False):
                 content = coll_props.get('content', [])
-                full_coll_data = self.world_map.resource_registry.get(collection_id)
+                full_coll_data = self.resource_registry.get(collection_id)
                 if full_coll_data:
                     for note_id in content:
                         if isinstance(note_id, str) and note_id.startswith('Note_'):
-                            note_data = self.world_map.resource_registry.get(note_id)
+                            note_data = self.resource_registry.get(note_id)
                             if note_data and not note_data.get('properties', {}).get('persistent', False):
                                 # Auto-persist Note added after Collection was persisted
                                 note_data['properties']['persistent'] = True
@@ -1397,16 +1512,11 @@ class InfospaceResourceManager:
                 self.note_counter = world_data.get('note_counter', 0)
                 
                 # Get Note type from resource registry
-                try:
-                    note_type = self.world_map.resource_types.Note
-                except AttributeError:
-                    logger.warning("Note type not available in this map, skipping Note restoration")
-                    note_type = None
+                note_type = getattr(self.resource_types, 'Note', None)
                 
                 if note_type:
                     instances = world_data['note_instances']
                     for info_id, info_data in instances.items():
-                        # Reconstruct resource_data structure
                         resource_data = {
                             'name': info_data['name'],
                             'type': note_type,
@@ -1416,19 +1526,12 @@ class InfospaceResourceManager:
                             'properties': info_data.get('properties', {})
                         }
                         
-                        # Register in resource_registry
-                        self.world_map.resource_registry[info_id] = resource_data
+                        self.resource_registry[info_id] = resource_data
                         
-                        # Place in spatial grid
-                        x, y = info_data['location']
-                        self.world_map.patches[x][y].resources[info_id] = resource_data
-                        
-                        # Restore named note mapping if present
                         note_name = info_data.get('properties', {}).get('note_name')
                         if note_name:
                             self.named_notes[note_name] = info_id
                         
-                        # Add to system "Notes" collection
                         self.add_note_to_system_collection(info_id)
                     
                     logger.info(f"📂 Restored {len(instances)} Note instances, counter at {self.note_counter}")
@@ -1442,16 +1545,11 @@ class InfospaceResourceManager:
                 self.collection_counter = world_data.get('collection_counter', 0)
                 
                 # Get Collection type from resource registry
-                try:
-                    collection_type = self.world_map.resource_types.Collection
-                except AttributeError:
-                    logger.warning("Collection type not available in this map, skipping Collection restoration")
-                    collection_type = None
+                collection_type = getattr(self.resource_types, 'Collection', None)
                 
                 if collection_type:
                     instances = world_data['collection_instances']
                     for info_id, info_data in instances.items():
-                        # Reconstruct resource_data structure
                         resource_data = {
                             'name': info_data['name'],
                             'type': collection_type,
@@ -1461,14 +1559,8 @@ class InfospaceResourceManager:
                             'properties': info_data.get('properties', {})
                         }
                         
-                        # Register in resource_registry
-                        self.world_map.resource_registry[info_id] = resource_data
+                        self.resource_registry[info_id] = resource_data
                         
-                        # Place in spatial grid
-                        x, y = info_data['location']
-                        self.world_map.patches[x][y].resources[info_id] = resource_data
-                        
-                        # Restore named collection mapping if present
                         collection_name = info_data.get('properties', {}).get('collection_name')
                         if collection_name:
                             self.named_collections[collection_name] = info_id
@@ -1479,11 +1571,11 @@ class InfospaceResourceManager:
             
             # Cleanup dangling note_ids in restored persistent Collections
             for info_id, info_data in instances.items():
-                resource_data = self.world_map.resource_registry.get(info_id)
+                resource_data = self.resource_registry.get(info_id)
                 if resource_data and resource_data.get('properties', {}).get('persistent', False):
                     content = resource_data['properties'].setdefault('content', [])
                     original_len = len(content)
-                    content = [nid for nid in content if isinstance(nid, str) and nid.startswith('Note_') and self.world_map.resource_registry.get(nid)]
+                    content = [nid for nid in content if isinstance(nid, str) and nid.startswith('Note_') and self.resource_registry.get(nid)]
                     resource_data['properties']['content'] = content
                     resource_data['properties']['item_count'] = len(content)
                     removed_count = original_len - len(content)
@@ -1493,4 +1585,3 @@ class InfospaceResourceManager:
         # Load resource indexes and re-index persistent resources
         self.resource_indexer.load_indexes(self.world_name)
         self.resource_indexer.reindex_persistent_resources()
-

@@ -115,6 +115,7 @@ class CharacterLauncher:
     def launch_shared_services(self, map_file: str = None, launch_ui: bool = False, launch_resource_browser: bool = False, server_name: str = 'vllm', model_name: str = None, ui_port: int = 3000, setting: str = None, scenario_name: str = None):
         """Launch shared services (map node, optional UI, optional resource browser)."""
         self.logger.info('Launching shared services...')
+        world_label = scenario_name or (Path(map_file).stem if map_file else 'infospace')
         
         # Launch FastAPI Action Display Node (optional UI)
         if launch_ui:
@@ -132,12 +133,7 @@ class CharacterLauncher:
         # Launch Resource Browser (optional debug tool)
         if launch_resource_browser:
             try:
-                # Extract map name from map_file for resource browser
-                map_name = 'infolab'  # default
-                if map_file:
-                    map_name = map_file.replace('.py', '')
-                
-                browser_args = [sys.executable, 'resource_browser.py', '--map', map_name, '--port', '3001', '--no-browser']
+                browser_args = [sys.executable, 'resource_browser.py', '--map', world_label, '--port', '3001', '--no-browser']
                 browser_process = subprocess.Popen(browser_args)
                 self.shared_processes.append(browser_process)
                 self.logger.info(f'✅ Resource Browser launched on port 3001')
@@ -149,10 +145,19 @@ class CharacterLauncher:
         # Launch map node (required for situation awareness)
         try:
             map_args = [sys.executable, 'map_node.py']
+            map_path = None
             if map_file:
-                # Decision on reuse/new world is handled early in main()
-                world_name = map_file.replace('.py', '')
-                map_args.extend(['-m', map_file, '-w', world_name])
+                candidate = Path(map_file)
+                if not candidate.exists():
+                    alt = Path(__file__).parent / 'maps' / map_file
+                    if alt.exists():
+                        candidate = alt
+                if candidate.exists():
+                    map_path = str(candidate)
+            if map_path:
+                map_args.extend(['-m', map_path])
+            if world_label:
+                map_args.extend(['-w', world_label])
             if setting:
                 map_args.extend(['-s', setting])   
             # Pass LLM configuration to map_node
@@ -173,7 +178,7 @@ class CharacterLauncher:
                 self.logger.info('Debug mode enabled via CWB_DEBUG - map turn timeout will be disabled')
             map_process = subprocess.Popen(map_args, env=env)
             self.shared_processes.append(map_process)
-            self.logger.info(f'✅ Map Node launched' + (f' with map: {map_file}' if map_file else ''))
+            self.logger.info(f'✅ Map Node launched (world: {world_label})')
             
             # Wait for map node to be ready (check for initialization message)
             self.logger.info('⏳ Waiting for Map Node to initialize...')
@@ -263,34 +268,12 @@ class CharacterLauncher:
         """Launch all character instances."""
         self.logger.info(f'Launching {len(self.characters)} characters...')
         
-        # Detect if map is infospace
-        is_infospace = False
-        map_name = None
-        if map_file:
-            import importlib.util
-            import os
-            maps_dir = os.path.join(os.path.dirname(__file__), 'maps')
-            map_path = os.path.join(maps_dir, map_file)
-            
-            # Try to load map module to check if it has InfospaceMap
-            if os.path.exists(map_path):
-                map_name = map_file.replace('.py', '')
-                spec = importlib.util.spec_from_file_location("temp_map_module", map_path)
-                temp_map_module = importlib.util.module_from_spec(spec)
-                spec.loader.exec_module(temp_map_module)
-                
-                # Check if it uses InfospaceMap
-                if hasattr(temp_map_module, 'map_class'):
-                    map_class_name = temp_map_module.map_class.__name__
-                    is_infospace = ('Infospace' in map_class_name or 'InfoSpace' in map_class_name)
-                    if is_infospace:
-                        self.logger.info(f'🧩 Detected infospace map: {map_file}')
+        world_label = scenario_name or (Path(map_file).stem if map_file else 'infospace')
         
         # Add infospace flag and map name to all character configs
         for character in self.characters:
-            character.config['is_infospace'] = is_infospace
-            if map_name:
-                character.config['map_name'] = map_name
+            character.config['is_infospace'] = True
+            character.config['map_name'] = world_label
         
         # Launch shared services first
         self.launch_shared_services(map_file, launch_ui, launch_resource_browser, server_name, model_name, ui_port, setting, scenario_name)
@@ -415,7 +398,7 @@ def main():
     parser.add_argument('config_file', help='YAML configuration file with character and LLM settings')
     parser.add_argument('--characters', nargs='+', help='Character names to launch (overrides config file)')
     parser.add_argument('--list-only', action='store_true', help='List available characters and exit')
-    parser.add_argument('--map-file', help='Map file name (e.g., forest.py) to load in the shared map node (overrides YAML "map" if provided)')
+    parser.add_argument('--map-file', help='Legacy map file or world label for the shared infospace node (overrides YAML "map" if provided)')
     parser.add_argument('--ui', action='store_true', help='Launch FastAPI web UI')
     parser.add_argument('--ui-port', type=int, default=3000, help='Port for FastAPI web UI (default: 3000)')
     parser.add_argument('--resource-browser', action='store_true', help='Launch Resource Browser for debugging (port 3001)')
@@ -505,78 +488,66 @@ def main():
         return
     
     try:
-        # Launch all characters
-        effective_map_file = args.map_file if args.map_file else yaml_map_file
-        
-        # Prompt early about reusing existing world before any subprocesses start
-        if effective_map_file:
-            world_name = effective_map_file.replace('.py', '')
-            world_file = Path(f"data/world/{world_name}_world.json")
-            if world_file.exists():
-                print(f"\nFound existing world data for '{world_name}'")
-                reuse = input("Reuse existing world? (y/n): ").strip().lower()
-                if reuse in ['n', 'no']:
-                    confirm_delete = input("Are you sure you want to delete existing world data and create new? (y/n): ").strip().lower()
-                    if confirm_delete == 'y':
-                        print("Creating new world...")
-                        # Remove existing world file
-                        try:
-                            world_file.unlink()
-                            print(f"Removed existing world data for '{world_name}'")
-                        except Exception as e:
-                            print(f"Failed to remove existing world data: {e}")
-                        
-                        # Remove existing character data for characters in current config
-                        data_dir = Path("data")
-                        if data_dir.exists():
-                            character_names = [char.name for char in launcher.characters]
-                            
-                            memory_dir = data_dir / "memory"
-                            if memory_dir.exists():
-                                for mem_file in memory_dir.glob("*_memory.json"):
-                                    char_name = mem_file.stem.replace('_memory', '')
-                                    if char_name in character_names:
-                                        try:
-                                            mem_file.unlink()
-                                            print(f"Removed existing memory data: {mem_file.name}")
-                                        except Exception:
-                                            pass
-                            
-                            situation_dir = data_dir / "situation"
-                            if situation_dir.exists():
-                                for sit_file in situation_dir.glob("*_situation.json"):
-                                    char_name = sit_file.stem.replace('_situation', '')
-                                    if char_name in character_names:
-                                        try:
-                                            sit_file.unlink()
-                                            print(f"Removed existing situation data: {sit_file.name}")
-                                        except Exception:
-                                            pass
-                            
-                            # Remove RAG stores for characters in current config
-                            rag_stores_dir = data_dir / "rag_stores"
-                            if rag_stores_dir.exists():
-                                for char_name in character_names:
-                                    char_rag_dir = rag_stores_dir / char_name
-                                    if char_rag_dir.exists():
-                                        try:
-                                            import shutil
-                                            shutil.rmtree(char_rag_dir)
-                                            print(f"Removed existing RAG store: {char_name}")
-                                        except Exception as e:
-                                            print(f"Failed to remove RAG store for {char_name}: {e}")
-                        else:
-                            print(f"Reusing existing world '{world_name}'")
-                    elif confirm_delete == 'n':
-                        reuse = 'y'
-                        print(f"Reusing existing world '{world_name}'")
-                elif reuse == 'y':
-                    print(f"Reusing existing world '{world_name}'")
-                else:
-                    # Invalid or empty, default to reuse
-                    print(f"Reusing existing world '{world_name}'")
+        world_label_source = args.map_file or yaml_map_file or scenario_name
+        world_name = Path(world_label_source).stem if world_label_source else 'infospace'
+        world_file = Path(f"data/world/{world_name}_world.json")
 
-            launcher.launch_all_characters(effective_map_file, args.ui, args.resource_browser, server_name, model_name, ui_port=args.ui_port, setting=setting, scenario_name=scenario_name)
+        if world_file.exists():
+            print(f"\nFound existing world data for '{world_name}'")
+            reuse = input("Reuse existing world? (y/n): ").strip().lower()
+            if reuse in ['n', 'no']:
+                confirm_delete = input("Are you sure you want to delete existing world data and create new? (y/n): ").strip().lower()
+                if confirm_delete == 'y':
+                    print("Creating new world...")
+                    try:
+                        world_file.unlink()
+                        print(f"Removed existing world data for '{world_name}'")
+                    except Exception as e:
+                        print(f"Failed to remove existing world data: {e}")
+                    
+                    data_dir = Path("data")
+                    if data_dir.exists():
+                        character_names = [char.name for char in launcher.characters]
+                        
+                        memory_dir = data_dir / "memory"
+                        if memory_dir.exists():
+                            for mem_file in memory_dir.glob("*_memory.json"):
+                                char_name = mem_file.stem.replace('_memory', '')
+                                if char_name in character_names:
+                                    try:
+                                        mem_file.unlink()
+                                        print(f"Removed existing memory data: {mem_file.name}")
+                                    except Exception:
+                                        pass
+                        
+                        situation_dir = data_dir / "situation"
+                        if situation_dir.exists():
+                            for sit_file in situation_dir.glob("*_situation.json"):
+                                char_name = sit_file.stem.replace('_situation', '')
+                                if char_name in character_names:
+                                    try:
+                                        sit_file.unlink()
+                                        print(f"Removed existing situation data: {sit_file.name}")
+                                    except Exception:
+                                        pass
+                        
+                        rag_stores_dir = data_dir / "rag_stores"
+                        if rag_stores_dir.exists():
+                            for char_name in character_names:
+                                char_rag_dir = rag_stores_dir / char_name
+                                if char_rag_dir.exists():
+                                    try:
+                                        import shutil
+                                        shutil.rmtree(char_rag_dir)
+                                        print(f"Removed existing RAG store: {char_name}")
+                                    except Exception as e:
+                                        print(f"Failed to remove RAG store for {char_name}: {e}")
+                else:
+                    print(f"Reusing existing world '{world_name}'")
+            else:
+                print(f"Reusing existing world '{world_name}'")
+
+        launcher.launch_all_characters(world_label_source, args.ui, args.resource_browser, server_name, model_name, ui_port=args.ui_port, setting=setting, scenario_name=scenario_name or world_name)
         
         # Monitor processes
         launcher.monitor_processes()
@@ -588,4 +559,4 @@ def main():
 
 
 if __name__ == '__main__':
-    main() 
+    main()

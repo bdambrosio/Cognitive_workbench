@@ -8,7 +8,6 @@ Replaces ROS2 complexity with simple Zenoh pub/sub.
 
 import traceback
 import zenoh
-from zenoh import ConsolidationMode, QueryTarget
 import json
 import time
 import logging
@@ -20,9 +19,6 @@ from pathlib import Path
 from datetime import datetime
 from typing import Dict, List, Any
 import urllib.parse
-
-
-from utils import hash_utils, zenoh_utils
 
 # Configure logging with unbuffered output
 # Console handler with WARNING level (less verbose)
@@ -111,13 +107,6 @@ class ZenohSituationNode:
             self.action_callback
         )
 
-        # Subscriber for explicit situation update requests (step_look, etc.)
-        # Executive publishes to this topic after actions that change visibility/adjacency
-        self.request_update_subscriber = self.session.declare_subscriber(
-            f"cognitive/{character_name}/situation/request_update",
-            self.map_update_callback
-        )
-        
         # === ZENOH PUBLICATION ===
         # NAME: situation_update
         # TOPIC: cognitive/{character}/situation/update
@@ -164,7 +153,6 @@ class ZenohSituationNode:
         # Shutdown flags
         self.shutdown_requested = False
         self._shutting_down = False
-        self.update_map_retries = 0
         # Register signal handlers for graceful shutdown
         signal.signal(signal.SIGTERM, self._signal_handler)
         signal.signal(signal.SIGINT, self._signal_handler)
@@ -172,7 +160,6 @@ class ZenohSituationNode:
         logger.info(f'🧭 Situation Node initialized for character: {character_name}')
         logger.info(f'   - Subscribing to: cognitive/{character_name}/sense_data')
         logger.info(f'   - Subscribing to: cognitive/{character_name}/action')
-        logger.info(f'   - Subscribing to: cognitive/{character_name}/situation/request_update')
         logger.info(f'   - Publishing to: cognitive/{character_name}/situation/update')
         logger.info(f'   - Queryable at: cognitive/{character_name}/situation/current_situation')
         logger.info(f'   - Proximity queryable at: cognitive/{character_name}/situation/proximity')
@@ -225,14 +212,6 @@ class ZenohSituationNode:
         except Exception as e:
             logger.error(f'Error processing action: {e}')
     
-    def map_update_callback(self, sample):
-        """Handle incoming actions to update situation."""
-        try:
-            self.update_map_retries = 0
-            self._update_map_data()
-            
-        except Exception as e:
-            logger.error(f'Error processing action: {e}')
     
     def _update_situation_from_sense_data(self, sense_data: Dict[str, Any]):
         """Update situation based on incoming sense data."""
@@ -246,91 +225,8 @@ class ZenohSituationNode:
     
     def _update_situation_from_action(self, action_data: Dict[str, Any]):
         """Update situation based on incoming action."""
-        try:
-            if 'announcement' in action_data.get('type') or 'move' in action_data.get('type'):
-                self.update_map_retries = 0
-                self._update_map_data()
-            
-        except Exception as e:
-            logger.error(f'Error updating situation from action: {e}')
-    
-    def _update_map_data(self):
-        """Update map data through lookup query."""
-        try:
-            # Query map node for agent look data with timeout
-            logger.info(f'Updating map data for {self.character_name}')
-            for reply in self.session.get(f"cognitive/map/agent/{self.character_name}/look", target=QueryTarget.BEST_MATCHING, consolidation=ConsolidationMode.NONE, timeout=4.0 if not self.debug else 300.0):
-                try:
-                    if reply.ok:
-                        map_look_data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
-                    if reply.ok and map_look_data['success']:
-                        for character in map_look_data['characters']:
-                            if type(character) == dict:
-                                logger.error(f'Character is a dict: {character}')
-                        self.situation['location'] = map_look_data['location']
-                        self.situation['visible_characters'] = map_look_data['characters']
-                        view_strings = hash_utils.findall('view', map_look_data['look_result'])
-                        self.situation['views'] = [self.parse_view_string(view_string) for view_string in view_strings]
-                        self.situation['adjacent_to']['resources'] = []
-                        self.situation['adjacent_to']['characters'] = []
-                        self.situation['adjacent_to']['paths'] = []
-                        self.situation['resources'] = []
-                        self.situation['paths'] = []
-                        self.situation['characters'] = map_look_data['characters']
-                        self.situation['paths'] = map_look_data['paths']
-
-                        # Check if resources and characters are in the response
-                        for view in self.situation['views']:
-                            for resource in view['resources']:
-                                if isinstance(resource, dict) and 'distance' in resource:
-                                    if resource['distance'] <= 1:
-                                        self.situation['adjacent_to']['resources'].append(resource['name'])
-                                    if resource['name'] not in self.situation['resources']:
-                                        self.situation['resources'].append(resource['name'])
-                        
-                            for path in view['paths']:
-                                if isinstance(path, dict) and 'distance' in path:
-                                    if path['distance'] <= 1:
-                                        self.situation['adjacent_to']['paths'].append(path['name'])
-                                    if path['name'] not in self.situation['paths']:
-                                        self.situation['paths'].append(path['name'])
-                        
-                            for character in view['characters']:
-                                if isinstance(character, dict) and 'distance' in character:
-                                    if character['distance'] <= 1 and (character not in self.situation['adjacent_to']['characters']):
-                                        self.situation['adjacent_to']['characters'].append(character['name'])
-                                    if character['name'] not in self.situation['characters']:
-                                        self.situation['characters'].append(character['name'])
-                        self.situation['adjacent_to']['characters'] = list(set(self.situation['adjacent_to']['characters']))
-                        self.situation['adjacent_to']['resources'] = list(set(self.situation['adjacent_to']['resources']))
-                        logger.info(f'🗺️ Updated map look data for {self.character_name}')
-                        logger.debug(f'   Adjacent resources: {self.situation["adjacent_to"]["resources"]}')
-                        logger.debug(f'   Adjacent characters: {self.situation["adjacent_to"]["characters"]}')
-                        # Save and publish updated situation
-                        self.save_situation()
-                        self._publish_situation()
-                        logger.info(f'Map look data updated for {self.character_name}')
-                        break
-                    else:
-                        reply_str = str(reply)
-                        decoded_error = zenoh_utils.decode_zenoh_error_payload(reply_str)
-                        if 'timeout' in decoded_error or 'not found' in decoded_error:
-                            self.update_map_retries += 1
-                            if self.update_map_retries < 3:
-                                self._update_map_data()
-                            else:
-                                logger.error(f'Map query timeout for {self.character_name} (map node may be busy)')
-                        break
-                except Exception as e:
-                    logger.error(f'Error parsing map look response for {self.character_name}: {e}')
-                    traceback.print_exc()
-                    break
-            
-        except Exception as e:
-            if "timeout" in str(e).lower():
-                logger.error(f'Map query timeout for {self.character_name} (map node may be busy)')
-            else:
-                logger.error(f'Error updating map data: {e}')
+        # Legacy map-driven updates removed; rely on sense data instead.
+        return
     
     def delta(self, old_data, new_data):
         """Calculate the delta between two data sets. tbd"""
@@ -629,15 +525,8 @@ class ZenohSituationNode:
             logger.error(f'Error during shutdown: {e}')
     
     def parse_view_string(self, view_string: str) -> dict:
-        """
-        Parse a view string into a structured dictionary.
-        
-        Example input: "Southwest: visibility 40, terrain Forest, slope Downhill ; resources: Fallen_Branch22 distance 9; characters: Joe distance 1;"
-        
-        Returns:
-            dict: {'direction': str, 'visibility': int, 'terrain': str, 'slope': str, 'resources': [{'name': str, 'distance': int}], 'characters': [{'name': str, 'distance': int}]}
-        """
-        result = {
+        """Legacy parser retained for compatibility; returns empty infospace view."""
+        return {
             'direction': '',
             'visibility': 0,
             'terrain': '',
@@ -647,78 +536,6 @@ class ZenohSituationNode:
             'characters': [],
             'paths': []
         }
-        
-        # Split direction from the rest
-        parts = view_string.split(':', 1)
-        if len(parts) < 2:
-            return result
-            
-        result['direction'] = parts[0].strip()
-        remaining = parts[1].strip()
-        
-        # Split by semicolons to get main section and optional sections
-        sections = remaining.split(';')
-        
-        # Parse main section (visibility, terrain, slope)
-        main_section = sections[0].strip()
-        main_parts = [part.strip() for part in main_section.split(',')]
-        
-        for part in main_parts:
-            if part.startswith('visibility'):
-                if part.split()[1].isdigit():
-                    result['visibility'] = int(part.split()[1])
-                else:
-                    result['visibility'] = 0
-            elif part.startswith('terrain'):
-                result['terrain'] = part.split()[1]
-            elif part.startswith('property'):
-                result['property'] = part.split()[1]
-            elif part.startswith('slope'):
-                result['slope'] = part.split()[1]
-        
-        # Parse optional sections (resources, characters, paths)
-        for section in sections[1:]:
-            section = section.strip()
-            if not section:
-                continue
-                
-            if section.startswith('resources:'):
-                # Parse resources: "resources: Name1 distance X, Name2 distance Y"
-                resources_part = section[10:].strip()  # Remove "resources: "
-                if resources_part:
-                    resource_items = [item.strip() for item in resources_part.split(',')]
-                    for item in resource_items:
-                        item_parts = item.split()
-                        if len(item_parts) >= 3 and item_parts[-2] == 'distance':
-                            resource_name = ' '.join(item_parts[:-2])
-                            distance = int(item_parts[-1])
-                            result['resources'].append({'name': resource_name, 'distance': distance})
-            
-            elif section.startswith('characters:'):
-                # Parse characters: "characters: Name1 distance X, Name2 distance Y"
-                characters_part = section[11:].strip()  # Remove "characters: "
-                if characters_part:
-                    character_items = [item.strip() for item in characters_part.split(',')]
-                    for item in character_items:
-                        item_parts = item.split()
-                        if len(item_parts) >= 3 and item_parts[-2] == 'distance':
-                            character_name = ' '.join(item_parts[:-2])
-                            distance = int(item_parts[-1])
-                            result['characters'].append({'name': character_name, 'distance': distance})
-            
-            elif section.startswith('roads:') or section.startswith('paths:'):
-                # Parse infrastructure: "roads: PathXY distance X, PathUV distance Y"
-                infra_part = section.split(':', 1)[1].strip()
-                if infra_part:
-                    infra_items = [item.strip() for item in infra_part.split(',')]
-                    for item in infra_items:
-                        item_parts = item.split()
-                        if len(item_parts) >= 3 and item_parts[-2] == 'distance':
-                            path_name = ' '.join(item_parts[:-2])
-                            distance = int(item_parts[-1])
-                            result['paths'].append({'name': path_name, 'distance': distance})
-        
-        return result
 
 
 def main():

@@ -1,37 +1,19 @@
 """
-Infospace cognition map module.
+Infospace cognition module.
 
 Defines resource types for information/semantic operations:
 - Note: Dynamic resources (artifacts created at runtime)
 - Collection: Dynamic resources (groups of related notes or structured data)
 """
 
-from enum import Enum, auto
 import logging
+from enum import Enum
 
-# Import the dynamic resource system
-from world_map import ResourceTypeRegistry
+from infospace_types import InfospaceResources, InfospaceTerrain, ResourceTypeRegistry
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-
-# Minimal enums for infospace
-class InfospaceTerrain(Enum):
-    """Single terrain type for information space."""
-    InfoSpace = 1
-
-
-class InfospaceResources(Enum):
-    """
-    Resource types in infospace.
-    
-    - Note: Dynamic resources (artifacts created at runtime)
-    - Collection: Dynamic resources (groups of related notes or structured data)
-    """
-    Note = auto()
-    Collection = auto()
 
 
 # No infrastructure or properties needed
@@ -138,8 +120,3 @@ def setup_module():
 if __name__ == "__main__":
     # Use module-level setup
     setup_module()
-
-# Import InfospaceMap for map_node
-from infospace_map import InfospaceMap
-
-map_class = InfospaceMap
