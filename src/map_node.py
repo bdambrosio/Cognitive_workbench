@@ -1079,6 +1079,13 @@ end your response with:
             if not resource_name:
                 raise ValueError("No resource name provided")
             
+            # Skip special endpoints that have their own queryables
+            # These are handled by dedicated queryables, not the wildcard pattern
+            special_endpoints = {'search', 'update_commentary', 'remove', 'place', 'view'}
+            if resource_name in special_endpoints:
+                # This query should be handled by a more specific queryable, ignore it here
+                return
+            
             # Try direct lookup first (checks resource_registry and patches)
             resource = self.world_map.get_resource_by_name(resource_name)
             

@@ -932,29 +932,54 @@ Only provide the result, followed by the </end> tag.""")
             'threshold': threshold
         }
         
-        for reply in self.session.get(
-            "cognitive/map/resource/search",
-            target=QueryTarget.BEST_MATCHING,
-            consolidation=ConsolidationMode.NONE,
-            timeout=5.0,
-            payload=json.dumps(payload).encode('utf-8')
-        ):
-            if reply.ok:
-                response = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
-                if response.get('success'):
-                    return {
-                        'status': 'success',
-                        'notes': response.get('notes', []),
-                        'collections': response.get('collections', [])
-                    }
-                else:
+        try:
+            reply_received = False
+            for reply in self.session.get(
+                "cognitive/map/resource/search",
+                target=QueryTarget.BEST_MATCHING,
+                consolidation=ConsolidationMode.NONE,
+                timeout=5.0,
+                payload=json.dumps(payload).encode('utf-8')
+            ):
+                reply_received = True
+                if reply.ok:
+                    response = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
+                    if response.get('success'):
+                        return {
+                            'status': 'success',
+                            'notes': response.get('notes', []),
+                            'collections': response.get('collections', [])
+                        }
+                    else:
+                        return {
+                            'status': 'failed',
+                            'reason': response.get('error', 'Search failed')
+                        }
+                elif reply.err:
+                    # Zenoh error response
+                    error_msg = str(reply.err.payload.to_bytes().decode('utf-8')) if reply.err.payload else str(reply.err)
                     return {
                         'status': 'failed',
-                        'reason': response.get('error', 'Search failed')
+                        'reason': f'Zenoh error: {error_msg}'
                     }
-            break
+                break
+            
+            if not reply_received:
+                # No reply at all - queryable might not be registered yet
+                return {
+                    'status': 'failed',
+                    'reason': 'No response from map_node (queryable may not be registered yet)'
+                }
+        except Exception as e:
+            logger.warning(f"Exception during resource search: {e}")
+            import traceback
+            traceback.print_exc()
+            return {
+                'status': 'failed',
+                'reason': f'Exception: {str(e)}'
+            }
         
-        return {'status': 'failed', 'reason': 'No response from map_node'}
+        return {'status': 'failed', 'reason': 'Unknown error'}
     
     def _execute_load(self, action: Dict) -> Dict:
         """
@@ -1694,20 +1719,22 @@ Only provide the result, followed by the </end> tag.""")
         """
         Expand a Note into a Collection of Notes.
         
-        Handles two cases:
-        1. JSON with array field: Extracts array from specified field (default 'results')
-        2. Plain text: Splits on newlines and filters empty lines
+        Handles three cases:
+        1. Simple JSON array: Directly uses the array (e.g., [1, 2, 3])
+        2. JSON object with array field: Extracts array from specified field (default 'results')
+        3. Plain text: Splits on newlines and filters empty lines
         
         Required: target, out
-        Optional: field (default: 'results') - only used for JSON case
+        Optional: field (default: 'results') - only used for JSON object case
         
         Argument types:
-        - target: $variable (Note containing JSON with array or plain text)
-        - field: literal string (name of array field, default 'results') - ignored for plain text
+        - target: $variable (Note containing JSON array, JSON object with array field, or plain text)
+        - field: literal string (name of array field, default 'results') - only used for JSON object case
         - out: variable name for resulting Collection
         
         Examples:
-        - Expand query-web results: {"type":"expand","target":"$results","out":"$items"}
+        - Expand simple JSON array: {"type":"expand","target":"$json_note","out":"$items"} (where note contains [1,2,3])
+        - Expand query-web results: {"type":"expand","target":"$results","out":"$items"} (where note contains {"results": [...]})
         - Expand text lines: {"type":"expand","target":"$text_note","out":"$lines"}
         """
         error = self._validate_required_fields(action, 'target', 'out')
@@ -1764,12 +1791,19 @@ Only provide the result, followed by the </end> tag.""")
         
         # If content is valid JSON, extract array field (do NOT fall back to text)
         if is_json and content_obj:
-            if field_name in content_obj:
-                array_data = content_obj[field_name]
-                if not isinstance(array_data, list):
-                    return {'status': 'failed', 'reason': f'Field "{field_name}" exists but is not an array'}
+            # First check if content_obj is itself a simple JSON array
+            if isinstance(content_obj, list):
+                array_data = content_obj
+            # Otherwise, check for the specified field in the object
+            elif isinstance(content_obj, dict):
+                if field_name in content_obj:
+                    array_data = content_obj[field_name]
+                    if not isinstance(array_data, list):
+                        return {'status': 'failed', 'reason': f'Field "{field_name}" exists but is not an array'}
+                else:
+                    return {'status': 'failed', 'reason': f'JSON content missing "{field_name}" array field'}
             else:
-                return {'status': 'failed', 'reason': f'JSON content missing "{field_name}" array field'}
+                return {'status': 'failed', 'reason': f'JSON content must be an array or object with "{field_name}" field'}
         
         # Only if NOT JSON (parse failed), fall back to plain text line splitting
         elif not is_json:
@@ -1797,7 +1831,16 @@ Only provide the result, followed by the </end> tag.""")
         
         # Bind to out variable
         self._bind_variable(out_var, collection_id)
-        source_desc = f"{note_id}.{field_name}" if content_obj and field_name in content_obj else f"{note_id} (lines)"
+        # Build source description
+        if is_json and content_obj:
+            if isinstance(content_obj, list):
+                source_desc = f"{note_id} (JSON array)"
+            elif isinstance(content_obj, dict) and field_name in content_obj:
+                source_desc = f"{note_id}.{field_name}"
+            else:
+                source_desc = f"{note_id} (JSON)"
+        else:
+            source_desc = f"{note_id} (lines)"
         logger.info(f"Expanded {source_desc} ({len(note_ids)} items) → ${out_var}")
         
         return {'status': 'success', 'value': collection_id}
@@ -2837,6 +2880,7 @@ Only provide the result, followed by the </end> tag.""")
     def _extract_json_from_text(self, text: str) -> Optional[Any]:
         """
         Extract JSON from text with code fences, preambles, and trailing text.
+        Handles both JSON objects ({...}) and JSON arrays ([...]).
         Based on repair_json logic from llm_api.py.
         
         Returns parsed dict/list or None if no valid JSON found.
@@ -2847,12 +2891,25 @@ Only provide the result, followed by the </end> tag.""")
         # Remove code fences first (common in LLM responses)
         cleaned = text.replace("```json", "").replace("```", "").strip()
         
-        # Find JSON boundaries (first { to last })
-        if not cleaned.startswith('{') and '{' in cleaned:
-            start = cleaned.find('{')
-            end = cleaned.rfind('}')
-            if start >= 0 and end > start:
-                cleaned = cleaned[start:end+1]
+        # Determine if we're looking for an object or array
+        is_array = cleaned.startswith('[') or ('[' in cleaned and cleaned.find('[') < cleaned.find('{'))
+        is_object = cleaned.startswith('{') or ('{' in cleaned and cleaned.find('{') < cleaned.find('['))
+        
+        # Find JSON boundaries
+        if is_array:
+            # Find first [ to last ]
+            if not cleaned.startswith('[') and '[' in cleaned:
+                start = cleaned.find('[')
+                end = cleaned.rfind(']')
+                if start >= 0 and end > start:
+                    cleaned = cleaned[start:end+1]
+        elif is_object:
+            # Find first { to last }
+            if not cleaned.startswith('{') and '{' in cleaned:
+                start = cleaned.find('{')
+                end = cleaned.rfind('}')
+                if start >= 0 and end > start:
+                    cleaned = cleaned[start:end+1]
         
         # Remove newlines outside of string values
         in_string = False
@@ -2868,19 +2925,35 @@ Only provide the result, followed by the </end> tag.""")
             i += 1
         cleaned = ''.join(result)
         
-        # Find first complete JSON object by brace counting
-        brace_count = 0
-        json_end = 0
-        for i, char in enumerate(cleaned):
-            if char == '{':
-                brace_count += 1
-            elif char == '}':
-                brace_count -= 1
-                if brace_count == 0:
-                    json_end = i + 1
-                    break
-        if json_end > 0:
-            cleaned = cleaned[:json_end]
+        # Find first complete JSON structure by bracket/brace counting
+        if is_array:
+            # Count brackets for arrays
+            bracket_count = 0
+            json_end = 0
+            for i, char in enumerate(cleaned):
+                if char == '[':
+                    bracket_count += 1
+                elif char == ']':
+                    bracket_count -= 1
+                    if bracket_count == 0:
+                        json_end = i + 1
+                        break
+            if json_end > 0:
+                cleaned = cleaned[:json_end]
+        elif is_object:
+            # Count braces for objects
+            brace_count = 0
+            json_end = 0
+            for i, char in enumerate(cleaned):
+                if char == '{':
+                    brace_count += 1
+                elif char == '}':
+                    brace_count -= 1
+                    if brace_count == 0:
+                        json_end = i + 1
+                        break
+            if json_end > 0:
+                cleaned = cleaned[:json_end]
         
         # Parse extracted JSON
         try:
