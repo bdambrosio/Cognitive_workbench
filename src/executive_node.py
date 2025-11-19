@@ -1759,7 +1759,7 @@ end your response with </end>
             # Physical world primitives
             'move', 'say', 'think', 'take', 'place', 'inspect', 'use', 'scan',
             # Infospace primitives - Phase 1 & 2
-            'apply', 'display', 'create-note', 'create-collection', 'persist', 'load', 'index', 'organize', 'search',
+            'apply', 'display', 'create-note', 'create-collection', 'persist', 'load', 'index', 'organize', 'search-notes', 'search-collections', 'search-within-collection',
             'extract', 'filter', 'merge', 'coerce',
             'aggregate', 'sort', 'group_by', 'compare', 'map', 'flatten', 'add', 'expand',
             # Level 4: Structured data primitives
@@ -1974,7 +1974,7 @@ end your response with </end>
                 # Core primitives
                 'apply', 'map', 'coerce', 'focus',
                 'create-note', 'create-collection', 'persist', 'load',
-                'index', 'organize', 'search',
+                'index', 'organize', 'search-notes', 'search-collections', 'search-within-collection',
                 # Data operations
                 'flatten', 'add', 'expand',
                 # Set operations

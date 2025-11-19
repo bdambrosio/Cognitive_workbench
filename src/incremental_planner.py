@@ -175,7 +175,15 @@ Operation Compatibility:
 │ expand, as-json, refine │  ✓   │     ❌     │
 │ summarize, relate       │  ✓   │     ✓      │
 │ map, flatten            │  ❌  │     ✓      │
+│ search-notes            │  N/A │     N/A    │ (global discovery)
+│ search-collections      │  N/A │     N/A    │ (global discovery)
+│ search-within-collection│  ❌  │     ✓      │ (requires indexed Collection)
 └─────────────────────────┴──────┴────────────┘
+
+Search Primitives:
+- search-notes: Global discovery across all Notes (no target needed)
+- search-collections: Global discovery across all Collections (no target needed)
+- search-within-collection: Search within a specific indexed Collection (requires target Collection, must be indexed first)
 
 Efficiency Rules:
 - Use tools directly on Notes for single items
@@ -263,9 +271,17 @@ def build_tool_catalog(available_tools: Dict[str, Dict], primitives_reference: s
             "description": "Mark Note/Collection as persistent",
             "schema_hint": {"target": "$variable"}
         },
-        "search": {
-            "description": "Semantic search on indexed Collection",
-            "schema_hint": {"source": "$variable", "query": "string", "out": "$variable", "expect": "string"}
+        "search-notes": {
+            "description": "Global search across all Notes using embedding-based retrieval. Discovers Notes by content/metadata.",
+            "schema_hint": {"value": "string (query)", "out": "$variable", "limit": "int (optional, default 5)", "threshold": "float (optional, default 0.3)"}
+        },
+        "search-collections": {
+            "description": "Global search across all Collections using embedding-based retrieval. Discovers Collections by content/metadata.",
+            "schema_hint": {"value": "string (query)", "out": "$variable", "limit": "int (optional, default 3)", "threshold": "float (optional, default 0.3)"}
+        },
+        "search-within-collection": {
+            "description": "Search within a specific indexed Collection. Requires Collection to be indexed first. Returns matching Notes/chunks from that Collection.",
+            "schema_hint": {"target": "$variable (indexed Collection)", "value": "string (query)", "out": "$variable", "limit": "int (optional, default 5)", "threshold": "float (optional, default 0.0)", "return_mode": "string (optional, 'chunks' or 'notes', default 'chunks')"}
         },
         "index": {
             "description": "Build embedding index for Collection",
@@ -526,7 +542,7 @@ def sgl_to_infospace_action(tool_name: str, args_json: str, step: int, available
             action["args"] = args
     
     # Ensure 'out' field if tool produces output
-    output_producing = ["create-note", "create-collection", "load", "search", "map", 
+    output_producing = ["create-note", "create-collection", "load", "search-notes", "search-collections", "search-within-collection", "map", 
                        "expand", "flatten", "query-web", "semantic-scholar", "summarize",
                        "refine", "assess", "relate", "extract-entities", "filter-collection",
                        "fetch-text", "as-json", "as-markdown"]
@@ -534,7 +550,7 @@ def sgl_to_infospace_action(tool_name: str, args_json: str, step: int, available
         action["out"] = f"$step_{step}_result"
     
     # Add expect if needed
-    uncertain_tools = ["query-web", "semantic-scholar", "search", "load"]
+    uncertain_tools = ["query-web", "semantic-scholar", "search-notes", "search-collections", "search-within-collection", "load"]
     if tool_name in uncertain_tools and "expect" not in action:
         action["expect"] = f"should get result from {tool_name}"
     
