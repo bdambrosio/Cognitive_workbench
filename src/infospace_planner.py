@@ -66,11 +66,11 @@ Argument Conventions:
 
 CONSTRAINTS
 - Use only primitives / tools listed in the AVAILABLE ACTIONS and TOOLS sections.
-- Variables must be created before use (create-note, create-collection, tools, search, or index may bind them).
+- Variables must be created before use (create-note, create-collection, tools, search-notes, search-collections, search-within-collection, or index may bind them).
 - All JSON must be syntactically valid (no comments or trailing commas).
 - Keep plans concise (recommended: 12 steps or fewer).
 - Output only valid JSON.
-- REQUIRED FIELDS: All output-producing tools MUST include 'out' field. Tools with uncertain outcomes (query-web, semantic-scholar, search, load, summarize, relate, refine, assess, extract-entities, filter-collection) MUST also include 'expect' field.
+- REQUIRED FIELDS: All output-producing tools MUST include 'out' field. Tools with uncertain outcomes (query-web, semantic-scholar, search-notes, search-collections, search-within-collection, load, summarize, relate, refine, assess, extract-entities, filter-collection) MUST also include 'expect' field.
 - Note: 'display' and 'think' accept either 'value' or 'target' (both work).
 
 EFFICIENCY RULES
@@ -106,16 +106,27 @@ Pattern: Adding filtered items to existing Collection
   {"type":"semantic-scholar","args":{"query":"LLM agents 2025"},"out":"$new_papers","expect":"should find recent papers"}
   {"type":"map","target":"$new_papers","operation":"add","args":{"target":"$papers"},"out":"$papers"}
 
-Pattern: Semantic search with chunking (index/search)
-  index → search → (optional: use return_mode to control what search returns)
-
+Pattern: Global resource discovery (search-notes/search-collections)
+  search-notes → load → (use found Note IDs)
+  search-collections → load → (use found Collection IDs)
+  
+  Example - Find existing Notes:
+  {"type":"search-notes","value":"transformer architecture","limit":5,"out":"$found_notes","expect":"should find Notes about transformers"}
+  {"type":"load","resource_id":"$found_notes[0]","out":"$note1"}
+  
+  Example - Find existing Collections:
+  {"type":"search-collections","value":"research papers","limit":3,"out":"$found_collections","expect":"should find Collections of papers"}
+  
+Pattern: Semantic search within indexed Collection (index/search-within-collection)
+  index → search-within-collection → (optional: use return_mode to control what search returns)
+  
   Example - Find relevant passages:
   {"type":"index","source":"$documents"}
-  {"type":"search","source":"$documents","query":"transformer attention","return_mode":"chunks","limit":10,"out":"$passages","expect":"should return relevant text excerpts"}
+  {"type":"search-within-collection","target":"$documents","value":"transformer attention","return_mode":"chunks","limit":10,"out":"$passages","expect":"should return relevant text excerpts"}
   
   Example - Find relevant documents:
   {"type":"index","source":"$papers"}
-  {"type":"search","source":"$papers","query":"block-rank algorithm","return_mode":"notes","limit":5,"out":"$relevant_papers","expect":"should return papers discussing block-rank"}
+  {"type":"search-within-collection","target":"$papers","value":"block-rank algorithm","return_mode":"notes","limit":5,"out":"$relevant_papers","expect":"should return papers discussing block-rank"}
 
 Pattern: Multi-item tool application
   When you need to apply a tool to two or more Notes together (e.g. compare, analyze together), create a Collection.

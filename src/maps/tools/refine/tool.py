@@ -15,8 +15,8 @@ def tool(value, **kwargs):
     
     Args:
         value: Note content to transform
-        **kwargs: Optional parameters
-            - instruction: Natural language instruction (required)
+        **kwargs: Additional parameters
+            - instruction: Natural language instruction (REQUIRED)
             - llm_client: LLM client instance (optional, creates default if not provided)
     
     Returns:

@@ -226,7 +226,9 @@ class InfospaceExecutor:
             'load': self._execute_load,
             'index': self._execute_index,
             'organize': self._execute_index,  # Alias for index
-            'search': self._execute_search,
+            'search-within-collection': self._execute_search_within_collection,
+            'search-notes': self._execute_search_notes,
+            'search-collections': self._execute_search_collections,
             'say': self._execute_say,
             'display': self._execute_display,
             'think': self._execute_think,
@@ -1107,38 +1109,38 @@ Only provide the result, followed by the </end> tag.""")
         logger.info(f"Indexed {indexed_count} items from {collection_id}")
         return {'status': 'success', 'value': indexed_count}
     
-    def _execute_search(self, action: Dict) -> Dict:
+    def _execute_search_within_collection(self, action: Dict) -> Dict:
         """
-        Query indexed Collection.
+        Search within a specific indexed Collection.
         
-        Required: source, query, out
+        Required: target, value, out
         Optional: mode, limit, threshold, return_mode
         
         Argument types:
-        - source: $variable (indexed Collection to search)
-        - query: literal string OR $variable (resolves to query text)
+        - target: $variable (indexed Collection to search within)
+        - value: literal string OR $variable (resolves to query text)
         - mode: literal string ('semantic' or 'keyword', default 'semantic')
         - limit: int (max results to return, default 5)
         - threshold: float (minimum similarity score, default 0.0)
         - return_mode: literal string ('chunks' or 'notes', default 'chunks')
         - out: literal string (variable name to store results)
         """
-        source_arg = action.get('source')
-        query = self._resolve_value(action.get('query'))
+        target_arg = action.get('target')
+        query = self._resolve_value(action.get('value'))
         mode = action.get('mode', 'semantic')
         limit = action.get('limit', 5)
         threshold = action.get('threshold', 0.0)
         return_mode = action.get('return_mode', 'chunks')
         out_var = action.get('out')
         
-        if not source_arg or not query or not out_var:
-            return {'status': 'failed', 'reason': 'search requires source, query, and out'}
+        if not target_arg or not query or not out_var:
+            return {'status': 'failed', 'reason': 'search-within-collection requires target, value, and out'}
         
-        # Source should be a Collection variable
-        if not isinstance(source_arg, str) or not source_arg.startswith('$'):
-            return {'status': 'failed', 'reason': 'search source must be $variable referencing an indexed Collection'}
+        # Target should be a Collection variable
+        if not isinstance(target_arg, str) or not target_arg.startswith('$'):
+            return {'status': 'failed', 'reason': 'search-within-collection target must be $variable referencing an indexed Collection'}
         
-        collection_var = source_arg[1:]
+        collection_var = target_arg[1:]
         
         # Get Collection ID from bindings
         if collection_var not in self.plan_bindings:
@@ -1227,10 +1229,122 @@ Only provide the result, followed by the </end> tag.""")
         result_collection_id = self._create_collection(note_ids, 'search_results')
         if result_collection_id:
             self._bind_variable(out_var, result_collection_id)
-            logger.info(f"Search found {len(results)} results, created {result_collection_id} with {len(note_ids)} Notes → ${out_var}")
+            logger.info(f"Search-within-collection found {len(results)} results, created {result_collection_id} with {len(note_ids)} Notes → ${out_var}")
             return {'status': 'success', 'value': result_collection_id}
         else:
             logger.error(f"Failed to create Collection for search results")
+            return {'status': 'failed', 'reason': 'Failed to create result Collection'}
+    
+    def _execute_search_notes(self, action: Dict) -> Dict:
+        """
+        Global search across all Notes using embedding-based retrieval.
+        
+        Required: value, out
+        Optional: limit, threshold
+        
+        Argument types:
+        - value: literal string OR $variable (resolves to query text)
+        - limit: int (max Notes to return, default 5)
+        - threshold: float (minimum similarity score, default 0.3)
+        - out: literal string (variable name to store results Collection)
+        """
+        query = self._resolve_value(action.get('value'))
+        limit = action.get('limit', 5)
+        threshold = action.get('threshold', 0.3)
+        out_var = action.get('out')
+        
+        if not query or not out_var:
+            return {'status': 'failed', 'reason': 'search-notes requires value and out'}
+        
+        # Search for Notes globally
+        search_result = self.search_resources([query], k_notes=limit, k_collections=0, threshold=threshold)
+        
+        if search_result.get('status') != 'success':
+            return {'status': 'failed', 'reason': search_result.get('reason', 'Search failed')}
+        
+        notes = search_result.get('notes', [])
+        
+        if not notes:
+            # Return empty Collection for no results
+            empty_coll_id = self._create_collection([], 'search_notes_empty')
+            if empty_coll_id:
+                self._bind_variable(out_var, empty_coll_id)
+                return {'status': 'success', 'value': empty_coll_id}
+            return {'status': 'failed', 'reason': 'No Notes found and failed to create empty Collection'}
+        
+        # Create Notes for each result (load existing Notes by ID)
+        note_ids = []
+        for note_result in notes:
+            note_id = note_result.get('resource_id')
+            if note_id and note_id.startswith('Note_'):
+                note_ids.append(note_id)
+        
+        if not note_ids:
+            return {'status': 'failed', 'reason': 'No valid Note IDs found in search results'}
+        
+        # Create Collection containing found Notes
+        collection_id = self._create_collection(note_ids, 'search_notes_results')
+        if collection_id:
+            self._bind_variable(out_var, collection_id)
+            logger.info(f"Search-notes found {len(note_ids)} Notes, created {collection_id} → ${out_var}")
+            return {'status': 'success', 'value': collection_id}
+        else:
+            return {'status': 'failed', 'reason': 'Failed to create result Collection'}
+    
+    def _execute_search_collections(self, action: Dict) -> Dict:
+        """
+        Global search across all Collections using embedding-based retrieval.
+        
+        Required: value, out
+        Optional: limit, threshold
+        
+        Argument types:
+        - value: literal string OR $variable (resolves to query text)
+        - limit: int (max Collections to return, default 3)
+        - threshold: float (minimum similarity score, default 0.3)
+        - out: literal string (variable name to store results Collection)
+        """
+        query = self._resolve_value(action.get('value'))
+        limit = action.get('limit', 3)
+        threshold = action.get('threshold', 0.3)
+        out_var = action.get('out')
+        
+        if not query or not out_var:
+            return {'status': 'failed', 'reason': 'search-collections requires value and out'}
+        
+        # Search for Collections globally
+        search_result = self.search_resources([query], k_notes=0, k_collections=limit, threshold=threshold)
+        
+        if search_result.get('status') != 'success':
+            return {'status': 'failed', 'reason': search_result.get('reason', 'Search failed')}
+        
+        collections = search_result.get('collections', [])
+        
+        if not collections:
+            # Return empty Collection for no results
+            empty_coll_id = self._create_collection([], 'search_collections_empty')
+            if empty_coll_id:
+                self._bind_variable(out_var, empty_coll_id)
+                return {'status': 'success', 'value': empty_coll_id}
+            return {'status': 'failed', 'reason': 'No Collections found and failed to create empty Collection'}
+        
+        # Create Collection containing found Collection IDs
+        collection_ids = []
+        for coll_result in collections:
+            coll_id = coll_result.get('resource_id')
+            if coll_id and coll_id.startswith('Collection_'):
+                collection_ids.append(coll_id)
+        
+        if not collection_ids:
+            return {'status': 'failed', 'reason': 'No valid Collection IDs found in search results'}
+        
+        # Create Collection containing found Collections (Collections can contain Collections)
+        result_collection_id = self._create_collection(collection_ids, 'search_collections_results')
+        if result_collection_id:
+            self._bind_variable(out_var, result_collection_id)
+            logger.info(f"Search-collections found {len(collection_ids)} Collections, created {result_collection_id} → ${out_var}")
+            return {'status': 'success', 'value': result_collection_id}
+        else:
             return {'status': 'failed', 'reason': 'Failed to create result Collection'}
     
     def _execute_say(self, action: Dict) -> Dict:
@@ -3702,10 +3816,10 @@ Only provide the result, followed by the </end> tag.""")
                 'source': '$test_data',
                 'index_type': 'keyword'
             },
-            'search': {
-                'type': 'search',
-                'source': '$test_data',
-                'query': 'test query',
+            'search-within-collection': {
+                'type': 'search-within-collection',
+                'target': '$test_data',
+                'value': 'test query',
                 'mode': 'keyword',
                 'out': 'test_results',
                 'expect': 'test search results'
