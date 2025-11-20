@@ -2,7 +2,7 @@
 is-empty tool - check if text is null, empty, or whitespace only.
 """
 
-def tool(value, **kwargs):
+def tool(value, runtime=None, **kwargs):
     """
     Check if value is null, empty, or only whitespace.
     

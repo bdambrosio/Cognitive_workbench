@@ -15,6 +15,14 @@ from pathlib import Path
 from typing import Dict, List, Any, Optional, Tuple
 from datetime import datetime
 
+# Try to import SGLang for runtime support
+try:
+    import sglang as sgl
+    from sglang import function, user, assistant, gen
+    HAS_SGLANG = True
+except ImportError:
+    HAS_SGLANG = False
+
 logger = logging.getLogger(__name__)
 
 
@@ -70,6 +78,9 @@ class InfospaceExecutor:
         
         # Suspension state for sync execution
         self._sync_suspension_state = None
+        
+        # SGLang runtime (set by IncrementalPlanner if available)
+        self.runtime = None
         
         logger.info(f"InfospaceExecutor initialized for {agent_name} with {len(available_tools)} tools")
     
@@ -539,6 +550,62 @@ Only provide the result, followed by the </end> tag.""")
             logger.error(f"Prompt tool execution failed: {e}")
             return {'status': 'failed', 'reason': str(e)}
 
+    def _sglang_generate(self, messages, max_tokens=2000, temperature=0.7, stops=None):
+        """
+        Generate text using SGLang Runtime.
+        Wraps SGLang's function decorator pattern to match llm_client.generate() interface.
+        
+        Args:
+            messages: List of message strings (or single string)
+            max_tokens: Maximum tokens to generate
+            temperature: Sampling temperature
+            stops: List of stop sequences
+            
+        Returns:
+            Object with .success, .text, and .error attributes (matching llm_client response)
+        """
+        if not HAS_SGLANG or not self.runtime:
+            return type('Response', (), {'success': False, 'error': 'SGLang not available', 'text': ''})()
+        
+        class Response:
+            def __init__(self, success, text='', error=None):
+                self.success = success
+                self.text = text
+                self.error = error
+        
+        try:
+            # Convert messages to single prompt string
+            if isinstance(messages, list):
+                prompt = '\n'.join(str(m) for m in messages)
+            else:
+                prompt = str(messages)
+            
+            # Create a simple generation function
+            @function
+            def generate_text(s, prompt_text):
+                s += user(prompt_text)
+                # Convert stops list to string (SGLang uses stop as string, take first if list)
+                stop_str = None
+                if stops:
+                    if isinstance(stops, list) and len(stops) > 0:
+                        stop_str = stops[0]  # SGLang gen() uses single stop string
+                    elif isinstance(stops, str):
+                        stop_str = stops
+                gen_kwargs = {"max_tokens": max_tokens, "temperature": temperature}
+                if stop_str:
+                    gen_kwargs["stop"] = stop_str
+                s += assistant(gen("output", **gen_kwargs))
+            
+            # Run the function
+            state = generate_text.run(prompt_text=prompt)
+            result_text = state["output"].strip()
+            
+            return Response(success=True, text=result_text)
+        except Exception as e:
+            logger.error(f"SGLang generation error: {e}")
+            traceback.print_exc()
+            return Response(success=False, error=str(e))
+
     def _execute_python_tool(self, tool_name: str, input_value: Any,
                             tool_info: Dict, additional_args: Dict) -> Dict:
         """
@@ -655,6 +722,16 @@ Only provide the result, followed by the </end> tag.""")
         resolved_args['map_name'] = self.map_name
         resolved_args['llm_client'] = self.llm_client
         resolved_args['agent_name'] = self.agent_name
+        
+        # Add unified LLM generation callback (uses SGLang runtime if available, else llm_client)
+        def llm_generate(messages, max_tokens=2000, temperature=0.7, is_json=False, stops=None):
+            """Unified LLM generation interface - uses SGLang runtime if available, else llm_client."""
+            if self.runtime:
+                return self._sglang_generate(messages, max_tokens, temperature, stops)
+            else:
+                return self.llm_client.generate(messages, max_tokens, temperature, is_json, stops)
+        
+        resolved_args['llm_generate'] = llm_generate
         
         # Execute tool
         try:

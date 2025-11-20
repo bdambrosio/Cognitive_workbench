@@ -73,7 +73,7 @@ def _create_collection(note_ids: List[str], agent_name: str, source_skill: str =
     return None
 
 
-def tool(value: Any, **kwargs) -> str:
+def tool(value: Any, runtime=None, **kwargs) -> str:
     """
     Filter Collection items by predicate, return new Collection ID.
     
@@ -120,7 +120,12 @@ def tool(value: Any, **kwargs) -> str:
         # LLM evaluation
         prompt = f"Does this match '{predicate}'? Respond 'true' or 'false' only.\n\nContent: {content_str}"
         try:
-            response = llm_client.generate([prompt], max_tokens=10)
+            # Use unified llm_generate callback if available, else fall back to llm_client
+            llm_generate = kwargs.get('llm_generate')
+            if llm_generate:
+                response = llm_generate(messages=[prompt], max_tokens=10, temperature=0.0, is_json=False)
+            else:
+                response = llm_client.generate([prompt], max_tokens=10)
             if not response.success:
                 logger.error(f"LLM evaluation failed for {note_id}: {response.error}")
                 continue

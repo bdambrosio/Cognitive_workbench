@@ -2,7 +2,7 @@
 Is-positive tool - example Python condition tool.
 """
 
-def tool(value, **kwargs):
+def tool(value, runtime=None, **kwargs):
     """
     Check if value is a positive number.
     

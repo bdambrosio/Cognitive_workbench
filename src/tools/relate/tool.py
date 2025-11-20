@@ -68,7 +68,7 @@ def _flatten_collection(collection_id: str, separator: str = '\n\n') -> str:
     return _flatten_list(content, separator)
 
 
-def _summarize_note(content: str, focus: str = '', heartbeat=None) -> str:
+def _summarize_note(content: str, focus: str = '', heartbeat=None, kwargs=None) -> str:
     """
     Summarize a Note if it exceeds context limits. 
     Chunks content > 16k chars before summarizing.
@@ -88,13 +88,24 @@ End your response with:
 </end>
 Summary:"""
         
-        response = llm_client.generate(
-            messages=[prompt],
-            max_tokens=1000,
-            temperature=0.3,
-            is_json=False,
-            stops=['</end>']
-        )
+        # Use unified llm_generate callback if available, else fall back to llm_client
+        llm_generate = kwargs.get('llm_generate') if kwargs else None
+        if llm_generate:
+            response = llm_generate(
+                messages=[prompt],
+                max_tokens=1000,
+                temperature=0.3,
+                is_json=False,
+                stops=['</end>']
+            )
+        else:
+            response = llm_client.generate(
+                messages=[prompt],
+                max_tokens=1000,
+                temperature=0.3,
+                is_json=False,
+                stops=['</end>']
+            )
         
         # Send heartbeat after LLM call
         if heartbeat:
@@ -134,13 +145,24 @@ End your response with:
 </end>
 Summary:"""
         
-        response = llm_client.generate(
-            messages=[prompt],
-            max_tokens=1000,
-            temperature=0.3,
-            is_json=False,
-            stops=['</end>']
-        )
+        # Use unified llm_generate callback if available, else fall back to llm_client
+        llm_generate = kwargs.get('llm_generate') if kwargs else None
+        if llm_generate:
+            response = llm_generate(
+                messages=[prompt],
+                max_tokens=1000,
+                temperature=0.3,
+                is_json=False,
+                stops=['</end>']
+            )
+        else:
+            response = llm_client.generate(
+                messages=[prompt],
+                max_tokens=1000,
+                temperature=0.3,
+                is_json=False,
+                stops=['</end>']
+            )
         
         # Send heartbeat after LLM call
         if heartbeat:
@@ -158,12 +180,12 @@ Summary:"""
     # If combined summary is still > 16k, recursively summarize it
     if len(combined_summary) > 16000:
         logger.info(f"summarize: combined summary ({len(combined_summary)} chars) still exceeds 16k, recursively summarizing")
-        return _summarize_note(combined_summary, focus, heartbeat)
+        return _summarize_note(combined_summary, focus, heartbeat, kwargs)
     
     return combined_summary
 
 
-def _preprocess_element(element: any, focus: str = '', heartbeat=None) -> str:
+def _preprocess_element(element: any, focus: str = '', heartbeat=None, kwargs=None) -> str:
     """
     Preprocess a single element for comparison.
     
@@ -198,7 +220,7 @@ def _preprocess_element(element: any, focus: str = '', heartbeat=None) -> str:
     # Step 5: Summarize if > 16k chars
     if len(content) > 16000:
         logger.info(f"relate: element exceeds 16k ({len(content)} chars), summarizing")
-        summarized = _summarize_note(content, focus, heartbeat)
+        summarized = _summarize_note(content, focus, heartbeat, kwargs)
         content = str(summarized) if summarized is not None else content[:16000]
     
     # Ensure content is still a string after summarization
@@ -213,7 +235,7 @@ def _preprocess_element(element: any, focus: str = '', heartbeat=None) -> str:
     return content
 
 
-def tool(value, **kwargs):
+def tool(value, runtime=None, **kwargs):
     """
     Compare exactly two Notes/Collections to find similarities, differences, and relationships.
     
@@ -246,8 +268,8 @@ def tool(value, **kwargs):
     focus = focus_aspects if focus_aspects else "key themes, facts, and perspectives for comparison"
     
     # Preprocess each element independently
-    element_a = _preprocess_element(value[0], focus, heartbeat)
-    element_b = _preprocess_element(value[1], focus, heartbeat)
+    element_a = _preprocess_element(value[0], focus, heartbeat, kwargs)
+    element_b = _preprocess_element(value[1], focus, heartbeat, kwargs)
     
     # Format for LLM comparison
     formatted_input = f"""## Item A
@@ -284,13 +306,23 @@ Do not include any introductory, reasoning, or explanatory text in your response
 
 """
     
-    response = llm_client.generate(
-        messages=[prompt],
-        max_tokens=1000,
-        temperature=0.5,
-        is_json=True,
-        stops=['</end>']
-    )
+    # Use unified llm_generate callback if available, else fall back to llm_client
+    llm_generate = kwargs.get('llm_generate')
+    if llm_generate:
+        response = llm_generate(
+            messages=[prompt],
+            max_tokens=1000,
+            temperature=0.5,
+            is_json=True
+        )
+    else:
+        response = llm_client.generate(
+            messages=[prompt],
+            max_tokens=1000,
+            temperature=0.5,
+            is_json=True,
+            stops=['</end>']
+        )
     
     # Send heartbeat after LLM call
     heartbeat = kwargs.get('heartbeat')

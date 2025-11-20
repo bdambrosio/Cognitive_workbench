@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 warnings.filterwarnings('ignore', category=UserWarning, module='unstructured')
 
 
-def tool(url_or_content: str, **kwargs) -> str:
+def tool(url_or_content: str, runtime=None, **kwargs) -> str:
     """
     Fetch text from URL, base64 PDF, Note ID, or Collection ID. Auto-detects format and extracts all text.
     Collection-aware: If input is Collection ID, fetches first item's content.

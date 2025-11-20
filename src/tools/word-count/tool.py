@@ -2,7 +2,7 @@
 Word count tool - example Python tool.
 """
 
-def tool(value, **kwargs):
+def tool(value, runtime=None, **kwargs):
     """
     Count words in input text.
     

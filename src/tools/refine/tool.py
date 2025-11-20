@@ -9,7 +9,7 @@ llm_client = ZenohLLMClient(server_name='vllm', model_name='models/Qwen3-Next:1.
 logger = logging.getLogger(__name__)
 
 
-def tool(value, **kwargs):
+def tool(value, runtime=None, **kwargs):
     """
     Transform Note content using natural language instruction.
     
@@ -52,14 +52,24 @@ End your response with:
         # Calculate max_tokens based on chunk size
         max_tokens = len(chunk_text) // 2
         
-        # Call LLM
-        response = llm_client.generate(
-            messages=[prompt],
-            max_tokens=max_tokens,
-            temperature=0.4,
-            is_json=False,
-            stops=['</end>']
-        )
+        # Use unified llm_generate callback if available, else fall back to llm_client
+        llm_generate = kwargs.get('llm_generate')
+        if llm_generate:
+            response = llm_generate(
+                messages=[prompt],
+                max_tokens=max_tokens,
+                temperature=0.4,
+                is_json=False,
+                stops=['</end>']
+            )
+        else:
+            response = llm_client.generate(
+                messages=[prompt],
+                max_tokens=max_tokens,
+                temperature=0.4,
+                is_json=False,
+                stops=['</end>']
+            )
         
         # Send heartbeat after LLM call to reset timeout
         heartbeat = kwargs.get('heartbeat')

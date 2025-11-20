@@ -108,7 +108,7 @@ def _resolve_context(context_arg: str) -> str:
     return context_str
 
 
-def tool(value, **kwargs):
+def tool(value, runtime=None, **kwargs):
     """
     Generate new content using natural language prompt.
     
@@ -165,14 +165,24 @@ End your response with:
     
     logger.info(f"generate-note: {prompt[:50]}... (style={style})")
     
-    # Call LLM
-    response = llm_client.generate(
-        messages=[generation_prompt],
-        max_tokens=max_tokens,
-        temperature=temperature,
-        is_json=False,
-        stops=['</end>']
-    )
+    # Use unified llm_generate callback if available, else fall back to llm_client
+    llm_generate = kwargs.get('llm_generate')
+    if llm_generate:
+        response = llm_generate(
+            messages=[generation_prompt],
+            max_tokens=max_tokens,
+            temperature=temperature,
+            is_json=False,
+            stops=['</end>']
+        )
+    else:
+        response = llm_client.generate(
+            messages=[generation_prompt],
+            max_tokens=max_tokens,
+            temperature=temperature,
+            is_json=False,
+            stops=['</end>']
+        )
     
     # Send heartbeat after LLM call to reset timeout
     heartbeat = kwargs.get('heartbeat')
