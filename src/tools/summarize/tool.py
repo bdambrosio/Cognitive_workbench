@@ -338,7 +338,7 @@ def _compute_target_length(effective_tokens, style, compression_ratio):
         return max(target, 300)
 
 
-def tool(value, **kwargs):
+def tool(value, runtime=None, **kwargs):
     """
     Summarize content with focus-aware compression and adaptive styling.
     
@@ -427,13 +427,24 @@ End your response with:
 """
         
         # max_tokens = 1.5x final output limit (2000 tokens)
-        response = llm_client.generate(
-            messages=[prompt],
-            max_tokens=3000,
-            temperature=0.3,
-            is_json=False,
-            stops=['</end>']
-        )
+        # Use unified llm_generate callback if available, else fall back to llm_client
+        llm_generate = kwargs.get('llm_generate')
+        if llm_generate:
+            response = llm_generate(
+                messages=[prompt],
+                max_tokens=3000,
+                temperature=0.3,
+                is_json=False,
+                stops=['</end>']
+            )
+        else:
+            response = llm_client.generate(
+                messages=[prompt],
+                max_tokens=3000,
+                temperature=0.3,
+                is_json=False,
+                stops=['</end>']
+            )
         
         if heartbeat:
             heartbeat()
@@ -470,13 +481,24 @@ End your response with:
         
         # max_tokens = 1.5x target per chunk
         max_chunk_tokens = int(tokens_per_chunk * 1.5)
-        response = llm_client.generate(
-            messages=[prompt],
-            max_tokens=max_chunk_tokens,
-            temperature=0.3,
-            is_json=False,
-            stops=['</end>']
-        )
+        # Use unified llm_generate callback if available, else fall back to llm_client
+        llm_generate = kwargs.get('llm_generate')
+        if llm_generate:
+            response = llm_generate(
+                messages=[prompt],
+                max_tokens=max_chunk_tokens,
+                temperature=0.3,
+                is_json=False,
+                stops=['</end>']
+            )
+        else:
+            response = llm_client.generate(
+                messages=[prompt],
+                max_tokens=max_chunk_tokens,
+                temperature=0.3,
+                is_json=False,
+                stops=['</end>']
+            )
         
         if heartbeat:
             heartbeat()
@@ -504,13 +526,24 @@ End your response with:
 """
     
     # max_tokens = 1.5x final output limit (2000 tokens)
-    response = llm_client.generate(
-        messages=[synthesis_prompt],
-        max_tokens=3000,
-        temperature=0.3,
-        is_json=False,
-        stops=['</end>']
-    )
+    # Use unified llm_generate callback if available, else fall back to llm_client
+    llm_generate = kwargs.get('llm_generate')
+    if llm_generate:
+        response = llm_generate(
+            messages=[synthesis_prompt],
+            max_tokens=3000,
+            temperature=0.3,
+            is_json=False,
+            stops=['</end>']
+        )
+    else:
+        response = llm_client.generate(
+            messages=[synthesis_prompt],
+            max_tokens=3000,
+            temperature=0.3,
+            is_json=False,
+            stops=['</end>']
+        )
     
     if heartbeat:
         heartbeat()

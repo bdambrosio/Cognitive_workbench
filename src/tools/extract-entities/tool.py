@@ -10,7 +10,7 @@ llm_client = ZenohLLMClient(server_name='vllm', model_name='models/Qwen3-Next:1.
 logger = logging.getLogger(__name__)
 
 
-def tool(value, **kwargs):
+def tool(value, runtime=None, **kwargs):
     """
     Extract entities from text with automatic chunking for long documents.
     
@@ -32,7 +32,7 @@ def tool(value, **kwargs):
     
     if len(chunks) == 1:
         # Single chunk - direct extraction
-        return _extract_from_chunk(value, heartbeat)
+        return _extract_from_chunk(value, heartbeat, kwargs)
     
     # Multiple chunks - extract and merge
     logger.info(f"extract-entities: long document ({len(chunks)} chunks), extracting and merging")
@@ -49,7 +49,7 @@ def tool(value, **kwargs):
     
     # Extract from each chunk
     for i, (chunk_text, _) in enumerate(chunks):
-        chunk_result = _extract_from_chunk(chunk_text, heartbeat)
+        chunk_result = _extract_from_chunk(chunk_text, heartbeat, kwargs)
         
         # Parse JSON result
         chunk_entities = json.loads(chunk_result)
@@ -79,7 +79,7 @@ def tool(value, **kwargs):
     return json.dumps(result, indent=2)
 
 
-def _extract_from_chunk(text, heartbeat=None):
+def _extract_from_chunk(text, heartbeat=None, kwargs=None):
     """Extract entities from a single chunk of text."""
     prompt = f"""Extract entities from the following text. Return JSON with these fields:
     - people: list of person names
@@ -98,12 +98,22 @@ Do not include any introductory, reasoning, code fences,or explanatory text in y
 
 """
     
-    response = llm_client.generate(
-        messages=[prompt],
-        max_tokens=1000,
-        temperature=0.3,
-        is_json=True
-    )
+    # Use unified llm_generate callback if available, else fall back to llm_client
+    llm_generate = kwargs.get('llm_generate') if kwargs else None
+    if llm_generate:
+        response = llm_generate(
+            messages=[prompt],
+            max_tokens=1000,
+            temperature=0.3,
+            is_json=True
+        )
+    else:
+        response = llm_client.generate(
+            messages=[prompt],
+            max_tokens=1000,
+            temperature=0.3,
+            is_json=True
+        )
     
     # Send heartbeat after LLM call (prevents timeout during long operations)
     if heartbeat:

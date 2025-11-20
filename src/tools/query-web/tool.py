@@ -512,7 +512,7 @@ End your response with:
 # Tool interface for infospace
 # ------------------------------
 
-def tool(value, **kwargs):
+def tool(value, runtime=None, **kwargs):
     """
     Web search tool using Google CSE + LLM extraction.
     

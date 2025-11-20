@@ -1127,19 +1127,19 @@ class IncrementalPlanner:
         if not _SGL_BACKEND_INITIALIZED and sgl_model_path:
             try:
                 self.logger.info(f"Initializing SGLang backend with model: {sgl_model_path}")
-                sgl.set_default_backend(
-                    sgl.Runtime(
-                        model_path=sgl_model_path,
-                        tokenizer_path=sgl_model_path,
-                        device="cuda",
-                        context_length=32768,
-                        cuda_graph_max_bs=4,
-                        dtype="auto",
-                        tp_size=1,
-                        mem_fraction_static=0.82,
-                        tool_call_parser="qwen"
-                    )
+                runtime = sgl.Runtime(
+                    model_path=sgl_model_path,
+                    tokenizer_path=sgl_model_path,
+                    device="cuda",
+                    context_length=32768,
+                    cuda_graph_max_bs=4,
+                    dtype="auto",
+                    tp_size=1,
+                    mem_fraction_static=0.82,
+                    tool_call_parser="qwen"
                 )
+                sgl.set_default_backend(runtime)
+                executor.runtime = runtime
                 _SGL_BACKEND_INITIALIZED = True
             except Exception as e:
                 self.logger.error(f"Failed to initialize SGLang backend: {e}")

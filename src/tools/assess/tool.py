@@ -9,7 +9,7 @@ llm_client = ZenohLLMClient(server_name='vllm', model_name='models/Qwen3-Next:1.
 logger = logging.getLogger(__name__)
 
 
-def tool(value, **kwargs):
+def tool(value, runtime=None, **kwargs):
     """
     Test Note content against natural language predicate with automatic chunking.
     
@@ -62,13 +62,24 @@ End your response with:
 
 Answer (true or false):"""
     
-    response = llm_client.generate(
-        [prompt],
-        max_tokens=10,
-        temperature=0.0,
-        is_json=False,
-        stops=['</end>']
-    )
+    # Use unified llm_generate callback if available, else fall back to llm_client
+    llm_generate = kwargs.get('llm_generate') if kwargs else None
+    if llm_generate:
+        response = llm_generate(
+            messages=[prompt],
+            max_tokens=10,
+            temperature=0.0,
+            is_json=False,
+            stops=['</end>']
+        )
+    else:
+        response = llm_client.generate(
+            [prompt],
+            max_tokens=10,
+            temperature=0.0,
+            is_json=False,
+            stops=['</end>']
+        )
     
     # Send heartbeat after LLM call
     if kwargs:

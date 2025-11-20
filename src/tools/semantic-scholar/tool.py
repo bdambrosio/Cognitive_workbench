@@ -160,7 +160,7 @@ def _search_papers_direct(query: str, limit: int, api_key: str = None) -> List[D
         logger.error(f"Failed to search Semantic Scholar: {response.status_code}")
         return []
         
-def tool(value, **kwargs):
+def tool(value, runtime=None, **kwargs):
     """
     Semantic Scholar search tool.
     
