@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Relate tool - Compare Notes and Collections with automatic flattening and context management.
+Compare tool - Compare two Notes or Collections to find similarities, differences, and relationships.
 """
 import logging
 import json
@@ -219,7 +219,7 @@ def _preprocess_element(element: any, focus: str = '', heartbeat=None, kwargs=No
     
     # Step 5: Summarize if > 16k chars
     if len(content) > 16000:
-        logger.info(f"relate: element exceeds 16k ({len(content)} chars), summarizing")
+        logger.info(f"compare: element exceeds 16k ({len(content)} chars), summarizing")
         summarized = _summarize_note(content, focus, heartbeat, kwargs)
         content = str(summarized) if summarized is not None else content[:16000]
     
@@ -229,7 +229,7 @@ def _preprocess_element(element: any, focus: str = '', heartbeat=None, kwargs=No
     
     # Step 6: Final validation - truncate if still too large
     if len(content) > 16000:
-        logger.warning(f"relate: element still exceeds 16k after summarization ({len(content)} chars), truncating")
+        logger.warning(f"compare: element still exceeds 16k after summarization ({len(content)} chars), truncating")
         content = content[:16000]
     
     return content
@@ -240,36 +240,27 @@ def tool(value, runtime=None, **kwargs):
     Compare exactly two Notes/Collections to find similarities, differences, and relationships.
     
     Args:
-        value: List with exactly 2 elements (Note/Collection IDs or content)
+        value: First Note/Collection to compare (target)
         **kwargs: Optional parameters
-            - comparison_mode: 'similarity' | 'contradiction' | 'comprehensive' (default)
-            - threshold: Minimum similarity to report (default: 0.3)
-            - focus_aspects: String describing specific dimensions to compare
+            - other: Second Note/Collection to compare (REQUIRED)
+            - instruction: Natural language guidance for comparison focus (optional)
     
     Returns:
         Comparison analysis as JSON string
     """
-    if not value:
-        return json.dumps({"error": "No content to compare"})
+    other = kwargs.get('other')
+    if not value or not other:
+        return json.dumps({"error": "compare requires both target and other parameters"})
     
-    # Validate: must be list with exactly 2 elements
-    if not isinstance(value, list):
-        return json.dumps({"error": "relate requires a list with exactly 2 elements"})
-    
-    if len(value) != 2:
-        return json.dumps({"error": f"relate requires exactly 2 elements, got {len(value)}"})
-    
-    comparison_mode = kwargs.get('comparison_mode', 'comprehensive')
-    threshold = kwargs.get('threshold', 0.3)
-    focus_aspects = kwargs.get('focus_aspects', '')
+    instruction = kwargs.get('instruction', '')
     heartbeat = kwargs.get('heartbeat')
     
     # Build focus string for summarization
-    focus = focus_aspects if focus_aspects else "key themes, facts, and perspectives for comparison"
+    focus = instruction if instruction else "key themes, facts, and perspectives for comparison"
     
     # Preprocess each element independently
-    element_a = _preprocess_element(value[0], focus, heartbeat, kwargs)
-    element_b = _preprocess_element(value[1], focus, heartbeat, kwargs)
+    element_a = _preprocess_element(value, focus, heartbeat, kwargs)
+    element_b = _preprocess_element(other, focus, heartbeat, kwargs)
     
     # Format for LLM comparison
     formatted_input = f"""## Item A
@@ -279,17 +270,9 @@ def tool(value, runtime=None, **kwargs):
 {element_b}"""
     
     # Build comparison prompt
-    mode_guidance = ""
-    if comparison_mode == 'similarity':
-        mode_guidance = "\nFocus on identifying similarities and overlaps."
-    elif comparison_mode == 'contradiction':
-        mode_guidance = "\nFocus on identifying contradictions and conflicts."
+    instruction_guidance = f"\n{instruction}" if instruction else ""
     
-    focus_guidance = f"\nFocus aspects: {focus_aspects}" if focus_aspects else ""
-    
-    prompt = f"""Compare the following content to identify similarities, differences, and relationships.
-
-{mode_guidance}{focus_guidance}
+    prompt = f"""Compare the following content to identify similarities, differences, and relationships.{instruction_guidance}
 
 Content:
 {formatted_input}
@@ -330,7 +313,7 @@ Do not include any introductory, reasoning, or explanatory text in your response
         heartbeat()
     
     if not response.success:
-        logger.error(f"relate failed: {response.error}")
+        logger.error(f"compare failed: {response.error}")
         return json.dumps({"error": response.error})
     
     return response.text
