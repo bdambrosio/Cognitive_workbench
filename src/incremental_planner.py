@@ -196,6 +196,8 @@ Tool Selection:
 - Academic papers: semantic-scholar (provides abstracts, citations, PDFs)
 - General web: query-web (broad coverage, recent content)
 - Single URL fetch: fetch-text (NOT for query-web/semantic-scholar results)
+- Generate new content: generate-note (creates text/code from scratch, no target needed)
+- Transform existing content: refine (transforms existing Note content)
 - as-markdown: EXTRACT existing markdown from mixed text (NOT for converting TO markdown)
 - as-json: EXTRACT existing JSON from mixed text (NOT for converting TO JSON)
 
@@ -564,7 +566,7 @@ def sgl_to_infospace_action(tool_name: str, args_json: str, step: int, available
     # Ensure 'out' field if tool produces output
     output_producing = ["create-note", "create-collection", "load", "search-notes", "search-collections", "search-within-collection", "map", 
                        "expand", "flatten", "query-web", "semantic-scholar", "summarize",
-                       "refine", "assess", "relate", "extract-entities", "filter-collection",
+                       "refine", "generate-note", "assess", "relate", "extract-entities", "filter-collection",
                        "fetch-text", "as-json", "as-markdown"]
     if tool_name in output_producing and "out" not in action:
         action["out"] = f"$step_{step}_result"
@@ -1035,7 +1037,7 @@ if HAS_SGLANG:
             f"Max steps reached. Last task: {current_task}\n"
             f"Last thoughts: {s[f'thoughts_{max_steps-1}']}"
         )
-        #logger.info(f"full trace:\n{s}")
+        logger.info(f"full trace:\n{s}")
         return s
 
 
