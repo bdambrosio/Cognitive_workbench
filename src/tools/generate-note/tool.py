@@ -163,6 +163,7 @@ End your response with:
         max_tokens = 2000
         temperature = 0.7
     
+
     logger.info(f"generate-note: {prompt[:50]}... (style={style})")
     
     # Use unified llm_generate callback if available, else fall back to llm_client

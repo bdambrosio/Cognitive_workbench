@@ -2104,9 +2104,12 @@ Only provide the result, followed by the </end> tag.""")
         array_data = None
         is_json = False
         
-        # Try JSON extraction first (prioritize structured data)
+        # If content is already a Python list, use it directly
+        if isinstance(content, list):
+            array_data = content
+        # Try JSON extraction (prioritize structured data)
         # Use robust extraction that handles code fences, preambles, trailing text
-        if isinstance(content, str):
+        elif isinstance(content, str):
             # Robust extraction (strips code fences, preambles, trailing text)
             content_obj = self._extract_json_from_text(content)
             is_json = (content_obj is not None)
@@ -2133,8 +2136,8 @@ Only provide the result, followed by the </end> tag.""")
             else:
                 return {'status': 'failed', 'reason': f'JSON content must be an array or object with "{field_name}" field'}
         
-        # If NOT single JSON, try JSONL format (multiple JSON objects separated by newlines)
-        elif not is_json:
+        # If NOT single JSON and array_data not yet set, try JSONL format (multiple JSON objects separated by newlines)
+        elif not is_json and array_data is None:
             if isinstance(content, str):
                 # Try to detect and parse JSONL format
                 jsonl_array = self._detect_and_parse_jsonl(content)
@@ -2145,7 +2148,7 @@ Only provide the result, followed by the </end> tag.""")
                     lines = [line.strip() for line in content.split('\n')]
                     array_data = [line for line in lines if line]  # Filter empty lines
             else:
-                return {'status': 'failed', 'reason': f'Note content must be JSON with "{field_name}" array field, JSONL, or plain text'}
+                return {'status': 'failed', 'reason': f'Note content must be a JSON array (e.g., ["item1", "item2"]), JSON object with "{field_name}" array field, JSONL, or plain text (got {type(content).__name__})'}
         
         if not array_data:
             return {'status': 'failed', 'reason': 'No items to expand (empty array or no non-empty lines)'}
