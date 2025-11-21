@@ -144,43 +144,35 @@
     "source_file": "/home/bruce/Downloads/Cognitive_workbench/src/executive_node.py"
   },
   {
-    "name": "turn_complete",
-    "topic": "cognitive/map/turn/complete/{character}",
-    "description": "Character completed their turn",
-    "payload": "{\"character\": str, \"timestamp\": str}",
-    "triggers": "(internal turn management)",
-    "source_file": "/home/bruce/Downloads/Cognitive_workbench/src/executive_node.py"
-  },
-  {
-    "name": "turn_go",
-    "topic": "cognitive/map/turn/go",
-    "description": "Signal to all characters to start their turn",
-    "payload": "{\"turn_number\": int, \"active_characters\": list[str], \"timestamp\": float}",
-    "triggers": "(internal turn management - characters begin OODA loop)",
-    "source_file": "/home/bruce/Downloads/Cognitive_workbench/src/map_node.py"
-  },
-  {
-    "name": "turn_heartbeat",
-    "topic": "cognitive/map/turn/heartbeat/{character}",
-    "description": "Character is alive and processing (prevents turn timeout)",
+    "name": "executive_control_step",
+    "topic": "cognitive/{character}/control/step",
+    "description": "Direct step command to executive node - advance one OODA cycle",
     "payload": "{\"timestamp\": str}",
-    "triggers": "(internal turn management - resets timeout)",
-    "source_file": "/home/bruce/Downloads/Cognitive_workbench/src/infospace_executor.py"
+    "triggers": "(UI step button - direct executive control)",
+    "source_file": "/home/bruce/Downloads/Cognitive_workbench/src/fastapi_action_display.py"
   },
   {
-    "name": "turn_state_update",
-    "topic": "cognitive/map/turn_state_update",
-    "description": "Comprehensive turn state and UI button states",
-    "payload": "{\"type\": str, \"turn\": dict, \"buttons\": dict, \"timestamp\": float}",
+    "name": "executive_control_run",
+    "topic": "cognitive/{character}/control/run",
+    "description": "Direct run command to executive node - enable continuous execution",
+    "payload": "{\"timestamp\": str}",
+    "triggers": "(UI run button - direct executive control)",
+    "source_file": "/home/bruce/Downloads/Cognitive_workbench/src/fastapi_action_display.py"
+  },
+  {
+    "name": "executive_control_stop",
+    "topic": "cognitive/{character}/control/stop",
+    "description": "Direct stop command to executive node - pause execution",
+    "payload": "{\"timestamp\": str}",
+    "triggers": "(UI stop button - direct executive control)",
+    "source_file": "/home/bruce/Downloads/Cognitive_workbench/src/fastapi_action_display.py"
+  },
+  {
+    "name": "execution_state",
+    "topic": "cognitive/{character}/execution_state",
+    "description": "Current execution state (paused/running, mode)",
+    "payload": "{\"paused\": bool, \"mode\": str, \"character\": str, \"timestamp\": float}",
     "triggers": "(UI updates)",
-    "source_file": "/home/bruce/Downloads/Cognitive_workbench/src/map_node.py"
-  },
-  {
-    "name": "turn_stop",
-    "topic": "cognitive/map/turn/stop",
-    "description": "Turn stopped due to state threshold, plan failure, or manual stop",
-    "payload": "{\"character\": str, \"reason\": str, \"metric\": str, \"value\": float}",
-    "triggers": "HandlePlanFailure, AssessPerformance",
     "source_file": "/home/bruce/Downloads/Cognitive_workbench/src/executive_node.py"
   },
   {

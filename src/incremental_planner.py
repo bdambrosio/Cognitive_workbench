@@ -985,21 +985,11 @@ if HAS_SGLANG:
                 # Update index with commentary if resource was created
                 if resource_id:
                     try:
-                        from zenoh import QueryTarget, ConsolidationMode
-                        payload = {
-                            'resource_id': resource_id,
-                            'commentary': thoughts_text
-                        }
-                        for reply in executor.session.get(
-                            "cognitive/map/resource/update_commentary",
-                            target=QueryTarget.BEST_MATCHING,
-                            consolidation=ConsolidationMode.NONE,
-                            timeout=2.0,
-                            payload=json.dumps(payload).encode('utf-8')
-                        ):
-                            if reply.ok:
-                                logger.debug(f"Stage 3.1: Updated commentary for {resource_id} (created via {action.get('type')})")
-                            break
+                        if executor.resource_manager:
+                            executor.resource_manager.update_resource_commentary(resource_id, thoughts_text)
+                            logger.debug(f"Stage 3.1: Updated commentary for {resource_id} (created via {action.get('type')})")
+                        else:
+                            logger.debug(f"Stage 3.1: Resource manager not available for {resource_id}")
                     except Exception as e:
                         logger.debug(f"Stage 3.1: Failed to update commentary for {resource_id}: {e}")
             

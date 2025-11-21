@@ -10,6 +10,7 @@ import logging
 import hashlib
 import time
 from datetime import datetime, timedelta
+from pathlib import Path
 from typing import Dict, Any, Optional, List, Tuple
 
 from infospace_types import InfospaceResources, ResourceTypeRegistry
@@ -511,19 +512,17 @@ class InfospaceResourceManager:
     - Persistence helpers
     """
     
-    def __init__(self, world_name: str):
+    def __init__(self, world_name: str, session=None):
         """
         Initialize the resource manager.
         
         Args:
             world_name: Name of the world (for persistence/index naming)
+            session: Optional Zenoh session for save_all subscriber
         """
         self.world_name = world_name
         self.resource_types = ResourceTypeRegistry(InfospaceResources)
         self.resource_registry: Dict[str, Dict[str, Any]] = {}
-        
-        # Simulation clock owned by the manager
-        self.simulation_time = datetime(2024, 6, 15, 12, 0, 0)
         
         # Resource counters
         self.note_counter = 0
@@ -542,17 +541,56 @@ class InfospaceResourceManager:
         
         # Resource indexer for Stage 0 retrieval
         self.resource_indexer = ResourceIndexer(self)
+        
+        # File persistence path
+        self.resources_file = Path(f"data/resources/{self.world_name}_resources.json")
+        self.resources_file.parent.mkdir(parents=True, exist_ok=True)
+        
+        # Zenoh session for save_all subscriber
+        self.session = session
+        if self.session:
+            self.save_subscriber = self.session.declare_subscriber(
+                "cognitive/save_all",
+                self._handle_save_command
+            )
+            logger.info("InfospaceResourceManager: Subscribed to cognitive/save_all")
+        
+        # Create Note_null system resource (required global unique ID)
+        self._create_note_null()
+    
+    def _create_note_null(self):
+        """Create the distinguished Note_null system resource (required global unique ID)."""
+        if 'Note_null' in self.resource_registry:
+            return  # Already exists
+        
+        try:
+            note_type = self.resource_types.Note
+        except AttributeError:
+            logger.warning("Note resource type not available, cannot create Note_null")
+            return
+        
+        note_null_data = {
+            'name': 'Note_null',
+            'type': note_type,
+            'location': (0, 0),
+            'description': 'System null Note resource (sentinel for empty/null values)',
+            'remove_on_take': False,
+            'properties': {
+                'content': None,
+                'format': 'text',
+                'created_by': 'System',
+                'created_at': datetime.now().isoformat(),
+                'source_skill': 'system',
+                'source_value': '',
+                'note_name': 'null',
+                'is_system_resource': True
+            }
+        }
+        
+        self.resource_registry['Note_null'] = note_null_data
+        logger.info("📝 Created system Note_null resource")
 
     # ==================== Core Accessors ====================
-
-    def set_simulation_time(self, new_time: datetime):
-        """Set the shared simulation clock."""
-        self.simulation_time = new_time
-
-    def advance_simulation_minutes(self, minutes: int) -> datetime:
-        """Advance the simulation clock and return the new timestamp."""
-        self.simulation_time += timedelta(minutes=minutes)
-        return self.simulation_time
 
     def get_resource(self, name_or_id: Optional[str]) -> Optional[Dict[str, Any]]:
         """Retrieve a resource by ID, stable name, or canonicalized label."""
@@ -1508,3 +1546,211 @@ class InfospaceResourceManager:
         # Load resource indexes and re-index persistent resources
         self.resource_indexer.load_indexes(self.world_name)
         self.resource_indexer.reindex_persistent_resources()
+    
+    def save_to_file(self, file_path: Optional[Path] = None) -> bool:
+        """
+        Save resources to JSON file.
+        
+        Args:
+            file_path: Optional path to save file (defaults to self.resources_file)
+            
+        Returns:
+            True if saved successfully
+        """
+        try:
+            target_file = file_path or self.resources_file
+            target_file.parent.mkdir(parents=True, exist_ok=True)
+            
+            resource_data = self.save_resources()
+            
+            save_data = {
+                'world_name': self.world_name,
+                'timestamp': datetime.now().isoformat(),
+                'note_instances': resource_data['note_instances'],
+                'note_counter': resource_data['note_counter'],
+                'collection_instances': resource_data['collection_instances'],
+                'collection_counter': resource_data['collection_counter']
+            }
+            
+            with open(target_file, 'w') as f:
+                json.dump(save_data, f, indent=2)
+            
+            logger.info(f"💾 Saved resources to {target_file}")
+            return True
+        except Exception as e:
+            logger.error(f"Error saving resources to file: {e}")
+            return False
+    
+    def load_from_file(self, file_path: Optional[Path] = None) -> bool:
+        """
+        Load resources from JSON file.
+        
+        Args:
+            file_path: Optional path to load file (defaults to self.resources_file)
+            
+        Returns:
+            True if loaded successfully
+        """
+        try:
+            target_file = file_path or self.resources_file
+            if not target_file.exists():
+                logger.info(f"📂 No existing resources file at {target_file}, starting fresh")
+                return False
+            
+            with open(target_file, 'r') as f:
+                save_data = json.load(f)
+            
+            # Load resources using existing load_resources method
+            self.load_resources(save_data)
+            
+            logger.info(f"📂 Loaded resources from {target_file}")
+            return True
+        except Exception as e:
+            logger.error(f"Error loading resources from file: {e}")
+            return False
+    
+    def _handle_save_command(self, sample):
+        """Handle save command from cognitive/save_all topic."""
+        try:
+            logger.info('💾 InfospaceResourceManager received save command')
+            self.save_to_file()
+        except Exception as e:
+            logger.error(f'Error in save callback: {e}')
+    
+    # ==================== Public Query Methods ====================
+    
+    def get_resource_by_id(self, resource_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Get a resource by ID (public method for external callers).
+        
+        Args:
+            resource_id: Resource ID (e.g., "Note_42", "Collection_15")
+            
+        Returns:
+            Resource dict or None if not found
+        """
+        return self.get_resource(resource_id)
+    
+    def get_resource_content(self, resource_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Get resource content formatted for viewing (public method for UI).
+        
+        Args:
+            resource_id: Resource ID
+            
+        Returns:
+            Dict with type, content, metadata, or None if not found
+        """
+        resource = self.get_resource(resource_id)
+        if not resource:
+            return None
+        
+        resource_type = resource.get('type')
+        type_name = resource_type.name if hasattr(resource_type, 'name') else str(resource_type)
+        
+        content = resource.get('properties', {}).get('content', '')
+        if type_name == 'Collection':
+            # For Collections, content is a list of Note IDs
+            content = content if isinstance(content, list) else []
+        
+        # Make properties JSON-serializable
+        properties = resource.get('properties', {}).copy()
+        serializable_properties = {}
+        for key, value in properties.items():
+            if isinstance(value, datetime):
+                serializable_properties[key] = value.isoformat()
+            elif isinstance(value, (str, int, float, bool, type(None))):
+                serializable_properties[key] = value
+            elif isinstance(value, (dict, list)):
+                # Recursively clean nested structures
+                serializable_properties[key] = self._make_json_serializable(value)
+            else:
+                # Convert other types to string
+                serializable_properties[key] = str(value)
+        
+        return {
+            'success': True,
+            'type': type_name,
+            'content': content,
+            'metadata': {
+                'id': resource_id,
+                'name': resource.get('name', ''),
+                'description': resource.get('description', ''),
+                'properties': serializable_properties
+            }
+        }
+    
+    def _make_json_serializable(self, obj):
+        """Recursively convert objects to JSON-serializable types."""
+        if isinstance(obj, datetime):
+            return obj.isoformat()
+        elif isinstance(obj, (str, int, float, bool, type(None))):
+            return obj
+        elif isinstance(obj, dict):
+            return {k: self._make_json_serializable(v) for k, v in obj.items()}
+        elif isinstance(obj, (list, tuple)):
+            return [self._make_json_serializable(item) for item in obj]
+        else:
+            return str(obj)
+    
+    def get_resource_types(self) -> Dict[str, Any]:
+        """
+        Get all resource types (public method for external callers).
+        
+        Returns:
+            Dict with success flag and list of resource type names
+        """
+        type_names = []
+        for attr_name in dir(self.resource_types):
+            if not attr_name.startswith('_'):
+                attr_value = getattr(self.resource_types, attr_name)
+                if hasattr(attr_value, 'name'):
+                    type_names.append(attr_value.name)
+        
+        return {
+            'success': True,
+            'resource_types': type_names
+        }
+    
+    def get_resource_rules(self, type_name: str) -> Dict[str, Any]:
+        """
+        Get resource rules for a specific type (public method for external callers).
+        
+        Args:
+            type_name: Resource type name (e.g., "Note", "Collection", "Skill")
+            
+        Returns:
+            Dict with success flag and resource_rules
+        """
+        resource_type = getattr(self.resource_types, type_name, None)
+        if not resource_type:
+            return {
+                'success': False,
+                'error': f'Resource type {type_name} not found'
+            }
+        
+        # Build rules dict from resource type
+        rules = {
+            'description': getattr(resource_type, 'description', ''),
+            'use': getattr(resource_type, 'use', []),
+            'take': getattr(resource_type, 'take', []),
+            'create': getattr(resource_type, 'create', [])
+        }
+        
+        # Special handling for Skill type - include skill instances
+        if type_name.lower() == 'skill':
+            skill_instances = []
+            # Look for Skill resources in registry
+            for resource_id, resource_data in self.resource_registry.items():
+                if resource_data.get('type') == resource_type:
+                    skill_instances.append({
+                        'skill_name': resource_data.get('name', resource_id),
+                        'name': resource_data.get('name', resource_id),
+                        'description': resource_data.get('description', '')
+                    })
+            rules['skill_instances'] = skill_instances
+        
+        return {
+            'success': True,
+            'resource_rules': rules
+        }

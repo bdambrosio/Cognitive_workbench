@@ -260,17 +260,22 @@ class ZenohMemoryNode:
                 logger.info(f'Stored character announcement: {data.get("character_name", "unknown")}')
             elif action_type == 'say' or action_type == 'display' or action_type == 'response' or action_type == 'think':
                 source = data.get('source', 'unknown')
-                text = data['text']
+                # For display actions, prefer 'value' field if 'text' is not present
+                if action_type == 'display':
+                    text = data.get('text') or data.get('value', '')
+                else:
+                    text = data.get('text', '')
                 input = data.get('input', '')
                 # Store chat interaction in chat memory
-                self.chat_memory.append(input+': '+text)
+                if text:
+                    self.chat_memory.append(input+': '+text)
                     
                 # Add the character's response to entity conversation history
-                if source and text is not None and type(text) == str:
+                if source and text is not None and type(text) == str and text:
                     # Add conversation entry: this character sent a response to the source
                     self.add_conversation_entry(source, 'sent', text.strip()[:1000], self.character_name)
                     logger.info(f'Added response to entity {source}: {self.character_name} -> "{text[:50]}..."')
-                else:
+                elif action_type != 'display':  # Don't log error for display actions without text
                     logger.error(f'Missing input or text in cognitive_response action: {data.get("action_id", "unknown")}')
             elif action_type == 'take':
                 # Handle take action by adding item to inventory

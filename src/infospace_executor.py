@@ -40,7 +40,7 @@ class InfospaceExecutor:
     Design principle: Content is opaque. Field-based operations delegated to tools.
     """
     
-    def __init__(self, agent_name: str, session, map_name: str, llm_client, available_tools: Dict[str, Dict], executive_node=None):
+    def __init__(self, agent_name: str, session, map_name: str, llm_client, available_tools: Dict[str, Dict], executive_node=None, resource_manager=None):
         """
         Initialize infospace executor.
         
@@ -51,6 +51,7 @@ class InfospaceExecutor:
             llm_client: LLM client for tool execution
             available_tools: Dict of tool_name -> metadata (from tool_loader)
             executive_node: Reference to ZenohExecutiveNode (for ask action)
+            resource_manager: InfospaceResourceManager instance for direct resource access
         """
         self.agent_name = agent_name
         self.session = session
@@ -58,17 +59,7 @@ class InfospaceExecutor:
         self.llm_client = llm_client
         self.available_tools = available_tools
         self.executive_node = executive_node
-        
-        # === ZENOH PUBLICATION ===
-        # NAME: turn_heartbeat
-        # TOPIC: cognitive/map/turn/heartbeat/{character}
-        # DESCRIPTION: Character is alive and processing (prevents turn timeout)
-        # PAYLOAD: {"timestamp": str}
-        # TRIGGERS: (internal turn management - resets timeout)
-        # ========================
-        self.heartbeat_publisher = self.session.declare_publisher(
-            f"cognitive/map/turn/heartbeat/{agent_name}"
-        )
+        self.resource_manager = resource_manager
         
         # Plan-local state (ephemeral, cleared each plan)
         self.plan_bindings = {}  # $var_name -> resource_id (Note_N or Collection_N)
@@ -90,7 +81,7 @@ class InfospaceExecutor:
     
     def _create_collection(self, note_ids: list, source_context: str, collection_name: str = '', properties: Optional[Dict] = None) -> Optional[str]:
         """
-        Create a Collection resource in map_node.
+        Create a Collection resource.
         
         Args:
             note_ids: List of Note IDs (e.g., ["Note_2", "Note_3"])
@@ -101,35 +92,23 @@ class InfospaceExecutor:
         Returns:
             Collection ID if successful, None if failed
         """
-        from zenoh import QueryTarget, ConsolidationMode
-        payload_dict = {
-            'character_name': self.agent_name,
-            'content': note_ids,  # List of Note IDs
-            'format': 'list',
-            'source_skill': source_context,
-            'collection_name': collection_name
-        }
-        if properties:
-            payload_dict['properties'] = properties
-        for reply in self.session.get(
-            f"cognitive/map/collection/create",
-            target=QueryTarget.BEST_MATCHING,
-            consolidation=ConsolidationMode.NONE,
-            timeout=5.0,
-            payload=json.dumps(payload_dict).encode('utf-8')
-        ):
-            if reply.ok:
-                response = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
-                if response.get('success'):
-                    return response.get('info_id')
-                else:
-                    logger.error(f'Failed to create Collection: {response.get("error")}')
-            break
-        return None
+        if not self.resource_manager:
+            logger.error("Resource manager not available")
+            return None
+        
+        success, collection_id, error_msg, location = self.resource_manager.create_collection(
+            self.agent_name, note_ids, 'list', source_context, f'{len(note_ids)} items', collection_name, properties or {}
+        )
+        
+        if success:
+            return collection_id
+        else:
+            logger.error(f'Failed to create Collection: {error_msg}')
+            return None
     
     def _get_content(self, resource_id: str) -> Any:
         """
-        Fetch content from map_node for a given resource ID.
+        Fetch content for a given resource ID.
         
         Args:
             resource_id: Note_N or Collection_N ID
@@ -140,43 +119,20 @@ class InfospaceExecutor:
         if resource_id == "Note_null":
             return None
         
-        # Query map_node for the resource
-        from zenoh import QueryTarget, ConsolidationMode
-        for reply in self.session.get(
-            f"cognitive/map/resource/{resource_id}",
-            target=QueryTarget.BEST_MATCHING,
-            consolidation=ConsolidationMode.NONE,
-            timeout=5.0
-        ):
-            if reply.ok:
-                response = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
-                if response.get('success'):
-                    # Handle both response formats:
-                    # 1. handle_resource_by_name: {'success': True, 'resource': {...}}
-                    # 2. handle_resource_viewer: {'success': True, 'type': '...', 'content': ..., 'metadata': {...}}
-                    if 'resource' in response:
-                        # Format 1: extract content from resource.properties
-                        resource_data = response.get('resource')
-                        if not resource_data:
-                            logger.error(f"Resource {resource_id} returned no data")
-                            return None
-                        content = resource_data.get('properties', {}).get('content')
-                    else:
-                        # Format 2: content is directly in response
-                        content = response.get('content')
-                    
-                    return content
-                else:
-                    logger.warning(f"Failed to fetch {resource_id}: {response.get('error')}")
-                    return None
-            break
+        if not self.resource_manager:
+            logger.error("Resource manager not available")
+            return None
         
-        logger.warning(f"No response for {resource_id}")
-        return None
+        resource = self.resource_manager.get_resource(resource_id)
+        if not resource:
+            logger.warning(f"Resource {resource_id} not found")
+            return None
+        
+        return resource.get('properties', {}).get('content')
     
     def get_resource_metadata(self, resource_id: str) -> Optional[Dict]:
         """
-        Fetch metadata from map_node for a given resource ID.
+        Fetch metadata for a given resource ID.
         
         Args:
             resource_id: Note_N or Collection_N ID
@@ -187,28 +143,14 @@ class InfospaceExecutor:
         if resource_id == "Note_null":
             return None
         
-        # Query map_node for the resource
-        from zenoh import QueryTarget, ConsolidationMode
-        for reply in self.session.get(
-            f"cognitive/map/resource/{resource_id}",
-            target=QueryTarget.BEST_MATCHING,
-            consolidation=ConsolidationMode.NONE,
-            timeout=5.0
-        ):
-            if reply.ok:
-                response = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
-                if response.get('success'):
-                    if 'resource' in response:
-                        # Format 1: extract properties from resource
-                        resource_data = response.get('resource')
-                        if resource_data:
-                            return resource_data.get('properties', {})
-                    else:
-                        # Format 2: metadata is in response
-                        return response.get('metadata', {})
-            break
+        if not self.resource_manager:
+            return None
         
-        return None
+        resource = self.resource_manager.get_resource(resource_id)
+        if not resource:
+            return None
+        
+        return resource.get('properties', {})
     
     def execute_action(self, action: Dict) -> Dict:
         """
@@ -291,49 +233,7 @@ class InfospaceExecutor:
             return {'status': 'failed', 'reason': f'Execution error: {str(e)}'}
     
     # ==================== Core Operations ====================
-    
-    def _execute_scan(self, action: Dict) -> Dict:
-        """
-        Scan for resource/tool by name or interface type.
         
-        Required: type, target, out, expect
-        """
-        # Validate required fields
-        error = self._validate_required_fields(action, 'target', 'out')
-        if error:
-            return {'status': 'failed', 'reason': error}
-        
-        target = action.get('target')
-        out_var = action.get('out')
-        
-        # Query map for matching resources
-        query = {
-            'agent_name': self.agent_name,
-            'target': target,
-            'scan_type': 'tool'
-        }
-        
-        # Publish scan request
-        self.session.put(f"map/{self.map_name}/scan_request/{self.agent_name}", json.dumps(query))
-        
-        # Wait for response (with timeout)
-        response = self._wait_for_response(f"map/{self.map_name}/scan_response/{self.agent_name}", timeout=5.0)
-        
-        if not response:
-            return {'status': 'failed', 'reason': 'Scan timeout'}
-        
-        if response.get('status') != 'success':
-            return {'status': 'failed', 'reason': response.get('reason', 'Scan failed')}
-        
-        # Get result and create Note for it
-        result = response.get('result')
-        
-        # Bind result to variable
-        self._bind_variable(out_var, result)
-        
-        logger.info(f"Scan found: {result['name'] if isinstance(result, dict) else result}")
-        return {'status': 'success', 'value': result}
-    
     def _execute_apply(self, action: Dict) -> Dict:
         """
         Apply tool to input data.
@@ -518,8 +418,29 @@ Only provide the result, followed by the </end> tag.""")
             
             full_prompt = "".join(prompt_parts)
             
-            # Call LLM directly
-            llm_response = self.llm_client.generate(
+            # Create unified LLM generation wrapper (uses SGLang runtime if available, else llm_client)
+            def llm_generate(messages, bindings=None, max_tokens=2000, temperature=0.7, is_json=False, stops=None):
+                """Unified LLM generation interface - uses SGLang runtime if available, else llm_client."""
+                if self.runtime:
+                    # For SGLang, apply bindings to messages if provided
+                    if bindings and isinstance(messages, list):
+                        processed_messages = []
+                        for msg in messages:
+                            if isinstance(msg, str):
+                                # Apply template bindings
+                                processed_msg = msg
+                                for key, value in bindings.items():
+                                    processed_msg = processed_msg.replace(f"{{{{${key}}}}}", str(value))
+                                processed_messages.append(processed_msg)
+                            else:
+                                processed_messages.append(msg)
+                        messages = processed_messages
+                    return self._sglang_generate(messages, max_tokens, temperature, stops)
+                else:
+                    return self.llm_client.generate(messages, bindings=bindings, max_tokens=max_tokens, temperature=temperature, is_json=is_json, stops=stops)
+            
+            # Call LLM using unified wrapper
+            llm_response = llm_generate(
                 messages=[full_prompt],
                 bindings={},
                 max_tokens=1000,
@@ -527,16 +448,18 @@ Only provide the result, followed by the </end> tag.""")
                 stops=['</end>']
             )
             
-            # Send heartbeat after LLM call
-            self.heartbeat_publisher.put(json.dumps({
-                'character': self.agent_name,
-                'timestamp': time.time()
-            }))
+            # Handle response format (SGLang returns dict with 'text', llm_client returns object with .text)
+            if isinstance(llm_response, dict):
+                result_text = llm_response.get('text', '').strip()
+            elif hasattr(llm_response, 'text'):
+                result_text = llm_response.text.strip()
+            elif isinstance(llm_response, str):
+                result_text = llm_response.strip()
+            else:
+                return {'status': 'failed', 'reason': 'LLM returned invalid response format'}
             
-            if not llm_response or not llm_response.text:
+            if not result_text:
                 return {'status': 'failed', 'reason': 'LLM returned empty response'}
-            
-            result_text = llm_response.text.strip()
             logger.info(f"Prompt tool '{tool_name}' completed ({len(result_text)} chars)")
             
             # Check for null indicator - return Note_null resource ID instead of string
@@ -708,28 +631,32 @@ Only provide the result, followed by the </end> tag.""")
             for key, val in additional_args.items():
                 resolved_args[key] = self._resolve_value(val)
         
-        # Add heartbeat callback for tools (all tools receive it, LLM-using tools can call it)
-        def heartbeat():
-            """Send heartbeat to reset turn timeout"""
-            self.heartbeat_publisher.put(json.dumps({
-                'character': self.agent_name,
-                'timestamp': time.time()
-            }))
-        
-        resolved_args['heartbeat'] = heartbeat
-        
         # Add map_name and llm_client to kwargs for tools that need them
         resolved_args['map_name'] = self.map_name
         resolved_args['llm_client'] = self.llm_client
         resolved_args['agent_name'] = self.agent_name
+        resolved_args['resource_manager'] = self.resource_manager
         
         # Add unified LLM generation callback (uses SGLang runtime if available, else llm_client)
-        def llm_generate(messages, max_tokens=2000, temperature=0.7, is_json=False, stops=None):
+        def llm_generate(messages, bindings=None, max_tokens=2000, temperature=0.7, is_json=False, stops=None):
             """Unified LLM generation interface - uses SGLang runtime if available, else llm_client."""
             if self.runtime:
+                # For SGLang, apply bindings to messages if provided
+                if bindings and isinstance(messages, list):
+                    processed_messages = []
+                    for msg in messages:
+                        if isinstance(msg, str):
+                            # Apply template bindings
+                            processed_msg = msg
+                            for key, value in bindings.items():
+                                processed_msg = processed_msg.replace(f"{{{{${key}}}}}", str(value))
+                            processed_messages.append(processed_msg)
+                        else:
+                            processed_messages.append(msg)
+                    messages = processed_messages
                 return self._sglang_generate(messages, max_tokens, temperature, stops)
             else:
-                return self.llm_client.generate(messages, max_tokens, temperature, is_json, stops)
+                return self.llm_client.generate(messages, bindings=bindings, max_tokens=max_tokens, temperature=temperature, is_json=is_json, stops=stops)
         
         resolved_args['llm_generate'] = llm_generate
         
@@ -772,23 +699,6 @@ Only provide the result, followed by the </end> tag.""")
             'agent_name': self.agent_name,
             'target': target
         }
-        
-        self.session.put(
-            f"map/{self.map_name}/move_request/{self.agent_name}",
-            json.dumps(request)
-        )
-        
-        # Wait for response
-        response = self._wait_for_response(
-            f"map/{self.map_name}/move_response/{self.agent_name}",
-            timeout=5.0
-        )
-        
-        if not response:
-            return {'status': 'failed', 'reason': 'Focus timeout'}
-        
-        if response.get('status') != 'success':
-            return {'status': 'failed', 'reason': response.get('reason', 'Focus failed')}
         
         logger.info(f"Focused on {target}")
         return {'status': 'success', 'value': target}
@@ -1008,34 +918,21 @@ Only provide the result, followed by the </end> tag.""")
         if isinstance(value, str) and value == "Note_null":
             return "Note_null"
 
+        if not self.resource_manager:
+            logger.error("Resource manager not available")
+            return None
+        
         format_type = 'json' if isinstance(value, (dict, list)) else 'text'
-
-        from zenoh import QueryTarget, ConsolidationMode
-        payload_dict = {
-            'character_name': self.agent_name,
-            'content': value,
-            'format': format_type,
-            'source_skill': source_context,
-            'source_value': str(value)[:100],
-            'note_name': note_name
-        }
-        if properties:
-            payload_dict['properties'] = properties
-        for reply in self.session.get(
-            f"cognitive/map/note/create",
-            target=QueryTarget.BEST_MATCHING,
-            consolidation=ConsolidationMode.NONE,
-            timeout=5.0,
-            payload=json.dumps(payload_dict).encode('utf-8')
-        ):
-            if reply.ok:
-                response = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
-                if response.get('success'):
-                    return response.get('info_id')
-                else:
-                    logger.error(f'Failed to create Note: {response.get("error")}')
-            break
-        return None
+        
+        success, note_id, error_msg, location = self.resource_manager.create_note(
+            self.agent_name, value, format_type, source_context, str(value)[:100], note_name, properties or {}
+        )
+        
+        if success:
+            return note_id
+        else:
+            logger.error(f'Failed to create Note: {error_msg}')
+            return None
 
     def _execute_persist(self, action: Dict) -> Dict:
         """
@@ -1063,29 +960,18 @@ Only provide the result, followed by the </end> tag.""")
         if not isinstance(resource_id, str) or not (resource_id.startswith('Collection_') or resource_id.startswith('Note_')):
             return {'status': 'failed', 'reason': f'Target must be a Note or Collection ID, got: {resource_id}'}
         
-        from zenoh import QueryTarget, ConsolidationMode
-        for reply in self.session.get(
-            f"cognitive/map/collection/persist",
-            target=QueryTarget.BEST_MATCHING,
-            consolidation=ConsolidationMode.NONE,
-            timeout=5.0,
-            payload=json.dumps({
-                'resource_id': resource_id,
-                'character_name': self.agent_name
-            }).encode('utf-8')
-        ):
-            if reply.ok:
-                response = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
-                if response.get('success'):
-                    logger.info(f"Marked {resource_id} as persistent")
-                    return {'status': 'success', 'value': resource_id}
-                else:
-                    logger.error(f'Failed to persist resource: {response.get("error")}')
-                    return {'status': 'failed', 'reason': response.get('error', 'Unknown error')}
-            break
+        # Mark as persistent using resource manager
+        if not self.resource_manager:
+            return {'status': 'failed', 'reason': 'Resource manager not available'}
         
-        logger.error(f"Persist request failed for {resource_id}")
-        return {'status': 'failed', 'reason': 'Failed to mark resource as persistent'}
+        success, error_msg = self.resource_manager.mark_persistent(resource_id, self.agent_name)
+        
+        if success:
+            logger.info(f"Marked {resource_id} as persistent")
+            return {'status': 'success', 'value': resource_id}
+        else:
+            logger.error(f'Failed to persist resource: {error_msg}')
+            return {'status': 'failed', 'reason': error_msg or 'Unknown error'}
     
     def search_resources(self, queries: List[str], k_notes: int = 3, k_collections: int = 2, threshold: float = 0.3) -> Dict:
         """
@@ -1101,53 +987,49 @@ Only provide the result, followed by the </end> tag.""")
         Returns:
             Dict with 'notes' and 'collections' lists, or error dict
         """
-        from zenoh import QueryTarget, ConsolidationMode
-        
-        payload = {
-            'queries': queries,
-            'k_notes': k_notes,
-            'k_collections': k_collections,
-            'threshold': threshold
-        }
+        if not self.resource_manager:
+            return {
+                'status': 'failed',
+                'reason': 'Resource manager not available',
+                'notes': [],
+                'collections': []
+            }
         
         try:
-            reply_received = False
-            for reply in self.session.get(
-                "cognitive/map/resource/search",
-                target=QueryTarget.BEST_MATCHING,
-                consolidation=ConsolidationMode.NONE,
-                timeout=5.0,
-                payload=json.dumps(payload).encode('utf-8')
-            ):
-                reply_received = True
-                if reply.ok:
-                    response = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
-                    if response.get('success'):
-                        return {
-                            'status': 'success',
-                            'notes': response.get('notes', []),
-                            'collections': response.get('collections', [])
-                        }
-                    else:
-                        return {
-                            'status': 'failed',
-                            'reason': response.get('error', 'Search failed')
-                        }
-                elif reply.err:
-                    # Zenoh error response
-                    error_msg = str(reply.err.payload.to_bytes().decode('utf-8')) if reply.err.payload else str(reply.err)
-                    return {
-                        'status': 'failed',
-                        'reason': f'Zenoh error: {error_msg}'
-                    }
-                break
+            # Search both indexes for each query, merge results
+            all_notes = {}
+            all_collections = {}
             
-            if not reply_received:
-                # No reply at all - queryable might not be registered yet
-                return {
-                    'status': 'failed',
-                    'reason': 'No response from map_node (queryable may not be registered yet)'
-                }
+            for query_text in queries:
+                # Search Notes
+                note_results = self.resource_manager.resource_indexer.search_notes(
+                    query_text, k=k_notes, threshold=threshold
+                )
+                for result in note_results:
+                    resource_id = result['resource_id']
+                    # Keep highest score if duplicate
+                    if resource_id not in all_notes or result['score'] > all_notes[resource_id]['score']:
+                        all_notes[resource_id] = result
+                
+                # Search Collections
+                collection_results = self.resource_manager.resource_indexer.search_collections(
+                    query_text, k=k_collections, threshold=threshold
+                )
+                for result in collection_results:
+                    resource_id = result['resource_id']
+                    # Keep highest score if duplicate
+                    if resource_id not in all_collections or result['score'] > all_collections[resource_id]['score']:
+                        all_collections[resource_id] = result
+            
+            # Sort by score and take top k
+            notes_list = sorted(all_notes.values(), key=lambda x: x['score'], reverse=True)[:k_notes]
+            collections_list = sorted(all_collections.values(), key=lambda x: x['score'], reverse=True)[:k_collections]
+            
+            return {
+                'status': 'success',
+                'notes': notes_list,
+                'collections': collections_list
+            }
         except Exception as e:
             logger.warning(f"Exception during resource search: {e}")
             import traceback
@@ -1690,8 +1572,11 @@ Only provide the result, followed by the </end> tag.""")
         self.executive_node.action_publisher.put(json.dumps(action_data))
         self.executive_node.action_counter += 1
         
-        # Enter step mode so user can respond and click Step/Run
-        self.session.put("cognitive/map/turn/step", b"")
+        # Pause execution so user can respond and click Step/Run
+        if self.executive_node:
+            self.executive_node.execution_paused = True
+            self.executive_node.execution_mode = 'step'
+            self.executive_node._publish_execution_state()
         
         # Set suspension state in plan_state for _execute_next_step to handle
         self.executive_node.plan_state['awaiting_ask'] = {
@@ -2013,33 +1898,23 @@ Only provide the result, followed by the </end> tag.""")
             if not note_id:
                 return {'status': 'failed', 'reason': 'Failed to persist value as Note'}
         
-        # Request add from map_node
-        from zenoh import QueryTarget, ConsolidationMode
-        for reply in self.session.get(
-            f"cognitive/map/collection/add",
-            target=QueryTarget.BEST_MATCHING,
-            consolidation=ConsolidationMode.NONE,
-            timeout=5.0,
-            payload=json.dumps({
-                'collection_id': collection_id,
-                'note_id': note_id,
-                'agent_name': self.agent_name
-            }).encode('utf-8')
-        ):
-            if reply.ok:
-                response = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
-                if response.get('success'):
-                    # Bind to out variable (usually same as target)
-                    self._bind_variable(out_var, collection_id)
-                    display_var = self._normalize_var_for_log(out_var)
-                    logger.info(f"Added {note_id} to {collection_id} → {display_var}")
-                    return {'status': 'success', 'value': collection_id}
-                else:
-                    logger.error(f'Failed to add to Collection: {response.get("error")}')
-                    return {'status': 'failed', 'reason': response.get('error', 'Add failed')}
-            break
+        # Add to collection using resource manager
+        if not self.resource_manager:
+            return {'status': 'failed', 'reason': 'Resource manager not available'}
         
-        return {'status': 'failed', 'reason': 'No response from map_node'}
+        success, item_count, error_msg = self.resource_manager.add_to_collection(
+            collection_id, note_id, self.agent_name, 'add', None
+        )
+        
+        if success:
+            # Bind to out variable (usually same as target)
+            self._bind_variable(out_var, collection_id)
+            display_var = self._normalize_var_for_log(out_var)
+            logger.info(f"Added {note_id} to {collection_id} → {display_var}")
+            return {'status': 'success', 'value': collection_id}
+        else:
+            logger.error(f'Failed to add to Collection: {error_msg}')
+            return {'status': 'failed', 'reason': error_msg or 'Add failed'}
     
     def _execute_expand(self, action: Dict) -> Dict:
         """
@@ -2381,32 +2256,21 @@ Only provide the result, followed by the </end> tag.""")
         # Remove from list
         note_ids.remove(note_id)
         
-        # Update Collection via map_node (similar to add but with modified content)
-        from zenoh import QueryTarget, ConsolidationMode
-        for reply in self.session.get(
-            f"cognitive/map/collection/add",
-            target=QueryTarget.BEST_MATCHING,
-            consolidation=ConsolidationMode.NONE,
-            timeout=5.0,
-            payload=json.dumps({
-                'collection_id': collection_id,
-                'content': note_ids,  # Send full updated content
-                'agent_name': self.agent_name,
-                'operation': 'update'  # Signal this is an update, not add
-            }).encode('utf-8')
-        ):
-            if reply.ok:
-                response = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
-                if response.get('success'):
-                    self._bind_variable(out_var, collection_id)
-                    display_var = self._normalize_var_for_log(out_var)
-                    logger.info(f"Removed {note_id} from {collection_id} (now {len(note_ids)} items) → {display_var}")
-                    return {'status': 'success', 'value': collection_id}
-                else:
-                    return {'status': 'failed', 'reason': response.get('error', 'Remove failed')}
-            break
+        # Update Collection using resource manager
+        if not self.resource_manager:
+            return {'status': 'failed', 'reason': 'Resource manager not available'}
         
-        return {'status': 'failed', 'reason': 'No response from map_node'}
+        success, item_count, error_msg = self.resource_manager.add_to_collection(
+            collection_id, None, self.agent_name, 'update', note_ids
+        )
+        
+        if success:
+            self._bind_variable(out_var, collection_id)
+            display_var = self._normalize_var_for_log(out_var)
+            logger.info(f"Removed {note_id} from {collection_id} (now {len(note_ids)} items) → {display_var}")
+            return {'status': 'success', 'value': collection_id}
+        else:
+            return {'status': 'failed', 'reason': error_msg or 'Remove failed'}
     
     def _execute_project(self, action: Dict) -> Dict:
         """

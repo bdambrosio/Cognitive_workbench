@@ -6,63 +6,56 @@ import json
 import logging
 import os
 import requests
-from typing import List, Dict, Any
-import zenoh
-from zenoh import QueryTarget, ConsolidationMode
+from typing import List, Dict, Any, Optional
 
 logger = logging.getLogger(__name__)
 
-# Open zenoh session for creating Notes and Collections
-config = zenoh.Config()
-zenoh_session = zenoh.open(config)
 ss_api_key = os.getenv("SEMANTIC_SCHOLAR_API_KEY") or None
 
-def _create_note(content: Any, agent_name: str, source_skill: str = 'semantic-scholar') -> str:
-    """Create a Note via Zenoh and return its ID."""
-    for reply in zenoh_session.get(
-        "cognitive/map/note/create",
-        target=QueryTarget.BEST_MATCHING,
-        consolidation=ConsolidationMode.NONE,
-        payload=json.dumps({
-            'character_name': agent_name,
-            'content': content,
-            'format': 'json' if isinstance(content, dict) else 'text',
-            'source_skill': source_skill,
-            'source_value': str(content)[:100]
-        }).encode('utf-8'),
-        timeout=5.0
-    ):
-        if reply.ok:
-            response = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
-            if response.get('success'):
-                return response.get('info_id')
-        break
-    return None
+def _create_note(content: Any, agent_name: str, resource_manager, source_skill: str = 'semantic-scholar') -> Optional[str]:
+    """Create a Note via resource_manager and return its ID."""
+    if not resource_manager:
+        logger.error("resource_manager required for creating Notes")
+        return None
+    
+    success, note_id, error_msg, _ = resource_manager.create_note(
+        character_name=agent_name,
+        content=content,
+        format_type='json' if isinstance(content, dict) else 'text',
+        source_skill=source_skill,
+        source_value=str(content)[:100],
+        note_name='',  # Empty name for auto-generated notes
+        extra_props={}  # No extra properties
+    )
+    
+    if success:
+        return note_id
+    else:
+        logger.error(f"Failed to create Note: {error_msg}")
+        return None
 
-def _create_collection(note_ids: List[str], agent_name: str, source_skill: str = 'semantic-scholar') -> str:
-    """Create a Collection via Zenoh and return its ID."""
-    for reply in zenoh_session.get(
-        "cognitive/map/collection/create",
-        target=QueryTarget.BEST_MATCHING,
-        consolidation=ConsolidationMode.NONE,
-        payload=json.dumps({
-            'character_name': agent_name,
-            'content': note_ids,
-            'format': 'list',
-            'source_skill': source_skill,
-            'source_value': f'{len(note_ids)} papers'
-        }).encode('utf-8'),
-        timeout=5.0
-    ):
-        if reply.ok:
-            response = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
-            if response.get('success'):
-                collection_id = response.get('info_id')
-                logger.info(f"Created Collection {collection_id} with {len(note_ids)} items")
-                return collection_id
-        break
-    logger.error("Failed to create Collection via Zenoh")
-    return None
+def _create_collection(note_ids: List[str], agent_name: str, resource_manager, source_skill: str = 'semantic-scholar') -> Optional[str]:
+    """Create a Collection via resource_manager and return its ID."""
+    if not resource_manager:
+        logger.error("resource_manager required for creating Collections")
+        return None
+    
+    success, collection_id, error_msg, _ = resource_manager.create_collection(
+        agent_name,
+        note_ids,
+        'list',
+        f'{len(note_ids)} papers',
+        '',
+        '',
+        {}
+    )
+    
+    if success:
+        logger.info(f"Created Collection {collection_id} with {len(note_ids)} items")
+        return collection_id
+    else:
+        logger.error(f"Failed to create Collection: {error_msg}")
+        return None
 
 def search_papers(query: str, limit: int = 6) -> List[Dict[str, Any]]:
     """
@@ -110,7 +103,17 @@ def _search_papers_direct(query: str, limit: int, api_key: str = None) -> List[D
         for paper in data.get("data", []):
             abstract = paper.get("abstract", "No abstract available")
             title = paper.get("title", "Untitled")
-            authors = [a.get("name", "Unknown") for a in paper.get("authors", [])]
+            # Safely extract author names - handle various API response formats
+            authors = []
+            for a in paper.get("authors", []):
+                if isinstance(a, dict):
+                    author_name = a.get("name") or a.get("authorId") or "Unknown"
+                elif isinstance(a, str):
+                    author_name = a
+                else:
+                    # Fallback: try to convert to string
+                    author_name = str(a) if a else "Unknown"
+                authors.append(str(author_name))  # Ensure it's always a string
             year = paper.get("year", 0)
             citations = paper.get("citationCount", 0)
             venue = paper.get("venue", "")
@@ -166,7 +169,7 @@ def tool(value, runtime=None, **kwargs):
     
     Args:
         value: Search query string
-        **kwargs: agent_name (required), limit (optional)
+        **kwargs: agent_name (required), resource_manager (required), limit (optional)
         
     Returns:
         Collection ID containing structured Note for each paper result
@@ -184,6 +187,13 @@ def tool(value, runtime=None, **kwargs):
             'reason': 'agent_name required in kwargs'
         }
     
+    resource_manager = kwargs.get('resource_manager')
+    if not resource_manager:
+        return {
+            'status': 'failed',
+            'reason': 'resource_manager required in kwargs'
+        }
+    
     limit = kwargs.get('limit', 10)
     
     # Search papers
@@ -191,7 +201,7 @@ def tool(value, runtime=None, **kwargs):
     
     if not results:
         # Return empty Collection for no results
-        empty_coll_id = _create_collection([], agent_name)
+        empty_coll_id = _create_collection([], agent_name, resource_manager)
         if not empty_coll_id:
             return {'status': 'failed', 'reason': 'Failed to create empty Collection'}
         return empty_coll_id
@@ -199,7 +209,7 @@ def tool(value, runtime=None, **kwargs):
     # Create a Note for each paper result (each is structured JSON)
     note_ids = []
     for result in results:
-        note_id = _create_note(result, agent_name)
+        note_id = _create_note(result, agent_name, resource_manager)
         if note_id:
             note_ids.append(note_id)
         else:
@@ -209,7 +219,7 @@ def tool(value, runtime=None, **kwargs):
         return {'status': 'failed', 'reason': 'Failed to create any Notes from search results'}
     
     # Create Collection containing all paper Notes
-    collection_id = _create_collection(note_ids, agent_name)
+    collection_id = _create_collection(note_ids, agent_name, resource_manager)
     if not collection_id:
         return {'status': 'failed', 'reason': 'Failed to create Collection'}
     

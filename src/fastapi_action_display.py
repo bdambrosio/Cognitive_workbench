@@ -263,23 +263,9 @@ class FastAPIActionDisplayNode:
             self.step_complete_callback
         )
         
-        # Subscriber for turn start events
-        self.turn_start_subscriber = self.session.declare_subscriber(
-            "cognitive/map/turn",
-            self.turn_start_callback
-        )
         
-        # Subscriber for turn control status from map node
-        self.turn_control_subscriber = self.session.declare_subscriber(
-            "cognitive/map/turn_status",
-            self.turn_control_callback
-        )
-        
-        # NEW: Subscriber for unified turn state updates from map node
-        self.turn_state_update_subscriber = self.session.declare_subscriber(
-            "cognitive/map/turn_state_update",
-            self.turn_state_update_callback
-        )
+        # Subscriber for execution state updates from executive node
+        self.execution_state_subscriber = None  # Will be set when character is known
         
         # Subscriber for character goals
         self.goal_subscriber = self.session.declare_subscriber(
@@ -305,17 +291,6 @@ class FastAPIActionDisplayNode:
             self.current_activity_callback
         )
         # Subscriber for character current state
-        self.current_state_subscriber = self.session.declare_subscriber(
-            "cognitive/*/current_state",
-            self.current_state_callback
-        )
-        
-        # Subscriber for character situation data
-        self.situation_subscriber = self.session.declare_subscriber(
-            "cognitive/*/situation/update",
-            self.situation_callback
-        )
-        
         # Subscriber for launcher ready signal
         self.ready_subscriber = self.session.declare_subscriber(
             "cognitive/launcher/ready",
@@ -325,10 +300,13 @@ class FastAPIActionDisplayNode:
         # Publisher for memory storage
         self.memory_publisher = self.session.declare_publisher("cognitive/memory/store")
         
-        # Publishers for turn control
-        self.turn_step_publisher = self.session.declare_publisher("cognitive/map/turn/step")
-        self.turn_run_publisher = self.session.declare_publisher("cognitive/map/turn/run")
-        self.turn_stop_publisher = self.session.declare_publisher("cognitive/map/turn/stop")
+        # Track active character name for direct control
+        self.active_character_name = None
+        
+        # Publishers for direct execution control (will be set when character is known)
+        self.control_step_publisher = None
+        self.control_run_publisher = None
+        self.control_stop_publisher = None
         
         # Publisher for time management
         self.time_delay_publisher = self.session.declare_publisher("cognitive/map/time_delay_setting")
@@ -519,9 +497,10 @@ class FastAPIActionDisplayNode:
                 
                 # Automatically trigger a step to start plan execution
                 # This uses the same mechanism as the Step Turn button
-                with self.turn_state_lock:
-                    self.turn_state['mode'] = 'step'
-                self.turn_step_publisher.put(json.dumps({"timestamp": datetime.now().isoformat()}).encode())
+                if self.active_character_name and self.control_step_publisher:
+                    with self.turn_state_lock:
+                        self.turn_state['mode'] = 'step'
+                    self.control_step_publisher.put(json.dumps({"timestamp": datetime.now().isoformat()}).encode())
                 
                 await websocket.send_text(json.dumps({
                     'type': 'test_status',
@@ -638,26 +617,7 @@ class FastAPIActionDisplayNode:
             # Store as last character used
             self.last_character_name = actual_character_name
             
-            # Acquire conversation lock for User with target character
-            lock_acquired = False
-            lock_request = {
-                'requester': 'User',
-                'target': actual_character_name
-            }
-            for reply in self.session.get(
-                "cognitive/map/conversation/lock/acquire",
-                target=QueryTarget.BEST_MATCHING,
-                consolidation=ConsolidationMode.NONE,
-                payload=json.dumps(lock_request).encode('utf-8'),
-                timeout=5.0
-            ):
-                if reply.ok:
-                    lock_data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
-                    lock_acquired = lock_data.get('lock_acquired', False)
-                break
-            
-            if not lock_acquired:
-                return {"error": f"Could not acquire conversation lock with {actual_character_name}"}
+            # No conversation locks needed with single character
             
             # Get or create publisher for this character
             if actual_character_name not in self.character_publishers:
@@ -787,39 +747,9 @@ class FastAPIActionDisplayNode:
             if not actual_character_name:
                 return {"error": f"Character '{character_name}' not found. Available: {', '.join(sorted(self.active_characters))}"}
             
-            # Check if User is locked with this character
-            locked_with = None
-            for reply in self.session.get(
-                f"cognitive/map/conversation/lock/status/User",
-                target=QueryTarget.BEST_MATCHING,
-                consolidation=ConsolidationMode.NONE,
-                timeout=5.0
-            ):
-                if reply.ok:
-                    data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
-                    if data.get('success') and data.get('is_locked'):
-                        locked_with = data.get('locked_with', [])
-                        if actual_character_name not in locked_with:
-                            return {"error": f"User is not in conversation with {actual_character_name}"}
-                        break
+            # No conversation locks needed with single character
             
-            # Release conversation locks
-            lock_release = {
-                'character1': 'User',
-                'character2': actual_character_name
-            }
-            for reply in self.session.get(
-                "cognitive/map/conversation/lock/release",
-                target=QueryTarget.BEST_MATCHING,
-                consolidation=ConsolidationMode.NONE,
-                payload=json.dumps(lock_release).encode('utf-8'),
-                timeout=5.0
-            ):
-                if reply.ok:
-                    data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
-                    if not data.get('success'):
-                        logger.warning(f"Failed to release conversation lock: {data.get('error', 'Unknown error')}")
-                break
+            # No conversation locks needed with single character
             
             # Send close_dialog messages to both User and target character
             # Close User's dialog with target
@@ -839,62 +769,63 @@ class FastAPIActionDisplayNode:
         
         @self.app.get("/api/conversation_status")
         async def get_conversation_status():
-            """Get User's conversation lock status."""
-            for reply in self.session.get(
-                f"cognitive/map/conversation/lock/status/User",
-                target=QueryTarget.BEST_MATCHING,
-                consolidation=ConsolidationMode.NONE,
-                timeout=3.0
-            ):
-                if reply.ok:
-                    data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
-                    if data.get('success'):
-                        return {
-                            "is_locked": data.get('is_locked', False),
-                            "locked_with": data.get('locked_with', [])
-                        }
-                break
+            """Get User's conversation lock status (always unlocked with single character)."""
             return {"is_locked": False, "locked_with": []}
         
         @self.app.post("/api/turn/step")
         async def step_turn():
-            """Advance one turn for each character."""
+            """Advance one OODA cycle."""
             try:
+                if self.active_character_name is None:
+                    return {"success": False, "message": "No character available yet"}
+                
                 with self.turn_state_lock:
                     self.turn_state['mode'] = 'step'
                 
-                self.turn_step_publisher.put(json.dumps({"timestamp": datetime.now().isoformat()}).encode())
+                self.control_step_publisher.put(json.dumps({"timestamp": datetime.now().isoformat()}).encode())
+                logger.info(f"🎯 Step command sent to {self.active_character_name}")
                 
-                return {"success": True, "message": "Step Turn command sent"}
+                return {"success": True, "message": "Step command sent"}
             except Exception as e:
+                logger.error(f"Error in step_turn: {e}")
                 return {"success": False, "message": f"Error: {str(e)}"}
         
         @self.app.post("/api/turn/run")
         async def run_turns():
-            """Start automatic turn progression."""
+            """Start continuous execution."""
             try:
+                if self.active_character_name is None:
+                    return {"success": False, "message": "No character available yet"}
+                
                 logger.info(f"🏃 Run command received in FastAPI")
                 
-                self.turn_run_publisher.put(json.dumps({"timestamp": datetime.now().isoformat()}).encode())
-                logger.info(f"🏃 Run command published to map node")
+                with self.turn_state_lock:
+                    self.turn_state['mode'] = 'run'
                 
-                # Note: Turn state will be updated when map_node publishes the status change
-                return {"success": True, "message": "Run Turns command sent"}
+                self.control_run_publisher.put(json.dumps({"timestamp": datetime.now().isoformat()}).encode())
+                logger.info(f"🏃 Run command sent to {self.active_character_name}")
+                
+                return {"success": True, "message": "Run command sent"}
             except Exception as e:
                 logger.error(f"Error in run_turns: {e}")
                 return {"success": False, "message": f"Error: {str(e)}"}
         
         @self.app.post("/api/turn/stop")
         async def stop_turns():
-            """Stop automatic turn progression."""
+            """Stop execution."""
             try:
+                if self.active_character_name is None:
+                    return {"success": False, "message": "No character available yet"}
+                
                 logger.info(f"🛑 Stop command received in FastAPI")
                 
-                self.turn_stop_publisher.put(json.dumps({"timestamp": datetime.now().isoformat()}).encode())
-                logger.info(f"🛑 Stop command published to map node")
+                with self.turn_state_lock:
+                    self.turn_state['mode'] = 'step'
                 
-                # Note: Turn state will be updated when map_node publishes the status change
-                return {"success": True, "message": "Stop Turns command sent"}
+                self.control_stop_publisher.put(json.dumps({"timestamp": datetime.now().isoformat()}).encode())
+                logger.info(f"🛑 Stop command sent to {self.active_character_name}")
+                
+                return {"success": True, "message": "Stop command sent"}
             except Exception as e:
                 logger.error(f"Error in stop_turns: {e}")
                 return {"success": False, "message": f"Error: {str(e)}"}
@@ -1092,22 +1023,20 @@ class FastAPIActionDisplayNode:
                     if self.current_simulation_time:
                         return {"success": True, "time_info": self.current_simulation_time}
                     
-                    # Otherwise, try to query map_node for current time
-                    try:
-                        replies = self.session.get("cognitive/map/simulation_time", target=QueryTarget.BEST_MATCHING, consolidation=ConsolidationMode.NONE, timeout=5.0 if not self.debug else 300.0)
-                        for reply in replies:
-                            if reply.ok:
-                                response = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
-                                if response.get('success'):
-                                    # Cache the time for future requests
-                                    self.current_simulation_time = response
-                                    return {"success": True, "time_info": response}
-                            break
-                        
-                        return {"success": False, "message": "No response from map_node"}
-                    except Exception as query_error:
-                        logger.warning(f"Failed to query map_node for initial time: {query_error}")
-                        return {"success": False, "message": "Map node not ready yet"}
+                    # Use real datetime.now() directly
+                    from datetime import datetime
+                    current_time = datetime.now()
+                    time_info = {
+                        'year': current_time.year,
+                        'month': current_time.month,
+                        'day': current_time.day,
+                        'hour': current_time.hour,
+                        'minute': current_time.minute,
+                        'period': 'morning' if 5 <= current_time.hour < 12 else 'afternoon' if 12 <= current_time.hour < 17 else 'evening' if 17 <= current_time.hour < 21 else 'night',
+                        'season': 'spring' if 3 <= current_time.month <= 5 else 'summer' if 6 <= current_time.month <= 8 else 'autumn' if 9 <= current_time.month <= 11 else 'winter'
+                    }
+                    self.current_simulation_time = {'success': True, 'time_info': time_info}
+                    return {"success": True, "time_info": time_info}
                 else:
                     return {"success": False, "message": "Zenoh session not available"}
                     
@@ -1121,8 +1050,8 @@ class FastAPIActionDisplayNode:
                 if not hasattr(self, 'session'):
                     return {"success": False, "message": "Zenoh session not available"}
                 
-                # Query map_node for resource content
-                query_key = f"cognitive/map/resource/view/{resource_id}"
+                # Query executive_node for resource content
+                query_key = f"cognitive/{self.last_character_name}/resource/view/{resource_id}" if self.last_character_name else f"cognitive/*/resource/view/{resource_id}"
                 
                 replies = self.session.get(query_key, target=QueryTarget.BEST_MATCHING, consolidation=ConsolidationMode.NONE, timeout=5.0 if not self.debug else 300.0)
                 for reply in replies:
@@ -1142,7 +1071,7 @@ class FastAPIActionDisplayNode:
                             return {"success": False, "message": response.get('error', 'Resource not found')}
                     break
                 
-                return {"success": False, "message": "No response from map_node"}
+                return {"success": False, "message": "No response from executive_node"}
                     
             except Exception as e:
                 logger.error(f"Error fetching resource {resource_id}: {e}")
@@ -1854,9 +1783,6 @@ class FastAPIActionDisplayNode:
                 <div class="character-data-tabs" id="characterDataTabs">
                     <div class="character-data-tab active" data-tab="activity">Activity</div>
                     <div class="character-data-tab" data-tab="plan">Plan</div>
-                    <div class="character-data-tab" data-tab="view">View</div>
-                    <div class="character-data-tab" data-tab="state">State</div>
-                    <div class="character-data-tab" data-tab="relations">Relations</div>
                     <div class="character-data-tab" data-tab="activities">Activities</div>
                 </div>
                 
@@ -1875,27 +1801,6 @@ class FastAPIActionDisplayNode:
                             <div style="color: #888; font-style: italic; text-align: center; padding: 20px;">
                                 Select a character to view data
                             </div>
-                        </div>
-                    </div>
-                    
-                    <!-- View tab content -->
-                    <div class="character-data-panel" id="viewPanel">
-                        <div id="situationData" style="color: #888; font-style: italic; text-align: center; padding: 20px;">
-                            No situation data available
-                        </div>
-                    </div>
-                    
-                    <!-- State tab content -->
-                    <div class="character-data-panel" id="statePanel">
-                        <div id="stateData" style="color: #888; font-style: italic; text-align: center; padding: 20px;">
-                            No state data available
-                        </div>
-                    </div>
-                    
-                    <!-- Relations tab content -->
-                    <div class="character-data-panel" id="relationsPanel">
-                        <div id="relationsData" style="color: #888; font-style: italic; text-align: center; padding: 20px;">
-                            No relations data available
                         </div>
                     </div>
                     
@@ -1938,14 +1843,14 @@ class FastAPIActionDisplayNode:
                 <div class="input-section">
                     <h3>Turn Control</h3>
                     <div style="margin-bottom: 15px;">
-                        <button id="stepButton" onclick="stepTurn()" style="background: #555; margin-right: 10px;" disabled>Step Turn</button>
-                        <button id="runButton" onclick="runTurns()" style="background: #555; color: #888; margin-right: 10px;" disabled>Run</button>
-                        <button onclick="stopTurns()" style="background: #ff6b6b; margin-right: 10px;">Stop</button>
-                        <button onclick="saveAll()" style="background: #95e1d3; color: #1a1a1a; margin-right: 10px;">Save</button>
-                        <button onclick="exportToObsidian()" style="background: #7c3aed; color: white; margin-right: 10px;">Obsidian</button>
-                        <button onclick="openResourceBrowser()" style="background: #0e639c; color: white; margin-right: 10px;">🔍 Browser</button>
-                        <button onclick="openTestRunner()" style="background: #f39c12; color: white; margin-right: 10px;">🧪 Test</button>
-                        <button onclick="shutdownWithSave()" style="background: #ff4757; color: white;">Shutdown</button>
+                        <button id="stepButton" onclick="stepTurn()" style="background: #555; margin-right: 10px;" disabled title="Advance execution by one step">Step Turn</button>
+                        <button id="runButton" onclick="runTurns()" style="background: #555; color: #888; margin-right: 10px;" disabled title="Run execution continuously until stopped">Run</button>
+                        <button onclick="stopTurns()" style="background: #ff6b6b; margin-right: 10px;" title="Pause execution">Stop</button>
+                        <button onclick="saveAll()" style="background: #95e1d3; color: #1a1a1a; margin-right: 10px;" title="Save all resources and memory to disk">Save</button>
+                        <button onclick="exportToObsidian()" style="background: #7c3aed; color: white; margin-right: 10px;" title="Export action log to Obsidian vault">Obsidian</button>
+                        <button onclick="openResourceBrowser()" style="background: #0e639c; color: white; margin-right: 10px;" title="Open resource browser in new tab to view Notes and Collections">🔍 Browser</button>
+                        <button onclick="openTestRunner()" style="background: #f39c12; color: white; margin-right: 10px;" title="Open test runner to run evaluation tests">🧪 Test</button>
+                        <button onclick="shutdownWithSave()" style="background: #ff4757; color: white;" title="Save all data and shutdown the system">Shutdown</button>
                     </div>
                     <div style="margin-bottom: 15px; padding: 10px; background: #333; border-radius: 5px;">
                         <label for="timeSlider" style="display: block; margin-bottom: 5px; font-size: 14px; color: #ccc;">
@@ -1979,14 +1884,13 @@ class FastAPIActionDisplayNode:
                                 <input type="radio" name="executionMode" value="sync" id="modeSync">
                                 Sync
                             </label>
-                            <button onclick="sendText()" style="background-color: #5fb85f;">Send</button>
-                            <button onclick="endDialog()" style="background-color: #d32f2f;">End Conversation</button>
+                            <button onclick="sendText()" style="background-color: #5fb85f;">Submit</button>
                         </div>
                     </div>
                     <div id="activeConversation" style="color: #4ecdc4; font-size: 0.9em; margin-bottom: 10px; display: none;">
                         Active conversation with: <span id="activeConversationPartner"></span>
                     </div>
-                    <input type="text" id="characterInput" placeholder="Character name (optional)" style="width: 200px; margin-bottom: 8px;">
+                    <input type="text" id="characterInput" placeholder="Character name" style="width: 200px; margin-bottom: 8px; display: none;">
                     <textarea id="messageInput" placeholder="Message or Plan (multi-line supported)" style="width: 100%; height: 80px; resize: vertical; background-color: #2b2b2b; color: #ffffff; border: 1px solid #555; padding: 8px; font-family: monospace; box-sizing: border-box;"></textarea>
                     <div id="sendResult" style="margin-top: 5px;"></div>
                 </div>
@@ -2134,6 +2038,11 @@ class FastAPIActionDisplayNode:
                     if (data.action_type === 'announcement') {
                         createCharacterTab(data.character);
                         try { announcedCharacters.add(data.character); } catch (e) {}
+                        // Auto-fill character input with the first (and only) character
+                        const characterInput = document.getElementById('characterInput');
+                        if (characterInput && !characterInput.value) {
+                            characterInput.value = data.character;
+                        }
                         // If system is ready and all expected characters have announced, select first and enable controls
                         try {
                             if (lastReadyData && lastReadyData.system_ready) {
@@ -2162,10 +2071,6 @@ class FastAPIActionDisplayNode:
                     handleCurrentPlanUpdate(data);
                 } else if (data.type === 'current_activity') {
                     handleCurrentActivityUpdate(data);
-                } else if (data.type === 'current_state') {
-                    handleCurrentStateUpdate(data);
-                } else if (data.type === 'situation_data') {
-                    handleSituationDataUpdate(data);
                 } else if (data.type === 'turn_mode_update') {
                     updateTurnMode(data);
                 } else if (data.type === 'turn_start') {
@@ -2306,22 +2211,6 @@ class FastAPIActionDisplayNode:
                 if (activeCharacter) {
                     updateCharacterDataDisplay(activeCharacter);
                 }
-            } else if (tabName === 'view') {
-                document.getElementById('viewPanel').classList.add('active');
-                // Refresh situation display for current character
-                if (activeCharacter) {
-                    updateSituationDataDisplay(activeCharacter);
-                }
-            } else if (tabName === 'state') {
-                document.getElementById('statePanel').classList.add('active');
-                if (activeCharacter) {
-                    updateStateDataDisplay(activeCharacter);
-                }
-            } else if (tabName === 'relations') {
-                document.getElementById('relationsPanel').classList.add('active');
-                if (activeCharacter) {
-                    updateRelationsDataDisplay(activeCharacter);
-                }
             } else if (tabName === 'activities') {
                 document.getElementById('activitiesPanel').classList.add('active');
                 if (activeCharacter) {
@@ -2380,14 +2269,6 @@ class FastAPIActionDisplayNode:
             // Update character data display based on active tab
             updateActivityDataDisplay(characterName);
             updateCharacterDataDisplay(characterName);
-            updateSituationDataDisplay(characterName);
-            // Also refresh state panel if it is the active tab
-            try {
-                const statePanel = document.getElementById('statePanel');
-                if (statePanel && statePanel.classList.contains('active')) {
-                    updateStateDataDisplay(characterName);
-                }
-            } catch (e) { /* no-op */ }
             
             console.log(`Selected character tab: ${characterName}`);
         }
@@ -2497,44 +2378,6 @@ class FastAPIActionDisplayNode:
             }
         }
 
-        function handleCurrentStateUpdate(currentStateData) {
-            const characterName = currentStateData.character;
-            console.log(`Current state update for ${characterName}`);
-            if (characterTabs.has(characterName)) {
-                const tabData = characterTabs.get(characterName);
-                tabData.currentState = currentStateData;
-                if (activeCharacter === characterName) {
-                    updateStateDataDisplay(characterName);
-                }
-            } else {
-                console.warn(`Received current state for unknown character: ${characterName}`);
-                createCharacterTab(characterName);
-                const tabData = characterTabs.get(characterName);
-                tabData.currentState = currentStateData;
-            }
-        }
-        
-        function handleSituationDataUpdate(situationData) {
-            const characterName = situationData.character;
-            const situation = situationData.situation_data;
-            
-            console.log(`Situation data update for ${characterName}`);
-            
-            // Update the stored situation data for this character
-            if (characterTabs.has(characterName)) {
-                const tabData = characterTabs.get(characterName);
-                tabData.situationData = situation;
-                
-                // If this character's tab is currently active and view tab is selected, update the display
-                if (activeCharacter === characterName) {
-                    updateSituationDataDisplay(characterName);
-                }
-            } else {
-                // Character tab doesn't exist yet, this shouldn't happen
-                console.warn(`Received situation data for unknown character: ${characterName}`);
-            }
-        }
-        
         // Cache of latest simulation time (ISO string)
         let latestSimTimeISO = null;
 
@@ -2729,101 +2572,10 @@ class FastAPIActionDisplayNode:
             activityDataDiv.innerHTML = content;
         }
 
-        function updateStateDataDisplay(characterName) {
-            const stateDiv = document.getElementById('stateData');
-            if (!stateDiv) return;
-            if (!characterTabs.has(characterName)) {
-                stateDiv.innerHTML = '<div style="color: #888; font-style: italic; text-align: center; padding: 20px;">Character not found</div>';
-                return;
-            }
-            const tabData = characterTabs.get(characterName);
-            const state = tabData.currentState ? tabData.currentState.state || {} : {};
-            if (!state || Object.keys(state).length === 0) {
-                stateDiv.innerHTML = '<div style="color: #888; font-style: italic; text-align: center; padding: 20px;">No state data available</div>';
-                return;
-            }
-            let html = '';
-            Object.keys(state).forEach(key => {
-                const v = state[key] && typeof state[key].value !== 'undefined' ? state[key].value : '';
-                html += `<div class="character-data-item"><div class="character-data-label">${key.charAt(0).toUpperCase() + key.slice(1)}</div><div class="character-data-value">${Math.round(Number(v) || 0)}/100</div></div>`;
-            });
-            
-            // Fetch and display inventory
-            fetch(`/api/character/${characterName}/inventory`)
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success && data.inventory && data.inventory.length > 0) {
-                        html += '<hr style="border: none; border-top: 1px solid #404040; margin: 8px 0;">';
-                        html += '<div class="character-data-item"><div class="character-data-label">Inventory</div><div class="character-data-value">';
-                        data.inventory.forEach(item => {
-                            html += `<div style="margin: 2px 0;">${escapeHtml(item)}</div>`;
-                        });
-                        html += '</div></div>';
-                    } else if (data.success) {
-                        html += '<hr style="border: none; border-top: 1px solid #404040; margin: 8px 0;">';
-                        html += '<div class="character-data-item"><div class="character-data-label">Inventory</div><div class="character-data-value" style="color: #888; font-style: italic;">Empty</div></div>';
-                    }
-                    stateDiv.innerHTML = html;
-                })
-                .catch(error => {
-                    console.error(`Error fetching inventory for ${characterName}:`, error);
-                    stateDiv.innerHTML = html;
-                });
-        }
-        
         function escapeHtml(text) {
             const div = document.createElement('div');
             div.textContent = text;
             return div.innerHTML;
-        }
-        
-        function updateSituationDataDisplay(characterName) {
-            const situationDataDiv = document.getElementById('situationData');
-            const tabData = characterTabs.get(characterName);
-            
-            if (!tabData || !tabData.situationData) {
-                situationDataDiv.innerHTML = '<div style="color: #888; font-style: italic; text-align: center; padding: 20px;">No situation data available</div>';
-                return;
-            }
-            
-            // Format the situation data as JSON
-            const formattedData = JSON.stringify(tabData.situationData, null, 2);
-            situationDataDiv.innerHTML = `<pre style="white-space: pre-wrap; font-family: 'Courier New', monospace; font-size: 11px; margin: 0; color: #e0e0e0; text-align: left;">${formattedData}</pre>`;
-        }
-        
-        function updateRelationsDataDisplay(characterName) {
-            const relationsDataDiv = document.getElementById('relationsData');
-            
-            if (!relationsDataDiv) return;
-            
-            // Get all other characters
-            const otherCharacters = Array.from(characterTabs.keys()).filter(c => c !== characterName);
-            
-            if (otherCharacters.length === 0) {
-                relationsDataDiv.innerHTML = '<div style="color: #888; font-style: italic; text-align: center; padding: 20px;">No other characters available</div>';
-                return;
-            }
-            
-            // Build accordion HTML
-            let html = '<div style="padding: 10px;">';
-            otherCharacters.forEach(otherChar => {
-                html += `
-                    <div class="relation-accordion-item" style="margin-bottom: 5px; border: 1px solid #444; border-radius: 4px; overflow: hidden;">
-                        <div class="relation-accordion-header" 
-                             onclick="toggleRelationAccordion('${characterName}', '${otherChar}')"
-                             style="padding: 10px; background: #333; cursor: pointer; user-select: none; display: flex; justify-content: space-between; align-items: center;">
-                            <span style="font-weight: bold;">${otherChar}</span>
-                            <span id="accordion-arrow-${otherChar}" style="transition: transform 0.3s;">▶</span>
-                        </div>
-                        <div id="relation-content-${otherChar}" 
-                             style="display: none; padding: 15px; background: #2a2a2a; max-height: 400px; overflow-y: auto;">
-                            <div style="color: #888; font-style: italic;">Click to load relation data...</div>
-                        </div>
-                    </div>
-                `;
-            });
-            html += '</div>';
-            relationsDataDiv.innerHTML = html;
         }
         
         async function updateActivitiesDataDisplay(characterName) {
@@ -2886,68 +2638,14 @@ class FastAPIActionDisplayNode:
             }
         }
         
-        async function toggleRelationAccordion(characterName, targetCharacter) {
-            const contentDiv = document.getElementById(`relation-content-${targetCharacter}`);
-            const arrowSpan = document.getElementById(`accordion-arrow-${targetCharacter}`);
-            
-            if (!contentDiv) return;
-            
-            // Toggle visibility
-            if (contentDiv.style.display === 'none') {
-                // Opening - fetch data
-                contentDiv.style.display = 'block';
-                arrowSpan.style.transform = 'rotate(90deg)';
-                
-                // Show loading message
-                contentDiv.innerHTML = '<div style="color: #888; font-style: italic;">Loading...</div>';
-                
-                // Fetch relation data
-                try {
-                    const response = await fetch(`/api/relation/${characterName}/${targetCharacter}`);
-                    const data = await response.json();
-                    
-                    if (data.success) {
-                        // Check if no interaction has occurred yet
-                        if (data.no_interaction) {
-                            contentDiv.innerHTML = `
-                                <div style="text-align: center; padding: 20px; color: #888;">
-                                    <div style="font-size: 18px; margin-bottom: 10px;">👥</div>
-                                    <div style="font-style: italic;">No interaction history yet</div>
-                                    <div style="font-size: 11px; margin-top: 8px; color: #666;">
-                                        ${characterName} and ${targetCharacter} haven't interacted
-                                    </div>
-                                </div>
-                            `;
-                        } else {
-                            let html = '';
-                            
-                            // Display discourse_state
-                            html += '<div style="margin-bottom: 15px;">';
-                            html += '<div style="font-weight: bold; color: #95e1d3; margin-bottom: 5px;">Discourse State:</div>';
-                            html += '<div style="padding: 10px; background: #1a1a1a; border-radius: 4px; white-space: pre-wrap; font-family: monospace; font-size: 12px;">';
-                            html += data.discourse_state || '<span style="color: #888; font-style: italic;">No discourse state</span>';
-                            html += '</div></div>';
-                            
-                            // Display tom_model
-                            html += '<div>';
-                            html += '<div style="font-weight: bold; color: #95e1d3; margin-bottom: 5px;">Theory of Mind:</div>';
-                            html += '<div style="padding: 10px; background: #1a1a1a; border-radius: 4px; white-space: pre-wrap; font-family: monospace; font-size: 12px;">';
-                            html += data.tom_model || '<span style="color: #888; font-style: italic;">No ToM model</span>';
-                            html += '</div></div>';
-                            
-                            contentDiv.innerHTML = html;
-                        }
-                    } else {
-                        contentDiv.innerHTML = `<div style="color: #ff6b6b;">Error: ${data.message || 'Failed to load data'}</div>`;
-                    }
-                } catch (error) {
-                    contentDiv.innerHTML = `<div style="color: #ff6b6b;">Error: ${error.message}</div>`;
-                }
-            } else {
-                // Closing
-                contentDiv.style.display = 'none';
-                arrowSpan.style.transform = 'rotate(0deg)';
-            }
+        // Helper function to make resource IDs clickable in text
+        function makeResourceIdsClickable(text) {
+            if (!text || typeof text !== 'string') return text;
+            // Match Note_ or Collection_ followed by word characters (digits, letters, underscore)
+            // Use non-word-boundary pattern to catch Note_15, Collection_4, Note_null, etc.
+            return text.replace(/(Note_|Collection_)[\w]+/g, function(match) {
+                return `<a href="#" class="resource-link" data-resource-id="${match}">${match}</a>`;
+            });
         }
         
         function addActionEntry(actionData) {
@@ -2970,15 +2668,15 @@ class FastAPIActionDisplayNode:
             let actorLabel = '';
             if (actionData.is_text_only) {
                 if (typeLower === 'say' && actionData.target) {
-                    actorLabel = ` ${actionData.target}:`;
+                    actorLabel = ` ${makeResourceIdsClickable(actionData.target)}:`;
                 } else if (typeLower === 'response' && actionData.source) {
-                    actorLabel = ` ${actionData.source}:`;
+                    actorLabel = ` ${makeResourceIdsClickable(actionData.source)}:`;
                 }
             } else {
                 if (typeLower === 'take' && actionData.target) {
-                    actorLabel = ` ${actionData.target}`;
+                    actorLabel = ` ${makeResourceIdsClickable(actionData.target)}`;
                 } else if (typeLower === 'scan' && actionData.target) {
-                    actorLabel = ` ${actionData.target}`;
+                    actorLabel = ` ${makeResourceIdsClickable(actionData.target)}`;
                 }
             }
             html += `<span class="action-type">${actionData.action_type}</span>${actorLabel}`;
@@ -2987,48 +2685,74 @@ class FastAPIActionDisplayNode:
             if (actionData.is_text_only) {
                 const textContent = actionData.text || actionData.input_text || actionData.llm_response || '';
                 if (textContent) {
-                    html += `<br><span class="response-text">"${textContent}"</span>`;
+                    html += `<br><span class="response-text">"${makeResourceIdsClickable(textContent)}"</span>`;
                 }
             } else {
                 // Display action details if available
-                if (actionData.action || actionData.target || actionData.value || actionData.requested_target || actionData.error || actionData.status) {
+                if (actionData.action || actionData.target || actionData.value || actionData.requested_target || actionData.result || actionData.error || actionData.status) {
                     let actionDetails = [];
-                    if (actionData.action) actionDetails.push(`Action: ${actionData.action}`);
+                    if (actionData.action) {
+                        // Handle objects properly - serialize if needed
+                        const actionValue = typeof actionData.action === 'object' ? JSON.stringify(actionData.action) : actionData.action;
+                        actionDetails.push(`Action: ${actionValue}`);
+                    }
                     // Prefer resolved target if present, else show requested target, else target
                     const targetLabel = actionData.resolved_target || actionData.target || actionData.requested_target;
-                    if (targetLabel) actionDetails.push(`Target: ${targetLabel}`);
-                    if (actionData.requested_target && (!actionData.resolved_target && !actionData.target)) {
-                        actionDetails.push(`Requested: ${actionData.requested_target}`);
-                    }
-                    if (actionData.value) {
-                        // Check if value is a resource ID (Note_X or Collection_X)
-                        const isResourceId = /^(Note_|Collection_)\\d+$/.test(actionData.value);
-                        if (typeLower === 'createnote') {
-                            if (isResourceId) {
-                                actionDetails.push(`Created: <a href="#" class="resource-link" data-resource-id="${actionData.value}">${actionData.value}</a>`);
+                    if (targetLabel) {
+                        let targetDisplay = String(targetLabel);
+                        // If target is a variable ($var) but we have a resolved_target that's a resource ID, make variable clickable
+                        if (actionData.target && actionData.target.startsWith('$') && actionData.resolved_target) {
+                            const resolvedValue = String(actionData.resolved_target);
+                            // Check if resolved value is a resource ID
+                            if (/^(Note_|Collection_)[\w]+/.test(resolvedValue)) {
+                                // Make the variable clickable to the resolved resource
+                                targetDisplay = `<a href="#" class="resource-link" data-resource-id="${resolvedValue}">${actionData.target}</a>`;
                             } else {
-                                actionDetails.push(`Created: ${actionData.value}`);
-                            }
-                        } else if (typeLower === 'createcollection') {
-                            if (isResourceId) {
-                                actionDetails.push(`Created: <a href="#" class="resource-link" data-resource-id="${actionData.value}">${actionData.value}</a>`);
-                            } else {
-                                actionDetails.push(`Created: ${actionData.value}`);
+                                targetDisplay = makeResourceIdsClickable(targetDisplay);
                             }
                         } else {
-                            if (isResourceId) {
-                                actionDetails.push(`Value: <a href="#" class="resource-link" data-resource-id="${actionData.value}">${actionData.value}</a>`);
-                            } else {
-                                actionDetails.push(`Value: ${actionData.value}`);
-                            }
+                            targetDisplay = makeResourceIdsClickable(targetDisplay);
+                        }
+                        actionDetails.push(`Target: ${targetDisplay}`);
+                    }
+                    if (actionData.requested_target && (!actionData.resolved_target && !actionData.target)) {
+                        const clickableRequested = makeResourceIdsClickable(String(actionData.requested_target));
+                        actionDetails.push(`Requested: ${clickableRequested}`);
+                    }
+                    // Display result field for all actions (not just scan)
+                    // Check result field first, then value field as fallback
+                    if (actionData.result !== undefined && actionData.result !== null && actionData.result !== '') {
+                        // Handle objects properly - serialize if needed, otherwise convert to string
+                        const resultStr = typeof actionData.result === 'object' ? JSON.stringify(actionData.result) : String(actionData.result);
+                        const clickableResult = makeResourceIdsClickable(resultStr);
+                        if (typeLower === 'scan') {
+                            actionDetails.push(`Found: ${clickableResult}`);
+                        } else if (typeLower === 'createnote') {
+                            actionDetails.push(`Created: ${clickableResult}`);
+                        } else if (typeLower === 'createcollection') {
+                            actionDetails.push(`Created: ${clickableResult}`);
+                        } else {
+                            actionDetails.push(`result: ${clickableResult}`);
+                        }
+                    } else if (actionData.value) {
+                        // Fallback to value field if result is not set
+                        // Handle objects properly - serialize if needed, otherwise convert to string
+                        const valueStr = typeof actionData.value === 'object' ? JSON.stringify(actionData.value) : String(actionData.value);
+                        const clickableValue = makeResourceIdsClickable(valueStr);
+                        if (typeLower === 'createnote') {
+                            actionDetails.push(`Created: ${clickableValue}`);
+                        } else if (typeLower === 'createcollection') {
+                            actionDetails.push(`Created: ${clickableValue}`);
+                        } else {
+                            actionDetails.push(`Value: ${clickableValue}`);
                         }
                     }
                     // Add scan-specific details
                     if (typeLower === 'scan') {
                         if (actionData.out) actionDetails.push(`Variable: ${actionData.out}`);
-                        if (actionData.result) actionDetails.push(`Found: ${actionData.result}`);
                         if (actionData.variable_bound && actionData.bound_value) {
-                            actionDetails.push(`Bound: ${actionData.variable_bound} = ${actionData.bound_value}`);
+                            const clickableBound = makeResourceIdsClickable(String(actionData.bound_value));
+                            actionDetails.push(`Bound: ${actionData.variable_bound} = ${clickableBound}`);
                         }
                     }
                     // Append status/error inline without adding vertical height
@@ -3042,12 +2766,14 @@ class FastAPIActionDisplayNode:
                 
                 // Display input text if available
                 if (actionData.input_text) {
-                    html += `<br><span class="input-text">Input: "${actionData.input_text}"</span>`;
+                    const clickableInput = makeResourceIdsClickable(String(actionData.input_text));
+                    html += `<br><span class="input-text">Input: "${clickableInput}"</span>`;
                 }
                 
                 // Display LLM response if available
                 if (actionData.llm_response) {
-                    html += `<br><span class="response-text">Response: ${actionData.llm_response}</span>`;
+                    const clickableResponse = makeResourceIdsClickable(String(actionData.llm_response));
+                    html += `<br><span class="response-text">Response: ${clickableResponse}</span>`;
                 }
                 
                 // Display any additional fields from raw_data for future flexibility
@@ -3057,7 +2783,8 @@ class FastAPIActionDisplayNode:
                         // Skip fields we've already displayed
                         if (!['action', 'target', 'value', 'input_text', 'llm_response', 'action_type', 'action_id', 'timestamp', 'confidence'].includes(key)) {
                             if (value && value !== '') {
-                                additionalFields.push(`${key}: ${value}`);
+                                const clickableValue = makeResourceIdsClickable(String(value));
+                                additionalFields.push(`${key}: ${clickableValue}`);
                             }
                         }
                     }
@@ -3193,13 +2920,22 @@ class FastAPIActionDisplayNode:
         }
         
         async function sendText() {
-            const character = document.getElementById('characterInput').value;
+            let character = document.getElementById('characterInput').value;
+            // If no character specified, use the first (and only) character from characterTabs
+            if (!character && characterTabs.size > 0) {
+                character = Array.from(characterTabs.keys())[0];
+            }
             const message = document.getElementById('messageInput').value;
             const resultDiv = document.getElementById('sendResult');
             const mode = document.querySelector('input[name="executionMode"]:checked').value;
             
             if (!message) {
                 resultDiv.innerHTML = '<span class="error">Message is required</span>';
+                return;
+            }
+            
+            if (!character) {
+                resultDiv.innerHTML = '<span class="error">No character available</span>';
                 return;
             }
             
@@ -3283,39 +3019,6 @@ class FastAPIActionDisplayNode:
             }
         }
         
-        async function endDialog() {
-            const character = document.getElementById('characterInput').value;
-            const resultDiv = document.getElementById('sendResult');
-            
-            if (!character) {
-                resultDiv.innerHTML = '<span class="error">Character name is required</span>';
-                return;
-            }
-            
-            try {
-                const response = await fetch('/api/end_dialog', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        character: character
-                    })
-                });
-                
-                const result = await response.json();
-                
-                if (result.success) {
-                    resultDiv.innerHTML = `<span class="success">${result.message}</span>`;
-                    // Update conversation indicator
-                    updateConversationIndicator();
-                } else {
-                    resultDiv.innerHTML = `<span class="error">Error: ${result.error}</span>`;
-                }
-            } catch (error) {
-                resultDiv.innerHTML = `<span class="error">Error: ${error.message}</span>`;
-            }
-        }
         
         async function updateConversationIndicator() {
             try {
@@ -3512,13 +3215,17 @@ class FastAPIActionDisplayNode:
             // Populate character dropdown
             const charSelect = document.getElementById('testCharacterSelect');
             charSelect.innerHTML = '<option value="">-- Select Character --</option>';
+            const characterNames = [];
             for (const [charName, _] of characterTabs) {
                 charSelect.innerHTML += `<option value="${charName}">${charName}</option>`;
+                characterNames.push(charName);
             }
             
-            // Restore sticky character selection if available
-            if (lastSelectedTestCharacter) {
+            // Restore sticky character selection if available, otherwise select first character
+            if (lastSelectedTestCharacter && characterNames.includes(lastSelectedTestCharacter)) {
                 charSelect.value = lastSelectedTestCharacter;
+            } else if (characterNames.length > 0) {
+                charSelect.value = characterNames[0];
             }
             
             // Save selection when changed
@@ -4033,44 +3740,6 @@ class FastAPIActionDisplayNode:
         except Exception as e:
             import traceback
             traceback.print_exc()
-
-    def current_state_callback(self, sample):
-        """Handle incoming character current internal state."""
-        try:
-            current_state_data = json.loads(sample.payload.to_bytes().decode('utf-8'))
-            # Extract character name from topic path
-            topic_path = str(sample.key_expr)
-            character_name = topic_path.split('/')[1]  # cognitive/{character}/current_state
-            # Store current state for this character
-            if not hasattr(self, 'character_current_states'):
-                self.character_current_states = {}
-            self.character_current_states[character_name] = current_state_data
-            # Send current state update to web clients
-            self._send_current_state_to_websockets(current_state_data, character_name)
-        except Exception as e:
-            import traceback
-            traceback.print_exc()
-    
-    def situation_callback(self, sample):
-        """Handle incoming character situation data."""
-        try:
-            situation_data = json.loads(sample.payload.to_bytes().decode('utf-8'))
-            
-            # Extract character name from topic path
-            topic_path = str(sample.key_expr)
-            character_name = topic_path.split('/')[1]  # cognitive/{character}/situation/update
-            
-            # Store situation data for this character
-            with self.character_situation_data_lock:
-                self.character_situation_data[character_name] = situation_data
-            
-            # Send situation data update to web clients
-            self._send_situation_data_to_websockets(situation_data, character_name)
-            
-        except Exception as e:
-            import traceback
-            traceback.print_exc()
-    
     def step_complete_callback(self, sample):
         """Handle step complete events from map node."""
         try:
@@ -4089,70 +3758,69 @@ class FastAPIActionDisplayNode:
             import traceback
             traceback.print_exc()
     
-    def turn_start_callback(self, sample):
-        """Handle turn start events from map node."""
-        try:
-            turn_data = json.loads(sample.payload.to_bytes().decode('utf-8'))
-            
-            with self.turn_state_lock:
-                self.turn_state['turn_number'] = turn_data.get('turn_number', self.turn_state['turn_number'] + 1)
-                self.turn_state['active_characters'] = turn_data.get('active_characters', [])
-                self.turn_state['completed_characters'] = []
-                self.turn_state['turn_start_time'] = time.time()
-            
-            # Send turn start message to web clients
-            self._send_turn_start_to_websockets(turn_data)
-            
-            # Send turn state update to web clients
-            self._send_turn_state_update()
-            
-        except Exception as e:
-            import traceback
-            traceback.print_exc()
-    
-    def turn_control_callback(self, sample):
-        """Handle turn control status updates from map node."""
-        try:
-            turn_control_data = json.loads(sample.payload.to_bytes().decode('utf-8'))
-            
-            with self.turn_state_lock:
-                # Update mode based on map node's actual state
-                self.turn_state['mode'] = turn_control_data.get('mode', 'step')
-                logger.info(f"🔄 Turn control update from map node: mode={self.turn_state['mode']}")
-            
-            # Send just the mode update to the UI
-            self._send_turn_mode_update()
-            
-        except Exception as e:
-            import traceback
-            traceback.print_exc()
-    
-    def turn_state_update_callback(self, sample):
-        """
-        Handle unified turn state updates from map node (NEW).
-        
-        This receives comprehensive state including:
-        - Turn information (number, mode, progress)
-        - Computed button states (enabled/disabled with tooltips)
-        - All state in one message - no race conditions
-        """
+    def execution_state_callback(self, sample):
+        """Handle execution state updates from executive node."""
         try:
             state_data = json.loads(sample.payload.to_bytes().decode('utf-8'))
             
-            logger.info(f"🆕 Received turn_state_update: turn={state_data['turn']['number']}, "
-                       f"mode={state_data['turn']['mode']}, "
-                       f"step_enabled={state_data['buttons']['step']['enabled']}")
+            paused = state_data.get('paused', True)
+            mode = state_data.get('mode', 'step')
             
-            # Forward complete state to websockets for UI rendering (broadcast to all)
+            with self.turn_state_lock:
+                self.turn_state['mode'] = mode
+            
+            # Compute button states
+            # Step/Run enabled when paused and in step mode (ready to advance)
+            # Stop enabled when running (not paused) or in run mode
+            step_enabled = paused and mode == 'step'
+            run_enabled = paused and mode == 'step'
+            stop_enabled = not paused or mode == 'run'
+            
+            # Format as turn_state_update for UI compatibility
+            turn_state_update = {
+                'type': 'turn_state_update',
+                'turn': {
+                    'number': 0,  # No turn numbers anymore
+                    'mode': mode,
+                    'auto_progression': mode == 'run',
+                    'active_count': 0 if paused else 1,
+                    'completed_count': 0,
+                    'active_characters': [] if paused else [state_data.get('character', '')],
+                    'completed_characters': [],
+                    'is_active': not paused
+                },
+                'buttons': {
+                    'step': {
+                        'enabled': step_enabled,
+                        'label': '🎯 Step',
+                        'tooltip': 'Ready - click to advance one OODA cycle' if step_enabled else 'Execution in progress'
+                    },
+                    'run': {
+                        'enabled': run_enabled,
+                        'label': '🏃 Run',
+                        'tooltip': 'Ready - click to run continuously' if run_enabled else 'Execution in progress'
+                    },
+                    'stop': {
+                        'enabled': stop_enabled,
+                        'label': '⏹️ Stop',
+                        'tooltip': 'Click to pause execution' if stop_enabled else 'Not running'
+                    }
+                },
+                'timestamp': state_data.get('timestamp', time.time())
+            }
+            
+            logger.info(f"🆕 Received execution_state: paused={paused}, mode={mode}, step_enabled={step_enabled}, run_enabled={run_enabled}")
+            
+            # Forward formatted state to websockets for UI rendering
             with self.websocket_lock:
                 for ws in self.websocket_connections:
                     try:
-                        asyncio.run(ws.send_json(state_data))
+                        asyncio.run(ws.send_json(turn_state_update))
                     except Exception as e:
-                        logger.error(f"Error sending turn_state_update to websocket: {e}")
+                        logger.error(f"Error sending execution_state to websocket: {e}")
             
         except Exception as e:
-            logger.error(f"Error in turn_state_update_callback: {e}")
+            logger.error(f"Error in execution_state_callback: {e}")
             import traceback
             traceback.print_exc()
     
@@ -4757,49 +4425,75 @@ class FastAPIActionDisplayNode:
             print(f'❌ Error storing text input in memory: {e}')
     
     def _auto_release_user_lock(self, target_character: str):
-        """Auto-release User's previous conversation lock if User is locked with someone else."""
-        for reply in self.session.get(
-            f"cognitive/map/conversation/lock/status/User",
-            target=QueryTarget.BEST_MATCHING,
-            consolidation=ConsolidationMode.NONE,
-            timeout=3.0
-        ):
-            if reply.ok:
-                data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
-                if data.get('success') and data.get('is_locked'):
-                    locked_with = data.get('locked_with', [])
-                    # If User is locked with someone other than target, release it
-                    for locked_char in locked_with:
-                        if locked_char != target_character:
-                            logger.info(f"Auto-releasing User's previous lock with {locked_char}")
-                            lock_release = {
-                                'character1': 'User',
-                                'character2': locked_char
-                            }
-                            # Release lock via queryable
-                            for lock_reply in self.session.get(
-                                "cognitive/map/conversation/lock/release",
-                                target=QueryTarget.BEST_MATCHING,
-                                consolidation=ConsolidationMode.NONE,
-                                payload=json.dumps(lock_release).encode('utf-8'),
-                                timeout=3.0
-                            ):
-                                break
-                            # Close dialogs
-                            self.session.put(
-                                f"cognitive/User/memory/close_dialog",
-                                json.dumps({'entity_name': locked_char})
-                            )
-                            self.session.put(
-                                f"cognitive/{locked_char}/memory/close_dialog",
-                                json.dumps({'entity_name': 'User'})
-                            )
-            break
+        """Auto-release User's previous conversation lock (no-op with single character)."""
+        # No conversation locks needed with single character
+        pass
     
     def _handle_character_announcement(self, action_data: Dict[str, Any], character_name: str):
         """Handle character announcement actions."""
-
         self.active_characters.add(character_name)
+        
+        # Set active character name for direct control (first announced character)
+        if self.active_character_name is None:
+            self.active_character_name = character_name
+            # Create publishers for direct control
+            self.control_step_publisher = self.session.declare_publisher(
+                f"cognitive/{character_name}/control/step"
+            )
+            self.control_run_publisher = self.session.declare_publisher(
+                f"cognitive/{character_name}/control/run"
+            )
+            self.control_stop_publisher = self.session.declare_publisher(
+                f"cognitive/{character_name}/control/stop"
+            )
+            # Subscribe to execution state updates
+            self.execution_state_subscriber = self.session.declare_subscriber(
+                f"cognitive/{character_name}/execution_state",
+                self.execution_state_callback
+            )
+            logger.info(f"📡 Direct control publishers and execution state subscriber created for {character_name}")
+            
+            # Send initial button state to UI (character ready, paused, step mode)
+            # This enables buttons immediately on startup
+            initial_state = {
+                'type': 'turn_state_update',
+                'turn': {
+                    'number': 0,
+                    'mode': 'step',
+                    'auto_progression': False,
+                    'active_count': 0,
+                    'completed_count': 0,
+                    'active_characters': [],
+                    'completed_characters': [],
+                    'is_active': False
+                },
+                'buttons': {
+                    'step': {
+                        'enabled': True,
+                        'label': '🎯 Step',
+                        'tooltip': 'Ready - click to advance one OODA cycle'
+                    },
+                    'run': {
+                        'enabled': True,
+                        'label': '🏃 Run',
+                        'tooltip': 'Ready - click to run continuously'
+                    },
+                    'stop': {
+                        'enabled': False,
+                        'label': '⏹️ Stop',
+                        'tooltip': 'Not running'
+                    }
+                },
+                'timestamp': time.time()
+            }
+            
+            # Send to all connected websockets
+            with self.websocket_lock:
+                for ws in self.websocket_connections:
+                    try:
+                        asyncio.run(ws.send_json(initial_state))
+                    except Exception as e:
+                        logger.error(f"Error sending initial state to websocket: {e}")
     
     def shutdown(self):
         """Shutdown the node."""
