@@ -59,6 +59,14 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__))))
 
 from llm_client import ZenohLLMClient
 
+# SGLang imports
+try:
+    import sglang as sgl
+    HAS_SGLANG = True
+except ImportError:
+    HAS_SGLANG = False
+    sgl = None
+
 
 # ============================================================================
 # Plan support classes (extracted from plan.py for infospace-only usage)
@@ -345,25 +353,76 @@ class ZenohExecutiveNode:
             """Get the last action result for backward compatibility."""
             return self.action_history[-1].result if self.action_history else None
         
-        # LLM client
+        # LLM backend - Use SGLang.Runtime for infospace, ZenohLLMClient as fallback
         llm_config = self.character_config.get('llm_config', {})
         server_name = llm_config.get('server_name', 'openai')
         model_name = llm_config.get('model_name', 'gpt-4.1')
+        sgl_model_path = llm_config.get('sgl_model_path')
         
-        self.llm_client = ZenohLLMClient(server_name=server_name, model_name=model_name, service_timeout=200.0 if not self.debug else 300.0)
-        logger.info(f'🤖 LLM client initialized (server={server_name}, model={model_name})')
+        self.runtime = None
+        self.llm_client = None
+        
+        # Initialize SGLang.Runtime if available and configured
+        if HAS_SGLANG and sgl_model_path:
+            try:
+                logger.info(f"🚀 Initializing SGLang Runtime with model: {sgl_model_path}")
+                self.runtime = sgl.Runtime(
+                    model_path=sgl_model_path,
+                    tokenizer_path=sgl_model_path,
+                    device="cuda",
+                    context_length=32768,
+                    cuda_graph_max_bs=4,
+                    dtype="auto",
+                    tp_size=1,
+                    mem_fraction_static=0.82,
+                    tool_call_parser="qwen"
+                )
+                sgl.set_default_backend(self.runtime)
+                logger.info(f'🤖 SGLang Runtime initialized (model={sgl_model_path})')
+            except Exception as e:
+                logger.error(f"Failed to initialize SGLang Runtime: {e}")
+                logger.info("Falling back to ZenohLLMClient")
+                self.runtime = None
+        
+        # Fallback to ZenohLLMClient if SGLang not available
+        if not self.runtime:
+            self.llm_client = ZenohLLMClient(server_name=server_name, model_name=model_name, service_timeout=200.0 if not self.debug else 300.0)
+            logger.info(f'🤖 LLM client initialized (server={server_name}, model={model_name})')
         
         # Create llm_generate wrapper function (unified interface for LLM calls)
         def llm_generate(messages, bindings=None, max_tokens=2000, temperature=0.7, is_json=False, stops=None):
-            """Unified LLM generation interface - wrapper around llm_client.generate()."""
-            return self.llm_client.generate(
-                messages=messages,
-                bindings=bindings,
-                max_tokens=max_tokens,
-                temperature=temperature,
-                is_json=is_json,
-                stops=stops if stops else ['</end>']
-            )
+            """Unified LLM generation interface - uses SGLang Runtime if available, else ZenohLLMClient."""
+            if self.runtime:
+                # Use SGLang Runtime - apply bindings if provided
+                if bindings and isinstance(messages, list):
+                    processed_messages = []
+                    for msg in messages:
+                        if isinstance(msg, str):
+                            # Apply template bindings
+                            processed_msg = msg
+                            for key, value in bindings.items():
+                                processed_msg = processed_msg.replace(f"{{{{${key}}}}}", str(value))
+                            processed_messages.append(processed_msg)
+                        else:
+                            processed_messages.append(msg)
+                    messages = processed_messages
+                
+                # Use infospace_executor's _sglang_generate method via temporary executor instance
+                if self.infospace_executor:
+                    return self.infospace_executor._sglang_generate(messages, max_tokens, temperature, stops, is_json)
+                else:
+                    logger.error("SGLang Runtime available but no infospace_executor to use it")
+                    return type('Response', (), {'success': False, 'error': 'No executor', 'text': ''})()
+            else:
+                # Fallback to ZenohLLMClient
+                return self.llm_client.generate(
+                    messages=messages,
+                    bindings=bindings,
+                    max_tokens=max_tokens,
+                    temperature=temperature,
+                    is_json=is_json,
+                    stops=stops if stops else ['</end>']
+                )
         self.llm_generate = llm_generate
         
         # Initialize memory module (wraps EntityModel and discourse)
@@ -382,54 +441,48 @@ class ZenohExecutiveNode:
         )
         logger.info(f'💾 Subscribed to cognitive/save_all')
         
-        # Detect infospace and initialize infospace executor if needed
-        self.is_infospace = self.character_config.get('is_infospace', False)
-        self.map_name = self.character_config.get('map_name', 'infolab' if self.is_infospace else 'default')
+        # Infospace is always enabled now (physical world removed)
+        self.map_name = self.character_config.get('map_name', 'infolab')
         self.infospace_executor = None
         self.available_tools = {}
         
-        # Initialize unified planner
+        # Initialize unified planner (infospace only)
         from unified_planner import UnifiedPlanner
-        world_type = 'infospace' if self.is_infospace else 'physical'
         self.planner = UnifiedPlanner(
             llm_client=self.llm_client,
             character=self,
-            world_type=world_type,
+            world_type='infospace',
             map_name=self.map_name,
             logger_instance=logger
         )
         self.available_tools = self.planner.available_tools
         
-        if self.is_infospace:
-            from infospace_executor import InfospaceExecutor
-            from infospace_semantic_validator import InfospaceSemanticValidator
-            from infospace_resource_manager import InfospaceResourceManager
-            from pathlib import Path
-            
-            # Create resource manager for direct resource access
-            self.resource_manager = InfospaceResourceManager(self.map_name, session=self.session)
-            logger.info(f'📦 Resource manager initialized for {self.map_name}')
-            
-            # Load resources from file on startup
-            self.resource_manager.load_from_file()
-            logger.info(f'📂 Loaded resources from file for {self.map_name}')
-            
-            self.infospace_executor = InfospaceExecutor(
-                character_name,
-                self.session,
-                self.map_name,
-                self.llm_client,
-                self.available_tools,
-                self,
-                self.resource_manager
-            )
-            logger.info(f'🧩 Infospace executor initialized for {character_name}')
-            
-            # Initialize semantic validator
-            tools_dir = Path(__file__).parent / 'tools'
-            
-            self.semantic_validator = InfospaceSemanticValidator(character=self, tools_dir=str(tools_dir) if tools_dir.exists() else None, prefix_prompt=self.planner.template)
-            logger.info(f'🔍 Semantic validator initialized for {character_name}')
+        # Initialize infospace components
+        from infospace_executor import InfospaceExecutor
+        from infospace_resource_manager import InfospaceResourceManager
+        from pathlib import Path
+        
+        # Create resource manager for direct resource access
+        self.resource_manager = InfospaceResourceManager(self.map_name, session=self.session)
+        logger.info(f'📦 Resource manager initialized for {self.map_name}')
+        
+        # Load resources from file on startup
+        self.resource_manager.load_from_file()
+        logger.info(f'📂 Loaded resources from file for {self.map_name}')
+        
+        self.infospace_executor = InfospaceExecutor(
+            character_name,
+            self.session,
+            self.map_name,
+            self.runtime or self.llm_client,  # Pass runtime if available, else llm_client
+            self.available_tools,
+            self,
+            self.resource_manager
+        )
+        # Share runtime with executor
+        if self.runtime:
+            self.infospace_executor.runtime = self.runtime
+        logger.info(f'🧩 Infospace executor initialized for {character_name}')
         
         # Internal state
         self.action_counter = 0
@@ -526,31 +579,29 @@ class ZenohExecutiveNode:
         )
         
         # Subscriber for enabling compliance tracking (evaluation mode)
-        if self.is_infospace:
-            self.compliance_tracking_subscriber = self.session.declare_subscriber(
+        self.compliance_tracking_subscriber = self.session.declare_subscriber(
                 f"cognitive/{character_name}/enable_compliance_tracking",
                 self._enable_compliance_tracking_callback
             )
         
         # Queryable for activity list (character-specific)
         # Queryables for resource management (for UI and resource_browser)
-        if self.is_infospace:
-            self.resource_view_queryable = self.session.declare_queryable(
+        self.resource_view_queryable = self.session.declare_queryable(
                 f"cognitive/{character_name}/resource/view/*",
                 self._handle_resource_view_query
-            )
-            self.resources_list_queryable = self.session.declare_queryable(
-                f"cognitive/{character_name}/resources",
-                self._handle_resources_list_query
-            )
-            self.resource_by_id_queryable = self.session.declare_queryable(
-                f"cognitive/{character_name}/resource/*",
-                self._handle_resource_by_id_query
-            )
-            self.resource_remove_queryable = self.session.declare_queryable(
-                f"cognitive/{character_name}/resource/remove/*",
-                self._handle_resource_remove_query
-            )
+        )
+        self.resources_list_queryable = self.session.declare_queryable(
+            f"cognitive/{character_name}/resources",
+            self._handle_resources_list_query
+        )
+        self.resource_by_id_queryable = self.session.declare_queryable(
+            f"cognitive/{character_name}/resource/*",
+            self._handle_resource_by_id_query
+        )
+        self.resource_remove_queryable = self.session.declare_queryable(
+            f"cognitive/{character_name}/resource/remove/*",
+            self._handle_resource_remove_query
+        )
         
         self.activity_list_queryable = self.session.declare_queryable(
             f"cognitive/{character_name}/activity/list",
@@ -609,7 +660,7 @@ class ZenohExecutiveNode:
         try:
             logger.info(f'💾 {self.character_name} received save_all command')
             self.memory.save()
-            if self.is_infospace and self.resource_manager:
+            if self.resource_manager:
                 self.resource_manager.save_to_file()
                 logger.info(f'💾 Saved resource manager state for {self.map_name}')
         except Exception as e:
@@ -635,7 +686,7 @@ class ZenohExecutiveNode:
                         if self.text_input_queue:
                             # Don't process text_input if awaiting ask response
                             # Let ask handler in _execute_next_step grab the response
-                            if not (self.is_infospace and self.plan_state and self.plan_state.get('awaiting_ask')):
+                            if not (self.plan_state and self.plan_state.get('awaiting_ask')):
                                 self._process_text_input()
                         self._run_ooda_loop()
                         
@@ -934,12 +985,8 @@ class ZenohExecutiveNode:
         """Format the situation data for the LLM."""
         formatted_situation = ''
         
-        # Skip map-based situation data for infospace characters
-        # (situation_node has been removed - it was only for map-based spatial awareness)
-        if not self.is_infospace:
-            # Map-based situation data would go here if needed in the future
-            # Currently not used since situation_node is removed
-            pass
+        # Map-based situation data not used (infospace only)
+        pass
         
         # world state updates disabled
 
@@ -1008,7 +1055,7 @@ class ZenohExecutiveNode:
                 system_prompt += f"\n#The overall setting is:\n{self.character_config['setting']}\n"
             if not self.map_types:
                 try:
-                    if self.is_infospace and self.resource_manager:
+                    if self.resource_manager:
                         self.map_types = self.resource_manager.get_resource_types()
                     else:
                         # Fallback for non-infospace (shouldn't happen in current architecture)
@@ -1409,7 +1456,7 @@ class ZenohExecutiveNode:
             metrics['plan_score'] = 0.0
         
         # Add infospace compliance metrics if evaluation mode is active
-        if self.is_infospace and hasattr(self.infospace_executor, '_compliance_tracker'):
+        if hasattr(self.infospace_executor, '_compliance_tracker'):
             tracker = self.infospace_executor._compliance_tracker
             if tracker:
                 compliance_metrics = tracker.get_metrics()
@@ -1612,7 +1659,7 @@ class ZenohExecutiveNode:
     def _enable_compliance_tracking_callback(self, sample):
         """Handle enabling compliance tracking for evaluation mode."""
         try:
-            if self.is_infospace and hasattr(self, 'infospace_executor'):
+            if hasattr(self, 'infospace_executor'):
                 from infospace_compliance import ComplianceTracker
                 
                 # Create and attach compliance tracker to executor
@@ -1646,7 +1693,7 @@ class ZenohExecutiveNode:
     def _handle_resource_view_query(self, query):
         """Handle query for resource content viewing (for UI)."""
         try:
-            if not self.is_infospace or not self.resource_manager:
+            if not self.resource_manager:
                 response = {
                     'success': False,
                     'error': 'Resource viewing only available for infospace characters'
@@ -1686,7 +1733,7 @@ class ZenohExecutiveNode:
     def _handle_resources_list_query(self, query):
         """Handle query for resources list (for resource_browser)."""
         try:
-            if not self.is_infospace or not self.resource_manager:
+            if not self.resource_manager:
                 response = {
                     'success': False,
                     'error': 'Resource list only available for infospace characters'
@@ -1730,7 +1777,7 @@ class ZenohExecutiveNode:
     def _handle_resource_by_id_query(self, query):
         """Handle query for resource by ID (for resource_browser)."""
         try:
-            if not self.is_infospace or not self.resource_manager:
+            if not self.resource_manager:
                 response = {
                     'success': False,
                     'error': 'Resource query only available for infospace characters'
@@ -1790,7 +1837,7 @@ class ZenohExecutiveNode:
     def _handle_resource_remove_query(self, query):
         """Handle query for resource removal (for resource_browser)."""
         try:
-            if not self.is_infospace or not self.resource_manager:
+            if not self.resource_manager:
                 response = {
                     'success': False,
                     'error': 'Resource removal only available for infospace characters'
@@ -1833,7 +1880,7 @@ class ZenohExecutiveNode:
     def _sync_plan_execution_handler(self, query):
         """Handle query for synchronous plan execution."""
         try:
-            if not self.is_infospace or not self.infospace_executor:
+            if not self.infospace_executor:
                 response = {
                     'success': False,
                     'error': 'Sync plan execution only available for infospace characters'
@@ -1930,16 +1977,15 @@ class ZenohExecutiveNode:
                 self._observe()
             self.current_goal = Goal(parsed_goal, [self.character_name], description='', termination='')
             
-            # In infospace mode, skip goal rewriting and plan immediately
-            if self.is_infospace:
-                self._publish_goal(self.current_goal)
-                logger.info(f'🧩 {self.character_name} infospace planning for goal: {parsed_goal}')
-                self._plan(self.current_goal)
-                if self.current_plan:
-                    self._publish_current_plan()
-                    self.plan_just_generated = True
-                    logger.info(f'📋 {self.character_name} generated plan with {len(self.current_plan["plan"])} steps')
-                return
+            # Skip goal rewriting and plan immediately (infospace mode)
+            self._publish_goal(self.current_goal)
+            logger.info(f'🧩 {self.character_name} infospace planning for goal: {parsed_goal}')
+            self._plan(self.current_goal)
+            if self.current_plan:
+                self._publish_current_plan()
+                self.plan_just_generated = True
+                logger.info(f'📋 {self.character_name} generated plan with {len(self.current_plan["plan"])} steps')
+            return
             
             # In manual mode, publish goal and auto-generate plan
             if self.manual:
@@ -1969,9 +2015,8 @@ class ZenohExecutiveNode:
         Limits size and fields to keep logs small. Returns [] on failure.
         For infospace characters, returns empty list (no spatial percepts).
         """
-        # Skip situation queries for infospace characters (situation_node removed)
-        if self.is_infospace:
-            return []
+        # Situation queries not used (infospace only, situation_node removed)
+        return []
         
         snapshot: List[Dict[str, Any]] = []
         try:
@@ -2309,8 +2354,8 @@ class ZenohExecutiveNode:
             except Exception as e:
                 logger.error(f'Error saving memory during shutdown: {e}')
             
-            # Save resource manager if infospace
-            if self.is_infospace and self.resource_manager:
+            # Save resource manager
+            if self.resource_manager:
                 try:
                     self.resource_manager.save_to_file()
                     logger.info(f'💾 Saved resource manager state for {self.map_name}')
