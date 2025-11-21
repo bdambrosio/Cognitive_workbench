@@ -34,16 +34,7 @@ This creates a tight loop between thought and action, allowing agents to handle 
 
 *See: `src/incremental_planner.py`*
 
-### 2. Entity Modeling & Theory of Mind (ToM)
-Agents build mental models of their interlocutors:
-- Tracks every interaction indexed by other character (default: "User")
-- Maintains distinct **discourse states** for each relationship
-- Models **Theory of Mind (ToM)** — what they know, want, and intend
-- Consolidates conversation history to maintain long-term coherence
-
-*See: `src/memory.py`, `src/entity_model.py`, `src/discourse.py`*
-
-### 3. Information Space ("Infospace")
+### 2. Information Space ("Infospace")
 Information is treated as a spatial environment where:
 - **Notes** and **Collections** are primitive persistent objects
 - **Cognitive Operations** (search, index, summarize, relate, filter, map) are "spatial" actions
@@ -51,6 +42,15 @@ Information is treated as a spatial environment where:
 - All operations use vector embeddings for semantic search and organization
 
 *See: `src/infospace_executor.py`, `src/infospace_resource_manager.py`*
+
+### 3. Entity Modeling & Theory of Mind (ToM) (still there from older multi-agent version, not fully functional right now)
+Agents build mental models of their interlocutors:
+- Tracks every interaction indexed by other character (default: "User")
+- Maintains distinct **discourse states** for each relationship
+- Models **Theory of Mind (ToM)** — what they know, want, and intend
+- Consolidates conversation history to maintain long-term coherence
+
+*See: `src/memory.py`, `src/entity_model.py`, `src/discourse.py`*
 
 ---
 
@@ -271,6 +271,7 @@ Edit `scenarios/jill.yaml`:
 cd src
 python3 launcher.py ../scenarios/jill.yaml --ui
 ```
+Startup can take a while, it loads llm, be patient...
 
 Access the UI at `http://localhost:3000`.
 
@@ -384,7 +385,7 @@ Docs/                         # Design documents (may be outdated)
 
 **Resource Usage:**
 - Memory: ~2-4GB (without SGLang)
-- SGLang: +8-16GB GPU memory (model-dependent)
+- SGLang: +8-96GB GPU memory (model-dependent, I use 16Bit Qwen3-Coder-30B. set model in jill.yaml)
 - Disk: ~50MB per agent (Note/Collection persistence)
 
 ---
