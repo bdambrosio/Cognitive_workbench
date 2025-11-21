@@ -1112,30 +1112,10 @@ class IncrementalPlanner:
         self.primitives_reference = primitives_reference
         self.logger = logger_instance or logger
         
-        # Initialize SGLang backend if needed
-        global _SGL_BACKEND_INITIALIZED
-        if not _SGL_BACKEND_INITIALIZED and sgl_model_path:
-            try:
-                self.logger.info(f"Initializing SGLang backend with model: {sgl_model_path}")
-                runtime = sgl.Runtime(
-                    model_path=sgl_model_path,
-                    tokenizer_path=sgl_model_path,
-                    device="cuda",
-                    context_length=32768,
-                    cuda_graph_max_bs=4,
-                    dtype="auto",
-                    tp_size=1,
-                    mem_fraction_static=0.82,
-                    tool_call_parser="qwen"
-                )
-                sgl.set_default_backend(runtime)
-                executor.runtime = runtime
-                _SGL_BACKEND_INITIALIZED = True
-            except Exception as e:
-                self.logger.error(f"Failed to initialize SGLang backend: {e}")
-                raise
-        elif not _SGL_BACKEND_INITIALIZED:
-            self.logger.warning("SGLang backend not initialized and no model path provided!")
+        # SGLang runtime is now initialized in executive_node
+        # Just verify it's available
+        if not executor.runtime:
+            self.logger.warning("SGLang runtime not available in executor - incremental planner may have reduced functionality")
         
         # Build tool catalog
         self.tools = build_tool_catalog(available_tools, primitives_reference)

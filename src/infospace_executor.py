@@ -2047,9 +2047,11 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         
         Examples:
         - Expand simple JSON array: {"type":"expand","target":"$json_note","out":"$items"} (where note contains [1,2,3])
-        - Expand query-web results: {"type":"expand","target":"$results","out":"$items"} (where note contains {"results": [...]})
+        - Expand structured data: {"type":"expand","target":"$data_note","out":"$items"} (where note contains {"results": [...]})
         - Expand JSONL: {"type":"expand","target":"$jsonl_note","out":"$items"} (where note contains {"key":"val1"}\n{"key":"val2"})
         - Expand text lines: {"type":"expand","target":"$text_note","out":"$lines"}
+        
+        NOTE: query-web and semantic-scholar return Collections directly - NO expand needed.
         """
         error = self._validate_required_fields(action, 'target', 'out')
         if error:
