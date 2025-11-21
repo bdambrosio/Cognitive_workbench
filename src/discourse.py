@@ -16,12 +16,11 @@ import numpy as np
 import zenoh
 #from sentence_transformers import SentenceTransformer
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from Messages import SystemMessage
 from utils import hash_utils
 from utils.state_utils import calculate_state_activity_alignment, get_known_states
 from utils.format_utils import format_middle_nouns, format_middle_verbs
 # Type checking imports
-from typing import TYPE_CHECKING, List
+from typing import TYPE_CHECKING, List, Callable
 if TYPE_CHECKING:
     from executive_node import ZenohExecutiveNode
 
@@ -42,17 +41,6 @@ logging.basicConfig(
     force=True
 )
 logger = logging.getLogger('discourse')
-
-
-
-# Add dedicated handler for llm_client logger
-llm_client_logger = logging.getLogger('llm_client')
-llm_client_file_handler = logging.FileHandler('logs/llm_client.log', mode='a')
-llm_client_file_handler.setLevel(logging.INFO)
-llm_client_file_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s', '%Y-%m-%d %H:%M:%S'))
-llm_client_logger.addHandler(llm_client_file_handler)
-llm_client_logger.setLevel(logging.INFO)
-from llm_client import ZenohLLMClient
 
 map_types = None
 
@@ -491,8 +479,8 @@ End your response with:
 </end>
 """
 class DiscourseTracker:
-    def __init__(self, llm_client, self_character_name: str, other_character_name: str):
-        self.llm_client = llm_client
+    def __init__(self, llm_generate: Callable, self_character_name: str, other_character_name: str):
+        self.llm_generate = llm_generate
         self.self_character = self_character_name
         self.other_character = other_character_name
         self.objects = {}
@@ -532,49 +520,91 @@ class DiscourseTracker:
     def analyze_segment(self, dialog, start=0, end=None, previous_discourse_state="", tom=""):
         if end is None:
             end = len(dialog) - 1
-        segment  = self.format_segment(dialog, start, end)
-        response = self.llm_client.ask({'conversation_turns': segment, 
-                                      'previous_discourse_state': previous_discourse_state, 
-                                      'current_tom_model': tom,
-                                      'start_turn': start,
-                                      'end_turn': end
-                                }, 
-                            [SystemMessage(content=DISCOURSE_ANALYSIS_TEMPLATE)],
-                            max_tokens=3000,
-                            temp=0.4,
-                            stops=['</end>'],
-                            is_json=False,
-                            log=True)
-        #if isinstance(response, dict):
-        #    logger.info(json.dumps(response, indent=2))
-        #else:
-        #    logger.info(response)
-        return response
+        segment = self.format_segment(dialog, start, end)
+        
+        # Apply bindings to template
+        prompt = DISCOURSE_ANALYSIS_TEMPLATE
+        bindings = {
+            'conversation_turns': segment,
+            'previous_discourse_state': previous_discourse_state,
+            'current_tom_model': tom,
+            'start_turn': start,
+            'end_turn': end
+        }
+        for key, value in bindings.items():
+            prompt = prompt.replace(f"{{{{${key}}}}}", str(value))
+        
+        response = self.llm_generate(
+            messages=[prompt],
+            bindings={},
+            max_tokens=3000,
+            temperature=0.4,
+            stops=['</end>'],
+            is_json=False
+        )
+        
+        # Handle response format (SGLang returns dict, llm_client returns object)
+        if isinstance(response, dict):
+            response_text = response.get('text', '')
+            success = response.get('success', False)
+        elif hasattr(response, 'text'):
+            response_text = response.text
+            success = response.success if hasattr(response, 'success') else True
+        else:
+            response_text = str(response)
+            success = True
+        
+        if not success:
+            logger.warning(f'Discourse analysis failed')
+            return ""
+        
+        return response_text
 
     def update_tom_from_discourse_segment(self, dialog, character_name, start=0, end=None, discourse_state="", previous_tom_state=""):
         if end is None:
             end = len(dialog) - 1
-        segment  = self.format_segment(dialog, start, end)
-        response = self.llm_client.ask({'conversation_turns': segment, 
-                                      'current_discourse_state': discourse_state, 
-                                      'previous_tom_model': previous_tom_state,
-                                      'other_person_name': character_name,
-                                      'start_turn': start,
-                                      'end_turn': end
-                                }, 
-                            [SystemMessage(content=TOM_UPDATE_TEMPLATE)],
-                            max_tokens=3000,
-                            temp=0.4,
-                            stops=['</end>'],
-                            is_json=False,
-                            log=True)
-        #if isinstance(response, dict):
-        #    print(json.dumps(response, indent=2))
-        #else:
-        #    print(response)
-        return response
+        segment = self.format_segment(dialog, start, end)
+        
+        # Apply bindings to template
+        prompt = TOM_UPDATE_TEMPLATE
+        bindings = {
+            'conversation_turns': segment,
+            'current_discourse_state': discourse_state,
+            'previous_tom_model': previous_tom_state,
+            'other_person_name': character_name,
+            'start_turn': start,
+            'end_turn': end
+        }
+        for key, value in bindings.items():
+            prompt = prompt.replace(f"{{{{${key}}}}}", str(value))
+        
+        response = self.llm_generate(
+            messages=[prompt],
+            bindings={},
+            max_tokens=3000,
+            temperature=0.4,
+            stops=['</end>'],
+            is_json=False
+        )
+        
+        # Handle response format (SGLang returns dict, llm_client returns object)
+        if isinstance(response, dict):
+            response_text = response.get('text', '')
+            success = response.get('success', False)
+        elif hasattr(response, 'text'):
+            response_text = response.text
+            success = response.success if hasattr(response, 'success') else True
+        else:
+            response_text = str(response)
+            success = True
+        
+        if not success:
+            logger.warning(f'ToM update failed')
+            return ""
+        
+        return response_text
 # Extraction functions (LLM-based, clearly defined)
-def extract_agenda_items(llm_client, discourse_state: str, my_name: str) -> List[dict]:
+def extract_agenda_items(llm_generate: Callable, discourse_state: str, my_name: str) -> List[dict]:
     """
     Extract all items competing for my attention.
     """
@@ -604,11 +634,37 @@ monitoring|Check that Joe is participating in exploration
 
 Output:"""
     
-    response = llm_client.ask({'discourse_state': discourse_state, 'my_name': my_name}, [SystemMessage(content=prompt)], 
-                                max_tokens=500, temp=0.4, stops=['</end>'], is_json=False, log=True)
+    # Apply bindings to prompt
+    prompt_with_bindings = prompt
+    prompt_with_bindings = prompt_with_bindings.replace("{{$discourse_state}}", discourse_state)
+    prompt_with_bindings = prompt_with_bindings.replace("{{$my_name}}", my_name)
+    
+    response = llm_generate(
+        messages=[prompt_with_bindings],
+        bindings={},
+        max_tokens=500,
+        temperature=0.4,
+        stops=['</end>'],
+        is_json=False
+    )
+    
+    # Handle response format
+    if isinstance(response, dict):
+        response_text = response.get('text', '')
+        success = response.get('success', False)
+    elif hasattr(response, 'text'):
+        response_text = response.text
+        success = response.success if hasattr(response, 'success') else True
+    else:
+        response_text = str(response)
+        success = True
+    
+    if not success or not response_text:
+        logger.warning(f'Agenda extraction failed')
+        return []
     
     items = []
-    for line in response.strip().split('\n'):
+    for line in response_text.strip().split('\n'):
         if '|' not in line:
             continue
         type_, action = line.split('|', 1)
@@ -659,14 +715,13 @@ conversation=[
   ]
 
 def main():
-    llm_client = ZenohLLMClient(server_name='vllm', model_name='gpt-4o-mini', service_timeout=240.0)
-
-    discourse_tracker = DiscourseTracker(llm_client, "Joe", "Samantha")
-    #discourse_tracker.extract_objects(turns)
-    #print(discourse_tracker.get_objects())
-    discourse_state = discourse_tracker.analyze_segment(conversation, 1, 10, '')
-    tom = discourse_tracker.update_tom_from_discourse_segment(conversation, 'Joe', 1, 10, discourse_state, '' )
-    agenda_items = extract_agenda_items(llm_client,discourse_state, "Joe")
+    # Example usage - requires llm_generate callback
+    # llm_generate = ... (from executive_node or infospace_executor)
+    # discourse_tracker = DiscourseTracker(llm_generate, "Joe", "Samantha")
+    # discourse_state = discourse_tracker.analyze_segment(conversation, 1, 10, '')
+    # tom = discourse_tracker.update_tom_from_discourse_segment(conversation, 'Joe', 1, 10, discourse_state, '' )
+    # agenda_items = extract_agenda_items(llm_generate, discourse_state, "Joe")
+    pass
     print(agenda_items)
     #final_discourse_state = discourse_tracker.analyze_segment(conversation, 11, 21, discourse_state, tom)
     #final_tom = discourse_tracker.update_tom_from_discourse_segment(conversation, 'Joe', 11, 21, final_discourse_state, tom)

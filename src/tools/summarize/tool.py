@@ -9,9 +9,7 @@ import time
 import uuid
 import traceback
 from zenoh import QueryTarget, ConsolidationMode
-from llm_client import ZenohLLMClient
 
-llm_client = ZenohLLMClient(server_name='vllm', model_name='models/Qwen3-Next:1.5B')
 logger = logging.getLogger(__name__)
 
 # Resource manager will be passed via kwargs
@@ -348,24 +346,17 @@ End your response with:
 """
         
         # max_tokens = 1.5x final output limit (2000 tokens)
-        # Use unified llm_generate callback if available, else fall back to llm_client
+        # Use unified llm_generate callback (required)
         llm_generate = kwargs.get('llm_generate')
-        if llm_generate:
-            response = llm_generate(
-                messages=[prompt],
-                max_tokens=3000,
-                temperature=0.3,
-                is_json=False,
-                stops=['</end>']
-            )
-        else:
-            response = llm_client.generate(
-                messages=[prompt],
-                max_tokens=3000,
-                temperature=0.3,
-                is_json=False,
-                stops=['</end>']
-            )
+        if not llm_generate:
+            raise ValueError("llm_generate callback is required")
+        response = llm_generate(
+            messages=[prompt],
+            max_tokens=3000,
+            temperature=0.3,
+            is_json=False,
+            stops=['</end>']
+        )
         
         if heartbeat:
             heartbeat()
@@ -402,24 +393,17 @@ End your response with:
         
         # max_tokens = 1.5x target per chunk
         max_chunk_tokens = int(tokens_per_chunk * 1.5)
-        # Use unified llm_generate callback if available, else fall back to llm_client
+        # Use unified llm_generate callback (required)
         llm_generate = kwargs.get('llm_generate')
-        if llm_generate:
-            response = llm_generate(
-                messages=[prompt],
-                max_tokens=max_chunk_tokens,
-                temperature=0.3,
-                is_json=False,
-                stops=['</end>']
-            )
-        else:
-            response = llm_client.generate(
-                messages=[prompt],
-                max_tokens=max_chunk_tokens,
-                temperature=0.3,
-                is_json=False,
-                stops=['</end>']
-            )
+        if not llm_generate:
+            raise ValueError("llm_generate callback is required")
+        response = llm_generate(
+            messages=[prompt],
+            max_tokens=max_chunk_tokens,
+            temperature=0.3,
+            is_json=False,
+            stops=['</end>']
+        )
         
         if heartbeat:
             heartbeat()
@@ -447,24 +431,17 @@ End your response with:
 """
     
     # max_tokens = 1.5x final output limit (2000 tokens)
-    # Use unified llm_generate callback if available, else fall back to llm_client
+    # Use unified llm_generate callback (required)
     llm_generate = kwargs.get('llm_generate')
-    if llm_generate:
-        response = llm_generate(
-            messages=[synthesis_prompt],
-            max_tokens=3000,
-            temperature=0.3,
-            is_json=False,
-            stops=['</end>']
-        )
-    else:
-        response = llm_client.generate(
-            messages=[synthesis_prompt],
-            max_tokens=3000,
-            temperature=0.3,
-            is_json=False,
-            stops=['</end>']
-        )
+    if not llm_generate:
+        raise ValueError("llm_generate callback is required")
+    response = llm_generate(
+        messages=[synthesis_prompt],
+        max_tokens=3000,
+        temperature=0.3,
+        is_json=False,
+        stops=['</end>']
+    )
     
     if heartbeat:
         heartbeat()

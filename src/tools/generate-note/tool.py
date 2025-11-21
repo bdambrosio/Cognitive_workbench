@@ -7,9 +7,7 @@ import logging
 import json
 import zenoh
 from zenoh import QueryTarget, ConsolidationMode
-from llm_client import ZenohLLMClient
 
-llm_client = ZenohLLMClient(server_name='vllm', model_name='models/Qwen3-Next:1.5B')
 logger = logging.getLogger(__name__)
 
 # Open zenoh session for fetching Collection/Note content
@@ -166,24 +164,17 @@ End your response with:
 
     logger.info(f"generate-note: {prompt[:50]}... (style={style})")
     
-    # Use unified llm_generate callback if available, else fall back to llm_client
+    # Use unified llm_generate callback (required)
     llm_generate = kwargs.get('llm_generate')
-    if llm_generate:
-        response = llm_generate(
-            messages=[generation_prompt],
-            max_tokens=max_tokens,
-            temperature=temperature,
-            is_json=False,
-            stops=['</end>']
-        )
-    else:
-        response = llm_client.generate(
-            messages=[generation_prompt],
-            max_tokens=max_tokens,
-            temperature=temperature,
-            is_json=False,
-            stops=['</end>']
-        )
+    if not llm_generate:
+        raise ValueError("llm_generate callback is required")
+    response = llm_generate(
+        messages=[generation_prompt],
+        max_tokens=max_tokens,
+        temperature=temperature,
+        is_json=False,
+        stops=['</end>']
+    )
     
     # Send heartbeat after LLM call to reset timeout
     heartbeat = kwargs.get('heartbeat')

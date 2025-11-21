@@ -4,9 +4,7 @@ Entity extraction tool with automatic chunking for long documents.
 """
 import logging
 import json
-from llm_client import ZenohLLMClient
 
-llm_client = ZenohLLMClient(server_name='vllm', model_name='models/Qwen3-Next:1.5B')
 logger = logging.getLogger(__name__)
 
 
@@ -98,22 +96,16 @@ Do not include any introductory, reasoning, code fences,or explanatory text in y
 
 """
     
-    # Use unified llm_generate callback if available, else fall back to llm_client
+    # Use unified llm_generate callback (required)
     llm_generate = kwargs.get('llm_generate') if kwargs else None
-    if llm_generate:
-        response = llm_generate(
-            messages=[prompt],
-            max_tokens=1000,
-            temperature=0.3,
-            is_json=True
-        )
-    else:
-        response = llm_client.generate(
-            messages=[prompt],
-            max_tokens=1000,
-            temperature=0.3,
-            is_json=True
-        )
+    if not llm_generate:
+        raise ValueError("llm_generate callback is required")
+    response = llm_generate(
+        messages=[prompt],
+        max_tokens=1000,
+        temperature=0.3,
+        is_json=True
+    )
     
     # Send heartbeat after LLM call (prevents timeout during long operations)
     if heartbeat:

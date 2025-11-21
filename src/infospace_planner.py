@@ -129,7 +129,7 @@ Pattern: Semantic search within indexed Collection (index/search-within-collecti
   {"type":"search-within-collection","target":"$papers","value":"block-rank algorithm","return_mode":"notes","limit":5,"out":"$relevant_papers","expect":"should return papers discussing block-rank"}
 
 Pattern: Multi-item tool application
-  When you need to apply a tool to two or more Notes together (e.g. compare, analyze together), create a Collection.
+  When you need to apply a tool to two or more Notes together (e.g. relate, analyze together), create a Collection.
   create-collection → apply → (optional: use tool with target to apply to Collection)
   
   Example - Compare two search results:

@@ -10,7 +10,7 @@ import json
 import random
 import discourse
 from utils import hash_utils
-from llm_client import ZenohLLMClient
+from typing import Callable
 
 class EntityModel:
     """
@@ -18,14 +18,14 @@ class EntityModel:
     Tracks visual sightings and conversation history organized as dialogs.
     """
     
-    def __init__(self, character_name: str, entity_name: str, logger, llm_client: ZenohLLMClient):
+    def __init__(self, character_name: str, entity_name: str, logger, llm_generate: Callable):
         self.character_name = character_name
         self.entity_name = entity_name
         self.first_seen: Optional[datetime] = None
         self.last_seen: Optional[datetime] = None
-        self.llm_client = llm_client
+        self.llm_generate = llm_generate
         self.logger = logger
-        self.discourse = discourse.DiscourseTracker(llm_client, character_name, entity_name)
+        self.discourse = discourse.DiscourseTracker(llm_generate, character_name, entity_name)
         self.discourse_state = ""
         self.tom_model = ""
         
@@ -91,12 +91,11 @@ class EntityModel:
                 if isinstance(memory, dict) and 'source' in memory and 'text' in memory:
                     dialog_history += f"\t{memory['source']}: {memory['text']}\n"
 
-        system_prompt = """Given the following dialog transcript, create two summaries, one for each of the two characters.
+        prompt = """Given the following dialog transcript, create two summaries, one for each of the two characters.
 Each summary should be a single sentence accurately conveying the essence of that character's part of the conversation.
 Each summary Should accurately reflect both the content and tone of that character's part of the conversation.
-"""
 
-        user_prompt = """#Dialog transcript
+#Dialog transcript
 {{$transcript}}
 ##
 
@@ -109,13 +108,36 @@ Respond with the two summaries in hash-formatted text using the following format
 Do not include any other introductory, explanatory, discursive, or formatting text in your response.
 End your response with: 
 </end>"""
-
-        response = self.llm_client.generate([system_prompt, user_prompt], bindings={'transcript': dialog_history, 'name': self.character_name, 'other_name': self.entity_name}, 
-                                            stops=['</end>'], max_tokens=60)
-        if response.success:
-            response=response.text
-            me = hash_utils.find(f'{self.character_name}', response)
-            other = hash_utils.find(f'{self.entity_name}', response)
+        
+        # Apply bindings
+        prompt_with_bindings = prompt
+        prompt_with_bindings = prompt_with_bindings.replace("{{$transcript}}", dialog_history)
+        prompt_with_bindings = prompt_with_bindings.replace("{{$name}}", self.character_name)
+        prompt_with_bindings = prompt_with_bindings.replace("{{$other_name}}", self.entity_name)
+        
+        response = self.llm_generate(
+            messages=[prompt_with_bindings],
+            bindings={},
+            max_tokens=60,
+            temperature=0.7,
+            stops=['</end>'],
+            is_json=False
+        )
+        
+        # Handle response format
+        if isinstance(response, dict):
+            response_text = response.get('text', '')
+            success = response.get('success', False)
+        elif hasattr(response, 'text'):
+            response_text = response.text
+            success = response.success if hasattr(response, 'success') else True
+        else:
+            response_text = str(response)
+            success = True
+        
+        if success and response_text:
+            me = hash_utils.find(f'{self.character_name}', response_text)
+            other = hash_utils.find(f'{self.entity_name}', response_text)
             # Wrap summaries in proper entry dicts to maintain consistent structure
             self.dialogs[-6] = [
                 {
@@ -132,7 +154,7 @@ End your response with:
                 }
             ]
         else:
-            self.logger.error(f'Error in consolidate_dialog for {self.character_name} and {self.entity_name}: {response}')
+            self.logger.error(f'Error in consolidate_dialog for {self.character_name} and {self.entity_name}: {response_text if success else "LLM call failed"}')
 
 
     
@@ -279,7 +301,7 @@ End your response with:
         }
     
     @classmethod
-    def load_from_dict(cls, character_name: str, data: Dict[str, Any], logger=None, llm_client=None) -> 'EntityModel':
+    def load_from_dict(cls, character_name: str, data: Dict[str, Any], logger=None, llm_generate=None) -> 'EntityModel':
         """
         Load entity model from dictionary (for persistence).
         Handles migration from old conversation_history format.
@@ -292,7 +314,7 @@ End your response with:
         Returns:
             EntityModel instance
         """
-        entity = cls(character_name, data['entity_name'], logger, llm_client=llm_client)
+        entity = cls(character_name, data['entity_name'], logger, llm_generate=llm_generate)
         
         # Load timestamps
         if data.get('first_seen'):
@@ -381,12 +403,12 @@ End your response with:
         # don't actually need this, already in transcript!
         #transcript_text += f"{self.entity_name}: {input_text}\n"
         
-        # If no LLM client available, default to continuing dialog
-        if not self.llm_client:
-            self.logger.warning(f'No LLM client available for natural_dialog_end, defaulting to continue')
+        # If no LLM generate callback available, default to continuing dialog
+        if not self.llm_generate:
+            self.logger.warning(f'No LLM generate callback available for natural_dialog_end, defaulting to continue')
             return False
         
-        system_prompt = """Given the following context and dialog transcript, rate the naturalness of ending at this point.
+        prompt = """Given the following context and dialog transcript, rate the naturalness of ending at this point.
 Include in your consideration of whether you are likely to end the dialog your personality and drives. 
 
 #Context
@@ -407,18 +429,42 @@ Respond only with a rating between 0 and 10, where
 Do not include any text in your response, ONLY the numeric rating.
 
 My rating is:
-"""  
+"""
+        
+        # Apply bindings
+        prompt_with_bindings = prompt
+        prompt_with_bindings = prompt_with_bindings.replace("{{$context}}", context)
+        prompt_with_bindings = prompt_with_bindings.replace("{{$transcript}}", transcript_text)
+        
         try:
-            response = self.llm_client.generate([system_prompt], bindings={'transcript': transcript_text, 'context': context}, stops=['</end>'], max_tokens=20)
-            if response.success:
-            # Extract rating from response
-                response=response.text
+            response = self.llm_generate(
+                messages=[prompt_with_bindings],
+                bindings={},
+                max_tokens=20,
+                temperature=0.7,
+                stops=['</end>'],
+                is_json=False
+            )
+            
+            # Handle response format
+            if isinstance(response, dict):
+                response_text = response.get('text', '')
+                success = response.get('success', False)
+            elif hasattr(response, 'text'):
+                response_text = response.text
+                success = response.success if hasattr(response, 'success') else True
+            else:
+                response_text = str(response)
+                success = True
+            
+            if success:
+                # Extract rating from response
                 try:
-                    rating = int(''.join(filter(str.isdigit, response)))
+                    rating = int(''.join(filter(str.isdigit, response_text)))
                     if rating < 0 or rating > 10:
                         rating = 7
                 except ValueError:
-                    self.logger.warning(f'{self.entity_name} natural_dialog_end: invalid rating: {response}')
+                    self.logger.warning(f'{self.entity_name} natural_dialog_end: invalid rating: {response_text}')
                     rating = 7
             
             # Determine if dialog should end based on rating and some randomness

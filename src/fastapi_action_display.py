@@ -932,7 +932,7 @@ class FastAPIActionDisplayNode:
                 if not hasattr(self, 'session'):
                     return {"success": False, "message": "Zenoh session not available", "inventory": []}
                 
-                # Query memory_node for inventory
+                # Inventory removed - return empty list
                 query_key = f"cognitive/{character_name}/memory/inventory"
                 
                 try:
@@ -1084,7 +1084,7 @@ class FastAPIActionDisplayNode:
                 if not hasattr(self, 'session'):
                     return {"success": False, "message": "Zenoh session not available", "no_interaction": False}
                 
-                # Query memory_node for relation data
+                # Query executive_node memory module for relation data
                 query_key = f"cognitive/{character_name}/memory/entity/{target_character}?query=relation"
                 
                 try:

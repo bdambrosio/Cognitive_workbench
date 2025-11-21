@@ -1,0 +1,16 @@
+# Online research on emergent capabilities in large models
+# Tests that the planner can:
+# - find arguments on both sides
+# - assess evidence quality
+# - tell me what questions remain unresolved
+
+name: "Online research on emergent capabilities in large models"
+description: "Find arguments on both sides, assess their evidence quality, and tell me what questions remain unresolved."
+
+test_goal: >
+  goal: I need to understand the debate around emergent capabilities in large models. 
+  Find arguments on both sides, assess their evidence quality, and tell me what questions remain unresolved.
+
+expected_metrics:
+  plan_completed: true
+  type_violations: 0

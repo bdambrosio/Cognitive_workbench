@@ -226,7 +226,43 @@ class InfospaceExecutor:
                 return {'status': 'failed', 'reason': f'Unknown action: {action_type}'}
         
         try:
-            return handler(action)
+            result = handler(action)
+            
+            # Process expectation comparison if action has 'expect' field
+            if action.get('expect') and result.get('status') == 'success':
+                try:
+                    from utils.action_post_processing import process_action_expectation
+                    
+                    # Create llm_generate wrapper that matches the interface
+                    def llm_generate_wrapper(messages, bindings=None, max_tokens=2000, temperature=0.7, is_json=False, stops=None):
+                        """Wrapper for action_post_processing that uses executor's llm_generate."""
+                        if self.runtime:
+                            # For SGLang, apply bindings to messages if provided
+                            if bindings and isinstance(messages, list):
+                                processed_messages = []
+                                for msg in messages:
+                                    if isinstance(msg, str):
+                                        # Apply template bindings
+                                        processed_msg = msg
+                                        for key, value in bindings.items():
+                                            processed_msg = processed_msg.replace(f"{{{{${key}}}}}", str(value))
+                                        processed_messages.append(processed_msg)
+                                    else:
+                                        processed_messages.append(msg)
+                                messages = processed_messages
+                            return self._sglang_generate(messages, max_tokens, temperature, stops, is_json=is_json)
+                        else:
+                            return self.llm_client.generate(messages, bindings=bindings, max_tokens=max_tokens, temperature=temperature, is_json=is_json, stops=stops)
+                    
+                    comparison = process_action_expectation(
+                        action, result, llm_generate_wrapper, self.resource_manager, debug=False
+                    )
+                    if comparison and not comparison.get('matched'):
+                        logger.warning(f"Expectation mismatch for {action_type}: {comparison.get('response', '')}")
+                except Exception as e:
+                    logger.debug(f"Expectation processing failed (non-critical): {e}")
+            
+            return result
         except Exception as e:
             logger.error(f"Error executing action {action_type}: {e}")
             logger.error(traceback.format_exc())
@@ -435,7 +471,7 @@ Only provide the result, followed by the </end> tag.""")
                             else:
                                 processed_messages.append(msg)
                         messages = processed_messages
-                    return self._sglang_generate(messages, max_tokens, temperature, stops)
+                    return self._sglang_generate(messages, max_tokens, temperature, stops, is_json=is_json)
                 else:
                     return self.llm_client.generate(messages, bindings=bindings, max_tokens=max_tokens, temperature=temperature, is_json=is_json, stops=stops)
             
@@ -473,7 +509,7 @@ Only provide the result, followed by the </end> tag.""")
             logger.error(f"Prompt tool execution failed: {e}")
             return {'status': 'failed', 'reason': str(e)}
 
-    def _sglang_generate(self, messages, max_tokens=2000, temperature=0.7, stops=None):
+    def _sglang_generate(self, messages, max_tokens=2000, temperature=0.7, stops=None, is_json=False):
         """
         Generate text using SGLang Runtime.
         Wraps SGLang's function decorator pattern to match llm_client.generate() interface.
@@ -483,19 +519,21 @@ Only provide the result, followed by the </end> tag.""")
             max_tokens: Maximum tokens to generate
             temperature: Sampling temperature
             stops: List of stop sequences
+            is_json: If True, parse response as JSON and return dict
             
         Returns:
             Object with .success, .text, and .error attributes (matching llm_client response)
+            If is_json=True, .text will be a dict (parsed JSON) instead of string
         """
         if not HAS_SGLANG or not self.runtime:
             return type('Response', (), {'success': False, 'error': 'SGLang not available', 'text': ''})()
-        
+
         class Response:
             def __init__(self, success, text='', error=None):
                 self.success = success
                 self.text = text
                 self.error = error
-        
+
         try:
             # Convert messages to single prompt string
             if isinstance(messages, list):
@@ -523,11 +561,121 @@ Only provide the result, followed by the </end> tag.""")
             state = generate_text.run(prompt_text=prompt)
             result_text = state["output"].strip()
             
+            # Post-process JSON if requested
+            if is_json:
+                result_text = self._parse_json_response(result_text, prompt)
+            
             return Response(success=True, text=result_text)
         except Exception as e:
             logger.error(f"SGLang generation error: {e}")
             traceback.print_exc()
             return Response(success=False, error=str(e))
+    
+    def _parse_json_response(self, response_text, original_prompt=None):
+        """
+        Parse JSON from response text, with repair mechanism.
+        Adapted from llm_api.py repair_json logic.
+        
+        Args:
+            response_text: Raw text response that should contain JSON
+            original_prompt: Original prompt (for error logging)
+            
+        Returns:
+            Parsed dict if successful, None if parsing fails after repair attempts
+        """
+        if isinstance(response_text, dict):
+            return response_text
+        
+        if not isinstance(response_text, str):
+            response_text = str(response_text)
+        
+        response = response_text.strip()
+        
+        # Remove markdown code fences if present
+        response = response.replace("```json", "").replace("```", "").strip()
+        
+        # Try direct parse first
+        try:
+            return json.loads(response)
+        except json.JSONDecodeError:
+            pass
+        
+        # Repair attempt 1: Extract JSON if not at start
+        if not response.startswith('{') and '{' in response:
+            start = response.find('{')
+            end = response.rfind('}')
+            if start >= 0 and end >= start:
+                response = response[start:end+1]
+        
+        # Repair attempt 2: Remove newlines outside string values
+        in_string = False
+        result = []
+        i = 0
+        while i < len(response):
+            if response[i] == '"' and (i == 0 or response[i-1] != '\\'):
+                in_string = not in_string
+            if not in_string and response[i] == '\n':
+                i += 1
+                continue
+            result.append(response[i])
+            i += 1
+        response = ''.join(result)
+        
+        # Repair attempt 3: Find first complete JSON object
+        brace_count = 0
+        json_end = 0
+        for i, char in enumerate(response):
+            if char == '{':
+                brace_count += 1
+            elif char == '}':
+                brace_count -= 1
+                if brace_count == 0:
+                    json_end = i + 1
+                    break
+        if json_end > 0:
+            response = response[:json_end]
+        
+        # Try parsing after repairs
+        try:
+            return json.loads(response)
+        except json.JSONDecodeError as e:
+            logger.error(f'Simple JSON repair failed: {e}')
+            logger.debug(f'Failed to parse JSON from: {response_text[:200]}...')
+            
+            # Fallback: Use LLM (sglang runtime) to repair JSON
+            if self.runtime and original_prompt:
+                logger.info('Attempting LLM-based JSON repair using sglang runtime')
+                repair_prompt = f"""You are a JSON repair tool.
+An LLM received the following prompt and returned invalid JSON. Your task is to repair the JSON.
+
+The prompt was:
+{original_prompt}
+
+The returned JSON was:
+{response_text}
+
+The reported error was:
+{str(e)}
+
+If it seems the JSON was truncated, it may have exceeded the max_tokens limit. In that case, try shortening some string values and completing the JSON according to the prompt.
+Respond only with the repaired JSON string. Do not output any reasoning.
+Make sure the string is in a format that can be parsed by the json.loads function. No commentary, no code fences.
+"""
+                try:
+                    repair_response = self._sglang_generate([repair_prompt], max_tokens=3500, temperature=0.2, stops=None, is_json=False)
+                    if repair_response.success:
+                        repaired_text = repair_response.text.strip()
+                        # Remove code fences if present
+                        repaired_text = repaired_text.replace("```json", "").replace("```", "").strip()
+                        try:
+                            return json.loads(repaired_text)
+                        except json.JSONDecodeError as e2:
+                            logger.error(f'LLM repair response also failed to parse: {e2}')
+                            logger.debug(f'Repair response: {repaired_text[:200]}...')
+                except Exception as repair_error:
+                    logger.error(f'LLM-based JSON repair failed: {repair_error}')
+            
+            return None
 
     def _execute_python_tool(self, tool_name: str, input_value: Any,
                             tool_info: Dict, additional_args: Dict) -> Dict:
@@ -654,7 +802,7 @@ Only provide the result, followed by the </end> tag.""")
                         else:
                             processed_messages.append(msg)
                     messages = processed_messages
-                return self._sglang_generate(messages, max_tokens, temperature, stops)
+                return self._sglang_generate(messages, max_tokens, temperature, stops, is_json=is_json)
             else:
                 return self.llm_client.generate(messages, bindings=bindings, max_tokens=max_tokens, temperature=temperature, is_json=is_json, stops=stops)
         
@@ -900,7 +1048,7 @@ Only provide the result, followed by the </end> tag.""")
     
     def _persist_note(self, value: Any, source_context: str, properties: Optional[Dict] = None, note_name: str = '') -> Optional[str]:
         """
-        Helper to persist a Note to map_node as a spatial resource.
+        Helper to persist a Note as a resource.
         
         Args:
             value: Content to persist
@@ -1068,7 +1216,7 @@ Only provide the result, followed by the </end> tag.""")
             else:
                 return {'status': 'failed', 'reason': f'Variable not bound: {var_name}'}
         
-        # Query map_node for the resource
+        # Query for the resource
         from zenoh import QueryTarget, ConsolidationMode
         for reply in self.session.get(
             f"cognitive/map/resource/{resource_id}",
@@ -1116,6 +1264,9 @@ Only provide the result, followed by the </end> tag.""")
         
         The Collection ID is used as the index identifier.
         """
+        if not self.resource_manager:
+            return {'status': 'failed', 'reason': 'Resource manager not available'}
+        
         source_arg = action.get('source')
         index_type = action.get('index_type', 'semantic')
         fields = action.get('fields', {})
@@ -1139,33 +1290,18 @@ Only provide the result, followed by the </end> tag.""")
         if not isinstance(collection_id, str) or not collection_id.startswith('Collection_'):
             return {'status': 'failed', 'reason': f'Variable {collection_var} is not a Collection'}
         
-        # Request indexing from map_node using Collection ID
-        request = {
-            'agent_name': self.agent_name,
-            'collection_id': collection_id,
-            'index_type': index_type,
-            'fields': fields
-        }
-        
-        self.session.put(
-            f"map/{self.map_name}/index_request/{self.agent_name}",
-            json.dumps(request)
+        # Call resource_manager directly
+        success, indexed_count, error_msg = self.resource_manager.index_collection(
+            agent_name=self.agent_name,
+            collection_id=collection_id,
+            index_type=index_type,
+            fields=fields
         )
         
-        # Wait for response
-        response = self._wait_for_response(
-            f"map/{self.map_name}/index_response/{self.agent_name}",
-            timeout=15.0  # Embedding generation takes time, especially on first model load
-        )
+        if not success:
+            return {'status': 'failed', 'reason': error_msg or 'Index failed'}
         
-        if not response:
-            return {'status': 'failed', 'reason': 'Index timeout'}
-        
-        if response.get('status') != 'success':
-            return {'status': 'failed', 'reason': response.get('reason', 'Index failed')}
-        
-        indexed_count = response.get('indexed_count', 0)
-        logger.info(f"Indexed {indexed_count} items from {collection_id}")
+        logger.info(f"Indexed {indexed_count} chunks from {collection_id}")
         return {'status': 'success', 'value': indexed_count}
     
     def _execute_search_within_collection(self, action: Dict) -> Dict:
@@ -1210,36 +1346,24 @@ Only provide the result, followed by the </end> tag.""")
         if not isinstance(collection_id, str) or not collection_id.startswith('Collection_'):
             return {'status': 'failed', 'reason': f'Variable {collection_var} is not a Collection'}
         
-        # Request search from map_node using Collection ID
-        request = {
-            'agent_name': self.agent_name,
-            'collection_id': collection_id,
-            'query': query,
-            'mode': mode,
-            'limit': limit,
-            'threshold': threshold,
-            'return_mode': return_mode
-        }
+        if not self.resource_manager:
+            return {'status': 'failed', 'reason': 'Resource manager not available'}
         
-        self.session.put(
-            f"map/{self.map_name}/search_request/{self.agent_name}",
-            json.dumps(request)
+        # Call resource_manager directly
+        success, results, error_msg = self.resource_manager.search_collection(
+            agent_name=self.agent_name,
+            collection_id=collection_id,
+            query=query,
+            mode=mode,
+            limit=limit,
+            threshold=threshold,
+            return_mode=return_mode
         )
         
-        # Wait for response
-        response = self._wait_for_response(
-            f"map/{self.map_name}/search_response/{self.agent_name}",
-            timeout=10.0
-        )
+        if not success:
+            return {'status': 'failed', 'reason': error_msg or 'Search failed'}
         
-        if not response:
-            return {'status': 'failed', 'reason': 'Search timeout'}
-        
-        if response.get('status') != 'success':
-            return {'status': 'failed', 'reason': response.get('reason', 'Search failed')}
-        
-        # Bind results to output variable
-        results = response.get('results', [])
+        # Results is already a list of dicts with 'document', 'score', 'metadata' fields
         
         # Create structured Notes for each search result (matching query-web/semantic-scholar format)
         note_ids = []
@@ -1283,7 +1407,7 @@ Only provide the result, followed by the </end> tag.""")
             if note_id:
                 note_ids.append(note_id)
         
-        # Create Collection in map_node
+        # Create Collection for results
         result_collection_id = self._create_collection(note_ids, 'search_results')
         if result_collection_id:
             self._bind_variable(out_var, result_collection_id)
@@ -1527,17 +1651,6 @@ Only provide the result, followed by the </end> tag.""")
         
         if value is None:
             return {'status': 'failed', 'reason': 'think requires value or target'}
-        
-        # Publish think message to map (for memory system)
-        message = {
-            'agent_name': self.agent_name,
-            'content': str(value)
-        }
-        
-        self.session.put(
-            f"map/{self.map_name}/think/{self.agent_name}",
-            json.dumps(message)
-        )
         
         logger.info(f"Think: {value}")
         return {'status': 'success', 'value': value}
@@ -3035,7 +3148,7 @@ Only provide the result, followed by the </end> tag.""")
     
     def _dereference_collection(self, collection_var: str) -> List[str]:
         """
-        Get Collection Note IDs by querying map_node.
+        Get Collection Note IDs by querying resource manager.
         
         Args:
             collection_var: Variable name (without $) of the Collection
@@ -3051,7 +3164,7 @@ Only provide the result, followed by the </end> tag.""")
         
         # Check if it's a Collection_N ID
         if isinstance(collection_id, str) and collection_id.startswith('Collection_'):
-            # Fetch Collection from map_node
+            # Fetch Collection from resource manager
             content = self._get_content(collection_id)
             if isinstance(content, list):
                 return content
@@ -3253,7 +3366,7 @@ Only provide the result, followed by the </end> tag.""")
         
         # If starts with Note_ or Collection_, validate and return as-is (literal ID)
         if value.startswith('Note_') or value.startswith('Collection_'):
-            # Could optionally validate existence via map_node query here
+            # Could optionally validate existence via resource query here
             return value
         
         # Otherwise return as-is (could be a name for load operation)
@@ -3268,7 +3381,7 @@ Only provide the result, followed by the </end> tag.""")
             value: Can be a literal value, "$variable" string, or template string with embedded "$variable" patterns
             
         Returns:
-            Resolved content value (fetches from map_node if resource ID)
+            Resolved content value (fetches from resource manager if resource ID)
         """
         if not isinstance(value, str):
             return value
@@ -3297,7 +3410,7 @@ Only provide the result, followed by the </end> tag.""")
             
             resource_id = self.plan_bindings[var_name]
             
-            # If it's a resource ID, fetch content from map_node
+            # If it's a resource ID, fetch content from resource manager
             if isinstance(resource_id, str) and (resource_id.startswith('Note_') or resource_id.startswith('Collection_')):
                 return self._get_content(resource_id)
             
@@ -3312,7 +3425,7 @@ Only provide the result, followed by the </end> tag.""")
                 resource_id = self.plan_bindings[var_name]
                 logger.debug(f"Resolving template variable {var_ref} → {resource_id}")
                 
-                # If it's a resource ID, fetch content from map_node
+                # If it's a resource ID, fetch content from resource manager
                 if isinstance(resource_id, str) and (resource_id.startswith('Note_') or resource_id.startswith('Collection_')):
                     resolved_content = self._get_content(resource_id)
                     if resolved_content is None:
@@ -3412,34 +3525,6 @@ Only provide the result, followed by the </end> tag.""")
             return f"{field_name} must be {type_names}, got {actual_type}"
         
         return None
-    
-    def _wait_for_response(self, topic: str, timeout: float = 5.0) -> Optional[Dict]:
-        """
-        Wait for Zenoh response on topic.
-        
-        Args:
-            topic: Zenoh topic to listen on
-            timeout: Max wait time in seconds
-            
-        Returns:
-            Response dict or None if timeout
-        """
-        response_data = [None]
-        
-        def handler(sample):
-            response_data[0] = json.loads(sample.payload.to_bytes().decode('utf-8'))
-        
-        # Subscribe and wait
-        subscriber = self.session.declare_subscriber(topic, handler)
-        
-        start_time = time.time()
-        while response_data[0] is None and time.time() - start_time < timeout:
-            time.sleep(0.1)
-        
-        # Undeclare subscriber
-        subscriber.undeclare()
-        
-        return response_data[0]
     
     def execute_plan_sync(self, plan: Dict, max_steps: int = 1000, max_depth: int = 10, initial_bindings: Dict = None) -> Dict:
         """

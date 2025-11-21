@@ -5,14 +5,10 @@ Filter items in a Collection based on natural-language predicate, returning a ne
 import logging
 import json
 from typing import List, Any
-from llm_client import ZenohLLMClient
 
 logger = logging.getLogger(__name__)
 
 # Resource manager will be passed via kwargs
-
-# LLM client (use default from kwargs if provided, else fallback)
-default_llm_client = ZenohLLMClient(server_name='vllm', model_name='models/Qwen3-Next:1.5B')
 
 
 def _get_content(resource_id: str, resource_manager) -> Any:
@@ -61,7 +57,7 @@ def tool(value: Any, runtime=None, **kwargs) -> str:
         **kwargs: 
             - predicate (required): Filtering condition
             - mode ('include'/'exclude', default 'include')
-            - llm_client: Optional LLM client (uses default if not provided)
+            - llm_generate: Required LLM generation callback
             - map_name: Map name (for logging)
             - agent_name: Agent name (for collection creation, defaults to 'system')
     
@@ -77,7 +73,9 @@ def tool(value: Any, runtime=None, **kwargs) -> str:
     
     mode = kwargs.get('mode', 'include')
     agent_name = kwargs.get('agent_name', 'system')
-    llm_client = kwargs.get('llm_client', default_llm_client)
+    llm_generate = kwargs.get('llm_generate')
+    if not llm_generate:
+        raise ValueError("llm_generate callback is required")
     
     if not isinstance(value, list):
         logger.warning("Input not a list; treating as empty Collection")
@@ -100,12 +98,8 @@ def tool(value: Any, runtime=None, **kwargs) -> str:
         # LLM evaluation
         prompt = f"Does this match '{predicate}'? Respond 'true' or 'false' only.\n\nContent: {content_str}"
         try:
-            # Use unified llm_generate callback if available, else fall back to llm_client
-            llm_generate = kwargs.get('llm_generate')
-            if llm_generate:
-                response = llm_generate(messages=[prompt], max_tokens=10, temperature=0.0, is_json=False)
-            else:
-                response = llm_client.generate([prompt], max_tokens=10)
+            # Use unified llm_generate callback (required)
+            response = llm_generate(messages=[prompt], max_tokens=10, temperature=0.0, is_json=False)
             if not response.success:
                 logger.error(f"LLM evaluation failed for {note_id}: {response.error}")
                 continue
