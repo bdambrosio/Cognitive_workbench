@@ -4,73 +4,52 @@ Filter items in a Collection based on natural-language predicate, returning a ne
 """
 import logging
 import json
-import zenoh
 from typing import List, Any
-from zenoh import QueryTarget, ConsolidationMode
 from llm_client import ZenohLLMClient
 
 logger = logging.getLogger(__name__)
 
-# Open zenoh session for fetching Note content and creating Collections
-config = zenoh.Config()
-zenoh_session = zenoh.open(config)
+# Resource manager will be passed via kwargs
 
 # LLM client (use default from kwargs if provided, else fallback)
 default_llm_client = ZenohLLMClient(server_name='vllm', model_name='models/Qwen3-Next:1.5B')
 
 
-def _get_content(resource_id: str) -> Any:
-    """Fetch content from map_node for a resource ID."""
+def _get_content(resource_id: str, resource_manager) -> Any:
+    """Fetch content for a resource ID."""
     if resource_id == "Note_null":
         return None
     
-    for reply in zenoh_session.get(
-        f"cognitive/map/resource/{resource_id}",
-        target=QueryTarget.BEST_MATCHING,
-        consolidation=ConsolidationMode.NONE,
-        timeout=5.0
-    ):
-        if reply.ok:
-            response = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
-            if response.get('success'):
-                if 'resource' in response:
-                    resource_data = response.get('resource')
-                    if resource_data:
-                        return resource_data.get('properties', {}).get('content')
-                else:
-                    return response.get('content')
-        break
-    return None
+    if not resource_manager:
+        logger.error("Resource manager not available")
+        return None
+    
+    resource = resource_manager.get_resource(resource_id)
+    if not resource:
+        return None
+    
+    return resource.get('properties', {}).get('content')
 
 
-def _create_collection(note_ids: List[str], agent_name: str, source_skill: str = 'filter-collection') -> str:
-    """Create a new Collection with the given note_ids via Zenoh."""
+def _create_collection(note_ids: List[str], agent_name: str, resource_manager, source_skill: str = 'filter-collection') -> str:
+    """Create a new Collection with the given note_ids."""
     if not note_ids:
         note_ids = []
     
-    for reply in zenoh_session.get(
-        "cognitive/map/collection/create",
-        target=QueryTarget.BEST_MATCHING,
-        consolidation=ConsolidationMode.NONE,
-        payload=json.dumps({
-            'character_name': agent_name,
-            'content': note_ids,
-            'format': 'list',
-            'source_skill': source_skill,
-            'source_value': f'{len(note_ids)} filtered items'
-        }).encode('utf-8'),
-        timeout=5.0
-    ):
-        if reply.ok:
-            response = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
-            if response.get('success'):
-                collection_id = response.get('info_id')
-                logger.info(f"Created filtered Collection {collection_id} with {len(note_ids)} items")
-                return collection_id
-        break
+    if not resource_manager:
+        logger.error("Resource manager not available")
+        return None
     
-    logger.error("Failed to create Collection via Zenoh")
-    return None
+    success, collection_id, error_msg, location = resource_manager.create_collection(
+        agent_name, note_ids, 'list', source_skill, f'{len(note_ids)} filtered items', '', {}
+    )
+    
+    if success:
+        logger.info(f"Created filtered Collection {collection_id} with {len(note_ids)} items")
+        return collection_id
+    else:
+        logger.error(f"Failed to create Collection: {error_msg}")
+        return None
 
 
 def tool(value: Any, runtime=None, **kwargs) -> str:
@@ -89,11 +68,12 @@ def tool(value: Any, runtime=None, **kwargs) -> str:
     Returns:
         New Collection ID (str) or None on error
     """
+    resource_manager = kwargs.get('resource_manager')
     predicate = kwargs.get('predicate')
     if not predicate:
         logger.warning("No predicate provided; returning empty Collection")
         agent_name = kwargs.get('agent_name', 'system')
-        return _create_collection([], agent_name) or ""
+        return _create_collection([], agent_name, resource_manager) or ""
     
     mode = kwargs.get('mode', 'include')
     agent_name = kwargs.get('agent_name', 'system')
@@ -101,7 +81,7 @@ def tool(value: Any, runtime=None, **kwargs) -> str:
     
     if not isinstance(value, list):
         logger.warning("Input not a list; treating as empty Collection")
-        return _create_collection([], agent_name) or ""
+        return _create_collection([], agent_name, resource_manager) or ""
     
     filtered_ids = []
     for note_id in value:
@@ -109,8 +89,8 @@ def tool(value: Any, runtime=None, **kwargs) -> str:
             # Skip invalid IDs (could be sub-collections in future)
             continue
         
-        # Fetch note content via Zenoh
-        note_content = _get_content(note_id)
+        # Fetch note content
+        note_content = _get_content(note_id, resource_manager)
         if note_content is None:
             logger.warning(f"Note {note_id} not found or has no content; skipping")
             continue
@@ -139,7 +119,7 @@ def tool(value: Any, runtime=None, **kwargs) -> str:
             filtered_ids.append(note_id)
     
     # Create new Collection with filtered note_ids
-    new_coll_id = _create_collection(filtered_ids, agent_name)
+    new_coll_id = _create_collection(filtered_ids, agent_name, resource_manager)
     if not new_coll_id:
         logger.error("Failed to create filtered Collection")
         return ""

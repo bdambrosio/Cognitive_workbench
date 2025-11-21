@@ -142,49 +142,8 @@ class CharacterLauncher:
                 self.logger.error(f'❌ Failed to launch Resource Browser: {e}')
                 
         
-        # Launch map node (required for situation awareness)
-        try:
-            map_args = [sys.executable, 'map_node.py']
-            map_path = None
-            if map_file:
-                candidate = Path(map_file)
-                if not candidate.exists():
-                    alt = Path(__file__).parent / 'maps' / map_file
-                    if alt.exists():
-                        candidate = alt
-                if candidate.exists():
-                    map_path = str(candidate)
-            if map_path:
-                map_args.extend(['-m', map_path])
-            if world_label:
-                map_args.extend(['-w', world_label])
-            if setting:
-                map_args.extend(['-s', setting])   
-            # Pass LLM configuration to map_node
-            if server_name:
-                map_args.extend(['--server', server_name])
-            if model_name:
-                map_args.extend(['--model', model_name])
-            # Optional max_turns from env (set via YAML or externally)
-            try:
-                max_turns = os.environ.get('CWB_MAX_TURNS')
-                if max_turns:
-                    map_args.extend(['--max-turns', str(int(max_turns))])
-            except Exception:
-                pass
-            # Propagate optional debug flag to disable map turn timeouts
-            env = os.environ.copy()
-            if env.get('CWB_DEBUG', ''):
-                self.logger.info('Debug mode enabled via CWB_DEBUG - map turn timeout will be disabled')
-            map_process = subprocess.Popen(map_args, env=env)
-            self.shared_processes.append(map_process)
-            self.logger.info(f'✅ Map Node launched (world: {world_label})')
-            
-            # Wait for map node to be ready (check for initialization message)
-            self.logger.info('⏳ Waiting for Map Node to initialize...')
-            time.sleep(5)  # Give map node time to start up
-        except Exception as e:
-            self.logger.error(f'❌ Failed to launch Map Node: {e}')
+        # Map node removed - resource management now handled by executive_node
+        self.logger.info(f'✅ Resource management handled by executive_node (world: {world_label})')
     
     def launch_character(self, character: CharacterInstance):
         """Launch all nodes for a specific character."""

@@ -66,13 +66,16 @@ class ResourceBrowser:
             return self.delete_resource_via_zenoh(resource_id)
     
     def query_resources(self) -> Dict:
-        """Query map_node for resource list."""
-        key = "cognitive/map/resources"
+        """Query executive_node for resource list."""
+        # Try to find active character by querying for resources
+        # Use wildcard to find any character's resources
+        key = "cognitive/*/resources"
         logger.info(f"Querying: {key}")
         
-        for reply in self.session.get(key, timeout=2.0):
+        from zenoh import QueryTarget, ConsolidationMode
+        for reply in self.session.get(key, target=QueryTarget.BEST_MATCHING, consolidation=ConsolidationMode.NONE, timeout=2.0):
             if reply.ok:
-                data = json.loads(reply.ok.payload.to_string())
+                data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
                 if data.get('success'):
                     resources = data.get('resources', [])
                     
@@ -88,31 +91,35 @@ class ResourceBrowser:
                     }
                 return data
         
-        return {'success': False, 'error': 'No response from map_node'}
+        return {'success': False, 'error': 'No response from executive_node'}
     
     def query_resource(self, resource_id: str) -> Dict:
-        """Query map_node for specific resource."""
-        key = f"cognitive/map/resource/{resource_id}"
+        """Query executive_node for specific resource."""
+        # Use wildcard to find any character's resource
+        key = f"cognitive/*/resource/{resource_id}"
         logger.info(f"Querying: {key}")
         
-        for reply in self.session.get(key, timeout=2.0):
+        from zenoh import QueryTarget, ConsolidationMode
+        for reply in self.session.get(key, target=QueryTarget.BEST_MATCHING, consolidation=ConsolidationMode.NONE, timeout=2.0):
             if reply.ok:
-                data = json.loads(reply.ok.payload.to_string())
+                data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
                 return data
         
         return {'success': False, 'error': f'Resource {resource_id} not found'}
     
     def delete_resource_via_zenoh(self, resource_id: str) -> Dict:
-        """Delete resource via Zenoh query to map_node."""
-        key = f"cognitive/map/resource/remove/{resource_id}"
+        """Delete resource via Zenoh query to executive_node."""
+        # Use wildcard to find any character's resource
+        key = f"cognitive/*/resource/remove/{resource_id}"
         logger.info(f"Deleting resource: {key}")
         
-        for reply in self.session.get(key, timeout=2.0):
+        from zenoh import QueryTarget, ConsolidationMode
+        for reply in self.session.get(key, target=QueryTarget.BEST_MATCHING, consolidation=ConsolidationMode.NONE, timeout=2.0):
             if reply.ok:
-                data = json.loads(reply.ok.payload.to_string())
+                data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
                 return data
         
-        return {'success': False, 'error': f'No response from map_node for deletion'}
+        return {'success': False, 'error': f'No response from executive_node for deletion'}
     
     def get_html(self) -> str:
         """Generate HTML UI."""

@@ -14,9 +14,7 @@ from llm_client import ZenohLLMClient
 llm_client = ZenohLLMClient(server_name='vllm', model_name='models/Qwen3-Next:1.5B')
 logger = logging.getLogger(__name__)
 
-# Open zenoh session for fetching Collection/Note content and calling map_node
-config = zenoh.Config()
-zenoh_session = zenoh.open(config)
+# Resource manager will be passed via kwargs
 
 # Module-level cached embedder (shared across all summarize tool calls)
 _embedder = None
@@ -31,41 +29,33 @@ def _get_embedder():
     return _embedder
 
 
-def _get_content(resource_id: str) -> any:
-    """Fetch content from map_node for a resource ID."""
+def _get_content(resource_id: str, resource_manager) -> any:
+    """Fetch content for a resource ID."""
     if resource_id == "Note_null":
         return None
     
-    for reply in zenoh_session.get(
-        f"cognitive/map/resource/{resource_id}",
-        target=QueryTarget.BEST_MATCHING,
-        consolidation=ConsolidationMode.NONE,
-        timeout=5.0
-    ):
-        if reply.ok:
-            response = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
-            if response.get('success'):
-                if 'resource' in response:
-                    resource_data = response.get('resource')
-                    if resource_data:
-                        return resource_data.get('properties', {}).get('content')
-                else:
-                    return response.get('content')
-        break
-    return None
+    if not resource_manager:
+        logger.error("Resource manager not available")
+        return None
+    
+    resource = resource_manager.get_resource(resource_id)
+    if not resource:
+        return None
+    
+    return resource.get('properties', {}).get('content')
 
 
-def _flatten_list(items: list, separator: str = '\n\n') -> str:
+def _flatten_list(items: list, resource_manager, separator: str = '\n\n') -> str:
     """Flatten a list (Collection content) into concatenated Note content."""
     note_contents = []
     for item in items:
         if isinstance(item, str) and item.startswith('Note_'):
-            note_content = _get_content(item)
+            note_content = _get_content(item, resource_manager)
             if note_content is not None:
                 note_contents.append(str(note_content))
         elif isinstance(item, str) and item.startswith('Collection_'):
             # Recursively flatten nested Collections
-            flattened = _flatten_collection(item, separator)
+            flattened = _flatten_collection(item, resource_manager, separator)
             if flattened:
                 note_contents.append(flattened)
         else:
@@ -74,13 +64,13 @@ def _flatten_list(items: list, separator: str = '\n\n') -> str:
     return separator.join(note_contents)
 
 
-def _flatten_collection(collection_id: str, separator: str = '\n\n') -> str:
+def _flatten_collection(collection_id: str, resource_manager, separator: str = '\n\n') -> str:
     """Flatten a Collection into concatenated Note content."""
-    content = _get_content(collection_id)
+    content = _get_content(collection_id, resource_manager)
     if not isinstance(content, list):
         return str(content) if content else ""
     
-    return _flatten_list(content, separator)
+    return _flatten_list(content, resource_manager, separator)
 
 
 def _estimate_tokens(text):
@@ -88,25 +78,7 @@ def _estimate_tokens(text):
     return len(text) // 4
 
 
-def _wait_for_response(topic: str, timeout: float = 10.0):
-    """Wait for response on Zenoh topic."""
-    response_data = None
-    start_time = time.time()
-    
-    def response_handler(sample):
-        nonlocal response_data
-        if not response_data:  # Only take first response
-            response_data = json.loads(sample.payload.to_bytes().decode('utf-8'))
-    
-    subscriber = zenoh_session.declare_subscriber(topic, response_handler)
-    
-    try:
-        while not response_data and (time.time() - start_time) < timeout:
-            time.sleep(0.1)
-    finally:
-        subscriber.undeclare()
-    
-    return response_data
+# _wait_for_response removed - no longer needed with direct method calls
 
 
 def _semantic_filter_direct(text_content: str, focus: str, target_tokens: int) -> str:
@@ -200,127 +172,74 @@ def _semantic_filter_direct(text_content: str, focus: str, target_tokens: int) -
         return text_content
 
 
-def _create_temp_collection(text_content: str, map_name: str = 'infolab') -> str:
+def _create_temp_collection(text_content: str, resource_manager, map_name: str = 'infolab') -> str:
     """Create temporary Collection with text content for indexing."""
-    # Create a Note with the text content
-    note_id = None
-    for reply in zenoh_session.get(
-        "cognitive/map/note/create",
-        target=QueryTarget.BEST_MATCHING,
-        consolidation=ConsolidationMode.NONE,
-        payload=json.dumps({
-            'character_name': 'summarize_tool',
-            'content': text_content,
-            'format': 'text',
-            'source_skill': 'summarize_temp'
-        }).encode('utf-8'),
-        timeout=5.0
-    ):
-        if reply.ok:
-            response = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
-            if response.get('success'):
-                note_id = response.get('info_id')
-                break
-        break
+    if not resource_manager:
+        logger.error("Resource manager not available")
+        return None
     
-    if not note_id:
-        logger.error("Failed to create temporary Note")
+    # Create a Note with the text content
+    success, note_id, error_msg, location = resource_manager.create_note(
+        'summarize_tool', text_content, 'text', 'summarize_temp', str(text_content)[:100], '', {}
+    )
+    
+    if not success:
+        logger.error(f"Failed to create temporary Note: {error_msg}")
         return None
     
     # Create Collection containing the Note
-    collection_id = None
-    for reply in zenoh_session.get(
-        "cognitive/map/collection/create",
-        target=QueryTarget.BEST_MATCHING,
-        consolidation=ConsolidationMode.NONE,
-        payload=json.dumps({
-            'character_name': 'summarize_tool',
-            'content': [note_id],
-            'format': 'list',
-            'source_skill': 'summarize_temp',
-            'collection_name': f'summarize_temp_{uuid.uuid4().hex[:8]}'
-        }).encode('utf-8'),
-        timeout=5.0
-    ):
-        if reply.ok:
-            response = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
-            if response.get('success'):
-                collection_id = response.get('info_id')
-                break
-        break
+    success, collection_id, error_msg, location = resource_manager.create_collection(
+        'summarize_tool', [note_id], 'list', 'summarize_temp', '1 item', f'summarize_temp_{uuid.uuid4().hex[:8]}', {}
+    )
     
-    if not collection_id:
-        logger.error("Failed to create temporary Collection")
+    if not success:
+        logger.error(f"Failed to create temporary Collection: {error_msg}")
         return None
     
     return collection_id
 
 
-def _index_collection(collection_id: str, map_name: str = 'infolab') -> bool:
-    """Index a Collection via map_node."""
-    request = {
-        'agent_name': 'summarize_tool',
-        'collection_id': collection_id,
-        'index_type': 'semantic',
-        'fields': {'content': 'embed'}
-    }
-    
-    # Publish index request
-    zenoh_session.put(
-        f"map/{map_name}/index_request/summarize_tool",
-        json.dumps(request)
-    )
-    
-    # Wait for response
-    response = _wait_for_response(
-        f"map/{map_name}/index_response/summarize_tool",
-        timeout=15.0
-    )
-    
-    if not response:
-        logger.error("Index request timeout")
+def _index_collection(collection_id: str, resource_manager, agent_name: str = 'summarize_tool') -> bool:
+    """Index a Collection via resource_manager."""
+    if not resource_manager:
+        logger.error("resource_manager required for indexing")
         return False
     
-    if response.get('status') != 'success':
-        logger.error(f"Index failed: {response.get('reason')}")
+    success, indexed_count, error_msg = resource_manager.index_collection(
+        agent_name,
+        collection_id,
+        'semantic',
+        {'content': 'embed'}
+    )
+    
+    if not success:
+        logger.error(f"Index failed: {error_msg}")
         return False
     
     return True
 
 
-def _search_collection(collection_id: str, query: str, limit: int, map_name: str = 'infolab') -> list:
-    """Search indexed Collection and return chunk results."""
-    request = {
-        'agent_name': 'summarize_tool',
-        'collection_id': collection_id,
-        'query': query,
-        'mode': 'semantic',
-        'limit': limit,
-        'threshold': 0.0,
-        'return_mode': 'chunks'
-    }
-    
-    # Publish search request
-    zenoh_session.put(
-        f"map/{map_name}/search_request/summarize_tool",
-        json.dumps(request)
-    )
-    
-    # Wait for response
-    response = _wait_for_response(
-        f"map/{map_name}/search_response/summarize_tool",
-        timeout=10.0
-    )
-    
-    if not response:
-        logger.error("Search request timeout")
+def _search_collection(collection_id: str, query: str, limit: int, resource_manager, agent_name: str = 'summarize_tool') -> list:
+    """Search indexed Collection via resource_manager and return chunk results."""
+    if not resource_manager:
+        logger.error("resource_manager required for searching")
         return []
     
-    if response.get('status') != 'success':
-        logger.error(f"Search failed: {response.get('reason')}")
+    success, results, error_msg = resource_manager.search_collection(
+        agent_name,
+        collection_id,
+        query,
+        'semantic',
+        limit,
+        0.0,
+        'chunks'
+    )
+    
+    if not success:
+        logger.error(f"Search failed: {error_msg}")
         return []
     
-    return response.get('results', [])
+    return results
 
 
 def _compute_target_length(effective_tokens, style, compression_ratio):
@@ -366,10 +285,12 @@ def tool(value, runtime=None, **kwargs):
         logger.warning(f"Unknown style '{style}', using 'technical'")
         style = 'technical'
     
+    resource_manager = kwargs.get('resource_manager')
+    
     # Flatten Collection if input is a list
     if isinstance(value, list):
         logger.info(f"summarize: flattening Collection with {len(value)} items")
-        value = _flatten_list(value)
+        value = _flatten_list(value, resource_manager)
     
     # Measure input
     input_tokens = _estimate_tokens(value)

@@ -161,7 +161,7 @@ Pattern: Single vs. Multiple Item Processing
   {"type":"union","target":"$items1","value":"$items2","out":"$all_items"}
 
 Pattern: Universal LLM Transformations (refine, assess)
-  Use refine for ad-hoc transformations without specialized tools.
+  Use refine for editing/transforming existing Note content (does not add new content).
   Use assess for complex boolean conditions.  
   refine → assess → (optional: use target to apply to Collection)
 

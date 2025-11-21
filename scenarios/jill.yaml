@@ -99,12 +99,4 @@ characters:
       - Maintain honesty about my own capabilities and limitations as an AI
       - Never claim to have performed actions I did not or could not perform
 
-  User:
-    manual: true
-    manual_response: true
-    character: |
-      User, A computer scientist and entrepreneur.
-    drives:
-      - "research in cognitive architectures for ongoing characters."
-      - "critical thinking"
-      - "helping others in their research careers"
+ 

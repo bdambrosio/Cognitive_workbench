@@ -18,15 +18,9 @@ from typing import List, Dict, Any, Optional
 import requests
 import urllib.parse as en
 import warnings
-import zenoh
-from zenoh import QueryTarget, ConsolidationMode
 
 import wordfreq as wf
 from unstructured.partition.html import partition_html
-
-# Open zenoh session for creating Notes and Collections
-config = zenoh.Config()
-zenoh_session = zenoh.open(config)
 
 # ------------------------------
 # Logging setup
@@ -38,55 +32,42 @@ logger.setLevel(logging.INFO)
 warnings.filterwarnings('ignore', category=UserWarning, module='unstructured')
 
 # ------------------------------
-# Zenoh helpers for creating Notes/Collections
+# Helpers for creating Notes/Collections
 # ------------------------------
 
-def _create_note(content: Any, agent_name: str, source_skill: str = 'query-web') -> str:
-    """Create a Note via Zenoh and return its ID."""
-    for reply in zenoh_session.get(
-        "cognitive/map/note/create",
-        target=QueryTarget.BEST_MATCHING,
-        consolidation=ConsolidationMode.NONE,
-        payload=json.dumps({
-            'character_name': agent_name,
-            'content': content,
-            'format': 'json' if isinstance(content, dict) else 'text',
-            'source_skill': source_skill,
-            'source_value': str(content)[:100]
-        }).encode('utf-8'),
-        timeout=5.0
-    ):
-        if reply.ok:
-            response = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
-            if response.get('success'):
-                return response.get('info_id')
-        break
-    return None
+def _create_note(content: Any, agent_name: str, resource_manager, source_skill: str = 'query-web') -> str:
+    """Create a Note and return its ID."""
+    if not resource_manager:
+        logger.error("Resource manager not available")
+        return None
+    
+    format_type = 'json' if isinstance(content, dict) else 'text'
+    success, note_id, error_msg, location = resource_manager.create_note(
+        agent_name, content, format_type, source_skill, str(content)[:100], '', {}
+    )
+    
+    if success:
+        return note_id
+    else:
+        logger.error(f"Failed to create Note: {error_msg}")
+        return None
 
-def _create_collection(note_ids: List[str], agent_name: str, source_skill: str = 'query-web') -> str:
-    """Create a Collection via Zenoh and return its ID."""
-    for reply in zenoh_session.get(
-        "cognitive/map/collection/create",
-        target=QueryTarget.BEST_MATCHING,
-        consolidation=ConsolidationMode.NONE,
-        payload=json.dumps({
-            'character_name': agent_name,
-            'content': note_ids,
-            'format': 'list',
-            'source_skill': source_skill,
-            'source_value': f'{len(note_ids)} search results'
-        }).encode('utf-8'),
-        timeout=5.0
-    ):
-        if reply.ok:
-            response = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
-            if response.get('success'):
-                collection_id = response.get('info_id')
-                logger.info(f"Created Collection {collection_id} with {len(note_ids)} items")
-                return collection_id
-        break
-    logger.error("Failed to create Collection via Zenoh")
-    return None
+def _create_collection(note_ids: List[str], agent_name: str, resource_manager, source_skill: str = 'query-web') -> str:
+    """Create a Collection and return its ID."""
+    if not resource_manager:
+        logger.error("Resource manager not available")
+        return None
+    
+    success, collection_id, error_msg, location = resource_manager.create_collection(
+        agent_name, note_ids, 'list', source_skill, f'{len(note_ids)} search results', '', {}
+    )
+    
+    if success:
+        logger.info(f"Created Collection {collection_id} with {len(note_ids)} items")
+        return collection_id
+    else:
+        logger.error(f"Failed to create Collection: {error_msg}")
+        return None
 
 # ------------------------------
 # Small utilities
@@ -235,10 +216,9 @@ def _html_to_text_extract(html: str, query: str, max_chars: int) -> str:
 # LLM-assisted TL;DR
 # ------------------------------
 
-def _llm_tldr(LLM_client, text: str, query: str, max_chars: int, timeout: float = 12.0, heartbeat=None) -> str:
+def _llm_tldr(llm_generate, text: str, query: str, max_chars: int, timeout: float = 12.0, heartbeat=None) -> str:
     """
-    Your environment should provide LLM_client.generate(...)
-    Keep this call shape; fill in your client inside your app.
+    Use llm_generate function for LLM calls.
     """
     prompt = ["Your task is to analyze the following Text to identify if it is relevant to the Query.\n",
               """Query:
@@ -259,7 +239,7 @@ Respond only with the JSON, no commentary, no code fences, no reasoning:
 
 """]
     try:
-        raw = LLM_client.generate(messages=prompt, bindings={"query": query, "text": text}, max_tokens = max_chars, temperature=0.2, is_json=True, timeout=timeout)
+        raw = llm_generate(messages=prompt, bindings={"query": query, "text": text}, max_tokens=max_chars, temperature=0.2, is_json=True)
         
         # Send heartbeat after LLM call
         if heartbeat:
@@ -314,7 +294,7 @@ def _detect_format_from_content(content: str, url: str) -> str:
     # Default to html for web search results
     return "html"
 
-def _process_url(url: str, query: str, client, per_url_timeout: float, max_chars: int, heartbeat=None) -> Dict[str, Any]:
+def _process_url(url: str, query: str, llm_generate, per_url_timeout: float, max_chars: int, heartbeat=None) -> Dict[str, Any]:
     start = time.time()
     html = _http_get(url, timeout=per_url_timeout)
     if not html:
@@ -336,7 +316,7 @@ def _process_url(url: str, query: str, client, per_url_timeout: float, max_chars
         
         # LLM filter for relevance
         remaining_time = max(3.0, per_url_timeout - (time.time() - start) - 1.0)
-        tldr = _llm_tldr(client, extract, query=query, max_chars=max_chars, timeout=remaining_time, heartbeat=heartbeat)
+        tldr = _llm_tldr(llm_generate, extract, query=query, max_chars=max_chars, timeout=remaining_time, heartbeat=heartbeat)
         filtered_text = extract
         
         # Return uniform structure matching fetch-text
@@ -374,7 +354,7 @@ def _create_empty_result(url: str, start_time: float, file_format: str = "html")
 # Public entry point
 # ------------------------------
 
-def llm_search(query: str, client, max_chars: int = 8000, max_urls: int = 10, max_workers: int = 6, wall_time_limit: float = 20.0, heartbeat=None) -> List[Dict[str, Any]]:
+def llm_search(query: str, llm_generate, max_chars: int = 8000, max_urls: int = 10, max_workers: int = 6, wall_time_limit: float = 20.0, heartbeat=None) -> List[Dict[str, Any]]:
     """
     High-level:
       1) Google CSE for initial URL set (two phrasings interleaved).
@@ -393,7 +373,7 @@ def llm_search(query: str, client, max_chars: int = 8000, max_urls: int = 10, ma
     # LLM rephrase
     rephr = ""
     try:
-        response = client.generate(
+        response = llm_generate(
             messages=[f"""Rephrase the following google searchquery. 
 Generate a significant rephrasing of the query that is likely to find different results from the original query. 
 Be sure to keep, or better, sharpen the semantic intent of the query.
@@ -462,7 +442,7 @@ End your response with:
                 url = interleaved[idx]
                 idx += 1
                 per_url_timeout = max(8.0, wall_time_limit - (time.time() - t0 - 1.0))
-                fut = ex.submit(_process_url, url, query, client, per_url_timeout, max_chars/4, heartbeat)
+                fut = ex.submit(_process_url, url, query, llm_generate, per_url_timeout, max_chars/4, heartbeat)
                 logger.info(f"Submitted task for url: {url}")
                 in_flight.append(fut)
 
@@ -518,7 +498,7 @@ def tool(value, runtime=None, **kwargs):
     
     Args:
         value: Search query string
-        **kwargs: agent_name (required), llm_client (optional)
+        **kwargs: agent_name (required), llm_generate (preferred) or llm_client (fallback)
     
     Returns:
         Collection ID containing structured Note for each search result
@@ -536,17 +516,42 @@ def tool(value, runtime=None, **kwargs):
             'reason': 'agent_name required in kwargs'
         }
     
-    # Get or create LLM client
-    llm_client = kwargs.get('llm_client')
-    if not llm_client:
-        try:
-            from llm_client import ZenohLLMClient
-            llm_client = ZenohLLMClient(server_name='vllm', model_name='models/Qwen3-Next:1.5B')
-        except Exception as e:
-            return {
-                'status': 'failed',
-                'reason': f'Failed to create LLM client: {e}'
-            }
+    # Get llm_generate function (preferred) or create fallback from llm_client
+    llm_generate = kwargs.get('llm_generate')
+    if not llm_generate:
+        # Fallback: create llm_generate wrapper from llm_client if provided
+        llm_client = kwargs.get('llm_client')
+        if llm_client:
+            def llm_generate_wrapper(messages, bindings=None, max_tokens=2000, temperature=0.7, is_json=False, stops=None):
+                return llm_client.generate(
+                    messages=messages,
+                    bindings=bindings,
+                    max_tokens=max_tokens,
+                    temperature=temperature,
+                    is_json=is_json,
+                    stops=stops if stops else ['</end>']
+                )
+            llm_generate = llm_generate_wrapper
+        else:
+            # Last resort: create LLM client and wrapper
+            try:
+                from llm_client import ZenohLLMClient
+                llm_client = ZenohLLMClient(server_name='vllm', model_name='models/Qwen3-Next:1.5B')
+                def llm_generate_wrapper(messages, bindings=None, max_tokens=2000, temperature=0.7, is_json=False, stops=None):
+                    return llm_client.generate(
+                        messages=messages,
+                        bindings=bindings,
+                        max_tokens=max_tokens,
+                        temperature=temperature,
+                        is_json=is_json,
+                        stops=stops if stops else ['</end>']
+                    )
+                llm_generate = llm_generate_wrapper
+            except Exception as e:
+                return {
+                    'status': 'failed',
+                    'reason': f'Failed to create LLM client: {e}'
+                }
     
     # Check for required API keys
     if not os.getenv('GOOGLE_API_KEY') or not os.getenv('GOOGLE_CX'):
@@ -559,7 +564,7 @@ def tool(value, runtime=None, **kwargs):
     try:
         results = llm_search(
             query=value,
-            client=llm_client,
+            llm_generate=llm_generate,
             max_chars=32000,
             max_urls=10,
             max_workers=6,
@@ -572,9 +577,11 @@ def tool(value, runtime=None, **kwargs):
             'reason': f'Search failed: {e}'
         }
     
+    resource_manager = kwargs.get('resource_manager')
+    
     if not results:
         # Return empty Collection for no results
-        empty_coll_id = _create_collection([], agent_name)
+        empty_coll_id = _create_collection([], agent_name, resource_manager)
         if not empty_coll_id:
             return {'status': 'failed', 'reason': 'Failed to create empty Collection'}
         return empty_coll_id
@@ -582,7 +589,7 @@ def tool(value, runtime=None, **kwargs):
     # Create a Note for each result (each is structured JSON)
     note_ids = []
     for result in results:
-        note_id = _create_note(result, agent_name)
+        note_id = _create_note(result, agent_name, resource_manager)
         if note_id:
             note_ids.append(note_id)
         else:
@@ -592,7 +599,7 @@ def tool(value, runtime=None, **kwargs):
         return {'status': 'failed', 'reason': 'Failed to create any Notes from search results'}
     
     # Create Collection containing all result Notes
-    collection_id = _create_collection(note_ids, agent_name)
+    collection_id = _create_collection(note_ids, agent_name, resource_manager)
     if not collection_id:
         return {'status': 'failed', 'reason': 'Failed to create Collection'}
     
@@ -602,5 +609,7 @@ def tool(value, runtime=None, **kwargs):
 if __name__ == "__main__":
     from llm_client import ZenohLLMClient
     client = ZenohLLMClient(server_name='openai', model_name='gpt-4.1')
-    results = llm_search("What is the weather in Tokyo?", client, max_chars=1000, max_urls=10, max_workers=4, wall_time_limit=20.0)
+    def llm_generate_wrapper(messages, bindings=None, max_tokens=2000, temperature=0.7, is_json=False, stops=None):
+        return client.generate(messages=messages, bindings=bindings, max_tokens=max_tokens, temperature=temperature, is_json=is_json, stops=stops if stops else ['</end>'])
+    results = llm_search("What is the weather in Tokyo?", llm_generate_wrapper, max_chars=1000, max_urls=10, max_workers=4, wall_time_limit=20.0)
     print(results)
