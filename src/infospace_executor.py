@@ -1602,11 +1602,9 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         """
         # Accept both value and target (target preferred for consistency with other primitives)
         target_arg = action.get('value') or action.get('target')
-        logger.warning(f"display: target_arg='{target_arg}' (type={type(target_arg).__name__})")
         
         # Resolve variable if it's a $variable
         value = self._resolve_value(target_arg)
-        logger.warning(f"display: resolved value (len={len(str(value)) if value else 0}): {str(value)[:200]}")
         
         # If resolved value is a resource ID (literal string like "Note_20"), dereference it
         if isinstance(value, str) and (value.startswith('Note_') or value.startswith('Collection_')):
