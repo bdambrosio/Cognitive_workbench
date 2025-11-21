@@ -1,14 +1,12 @@
 #!/usr/bin/env python3
 """
-Compare tool - Compare two Notes or Collections to find similarities, differences, and relationships.
+Relate tool - Compare two Notes or Collections to find similarities, differences, and relationships.
 """
 import logging
 import json
 import zenoh
 from zenoh import QueryTarget, ConsolidationMode
-from llm_client import ZenohLLMClient
 
-llm_client = ZenohLLMClient(server_name='vllm', model_name='models/Qwen3-Next:1.5B')
 logger = logging.getLogger(__name__)
 
 # Open zenoh session for fetching Collection/Note content
@@ -88,24 +86,17 @@ End your response with:
 </end>
 Summary:"""
         
-        # Use unified llm_generate callback if available, else fall back to llm_client
+        # Use unified llm_generate callback (required)
         llm_generate = kwargs.get('llm_generate') if kwargs else None
-        if llm_generate:
-            response = llm_generate(
-                messages=[prompt],
-                max_tokens=1000,
-                temperature=0.3,
-                is_json=False,
-                stops=['</end>']
-            )
-        else:
-            response = llm_client.generate(
-                messages=[prompt],
-                max_tokens=1000,
-                temperature=0.3,
-                is_json=False,
-                stops=['</end>']
-            )
+        if not llm_generate:
+            raise ValueError("llm_generate callback is required")
+        response = llm_generate(
+            messages=[prompt],
+            max_tokens=1000,
+            temperature=0.3,
+            is_json=False,
+            stops=['</end>']
+        )
         
         # Send heartbeat after LLM call
         if heartbeat:
@@ -145,24 +136,17 @@ End your response with:
 </end>
 Summary:"""
         
-        # Use unified llm_generate callback if available, else fall back to llm_client
+        # Use unified llm_generate callback (required)
         llm_generate = kwargs.get('llm_generate') if kwargs else None
-        if llm_generate:
-            response = llm_generate(
-                messages=[prompt],
-                max_tokens=1000,
-                temperature=0.3,
-                is_json=False,
-                stops=['</end>']
-            )
-        else:
-            response = llm_client.generate(
-                messages=[prompt],
-                max_tokens=1000,
-                temperature=0.3,
-                is_json=False,
-                stops=['</end>']
-            )
+        if not llm_generate:
+            raise ValueError("llm_generate callback is required")
+        response = llm_generate(
+            messages=[prompt],
+            max_tokens=1000,
+            temperature=0.3,
+            is_json=False,
+            stops=['</end>']
+        )
         
         # Send heartbeat after LLM call
         if heartbeat:
@@ -219,7 +203,7 @@ def _preprocess_element(element: any, focus: str = '', heartbeat=None, kwargs=No
     
     # Step 5: Summarize if > 16k chars
     if len(content) > 16000:
-        logger.info(f"compare: element exceeds 16k ({len(content)} chars), summarizing")
+        logger.info(f"relate: element exceeds 16k ({len(content)} chars), summarizing")
         summarized = _summarize_note(content, focus, heartbeat, kwargs)
         content = str(summarized) if summarized is not None else content[:16000]
     
@@ -229,7 +213,7 @@ def _preprocess_element(element: any, focus: str = '', heartbeat=None, kwargs=No
     
     # Step 6: Final validation - truncate if still too large
     if len(content) > 16000:
-        logger.warning(f"compare: element still exceeds 16k after summarization ({len(content)} chars), truncating")
+        logger.warning(f"relate: element still exceeds 16k after summarization ({len(content)} chars), truncating")
         content = content[:16000]
     
     return content
@@ -237,7 +221,7 @@ def _preprocess_element(element: any, focus: str = '', heartbeat=None, kwargs=No
 
 def tool(value, runtime=None, **kwargs):
     """
-    Compare exactly two Notes/Collections to find similarities, differences, and relationships.
+    Relate exactly two Notes/Collections to find similarities, differences, and relationships.
     
     Args:
         value: First Note/Collection to compare (target)
@@ -250,7 +234,7 @@ def tool(value, runtime=None, **kwargs):
     """
     other = kwargs.get('other')
     if not value or not other:
-        return json.dumps({"error": "compare requires both target and other parameters"})
+        return json.dumps({"error": "relate requires both target and other parameters"})
     
     instruction = kwargs.get('instruction', '')
     heartbeat = kwargs.get('heartbeat')
@@ -289,23 +273,16 @@ Do not include any introductory, reasoning, or explanatory text in your response
 
 """
     
-    # Use unified llm_generate callback if available, else fall back to llm_client
+    # Use unified llm_generate callback (required)
     llm_generate = kwargs.get('llm_generate')
-    if llm_generate:
-        response = llm_generate(
-            messages=[prompt],
-            max_tokens=1000,
-            temperature=0.5,
-            is_json=True
-        )
-    else:
-        response = llm_client.generate(
-            messages=[prompt],
-            max_tokens=1000,
-            temperature=0.5,
-            is_json=True,
-            stops=['</end>']
-        )
+    if not llm_generate:
+        raise ValueError("llm_generate callback is required")
+    response = llm_generate(
+        messages=[prompt],
+        max_tokens=1000,
+        temperature=0.5,
+        is_json=True
+    )
     
     # Send heartbeat after LLM call
     heartbeat = kwargs.get('heartbeat')
@@ -313,7 +290,7 @@ Do not include any introductory, reasoning, or explanatory text in your response
         heartbeat()
     
     if not response.success:
-        logger.error(f"compare failed: {response.error}")
+        logger.error(f"relate failed: {response.error}")
         return json.dumps({"error": response.error})
     
     return response.text

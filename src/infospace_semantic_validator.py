@@ -45,35 +45,16 @@ class InfospaceSemanticValidator:
         self.llm = LLM(server_name=llm_server, model_name=llm_model)
         self.character = character
         
-        # Load tools: ALWAYS load base tools first, then map-specific if provided
-        # Matches unified_planner._load_tools() logic
-        maps_base = Path(__file__).parent / 'maps'
+        # Load tools from src/tools directory
+        tools_dir_path = Path(__file__).parent / 'tools'
         self.available_tools = {}
         self.prefix_prompt = prefix_prompt
         
-        # Load base tools first
-        base_tools_dir = maps_base / 'tools'
-        if base_tools_dir.exists():
-            base_tools = load_tools(str(base_tools_dir))
-            self.available_tools.update(base_tools)
-            logger.info(f"Loaded {len(base_tools)} base tools from {base_tools_dir}")
+        if tools_dir_path.exists():
+            self.available_tools = load_tools(str(tools_dir_path))
+            logger.info(f"Loaded {len(self.available_tools)} tools from {tools_dir_path}")
         else:
-            logger.warning(f"Base tools directory not found: {base_tools_dir}")
-        
-        # Load map-specific tools if provided (overrides base on name collision)
-        if tools_dir:
-            map_tools_dir = Path(tools_dir)
-            if map_tools_dir.exists():
-                map_tools = load_tools(str(map_tools_dir))
-                if map_tools:
-                    # Log any overrides
-                    for name in map_tools:
-                        if name in self.available_tools:
-                            logger.info(f"Map tool '{name}' overrides base tool")
-                    self.available_tools.update(map_tools)
-                    logger.info(f"Loaded {len(map_tools)} map-specific tools from {map_tools_dir}")
-            else:
-                logger.warning(f"Map-specific tools directory not found: {map_tools_dir}")
+            logger.warning(f"Tools directory not found: {tools_dir_path}")
         
         logger.info(f"Total tools loaded: {len(self.available_tools)}")
     

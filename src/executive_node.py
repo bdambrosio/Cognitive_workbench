@@ -24,12 +24,11 @@ from Messages import SystemMessage, UserMessage
 from activity import ActivityManager, derive_drive_lexicon
 import utils.hash_utils as hash_utils
 from utils.zenoh_utils import datetime_handler
-import plan as plan_module
 from dataclasses import dataclass, asdict
 import os
 from templates import DRIVE_ASSESSMENT_TEMPLATE, GOAL_TEMPLATE, PLAN_TEMPLATE, PLAN_VERBS, REWRITE_TEMPLATE
-from plan import generate_plan_with_context
 from utils.format_utils import format_map_types, format_views_compact
+from weakref import WeakValueDictionary
 from utils.format_utils import format_views_compact
 from utils.condition_utils import deref_plan_target
 
@@ -59,6 +58,157 @@ import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__))))
 
 from llm_client import ZenohLLMClient
+
+
+# ============================================================================
+# Plan support classes (extracted from plan.py for infospace-only usage)
+# ============================================================================
+
+class Stack:
+    """Simple stack implementation for plan state."""
+    def __init__(self):
+        self.stack = []
+
+    def push(self, item):
+        self.stack.append(item)
+
+    def pop(self):
+        if not self.is_empty():
+            return self.stack.pop()
+        return None
+
+    def peek(self):
+        if not self.is_empty():
+            return self.stack[-1]
+        return None
+
+    def is_empty(self):
+        return len(self.stack) == 0
+
+    def size(self):
+        return len(self.stack)
+    
+    def get_entries(self):
+        """Return stack entries as a list, oldest first"""
+        return self.stack.copy()
+
+
+class Goal:
+    """Goal representation for executive node."""
+    _id_counter = 0
+    _instances = WeakValueDictionary()
+    
+    def __init__(self, name, actors, description='', termination=None):
+        Goal._id_counter += 1
+        self.id = f"g{Goal._id_counter}"
+        Goal._instances[self.id] = self
+        self.name = name
+        self.actors = actors
+        self.description = description
+        self.termination = termination
+        self.task_plan = []
+        self.tasks = []
+        self.completion_statement = ''
+
+    def __eq__(self, other):
+        if not isinstance(other, Goal):
+            return False
+        return self.id == other.id
+
+    def __hash__(self):
+        return hash(self.id)
+    
+    @classmethod
+    def get_by_id(cls, id: str):
+        return cls._instances.get(id)
+    
+    def short_string(self):
+        return f'{self.name}: {self.description}. termination: {self.termination}'
+    
+    def to_string(self):
+        return f"Goal {self.name}: {self.description}; actors: {', '.join([character_name for character_name in self.actors])}; termination: {self.termination}"
+
+
+def validate_and_create_goal(character_name, goal_hash):
+    """Validate a goal hash and create a goal object."""
+    goal_name = hash_utils.find('goal', goal_hash)
+    description = hash_utils.find('description', goal_hash)
+    other_character_name = hash_utils.find('otherCharacterName', goal_hash)
+    termination = hash_utils.find('termination', goal_hash)
+
+    if other_character_name and other_character_name.strip().lower() != 'none':
+        other_character_name = other_character_name.strip().capitalize()
+    else:
+        other_character_name = None
+
+    if goal_name and description and termination:
+        goal = Goal(
+            name=goal_name, 
+            actors=[character_name, other_character_name] if other_character_name else [character_name],
+            description=description, 
+            termination=termination.replace('##','').strip()
+        )
+        return goal
+    else:
+        logger.warning(f"Invalid goal generation response for {goal_hash}") 
+        return None
+
+
+def parse_plan_json(plan_text):
+    """Parse JSON plan string into internal plan structure."""
+    plan_text = plan_text.strip()
+    
+    # Remove 'plan:' prefix if present
+    if plan_text.startswith('plan:'):
+        plan_text = plan_text[5:].strip()
+    
+    try:
+        parsed = json.loads(plan_text)
+        
+        # If it's already wrapped, return as-is
+        if isinstance(parsed, dict) and 'plan' in parsed:
+            return parsed
+        
+        # If it's an array, wrap it
+        if isinstance(parsed, list):
+            return {'plan': parsed}
+        
+        # If it's a single action dict, wrap in array then dict
+        if isinstance(parsed, dict):
+            return {'plan': [parsed]}
+        
+        return {'plan': []}
+    except json.JSONDecodeError as e:
+        logger.error(f"Failed to parse plan JSON: {e}")
+        return {'plan': []}
+
+
+def verify_plan(plan_json):
+    """Basic plan verification - checks structure only."""
+    if isinstance(plan_json, str):
+        try:
+            plan_json = json.loads(plan_json)
+        except json.JSONDecodeError:
+            logger.error("Invalid JSON in plan")
+            return False
+    
+    if isinstance(plan_json, dict) and 'plan' in plan_json:
+        plan_steps = plan_json['plan']
+        if not isinstance(plan_steps, list):
+            return False
+        # Basic check - each step should have 'type'
+        for step in plan_steps:
+            if not isinstance(step, dict) or 'type' not in step:
+                return False
+        return True
+    
+    return False
+
+
+# ============================================================================
+# End of plan support classes
+# ============================================================================
+
 
 @dataclass
 class ActionRecord:
@@ -147,14 +297,6 @@ class ZenohExecutiveNode:
             f"cognitive/{character_name}/planning/plan_log"
         )
         
-        # === ZENOH PUBLICATION ===
-        # NAME: memory_store
-        # TOPIC: cognitive/{character}/memory/store
-        # DESCRIPTION: Store memory (conversation, observation, reflection)
-        # PAYLOAD: {"type": str, "content": Any, "timestamp": str}
-        # TRIGGERS: OrganizeResearchNotes, UpdateKnowledgeBase
-        # ========================
-        self.memory_publisher = self.session.declare_publisher(f"cognitive/{character_name}/memory/store")
         
         # === ZENOH PUBLICATION ===
         # NAME: goal
@@ -224,6 +366,22 @@ class ZenohExecutiveNode:
             )
         self.llm_generate = llm_generate
         
+        # Initialize memory module (wraps EntityModel and discourse)
+        from memory import Memory
+        self.memory = Memory(
+            character_name=self.character_name,
+            llm_generate=self.llm_generate,
+            persistence_path=f"data/memory/{self.character_name}_memory.json"
+        )
+        logger.info(f'🧠 Memory module initialized for {self.character_name}')
+        
+        # Subscriber for save_all command (forward to memory and resource_manager)
+        self.save_subscriber = self.session.declare_subscriber(
+            "cognitive/save_all",
+            self._handle_save_command
+        )
+        logger.info(f'💾 Subscribed to cognitive/save_all')
+        
         # Detect infospace and initialize infospace executor if needed
         self.is_infospace = self.character_config.get('is_infospace', False)
         self.map_name = self.character_config.get('map_name', 'infolab' if self.is_infospace else 'default')
@@ -268,10 +426,7 @@ class ZenohExecutiveNode:
             logger.info(f'🧩 Infospace executor initialized for {character_name}')
             
             # Initialize semantic validator
-            maps_base = Path(__file__).parent / 'maps'
-            tools_dir = maps_base / self.map_name / 'tools'
-            if not tools_dir.exists():
-                tools_dir = maps_base / 'tools'
+            tools_dir = Path(__file__).parent / 'tools'
             
             self.semantic_validator = InfospaceSemanticValidator(character=self, tools_dir=str(tools_dir) if tools_dir.exists() else None, prefix_prompt=self.planner.template)
             logger.info(f'🔍 Semantic validator initialized for {character_name}')
@@ -311,8 +466,6 @@ class ZenohExecutiveNode:
         self.plan_log: List[Dict[str, Any]] = [] # log of plans and actions
         # Track simulation time at plan boundaries
         self.current_plan_start_sim_iso: Optional[str] = None
-        # Local cache of inventory item ids (exact strings)
-        self.inventory_cache: List[str] = []
         # Ontology (guard for manual characters / missing files)
         try:
             if self.character_config.get('ontology', True):
@@ -341,17 +494,6 @@ class ZenohExecutiveNode:
         self.control_stop_subscriber = self.session.declare_subscriber(
             f"cognitive/{character_name}/control/stop",
             self.handle_stop_command
-        )
-        
-        # === ZENOH PUBLICATION ===
-        # NAME: perception_action_result
-        # TOPIC: cognitive/{character}/perception/action_result
-        # DESCRIPTION: Result of perception action (sense, observe)
-        # PAYLOAD: {"action": str, "result": Any, "timestamp": str}
-        # TRIGGERS: (internal perception processing)
-        # ========================
-        self.perception_action_result_publisher = self.session.declare_publisher(
-            f"cognitive/{character_name}/perception/action_result"
         )
         
         # === ZENOH PUBLICATION ===
@@ -436,7 +578,6 @@ class ZenohExecutiveNode:
 
         logger.info(f'🧠 Zenoh Executive Node initialized for character: {character_name}')
         logger.info(f'   - Subscribing to: cognitive/{character_name}/sense_data')
-        logger.info(f'   - Subscribing to: cognitive/{character_name}/situation/update')
         logger.info(f'   - Subscribing to: cognitive/{character_name}/control/step')
         logger.info(f'   - Subscribing to: cognitive/{character_name}/control/run')
         logger.info(f'   - Subscribing to: cognitive/{character_name}/control/stop')
@@ -444,7 +585,7 @@ class ZenohExecutiveNode:
         logger.info(f'   - Subscribing to: cognitive/{character_name}/end_dialog')
         logger.info(f'   - Publishing to: cognitive/{character_name}/action')
         logger.info(f'   - Publishing to: cognitive/{character_name}/situation/request_update')
-        logger.info(f'   - Publishing to: cognitive/{character_name}/memory/store')
+        logger.info(f'   - Subscribing to: cognitive/save_all')
         logger.info(f'   - Publishing to: cognitive/{character_name}/goal')
         logger.info(f'   - Publishing to: cognitive/{character_name}/decided_action')
         logger.info(f'   - Publishing to: cognitive/{character_name}/execution_state')
@@ -462,6 +603,17 @@ class ZenohExecutiveNode:
         """Handle shutdown signals gracefully."""
         logger.warning(f'Received signal {signum}, initiating shutdown...')
         self.shutdown_requested = True
+    
+    def _handle_save_command(self, sample):
+        """Handle save_all command - save memory and resource_manager state."""
+        try:
+            logger.info(f'💾 {self.character_name} received save_all command')
+            self.memory.save()
+            if self.is_infospace and self.resource_manager:
+                self.resource_manager.save_to_file()
+                logger.info(f'💾 Saved resource manager state for {self.map_name}')
+        except Exception as e:
+            logger.error(f'Error handling save command: {e}')
     
     def run(self):
         """Main OODA loop."""
@@ -748,25 +900,7 @@ class ZenohExecutiveNode:
                 if clean_input.startswith('goal:'):
                     logger.info(f'📥 {self.character_name} Received goal command from User: "{clean_input}"')
                     self.parse_and_set_goal(clean_input)
-                    return  # Don't process as speech
-                elif clean_input.startswith('plan:'):
-                    logger.info(f'📥 {self.character_name} Received plan command from User: "{clean_input}"')
-                    self.parse_and_set_plan(clean_input)
-                    return  # Don't process as speech
-                elif clean_input.startswith('edit:'):
-                    logger.info(f'📥 {self.character_name} Received edit command from User: "{clean_input}"')
-                    self.parse_and_edit_plan(clean_input)
-                    return  # Don't process as speech
-                elif clean_input.startswith('test:'):
-                    logger.info(f'📥 {self.character_name} Received test command from User: "{clean_input}"')
-                    if self.is_infospace and self.infospace_executor:
-                        if 'primitives' in clean_input.lower():
-                            self.infospace_executor.test_primitives()
-                        else:
-                            logger.warning(f'Unknown test command: {clean_input}')
-                    else:
-                        logger.warning(f'Test command only available in infospace mode')
-                    return  # Don't process as speech
+                    return  # Don't process as speech                   return  # Don't process as speech
             
             # Normal dialog processing
             logger.info(f'📥 {self.character_name} Processing text input: "{text_input}" (source: {source})')
@@ -799,35 +933,14 @@ class ZenohExecutiveNode:
     def format_situation(self):
         """Format the situation data for the LLM."""
         formatted_situation = ''
-        if self.last_situation_data and self.last_situation_data.get('location'):
-            formatted_situation += f"\n#You are at location: {self.last_situation_data['location']}, in terrain: {self.last_situation_data['views'][0]['terrain']}, on property type: {self.last_situation_data['views'][0]['property']}\n"
-        if self.last_situation_data and self.last_situation_data.get('visible_characters'):
-            formatted_situation += f"\n#You can see {len(self.last_situation_data['visible_characters'])} people: {', and '.join(self.last_situation_data['visible_characters'])}\n"
-        if self.last_situation_data and self.last_situation_data.get('look'):
-            formatted_situation += f"\n#You can see the following:\n\t{'\n\t'.join(self.last_situation_data['look'])}\n"
         
-        # Add adjacent information
-        if self.last_situation_data and self.last_situation_data.get('adjacent_to'):
-            adjacent = self.last_situation_data['adjacent_to']
-            if adjacent.get('resources'):
-                formatted_situation += f"\n#You are adjacent to these resources (available to take, inspect, or use): {', '.join(adjacent['resources'])}\n"
-            if adjacent.get('characters'):
-                formatted_situation += f"\n#You are adjacent to these characters (available to interact with): {', '.join(adjacent['characters'])}\n"
-
-        if self.last_situation_data and self.last_situation_data.get('characters'):
-            for character_name in self.last_situation_data['characters']:
-                #entity_context = self.get_entity_context(character_name, 10)
-                #if entity_context:
-                formatted_situation += f"\n#You can see {character_name}"#, with whom you have had the following conversation history:\n"
-                    #for memory in entity_context['conversation_history']: 
-                        #formatted_situation += f"\n\t{memory['source']}: {memory['text']}"
-                    #formatted_situation += '\n'
-
-        if self.last_situation_data and self.last_situation_data.get('views'):
-            compact_views = format_views_compact(self.last_situation_data['views'])
-            if compact_views:
-                formatted_situation += f"\n#You can see the following:\n" + compact_views
-
+        # Skip map-based situation data for infospace characters
+        # (situation_node has been removed - it was only for map-based spatial awareness)
+        if not self.is_infospace:
+            # Map-based situation data would go here if needed in the future
+            # Currently not used since situation_node is removed
+            pass
+        
         # world state updates disabled
 
         if self.inspections:
@@ -914,30 +1027,6 @@ class ZenohExecutiveNode:
                 for i, memory in enumerate(entity_context['conversation_history']):  # Use last 2 memories
                     user_prompt += f"\n\t{memory['source']}: {memory['text'][:600]}..."
                 user_prompt += '\n'
-            # get inventory and cache exact ids
-            inventory = []
-            try:
-                for reply in self.session.get(f"cognitive/{self.character_name}/memory/inventory", target=QueryTarget.BEST_MATCHING, consolidation=ConsolidationMode.NONE, timeout=2.0 if not self.debug else 300.0):
-                    if reply.ok:
-                        data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
-                        if data.get('success'):
-                            value = data.get('value', [])
-                            if isinstance(value, list):
-                                inventory.extend(value)
-                            elif value:
-                                inventory.append(value)
-            except Exception as e:
-                logger.error(f'Error querying inventory in _build_user_prompt: {e}')
-            # update local cache
-            try:
-                self.inventory_cache = [str(v) for v in inventory]
-            except Exception:
-                self.inventory_cache = []
-            if inventory:
-                user_prompt += f'\n#Your inventory includes:'
-                for item in inventory:
-                    user_prompt += f"\n\t{item}"
-            user_prompt += '\n'
             if self.action_history:
                 last_action = self.action_history[-1]
                 result_str = self._truncate_result(last_action.result)
@@ -1006,11 +1095,11 @@ class ZenohExecutiveNode:
                 forms = hash_utils.findall_forms(response.text)
                 if len(forms) == 0:
                     logger.error(f'No goal found in LLM response: {response.text}')
-                    self.current_goal = plan_module.Goal('sleep', actors=[self.character_name])
+                    self.current_goal = Goal('sleep', actors=[self.character_name])
                     self._publish_goal(self.current_goal)
                     return self.current_goal
                 for goal_hash in forms:
-                    goal = plan_module.validate_and_create_goal(self.character_name, goal_hash)
+                    goal = validate_and_create_goal(self.character_name, goal_hash)
                     if goal:
                         logger.info(f'{self.character_name} generated goal: {goal.to_string()}')
                         self.current_goal = goal
@@ -1026,7 +1115,7 @@ class ZenohExecutiveNode:
                 logger.error(f'LLM call failed: {response.error}')
                 self.current_plan = None
                 self.plan_bindings = {}  # Clear scan variables for new plan
-                self.current_goal = plan_module.Goal('sleep', actors=[self.character_name])
+                self.current_goal = Goal('sleep', actors=[self.character_name])
                 self._publish_goal(self.current_goal)
 
             if not self.current_goal:
@@ -1034,12 +1123,12 @@ class ZenohExecutiveNode:
         except Exception as e:
             logger.error(f'Error in _orient: {e}')
             traceback.print_exc()
-            self.current_goal = plan_module.Goal('sleep', actors=[self.character_name])
+            self.current_goal = Goal('sleep', actors=[self.character_name])
             self._publish_goal(self.current_goal)
         return self.current_goal
 
 
-    def _plan(self, goal: plan_module.Goal):
+    def _plan(self, goal: Goal):
         """Plan: Return existing plan or create single-action plan from goal."""
         # If we already have a plan, return it
         if self.current_plan is not None:
@@ -1391,6 +1480,10 @@ class ZenohExecutiveNode:
                 if len(self.text_input_queue) > 3:
                     logger.warning(f'⚠️ Text input queue size {len(self.text_input_queue)} > 3, dropping oldest')
                     self.text_input_queue.pop(0)
+                
+                # Add conversation entry to memory (default entity is "User")
+                entity_name = source if source != 'console' else "User"
+                self.memory.add_conversation_entry(entity_name, source, text_input)
                 
         except Exception as e:
             traceback.print_exc()
@@ -1811,14 +1904,8 @@ class ZenohExecutiveNode:
             
             # === ZENOH PUBLICATION (ad-hoc) ===
             # NAME: memory_close_dialog
-            # TOPIC: cognitive/{character}/memory/close_dialog
-            # DESCRIPTION: Memory node notified to close dialog context
-            # PAYLOAD: {"entity_name": str}
-            # TRIGGERS: (internal memory cleanup)
-            # ========================
-            key = f"cognitive/{source}/memory/close_dialog"
-            payload = json.dumps({'entity_name': self.character_name})
-            self.session.put(key, payload)
+            # Close dialog in memory module (direct call, no Zenoh)
+            self.memory.close_dialog(self.character_name)
             
         except Exception as e:
             logger.error(f'Error publishing dialog end to {source}: {e}')
@@ -1841,7 +1928,7 @@ class ZenohExecutiveNode:
             
             if not self.observations:
                 self._observe()
-            self.current_goal = plan_module.Goal(parsed_goal, [self.character_name], description='', termination='')
+            self.current_goal = Goal(parsed_goal, [self.character_name], description='', termination='')
             
             # In infospace mode, skip goal rewriting and plan immediately
             if self.is_infospace:
@@ -1876,197 +1963,34 @@ class ZenohExecutiveNode:
             traceback.print_exc()
             return
 
-    def parse_and_set_plan(self, plan_text):
-        """Parse JSON plan input from UI and set current plan."""
-        try:
-            # Parse JSON format
-            parsed_plan = plan_module.parse_plan_json(plan_text)
-            
-            # Validate with appropriate validator
-            if self.is_infospace:
-                validation = self.planner.verify_plan(parsed_plan)
-                valid = validation.get('valid', False) if isinstance(validation, dict) else validation
-                if not valid:
-                    reason = validation.get('reason', 'Unknown validation error') if isinstance(validation, dict) else 'Validation failed'
-                    logger.error(f"Invalid plan for {self.character_name}: {reason}")
-                    return
-            else:
-                valid = plan_module.verify_plan(parsed_plan)
-                if not valid:
-                    logger.error(f"Invalid plan for {self.character_name}")
-                    return
-            
-            # Immediately clear existing plan/activity to interrupt execution
-            self.current_plan = None
-            self.current_activity = None
-            self.plan_state = None
-            self.plan_bindings = {}
-            self.plan_bindings_cache = {}
-            self.goal_source = 'ui'
-            self.awaiting_user_input = False
-            logger.info(f'🛑 {self.character_name} interrupting existing plan for new plan')
-            
-            # Set new plan
-            self.current_plan = parsed_plan
-            self.current_plan_prompt = "Manual plan via UI"
-            logger.info(f'📋 {self.character_name} assigned UI plan with {len(parsed_plan["plan"])} steps')
-            self.plan_summary_completed = False
-            self._publish_current_plan()
-            self.plan_just_generated = True
-            self.plan_state = {
-                'step_stack': plan_module.Stack()
-            }
-            
-            logger.info(f"📋 {self.character_name} received new plan with {len(parsed_plan['plan'])} steps")
-        except Exception as e:
-            logger.error(f"Plan parsing failed for {self.character_name}: {e}")
-            # Plan assignment failed - character continues with existing behavior
-
-    def parse_and_edit_plan(self, edit_text):
-        """Edit existing plan using natural language instruction."""
-        try:
-            if not self.current_plan:
-                logger.warning(f'⚠️ {self.character_name} no current plan to edit')
-                return
-            
-            instruction = edit_text.strip().strip('"').strip("'")[5:].strip()
-            if not instruction:
-                logger.warning(f'⚠️ {self.character_name} empty edit instruction')
-                return
-            
-            logger.info(f'✏️ {self.character_name} editing plan with instruction: {instruction}')
-            
-            current_plan_json = json.dumps(self.current_plan, indent=2)
-            
-            # Build prompt with planning language spec
-            if self.is_infospace:
-                plan_template = self.planner.template
-                
-                prompt = f"""\n\nTASK:You are editing an infospace plan.
-
-INSTRUCTION: {instruction}
-
-CURRENT PLAN:
-{current_plan_json}
-
-Return ONLY the edited plan as valid JSON, with no explanation or commentary.
-
-EDITED PLAN:"""
-                response = self.llm_generate([plan_template, prompt], temperature=0.3, is_json=True)
-
-            else:
-                prompt = f"""Edit the following plan according to the instruction provided.
-Return ONLY valid JSON in the same format, with no explanation or commentary.
-Preserve all required fields and use only valid action types.
-
-INSTRUCTION: {instruction}
-
-CURRENT PLAN:
-{current_plan_json}
-
-EDITED PLAN (JSON only):"""
-            
-                response = self.llm_generate([prompt], temperature=0.3, is_json=True)
-            if not response or not response.success:
-                logger.error(f'❌ {self.character_name} LLM failed to edit plan')
-                return
-            
-            # Handle response - may already be parsed dict or JSON string
-            if isinstance(response.text, dict):
-                edited_plan = response.text
-            else:
-                edited_plan = json.loads(response.text)
-            
-            # Validate with appropriate validator
-            if self.is_infospace:
-                validation = self.planner.verify_plan(edited_plan)
-                valid = validation.get('valid', False) if isinstance(validation, dict) else validation
-                if not valid:
-                    reason = validation.get('reason', 'Unknown validation error') if isinstance(validation, dict) else 'Validation failed'
-                    logger.error(f'❌ {self.character_name} edited plan validation failed: {reason}')
-                    return
-            else:
-                valid = plan_module.verify_plan(edited_plan)
-                if not valid:
-                    logger.error(f'❌ {self.character_name} edited plan validation failed')
-                    return
-            
-            # Update plan
-            self.current_plan = edited_plan
-            self.plan_just_generated = True
-            self._publish_current_plan()
-            logger.info(f'✅ {self.character_name} plan edited successfully, {len(edited_plan["plan"])} steps')
-        except Exception as e:
-            logger.error(f"Plan editing failed for {self.character_name}: {e}")
-            traceback.print_exc()
-
-
     def _capture_percepts_at_plan(self) -> List[Dict[str, Any]]:
         """Capture a compact, normalized snapshot of percepts at plan start.
 
         Limits size and fields to keep logs small. Returns [] on failure.
+        For infospace characters, returns empty list (no spatial percepts).
         """
+        # Skip situation queries for infospace characters (situation_node removed)
+        if self.is_infospace:
+            return []
+        
         snapshot: List[Dict[str, Any]] = []
         try:
-            situation = None
-            try:
-                for reply in self.session.get(f"cognitive/{self.character_name}/situation/current_situation", target=QueryTarget.BEST_MATCHING, consolidation=ConsolidationMode.NONE, timeout=3.0 if not self.debug else 300.0):
-                    if reply.ok:
-                        situation_data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
-                        if situation_data.get('success'):
-                            situation = situation_data.get('situation', {})
-                            break
-            except Exception as e:
-                logger.error(f'Error querying current_situation in format_situation: {e}')
-            views = situation.get('views', []) if isinstance(situation, dict) else []
-            # Cap number of views
-            for view in views[:9]:
-                entry: Dict[str, Any] = {
-                    'direction': view.get('direction'),
-                    'terrain': view.get('terrain'),
-                    'visibility': view.get('visibility'),
-                }
-                resources_out = []
-                for res in (view.get('resources') or [])[:5]:
-                    resources_out.append({'name': res.get('name'), 'distance': res.get('distance')})
-                chars_out = []
-                for ch in (view.get('characters') or [])[:5]:
-                    chars_out.append({'name': ch.get('name'), 'distance': ch.get('distance')})
-                if resources_out:
-                    entry['resources'] = resources_out
-                if chars_out:
-                    entry['characters'] = chars_out
-                paths_out = []
-                for ch in (view.get('paths') or [])[:5]:
-                    chars_out.append({'name': ch.get('name'), 'distance': ch.get('distance')})
-                if paths_out:
-                    entry['paths'] = paths_out
-                snapshot.append(entry)
+            # Map-based situation queries removed (situation_node no longer exists)
+            # Return empty snapshot for now
+            pass
         except Exception:
             return []
         return snapshot
 
     
     def _get_recent_chat_memories(self, num_entries: int) -> List[Dict[str, Any]]:
-        """Get recent memory entries using Zenoh queries."""
+        """Get recent memory entries from memory module."""
         try:
-            # Query short-term memory
-            entries = []
-            for reply in self.session.get(f"cognitive/{self.character_name}/memory/chat/*", target=QueryTarget.BEST_MATCHING, consolidation=ConsolidationMode.NONE, timeout=3.0 if not self.debug else 300.0):
-                try:
-                    if reply.ok:
-                        content = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
-                        entries.append(content)
-                except Exception as e:
-                    logger.error(f'Error getting recent memories: {e}')
-                    continue
-            
-            m1 = entries[0] if len(entries) > 0 else None
-            m2 = m1['entries'] if m1 else []
-
-            logger.info(f'📚 Retrieved {len(entries)} recent memory entries')
-            return m2
-            
+            # Get entity data for User (default entity)
+            entity_data = self.memory.get_entity_data("User", limit=num_entries, scope='all')
+            if entity_data:
+                return entity_data.get('conversation_history', [])
+            return []
         except Exception as e:
             logger.error(f'Error getting recent memories: {e}')
             return []
@@ -2152,33 +2076,29 @@ EDITED PLAN (JSON only):"""
  
     def get_entity_context(self, entity_name: str, limit: int = 20, scope='all') -> Dict[str, Any]:
         """
-        Query entity data from memory node for context.
+        Get entity data from memory module for context.
         
         Args:
-            entity_name: Name of the entity to query
+            entity_name: Name of the entity to query (defaults to "User" if not provided)
             limit: Number of recent conversation entries to include (default 20)
+            scope: 'current' for last dialog only, 'all' for entries from all dialogs
             
         Returns:
-            Dictionary with entity data or None if query failed
+            Dictionary with entity data or None if not found
         """
         # safeguard - don't allow variables in query
         entity_name = entity_name.replace('$', '')
+        if not entity_name:
+            entity_name = "User"
+        
         try:
-            key_expr = f"cognitive/{self.character_name}/memory/entity/{entity_name}?query=dialog&limit={limit}&scope={scope}"
-            for reply in self.session.get(key_expr, target=QueryTarget.BEST_MATCHING, consolidation=ConsolidationMode.NONE, timeout=10.0 if not self.debug else 20.0):
-                if reply.ok:
-                    data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
-                    if data and data.get('success'):
-                        logger.info(f'👥 Retrieved entity context for {entity_name}')
-                        return data.get('entity_data')
-            logger.warning(f'Entity query failed or no response for {entity_name}')
-            for handler in logger.handlers:
-                handler.flush()
+            entity_data = self.memory.get_entity_data(entity_name, limit=limit, scope=scope)
+            if entity_data:
+                logger.info(f'👥 Retrieved entity context for {entity_name}')
+                return entity_data
             return None
         except Exception as e:
-            logger.error(f'Error querying entity context for {entity_name}: {e}')
-            for handler in logger.handlers:
-                handler.flush()
+            logger.error(f'Error getting entity context for {entity_name}: {e}')
             return None
     
     def get_rag_context(self, query_text: str, entity_name: str = None, k: int = 5) -> Dict[str, Any]:
@@ -2349,32 +2269,28 @@ EDITED PLAN (JSON only):"""
     
     def get_entity_discourse_tom_models(self, entity_name: str, limit: int = 20, scope='all') -> Dict[str, Any]:
         """
-        Query entity data from memory node for discourse analysis and tom_model.
+        Get entity discourse state and ToM model from memory module.
         Args:
-            entity_name: Name of the entity to query
-            limit: Number of recent conversation entries to include (default 20)
+            entity_name: Name of the entity to query (defaults to "User" if not provided)
+            limit: Number of recent conversation entries to include (default 20, unused but kept for compatibility)
+            scope: 'current' or 'all' (unused but kept for compatibility)
         Returns:
-            Dictionary with entity data or None if query failed
+            Dictionary with discourse_state and tom_model
         """
         # safeguard - don't allow variables in query
         entity_name = entity_name.replace('$', '')
+        if not entity_name:
+            entity_name = "User"
+        
         logger.info(f' Getting entity discourse/tom for {entity_name}')
-        for handler in logger.handlers: handler.flush()
         try:
-            key_expr = f"cognitive/{self.character_name}/memory/entity/{entity_name}?query=relation"
-            for reply in self.session.get(key_expr, target=QueryTarget.BEST_MATCHING, consolidation=ConsolidationMode.NONE, timeout=3.0 if not self.debug else 300.0):
-                if reply.ok:
-                    data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
-                    if data and data.get('success'):
-                        logger.info(f'👥 Retrieved entity discourse/tom for {entity_name}')
-                        return data
-            logger.warning(f'Entity discourse/tom query failed or no response for {entity_name}')
-            for handler in logger.handlers:  handler.flush()
-            return None
+            result = self.memory.get_entity_discourse_tom(entity_name)
+            if result.get('success'):
+                logger.info(f'👥 Retrieved entity discourse/tom for {entity_name}')
+            return result
         except Exception as e:
-            logger.error(f'Error querying entity discourse/tom for {entity_name}: {e}')
-            for handler in logger.handlers: handler.flush()
-            return None
+            logger.error(f'Error getting entity discourse/tom for {entity_name}: {e}')
+            return {'success': False, 'discourse_state': '', 'tom_model': ''}
 
     
     def shutdown(self):
@@ -2385,6 +2301,21 @@ EDITED PLAN (JSON only):"""
             self._shutting_down = True
             
             logger.info(f'Executive Node shutdown initiated for {self.character_name}...')
+            
+            # Save memory before shutdown
+            try:
+                self.memory.save()
+                logger.info(f'💾 Saved memory state for {self.character_name}')
+            except Exception as e:
+                logger.error(f'Error saving memory during shutdown: {e}')
+            
+            # Save resource manager if infospace
+            if self.is_infospace and self.resource_manager:
+                try:
+                    self.resource_manager.save_to_file()
+                    logger.info(f'💾 Saved resource manager state for {self.map_name}')
+                except Exception as e:
+                    logger.error(f'Error saving resource manager during shutdown: {e}')
             
             # Publish shutdown event for cleanup
             try:

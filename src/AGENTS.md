@@ -1,7 +1,7 @@
 # Repository Guidelines
 
 ## Project Structure & Module Organization
-Cognitive Workbench is a pure-Python Zenoh stack. `launcher.py` orchestrates `memory_node.py`, `situation_node.py`, `executive_node.py`, and `skill_executor.py` instances defined in `characters.yaml`. Infospace state is maintained by `map_node.py` and `infospace_resource_manager.py`, backed by the schemas in `infospace_types.py`. RAG stores and planner traces stay in `data/`; helpers live in `utils/` and `templates.py`. Runtime output belongs in `logs/`; keep generated assets outside Git.
+Cognitive Workbench is a pure-Python Zenoh stack. `launcher.py` orchestrates `memory_node.py`, `situation_node.py`, and `executive_node.py` instances defined in `characters.yaml`. Infospace state is maintained by `map_node.py` and `infospace_resource_manager.py`, backed by the schemas in `infospace_types.py`. RAG stores and planner traces stay in `data/`; helpers live in `utils/` and `templates.py`. Runtime output belongs in `logs/`; keep generated assets outside Git.
 
 ## Build, Test, and Development Commands
 - `python -m venv .venv && source .venv/bin/activate` — create a Python 3.10+ virtual environment.

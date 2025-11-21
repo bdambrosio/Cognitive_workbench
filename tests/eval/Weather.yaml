@@ -1,0 +1,16 @@
+# Test 2.1b: Evidence Linkage for Extracted Arguments
+# Tests that the planner can:
+# - identify evidence passages for each argument
+# - link arguments to evidence via Note references or IDs
+# - keep argument/evidence pairing consistent with gold labels
+
+name: "Today's local weather"
+description: "Get the today's local weather for the user's location."
+
+test_goal: >
+  goal: search for Berkeley, CA weather forecast for Nov 21, 2025. 
+  Summarize forecast findings , format, and display.
+
+expected_metrics:
+  plan_completed: true
+  type_violations: 0

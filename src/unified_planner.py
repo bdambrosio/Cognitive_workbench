@@ -67,31 +67,17 @@ class UnifiedPlanner:
         self.logger.info(f"UnifiedPlanner initialized: {world_type} world, map={map_name}, {len(self.available_tools)} tools")
     
     def _load_tools(self) -> Dict[str, Dict]:
-        """Load base tools + map-specific tools (map overrides base on name collision)."""
+        """Load tools from src/tools directory."""
         from utils.tool_loader import load_tools
         
-        maps_base = Path(__file__).parent
+        tools_dir = Path(__file__).parent / 'tools'
         tools = {}
         
-        # Load base tools first
-        base_tools_dir = maps_base / 'tools'
-        if base_tools_dir.exists():
-            self.logger.info(f"Loading base tools from: {base_tools_dir}")
-            tools.update(load_tools(str(base_tools_dir)))
+        if tools_dir.exists():
+            self.logger.info(f"Loading tools from: {tools_dir}")
+            tools.update(load_tools(str(tools_dir)))
         else:
-            self.logger.warning(f"Base tools directory not found: {base_tools_dir}")
-        
-        # Load map-specific tools (can override base)
-        map_tools_dir = maps_base / self.map_name / 'tools'
-        if map_tools_dir.exists():
-            self.logger.info(f"Loading map-specific tools from: {map_tools_dir}")
-            map_tools = load_tools(str(map_tools_dir))
-            if map_tools:
-                # Log any overrides
-                for name in map_tools:
-                    if name in tools:
-                        self.logger.info(f"Map tool '{name}' overrides base tool")
-                tools.update(map_tools)
+            self.logger.warning(f"Tools directory not found: {tools_dir}")
         
         self.logger.info(f"Total tools loaded: {len(tools)} (base + map-specific)")
         return tools
@@ -113,7 +99,8 @@ class UnifiedPlanner:
         if self.world_type == 'infospace':
             plan = self._generate_infospace_plan(goal, context)
         else:
-            plan = self._generate_physical_plan(goal, context)
+            logger.error("Physical world planning no longer supported")
+            plan=None
         
         return plan
     
@@ -125,7 +112,7 @@ class UnifiedPlanner:
         executor = context.get('executor')
         character_name = self.character.character_name if hasattr(self.character, 'character_name') else None
         
-        if executor and character_name == 'Jill':
+        if executor:
             try:
                 # Import only for Jill to avoid SGLang initialization for other characters
                 from incremental_planner import IncrementalPlanner, HAS_SGLANG
@@ -151,76 +138,13 @@ class UnifiedPlanner:
                         return plan_result
                     else:
                         self.logger.warning(f"Incremental planner failed: {plan_result.get('error')}, falling back")
+                        return {'error': plan_result.get('error')}
             except Exception as e:
                 self.logger.warning(f"Incremental planner error: {e}, falling back to standard planner")
                 traceback.print_exc()
-        
-        # Fallback to standard single-shot planning
-        logger.info(f"generating infospace plan for {self.character.character_name}")
-        tools_formatted = self._format_tools()
-        
-        user_prompt = f""""\n\nTASK: Generate a JSON format plan for the Goal below adhering strictly to the plan specification and output requirements above.
-
-#GOAL: {goal}
-
-# OUTPUT REQUIREMENTS
-- Respond with the plan as valid JSON only — no prose, markdown, reasoning, code fences, or commentary.
-- Close all brackets and quote marks; ensure valid JSON.
-- Do not include trailing commas.
-
-"""
-        
-        # Generate plan using LLM
-        response = self.llm_client.generate(
-            [self.template, user_prompt],
-            max_tokens=2000,
-            temperature=0.3,
-            is_json=True
-        )
-        
-        # Parse response
-        if isinstance(response.text, dict):
-            plan = response.text
         else:
-            plan = self._parse_plan_response(response.text)
-        
-        if plan.get('error'):
-            self.logger.error(f"Plan generation failed: {plan.get('error')}")
-            return plan
-        
-        self.logger.info(f"Generated plan with {len(plan.get('plan', []))} steps")
-        return plan
-    
-    def _generate_physical_plan(self, goal: str, context: Dict) -> Dict:
-        """Generate physical world plan."""
-        from plan import generate_plan_with_context
-        
-        # Extract character from context
-        character = context.get('character')
-        if not character:
-            return {'error': 'No character in context'}
-        
-        logger.info(f"Generating physical plan for goal: {goal}")
-        # Format tools for template (add to context)
-        tools_formatted = self._format_tools()
-        
-        # Build prompt text with tools
-        prompt_text = context.get('situation', '')
-        if tools_formatted:
-            prompt_text += f"\n\nAvailable tools:\n{tools_formatted}"
-        
-        # Use existing physical planner
-        plan = generate_plan_with_context(
-            character=character,
-            current_activity=context.get('current_activity'),
-            goal_text=goal,
-            prompt_text=prompt_text,
-            percepts_at_plan=context.get('percepts'),
-            server_name=context.get('server_name', 'vllm'),
-            model_name=context.get('model_name', 'llama3.3-70B-instruct')
-        )
-        
-        return plan
+            self.logger.error("No executor found for infospace planning")
+            return {'error': 'No executor found for infospace planning'}
     
     def _format_tools(self) -> str:
         """Format tools for template inclusion."""
@@ -244,26 +168,6 @@ class UnifiedPlanner:
             lines.append("")
         
         return '\n'.join(lines)
-    
-    def _parse_plan_response(self, response_text: str) -> Dict:
-        """Parse LLM response into plan dict."""
-        if not response_text or not response_text.strip():
-            return {'error': 'Empty response from LLM'}
-        
-        # Remove markdown code fences if present
-        text = response_text.strip()
-        if text.startswith('```'):
-            lines = text.split('\n')
-            text = '\n'.join(lines[1:-1]) if len(lines) > 2 else text
-        
-        try:
-            plan = json.loads(text)
-            if not isinstance(plan, dict) or 'plan' not in plan:
-                return {'error': 'Invalid plan format - missing plan field'}
-            return plan
-        except json.JSONDecodeError as e:
-            self.logger.error(f"Failed to parse plan JSON: {e}")
-            return {'error': f'JSON parse error: {e}'}
     
     def verify_plan(self, plan_json: Any) -> Dict:
         """

@@ -245,14 +245,27 @@ Respond only with the JSON, no commentary, no code fences, no reasoning:
         if heartbeat:
             heartbeat()
         
-        # Accept either dict or string JSON
+        # Handle response: should be dict after is_json=True processing
         if isinstance(raw.text, dict):
             if str(raw.text.get("relevant", "")).lower().startswith("true"):
                 return True
             else:
                 logger.warning(f"No relevant content found for query: {query}")
                 return False
-        return False
+        elif isinstance(raw.text, str):
+            # Fallback: try parsing string JSON (shouldn't happen with fix, but handle gracefully)
+            if raw.success:
+                if "true" in str(raw.text).lower():
+                    return True
+                else:
+                    logger.warning(f"No relevant content found for query: {query}")
+                    return False
+            else:
+                logger.warning(f"No relevant content found for query: {query}")
+                return False
+        else:
+            logger.warning(f"No relevant content found for query: {query}")
+            return False
     except Exception as e:
         logger.error(f"LLM TLDR failed: {e}")
         traceback.print_exc()
@@ -397,6 +410,7 @@ End your response with:
             heartbeat()
         
         rephrase = response.text
+        logger.info(f"LLM rephrased query-web query: {rephrase}")
     except Exception as e:
         logger.error(f"LLM rephrasing failed: {e}")
         traceback.print_exc()
@@ -452,8 +466,8 @@ End your response with:
                 if fut.done():
                     try:
                         item = fut.result()
-                        logger.info(f"Completed task: {item}")
                         if item and item.get("text"):
+                            logger.info(f"Completed task: {item.get('text')[:20]}...")
                             results.append(item)
                     except Exception as e:
                         logger.error(f"Error processing task: {e}")
@@ -533,22 +547,8 @@ def tool(value, runtime=None, **kwargs):
                 )
             llm_generate = llm_generate_wrapper
         else:
-            # Last resort: create LLM client and wrapper
-            try:
-                from llm_client import ZenohLLMClient
-                llm_client = ZenohLLMClient(server_name='vllm', model_name='models/Qwen3-Next:1.5B')
-                def llm_generate_wrapper(messages, bindings=None, max_tokens=2000, temperature=0.7, is_json=False, stops=None):
-                    return llm_client.generate(
-                        messages=messages,
-                        bindings=bindings,
-                        max_tokens=max_tokens,
-                        temperature=temperature,
-                        is_json=is_json,
-                        stops=stops if stops else ['</end>']
-                    )
-                llm_generate = llm_generate_wrapper
-            except Exception as e:
-                return {
+            # llm_generate is required
+            return {
                     'status': 'failed',
                     'reason': f'Failed to create LLM client: {e}'
                 }
