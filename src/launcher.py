@@ -166,22 +166,7 @@ class CharacterLauncher:
         # Small delay to ensure memory_node initializes
         time.sleep(0.5)
         
-        # Launch situation_node for this character (2nd - needs map_node)
-        try:
-            situation_process = subprocess.Popen([
-                sys.executable, 'situation_node.py', 
-                '-c', character.name, 
-                '-config', json.dumps(character.config)
-            ], env=os.environ.copy())
-            character.processes.append(situation_process)
-            self.logger.info(f'✅ {character.name} situation_node launched')
-        except Exception as e:
-            self.logger.error(f'❌ Failed to launch {character.name} situation_node: {e}')
-        
-        # Small delay to ensure situation_node initializes
-        time.sleep(0.5)
-        
-        # Launch perception_node for this character (3rd - processes sensory input)
+        # Launch perception_node for this character (processes sensory input)
         try:
             perception_process = subprocess.Popen([
                 sys.executable, 'perception_node.py', 

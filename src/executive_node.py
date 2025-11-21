@@ -127,12 +127,6 @@ class ZenohExecutiveNode:
             self.sense_data_callback
         )
         
-        # Subscriber for situation data (character-specific)
-        self.situation_subscriber = self.session.declare_subscriber(
-            f"cognitive/{character_name}/situation/update",
-            self.situation_callback
-        )
-        
         # === ZENOH PUBLICATION ===
         # NAME: action
         # TOPIC: cognitive/{character}/action
@@ -285,7 +279,6 @@ class ZenohExecutiveNode:
         # Internal state
         self.action_counter = 0
         self.last_sense_data = None
-        self.last_situation_data = None
         
         # OODA loop state
         self.current_goal = None
@@ -1402,18 +1395,6 @@ class ZenohExecutiveNode:
         except Exception as e:
             traceback.print_exc()
             logger.error(f'Error processing sense data: {e}')
-    
-    def situation_callback(self, sample):
-        """Handle incoming situation data."""
-        try:
-            situation_data = json.loads(sample.payload.to_bytes().decode('utf-8'))
-            logger.info(f'📊 {self.character_name} Received situation update')
-            
-            # Store situation data for potential use in LLM processing
-            self.last_situation_data = situation_data
-            
-        except Exception as e:
-            logger.error(f'Error processing situation data: {e}')
     
     def handle_step_command(self, sample):
         """Handle step command - advance one OODA cycle."""
