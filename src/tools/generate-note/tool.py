@@ -5,41 +5,22 @@ Generates new text or code from scratch using natural language prompts.
 """
 import logging
 import json
-import zenoh
-from zenoh import QueryTarget, ConsolidationMode
 
 logger = logging.getLogger(__name__)
 
-# Open zenoh session for fetching Collection/Note content
-config = zenoh.Config()
-zenoh_session = zenoh.open(config)
 
-
-def _get_content(resource_id: str) -> any:
-    """Fetch content from map_node for a resource ID."""
+def _get_content(resource_id: str, resource_manager) -> any:
+    """Fetch content from resource_manager for a resource ID."""
     if resource_id == "Note_null":
         return None
     
-    for reply in zenoh_session.get(
-        f"cognitive/map/resource/{resource_id}",
-        target=QueryTarget.BEST_MATCHING,
-        consolidation=ConsolidationMode.NONE,
-        timeout=5.0
-    ):
-        if reply.ok:
-            response = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
-            if response.get('success'):
-                if 'resource' in response:
-                    resource_data = response.get('resource')
-                    if resource_data:
-                        return resource_data.get('properties', {}).get('content')
-                else:
-                    return response.get('content')
-        break
+    resource = resource_manager.get_resource(resource_id)
+    if resource:
+        return resource.get('properties', {}).get('content')
     return None
 
 
-def _resolve_context(context_arg: str) -> str:
+def _resolve_context(context_arg: str, resource_manager) -> str:
     """
     Resolve context argument to text content.
     
@@ -59,7 +40,7 @@ def _resolve_context(context_arg: str) -> str:
     # Check if it's a Collection ID
     if context_str.startswith('Collection_'):
         try:
-            collection_content = _get_content(context_str)
+            collection_content = _get_content(context_str, resource_manager)
             if collection_content is None:
                 logger.warning(f"Collection {context_str} not found")
                 return ''
@@ -73,7 +54,7 @@ def _resolve_context(context_arg: str) -> str:
             context_parts = []
             for note_id in collection_content:
                 if isinstance(note_id, str) and note_id.startswith('Note_'):
-                    note_content = _get_content(note_id)
+                    note_content = _get_content(note_id, resource_manager)
                     if note_content is not None:
                         # Handle structured Notes (extract text field if present)
                         if isinstance(note_content, dict) and 'text' in note_content:
@@ -89,7 +70,7 @@ def _resolve_context(context_arg: str) -> str:
     # Check if it's a Note ID
     if context_str.startswith('Note_'):
         try:
-            note_content = _get_content(context_str)
+            note_content = _get_content(context_str, resource_manager)
             if note_content is None:
                 logger.warning(f"Note {context_str} not found")
                 return ''
@@ -125,9 +106,10 @@ def tool(value, runtime=None, **kwargs):
     
     style = kwargs.get('style', 'text').lower()
     context_arg = kwargs.get('context', '')
+    resource_manager = kwargs.get('resource_manager')
     
     # Resolve context (handles Collection IDs, Note IDs, or plain text)
-    context = _resolve_context(context_arg)
+    context = _resolve_context(context_arg, resource_manager)
     
     # Build generation prompt based on style
     if style == 'code':
