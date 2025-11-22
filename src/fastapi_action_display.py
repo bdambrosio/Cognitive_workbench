@@ -2605,7 +2605,7 @@ class FastAPIActionDisplayNode:
             if (!text || typeof text !== 'string') return text;
             // Match Note_ or Collection_ followed by word characters (digits, letters, underscore)
             // Use non-word-boundary pattern to catch Note_15, Collection_4, Note_null, etc.
-            return text.replace(/(Note_|Collection_)[\w]+/g, function(match) {
+            return text.replace(/(Note_|Collection_)[\\w]+/g, function(match) {
                 return `<a href="#" class="resource-link" data-resource-id="${match}">${match}</a>`;
             });
         }
@@ -2683,7 +2683,7 @@ class FastAPIActionDisplayNode:
                         if (actionData.target && actionData.target.startsWith('$') && actionData.resolved_target) {
                             const resolvedValue = String(actionData.resolved_target);
                             // Check if resolved value is a resource ID
-                            if (/^(Note_|Collection_)[\w]+/.test(resolvedValue)) {
+                            if (/^(Note_|Collection_)[\\w]+/.test(resolvedValue)) {
                                 // Make the variable clickable to the resolved resource
                                 targetDisplay = `<a href="#" class="resource-link" data-resource-id="${resolvedValue}">${actionData.target}</a>`;
                             } else {

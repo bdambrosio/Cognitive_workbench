@@ -109,7 +109,7 @@ class CharacterLauncher:
         self.characters.append(character)
         self.logger.info(f'Added character: {canonical_name}')
     
-    def launch_shared_services(self, map_file: str = None, launch_ui: bool = False, launch_resource_browser: bool = False, server_name: str = 'vllm', model_name: str = None, ui_port: int = 3000, setting: str = None, scenario_name: str = None):
+    def launch_shared_services(self, map_file: str = None, launch_ui: bool = False, launch_resource_browser: bool = False, ui_port: int = 3000, setting: str = None, scenario_name: str = None):
         """Launch shared services (map node, optional UI, optional resource browser)."""
         self.logger.info('Launching shared services...')
         world_label = scenario_name or (Path(map_file).stem if map_file else 'infospace')
@@ -161,7 +161,7 @@ class CharacterLauncher:
         except Exception as e:
             self.logger.error(f'❌ Failed to launch {character.name} executive_node: {e}')
     
-    def launch_all_characters(self, map_file: str = None, launch_ui: bool = False, launch_resource_browser: bool = False, server_name: str = 'vllm', model_name: str = None, ui_port: int = 3000, setting: str = None, scenario_name: str = None):
+    def launch_all_characters(self, map_file: str = None, launch_ui: bool = False, launch_resource_browser: bool = False, ui_port: int = 3000, setting: str = None, scenario_name: str = None):
         """Launch all character instances."""
         self.logger.info(f'Launching {len(self.characters)} characters...')
         
@@ -173,7 +173,7 @@ class CharacterLauncher:
             character.config['map_name'] = world_label
         
         # Launch shared services first
-        self.launch_shared_services(map_file, launch_ui, launch_resource_browser, server_name, model_name, ui_port, setting, scenario_name)
+        self.launch_shared_services(map_file, launch_ui, launch_resource_browser, ui_port, setting, scenario_name)
         time.sleep(2)  # Give shared services time to start
         
         # Launch each character
@@ -320,10 +320,8 @@ def main():
         # Extract scenario name from config filename (e.g., "laTerre.yaml" -> "laTerre")
         scenario_name = Path(args.config_file).stem
         
-        # Extract LLM configuration
+        # Extract LLM configuration (still needed by executive_node for SGLang)
         llm_config = config_data.get('llm_config', {})
-        server_name = llm_config.get('server_name', 'vllm')
-        model_name = llm_config.get('model_name', None)
         
         # Extract optional map file from YAML (key: 'map')
         yaml_map_file = config_data.get('map')
@@ -444,7 +442,7 @@ def main():
             else:
                 print(f"Reusing existing world '{world_name}'")
 
-        launcher.launch_all_characters(world_label_source, args.ui, args.resource_browser, server_name, model_name, ui_port=args.ui_port, setting=setting, scenario_name=scenario_name or world_name)
+        launcher.launch_all_characters(world_label_source, args.ui, args.resource_browser, ui_port=args.ui_port, setting=setting, scenario_name=scenario_name or world_name)
         
         # Monitor processes
         launcher.monitor_processes()
