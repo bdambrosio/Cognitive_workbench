@@ -612,8 +612,33 @@ def execute_infospace_action(action: Dict, executor, agent_name: str) -> str:
         agent_name: Agent name for logging
         
     Returns:
-        Result text for Stage 3 reflection
+        Result text for Stage 3 reflection (format: [SUCCESS] <result> | <action> | Bound: <var>)
     """
+    # Constants for result formatting
+    MAX_RESULT_LENGTH = 128
+    
+    def _format_result_value(value: Any) -> str:
+        """Format a result value for display, with length limits and newline handling."""
+        if value is None or value == '':
+            return ''
+        
+        # Convert to string
+        result_str = str(value)
+        
+        # Replace newlines with space-pipe-space for readability
+        result_str = result_str.replace('\n', ' | ')
+        
+        # Truncate if too long, breaking at word boundary
+        if len(result_str) > MAX_RESULT_LENGTH:
+            truncated = result_str[:MAX_RESULT_LENGTH]
+            # Find last space to avoid mid-word cut
+            last_space = truncated.rfind(' ')
+            if last_space > MAX_RESULT_LENGTH - 20:  # Only if reasonably close to end
+                truncated = truncated[:last_space]
+            result_str = truncated + '...'
+        
+        return result_str
+    
     try:
         # Track action in executor's plan_actions if available
         if hasattr(executor, '_plan_actions'):
@@ -656,36 +681,66 @@ def execute_infospace_action(action: Dict, executor, agent_name: str) -> str:
             executor._compliance_tracker.check_action(action, result, executor.plan_bindings)
         
         if result.get('status') == 'success':
+            # Extract actual result value from executor
+            actual_value = result.get('result') or result.get('value', '')
+            
+            # Get bound variable and resource ID if present
             bound_var = action.get('out', '')
+            resource_id = None
             if bound_var:
-                # Get bound value if available
                 resource_id = executor.plan_bindings.get(bound_var.lstrip('$'))
-                if resource_id:
-                    # Enhanced feedback for Collections
-                    if resource_id.startswith('Collection_'):
-                        metadata = executor.get_resource_metadata(resource_id)
-                        if metadata:
-                            item_count = metadata.get('item_count', 0)
-                            source_skill = metadata.get('source_skill', '')
-                            # Build informative message
-                            info_parts = [f"{item_count} items"]
-                            if source_skill:
-                                info_parts.append(f"from {source_skill}")
-                            return f"[SUCCESS] Bound {bound_var} to {resource_id} ({', '.join(info_parts)})"
-                    
-                    # For Notes, try to show simple content (booleans, short strings)
-                    elif resource_id.startswith('Note_'):
-                        # Fetch content for simple types to aid reflection
-                        content = executor._get_content(resource_id)
-                        if isinstance(content, bool):
-                            return f"[SUCCESS] Bound {bound_var} to {resource_id} (value: {content})"
-                        elif isinstance(content, (int, float)):
-                            return f"[SUCCESS] Bound {bound_var} to {resource_id} (value: {content})"
-                        elif isinstance(content, str) and len(content) <= 50:
-                            return f"[SUCCESS] Bound {bound_var} to {resource_id} (value: '{content}')"
-                    
-                    return f"[SUCCESS] Bound {bound_var} to {resource_id}"
-            return f"[SUCCESS] {action['type']} completed"
+            
+            # For Notes: fetch actual content to show in result
+            if isinstance(actual_value, str) and actual_value.startswith('Note_'):
+                try:
+                    content = executor._get_content(actual_value)
+                    # Format the actual content
+                    actual_result_str = _format_result_value(content)
+                except Exception:
+                    # Fallback if content fetch fails
+                    actual_result_str = actual_value
+            else:
+                # For all other values, format directly
+                actual_result_str = _format_result_value(actual_value)
+            
+            # Build result message in format: [SUCCESS] <result> | <action> | Bound: <var> to <resource>
+            action_type = action['type']
+            
+            # Special handling for Collections: keep current format (item count is more useful than contents)
+            if resource_id and resource_id.startswith('Collection_'):
+                metadata = executor.get_resource_metadata(resource_id)
+                if metadata:
+                    item_count = metadata.get('item_count', 0)
+                    source_skill = metadata.get('source_skill', '')
+                    info_parts = [f"{item_count} items"]
+                    if source_skill:
+                        info_parts.append(f"from {source_skill}")
+                    collection_info = ', '.join(info_parts)
+                    if bound_var:
+                        return f"[SUCCESS] Collection ({collection_info}) | {action_type} completed | Bound: {bound_var} to {resource_id}"
+                    else:
+                        return f"[SUCCESS] Collection ({collection_info}) | {action_type} completed"
+            
+            # Result-first format for all other cases
+            if actual_result_str:
+                if bound_var and resource_id:
+                    # Don't duplicate resource ID if it's the same as the result
+                    if actual_result_str == resource_id:
+                        return f"[SUCCESS] {action_type} completed | Bound: {bound_var} to {resource_id}"
+                    else:
+                        return f"[SUCCESS] {actual_result_str} | {action_type} completed | Bound: {bound_var} to {resource_id}"
+                elif bound_var:
+                    return f"[SUCCESS] {actual_result_str} | {action_type} completed | Bound: {bound_var}"
+                else:
+                    return f"[SUCCESS] {actual_result_str} | {action_type} completed"
+            else:
+                # No actual result to show, fallback to basic format
+                if bound_var and resource_id:
+                    return f"[SUCCESS] {action_type} completed | Bound: {bound_var} to {resource_id}"
+                elif bound_var:
+                    return f"[SUCCESS] {action_type} completed | Bound: {bound_var}"
+                else:
+                    return f"[SUCCESS] {action_type} completed"
         else:
             error_reason = result.get('reason', 'Unknown error')
             return f"[ERROR] {action['type']} failed: {error_reason}"
@@ -791,7 +846,7 @@ if HAS_SGLANG:
     
     @function
     def tool_planner_infospace(s, goal: str, character_context: str, recent_context: str, 
-                              tools_catalog_text: str, executor, max_steps: int = 16):
+                              tools_catalog_text: str, executor, trace_file=None, max_steps: int = 16):
         """
         SGLang incremental planner for infospace goals.
         
@@ -964,13 +1019,22 @@ if HAS_SGLANG:
             
             # Stage 3: Reflect
             s += user(
-                f"STAGE 3 (step {step + 1}/{max_steps}):\n"
-                f"Tool `{tool_name}` with args:\n{tool_args_json}\n\n"
-                f"Result:\n{tool_result[:512]}\n\n"
-                "Respond using Stage 3 FORMAT. Be concise.\n"
-                "Ensure the REQUEST_TOOLS list is a valid JSON list of tool names.\n"
-                "DONE: YES only when you have EXECUTED all required actions (not just planned them). "
-                "Thinking about an action ≠ executing it. You must actually call display/persist/etc.\n"
+                f"========================================\n"
+                f"STAGE 3 - TOOL EXECUTION COMPLETE (step {step + 1}/{max_steps})\n"
+                f"========================================\n\n"
+                f"Tool executed: `{tool_name}`\n"
+                f"Arguments: {tool_args_json}\n\n"
+                f">>> ACTUAL RESULT (ground truth) >>>\n"
+                f"{tool_result[:512]}\n"
+                f">>> END RESULT >>>\n\n"
+                f"INSTRUCTIONS:\n"
+                f"1. The result above is GROUND TRUTH. Use it exactly as shown.\n"
+                f"2. If reporting to user, use ONLY the values from the result above.\n"
+                f"3. Do NOT approximate, summarize, or invent values.\n"
+                f"4. Evaluate: Is the goal complete, including actual execution of all planned actions? If yes, respond DONE: YES.\n"
+                f"   If no, determine the next action needed.\n\n"
+                f"Respond using Stage 3 FORMAT. Be concise.\n"
+                f"Ensure the REQUEST_TOOLS list is a valid JSON list of tool names.\n"
             )
             
             s += assistant(
@@ -1033,7 +1097,7 @@ if HAS_SGLANG:
             if done_raw.startswith("YES"):
                 s["final_answer"] = s[f"thoughts_{step}"]
                 #print (f"full trace:\n{s}")
-                return
+                break
             
             # Update current task for next iteration
             next_task_raw = s[f"next_task_{step}"].strip()
@@ -1043,13 +1107,18 @@ if HAS_SGLANG:
             else:
                 logger.warning(f"Step {step}: No NEXT_TASK provided, keeping current task")
         
-        # Max steps reached
-        s["final_answer"] = (
-            f"Max steps reached. Last task: {current_task}\n"
-            f"Last thoughts: {s[f'thoughts_{max_steps-1}']}"
-        )
-        num_tokens = len(executor.runtime.tokenizer.encode(s.text))
-        logger.info(f"total tokens: {num_tokens}")
+        
+        # Write full conversation state to trace file (file-only, not console)
+        if trace_file:
+            logger.info(f"Writing full conversation state to trace file")
+            trace_file.write(f"\n{'='*80}\n")
+            trace_file.write(f"Planning session: {time.strftime('%Y-%m-%d %H:%M:%S')}\n")
+            trace_file.write(f"Goal: {goal}\n")
+            trace_file.write(f"total length: {len(str(s))}\n")
+            trace_file.write(f"{'='*80}\n")
+            trace_file.write(str(s)+"\n")
+            trace_file.write(f"\n{'='*80}\n\n")
+            trace_file.flush()
         return s
 
 
@@ -1143,6 +1212,22 @@ class IncrementalPlanner:
         self.tools = build_tool_catalog(available_tools, primitives_reference)
         self.tools_catalog_text = tool_catalog_text(self.tools)
         self.logger.info(f"IncrementalPlanner initialized with {len(self.tools)} tools")
+        
+        # Open trace file for SGLang conversation state logging (file-only, not console)
+        character_name = getattr(executor, 'agent_name', 'unknown')
+        trace_dir = os.path.join(os.path.dirname(__file__), 'logs')
+        os.makedirs(trace_dir, exist_ok=True)
+        trace_path = os.path.join(trace_dir, f'planner_trace_{character_name}.txt')
+        self.trace_file = open(trace_path, 'a', encoding='utf-8')
+        self.logger.info(f"Trace file opened: {trace_path}")
+    
+    def __del__(self):
+        """Cleanup: close trace file on instance destruction."""
+        if hasattr(self, 'trace_file') and self.trace_file:
+            try:
+                self.trace_file.close()
+            except Exception:
+                pass
     
     def generate_plan(self, goal: str, context: Dict = None, max_steps: int = 16) -> Dict:
         """
@@ -1180,6 +1265,7 @@ class IncrementalPlanner:
                 recent_context=recent_context,
                 tools_catalog_text=self.tools_catalog_text,
                 executor=self.executor,
+                trace_file=self.trace_file,
                 max_steps=max_steps
             )
             
