@@ -11,7 +11,7 @@
 - ✅ `say` - Communication primitive
 - ✅ `think` - Internal notes primitive
 
-**Current List (18 primitives):**
+**Current List (19 primitives):**
 ```python
 infospace_primitives = {
     # Phase 1 Core (7)
@@ -19,8 +19,8 @@ infospace_primitives = {
     'index', 'organize', 'search',
     # Phase 1 Control (3)
     'if', 'while', 'wait',
-    # Phase 1 Communication (2)
-    'say', 'think',
+    # Phase 1 Communication (3)
+    'say', 'think', 'ask',
     # Phase 2 Data (4)
     'extract', 'filter', 'merge', 'transform',
     # Phase 2 Analysis (4)
@@ -36,8 +36,8 @@ infospace_primitives = {
 **Updated Order:**
 - Reorganized to group: Core, Storage, Control, Communication, then Phase 2
 
-**Handler List (18 primitives):**
-- Phase 1: `apply`, `move`, `create`, `save`, `index`, `organize`, `search`, `if`, `while`, `wait`, `say`, `think`
+**Handler List (19 primitives):**
+- Phase 1: `apply`, `move`, `create`, `save`, `index`, `organize`, `search`, `if`, `while`, `wait`, `say`, `think`, `ask`
 - Phase 2: `extract`, `filter`, `merge`, `transform`, `aggregate`, `sort`, `group_by`, `compare`
 
 ### 3. **Test Primitives** (`infospace_executor.py`)
@@ -51,8 +51,9 @@ infospace_primitives = {
 - ✅ `organize` - Test for index alias
 - ✅ `say` - Test for output communication
 - ✅ `think` - Test for internal notes
+- ✅ `ask` - Test for user input (interactive primitive)
 
-**Test Coverage:** 18/18 primitives (100%)
+**Test Coverage:** 19/19 primitives (100%)
 
 ---
 
@@ -74,6 +75,7 @@ infospace_primitives = {
 | wait | ✓ | ✓ | ✓ | - |
 | say | ✓ | ✓ | ✓ | ✓ |
 | think | ✓ | ✓ | ✓ | ✓ |
+| ask | ✓ | ✓ | ✓ | ✓ |
 | extract | ✓ | ✓ | ✓ | - |
 | filter | ✓ | ✓ | ✓ | - |
 | merge | ✓ | ✓ | ✓ | - |

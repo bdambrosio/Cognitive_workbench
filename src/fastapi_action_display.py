@@ -311,17 +311,13 @@ class FastAPIActionDisplayNode:
         # Publisher for time management
         self.time_delay_publisher = self.session.declare_publisher("cognitive/map/time_delay_setting")
         
-        # Subscriber for time advancement updates
-        self.time_advanced_subscriber = self.session.declare_subscriber(
-            "cognitive/map/time_advanced",
-            self.time_advanced_callback
-        )
         
         # Publisher for save commands
         self.save_publisher = self.session.declare_publisher("cognitive/save_all")
         
-        # Current simulation time tracking
-        self.current_simulation_time = None
+        # Current time tracking (using datetime)
+        from datetime import datetime
+        self.current_time = datetime.now()
         
         # Publishers for shutdown commands
         self.shutdown_executive_publisher = self.session.declare_publisher("cognitive/shutdown/executive")
@@ -545,17 +541,26 @@ class FastAPIActionDisplayNode:
                 }
                 await websocket.send_text(json.dumps(test_data))
                 
-                # Send current simulation time if available
-                if self.current_simulation_time:
-                    time_data = {
-                        'type': 'time_update',
-                        'time_info': self.current_simulation_time.get('time_info', {}),
-                        'timestamp': datetime.now().isoformat()
-                    }
-                    await websocket.send_text(json.dumps(time_data))
-                    logger.info(f'📤 Sent current time to new WebSocket connection: {time_data["time_info"].get("datetime", "unknown")}')
-                else:
-                    logger.info('📤 No simulation time available for new WebSocket connection')
+                # Send current time
+                from datetime import datetime
+                current_time = datetime.now()
+                time_info = {
+                    'year': current_time.year,
+                    'month': current_time.month,
+                    'day': current_time.day,
+                    'hour': current_time.hour,
+                    'minute': current_time.minute,
+                    'datetime': current_time.isoformat(),
+                    'period': 'morning' if 5 <= current_time.hour < 12 else 'afternoon' if 12 <= current_time.hour < 17 else 'evening' if 17 <= current_time.hour < 21 else 'night',
+                    'season': 'spring' if 3 <= current_time.month <= 5 else 'summer' if 6 <= current_time.month <= 8 else 'autumn' if 9 <= current_time.month <= 11 else 'winter'
+                }
+                time_data = {
+                    'type': 'time_update',
+                    'time_info': time_info,
+                    'timestamp': current_time.isoformat()
+                }
+                await websocket.send_text(json.dumps(time_data))
+                logger.info(f'📤 Sent current time to new WebSocket connection: {current_time.isoformat()}')
             except Exception:
                 pass  # Ignore test message errors
             
@@ -1016,30 +1021,21 @@ class FastAPIActionDisplayNode:
         
         @self.app.get("/api/time/initial")
         async def get_initial_time():
-            """Get initial simulation time information."""
+            """Get initial time information."""
             try:
-                if hasattr(self, 'session'):
-                    # If we have cached time, return it
-                    if self.current_simulation_time:
-                        return {"success": True, "time_info": self.current_simulation_time}
-                    
-                    # Use real datetime.now() directly
-                    from datetime import datetime
-                    current_time = datetime.now()
-                    time_info = {
-                        'year': current_time.year,
-                        'month': current_time.month,
-                        'day': current_time.day,
-                        'hour': current_time.hour,
-                        'minute': current_time.minute,
-                        'period': 'morning' if 5 <= current_time.hour < 12 else 'afternoon' if 12 <= current_time.hour < 17 else 'evening' if 17 <= current_time.hour < 21 else 'night',
-                        'season': 'spring' if 3 <= current_time.month <= 5 else 'summer' if 6 <= current_time.month <= 8 else 'autumn' if 9 <= current_time.month <= 11 else 'winter'
-                    }
-                    self.current_simulation_time = {'success': True, 'time_info': time_info}
-                    return {"success": True, "time_info": time_info}
-                else:
-                    return {"success": False, "message": "Zenoh session not available"}
-                    
+                from datetime import datetime
+                current_time = datetime.now()
+                time_info = {
+                    'year': current_time.year,
+                    'month': current_time.month,
+                    'day': current_time.day,
+                    'hour': current_time.hour,
+                    'minute': current_time.minute,
+                    'datetime': current_time.isoformat(),
+                    'period': 'morning' if 5 <= current_time.hour < 12 else 'afternoon' if 12 <= current_time.hour < 17 else 'evening' if 17 <= current_time.hour < 21 else 'night',
+                    'season': 'spring' if 3 <= current_time.month <= 5 else 'summer' if 6 <= current_time.month <= 8 else 'autumn' if 9 <= current_time.month <= 11 else 'winter'
+                }
+                return {"success": True, "time_info": time_info}
             except Exception as e:
                 return {"success": False, "message": f"Error: {str(e)}"}
         
@@ -1191,44 +1187,6 @@ class FastAPIActionDisplayNode:
                 return {"success": False, "message": f"Error: {str(e)}"}
 
     
-    async def _initiate_shutdown(self):
-        """Coordinate system shutdown in proper sequence."""
-        self.shutdown_in_progress = True
-        
-        shutdown_data = {
-            "timestamp": datetime.now().isoformat(),
-            "source": "ui",
-            "characters": list(self.active_characters)
-        }
-        
-        # Step 1: Shutdown executive nodes for each character
-        logger.info("🔌 Step 1: Shutting down executive nodes...")
-        self.shutdown_executive_publisher.put(json.dumps(shutdown_data))
-        
-        # Step 2: Shutdown sense nodes for each character 
-        logger.info("🔌 Step 2: Shutting down sense nodes...")
-        self.shutdown_sense_publisher.put(json.dumps(shutdown_data))
-        
-        # Step 3: Shutdown memory and situation nodes for each character
-        logger.info("🔌 Step 3: Shutting down memory and situation nodes...")
-        self.shutdown_memory_publisher.put(json.dumps(shutdown_data))
-        self.shutdown_situation_publisher.put(json.dumps(shutdown_data))
-        
-        # Step 4: Shutdown shared nodes (map, llm_service)
-        logger.info("🔌 Step 4: Shutting down shared nodes...")
-        self.shutdown_shared_publisher.put(json.dumps(shutdown_data))
-        
-        # Step 5: Shutdown self after brief delay
-        logger.info("🔌 Step 5: Shutting down display node...")
-        await asyncio.sleep(1.0)
-        
-        # Trigger our own graceful shutdown
-        try:
-            self.shutdown()
-        finally:
-            import sys
-            sys.exit(0)
-
     def _get_html_template(self) -> str:
         """Get the HTML template for the web UI."""
         return """
@@ -1892,6 +1850,10 @@ class FastAPIActionDisplayNode:
                     </div>
                     <input type="text" id="characterInput" placeholder="Character name" style="width: 200px; margin-bottom: 8px; display: none;">
                     <textarea id="messageInput" placeholder="Message or Plan (multi-line supported)" style="width: 100%; height: 80px; resize: vertical; background-color: #2b2b2b; color: #ffffff; border: 1px solid #555; padding: 8px; font-family: monospace; box-sizing: border-box;"></textarea>
+                    <div id="askIndicator" style="display: none; color: #f39c12; padding: 8px; margin-top: 8px; background: #2a2a2a; border-radius: 4px; border: 1px solid #f39c12;">
+                        ❓ <strong>Question:</strong> <span id="askQuestion"></span>
+                        <div style="font-size: 11px; color: #888; margin-top: 4px;">Type your response above and click Send or press Step to continue</div>
+                    </div>
                     <div id="sendResult" style="margin-top: 5px;"></div>
                 </div>
             </div>
@@ -2658,6 +2620,21 @@ class FastAPIActionDisplayNode:
                 return;
             }
             
+            // Handle ask action type - show indicator
+            if (typeLower === 'ask') {
+                const questionText = actionData.text || actionData.value || 'Awaiting your response...';
+                document.getElementById('askQuestion').textContent = questionText;
+                document.getElementById('askIndicator').style.display = 'block';
+                // Clear message input to make it obvious user should type response
+                document.getElementById('messageInput').value = '';
+                // Also add to action log for completeness
+            }
+            
+            // Handle response action type - hide ask indicator
+            if (typeLower === 'response') {
+                document.getElementById('askIndicator').style.display = 'none';
+            }
+            
             const entry = document.createElement('div');
             entry.className = 'action-entry';
             
@@ -2668,6 +2645,8 @@ class FastAPIActionDisplayNode:
             let actorLabel = '';
             if (actionData.is_text_only) {
                 if (typeLower === 'say' && actionData.target) {
+                    actorLabel = ` ${makeResourceIdsClickable(actionData.target)}:`;
+                } else if (typeLower === 'ask' && actionData.target) {
                     actorLabel = ` ${makeResourceIdsClickable(actionData.target)}:`;
                 } else if (typeLower === 'response' && actionData.source) {
                     actorLabel = ` ${makeResourceIdsClickable(actionData.source)}:`;
@@ -3009,6 +2988,8 @@ class FastAPIActionDisplayNode:
                 if (result.success) {
                     resultDiv.innerHTML = `<span class="success">${result.message}</span>`;
                     document.getElementById('messageInput').value = '';
+                    // Hide ask indicator when user responds
+                    document.getElementById('askIndicator').style.display = 'none';
                     // Update conversation indicator
                     updateConversationIndicator();
                 } else {
@@ -3601,7 +3582,22 @@ class FastAPIActionDisplayNode:
             # Open browser automatically
             webbrowser.open(f'http://localhost:{self.port}')
             
-            # Start FastAPI server
+            # Start FastAPI server with custom access log filter
+            # Suppress logs for conversation_status endpoint (polling keeps websocket alive)
+            import logging
+            class FilteredAccessLogger(logging.Filter):
+                def filter(self, record):
+                    # Suppress access logs for conversation_status endpoint
+                    # Check the log message itself (uvicorn logs in format: "IP - "METHOD PATH" STATUS")
+                    msg = record.getMessage() if hasattr(record, 'getMessage') else str(record.msg)
+                    if '/api/conversation_status' in msg:
+                        return False
+                    return True
+            
+            # Configure uvicorn access logger
+            uvicorn_access_logger = logging.getLogger("uvicorn.access")
+            uvicorn_access_logger.addFilter(FilteredAccessLogger())
+            
             uvicorn.run(self.app, host="0.0.0.0", port=self.port)
             
         except KeyboardInterrupt:
@@ -3838,39 +3834,25 @@ class FastAPIActionDisplayNode:
                 # Send ready state update to web clients
                 self._send_ready_state_update()
                 
-                # Send current time to all connected WebSocket clients if available
-                if self.current_simulation_time:
-                    self._send_time_update_to_websockets(self.current_simulation_time.get('time_info', {}))
-                    logger.info(f'📤 Sent current time to all WebSocket clients: {self.current_simulation_time.get("time_info", {}).get("datetime", "unknown")}')
-                else:
-                    logger.info('📤 No simulation time available to send to WebSocket clients')
+                # Send current time to all connected WebSocket clients
+                from datetime import datetime
+                current_time = datetime.now()
+                time_info = {
+                    'year': current_time.year,
+                    'month': current_time.month,
+                    'day': current_time.day,
+                    'hour': current_time.hour,
+                    'minute': current_time.minute,
+                    'datetime': current_time.isoformat(),
+                    'period': 'morning' if 5 <= current_time.hour < 12 else 'afternoon' if 12 <= current_time.hour < 17 else 'evening' if 17 <= current_time.hour < 21 else 'night',
+                    'season': 'spring' if 3 <= current_time.month <= 5 else 'summer' if 6 <= current_time.month <= 8 else 'autumn' if 9 <= current_time.month <= 11 else 'winter'
+                }
+                self._send_time_update_to_websockets(time_info)
+                logger.info(f'📤 Sent current time to all WebSocket clients: {current_time.isoformat()}')
                 
         except Exception as e:
             import traceback
-            traceback.print_exc()
-    
-
-    
-    def time_advanced_callback(self, sample):
-        """Handle time advancement updates from map_node."""
-        try:
-            time_data = json.loads(sample.payload.to_bytes().decode('utf-8'))
-            
-            # Extract new time info
-            new_time_info = time_data.get('new_time_info', {})
-            if new_time_info and 'datetime' in new_time_info:
-                # Cache the full time data for future requests
-                self.current_simulation_time = time_data
-                #logger.info(f'⏰ Time advanced: {new_time_info["datetime"]}')
-                
-                # Send time update to web clients
-                self._send_time_update_to_websockets(new_time_info)
-            else:
-                logger.warning(f'Received time_advanced but no valid time_info in data')
-                
-        except Exception as e:
-            logger.error(f'Error in time_advanced callback: {e}')
-    
+            traceback.print_exc()    
 
     
     def _send_to_websockets(self, action_data: Dict[str, Any], character_name: str):

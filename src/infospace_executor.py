@@ -214,7 +214,7 @@ class InfospaceExecutor:
                 logger.error(error_msg)
                 return {'status': 'failed', 'reason': error_msg}
         
-        logger.info(f"Attempting to execute tool '{json.dumps(action)}' directly")
+        logger.info(f"Executing action: {json.dumps(action)}")
         handler = handlers.get(action_type)
         if not handler:
             # Check if it's a dynamic tool (not a primitive)
@@ -1591,6 +1591,20 @@ Make sure the string is in a format that can be parsed by the json.loads functio
             json.dumps(sense_data)
         )
         
+        # Also publish to action channel for UI display
+        action_data = {
+            'type': 'say',
+            'action_type': 'say',
+            'action_id': f'action_{self.executive_node.action_counter}',
+            'timestamp': datetime.now().isoformat(),
+            'text': str(value),
+            'source': self.agent_name,
+            'target': target,
+            'is_text_only': True
+        }
+        self.executive_node.action_publisher.put(json.dumps(action_data))
+        self.executive_node.action_counter += 1
+        
         logger.info(f"Say [{target}]: {value}")
         return {'status': 'success', 'value': value}
     
@@ -1640,9 +1654,10 @@ Make sure the string is in a format that can be parsed by the json.loads functio
     
     def _execute_think(self, action: Dict) -> Dict:
         """
-        Internal thought/note (logged but not communicated externally).
+        Create an internal thought note (not communicated externally).
         
         Required: type, value or target (accepts both for compatibility)
+        Optional: out (variable to bind the created note to)
         """
         # Accept both value and target (target preferred for consistency with other primitives)
         value = self._resolve_value(action.get('value') or action.get('target'))
@@ -1650,13 +1665,30 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         if value is None:
             return {'status': 'failed', 'reason': 'think requires value or target'}
         
-        logger.info(f"Think: {value}")
-        return {'status': 'success', 'value': value}
+        # Create and persist a note with the thought content
+        note_id = self._persist_note(str(value), 'think')
+        
+        if not note_id:
+            return {'status': 'failed', 'reason': 'Failed to persist thought note'}
+        
+        # Bind to output variable if specified
+        out_var = action.get('out')
+        if out_var:
+            self._bind_variable(out_var, note_id)
+            display_var = self._normalize_var_for_log(out_var)
+            logger.info(f"Think: created {note_id} → {display_var}")
+        else:
+            logger.info(f"Think: created {note_id}")
+        
+        return {'status': 'success', 'value': note_id}
     
     def _execute_ask(self, action: Dict) -> Dict:
         """
-        Ask user a question and suspend plan execution until response received.
-        Suspension logic handled in executive_node._execute_next_step().
+        Ask user a question and wait for response via polling.
+        
+        Publishes question to UI, then polls for user response.
+        Zenoh callbacks run in separate threads, so while we sleep,
+        _process_text_input can receive and store the response.
         
         Required: type, value, out
         Optional: target (defaults to 'User')
@@ -1671,32 +1703,67 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         
         target = action.get('target', 'User')
         
-        # Publish question via action_data (same format as say, appears in main UI)
+        # Publish question to UI
         action_data = {
             'type': 'ask',
+            'action_type': 'ask',
             'action_id': f'action_{self.executive_node.action_counter}',
             'timestamp': datetime.now().isoformat(),
             'text': str(question_text),
             'source': self.agent_name,
-            'target': target
+            'target': target,
+            'is_text_only': True
         }
         self.executive_node.action_publisher.put(json.dumps(action_data))
         self.executive_node.action_counter += 1
         
-        # Pause execution so user can respond and click Step/Run
-        if self.executive_node:
-            self.executive_node.execution_paused = True
-            self.executive_node.execution_mode = 'step'
-            self.executive_node._publish_execution_state()
-        
-        # Set suspension state in plan_state for _execute_next_step to handle
-        self.executive_node.plan_state['awaiting_ask'] = {
-            'out_var': out_var
-        }
-        
         display_var = self._normalize_var_for_log(out_var)
-        logger.info(f"❓ Ask: '{question_text}' → awaiting response for {display_var} (step mode enabled)")
-        return {'status': 'success', 'value': question_text}
+        logger.info(f"❓ Ask: '{question_text}' → awaiting response for {display_var}")
+        
+        # Mark that we're awaiting ask response
+        self.executive_node.awaiting_ask_response = True
+        
+        # Poll for response (with timeout)
+        import time
+        timeout = 300  # 5 minutes
+        start_time = time.time()
+        
+        while time.time() - start_time < timeout:
+            time.sleep(0.1)  # Release GIL, allow Zenoh callbacks to add to queue
+            
+            # Check if text input arrived in queue
+            if self.executive_node.text_input_queue:
+                # Process the text input directly
+                sense_data = self.executive_node.text_input_queue.pop(0)
+                content = sense_data['content']
+                try:
+                    content_data = json.loads(content)
+                    response_text = content_data.get('text', '')
+                except (json.JSONDecodeError, TypeError):
+                    response_text = str(content)
+                
+                response_text = response_text.strip().strip('"').strip("'")
+                
+                if response_text:
+                    self.executive_node.awaiting_ask_response = False
+                    
+                    # Don't publish response action - the User's say is already in the log
+                    # Publishing both creates redundant entries
+                    
+                    # Create Note with response
+                    response_note_id = self._persist_note(response_text, 'ask-response')
+                    if response_note_id:
+                        self._bind_variable(out_var, response_note_id)
+                        logger.info(f"✅ Ask response received: '{response_text[:50]}...' → {out_var} = {response_note_id}")
+                        return {'status': 'success', 'value': response_note_id}
+                    else:
+                        self._bind_variable(out_var, "Note_null")
+                        return {'status': 'success', 'value': "Note_null"}
+        
+        # Timeout - no response received
+        self.executive_node.awaiting_ask_response = False
+        logger.warning(f"⏱️ Ask timeout after {timeout}s: no user response")
+        return {'status': 'failed', 'reason': f'User response timeout after {timeout}s'}
     
     # ==================== Phase 2: Data Operations ====================
     
@@ -1709,6 +1776,7 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         target = self._resolve_value(action.get('target'))
         operation = action.get('operation')
         out_var = action.get('out')
+        
         
         if not target or not operation or not out_var:
             return {'status': 'failed', 'reason': 'coerce requires target, operation, and out'}

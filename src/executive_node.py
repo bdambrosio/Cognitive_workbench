@@ -242,7 +242,6 @@ class ActionRecord:
     fatigue_after: Optional[float] = None
     thirst_after: Optional[float] = None
     proposed_minutes: Optional[int] = None
-    simulation_time: Optional[str] = None
     # Optional traceability/telemetry extensions
     bindings_after: Optional[Dict[str, Any]] = None
     binding_evidence: Optional[Dict[str, Any]] = None
@@ -256,6 +255,22 @@ class ZenohExecutiveNode:
     - Decide: Choose next action
     - Act: Execute the chosen action
     """
+    
+    def _load_tools(self) -> Dict[str, Dict]:
+        """Load tools from src/tools directory."""
+        from utils.tool_loader import load_tools
+        from pathlib import Path
+        
+        tools_dir = Path(__file__).parent / 'tools'
+        tools = {}
+        
+        if tools_dir.exists():
+            logger.info(f"Loading tools from: {tools_dir}")
+            tools.update(load_tools(str(tools_dir)))
+        else:
+            logger.warning(f"Tools directory not found: {tools_dir}")
+        
+        return tools
     
     def __init__(self, character_name="default", character_config=None):
         # Store character info (canonicalized)
@@ -362,6 +377,14 @@ class ZenohExecutiveNode:
         self.runtime = None
         self.llm_client = None
         
+        # Check SGLang availability
+        HAS_SGLANG = False
+        try:
+            from incremental_planner import HAS_SGLANG as _HAS_SGLANG
+            HAS_SGLANG = _HAS_SGLANG
+        except ImportError:
+            pass
+        
         # Initialize SGLang.Runtime if available and configured
         if HAS_SGLANG and sgl_model_path:
             try:
@@ -444,18 +467,10 @@ class ZenohExecutiveNode:
         # Infospace is always enabled now (physical world removed)
         self.map_name = self.character_config.get('map_name', 'infolab')
         self.infospace_executor = None
-        self.available_tools = {}
         
-        # Initialize unified planner (infospace only)
-        from unified_planner import UnifiedPlanner
-        self.planner = UnifiedPlanner(
-            llm_client=self.llm_client,
-            character=self,
-            world_type='infospace',
-            map_name=self.map_name,
-            logger_instance=logger
-        )
-        self.available_tools = self.planner.available_tools
+        # Load tools for infospace planning
+        self.available_tools = self._load_tools()
+        logger.info(f'🔧 Loaded {len(self.available_tools)} tools for {self.character_name}')
         
         # Initialize infospace components
         from infospace_executor import InfospaceExecutor
@@ -484,6 +499,43 @@ class ZenohExecutiveNode:
             self.infospace_executor.runtime = self.runtime
         logger.info(f'🧩 Infospace executor initialized for {character_name}')
         
+        # Initialize planners (reused across all goals)
+        from templates import INFOSPACE_PRIMITIVES_REFERENCE
+        
+        # InfospacePlanner for plan verification
+        from infospace_planner import InfospacePlanner
+        self.infospace_planner = InfospacePlanner(
+            llm_client=self.llm_client,
+            available_tools=self.available_tools,
+            logger=logger
+        )
+        logger.info(f'📋 InfospacePlanner initialized for plan verification')
+        
+        # IncrementalPlanner for plan generation (SGLang-based)
+        self.incremental_planner = None
+        try:
+            from incremental_planner import IncrementalPlanner, HAS_SGLANG
+            
+            if HAS_SGLANG:
+                # Get SGLang model path from config
+                llm_config = self.character_config.get('llm_config', {})
+                sgl_model_path = llm_config.get('sgl_model_path')
+                
+                self.incremental_planner = IncrementalPlanner(
+                    executor=self.infospace_executor,
+                    available_tools=self.available_tools,
+                    primitives_reference=INFOSPACE_PRIMITIVES_REFERENCE,
+                    logger_instance=logger,
+                    sgl_model_path=sgl_model_path
+                )
+                logger.info(f'🚀 IncrementalPlanner initialized (SGLang) for {character_name}')
+            else:
+                logger.warning(f'⚠️  SGLang not available - incremental planning disabled')
+        except Exception as e:
+            logger.warning(f'⚠️  Failed to initialize IncrementalPlanner: {e}')
+            import traceback
+            traceback.print_exc()
+        
         # Internal state
         self.action_counter = 0
         self.last_sense_data = None
@@ -497,11 +549,13 @@ class ZenohExecutiveNode:
         self.text_input_queue = []
         self.action_history = []  # List of ActionRecord instances
         
+        # Ask primitive state
+        self.awaiting_ask_response = False
+        
         # Plan execution state
         self.current_activity = None
         self.current_step = None
         self.current_plan = None
-        self.plan_state = None
         self.plan_bindings_cache = {}
         # Snapshot of percepts at plan start (normalized, optional)
         self.percepts_at_plan: Optional[List[Dict[str, Any]]] = None
@@ -684,10 +738,7 @@ class ZenohExecutiveNode:
                     try:
                         # Priority order: Text input → Normal OODA
                         if self.text_input_queue:
-                            # Don't process text_input if awaiting ask response
-                            # Let ask handler in _execute_next_step grab the response
-                            if not (self.plan_state and self.plan_state.get('awaiting_ask')):
-                                self._process_text_input()
+                            self._process_text_input()
                         self._run_ooda_loop()
                         
                         # In step mode, pause after one OODA cycle
@@ -946,12 +997,15 @@ class ZenohExecutiveNode:
         if text_input and text_input.strip():
             clean_input = text_input.strip().strip('"').strip("'")
             
+            # If awaiting ask response, the ask primitive is polling text_input_queue directly
+            # So we should not process text inputs here - they'll be consumed by the polling loop
+            
             # Handle special commands from User BEFORE processing as dialog
             if source == 'User':
                 if clean_input.startswith('goal:'):
                     logger.info(f'📥 {self.character_name} Received goal command from User: "{clean_input}"')
                     self.parse_and_set_goal(clean_input)
-                    return  # Don't process as speech                   return  # Don't process as speech
+                    return  # Don't process as speech
             
             # Normal dialog processing
             logger.info(f'📥 {self.character_name} Processing text input: "{text_input}" (source: {source})')
@@ -1244,7 +1298,17 @@ class ZenohExecutiveNode:
             self.plan_counter += 1
             self.current_plan_id = f"p_{self.plan_counter}"
             self.step_counter = 0
-            self.current_plan = self.planner.generate_plan(goal=goal_text, context=context)
+            
+            # Use IncrementalPlanner if available, otherwise error
+            if self.incremental_planner:
+                self.current_plan = self.incremental_planner.generate_plan(
+                    goal=goal_text, 
+                    context=context, 
+                    max_steps=24
+                )
+            else:
+                logger.error("No planner available for infospace planning")
+                self.current_plan = {'error': 'No planner available for infospace planning'}
 
         return self.current_plan
 
@@ -1258,7 +1322,6 @@ class ZenohExecutiveNode:
         self.plan_bindings = {}
         self.plan_bindings_cache = {}
         self.action_history = []
-        self.plan_state = None
         if reason == 'manual goal override' or reason == 'manual plan override':
             return
         
@@ -1966,7 +2029,6 @@ class ZenohExecutiveNode:
             # Immediately clear existing plan/activity to interrupt execution
             self.current_plan = None
             self.current_activity = None
-            self.plan_state = None
             self.plan_bindings = {}
             self.plan_bindings_cache = {}
             self.goal_source = 'ui'

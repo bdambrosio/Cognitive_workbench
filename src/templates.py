@@ -735,28 +735,6 @@ Generate a score in [0.0,1.0] where 1.0 means perfectly aligned, 0.0 means compl
 Return ONLY a JSON object: {"score": float, "rationale": a terse string}"""
 
 
-WORLD_STATE_UPDATE_TEMPLATE = """The task is to update the world state based on the following update.
-
-#World state:
-{{$current_world_state}}
-
-#Update:
-{{$update_text}}
-
-#Simulation time:
-{{$simulation_time}}
-
-#Setting:
-{{$setting}}
-
-DIRECTIVE:
-Respond with a complete updated world state consistent with the update.
-Do not include any changes to the individual performing the action.
-Limit your response to 150 words.
-Respond only in text, with no JSON, formatting, or introductory or explanatory text.
-Return ONLY the updated world state.
-"""
-
 # Infospace Primitives Reference - For planning and validation
 INFOSPACE_PRIMITIVES_REFERENCE = """# INFOSPACE PRIMITIVES AND CONDITIONS
 

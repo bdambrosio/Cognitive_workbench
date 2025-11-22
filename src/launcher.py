@@ -99,11 +99,8 @@ class CharacterLauncher:
         except Exception:
             self.logger.warning('Received shutdown request via Zenoh')
         # Trigger graceful shutdown
-        try:
-            self.shutdown()
-        finally:
-            # Exit the launcher process
-            sys.exit(0)
+        self.running = False
+        self.shutdown()
     
     def add_character(self, name: str, config: Dict[str, Any]):
         """Add a character to be launched."""
@@ -142,7 +139,7 @@ class CharacterLauncher:
                 self.logger.error(f'❌ Failed to launch Resource Browser: {e}')
                 
         
-        # Map node removed - resource management now handled by executive_node
+        # Resource management handled by executive_node
         self.logger.info(f'✅ Resource management handled by executive_node (world: {world_label})')
     
     def launch_character(self, character: CharacterInstance):
@@ -257,7 +254,7 @@ class CharacterLauncher:
                 self.logger.error(f'  ❌ Error sending SIGTERM to {name} process {process.pid}: {e}')
         
         # Step 2: Wait for graceful shutdown (standard timeout)
-        shutdown_timeout = 10  # 10 seconds total
+        shutdown_timeout = 5  # 5 seconds total
         self.logger.info(f'⏳ Waiting up to {shutdown_timeout}s for graceful shutdown...')
         
         start_time = time.time()
