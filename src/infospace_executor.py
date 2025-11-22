@@ -1216,39 +1216,24 @@ Make sure the string is in a format that can be parsed by the json.loads functio
             else:
                 return {'status': 'failed', 'reason': f'Variable not bound: {var_name}'}
         
-        # Query for the resource
-        from zenoh import QueryTarget, ConsolidationMode
-        for reply in self.session.get(
-            f"cognitive/map/resource/{resource_id}",
-            target=QueryTarget.BEST_MATCHING,
-            consolidation=ConsolidationMode.NONE,
-            timeout=5.0
-        ):
-            if reply.ok:
-                response = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
-                if response.get('success'):
-                    # Get the actual resource ID from the response
-                    if 'resource' in response:
-                        resource_data = response.get('resource')
-                        actual_id = resource_data.get('name')  # This is the real ID (Note_X or Collection_X)
-                        if not actual_id:
-                            return {'status': 'failed', 'reason': f'Resource {resource_id} has no ID'}
-                    else:
-                        # Fallback: assume resource_id is already an ID
-                        actual_id = resource_id
-                    
-                    # Bind the actual resource ID to variable
-                    self._bind_variable(out_var, actual_id)
-                    # Determine resource type for logging
-                    resource_type = "Collection" if actual_id.startswith('Collection_') else "Note" if actual_id.startswith('Note_') else "Resource"
-                    display_var = self._normalize_var_for_log(out_var)
-                    logger.info(f"Loaded {resource_id} → {display_var} ({resource_type})")
-                    return {'status': 'success', 'value': actual_id}
-                else:
-                    return {'status': 'failed', 'reason': f'Resource not found: {resource_id}'}
-            break
+        # Direct call to resource manager
+        resource = self.resource_manager.get_resource(resource_id)
         
-        return {'status': 'failed', 'reason': f'No response for {resource_id}'}
+        if not resource:
+            return {'status': 'failed', 'reason': f'Resource not found: {resource_id}'}
+        
+        # Get the actual resource ID
+        actual_id = resource.get('name') or resource_id
+        
+        # Bind the actual resource ID to variable
+        self._bind_variable(out_var, actual_id)
+        
+        # Determine resource type for logging
+        resource_type = "Collection" if actual_id.startswith('Collection_') else "Note" if actual_id.startswith('Note_') else "Resource"
+        display_var = self._normalize_var_for_log(out_var)
+        logger.info(f"Loaded {resource_id} → {display_var} ({resource_type})")
+        
+        return {'status': 'success', 'value': actual_id}
     
     def _execute_index(self, action: Dict) -> Dict:
         """

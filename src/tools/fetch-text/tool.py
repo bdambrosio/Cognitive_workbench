@@ -49,49 +49,16 @@ def tool(url_or_content: str, runtime=None, **kwargs) -> str:
     if url_or_content.startswith('Note_'):
         try:
             resource_mgr = kwargs.get('resource_manager')
-            world_map = kwargs.get('world_map')
             
-            # Try to get resource manager or world_map
+            # Use resource manager to get Note
             if resource_mgr:
                 note_content = resource_mgr.get_resource(url_or_content)
                 if note_content:
                     content = note_content.get('properties', {}).get('content', '')
                 else:
                     return json.dumps({"error": f"Note {url_or_content} not found"})
-            elif world_map and hasattr(world_map, 'resource_registry'):
-                note = world_map.resource_registry.get(url_or_content)
-                if note:
-                    content = note.get('properties', {}).get('content', '')
-                else:
-                    return json.dumps({"error": f"Note {url_or_content} not found"})
             else:
-                # Try Zenoh query as fallback
-                import zenoh
-                from zenoh import QueryTarget, ConsolidationMode
-                config = zenoh.Config()
-                session = zenoh.open(config)
-                try:
-                    for reply in session.get(
-                        f"cognitive/map/resource/{url_or_content}",
-                        target=QueryTarget.BEST_MATCHING,
-                        consolidation=ConsolidationMode.NONE,
-                        timeout=5.0
-                    ):
-                        if reply.ok:
-                            response = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
-                            if response.get('success'):
-                                if 'resource' in response:
-                                    resource_data = response.get('resource')
-                                    content = resource_data.get('properties', {}).get('content', '')
-                                else:
-                                    content = response.get('content', '')
-                                break
-                        else:
-                            return json.dumps({"error": f"Note {url_or_content} not found"})
-                    else:
-                        return json.dumps({"error": f"Note {url_or_content} not found"})
-                finally:
-                    session.close()
+                return json.dumps({"error": f"resource_manager not available"})
             
             # If content is structured JSON (from query-web/semantic-scholar), extract text field
             if isinstance(content, dict):
@@ -123,45 +90,15 @@ def tool(url_or_content: str, runtime=None, **kwargs) -> str:
     if url_or_content.startswith('Collection_'):
         try:
             resource_mgr = kwargs.get('resource_manager')
-            world_map = kwargs.get('world_map')
             note_ids = []
             
-            # Try resource_manager first
+            # Use resource_manager to get Collection
             if resource_mgr:
                 collection_resource = resource_mgr.get_resource(url_or_content)
                 if collection_resource:
                     note_ids = collection_resource.get('properties', {}).get('content', [])
-            
-            # Fallback to world_map
-            if not note_ids and world_map and hasattr(world_map, 'resource_registry'):
-                collection = world_map.resource_registry.get(url_or_content)
-                if collection and collection.get('type') == 'collection':
-                    note_ids = collection.get('content', [])
-            
-            # Fallback to Zenoh query
-            if not note_ids:
-                import zenoh
-                from zenoh import QueryTarget, ConsolidationMode
-                config = zenoh.Config()
-                session = zenoh.open(config)
-                try:
-                    for reply in session.get(
-                        f"cognitive/map/resource/{url_or_content}",
-                        target=QueryTarget.BEST_MATCHING,
-                        consolidation=ConsolidationMode.NONE,
-                        timeout=5.0
-                    ):
-                        if reply.ok:
-                            response = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
-                            if response.get('success'):
-                                if 'resource' in response:
-                                    resource_data = response.get('resource')
-                                    note_ids = resource_data.get('properties', {}).get('content', [])
-                                else:
-                                    note_ids = response.get('content', [])
-                                break
-                finally:
-                    session.close()
+            else:
+                return json.dumps({"error": f"resource_manager not available"})
             
             if not note_ids:
                 return json.dumps({"error": f"Collection {url_or_content} not found or empty"})

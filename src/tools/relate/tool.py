@@ -4,51 +4,32 @@ Relate tool - Compare two Notes or Collections to find similarities, differences
 """
 import logging
 import json
-import zenoh
-from zenoh import QueryTarget, ConsolidationMode
 
 logger = logging.getLogger(__name__)
 
-# Open zenoh session for fetching Collection/Note content
-config = zenoh.Config()
-zenoh_session = zenoh.open(config)
 
-
-def _get_content(resource_id: str) -> any:
-    """Fetch content from map_node for a resource ID."""
+def _get_content(resource_id: str, resource_manager) -> any:
+    """Fetch content from resource_manager for a resource ID."""
     if resource_id == "Note_null":
         return None
     
-    for reply in zenoh_session.get(
-        f"cognitive/map/resource/{resource_id}",
-        target=QueryTarget.BEST_MATCHING,
-        consolidation=ConsolidationMode.NONE,
-        timeout=5.0
-    ):
-        if reply.ok:
-            response = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
-            if response.get('success'):
-                if 'resource' in response:
-                    resource_data = response.get('resource')
-                    if resource_data:
-                        return resource_data.get('properties', {}).get('content')
-                else:
-                    return response.get('content')
-        break
+    resource = resource_manager.get_resource(resource_id)
+    if resource:
+        return resource.get('properties', {}).get('content')
     return None
 
 
-def _flatten_list(items: list, separator: str = '\n\n') -> str:
+def _flatten_list(items: list, resource_manager, separator: str = '\n\n') -> str:
     """Flatten a list (Collection content) into concatenated Note content."""
     note_contents = []
     for item in items:
         if isinstance(item, str) and item.startswith('Note_'):
-            note_content = _get_content(item)
+            note_content = _get_content(item, resource_manager)
             if note_content is not None:
                 note_contents.append(str(note_content))
         elif isinstance(item, str) and item.startswith('Collection_'):
             # Recursively flatten nested Collections
-            flattened = _flatten_collection(item, separator)
+            flattened = _flatten_collection(item, resource_manager, separator)
             if flattened:
                 note_contents.append(flattened)
         else:
@@ -57,13 +38,13 @@ def _flatten_list(items: list, separator: str = '\n\n') -> str:
     return separator.join(note_contents)
 
 
-def _flatten_collection(collection_id: str, separator: str = '\n\n') -> str:
+def _flatten_collection(collection_id: str, resource_manager, separator: str = '\n\n') -> str:
     """Flatten a Collection into concatenated Note content."""
-    content = _get_content(collection_id)
+    content = _get_content(collection_id, resource_manager)
     if not isinstance(content, list):
         return str(content) if content else ""
     
-    return _flatten_list(content, separator)
+    return _flatten_list(content, resource_manager, separator)
 
 
 def _summarize_note(content: str, focus: str = '', heartbeat=None, kwargs=None) -> str:
@@ -169,7 +150,7 @@ Summary:"""
     return combined_summary
 
 
-def _preprocess_element(element: any, focus: str = '', heartbeat=None, kwargs=None) -> str:
+def _preprocess_element(element: any, resource_manager, focus: str = '', heartbeat=None, kwargs=None) -> str:
     """
     Preprocess a single element for comparison.
     
@@ -186,13 +167,13 @@ def _preprocess_element(element: any, focus: str = '', heartbeat=None, kwargs=No
     """
     # Step 1-4: Resolve and flatten
     if isinstance(element, str) and element.startswith('Collection_'):
-        content = _flatten_collection(element)
+        content = _flatten_collection(element, resource_manager)
         content = str(content) if content is not None else ""
     elif isinstance(element, str) and element.startswith('Note_'):
-        content = _get_content(element)
+        content = _get_content(element, resource_manager)
         content = str(content) if content is not None else ""
     elif isinstance(element, list):
-        content = _flatten_list(element)
+        content = _flatten_list(element, resource_manager)
         content = str(content) if content is not None else ""
     else:
         content = str(element) if element else ""
@@ -238,13 +219,14 @@ def tool(value, runtime=None, **kwargs):
     
     instruction = kwargs.get('instruction', '')
     heartbeat = kwargs.get('heartbeat')
+    resource_manager = kwargs.get('resource_manager')
     
     # Build focus string for summarization
     focus = instruction if instruction else "key themes, facts, and perspectives for comparison"
     
     # Preprocess each element independently
-    element_a = _preprocess_element(value, focus, heartbeat, kwargs)
-    element_b = _preprocess_element(other, focus, heartbeat, kwargs)
+    element_a = _preprocess_element(value, resource_manager, focus, heartbeat, kwargs)
+    element_b = _preprocess_element(other, resource_manager, focus, heartbeat, kwargs)
     
     # Format for LLM comparison
     formatted_input = f"""## Item A
