@@ -9,6 +9,7 @@ Read-only, manual refresh.
 import argparse
 import json
 import logging
+import signal
 import sys
 import webbrowser
 from pathlib import Path
@@ -34,14 +35,37 @@ class ResourceBrowser:
         self.port = port
         self.open_browser = open_browser
         self.app = FastAPI(title="Resource Browser")
+        self.shutdown_requested = False
         
         # Zenoh session
         config = zenoh.Config()
         self.session = zenoh.open(config)
         logger.info(f"Connected to Zenoh for map: {map_name}")
         
+        # Register signal handlers for graceful shutdown
+        signal.signal(signal.SIGTERM, self._signal_handler)
+        signal.signal(signal.SIGINT, self._signal_handler)
+        
         # Setup routes
         self.setup_routes()
+    
+    def _signal_handler(self, signum, frame):
+        """Handle shutdown signals gracefully."""
+        logger.info(f'Received signal {signum}, initiating shutdown...')
+        self.shutdown()
+    
+    def shutdown(self):
+        """Clean shutdown."""
+        if getattr(self, '_shutting_down', False):
+            return
+        self._shutting_down = True
+        self.shutdown_requested = True
+        try:
+            if hasattr(self, 'session'):
+                self.session.close()
+            logger.info('Resource Browser shutdown complete')
+        except Exception as e:
+            logger.error(f'Error during shutdown: {e}')
     
     def setup_routes(self):
         """Setup FastAPI routes."""
@@ -514,7 +538,12 @@ class ResourceBrowser:
         if self.open_browser:
             webbrowser.open(f'http://localhost:{self.port}')
         
-        uvicorn.run(self.app, host="0.0.0.0", port=self.port, log_level="warning")
+        try:
+            uvicorn.run(self.app, host="0.0.0.0", port=self.port, log_level="warning")
+        except KeyboardInterrupt:
+            logger.info('Resource Browser shutting down...')
+        finally:
+            self.shutdown()
 
 
 def main():

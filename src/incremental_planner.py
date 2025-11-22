@@ -253,6 +253,19 @@ def build_tool_catalog(available_tools: Dict[str, Dict], primitives_reference: s
             ],
             "schema_hint": {"value": "any content (string, number, boolean, array, object)", "name": "string (optional)", "out": "$variable"}
         },
+        "think": {
+            "description": "generate an internal reflection on the state of the plan. Use for reasoning about the goal or the state of the plan.",
+            "full_description": "generate an internal thought that enriches the planning context for subsequent tool selections. The thought is appended to the internal SGLang conversation state, allowing the LLM to reference it in later reasoning. Thoughts are NOT persisted as Notes, NOT published to the UI, and NOT communicated to the user. Use this for tracking reasoning steps, making observations, or noting intermediate conclusions that inform later decisions.",
+            "parameters": {
+                "value": "required: literal string or $variable referencing thought content"
+            },
+            "examples": [
+                '{"type":"think","value":"The user wants a summary, but how long should it be?"}',
+                '{"type":"think","value":"I need more context before proceeding with the query, should I ask the user for more information?"}',
+                '{"type":"think","value":"$observation"}'
+            ],
+            "schema_hint": {"value": "string or $variable"}
+        },
     }
     
     primitive_tools = {
@@ -308,9 +321,19 @@ def build_tool_catalog(available_tools: Dict[str, Dict], primitives_reference: s
             "description": "Display Note content to user",
             "schema_hint": {"value": "$variable"}
         },
+        "think": {
+            "description": PRIMITIVE_DOCS["think"]["description"],
+            "full_description": PRIMITIVE_DOCS["think"].get("full_description"),
+            "examples": PRIMITIVE_DOCS["think"].get("examples", []),
+            "schema_hint": PRIMITIVE_DOCS["think"]["schema_hint"]
+        },
         "say": {
             "description": "Output text to user",
             "schema_hint": {"target": "user", "value": "string"}
+        },
+        "ask": {
+            "description": "Ask user a question and wait for response (suspends plan execution). NOTE: Only works with sync plan execution (manual JSON plans), not with IncrementalPlanner.",
+            "schema_hint": {"target": "User (optional)", "value": "string (question text)", "out": "$variable"}
         }
     }
     
@@ -673,34 +696,21 @@ def execute_infospace_action(action: Dict, executor, agent_name: str) -> str:
 
 
 if HAS_SGLANG:
-    @function
-    def stage0_resource_retrieval(s, goal: str, executor):
+    #@function
+    def stage0_resource_retrieval(goal: str, executor):
         """
         Stage 0: Generate search queries from goal and retrieve relevant resources.
         
         Args:
-            s: SGLang state
             goal: Goal text
             executor: InfospaceExecutor instance
             
         Returns:
             Formatted string with available resources to inject into Stage 1 prompt
         """
-        s += system(
-            "You are helping extract search queries from a goal statement. "
-            "Focus on WHAT the goal is about (topics, concepts, data) rather than HOW to achieve it (actions, steps). "
-            "Generate 1-2 concise search queries that would help find relevant Notes or Collections."
-        )
-        s += user(f"Goal: {goal}\n\nGenerate 1-2 concise search queries (one per line, no numbering):")
-        s += assistant(gen("queries", max_tokens=128, stop="\n\n"))
         
         try:
-            queries_text = s["queries"].strip()
-            # Parse queries (one per line)
-            queries = [q.strip() for q in queries_text.split('\n') if q.strip()][:2]
-            
-            if not queries:
-                return ""
+            queries = [goal]
             
             # Search for resources
             search_result = executor.search_resources(queries, k_notes=3, k_collections=2, threshold=0.3)
@@ -709,7 +719,7 @@ if HAS_SGLANG:
                 reason = search_result.get('reason', 'Unknown error')
                 # Don't warn if queryable isn't ready yet or if indexes are empty (normal on startup)
                 if 'queryable may not be registered' in reason.lower() or 'no response' in reason.lower():
-                    logger.debug(f"Stage 0: Resource search unavailable (normal on startup): {reason}")
+                    logger.warning(f"Stage 0: Resource search unavailable (normal on startup): {reason}")
                 else:
                     logger.warning(f"Stage 0: Resource search failed: {reason}")
                 return ""
@@ -719,11 +729,11 @@ if HAS_SGLANG:
             
             if not notes and not collections:
                 # Empty results are normal when no resources exist yet
-                logger.debug("Stage 0: No relevant resources found (indexes may be empty)")
+                logger.warning("Stage 0: No relevant resources found (indexes may be empty)")
                 return ""
             
             # Format results for prompt injection with descriptions
-            lines = ["# Available Notes / Collections (may be relevant)\n"]
+            lines = ["#Available Notes / Collections that may be relevant)\n"]
             
             if notes:
                 lines.append("## Notes:")
@@ -734,13 +744,6 @@ if HAS_SGLANG:
                     
                     # Build description from metadata
                     desc_parts = []
-                    source_skill = props.get('source_skill', '')
-                    source_value = props.get('source_value', '')
-                    if source_skill:
-                        if source_value:
-                            desc_parts.append(f"Created via {source_skill} on {source_value}")
-                        else:
-                            desc_parts.append(f"Created via {source_skill}")
                     
                     # Add commentary if available
                     commentary = props.get('embedding_text', '').split('\n')
@@ -763,13 +766,6 @@ if HAS_SGLANG:
                     
                     # Build description from metadata
                     desc_parts = [f"{item_count} items"]
-                    source_skill = props.get('source_skill', '')
-                    source_value = props.get('source_value', '')
-                    if source_skill:
-                        if source_value:
-                            desc_parts.append(f"created via {source_skill} on {source_value}")
-                        else:
-                            desc_parts.append(f"created via {source_skill}")
                     
                     # Add commentary if available
                     commentary = props.get('embedding_text', '').split('\n')
@@ -812,8 +808,7 @@ if HAS_SGLANG:
         available_resources_text = ""
         if executor:
             try:
-                available_resources_text = stage0_resource_retrieval.run(goal=goal, executor=executor)
-                logger.info(f"Stage 0: Available resources: {available_resources_text}")
+                available_resources_text = stage0_resource_retrieval(goal=goal, executor=executor)
             except Exception as e:
                 logger.warning(f"Stage 0: Failed to retrieve resources: {e}")
         
@@ -824,17 +819,7 @@ if HAS_SGLANG:
             "and iteratively refine your plan until the goal is satisfied.\n"
         ]
         
-        # Add character context if available
-        if character_context:
-            system_parts.append(f"\n# CHARACTER CONTEXT\n{character_context}\n")
         
-        # Add recent context if available
-        if recent_context:
-            system_parts.append(f"{recent_context}\n")
-        
-        # Add available resources from Stage 0
-        if available_resources_text:
-            system_parts.append(f"\n{available_resources_text}\n")
         
         system_parts.append(f"\n{INCREMENTAL_PLAN_SPECIFICATIONS}\n")
         system_parts.append(
@@ -847,6 +832,22 @@ if HAS_SGLANG:
         
         s += system("".join(system_parts))
         
+        # Add character context if available - constant for run, so ok to add here
+        if character_context:
+            system_parts.append(f"\n# CHARACTER CONTEXT\n{character_context}\n")
+        
+        # Add recent context if available
+        if recent_context:
+            system_parts.append(f"{recent_context}\n")
+        
+        # Add available resources from Stage 0
+        if available_resources_text:
+            system_parts.append(f"\n{available_resources_text}\n")
+        # Add current date and time
+        import datetime
+        current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        system_parts.append(f"\n# CURRENT CONTEXT\nCurrent date and time: {current_time}\n")
+
         s += user(
             f"Goal: {goal}\n\n"
             f"Tool catalog:\n{tools_catalog_text}\n\n"
@@ -937,9 +938,29 @@ if HAS_SGLANG:
             if out_var:
                 resource_id_before = executor.plan_bindings.get(out_var.lstrip('$'))
             
-            tool_result = execute_infospace_action(action, executor, executor.agent_name)
-            logger.info(f"Stage 2: Choose tool + args\n{tool_name} -> {tool_args_json}")
-            logger.info(f"Step {step}: {tool_name} -> {tool_result[:100]}")
+            # Special handling for 'think' - append to conversation state instead of executing
+            if tool_name == "think":
+                # Extract thought content from action
+                thought_value = action.get('value', '')
+                # Resolve if it's a variable reference
+                if isinstance(thought_value, str) and thought_value.startswith('$'):
+                    var_name = thought_value.lstrip('$')
+                    thought_value = executor.plan_bindings.get(var_name, thought_value)
+                
+                # Append thought to conversation state
+                s += assistant(f"[Internal thought: {thought_value}]\n")
+                
+                # Log for debugging
+                logger.info(f"💭 Think (internal): {thought_value}")
+                
+                # Synthetic result for Stage 3 reflection
+                tool_result = f"[Thought recorded internally: {thought_value[:100]}{'...' if len(str(thought_value)) > 100 else ''}]"
+            
+            else:
+                # Normal external execution for all tools (including ask)
+                tool_result = execute_infospace_action(action, executor, executor.agent_name)
+                logger.info(f"Stage 2: Choose tool + args\n{tool_name} -> {tool_args_json}")
+                logger.info(f"Step {step}: {tool_name} -> {tool_result[:100]}")
             
             # Stage 3: Reflect
             s += user(
@@ -1027,7 +1048,8 @@ if HAS_SGLANG:
             f"Max steps reached. Last task: {current_task}\n"
             f"Last thoughts: {s[f'thoughts_{max_steps-1}']}"
         )
-        logger.info(f"full trace:\n{s}")
+        num_tokens = len(executor.runtime.tokenizer.encode(s.text))
+        logger.info(f"total tokens: {num_tokens}")
         return s
 
 

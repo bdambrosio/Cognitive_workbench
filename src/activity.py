@@ -488,31 +488,21 @@ class ActivityManager:
             situation['views'] = {}
             situation['views_compact'] = ''
         
-        # Get simulation time from map_node
-        try:
-            for time_reply in self.executive_node.session.get("cognitive/map/simulation_time", target=QueryTarget.BEST_MATCHING, consolidation=ConsolidationMode.NONE, timeout=70.0 if not self.executive_node.debug else 300.0):
-                if time_reply.ok:
-                    time_data = json.loads(time_reply.ok.payload.to_bytes().decode('utf-8'))
-                    if time_data.get('success'):
-                        situation['time_info'] = time_data.get('time_info', {})
-                        situation['weather'] = time_data.get('weather', 'unknown')
-                        situation['datetime'] = datetime.fromisoformat(situation['time_info'].get('datetime')) if situation['time_info'].get('datetime') else None
-                        break
-                    else:
-                        logger.error(f"Failed to get time data")
-                        situation['time_info'] = {'period': 'unknown', 'season': 'unknown'}
-                        situation['weather'] = 'unknown'
-                        situation['datetime'] = None
-                else:
-                    logger.error(f"Failed to get time data")
-                    situation['time_info'] = {'period': 'unknown', 'season': 'unknown'}
-                    situation['weather'] = 'unknown'
-                    situation['datetime'] = None
-                break
-        except Exception as e:
-            logger.warning(f"Failed to get time data: {e}")
-            situation['time_info'] = {'period': 'unknown', 'season': 'unknown'}
-            situation['weather'] = 'unknown'
+        # Get current time using datetime
+        from datetime import datetime
+        current_time = datetime.now()
+        situation['datetime'] = current_time
+        situation['time_info'] = {
+            'year': current_time.year,
+            'month': current_time.month,
+            'day': current_time.day,
+            'hour': current_time.hour,
+            'minute': current_time.minute,
+            'datetime': current_time.isoformat(),
+            'period': 'morning' if 5 <= current_time.hour < 12 else 'afternoon' if 12 <= current_time.hour < 17 else 'evening' if 17 <= current_time.hour < 21 else 'night',
+            'season': 'spring' if 3 <= current_time.month <= 5 else 'summer' if 6 <= current_time.month <= 8 else 'autumn' if 9 <= current_time.month <= 11 else 'winter'
+        }
+        situation['weather'] = 'unknown'
         
         # Set default values for fields that don't exist in the data
         situation['threats'] = []  # No threats data available
