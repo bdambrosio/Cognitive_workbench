@@ -25,7 +25,7 @@ This workbench currently focuses on three main areas of cognitive agent research
 ### 1. Incremental Planning with SGLang
 The **Incremental Planner** implements **interleaved reasoning** where the agent:
 - **Plans** incrementally, a few steps at a time
-- **Executes** tools **during planning** to gather information
+- **Executes** tools **during planning** to progress on goal
 - **Adapts** the plan based on execution results  
 - **Requests** additional tools dynamically as needs emerge
 - All within SGLang's `@function` context for efficient synchronous execution
@@ -51,17 +51,17 @@ This tight integration between thought and action enables complex research tasks
 
 **`think` Primitive (Revised):**
 - Internal reasoning appended to SGLang conversation state
-- Not executed externally, but logged for debugging
+- Not displayed externally, but logged for debugging
 - Creates actual Notes in infospace for later reference
-- Example: `{"type": "think", "value": "Need to verify these claims before proceeding", "out": "$thought"}`
+- Example: `{"type": "think", "value": "Should I verify these claims before proceeding?", "out": "$thought"}`
 
 *See: `src/infospace_executor.py`*
 
 ### 2. Information Space ("Infospace")
 Information is treated as a spatial environment where:
-- **Notes** and **Collections** are primitive persistent objects
+- **Notes** and **Collections** are primitive persistent objects (Items / Sets metaphor)
 - **Cognitive Operations** (search, index, summarize, relate, filter, map) are "spatial" actions
-- **Tools** are dynamically loaded Python/LLM skills executed within this space
+- **Tools** are dynamically loaded prompt / Python  skills executed within this space
 - All operations use vector embeddings for semantic search and organization
 
 *See: `src/infospace_executor.py`, `src/infospace_resource_manager.py`*
