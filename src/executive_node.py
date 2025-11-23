@@ -21,7 +21,7 @@ import argparse
 from datetime import datetime
 from typing import Dict, List, Any, Union, Optional
 from Messages import SystemMessage, UserMessage
-from activity import ActivityManager, derive_drive_lexicon
+
 import utils.hash_utils as hash_utils
 from utils.zenoh_utils import datetime_handler
 from dataclasses import dataclass, asdict
@@ -278,7 +278,6 @@ class ZenohExecutiveNode:
         self.character_config = character_config or {}
         self.drives = self.character_config.get('drives', [])
         self.drives_str = '\n'.join(self.drives)   
-        self.drive_lex = derive_drive_lexicon(self.drives_str)
         
         # Debug mode flag - must be set early as it's used throughout initialization
         self.debug = str(os.getenv('CWB_DEBUG', '')).lower() in ('1', 'true', 'yes', 'on')
@@ -348,14 +347,6 @@ class ZenohExecutiveNode:
         # ========================
         self.current_plan_publisher = self.session.declare_publisher(f"cognitive/{character_name}/current_plan")
         
-        # === ZENOH PUBLICATION ===
-        # NAME: current_activity
-        # TOPIC: cognitive/{character}/current_activity
-        # DESCRIPTION: Activity pattern changed (started, completed, switched)
-        # PAYLOAD: {"activity": str, "status": str, "timestamp": str}
-        # TRIGGERS: EvaluateMethodology, OptimizeWorkflow
-        # ========================
-        self.current_activity_publisher = self.session.declare_publisher(f"cognitive/{character_name}/current_activity")
         
         # Backward compatibility properties
         @property
@@ -553,7 +544,6 @@ class ZenohExecutiveNode:
         self.awaiting_ask_response = False
         
         # Plan execution state
-        self.current_activity = None
         self.current_step = None
         self.current_plan = None
         self.plan_bindings_cache = {}
@@ -573,18 +563,7 @@ class ZenohExecutiveNode:
         self.plan_log: List[Dict[str, Any]] = [] # log of plans and actions
         # Track simulation time at plan boundaries
         self.current_plan_start_sim_iso: Optional[str] = None
-        # Ontology (guard for manual characters / missing files)
-        try:
-            if self.character_config.get('ontology', True):
-                self.ontology = json.load(open(f'../scenarios/{self.character_name}-activity-ontology.json'))
-            else:
-                self.ontology = {}
-        except Exception as e:
-            self.ontology = {}
-            if not self.manual:
-                logger.warning(f"No activity ontology for {self.character_name}: {e}")
-        self.map_types = None # wait to initialize untill all characters have registered
-
+        
         # Execution control (replaces turn management)
         self.execution_paused = True  # Start paused, wait for step/run command
         self.execution_mode = 'step'  # 'step' or 'run'
@@ -626,19 +605,12 @@ class ZenohExecutiveNode:
             self._dialog_end_callback
         )
         
-        # Subscriber for manual activity selection (character-specific)
-        self.activity_selection_subscriber = self.session.declare_subscriber(
-            f"cognitive/{character_name}/activity/set",
-            self._activity_selection_callback
-        )
-        
         # Subscriber for enabling compliance tracking (evaluation mode)
         self.compliance_tracking_subscriber = self.session.declare_subscriber(
                 f"cognitive/{character_name}/enable_compliance_tracking",
                 self._enable_compliance_tracking_callback
             )
         
-        # Queryable for activity list (character-specific)
         # Queryables for resource management (for UI and resource_browser)
         self.resource_view_queryable = self.session.declare_queryable(
                 f"cognitive/{character_name}/resource/view/*",
@@ -657,11 +629,6 @@ class ZenohExecutiveNode:
             self._handle_resource_remove_query
         )
         
-        self.activity_list_queryable = self.session.declare_queryable(
-            f"cognitive/{character_name}/activity/list",
-            self._activity_list_query_handler
-        )
-        
         # Queryable for sync plan execution (character-specific)
         self.sync_plan_execution_queryable = self.session.declare_queryable(
             f"cognitive/{character_name}/execute_plan_sync",
@@ -674,12 +641,6 @@ class ZenohExecutiveNode:
 
         self.inspections = {} # cache of inspections
         self.uses = {} # cache of uses
-        self.activities = {} # dictionary of all available activities for initializing activity manager
-        try:
-            self.activities = json.load(open(f'../scenarios/{self.character_name}-activities.json'))
-            logger.info(f'📚 Loaded {len(self.activities)} activities for {self.character_name}')
-        except Exception as e:
-            logger.error(f'Error loading activities for {self.character_name}: {e}')
 
         logger.info(f'🧠 Zenoh Executive Node initialized for character: {character_name}')
         logger.info(f'   - Subscribing to: cognitive/{character_name}/sense_data')
@@ -696,9 +657,7 @@ class ZenohExecutiveNode:
         logger.info(f'   - Publishing to: cognitive/{character_name}/execution_state')
         logger.info(f'   - Publishing to: cognitive/map/time_proposal')
 
-        self.activity_manager = None
-        if self.activities:
-            self.activity_manager = ActivityManager(self, self.activities, self.llm_client, self.map_types)
+
 
         # Register signal handlers for graceful shutdown
         signal.signal(signal.SIGTERM, self._signal_handler)
@@ -952,35 +911,6 @@ class ZenohExecutiveNode:
         except Exception as e:
             logger.error(f'Error publishing current plan: {e}')
 
-    def _publish_current_activity(self):
-        """Publish current activity to the current_activity topic for UI display."""
-        try:
-            # Get current activity from activity manager if available
-            current_activity = None
-            current_step = None
-            activity_state = None
-            
-            if self.activity_manager:
-                current_activity = self.activity_manager.current_activity
-                activity_state = self.activity_manager.current_activity_state
-                if current_activity and activity_state:
-                    current_step = self.activity_manager.activity_step()
-            
-                current_activity_data = {
-                    'current_activity': json.dumps(current_activity, indent=2) if current_activity else '',
-                    'activity_data': current_activity,
-                    'current_step': current_step,
-                    'activity_state': activity_state,
-                    'timestamp': datetime.now().isoformat(),
-                    'character': self.character_name
-                }
-                
-                self.current_activity_publisher.put(json.dumps(current_activity_data, default=datetime_handler))
-                logger.info(f'🎯 Published current activity for {self.character_name}')
-            
-        except Exception as e:
-            logger.error(f'Error publishing current activity: {e}')
-
 
     def _process_text_input(self):
         """Process one queued text input."""
@@ -1084,8 +1014,6 @@ class ZenohExecutiveNode:
     def _update_system_prompt(self):
         """Update the system prompt with the current situation."""
         system_prompt = self.observations['static']
-        if self.activity_manager and self.activity_manager.has_active_activity():
-            system_prompt += f"\n#Your current hi-level activity is:\n\t{self.activity_manager.current_activity.get('name')}\n"
         if self.current_goal:
             system_prompt += f"\n#Your current goal is:\n\t{self.current_goal.to_string()}\n"
         if self.current_plan:
@@ -1107,19 +1035,7 @@ class ZenohExecutiveNode:
                 system_prompt += f"\n#Your drives are:\n\t{'\n\t'.join(self.character_config['drives'])}\n"
             if self.character_config.get('setting', None):
                 system_prompt += f"\n#The overall setting is:\n{self.character_config['setting']}\n"
-            if not self.map_types:
-                try:
-                    if self.resource_manager:
-                        self.map_types = self.resource_manager.get_resource_types()
-                    else:
-                        # Fallback for non-infospace (shouldn't happen in current architecture)
-                        self.map_types = {'success': False, 'resource_types': []}
-                except Exception as e:
-                    logger.error(f'Error getting resource types in _build_user_prompt: {e}')
-                    self.map_types = {'success': False, 'resource_types': []}
-            if self.map_types:
-                system_prompt += f"\n#The following are the types primary types in the scenario:\n{format_map_types(self.map_types)}"
-            # Build user prompt with context
+
             user_prompt += self.format_situation()
             entity_context = None
             entity_context = self.get_entity_context(self.character_name, 10)
@@ -1180,8 +1096,6 @@ class ZenohExecutiveNode:
                     "static_information": self.observations['static'],
                     "current_information": self.observations['dynamic'],
                     "current_percepts": self.percepts_at_plan,
-                    "activity_name": self.current_activity.get('name', '') if self.current_activity else '',
-                    "activity_steps": self.current_activity.get('steps', '') if self.current_activity else '',
                     "step_to_rewrite": self.current_step if self.current_step else '',
                 },
                 max_tokens=400,
@@ -1325,23 +1239,8 @@ class ZenohExecutiveNode:
         if reason == 'manual goal override' or reason == 'manual plan override':
             return
         
-        # Handle activity advancement if this plan is for the activity - assume a single plan per activity step
-        if self.activity_manager and self.activity_manager.has_active_activity() and self.activity_manager.current_plan == completed_plan:
-            # Advance to next activity step
-            next_step, activity = self.activity_manager.step_completion('success')
-            self._publish_current_activity()
-            self.current_goal = None
-            if next_step:
-                logger.info(f'🎯 Activity step completed, advancing to: {next_step["name"]}')
-            else:
-                # Activity completed - clear goal
-                self._publish_goal(self.current_goal)
-                self.current_activity = None
-                logger.info(f'✅ Activity completed for {self.character_name}')
-        else:
-            # No activity - clear goal (existing behavior)
-            self.current_goal = None
-            self._publish_goal(self.current_goal)
+        # No activity - clear goal (existing behavior)
+        self.current_goal = None
         
         # If goal was from UI, pause autonomous behavior to await next user input
         if self.goal_source == 'ui':
@@ -1538,7 +1437,6 @@ class ZenohExecutiveNode:
                     logger.info(f'🧪 EVAL STATS [{self.character_name}]: ✓ No violations, {checks_count} compatibility checks passed')
 
         entry = {
-            'activity': self.current_activity['name'] if self.current_activity else 'None',
             'goal': self.current_goal.to_string() if self.current_goal else '',
             'prompt': self.current_plan_prompt,
             'plan': self.current_plan,
@@ -1689,36 +1587,6 @@ class ZenohExecutiveNode:
         except Exception as e:
             logger.error(f'Error in end dialog callback: {e}')
     
-    def _activity_selection_callback(self, sample):
-        """Handle manual activity selection from UI."""
-        try:
-            data = json.loads(sample.payload.to_bytes().decode('utf-8'))
-            activity_name = data.get('activity_name')
-            
-            if not activity_name:
-                logger.error(f'No activity_name in manual selection request')
-                return
-            
-            logger.info(f'🎯 {self.character_name} received manual activity selection: {activity_name}')
-            
-            if not self.activity_manager:
-                logger.error(f'No activity_manager available for {self.character_name}')
-                return
-            
-            # Set the activity manually
-            step, activity = self.activity_manager.set_activity_manually(activity_name)
-            
-            if activity:
-                # Clear current plan and goal to start fresh with new activity
-                self.current_plan = None
-                self.current_goal = None
-                self._publish_current_activity()
-                logger.info(f'✅ {self.character_name} activity set to: {activity_name}')
-            else:
-                logger.error(f'Failed to set activity {activity_name} for {self.character_name}')
-        except Exception as e:
-            logger.error(f'Error in activity selection callback: {e}')
-    
     def _enable_compliance_tracking_callback(self, sample):
         """Handle enabling compliance tracking for evaluation mode."""
         try:
@@ -1733,25 +1601,6 @@ class ZenohExecutiveNode:
         except Exception as e:
             logger.error(f'Error enabling compliance tracking: {e}')
     
-    def _activity_list_query_handler(self, query):
-        """Handle query for available activities list."""
-        try:
-            activities = []
-            if self.activity_manager:
-                activities = self.activity_manager.get_available_activities()
-            
-            response = {
-                'success': True,
-                'activities': activities
-            }
-            query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
-        except Exception as e:
-            logger.error(f'Error handling activity list query: {e}')
-            response = {
-                'success': False,
-                'activities': []
-            }
-            query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
     
     def _handle_resource_view_query(self, query):
         """Handle query for resource content viewing (for UI)."""
@@ -2026,9 +1875,8 @@ class ZenohExecutiveNode:
         try:
             parsed_goal = goal_text.strip().strip('"').strip("'")[6:]
             
-            # Immediately clear existing plan/activity to interrupt execution
+            # Immediately clear existing plan to interrupt execution
             self.current_plan = None
-            self.current_activity = None
             self.plan_bindings = {}
             self.plan_bindings_cache = {}
             self.goal_source = 'ui'
