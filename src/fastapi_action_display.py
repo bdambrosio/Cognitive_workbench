@@ -20,7 +20,7 @@ import shutil
 from datetime import datetime
 from typing import Dict, List, Any, Set
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, FileResponse
 import uvicorn
 from pathlib import Path
 from concurrent.futures import TimeoutError
@@ -507,6 +507,21 @@ class FastAPIActionDisplayNode:
     
     def _setup_routes(self):
         """Setup FastAPI routes."""
+        
+        @self.app.get("/favicon.ico")
+        async def favicon():
+            """Serve favicon if it exists, otherwise return 204 No Content."""
+            favicon_path = Path("static/favicon.ico")
+            if not favicon_path.exists():
+                # Try PNG format
+                favicon_path = Path("static/favicon.png")
+            
+            if favicon_path.exists():
+                return FileResponse(favicon_path)
+            else:
+                # Return 204 No Content to suppress error
+                from fastapi import Response
+                return Response(status_code=204)
         
         @self.app.get("/", response_class=HTMLResponse)
         async def get_main_page():
