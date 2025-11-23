@@ -192,6 +192,11 @@ Efficiency Rules:
 - expand, refine, as-json work on Notes ONLY, not Collections
 - Use map to apply Note operations to each Collection item
 
+Common Patterns:
+- Add multiple Notes to Collection via map: {"type":"map","target":"$notes","operation":"add","args":{"target":"$collection"},"out":"$collection"}
+- Add all items from one Collection to another: {"type":"union","target":"$target_collection","value":"$source_collection","out":"$target_collection"}
+- Combine two Collections into new one: {"type":"union","target":"$coll1","value":"$coll2","out":"$combined"}
+
 Tool Selection:
 - Academic papers: semantic-scholar (provides abstracts, citations, PDFs)
 - General web: query-web (broad coverage, recent content)
@@ -334,6 +339,30 @@ def build_tool_catalog(available_tools: Dict[str, Dict], primitives_reference: s
         "ask": {
             "description": "Ask user a question and wait for response (suspends plan execution). NOTE: Only works with sync plan execution (manual JSON plans), not with IncrementalPlanner.",
             "schema_hint": {"target": "User (optional)", "value": "string (question text)", "out": "$variable"}
+        },
+        "add": {
+            "description": "Add a Note to an existing Collection (mutates Collection in place). CRITICAL: When used with map to add multiple Notes, the Collection must be in args.target, NOT top-level fields. Correct: {\"type\":\"map\",\"target\":\"$notes\",\"operation\":\"add\",\"args\":{\"target\":\"$collection\"},\"out\":\"$collection\"}. Wrong: {\"type\":\"map\",\"target\":\"$notes\",\"operation\":\"add\",\"out\":\"$collection\",\"value\":\"$collection\"}",
+            "schema_hint": {"target": "$variable (Collection)", "value": "$variable or literal", "out": "$variable"}
+        },
+        "remove": {
+            "description": "Remove a Note from a Collection (mutates Collection)",
+            "schema_hint": {"target": "$variable (Collection)", "value": "$variable or Note ID", "out": "$variable"}
+        },
+        "union": {
+            "description": "Union of two Collections (A ∪ B) - all items from both, deduplicated",
+            "schema_hint": {"target": "$variable (Collection A)", "value": "$variable (Collection B)", "out": "$variable"}
+        },
+        "intersection": {
+            "description": "Intersection of two Collections (A ∩ B) - items in both",
+            "schema_hint": {"target": "$variable (Collection A)", "value": "$variable (Collection B)", "out": "$variable"}
+        },
+        "difference": {
+            "description": "Difference of two Collections (A - B) - items in A but not in B",
+            "schema_hint": {"target": "$variable (Collection A)", "value": "$variable (Collection B)", "out": "$variable"}
+        },
+        "size": {
+            "description": "Get item count of a Collection",
+            "schema_hint": {"target": "$variable (Collection)", "out": "$variable"}
         }
     }
     
@@ -956,7 +985,12 @@ if HAS_SGLANG:
             "  THOUGHTS: <text>\n"
             "  DONE: <YES or NO - is the entire GOAL satisfied?>\n"
             "  NEXT_TASK: <next high-level subgoal, or blank if DONE=YES>\n"
-            "  REQUEST_TOOLS: <json list of tool names>\n\n"
+            "  REQUEST_TOOLS: <json array of tool names or empty array []>\n\n"
+            "  CRITICAL for REQUEST_TOOLS:\n"
+            "  - Always output valid JSON array: [] or [\"tool1\", \"tool2\"]\n"
+            "  - If no tools needed, output: []\n"
+            "  - If tools needed, output complete array on single line\n"
+            "  - Example: [\"project\", \"filter-structured\"]\n\n"
             "  If you realize you need a tool not initially selected, add it to REQUEST_TOOLS.\n"
             "  You'll receive its full documentation before the next step.\n\n"
             "Follow these formats exactly."
@@ -1044,8 +1078,8 @@ if HAS_SGLANG:
                 + gen(f"done_{step}", max_tokens=8, stop="\n")
                 + "\nNEXT_TASK: "
                 + gen(f"next_task_{step}", max_tokens=128, stop="\n")
-                + "\nREQUEST_TOOLS <optional: json list of tool names>(tools you may need but didn't initially select): \n"
-                + gen(f"request_tools_{step}", max_tokens=64, stop="\n")
+                + "\nREQUEST_TOOLS: "
+                + gen(f"request_tools_{step}", max_tokens=128, stop=["\n\n", "\n\nSTAGE"])
                 + "\n"
             )
             logger.info(f"THOUGHTS: {s[f'thoughts_{step}']}")

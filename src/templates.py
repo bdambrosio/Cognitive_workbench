@@ -818,18 +818,24 @@ Examples:
   {"type":"coerce","target":"$data","operation":"flatten","out":"$coerced"}
 
 ## add
-Description: Add a Note to an existing Collection (mutates Collection in place)
-Input: target: $variable → Collection, value: $variable → Note or literal
+Description: Add a Note or Collection to an existing Collection (mutates Collection in place with ID-based deduplication)
+Input: target: $variable → Collection, value: $variable → Note/Collection or literal
 Output: out: $variable → Collection (same variable, mutated)
 Parameters:
   - target (required): $variable referencing Collection
-  - value (required): $variable referencing Note or literal value
+  - value (required): $variable referencing Note, Collection, or literal value
   - out (required): $variable name (should match target)
 Preconditions: target variable must be bound to Collection
-Postconditions: Collection has new item added, out variable references same Collection
+Postconditions: Collection has new items added (deduplicated by Note ID), out variable references same Collection
+Notes:
+  - If value is a Collection, all its items are added with ID-based deduplication
+  - Duplicate Note IDs are automatically skipped
+  - Preserves name, persistence, and all metadata of target Collection
+  - Auto-updates vector index if target Collection is indexed
 Examples:
   {"type":"add","target":"$collection","value":"$new_note","out":"$collection"}
   {"type":"add","target":"$dialog_history","value":"Hello user","out":"$dialog_history"}
+  {"type":"add","target":"$papers","value":"$new_papers","out":"$papers"}
 
 ## size
 Description: Get item count of a Collection

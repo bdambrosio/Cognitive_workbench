@@ -144,7 +144,7 @@ Answer 'yes' or 'no', followed by a brief explanation (max 20 words). Include no
                 "expect_text": expect,
                 "update_text": resolved_text
             },
-            max_tokens=100,
+            max_tokens=30,
             temperature=0.3,
             is_json=False
         )

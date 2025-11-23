@@ -58,9 +58,10 @@ Variables:
 - Variables are cleared after plan completion
 
 Argument Conventions:
-- Literal strings/values: Use directly without "$" prefix (e.g., "hello")
+- Literal strings/values: Use directly without "$" prefix (e.g., "hello", "query text")
 - Variable references: Use "$variable" to resolve Note/Collection content
-- Output names: In "out" fields, use "$variable" syntax (e.g., "out":"$result")
+- Output names: In "out" fields, ALWAYS use "$variable" syntax (e.g., "out":"$result")
+- value field: Use "$variable" for data from variables, plain string for literal queries/text
 - Tools: Use tool name directly as action type (e.g., {"type":"tool-name",...})
 - Resource names: Case-sensitive
 
@@ -98,13 +99,16 @@ Pattern: Combining Multiple Collections
   Use union to merge results from multiple sources:
   {"type":"union","target":"$collection1","value":"$collection2","out":"$combined"}
 
-Pattern: Adding filtered items to existing Collection
-  load → semantic-scholar/query-web (returns Collection) → map with add to append each item → persist
+Pattern: Adding items to existing Collection
+  load → semantic-scholar/query-web (returns Collection) → add to append all items
   
   Example - Add new research papers to existing collection:
   {"type":"load","resource_id":"papers","out":"$papers","expect":"should have existing paper collection"}
   {"type":"semantic-scholar","args":{"query":"LLM agents 2025"},"out":"$new_papers","expect":"should find recent papers"}
-  {"type":"map","target":"$new_papers","operation":"add","args":{"target":"$papers"},"out":"$papers"}
+  {"type":"add","target":"$papers","value":"$new_papers","out":"$papers"}
+  
+  Note: add accepts both single Notes and Collections. When adding a Collection, all items are 
+  added with ID-based deduplication (duplicates skipped automatically).
 
 Pattern: Global resource discovery (search-notes/search-collections)
   search-notes → load → (use found Note IDs)
