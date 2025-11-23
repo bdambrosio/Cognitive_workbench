@@ -25,14 +25,37 @@ This workbench currently focuses on three main areas of cognitive agent research
 ### 1. Incremental Planning with SGLang
 The **Incremental Planner** implements **interleaved reasoning** where the agent:
 - **Plans** incrementally, a few steps at a time
-- **Executes** tools during planning to gather information
-- **Adapts** the plan based on execution results
+- **Executes** tools **during planning** to gather information
+- **Adapts** the plan based on execution results  
 - **Requests** additional tools dynamically as needs emerge
-- All within SGLang's structured generation framework for efficient inference
+- All within SGLang's `@function` context for efficient synchronous execution
 
-This creates a tight loop between thought and action, allowing agents to handle complex, multi-stage research tasks that require iterative information gathering and synthesis.
+**Key Innovation:** Tool execution happens **inside** the planning loop, not after. The planner sees actual results (e.g., "Word count: 306") and adapts immediately.
+
+**Result Format:** Tools now return both status and actual values:
+```
+[SUCCESS] Word count: 306 | word-count completed | Bound: $count to Note_529
+```
+
+This tight integration between thought and action enables complex research tasks requiring iterative information gathering and synthesis.
 
 *See: `src/incremental_planner.py`*
+
+### New Interactive Primitives
+
+**`ask` Primitive:**
+- Agent can request information from the user mid-plan
+- Synchronous execution: planning suspends until user responds
+- UI shows pending question indicator in input area
+- Example: `{"type": "ask", "target": "user", "value": "Which paper should I focus on?", "out": "$user_choice"}`
+
+**`think` Primitive (Revised):**
+- Internal reasoning appended to SGLang conversation state
+- Not executed externally, but logged for debugging
+- Creates actual Notes in infospace for later reference
+- Example: `{"type": "think", "value": "Need to verify these claims before proceeding", "out": "$thought"}`
+
+*See: `src/infospace_executor.py`*
 
 ### 2. Information Space ("Infospace")
 Information is treated as a spatial environment where:
@@ -62,26 +85,32 @@ The system is 100% **Infospace-only** (physical world support removed). It uses 
 
 | Component | Responsibility |
 |-----------|----------------|
-| **Executive Node** | OODA loop, planning, goal management, memory coordination |
-| **Incremental Planner** | SGLang-based iterative planning with tool execution feedback |
-| **Infospace Executor** | Executes primitives (create, load, search, etc.) and tools (Python/LLM skills) |
+| **Executive Node** | OODA loop, planning coordination, goal management, memory integration |
+| **Incremental Planner** | SGLang-based synchronous planning with in-loop tool execution |
+| **Infospace Executor** | Executes primitives (create, load, search, ask, think) and tools |
 | **Resource Manager** | Manages Notes/Collections, vector indexing, semantic search |
-| **Memory Module** | Entity models, discourse tracking, conversation history (no RAG) |
+| **Memory Module** | Entity models, discourse tracking, conversation history |
+| **FastAPI UI** | Web interface for monitoring and interaction |
 
-### Removed Components (Nov 2025)
+### Recent Removals (Nov 2025)
 - ~~Memory Node~~ → Integrated into Executive Node as `memory.py` module
-- ~~Map Node~~ → Functionality moved to `InfospaceResourceManager`
+- ~~Map Node~~ → Functionality moved to `InfospaceResourceManager` (direct method calls)
 - ~~Perception Node~~ → Refactored to `action_post_processing.py` utility
 - ~~Semantic Validator~~ → Validation now handled by Incremental Planner
 - ~~Physical World~~ → System is 100% infospace-only
 - ~~CharacterRAGStore~~ → Removed (unused)
+- ~~UnifiedPlanner~~ → Removed (redundant abstraction layer)
+- ~~Activity System~~ → Removed (activity_manager, activity UI tabs, activity.py)
+- ~~Turn-based Execution~~ → Continuous OODA loop with direct planning
+- ~~Simulation Time~~ → Now uses real `datetime.datetime`
 
 ### Technology Stack
-- **Communication**: [Eclipse Zenoh](https://zenoh.io/) (Python implementation)
-- **LLM Backend**: [SGLang](https://github.com/sgl-project/sglang) (primary), OpenAI/vLLM (fallback)
-- **Planning**: SGLang-based incremental planner with constrained generation
+- **Communication**: [Eclipse Zenoh](https://zenoh.io/) (Python) - for inter-process pub/sub
+- **LLM Backend**: [SGLang](https://github.com/sgl-project/sglang) (required for planning)
+- **Planning**: SGLang `@function` with constrained generation, synchronous execution
 - **Vector Store**: `txtai` with `sentence-transformers` embeddings
-- **Tools**: 32 dynamically loaded skills in `src/tools/`
+- **Tools**: 32+ dynamically loaded skills in `src/tools/`
+- **UI**: FastAPI + WebSockets for real-time monitoring
 
 ---
 
@@ -262,9 +291,28 @@ pip install -r src/requirements.txt
 
 ### Configuration
 Edit `scenarios/jill.yaml`:
-- Set `llm_config` for fallback LLM (OpenAI/vLLM)
-- Set `sgl_model_path` for SGLang runtime (e.g., `/path/to/Qwen2.5-32B-Instruct`)
-- Configure `is_infospace: true` (required)
+
+**Minimal Configuration:**
+```yaml
+llm_config:
+  sgl_model_path: "/path/to/model"  # Required - path to your SGLang model
+
+characters:
+  Jill:
+    character: |
+      Character description...
+    drives:
+      - Goal 1
+      - Goal 2
+```
+
+**SGLang Model Path:** This is the only required LLM configuration. Point it to a local model compatible with SGLang (e.g., Qwen, Llama, etc.).
+
+**Removed Configurations:**
+- `server_name`, `model_name` - No longer used (SGLang only)
+- Activity ontology files (`*-activity-ontology.json`)
+- Activities list files (`*-activities.json`)
+- Simulation time configuration
 
 ### Running an Experiment
 ```bash
@@ -281,28 +329,33 @@ Access the UI at `http://localhost:3000`.
 
 ```
 src/
-├── executive_node.py           # Main OODA loop, SGLang runtime initialization
-├── incremental_planner.py      # SGLang-based iterative planning
-├── infospace_executor.py       # Primitive & tool execution (4191 lines)
-├── infospace_resource_manager.py  # Note/Collection management, vector search
-├── memory.py                   # Entity model & discourse wrapper
-├── entity_model.py            # Theory of Mind tracking
-├── discourse.py               # Conversation analysis
-├── unified_planner.py         # Template-based planning (legacy)
+├── executive_node.py           # Main OODA loop, SGLang runtime, planning coordination
+├── incremental_planner.py      # SGLang-based synchronous planning with tool execution
+├── infospace_executor.py       # Primitive & tool execution engine
+├── infospace_resource_manager.py  # Note/Collection persistence, vector search
+├── memory.py                   # Entity model & discourse integration
+├── entity_model.py            # Theory of Mind tracking per entity
+├── discourse.py               # Conversation state analysis
+├── fastapi_action_display.py  # Web UI server (FastAPI + WebSockets)
+├── launcher.py                # Process orchestration
+├── templates.py               # LLM prompt templates
 ├── utils/
-│   ├── action_post_processing.py  # Expectation comparison
-│   └── llm_api.py             # LLM client abstraction
-└── tools/                     # 32 dynamically loaded skills
+│   ├── action_post_processing.py  # Result validation utilities
+│   └── llm_api.py             # LLM client wrapper (legacy)
+└── tools/                     # 32+ dynamically loaded skills
     ├── query-web/             # Web search & extraction
     ├── semantic-scholar/      # Academic paper search
     ├── summarize/             # Text summarization
     ├── filter-collection/     # Semantic filtering
     ├── relate/                # Relationship analysis
+    ├── word-count/            # Text metrics
     └── ...
 
 scenarios/                     # Agent configuration YAML files
-tests/                        # Evaluation framework
-Docs/                         # Design documents (may be outdated)
+data/                         # Persistent storage (Notes, Collections, memory)
+logs/                         # Execution logs and planner traces
+Docs/                         # Design documents (may lag code)
+
 ```
 
 ---
@@ -336,17 +389,53 @@ Docs/                         # Design documents (may be outdated)
 - `create-collection` - Create Collection from items
 
 **Primitives (built-in):**
-- `load`, `save`, `delete`, `display`, `think`, `ask`, `tell`, `index`
+- `load` - Load Note or Collection by ID or name
+- `save` - Persist Note or Collection to disk
+- `delete` - Remove Note or Collection
+- `display` - Show content in UI popup
+- `think` - Internal reasoning (logged, not executed externally)
+- `ask` - Interactive user input (synchronous wait for response)
+- `tell` - Send message to another character
+- `index` - Build vector index for Collection search
 
 ---
 
 ## ⚠️ Current Limitations
 
-1. **No physical world simulation** (removed Nov 2025)
-2. **Single-agent focus** (multi-agent WIP)
-3. **Memory persistence** is simple JSON (no graph DB)
-4. **UI is minimal** (research tool, not production)
-5. **Documentation lags code** by design (code = truth)
+1. **SGLang Required** - No longer optional; needed for planning
+2. **No physical world simulation** (removed Nov 2025)
+3. **Single-agent focus** (multi-agent capabilities reduced)
+4. **Memory persistence** is simple JSON (no graph DB)
+5. **UI is minimal** (research tool, not production-ready)
+6. **Documentation lags code** by design (code = truth)
+
+---
+
+## 🚨 Breaking Changes (Nov 2025)
+
+If migrating from an earlier version:
+
+**Removed:**
+- Activity system (activity_manager, activity ontology, activity.json files)
+- UnifiedPlanner (use IncrementalPlanner directly)
+- Simulation time (use real datetime)
+- Map node queryables (use resource_manager direct calls)
+- Physical world support
+- `server_name` and `model_name` in llm_config (use `sgl_model_path` only)
+
+**Changed:**
+- Tool result format (now includes actual values)
+- `think` primitive now creates Notes (not just logs)
+- `ask` primitive works synchronously (polls for response)
+- Tools receive `resource_manager` as kwarg
+- Startup is faster (planners initialized once)
+
+**Migration Guide:**
+1. Update `llm_config` in YAML - only `sgl_model_path` needed
+2. Remove activity-related files (`*-activity-ontology.json`, `*-activities.json`)
+3. SGLang is now required (install if not present)
+4. Tool implementations may need `resource_manager` parameter
+5. UI will only show "Plan" tab (Activity tabs removed)
 
 ---
 
@@ -354,39 +443,74 @@ Docs/                         # Design documents (may be outdated)
 
 ### Recent Architectural Changes (Nov 2025)
 
-**Simplification:** Removed 4 major components (Memory Node, Map Node, Perception Node, Semantic Validator) by:
-- Consolidating memory into `executive_node` as simple module
-- Moving indexing/search to `InfospaceResourceManager` (direct method calls)
-- Converting validation to inline checks in incremental planner
-- Removing physical world entirely (100% infospace)
+**Major Simplifications:**
+
+1. **Removed UnifiedPlanner abstraction** (redundant layer)
+   - `IncrementalPlanner` and `InfospacePlanner` now initialized directly in `executive_node`
+   - Eliminated startup delay from repeated planner instantiation
+   - Cleaner architecture with fewer indirection layers
+
+2. **Eliminated Activity System** (activity_manager, activity.py, activity UI tabs)
+   - System is now purely goal/plan-based
+   - Removed activity ontology, activity selection, activity tracking
+   - Simplified UI: only "Plan" tab remains in character panel
+   - Removed ~500 lines of dead code
+
+3. **Resource Access Refactoring**
+   - Replaced Zenoh queries with direct method calls to `resource_manager`
+   - Tools now receive `resource_manager` as kwarg parameter
+   - Fixed broken `load`, `generate-note`, `relate`, `fetch-text` tools
+   - Eliminated map_node queryables (no longer needed)
+
+4. **Removed Simulation Time**
+   - Now uses real `datetime.datetime` throughout
+   - Simplified time handling (no time advancement coordination)
+   - Removed time subscribers and publishers
+
+5. **Improved Tool Result Reporting**
+   - Results now show actual values, not just status
+   - Format: `[SUCCESS] <actual_result> | <action> | Bound: <var> to <resource>`
+   - 128-char truncation for long results
+   - Planner sees both execution status and actual data
 
 **Benefits:**
 - 40% reduction in inter-process communication
-- Simpler debugging (fewer nodes)
-- Direct method calls vs. Zenoh queries
-- SGLang as primary LLM backend (faster inference)
+- Simpler debugging (fewer nodes, direct calls)
+- Faster startup (single planner initialization)
+- Better planner feedback (sees actual tool results)
+- Cleaner codebase (~700 lines of dead code removed)
 
 **Trade-offs:**
 - Less modularity (acceptable for research)
-- Harder to scale to multi-agent scenarios
 - Executive node is larger (~2400 lines)
+- SGLang is now required (not optional)
 
 ---
 
 ## 📊 Performance Characteristics
 
 **Typical Complex Task (16 steps):**
-- Total time: ~60 seconds
+- Total time: ~45-60 seconds (improved with direct method calls)
 - Web searches: 2-4 seconds each
 - Semantic Scholar: 1 second
 - Summarization: 1-8 seconds (depends on input size)
 - Vector indexing: 300-500 embeddings/sec (txtai + sentence-transformers)
 - SGLang inference: Context-dependent (batch size 1, GPU)
+- Startup: ~15-20 seconds (improved with single planner init)
 
 **Resource Usage:**
 - Memory: ~2-4GB (without SGLang)
-- SGLang: +8-96GB GPU memory (model-dependent, I use 16Bit Qwen3-Coder-30B. set model in jill.yaml)
+- SGLang: +8-96GB GPU memory (model-dependent)
+  - Recommended: Qwen2.5-32B or Qwen3-Coder-30B (16-bit, ~60GB VRAM)
+  - Configure in `jill.yaml`: `sgl_model_path: "/path/to/model"`
 - Disk: ~50MB per agent (Note/Collection persistence)
+- Logs: Planner traces in `logs/planner_trace_{character}.txt` (full conversation state)
+
+**Recent Improvements:**
+- 40% reduction in Zenoh query overhead (direct method calls)
+- Faster startup (single planner initialization vs repeated instantiation)
+- Better planner feedback (actual tool results visible)
+- Reduced shutdown time (5s vs 10s)
 
 ---
 
