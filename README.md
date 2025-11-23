@@ -61,7 +61,7 @@ This tight integration between thought and action enables complex research tasks
 
 ### 2. Information Space ("Infospace")
 Information is treated as a spatial environment where:
-- **Notes** and **Collections** are primitive persistent objects (Items / Sets metaphor)
+- **Notes** and **Collections** are primitive persistent objects (Items / Sets metaphor, but set uniqueness is on Note ID, not content, for now)
 - **Cognitive Operations** (search, index, summarize, relate, filter, map) are "spatial" actions
 - **Tools** are dynamically loaded prompt / Python  skills executed within this space
 - All operations use vector embeddings for semantic search and organization
