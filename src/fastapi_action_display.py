@@ -856,6 +856,134 @@ class FastAPIActionDisplayNode:
             except Exception as e:
                 return {"success": False, "message": f"Error: {str(e)}"}
         
+        @self.app.post("/api/save_plan")
+        async def save_plan(request: Request):
+            """Save executed plan as a reusable tool in saved_plans/ directory."""
+            try:
+                data = await request.json()
+                tool_name = data.get('tool_name', '').strip()
+                goal = data.get('goal', '').strip()
+                plan_actions = data.get('plan', [])
+                parameters = data.get('parameters', [])  # List of {name, value, description}
+                overwrite = data.get('overwrite', False)
+                
+                # Validate inputs
+                if not tool_name:
+                    return {"success": False, "message": "Tool name is required"}
+                if not goal:
+                    return {"success": False, "message": "Goal is required"}
+                if not plan_actions:
+                    return {"success": False, "message": "Plan is empty"}
+                
+                # Validate tool name format (kebab-case)
+                import re
+                if not re.match(r'^[a-z][a-z0-9-]*$', tool_name):
+                    return {"success": False, "message": "Tool name must be lowercase kebab-case (e.g., 'research-papers')"}
+                
+                # Create saved_plans directory if it doesn't exist
+                saved_plans_dir = Path('saved_plans')
+                saved_plans_dir.mkdir(exist_ok=True)
+                
+                # Create tool directory
+                tool_dir = saved_plans_dir / tool_name
+                if tool_dir.exists():
+                    if not overwrite:
+                        return {"success": False, "message": f"Tool '{tool_name}' already exists"}
+                    # Overwrite - remove existing directory
+                    import shutil
+                    shutil.rmtree(tool_dir)
+                tool_dir.mkdir()
+                
+                # Generate SKILL.md with frontmatter
+                skill_content = f"""---
+name: {tool_name}
+description: {goal}
+type: plan
+manual_only: true
+parameters:
+"""
+                for param in parameters:
+                    param_name = param.get('name', '')
+                    param_desc = param.get('description', '')
+                    param_required = param.get('required', True)
+                    skill_content += f"  - name: {param_name}\n"
+                    if param_desc:
+                        skill_content += f"    description: {param_desc}\n"
+                    skill_content += f"    required: {param_required}\n"
+                
+                skill_content += """---
+
+# {tool_name}
+
+{goal}
+
+## Parameters
+
+"""
+                for param in parameters:
+                    param_name = param.get('name', '')
+                    param_desc = param.get('description', 'No description')
+                    param_default = param.get('value', '')
+                    skill_content += f"- `{param_name}`: {param_desc}"
+                    if param_default:
+                        skill_content += f" (default: `{param_default}`)"
+                    skill_content += "\n"
+                
+                skill_content += """
+## Usage
+
+```json
+{{
+  "type": "{tool_name}",
+  "args": {{"param1": "value1", ...}},
+  "out": "$result",
+  "expect": "..."
+}}
+```
+
+## Implementation
+
+This is a saved plan generated from an executed goal. The plan is stored in `plan.json` and will be executed directly when this tool is invoked.
+
+Original goal: {goal}
+
+Generated: {generated_at}
+"""
+                
+                # Write SKILL.md
+                skill_path = tool_dir / 'SKILL.md'
+                skill_path.write_text(skill_content.format(
+                    tool_name=tool_name,
+                    goal=goal,
+                    generated_at=datetime.now().isoformat()
+                ))
+                
+                # Generate plan.json
+                plan_data = {
+                    "goal": goal,
+                    "plan": plan_actions,
+                    "out": "$result",
+                    "parameters": {p['name']: p.get('value', '') for p in parameters},
+                    "saved_at": datetime.now().isoformat()
+                }
+                
+                plan_path = tool_dir / 'plan.json'
+                plan_path.write_text(json.dumps(plan_data, indent=2))
+                
+                logger.info(f"💾 Saved plan as tool: {tool_name} in {tool_dir}")
+                
+                return {
+                    "success": True,
+                    "message": f"Plan saved as tool: {tool_name}",
+                    "path": str(tool_dir)
+                }
+                
+            except Exception as e:
+                logger.error(f"Error saving plan: {e}")
+                import traceback
+                traceback.print_exc()
+                return {"success": False, "message": f"Error: {str(e)}"}
+        
         @self.app.post("/api/export_to_obsidian")
         async def export_to_obsidian():
             """Export current trace file to Obsidian vault."""
@@ -1797,7 +1925,7 @@ class FastAPIActionDisplayNode:
                         <button onclick="saveAll()" style="background: #95e1d3; color: #1a1a1a; margin-right: 10px;" title="Save all resources and memory to disk">Save</button>
                         <button onclick="exportToObsidian()" style="background: #7c3aed; color: white; margin-right: 10px;" title="Export action log to Obsidian vault">Obsidian</button>
                         <button onclick="openResourceBrowser()" style="background: #0e639c; color: white; margin-right: 10px;" title="Open resource browser in new tab to view Notes and Collections">🔍 Browser</button>
-                        <button onclick="openTestRunner()" style="background: #f39c12; color: white; margin-right: 10px;" title="Open test runner to run evaluation tests">🧪 Test</button>
+                        <button id="testButton" onclick="openTestRunner()" style="background: #555; color: #888; margin-right: 10px;" disabled title="Waiting for system startup...">🧪 Test</button>
                         <button onclick="shutdownWithSave()" style="background: #ff4757; color: white;" title="Save all data and shutdown the system">Shutdown</button>
                     </div>
                     <div style="margin-bottom: 15px; padding: 10px; background: #333; border-radius: 5px;">
@@ -1891,6 +2019,52 @@ class FastAPIActionDisplayNode:
                 </div>
                 <div id="testStatus" style="margin-top: 15px; padding: 10px; background: #2d2d2d; border-radius: 4px; min-height: 60px; max-height: 200px; overflow-y: auto;">
                     <div style="color: #888;">Select a test file to see details...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Save Plan Modal -->
+    <div id="savePlanModal" class="modal">
+        <div class="modal-content" style="max-width: 600px;">
+            <div class="modal-header">
+                <h2>💾 Save Plan as Tool</h2>
+                <span class="modal-close" onclick="closeSavePlanModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; margin-bottom: 5px; color: #ccc; font-weight: bold;">Tool Name:</label>
+                    <input type="text" id="toolNameInput" placeholder="e.g., research-papers-workflow" 
+                           style="width: 100%; padding: 8px; background: #1a1a1a; color: #e0e0e0; border: 1px solid #555; border-radius: 4px; font-family: 'Courier New', monospace;">
+                    <div style="font-size: 11px; color: #888; margin-top: 4px;">Use lowercase kebab-case (e.g., 'create-collection', 'search-papers')</div>
+                </div>
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; margin-bottom: 5px; color: #ccc; font-weight: bold;">Goal/Description:</label>
+                    <textarea id="toolGoalInput" rows="3" 
+                              style="width: 100%; padding: 8px; background: #1a1a1a; color: #e0e0e0; border: 1px solid #555; border-radius: 4px; resize: vertical; font-family: 'Segoe UI', sans-serif;"></textarea>
+                </div>
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; margin-bottom: 5px; color: #ccc; font-weight: bold;">Parameters (detected):</label>
+                    <div id="toolParametersDisplay" style="padding: 8px; background: #1a1a1a; border: 1px solid #555; border-radius: 4px; min-height: 40px; max-height: 200px; overflow-y: auto;">
+                        <div style="color: #888; font-style: italic;">No parameters detected</div>
+                    </div>
+                </div>
+                <div style="margin-bottom: 15px;">
+                    <label style="display: flex; align-items: center; color: #ccc; cursor: pointer;">
+                        <input type="checkbox" id="overwriteCheckbox" style="margin-right: 8px; cursor: pointer;">
+                        <span>Overwrite if tool already exists</span>
+                    </label>
+                </div>
+                <div style="display: flex; gap: 10px;">
+                    <button onclick="closeSavePlanModal()" style="flex: 1; background: #555; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">
+                        Cancel
+                    </button>
+                    <button onclick="executeSavePlan()" style="flex: 1; background: #00d4ff; color: #1a1a1a; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">
+                        💾 Save Tool
+                    </button>
+                </div>
+                <div id="savePlanStatus" style="margin-top: 15px; padding: 10px; background: #2d2d2d; border-radius: 4px; min-height: 40px; display: none;">
+                    <div style="color: #888;">Status will appear here...</div>
                 </div>
             </div>
         </div>
@@ -2007,9 +2181,11 @@ class FastAPIActionDisplayNode:
                                     // Enable controls if not in run mode
                                     const stepButton = document.getElementById('stepButton');
                                     const runButton = document.querySelector('button[onclick="runTurns()"]');
+                                    const testButton = document.getElementById('testButton');
                                     if (currentTurnMode !== 'run') {
                                         stepButton.disabled = false; stepButton.style.background = '#4ecdc4'; stepButton.title = 'Click to advance to next turn';
                                         runButton.disabled = false; runButton.style.background = '#ffe66d'; runButton.style.color = '#1a1a1a'; runButton.title = 'Click to run multiple turns';
+                                        testButton.disabled = false; testButton.style.background = '#f39c12'; testButton.style.color = 'white'; testButton.title = 'Open test runner to run evaluation tests';
                                     }
                                 }
                             }
@@ -2113,6 +2289,7 @@ class FastAPIActionDisplayNode:
             // Initialize buttons as disabled until system is ready
             const stepButton = document.getElementById('stepButton');
             const runButton = document.getElementById('runButton');
+            const testButton = document.getElementById('testButton');
             
             stepButton.disabled = true;
             stepButton.style.background = '#555';
@@ -2122,6 +2299,11 @@ class FastAPIActionDisplayNode:
             runButton.style.background = '#555';
             runButton.style.color = '#888';
             runButton.title = 'Waiting for system startup...';
+            
+            testButton.disabled = true;
+            testButton.style.background = '#555';
+            testButton.style.color = '#888';
+            testButton.title = 'Waiting for system startup...';
         });
         
         // Character Data Tab Functions
@@ -2340,9 +2522,12 @@ class FastAPIActionDisplayNode:
             
             // Add current plan if available
             if (tabData.currentPlan) {
+                const escapedCharName = characterName.replace(/'/g, "\\'");
                 content += `
                     <div class="character-data-item">
-                        <div class="character-data-label">Current Plan</div>
+                        <div class="character-data-label">Current Plan
+                            <button onclick="showSavePlanModal('${escapedCharName}')" style="float: right; padding: 2px 8px; background: #00d4ff; color: #1a1a1a; border: none; border-radius: 3px; cursor: pointer; font-size: 11px; font-weight: bold;">💾 Save as Tool</button>
+                        </div>
                         <div class="character-data-value"><pre style="white-space: pre-wrap; font-family: 'Courier New', monospace; font-size: 12px; margin: 0;">${tabData.currentPlan}</pre></div>
                     </div>
                 `;
@@ -3087,6 +3272,194 @@ class FastAPIActionDisplayNode:
                         <div>Compatibility checks: ${checks}</div>
                     </div>
                 `;
+            }
+        }
+        
+        // Save Plan Modal Functions
+        let currentSavePlanCharacter = null;
+        
+        function showSavePlanModal(characterName) {
+            currentSavePlanCharacter = characterName;
+            const tabData = characterTabs.get(characterName);
+            
+            if (!tabData || !tabData.currentPlan) {
+                alert('No plan available for this character');
+                return;
+            }
+            
+            // Parse the plan
+            let planData;
+            try {
+                planData = JSON.parse(tabData.currentPlan);
+            } catch (e) {
+                alert('Failed to parse plan JSON');
+                return;
+            }
+            
+            // Auto-suggest tool name from goal
+            const goal = tabData.goal || '';
+            let suggestedName = goal.toLowerCase()
+                .replace(/[^a-z0-9\s-]/g, '')
+                .replace(/\s+/g, '-')
+                .substring(0, 50);
+            if (!suggestedName) {
+                suggestedName = 'saved-plan';
+            }
+            
+            // Pre-fill form
+            document.getElementById('toolNameInput').value = suggestedName;
+            document.getElementById('toolGoalInput').value = goal;
+            
+            // Extract parameters from plan (look for literals and variables)
+            const parameters = extractPlanParameters(planData);
+            displayParameters(parameters);
+            
+            // Show modal
+            document.getElementById('savePlanModal').style.display = 'block';
+            document.getElementById('savePlanStatus').style.display = 'none';
+        }
+        
+        function closeSavePlanModal() {
+            document.getElementById('savePlanModal').style.display = 'none';
+            currentSavePlanCharacter = null;
+        }
+        
+        function extractPlanParameters(planData) {
+            // Extract unique literal values and variable references from plan
+            const parameters = [];
+            const seen = new Set();
+            
+            function traverse(obj, path = '') {
+                if (Array.isArray(obj)) {
+                    obj.forEach((item, idx) => traverse(item, `${path}[${idx}]`));
+                } else if (typeof obj === 'object' && obj !== null) {
+                    for (const [key, value] of Object.entries(obj)) {
+                        if (key === 'args' && typeof value === 'object') {
+                            // Found args object - extract parameters
+                            for (const [argKey, argValue] of Object.entries(value)) {
+                                const paramKey = `${obj.type || 'action'}.${argKey}`;
+                                if (!seen.has(paramKey)) {
+                                    seen.add(paramKey);
+                                    parameters.push({
+                                        name: argKey,
+                                        value: typeof argValue === 'string' ? argValue : JSON.stringify(argValue),
+                                        description: `Parameter for ${obj.type || 'action'}`,
+                                        required: true
+                                    });
+                                }
+                            }
+                        }
+                        traverse(value, `${path}.${key}`);
+                    }
+                }
+            }
+            
+            traverse(planData);
+            return parameters;
+        }
+        
+        function displayParameters(parameters) {
+            const display = document.getElementById('toolParametersDisplay');
+            if (parameters.length === 0) {
+                display.innerHTML = '<div style="color: #888; font-style: italic;">No parameters detected</div>';
+                return;
+            }
+            
+            let html = '<div style="font-family: Courier New, monospace; font-size: 12px;">';
+            parameters.forEach((param, idx) => {
+                html += `
+                    <div style="margin-bottom: 8px; padding: 6px; background: #2d2d2d; border-radius: 3px; border-left: 3px solid #00d4ff;">
+                        <div style="color: #00d4ff; font-weight: bold;">${param.name}</div>
+                        <div style="color: #888; font-size: 11px; margin-top: 2px;">${param.description}</div>
+                        <div style="color: #ccc; margin-top: 4px;">Default: <span style="color: #4ecdc4;">${param.value}</span></div>
+                    </div>
+                `;
+            });
+            html += '</div>';
+            display.innerHTML = html;
+        }
+        
+        async function executeSavePlan() {
+            const toolName = document.getElementById('toolNameInput').value.trim();
+            const goal = document.getElementById('toolGoalInput').value.trim();
+            const statusDiv = document.getElementById('savePlanStatus');
+            
+            // Validate inputs
+            if (!toolName) {
+                alert('Please enter a tool name');
+                return;
+            }
+            
+            if (!/^[a-z][a-z0-9-]*$/.test(toolName)) {
+                alert('Tool name must be lowercase kebab-case (e.g., "research-papers")');
+                return;
+            }
+            
+            if (!goal) {
+                alert('Please enter a goal/description');
+                return;
+            }
+            
+            const tabData = characterTabs.get(currentSavePlanCharacter);
+            if (!tabData || !tabData.currentPlan) {
+                alert('Plan data not available');
+                return;
+            }
+            
+            // Parse plan
+            let planData;
+            try {
+                planData = JSON.parse(tabData.currentPlan);
+            } catch (e) {
+                alert('Failed to parse plan JSON');
+                return;
+            }
+            
+            // Extract parameters
+            const parameters = extractPlanParameters(planData);
+            
+            // Get overwrite flag
+            const overwrite = document.getElementById('overwriteCheckbox').checked;
+            
+            // Show status
+            statusDiv.style.display = 'block';
+            statusDiv.innerHTML = '<div style="color: #f39c12;">⏳ Saving plan...</div>';
+            
+            try {
+                const response = await fetch('/api/save_plan', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        tool_name: toolName,
+                        goal: goal,
+                        plan: planData,
+                        parameters: parameters,
+                        overwrite: overwrite
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    statusDiv.innerHTML = `<div style="color: #27ae60;">✅ ${result.message}</div>`;
+                    setTimeout(() => {
+                        closeSavePlanModal();
+                    }, 2000);
+                } else {
+                    statusDiv.innerHTML = `<div style="color: #ff4757;">❌ Error: ${result.message}</div>`;
+                }
+            } catch (error) {
+                statusDiv.innerHTML = `<div style="color: #ff4757;">❌ Error: ${error.message}</div>`;
+            }
+        }
+        
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            const savePlanModal = document.getElementById('savePlanModal');
+            if (event.target === savePlanModal) {
+                closeSavePlanModal();
             }
         }
         
