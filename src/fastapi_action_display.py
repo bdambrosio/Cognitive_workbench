@@ -229,10 +229,6 @@ class FastAPIActionDisplayNode:
         self.character_current_plans: Dict[str, str] = {}  # character_name -> current_plan_string
         self.character_current_plans_lock = threading.Lock()
         
-        # Character current activities tracking
-        self.character_current_activities: Dict[str, Dict[str, Any]] = {}  # character_name -> current_activity_data
-        self.character_current_activities_lock = threading.Lock()
-        
         # Character situation data tracking
         self.character_situation_data: Dict[str, Dict[str, Any]] = {}  # character_name -> situation_data
         self.character_situation_data_lock = threading.Lock()
@@ -285,11 +281,6 @@ class FastAPIActionDisplayNode:
             self.current_plan_callback
         )
         
-        # Subscriber for character current activities
-        self.current_activity_subscriber = self.session.declare_subscriber(
-            "cognitive/*/current_activity",
-            self.current_activity_callback
-        )
         # Subscriber for character current state
         # Subscriber for launcher ready signal
         self.ready_subscriber = self.session.declare_subscriber(
@@ -1739,33 +1730,17 @@ class FastAPIActionDisplayNode:
                 
                 <!-- Character data tabs -->
                 <div class="character-data-tabs" id="characterDataTabs">
-                    <div class="character-data-tab active" data-tab="activity">Activity</div>
-                    <div class="character-data-tab" data-tab="plan">Plan</div>
-                    <div class="character-data-tab" data-tab="activities">Activities</div>
+                    <div class="character-data-tab active" data-tab="plan">Plan</div>
                 </div>
                 
                 <!-- Character data content -->
                 <div class="character-data-content">
-                    <!-- Activity tab content -->
-                    <div class="character-data-panel active" id="activityPanel">
-                        <div id="activityData" style="color: #888; font-style: italic; text-align: center; padding: 20px;">
-                            No activity data available
-                        </div>
-                    </div>
-                    
                     <!-- Plan tab content -->
-                    <div class="character-data-panel" id="planPanel">
+                    <div class="character-data-panel active" id="planPanel">
                         <div id="characterDataItems">
                             <div style="color: #888; font-style: italic; text-align: center; padding: 20px;">
                                 Select a character to view data
                             </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Activities tab content -->
-                    <div class="character-data-panel" id="activitiesPanel">
-                        <div id="activitiesData" style="color: #888; font-style: italic; text-align: center; padding: 20px;">
-                            No activities available
                         </div>
                     </div>
                 </div>
@@ -2161,22 +2136,11 @@ class FastAPIActionDisplayNode:
                 panel.classList.remove('active');
             });
             
-            if (tabName === 'activity') {
-                document.getElementById('activityPanel').classList.add('active');
-                // Refresh activity display for current character
-                if (activeCharacter) {
-                    updateActivityDataDisplay(activeCharacter);
-                }
-            } else if (tabName === 'plan') {
+            if (tabName === 'plan') {
                 document.getElementById('planPanel').classList.add('active');
                 // Refresh plan display for current character
                 if (activeCharacter) {
                     updateCharacterDataDisplay(activeCharacter);
-                }
-            } else if (tabName === 'activities') {
-                document.getElementById('activitiesPanel').classList.add('active');
-                if (activeCharacter) {
-                    updateActivitiesDataDisplay(activeCharacter);
                 }
             }
         }
@@ -2229,7 +2193,6 @@ class FastAPIActionDisplayNode:
             updateCharacterContent(characterName);
             
             // Update character data display based on active tab
-            updateActivityDataDisplay(characterName);
             updateCharacterDataDisplay(characterName);
             
             console.log(`Selected character tab: ${characterName}`);
@@ -2320,24 +2283,9 @@ class FastAPIActionDisplayNode:
         }
         
         function handleCurrentActivityUpdate(currentActivityData) {
+            // Activity tabs removed - this callback is now unused
             const characterName = currentActivityData.character;
-            const currentActivity = currentActivityData.current_activity;
-            
-            console.log(`Current activity update for ${characterName}: ${currentActivity ? 'Activity updated' : 'Activity cleared'}`);
-            
-            // Update the stored current activity for this character
-            if (characterTabs.has(characterName)) {
-                const tabData = characterTabs.get(characterName);
-                tabData.currentActivity = currentActivityData;
-                
-                // If this character's tab is currently active and activity tab is selected, update the display
-                if (activeCharacter === characterName) {
-                    updateActivityDataDisplay(characterName);
-                }
-            } else {
-                // Character tab doesn't exist yet, this shouldn't happen
-                console.warn(`Received current activity for unknown character: ${characterName}`);
-            }
+            console.log(`Current activity update for ${characterName} (ignored - activity tabs removed)`);
         }
 
         // Cache of latest simulation time (ISO string)
@@ -2408,196 +2356,11 @@ class FastAPIActionDisplayNode:
             dataItemsDiv.innerHTML = content;
         }
         
-        function updateActivityDataDisplay(characterName) {
-            const activityDataDiv = document.getElementById('activityData');
-            const tabData = characterTabs.get(characterName);
-            
-            if (!tabData || !tabData.currentActivity) {
-                activityDataDiv.innerHTML = '<div style="color: #888; font-style: italic; text-align: center; padding: 20px;">No activity data available</div>';
-                return;
-            }
-            
-            const activityData = tabData.currentActivity;
-            let content = '';
-            
-            // Add activity name if available
-            if (activityData.activity_data && activityData.activity_data.name) {
-                content += `
-                    <div class="character-data-item">
-                        <div class="character-data-label">Activity Name</div>
-                        <div class="character-data-value">${activityData.activity_data.name}</div>
-                    </div>
-                `;
-            }
-            
-            // Add activity duration if available
-            if (activityData.activity_data && activityData.activity_data.duration) {
-                const duration = activityData.activity_data.duration;
-                let durationText = '';
-                if (Array.isArray(duration)) {
-                    if (duration.length === 2) {
-                        durationText = `${duration[0]}-${duration[1]} minutes`;
-                    } else if (duration.length === 1) {
-                        durationText = `${duration[0]} minutes`;
-                    }
-                } else {
-                    durationText = `${duration} minutes`;
-                }
-                
-                content += `
-                    <div class="character-data-item">
-                        <div class="character-data-label">Duration</div>
-                        <div class="character-data-value">${durationText}</div>
-                    </div>
-                `;
-            }
-            
-            // Add activity category if available
-            if (activityData.activity_data && activityData.activity_data.category) {
-                content += `
-                    <div class="character-data-item">
-                        <div class="character-data-label">Category</div>
-                        <div class="character-data-value">${activityData.activity_data.category}</div>
-                    </div>
-                `;
-            }
-            
-            // Add activity tags if available
-            if (activityData.activity_data && activityData.activity_data.tags && activityData.activity_data.tags.length > 0) {
-                const tagsText = activityData.activity_data.tags.join(', ');
-                content += `
-                    <div class="character-data-item">
-                        <div class="character-data-label">Tags</div>
-                        <div class="character-data-value">${tagsText}</div>
-                    </div>
-                `;
-            }
-            
-            // Add current step if available
-            if (activityData.current_step && activityData.current_step.name) {
-                content += `
-                    <div class="character-data-item">
-                        <div class="character-data-label">Current Step</div>
-                        <div class="character-data-value">${activityData.current_step.name}</div>
-                    </div>
-                `;
-            }
-            
-            // Add activity steps if available
-            if (activityData.activity_data && activityData.activity_data.steps) {
-                const steps = activityData.activity_data.steps;
-                const currentStepIndex = activityData.activity_state ? activityData.activity_state.current_step_index || 0 : 0;
-                
-                let stepsContent = '';
-                steps.forEach((step, index) => {
-                    const isCurrentStep = index === currentStepIndex;
-                    const stepStyle = isCurrentStep ? 
-                        'background: #2a2a2a; color: #00d4ff; padding: 2px 4px; border-radius: 3px;' : 
-                        'color: #ccc;';
-                    const prefix = isCurrentStep ? '▶ ' : '  ';
-                    stepsContent += `${prefix}<span style="${stepStyle}">${index + 1}. ${step}</span>\n`;
-                });
-                
-                content += `
-                    <div class="character-data-item">
-                        <div class="character-data-label">Activity Steps</div>
-                        <div class="character-data-value"><pre style="white-space: pre-wrap; font-family: 'Courier New', monospace; font-size: 12px; margin: 0; line-height: 1.4;">${stepsContent}</pre></div>
-                    </div>
-                `;
-            }
-            
-            // Add activity state if available
-            if (activityData.activity_state) {
-                content += `
-                    <div class="character-data-item">
-                        <div class="character-data-label">Activity State</div>
-                        <div class="character-data-value"><pre style="white-space: pre-wrap; font-family: 'Courier New', monospace; font-size: 12px; margin: 0;">${JSON.stringify(activityData.activity_state, null, 2)}</pre></div>
-                    </div>
-                `;
-            }
-            
-            // If no content, show raw activity data
-            if (content === '' && activityData.current_activity) {
-                content = `
-                    <div class="character-data-item">
-                        <div class="character-data-label">Raw Activity Data</div>
-                        <div class="character-data-value"><pre style="white-space: pre-wrap; font-family: 'Courier New', monospace; font-size: 12px; margin: 0;">${activityData.current_activity}</pre></div>
-                    </div>
-                `;
-            }
-            
-            // Final fallback
-            if (content === '') {
-                content = '<div style="color: #888; font-style: italic; text-align: center; padding: 20px;">No activity data available</div>';
-            }
-            
-            activityDataDiv.innerHTML = content;
-        }
 
         function escapeHtml(text) {
             const div = document.createElement('div');
             div.textContent = text;
             return div.innerHTML;
-        }
-        
-        async function updateActivitiesDataDisplay(characterName) {
-            const activitiesDataDiv = document.getElementById('activitiesData');
-            
-            if (!activitiesDataDiv) return;
-            
-            activitiesDataDiv.innerHTML = '<div style="color: #888; font-style: italic; text-align: center; padding: 20px;">Loading...</div>';
-            
-            try {
-                const response = await fetch(`/api/activities/${characterName}`);
-                const data = await response.json();
-                
-                if (data.success && data.activities && data.activities.length > 0) {
-                    let html = '<div class="activities-list">';
-                    data.activities.forEach(activityName => {
-                        html += `<div class="activity-item" onclick="selectActivity('${characterName}', '${activityName}')">${activityName}</div>`;
-                    });
-                    html += '</div>';
-                    activitiesDataDiv.innerHTML = html;
-                } else {
-                    activitiesDataDiv.innerHTML = '<div style="color: #888; font-style: italic; text-align: center; padding: 20px;">No activities available</div>';
-                }
-            } catch (error) {
-                console.error(`Error fetching activities for ${characterName}:`, error);
-                activitiesDataDiv.innerHTML = '<div style="color: #ff6b6b; text-align: center; padding: 20px;">Error loading activities</div>';
-            }
-        }
-        
-        async function selectActivity(characterName, activityName) {
-            try {
-                const response = await fetch('/api/activity/set', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        character_name: characterName,
-                        activity_name: activityName
-                    })
-                });
-                
-                const result = await response.json();
-                
-                if (result.success) {
-                    console.log(`✅ Activity ${activityName} set for ${characterName}`);
-                    const resultDiv = document.getElementById('turnResult');
-                    if (resultDiv) {
-                        resultDiv.innerHTML = `<span class="success">Activity set: ${activityName}</span>`;
-                    }
-                } else {
-                    console.error(`Failed to set activity: ${result.message}`);
-                    const resultDiv = document.getElementById('turnResult');
-                    if (resultDiv) {
-                        resultDiv.innerHTML = `<span class="error">Error: ${result.message}</span>`;
-                    }
-                }
-            } catch (error) {
-                console.error(`Error setting activity:`, error);
-            }
         }
         
         // Helper function to make resource IDs clickable in text
@@ -3717,25 +3480,7 @@ class FastAPIActionDisplayNode:
             import traceback
             traceback.print_exc()
     
-    def current_activity_callback(self, sample):
-        """Handle incoming character current activities."""
-        try:
-            current_activity_data = json.loads(sample.payload.to_bytes().decode('utf-8'))
-            
-            # Extract character name from topic path
-            topic_path = str(sample.key_expr)
-            character_name = topic_path.split('/')[1]  # cognitive/{character}/current_activity
-            
-            # Store current activity for this character
-            with self.character_current_activities_lock:
-                self.character_current_activities[character_name] = current_activity_data
-            
-            # Send current activity update to web clients
-            self._send_current_activity_to_websockets(current_activity_data, character_name)
-            
-        except Exception as e:
-            import traceback
-            traceback.print_exc()
+    
     def step_complete_callback(self, sample):
         """Handle step complete events from map node."""
         try:
@@ -4029,46 +3774,6 @@ class FastAPIActionDisplayNode:
                 if websocket in self.websocket_connections:
                     self.websocket_connections.remove(websocket)
     
-    def _send_current_activity_to_websockets(self, current_activity_data: Dict[str, Any], character_name: str):
-        """Send current activity data to all connected WebSocket clients."""
-        with self.websocket_lock:
-            if not self.websocket_connections:
-                return
-        
-        # Prepare current activity data for web clients
-        web_data = {
-            'type': 'current_activity',
-            'character': character_name,
-            'current_activity': current_activity_data.get('current_activity', ''),
-            'activity_data': current_activity_data.get('activity_data'),
-            'current_step': current_activity_data.get('current_step'),
-            'activity_state': current_activity_data.get('activity_state'),
-            'timestamp': current_activity_data.get('timestamp', '')
-        }
-        
-        # Send to all connected clients
-        if self.event_loop is None:
-            return
-            
-        with self.websocket_lock:
-            disconnected = []
-            for websocket in self.websocket_connections:
-                try:
-                    # Use asyncio.run_coroutine_threadsafe to send from non-async context
-                    future = asyncio.run_coroutine_threadsafe(
-                        websocket.send_text(json.dumps(web_data)), 
-                        self.event_loop
-                    )
-                    future.result(timeout=5.0 if not self.debug else 300.0)
-                except Exception as e:
-                    # Don't remove client on timeout - just log the error
-                    if not isinstance(e, TimeoutError):
-                        disconnected.append(websocket)
-            
-            # Remove only truly disconnected clients (not timeout errors)
-            for websocket in disconnected:
-                if websocket in self.websocket_connections:
-                    self.websocket_connections.remove(websocket)
 
     def _send_current_state_to_websockets(self, current_state_data: Dict[str, Any], character_name: str):
         """Send current internal state data to all connected WebSocket clients."""
