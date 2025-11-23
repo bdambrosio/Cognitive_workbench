@@ -451,6 +451,7 @@ def main():
         print('\nReceived interrupt signal')
     finally:
         launcher.shutdown()
+        os._exit(0)
 
 
 if __name__ == '__main__':
