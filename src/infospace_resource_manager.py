@@ -738,8 +738,15 @@ class InfospaceResourceManager:
         """Lazy init embedding model"""
         if self.embedder is None:
             from sentence_transformers import SentenceTransformer
-            self.embedder = SentenceTransformer('all-MiniLM-L6-v2')
-            logger.info("Initialized embedding model: all-MiniLM-L6-v2")
+            try:
+                # Try offline first (uses cached model, no network calls)
+                self.embedder = SentenceTransformer('all-MiniLM-L6-v2', local_files_only=True)
+                logger.info("Initialized embedding model: all-MiniLM-L6-v2 (from cache)")
+            except Exception as e:
+                # First time or cache missing, download from HuggingFace
+                logger.info(f"Cache miss, downloading embedding model: {e}")
+                self.embedder = SentenceTransformer('all-MiniLM-L6-v2')
+                logger.info("Initialized embedding model: all-MiniLM-L6-v2 (downloaded)")
     
     # ==================== Note Creation ====================
     

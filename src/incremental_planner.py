@@ -159,16 +159,25 @@ Variable Syntax:
 - Literal strings: Use directly without $ (e.g., "hello")
 
 Operation Compatibility:
-┌─────────────────────────┬──────┬────────────┐
-│ Operation               │ Note │ Collection │
-├─────────────────────────┼──────┼────────────┤
-│ expand, as-json, refine │  ✓   │     ❌     │
-│ summarize, relate       │  ✓   │     ✓      │
-│ map, flatten            │  ❌  │     ✓      │
-│ search-notes            │  N/A │     N/A    │ (global discovery)
-│ search-collections      │  N/A │     N/A    │ (global discovery)
-│ search-within-collection│  ❌  │     ✓      │ (requires indexed Collection)
-└─────────────────────────┴──────┴────────────┘
+┌─────────────────────────────────┬──────┬────────────┬─────────────────────────────────┐
+│ Operation                       │ Note │ Collection │ Purpose                         │
+├─────────────────────────────────┼──────┼────────────┼─────────────────────────────────┤
+│ expand                          │  ✓   │     ❌     │ Note structure → Collection     │
+│ flatten                         │  ❌  │     ✓      │ Collection → single Note        │
+│ as-json, refine, coerce         │  ✓   │     ❌     │ Transform Note content          │
+│ summarize, relate               │  ✓   │     ✓      │ Generate new content            │
+│ map                             │  ❌  │     ✓      │ Apply op to each Collection item│
+│ project, pluck, sort, filter    │  ❌  │     ✓      │ SQL-like Collection ops         │
+│ join                            │  ❌  │     ✓      │ Merge 2 Collections (SQL JOIN)  │
+│ display                         │  ✓   │     ✓      │ Show content to user            │
+│ search-notes, search-collections│  N/A │     N/A    │ Global discovery (return Coll.) │
+│ search-within-collection        │  ❌  │     ✓      │ Search indexed Collection       │
+└─────────────────────────────────┴──────┴────────────┴─────────────────────────────────┘
+
+Key distinctions:
+- expand (Note→Coll): Transforms internal structure (array/lines) into separate items
+- flatten (Coll→Note): Opposite of expand, merges Collection into single Note
+- display: Use to VIEW contents, not expand (common mistake)
 
 Search Primitives:
 - search-notes: Global discovery across all Notes (no target needed). Returns Collection of structured Notes with text preview, metadata.source_id, metadata.uri, metadata.score, metadata.type.
@@ -185,6 +194,20 @@ All search primitives return structured Notes matching query-web/semantic-schola
 - char_count: Length of text preview
 
 Use project with metadata.uri or metadata.source_id for consistent access across all search results.
+
+SQL-like Collection Operations (require dict/JSON Notes):
+- project: Extract specific fields (SELECT columns) → new Collection with subset of fields
+- pluck: Extract single field as simple values → Collection of values  
+- filter-structured: Filter by field conditions (WHERE clauses) → filtered Collection
+- sort: Sort by field value (ORDER BY) → sorted Collection
+- join: Combine two Collections on matching field (INNER JOIN) → merged Collection
+
+Use cases:
+- project: Extract URLs from search results, get title+year from papers
+- pluck: Get just titles as simple list, extract scores for analysis
+- filter-structured: Papers after 2020, results with score>0.5, venue contains "NeurIPS"
+- sort: Rank by score (descending), chronological by year, alphabetical by title
+- join: Merge papers with citation data, combine user info with profiles
 
 Efficiency Rules:
 - Use tools directly on Notes for single items
@@ -315,8 +338,14 @@ def build_tool_catalog(available_tools: Dict[str, Dict], primitives_reference: s
             "schema_hint": {"target": "$variable", "operation": "string", "out": "$variable"}
         },
         "expand": {
-            "description": "Expand Note into Collection (JSON array or text lines)",
-            "schema_hint": {"target": "$variable", "out": "$variable"}
+            "description": "Transform Note structure into Collection: JSON array → Collection of Notes (one per element), or newline-separated text → Collection of Notes (one per line). NOT for inspecting Collection contents. Use display or flatten to view Collection data.",
+            "full_description": "Expand transforms a single Note's internal structure into a Collection. Input must be a Note (not Collection) containing either: (1) JSON array - each element becomes a Note in output Collection, or (2) newline-separated text - each line becomes a Note. This is a STRUCTURE TRANSFORMATION, not content inspection. To view Collection contents, use display (show to user) or flatten (merge into single Note). Common mistake: trying to expand a Collection to 'see inside it' - Collections are already expanded, use display instead.",
+            "examples": [
+                '{"type":"expand","target":"$json_array_note","out":"$items"}  # [1,2,3] → Collection of 3 Notes',
+                '{"type":"expand","target":"$text_note","out":"$lines"}  # "a\\nb\\nc" → Collection of 3 Notes',
+                '{"type":"expand","target":"$nested_json","out":"$objects"}  # [{"x":1},{"x":2}] → Collection'
+            ],
+            "schema_hint": {"target": "$variable (Note with array/text)", "out": "$variable (Collection)"}
         },
         "flatten": {
             "description": "Flatten Collection to single Note",
@@ -363,6 +392,68 @@ def build_tool_catalog(available_tools: Dict[str, Dict], primitives_reference: s
         "size": {
             "description": "Get item count of a Collection",
             "schema_hint": {"target": "$variable (Collection)", "out": "$variable"}
+        },
+        "project": {
+            "description": "Extract specific fields from each Note in Collection (SQL SELECT). Each Note must be JSON/dict. Only Notes with ALL requested fields present (non-null) are included in result. Use to extract URLs, titles, or specific attributes from search results.",
+            "full_description": "Project operation extracts specified fields from each Note in a Collection, similar to SQL SELECT. Input Collection must contain JSON/dict Notes. Output is a new Collection of projected Notes containing only the requested fields. Notes missing any requested field are excluded. Nested fields use dot notation (e.g., 'metadata.uri'). Common use: extract URLs from search results via project with fields=['metadata.uri'].",
+            "examples": [
+                '{"type":"project","target":"$search_results","fields":["metadata.uri"],"out":"$urls"}',
+                '{"type":"project","target":"$papers","fields":["title","metadata.year"],"out":"$paper_info"}',
+                '{"type":"project","target":"$results","fields":["metadata.source_id","metadata.score"],"out":"$filtered"}'
+            ],
+            "schema_hint": {"target": "$variable (Collection of dict Notes)", "fields": "array of field paths (strings)", "out": "$variable"}
+        },
+        "pluck": {
+            "description": "Extract single field value from each Note in Collection, returning Collection of simple values. Similar to project but returns raw values instead of dict Notes. Use when you need just one field as simple values (strings, numbers).",
+            "full_description": "Pluck extracts a single field from each Note in a Collection and returns a Collection of Notes containing just that field's value. Unlike project (which returns dict Notes), pluck returns simpler Notes. Notes missing the field are excluded. Use pluck for extracting a single attribute as values, use project for multiple fields as structured Notes.",
+            "examples": [
+                '{"type":"pluck","target":"$papers","field":"title","out":"$titles"}',
+                '{"type":"pluck","target":"$results","field":"metadata.score","out":"$scores"}'
+            ],
+            "schema_hint": {"target": "$variable (Collection of dict Notes)", "field": "string (field path)", "out": "$variable"}
+        },
+        "sort": {
+            "description": "Sort Collection by a field value (SQL ORDER BY). Notes must be JSON/dict with sortable field. Default ascending order, use reverse:true for descending.",
+            "full_description": "Sort a Collection by comparing a field in each Note. Input Collection must contain JSON/dict Notes with the specified field. Field must contain sortable values (numbers, strings, dates). Default is ascending order (A-Z, 0-9), set reverse:true for descending (Z-A, 9-0). Notes missing the sort field are placed at end.",
+            "examples": [
+                '{"type":"sort","target":"$papers","field":"metadata.year","out":"$sorted_papers"}',
+                '{"type":"sort","target":"$results","field":"metadata.score","reverse":true,"out":"$ranked"}',
+                '{"type":"sort","target":"$items","field":"title","out":"$alphabetical"}'
+            ],
+            "schema_hint": {"target": "$variable (Collection of dict Notes)", "field": "string (field path)", "reverse": "boolean (optional, default false)", "out": "$variable"}
+        },
+        "filter-structured": {
+            "description": "Filter Collection by field conditions (SQL WHERE with structured predicates). Supports operators: eq, ne, gt, lt, gte, lte, contains, in. Use for filtering by metadata like year>2020 or score>=0.5.",
+            "full_description": "Filter a Collection using structured field conditions. Input Collection must contain JSON/dict Notes. Conditions specify field, operator, and value. Operators: eq (equals), ne (not equals), gt (greater than), lt (less than), gte (>=), lte (<=), contains (substring/membership), in (value in list). Multiple conditions are AND-ed together. Notes missing fields fail the condition.",
+            "examples": [
+                '{"type":"filter-structured","target":"$papers","conditions":[{"field":"metadata.year","operator":"gte","value":2020}],"out":"$recent"}',
+                '{"type":"filter-structured","target":"$results","conditions":[{"field":"metadata.score","operator":"gt","value":0.5}],"out":"$high_quality"}',
+                '{"type":"filter-structured","target":"$papers","conditions":[{"field":"metadata.venue","operator":"contains","value":"NeurIPS"}],"out":"$neurips_papers"}'
+            ],
+            "schema_hint": {"target": "$variable (Collection of dict Notes)", "conditions": "array of {field, operator, value}", "out": "$variable"}
+        },
+        "join": {
+            "description": "Join two Collections on a common field (SQL JOIN). Creates new Collection of merged Notes where field values match. Inner join: only matching pairs included.",
+            "full_description": "Join two Collections by matching a field in Notes from both Collections. Input Collections must contain JSON/dict Notes with the specified join field. For each Note in left Collection, finds matching Notes in right Collection where field values are equal. Creates new Notes by merging matched pairs (right fields overwrite left on conflict). Only matched pairs are included (inner join). Use for combining related data from different sources.",
+            "examples": [
+                '{"type":"join","left":"$papers","right":"$citations","on":"paper_id","out":"$papers_with_citations"}',
+                '{"type":"join","left":"$users","right":"$profiles","on":"user_id","out":"$user_profiles"}'
+            ],
+            "schema_hint": {"left": "$variable (Collection)", "right": "$variable (Collection)", "on": "string (field name to join on)", "out": "$variable"}
+        },
+        "coerce": {
+            "description": "Convert Note content to different type/format. Supports: to-string, to-int, to-float, to-bool, to-json (parse JSON string), to-list (split string or wrap value). Use for type conversion before operations requiring specific types.",
+            "full_description": "Coerce converts a Note's content to a different type. Input is a Note (not Collection). Coercion types: 'to-string' (any -> string), 'to-int' (string/number -> integer), 'to-float' (string/number -> float), 'to-bool' (string/number -> boolean), 'to-json' (JSON string -> parsed object), 'to-list' (string -> split by delimiter, or value -> [value]). Use when operations require specific types (e.g., arithmetic needs numbers, sort needs comparable types).",
+            "examples": [
+                '{"type":"coerce","target":"$count_string","coercion":"to-int","out":"$count_number"}',
+                '{"type":"coerce","target":"$json_string","coercion":"to-json","out":"$parsed_object"}',
+                '{"type":"coerce","target":"$csv_line","coercion":"to-list","delimiter":",","out":"$fields"}'
+            ],
+            "schema_hint": {"target": "$variable (Note)", "coercion": "string (to-string|to-int|to-float|to-bool|to-json|to-list)", "delimiter": "string (optional, for to-list)", "out": "$variable"}
+        },
+        "focus": {
+            "description": "Set planning context focus (internal state). RARELY NEEDED. Most plans don't need explicit focus - use think for reasoning instead. Only use if explicitly managing planner attention across complex multi-phase workflows.",
+            "schema_hint": {"value": "string (focus description)"}
         }
     }
     
@@ -372,6 +463,11 @@ def build_tool_catalog(available_tools: Dict[str, Dict], primitives_reference: s
             "description": meta["description"],
             "schema_hint": meta["schema_hint"]
         }
+        # Include full_description and examples if available
+        if "full_description" in meta:
+            tools[name]["full_description"] = meta["full_description"]
+        if "examples" in meta:
+            tools[name]["examples"] = meta["examples"]
     
     # Enhanced descriptions to prevent common confusions
     TOOL_DISAMBIGUATION = {

@@ -984,6 +984,38 @@ Generated: {generated_at}
                 traceback.print_exc()
                 return {"success": False, "message": f"Error: {str(e)}"}
         
+        @self.app.get("/api/saved_plans")
+        async def list_saved_plans():
+            """List all saved plans in the saved_plans directory."""
+            try:
+                saved_plans_dir = Path('saved_plans')
+                if not saved_plans_dir.exists():
+                    return {"success": True, "plans": []}
+                
+                plans = []
+                for plan_dir in saved_plans_dir.iterdir():
+                    if plan_dir.is_dir() and not plan_dir.name.startswith('.'):
+                        skill_path = plan_dir / 'SKILL.md'
+                        plan_path = plan_dir / 'plan.json'
+                        
+                        if skill_path.exists() and plan_path.exists():
+                            # Read plan metadata
+                            plan_data = json.loads(plan_path.read_text())
+                            plans.append({
+                                "name": plan_dir.name,
+                                "goal": plan_data.get("goal", "No description"),
+                                "saved_at": plan_data.get("saved_at", "Unknown"),
+                                "action_count": len(plan_data.get("plan", []))
+                            })
+                
+                # Sort by saved_at descending (most recent first)
+                plans.sort(key=lambda x: x.get("saved_at", ""), reverse=True)
+                
+                return {"success": True, "plans": plans}
+            except Exception as e:
+                logger.error(f"Error listing saved plans: {e}")
+                return {"success": False, "message": f"Error: {str(e)}"}
+        
         @self.app.post("/api/export_to_obsidian")
         async def export_to_obsidian():
             """Export current trace file to Obsidian vault."""
@@ -1874,6 +1906,7 @@ Generated: {generated_at}
                 <!-- Character data tabs -->
                 <div class="character-data-tabs" id="characterDataTabs">
                     <div class="character-data-tab active" data-tab="plan">Plan</div>
+                    <div class="character-data-tab" data-tab="saved">Saved</div>
                 </div>
                 
                 <!-- Character data content -->
@@ -1883,6 +1916,15 @@ Generated: {generated_at}
                         <div id="characterDataItems">
                             <div style="color: #888; font-style: italic; text-align: center; padding: 20px;">
                                 Select a character to view data
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Saved Plans tab content -->
+                    <div class="character-data-panel" id="savedPanel">
+                        <div id="savedPlansList">
+                            <div style="color: #888; font-style: italic; text-align: center; padding: 20px;">
+                                Loading saved plans...
                             </div>
                         </div>
                     </div>
@@ -2339,6 +2381,10 @@ Generated: {generated_at}
                 if (activeCharacter) {
                     updateCharacterDataDisplay(activeCharacter);
                 }
+            } else if (tabName === 'saved') {
+                document.getElementById('savedPanel').classList.add('active');
+                // Load saved plans list
+                loadSavedPlansList();
             }
         }
         
@@ -3460,6 +3506,48 @@ Generated: {generated_at}
             const savePlanModal = document.getElementById('savePlanModal');
             if (event.target === savePlanModal) {
                 closeSavePlanModal();
+            }
+        }
+        
+        // Saved Plans List Functions
+        async function loadSavedPlansList() {
+            const listDiv = document.getElementById('savedPlansList');
+            listDiv.innerHTML = '<div style="color: #f39c12; text-align: center; padding: 20px;">⏳ Loading...</div>';
+            
+            try {
+                const response = await fetch('/api/saved_plans');
+                const result = await response.json();
+                
+                if (!result.success) {
+                    listDiv.innerHTML = `<div style="color: #ff4757; text-align: center; padding: 20px;">❌ Error: ${result.message}</div>`;
+                    return;
+                }
+                
+                const plans = result.plans || [];
+                
+                if (plans.length === 0) {
+                    listDiv.innerHTML = '<div style="color: #888; font-style: italic; text-align: center; padding: 20px;">No saved plans yet. Execute a goal and click "Save as Tool" to create one.</div>';
+                    return;
+                }
+                
+                let html = '';
+                plans.forEach((plan, idx) => {
+                    const savedDate = plan.saved_at ? new Date(plan.saved_at).toLocaleString() : 'Unknown';
+                    html += `
+                        <div class="character-data-item" style="cursor: pointer; transition: background 0.2s;" onmouseover="this.style.background='#333'" onmouseout="this.style.background='#1a1a1a'">
+                            <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 4px;">
+                                <div class="character-data-label" style="flex: 1; margin-bottom: 0;">${plan.name}</div>
+                                <div style="font-size: 10px; color: #666;">${plan.action_count} actions</div>
+                            </div>
+                            <div style="color: #ccc; font-size: 12px; line-height: 1.3; margin-bottom: 4px;">${plan.goal}</div>
+                            <div style="color: #666; font-size: 10px;">${savedDate}</div>
+                        </div>
+                    `;
+                });
+                
+                listDiv.innerHTML = html;
+            } catch (error) {
+                listDiv.innerHTML = `<div style="color: #ff4757; text-align: center; padding: 20px;">❌ Error: ${error.message}</div>`;
             }
         }
         

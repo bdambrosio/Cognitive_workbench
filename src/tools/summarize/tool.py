@@ -22,8 +22,15 @@ def _get_embedder():
     global _embedder
     if _embedder is None:
         from sentence_transformers import SentenceTransformer
-        _embedder = SentenceTransformer('all-MiniLM-L6-v2')
-        logger.info("Initialized shared embedding model for summarize tool")
+        try:
+            # Try offline first (uses cached model, no network calls)
+            _embedder = SentenceTransformer('all-MiniLM-L6-v2', local_files_only=True)
+            logger.info("Initialized shared embedding model for summarize tool (from cache)")
+        except Exception as e:
+            # First time or cache missing, download from HuggingFace
+            logger.info(f"Cache miss, downloading embedding model: {e}")
+            _embedder = SentenceTransformer('all-MiniLM-L6-v2')
+            logger.info("Initialized shared embedding model for summarize tool (downloaded)")
     return _embedder
 
 
@@ -289,6 +296,15 @@ def tool(value, runtime=None, **kwargs):
     if isinstance(value, list):
         logger.info(f"summarize: flattening Collection with {len(value)} items")
         value = _flatten_list(value, resource_manager)
+    
+    # Convert dict/object to JSON string if needed
+    if isinstance(value, dict):
+        import json
+        logger.info(f"summarize: converting dict to JSON string for processing")
+        value = json.dumps(value, indent=2)
+    elif not isinstance(value, str):
+        # Convert any other type to string
+        value = str(value)
     
     # Measure input
     input_tokens = _estimate_tokens(value)
