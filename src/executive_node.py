@@ -1500,7 +1500,7 @@ class ZenohExecutiveNode:
     def handle_step_command(self, sample):
         """Handle step command - advance one OODA cycle."""
         try:
-            logger.info(f'🎯 Step command received by {self.character_name}')
+            logger.debug(f'🎯 Step command received by {self.character_name}')
             self.execution_mode = 'step'
             self.execution_paused = False
             self._publish_execution_state()
@@ -1511,7 +1511,7 @@ class ZenohExecutiveNode:
     def handle_run_command(self, sample):
         """Handle run command - enable continuous execution."""
         try:
-            logger.info(f'🏃 Run command received by {self.character_name}')
+            logger.debug(f'🏃 Run command received by {self.character_name}')
             self.execution_mode = 'run'
             self.execution_paused = False
             self._publish_execution_state()
