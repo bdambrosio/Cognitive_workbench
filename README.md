@@ -41,7 +41,8 @@ This tight integration between thought and action enables complex research tasks
 
 *See: `src/incremental_planner.py`*
 
-[Watch Demo: Incremental Planner in Action](docs/incremental_planning.mp4)
+<video src="docs/incremental_planning.mp4" controls width="480"></video>
+
 
 ### New Interactive Primitives
 
