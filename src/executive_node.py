@@ -8,6 +8,7 @@ This node implements the OODA loop for character decision-making and action exec
 
 import math
 import random
+import re
 import traceback
 import zenoh
 from zenoh import QueryTarget, ConsolidationMode
@@ -19,6 +20,7 @@ import sys
 import signal
 import argparse
 from datetime import datetime
+from pathlib import Path
 from typing import Dict, List, Any, Union, Optional
 from Messages import SystemMessage, UserMessage
 
@@ -549,7 +551,7 @@ class ZenohExecutiveNode:
         self.plan_bindings_cache = {}
         # Snapshot of percepts at plan start (normalized, optional)
         self.percepts_at_plan: Optional[List[Dict[str, Any]]] = None
-        self.plan_bindings = {}  # Store scan action results: {var_name: scan_result}
+        # Note: plan_bindings now live in infospace_executor.plan_bindings (single source of truth)
         self.plan_summary_completed = False  # Track if current plan has been summarized
         self.plan_summary = None
         # Control-flow telemetry and plan/step identifiers
@@ -611,6 +613,11 @@ class ZenohExecutiveNode:
                 self._enable_compliance_tracking_callback
             )
         
+        self.execute_saved_plan_subscriber = self.session.declare_subscriber(
+            f"cognitive/{character_name}/execute_saved_plan",
+            self._handle_execute_saved_plan
+        )
+        
         # Queryables for resource management (for UI and resource_browser)
         self.resource_view_queryable = self.session.declare_queryable(
                 f"cognitive/{character_name}/resource/view/*",
@@ -633,6 +640,11 @@ class ZenohExecutiveNode:
         self.sync_plan_execution_queryable = self.session.declare_queryable(
             f"cognitive/{character_name}/execute_plan_sync",
             self._sync_plan_execution_handler
+        )
+        
+        self.plan_bindings_queryable = self.session.declare_queryable(
+            f"cognitive/{character_name}/plan_bindings",
+            self._plan_bindings_query_handler
         )
         
         # Shutdown flags
@@ -678,6 +690,58 @@ class ZenohExecutiveNode:
                 logger.info(f'💾 Saved resource manager state for {self.map_name}')
         except Exception as e:
             logger.error(f'Error handling save command: {e}')
+    
+    def _handle_execute_saved_plan(self, sample):
+        """Handle execute_saved_plan command - load and execute a saved plan."""
+        try:
+            data = json.loads(sample.payload)
+            plan_name = data.get("plan_name")
+            
+            if not plan_name:
+                logger.error(f'execute_saved_plan: missing plan_name')
+                return
+            
+            plan_path = Path('saved_plans') / plan_name / 'plan.json'
+            if not plan_path.exists():
+                logger.error(f'execute_saved_plan: plan not found: {plan_path}')
+                return
+            
+            logger.info(f'📂 {self.character_name} loading saved plan: {plan_name}')
+            plan_data = json.loads(plan_path.read_text())
+            
+            goal_text = plan_data.get("goal", "")
+            match = re.match(r'Goal (.+?):\s*;\s*actors:', goal_text)
+            goal_description = match.group(1) if match else goal_text
+            
+            self.current_goal = Goal(goal_description, [self.character_name], description='', termination='')
+            self.current_plan = plan_data.get("plan")
+            
+            self._publish_goal(self.current_goal)
+            self._publish_current_plan()
+            
+            logger.info(f'▶️  {self.character_name} executing saved plan: {plan_name}')
+            
+            # Use executor's bindings as the shared global bindings
+            result = self.infospace_executor.execute_plan_sync(
+                self.current_plan,
+                initial_bindings=self.infospace_executor.plan_bindings
+            )
+            
+            # Merge returned bindings back into executor's bindings (cascade support)
+            if 'bindings' in result:
+                self.infospace_executor.plan_bindings.update(result['bindings'])
+                logger.info(f'📊 {self.character_name} bindings updated: {list(self.infospace_executor.plan_bindings.keys())}')
+            
+            if result['status'] == 'success':
+                logger.info(f'✅ {self.character_name} saved plan completed: {plan_name}')
+            else:
+                logger.error(f'❌ {self.character_name} saved plan failed: {plan_name}')
+                logger.error(f'  Step {result.get("executed_steps", 0)}: {result.get("reason", "unknown")}')
+                logger.error(f'  Bindings at failure: {list(self.infospace_executor.plan_bindings.keys())}')
+        
+        except Exception as e:
+            logger.error(f'Error executing saved plan: {e}')
+            traceback.print_exc()
     
     def run(self):
         """Main OODA loop."""
@@ -805,8 +869,8 @@ class ZenohExecutiveNode:
                 display_target = target
                 if isinstance(target, str) and target.startswith('$'):
                     var_name = target[1:]
-                    if var_name in self.plan_bindings:
-                        display_target = self.plan_bindings[var_name]
+                    if self.infospace_executor and var_name in self.infospace_executor.plan_bindings:
+                        display_target = self.infospace_executor.plan_bindings[var_name]
                 
                 # Show what was created/processed
                 if result.get('status') == 'success':
@@ -871,8 +935,8 @@ class ZenohExecutiveNode:
             try:
                 if isinstance(raw_target, str) and raw_target.startswith('$'):
                     var_name = raw_target[1:]
-                    if var_name in self.plan_bindings:
-                        display_target = self.plan_bindings[var_name]
+                    if self.infospace_executor and var_name in self.infospace_executor.plan_bindings:
+                        display_target = self.infospace_executor.plan_bindings[var_name]
             except Exception:
                 pass
 
@@ -905,8 +969,8 @@ class ZenohExecutiveNode:
             logger.info(f'📋 Published current plan for {self.character_name}')
             
             # Log plan_bindings if they exist
-            if self.plan_bindings:
-                logger.info(f'🔗 {self.character_name} current plan_bindings: {self.plan_bindings}')
+            if self.infospace_executor and self.infospace_executor.plan_bindings:
+                logger.info(f'🔗 {self.character_name} current plan_bindings: {self.infospace_executor.plan_bindings}')
             
         except Exception as e:
             logger.error(f'Error publishing current plan: {e}')
@@ -1119,7 +1183,8 @@ class ZenohExecutiveNode:
                         logger.info(f'{self.character_name} generated goal: {goal.to_string()}')
                         self.current_goal = goal
                         self.current_plan = None  # Clear plan so _plan creates new one for this goal
-                        self.plan_bindings = {}  # Clear scan variables for new plan
+                        if self.infospace_executor:
+                            self.infospace_executor.plan_bindings.clear()
                         logger.info(f'🔄 {self.character_name} cleared plan_bindings for new plan')
                         self.plan_bindings_cache = {}
                         self._publish_goal(goal)
@@ -1129,7 +1194,8 @@ class ZenohExecutiveNode:
             else:
                 logger.error(f'LLM call failed: {response.error}')
                 self.current_plan = None
-                self.plan_bindings = {}  # Clear scan variables for new plan
+                if self.infospace_executor:
+                    self.infospace_executor.plan_bindings.clear()
                 self.current_goal = Goal('sleep', actors=[self.character_name])
                 self._publish_goal(self.current_goal)
 
@@ -1233,7 +1299,8 @@ class ZenohExecutiveNode:
             self._summarize_plan_execution()
         completed_plan = self.current_plan
         self.current_plan = None
-        self.plan_bindings = {}
+        if self.infospace_executor:
+            self.infospace_executor.plan_bindings.clear()
         self.plan_bindings_cache = {}
         self.action_history = []
         if reason == 'manual goal override' or reason == 'manual plan override':
@@ -1789,6 +1856,35 @@ class ZenohExecutiveNode:
             }
             query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
     
+    def _plan_bindings_query_handler(self, query):
+        """Handle query for current plan bindings."""
+        try:
+            bindings_data = {}
+            # Get bindings from infospace_executor (where incremental planner stores them)
+            bindings = {}
+            if self.infospace_executor and hasattr(self.infospace_executor, 'plan_bindings'):
+                bindings = self.infospace_executor.plan_bindings
+            
+            for var_name, value in bindings.items():
+                if isinstance(value, str):
+                    if value.startswith('Note_') or value.startswith('Collection_'):
+                        bindings_data[var_name] = {'type': 'resource_id', 'value': value}
+                    else:
+                        bindings_data[var_name] = {'type': 'string', 'value': value[:100] if len(value) > 100 else value}
+                elif isinstance(value, dict):
+                    bindings_data[var_name] = {'type': 'dict', 'keys': list(value.keys())}
+                elif isinstance(value, list):
+                    bindings_data[var_name] = {'type': 'list', 'length': len(value)}
+                else:
+                    bindings_data[var_name] = {'type': type(value).__name__, 'value': str(value)[:100]}
+            
+            response = {'success': True, 'bindings': bindings_data}
+            query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
+        except Exception as e:
+            logger.error(f'Error in plan_bindings query handler: {e}')
+            response = {'success': False, 'error': str(e)}
+            query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
+    
     def _sync_plan_execution_handler(self, query):
         """Handle query for synchronous plan execution."""
         try:
@@ -1877,7 +1973,8 @@ class ZenohExecutiveNode:
             
             # Immediately clear existing plan to interrupt execution
             self.current_plan = None
-            self.plan_bindings = {}
+            if self.infospace_executor:
+                self.infospace_executor.plan_bindings.clear()
             self.plan_bindings_cache = {}
             self.goal_source = 'ui'
             self.awaiting_user_input = False

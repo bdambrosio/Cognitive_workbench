@@ -1016,6 +1016,53 @@ Generated: {generated_at}
                 logger.error(f"Error listing saved plans: {e}")
                 return {"success": False, "message": f"Error: {str(e)}"}
         
+        @self.app.post("/api/execute_saved_plan")
+        async def execute_saved_plan(request: Request):
+            """Execute a saved plan."""
+            try:
+                data = await request.json()
+                plan_name = data.get("plan_name")
+                character = data.get("character")
+                
+                if not plan_name:
+                    return {"success": False, "message": "plan_name required"}
+                
+                if not character:
+                    return {"success": False, "message": "character required"}
+                
+                plan_path = Path(f'saved_plans/{plan_name}/plan.json')
+                if not plan_path.exists():
+                    return {"success": False, "message": f"Plan {plan_name} not found"}
+                
+                topic = f"cognitive/{character}/execute_saved_plan"
+                payload = json.dumps({"plan_name": plan_name})
+                self.session.put(topic, payload.encode('utf-8'))
+                
+                logger.info(f"Executing saved plan {plan_name} for {character}")
+                return {"success": True, "message": f"Executing {plan_name}"}
+            except Exception as e:
+                logger.error(f"Error executing saved plan: {e}")
+                return {"success": False, "message": f"Error: {str(e)}"}
+        
+        @self.app.get("/api/plan_bindings/{character}")
+        async def get_plan_bindings(character: str):
+            """Get current plan bindings for a character."""
+            try:
+                selector = f"cognitive/{character}/plan_bindings"
+                replies = self.session.get(selector, timeout=2.0)
+                
+                for reply in replies:
+                    if hasattr(reply, 'ok') and reply.ok is not None:
+                        payload_bytes = reply.ok.payload.to_bytes()
+                        response = json.loads(payload_bytes.decode('utf-8'))
+                        if response.get('success'):
+                            return {"success": True, "bindings": response.get('bindings', {})}
+                
+                return {"success": True, "bindings": {}}
+            except Exception as e:
+                logger.error(f"Error getting plan bindings: {e}")
+                return {"success": False, "message": f"Error: {str(e)}"}
+        
         @self.app.post("/api/export_to_obsidian")
         async def export_to_obsidian():
             """Export current trace file to Obsidian vault."""
@@ -1906,6 +1953,7 @@ Generated: {generated_at}
                 <!-- Character data tabs -->
                 <div class="character-data-tabs" id="characterDataTabs">
                     <div class="character-data-tab active" data-tab="plan">Plan</div>
+                    <div class="character-data-tab" data-tab="bindings">Bindings</div>
                     <div class="character-data-tab" data-tab="saved">Saved</div>
                 </div>
                 
@@ -1916,6 +1964,15 @@ Generated: {generated_at}
                         <div id="characterDataItems">
                             <div style="color: #888; font-style: italic; text-align: center; padding: 20px;">
                                 Select a character to view data
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Bindings tab content -->
+                    <div class="character-data-panel" id="bindingsPanel">
+                        <div id="bindingsList">
+                            <div style="color: #888; font-style: italic; text-align: center; padding: 20px;">
+                                No bindings available.
                             </div>
                         </div>
                     </div>
@@ -2380,6 +2437,12 @@ Generated: {generated_at}
                 // Refresh plan display for current character
                 if (activeCharacter) {
                     updateCharacterDataDisplay(activeCharacter);
+                }
+            } else if (tabName === 'bindings') {
+                document.getElementById('bindingsPanel').classList.add('active');
+                // Load bindings list
+                if (activeCharacter) {
+                    loadBindingsList(activeCharacter);
                 }
             } else if (tabName === 'saved') {
                 document.getElementById('savedPanel').classList.add('active');
@@ -3509,7 +3572,115 @@ Generated: {generated_at}
             }
         }
         
+        // Notification function
+        function showNotification(message, type = 'info') {
+            const notification = document.createElement('div');
+            notification.textContent = message;
+            notification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                padding: 12px 20px;
+                background: ${type === 'error' ? '#ff4757' : type === 'success' ? '#2ed573' : '#00d4ff'};
+                color: #1a1a1a;
+                border-radius: 6px;
+                font-weight: bold;
+                z-index: 10000;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+                animation: slideIn 0.3s ease-out;
+            `;
+            document.body.appendChild(notification);
+            setTimeout(() => {
+                notification.style.animation = 'slideOut 0.3s ease-out';
+                setTimeout(() => notification.remove(), 300);
+            }, 3000);
+        }
+        
         // Saved Plans List Functions
+        async function executeSavedPlan(planName) {
+            const character = currentCharacter;
+            if (!character) {
+                showNotification('❌ No character selected', 'error');
+                return;
+            }
+            
+            try {
+                showNotification(`▶️  Executing ${planName}...`, 'info');
+                
+                const response = await fetch('/api/execute_saved_plan', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({plan_name: planName, character: character})
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showNotification(`✅ ${result.message}`, 'success');
+                    switchCharacterDataTab('plan');
+                } else {
+                    showNotification(`❌ ${result.message}`, 'error');
+                }
+            } catch (error) {
+                showNotification(`❌ Error: ${error.message}`, 'error');
+            }
+        }
+        
+        async function loadBindingsList(character) {
+            const listDiv = document.getElementById('bindingsList');
+            listDiv.innerHTML = '<div style="color: #f39c12; text-align: center; padding: 20px;">⏳ Loading...</div>';
+            
+            try {
+                const response = await fetch(`/api/plan_bindings/${character}`);
+                const result = await response.json();
+                
+                if (!result.success) {
+                    listDiv.innerHTML = `<div style="color: #ff4757; text-align: center; padding: 20px;">❌ Error: ${result.message}</div>`;
+                    return;
+                }
+                
+                const bindings = result.bindings || {};
+                const bindingKeys = Object.keys(bindings);
+                
+                if (bindingKeys.length === 0) {
+                    listDiv.innerHTML = '<div style="color: #888; font-style: italic; text-align: center; padding: 20px;">No bindings set. Execute a plan to create bindings.</div>';
+                    return;
+                }
+                
+                let html = '<div style="margin-bottom: 10px; color: #00d4ff; font-weight: bold; font-size: 12px;">Variables in Scope:</div>';
+                bindingKeys.forEach(varName => {
+                    const binding = bindings[varName];
+                    let valueDisplay = '';
+                    
+                    if (binding.type === 'resource_id') {
+                        valueDisplay = `<a href="#" class="resource-link" data-resource-id="${binding.value}" style="color: #2ed573;">${binding.value}</a>`;
+                    } else if (binding.type === 'string') {
+                        valueDisplay = `"${binding.value}"`;
+                    } else if (binding.type === 'dict') {
+                        valueDisplay = `{${binding.keys.join(', ')}}`;
+                    } else if (binding.type === 'list') {
+                        valueDisplay = `[${binding.length} items]`;
+                    } else {
+                        valueDisplay = `${binding.value || binding.type}`;
+                    }
+                    
+                    html += `
+                        <div class="character-data-item">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <div class="character-data-label" style="color: #f39c12;">${varName}</div>
+                                <div style="font-size: 10px; color: #666;">${binding.type}</div>
+                            </div>
+                            <div style="color: #ccc; font-size: 11px; font-family: monospace; word-break: break-all;">${valueDisplay}</div>
+                        </div>
+                    `;
+                });
+                
+                listDiv.innerHTML = html;
+            } catch (error) {
+                listDiv.innerHTML = `<div style="color: #ff4757; text-align: center; padding: 20px;">❌ Error: ${error.message}</div>`;
+            }
+        }
+        
         async function loadSavedPlansList() {
             const listDiv = document.getElementById('savedPlansList');
             listDiv.innerHTML = '<div style="color: #f39c12; text-align: center; padding: 20px;">⏳ Loading...</div>';
@@ -3534,10 +3705,18 @@ Generated: {generated_at}
                 plans.forEach((plan, idx) => {
                     const savedDate = plan.saved_at ? new Date(plan.saved_at).toLocaleString() : 'Unknown';
                     html += `
-                        <div class="character-data-item" style="cursor: pointer; transition: background 0.2s;" onmouseover="this.style.background='#333'" onmouseout="this.style.background='#1a1a1a'">
+                        <div class="character-data-item" style="transition: background 0.2s;" onmouseover="this.style.background='#333'" onmouseout="this.style.background='#1a1a1a'">
                             <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 4px;">
                                 <div class="character-data-label" style="flex: 1; margin-bottom: 0;">${plan.name}</div>
-                                <div style="font-size: 10px; color: #666;">${plan.action_count} actions</div>
+                                <div style="display: flex; gap: 8px; align-items: center;">
+                                    <div style="font-size: 10px; color: #666;">${plan.action_count} actions</div>
+                                    <button onclick="executeSavedPlan('${plan.name}')" 
+                                            style="background: #00d4ff; color: #1a1a1a; border: none; border-radius: 4px; padding: 4px 8px; font-size: 11px; cursor: pointer; font-weight: bold;"
+                                            onmouseover="this.style.background='#00a8cc'" 
+                                            onmouseout="this.style.background='#00d4ff'">
+                                        ▶️ Execute
+                                    </button>
+                                </div>
                             </div>
                             <div style="color: #ccc; font-size: 12px; line-height: 1.3; margin-bottom: 4px;">${plan.goal}</div>
                             <div style="color: #666; font-size: 10px;">${savedDate}</div>
