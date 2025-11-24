@@ -2690,6 +2690,13 @@ Make sure the string is in a format that can be parsed by the json.loads functio
                 except:
                     value = value_str
                 
+                # Try to convert val to match value's type for comparison
+                if isinstance(value, (int, float)) and isinstance(val, str):
+                    try:
+                        val = float(val) if '.' in val else int(val)
+                    except:
+                        pass
+                
                 # Evaluate
                 if op == '>': return val > value
                 elif op == '<': return val < value

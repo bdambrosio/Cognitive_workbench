@@ -133,7 +133,7 @@ def _semantic_filter_direct(text_content: str, focus: str, target_tokens: int) -
             return text_content
         
         # Generate embeddings for all chunks and query
-        logger.info(f"summarize: embedding {len(chunks)} chunks for semantic filtering")
+        logger.debug(f"summarize: embedding {len(chunks)} chunks for semantic filtering")
         chunk_embeddings = embedder.encode(chunks, convert_to_tensor=False, show_progress_bar=False)
         query_embedding = embedder.encode([focus], convert_to_tensor=False, show_progress_bar=False)[0]
         
@@ -167,7 +167,7 @@ def _semantic_filter_direct(text_content: str, focus: str, target_tokens: int) -
         filtered_text = '\n\n'.join([chunk for _, chunk in selected_chunks])
         
         inclusion_pct = int(100 * len(filtered_text) / len(text_content)) if text_content else 0
-        logger.info(f"summarize: semantic filter kept {len(selected_chunks)}/{len(chunks)} chunks ({inclusion_pct}%)")
+        logger.debug(f"summarize: semantic filter kept {len(selected_chunks)}/{len(chunks)} chunks ({inclusion_pct}%)")
         
         return filtered_text
         
@@ -294,13 +294,13 @@ def tool(value, runtime=None, **kwargs):
     
     # Flatten Collection if input is a list
     if isinstance(value, list):
-        logger.info(f"summarize: flattening Collection with {len(value)} items")
+        logger.debug(f"summarize: flattening Collection with {len(value)} items")
         value = _flatten_list(value, resource_manager)
     
     # Convert dict/object to JSON string if needed
     if isinstance(value, dict):
         import json
-        logger.info(f"summarize: converting dict to JSON string for processing")
+        logger.debug(f"summarize: converting dict to JSON string for processing")
         value = json.dumps(value, indent=2)
     elif not isinstance(value, str):
         # Convert any other type to string
@@ -314,7 +314,7 @@ def tool(value, runtime=None, **kwargs):
     inclusion_pct = 100
     
     if focus:
-        logger.info(f"summarize: applying semantic search filter for '{focus}'")
+        logger.debug(f"summarize: applying semantic search filter for '{focus}'")
         
         # Use direct embedding approach (no temp Collections/Zenoh overhead)
         target_tokens = int(_compute_target_length(effective_tokens, style, compression_ratio))
@@ -342,7 +342,7 @@ def tool(value, runtime=None, **kwargs):
     focus_guidance = f"\nFocus on: {focus}" if focus else ""
     
     # Log summarization parameters
-    logger.info(f"summarize: input={input_tokens}t, focus={'yes' if focus else 'no'}, "
+    logger.debug(f"summarize: input={input_tokens}t, focus={'yes' if focus else 'no'}, "
                f"filtered={effective_tokens}t ({inclusion_pct}%), target={target_tokens}t, "
                f"style={style}, ratio={compression_ratio:.1f}")
     

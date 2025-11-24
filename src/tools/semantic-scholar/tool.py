@@ -149,7 +149,7 @@ def _search_papers_direct(query: str, limit: int, api_key: str = None) -> List[D
                         pdf_url = f"https://arxiv.org/pdf/{arxiv_id}.pdf"
                 
                 if not ((type(abstract) == str and len(abstract) > 0) and pdf_url):
-                    logger.error(f"skipping paper {title} because it has no abstract or PDF URL: {abstract} {pdf_url}")
+                    logger.debug(f"skipping paper {title} because it has no abstract or PDF URL: {abstract} {pdf_url}")
                     continue
                 result = {
                     "text": abstract,

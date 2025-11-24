@@ -133,6 +133,9 @@ try:
     import sglang as sgl
     from sglang import function, system, user, assistant, gen
     HAS_SGLANG = True
+    # Disable SGLang progress bars
+    import os
+    os.environ['TQDM_DISABLE'] = '1'
 except ImportError:
     HAS_SGLANG = False
     logger.warning("SGLang not available - incremental planner disabled")
@@ -599,7 +602,7 @@ def load_skill_docs(tool_names: List[str], available_tools: Dict[str, Dict]) -> 
             lines.append(f"\n## {tool_name.upper()}")
             lines.append(content)
             lines.append("\n" + "="*80 + "\n")
-            logger.info(f"Stage 1.5: Loaded docs for {tool_name} ({len(content)} chars)")
+            logger.debug(f"Stage 1.5: Loaded docs for {tool_name} ({len(content)} chars)")
             
         except Exception as e:
             logger.warning(f"Stage 1.5: Failed to load SKILL.md for {tool_name}: {e}")
@@ -909,7 +912,7 @@ if HAS_SGLANG:
             
             if not notes and not collections:
                 # Empty results are normal when no resources exist yet
-                logger.warning("Stage 0: No relevant resources found (indexes may be empty)")
+                logger.debug("Stage 0: No relevant resources found (indexes may be empty)")
                 return ""
             
             # Format results for prompt injection with descriptions

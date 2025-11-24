@@ -197,7 +197,7 @@ def _extract_subtext(text: str, keywords: List[str], keyword_weights: Dict[str, 
     # Join paragraphs with double newlines to preserve structure
     result = "\n\n".join(acc)
     if len(result) > max_chars:
-        logger.warning(f"Extracted text exceeds max_chars: {len(result)} > {max_chars}")
+        #logger.warning(f"Extracted text exceeds max_chars: {len(result)} > {max_chars}")
         result = result[:int(max_chars)]
     return result
 
@@ -250,7 +250,7 @@ Respond only with the JSON, no commentary, no code fences, no reasoning:
             if str(raw.text.get("relevant", "")).lower().startswith("true"):
                 return True
             else:
-                logger.warning(f"No relevant content found for query: {query}")
+                #logger.warning(f"No relevant content found for query: {query}")
                 return False
         elif isinstance(raw.text, str):
             # Fallback: try parsing string JSON (shouldn't happen with fix, but handle gracefully)
@@ -258,13 +258,13 @@ Respond only with the JSON, no commentary, no code fences, no reasoning:
                 if "true" in str(raw.text).lower():
                     return True
                 else:
-                    logger.warning(f"No relevant content found for query: {query}")
+                    #logger.warning(f"No relevant content found for query: {query}")
                     return False
             else:
-                logger.warning(f"No relevant content found for query: {query}")
+                #logger.warning(f"No relevant content found for query: {query}")
                 return False
         else:
-            logger.warning(f"No relevant content found for query: {query}")
+            #logger.warning(f"No relevant content found for query: {query}")
             return False
     except Exception as e:
         logger.error(f"LLM TLDR failed: {e}")
@@ -324,7 +324,7 @@ def _process_url(url: str, query: str, llm_generate, per_url_timeout: float, max
         
         # Reject garbage content
         if _is_mostly_numbers(extract):
-            logger.warning(f"Rejected mostly-numeric content from {url}")
+            #logger.warning(f"Rejected mostly-numeric content from {url}")
             return _create_empty_result(url, start, file_format)
         
         # LLM filter for relevance
@@ -410,7 +410,7 @@ End your response with:
             heartbeat()
         
         rephrase = response.text
-        logger.info(f"LLM rephrased query-web query: {rephrase}")
+        #logger.info(f"LLM rephrased query-web query: {rephrase}")
     except Exception as e:
         logger.error(f"LLM rephrasing failed: {e}")
         traceback.print_exc()
@@ -457,7 +457,7 @@ End your response with:
                 idx += 1
                 per_url_timeout = max(8.0, wall_time_limit - (time.time() - t0 - 1.0))
                 fut = ex.submit(_process_url, url, query, llm_generate, per_url_timeout, max_chars/4, heartbeat)
-                logger.info(f"Submitted task for url: {url}")
+                #logger.info(f"Submitted task for url: {url}")
                 in_flight.append(fut)
 
             # harvest any finished
@@ -467,7 +467,7 @@ End your response with:
                     try:
                         item = fut.result()
                         if item and item.get("text"):
-                            logger.info(f"Completed task: {item.get('text')[:20]}...")
+                            #logger.info(f"Completed task: {item.get('text')[:20]}...")
                             results.append(item)
                     except Exception as e:
                         logger.error(f"Error processing task: {e}")
@@ -478,7 +478,7 @@ End your response with:
                     try:
                         # Wait with timeout - if it completes, get result
                         item = fut.result(timeout=0.1)
-                        logger.info(f"Completed task: {item}")
+                        #logger.info(f"Completed task: {item}")
                         if item and item.get("text"):
                             results.append(item)
                         still.append(None)
