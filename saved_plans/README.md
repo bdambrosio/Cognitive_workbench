@@ -48,21 +48,40 @@ saved_plans/
 }
 ```
 
-## Future: Execution
+## Execution
 
-In the future, `infospace_executor` will be extended to execute these saved plans directly:
+Saved plans can be executed directly from the UI or via API:
 
-```json
-{
-  "type": "research-papers",
-  "args": {
-    "query": "LLM agents",
-    "limit": 10
-  },
-  "out": "$result",
-  "expect": "..."
-}
+### UI Execution
+
+1. Navigate to the **Saved** tab in the character sidebar
+2. Browse available saved plans
+3. Click the **▶️ Execute** button next to the plan you want to run
+4. The plan will execute with the character's current bindings
+5. Switch to the **Plan** tab to watch execution
+6. Check the **Bindings** tab to see variables created
+
+### API Execution
+
+```bash
+curl -X POST http://localhost:3000/api/execute_saved_plan \
+  -H "Content-Type: application/json" \
+  -d '{"plan_name": "goal-search-for-berkeley-ca-weather", "character": "Jill"}'
 ```
+
+### Cascade Pattern
+
+Plans preserve bindings across executions, enabling composition:
+
+```
+Plan A: search-papers    → Creates $papers (Collection)
+Plan B: filter-papers    → Uses $papers, creates $focused
+Plan C: summarize-papers → Uses $focused, creates $summary
+```
+
+Execute them in sequence to build complex workflows from simple, reusable plans.
+
+View current bindings in the **Bindings** tab to see what variables are available.
 
 ## Promotion to Full Tool
 
