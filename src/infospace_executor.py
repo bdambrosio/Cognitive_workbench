@@ -2606,8 +2606,9 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         if not collection_id:
             return {'status': 'failed', 'reason': 'Failed to create Collection'}
         
-        self.plan_bindings[out_var] = collection_id
-        logger.info(f"Took first {len(head_ids)}/{len(note_ids)} items → ${out_var}")
+        self._bind_variable(out_var, collection_id)
+        display_var = self._normalize_var_for_log(out_var)
+        logger.info(f"Took first {len(head_ids)}/{len(note_ids)} items → {display_var}")
         
         return {
             'status': 'success',
