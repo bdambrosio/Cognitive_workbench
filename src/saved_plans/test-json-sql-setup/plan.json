@@ -1,0 +1,86 @@
+{
+  "goal": "Goal Test JSON SQL setup - create test data: ; actors: Jill; termination:",
+  "plan": {
+    "plan": [
+      {
+        "type": "create-note",
+        "value": {"id": "A", "title": "Deep Learning", "year": 2020, "citations": 100, "venue": "ICML"},
+        "out": "$p1"
+      },
+      {
+        "type": "if",
+        "condition": {"type": "bound", "target": "$p1"},
+        "then": [{"type": "say", "value": "✓ p1 bound"}],
+        "else": [{"type": "say", "value": "✗ FAIL: create-note did not bind $p1"}]
+      },
+      {
+        "type": "create-note",
+        "value": {"id": "B", "title": "Transformers", "year": 2021, "citations": 250, "venue": "NeurIPS"},
+        "out": "$p2"
+      },
+      {
+        "type": "create-note",
+        "value": {"id": "C", "title": "GPT-4 Analysis", "year": 2023, "citations": 50, "venue": "JMLR"},
+        "out": "$p3"
+      },
+      {
+        "type": "create-note",
+        "value": {"id": "D", "title": "Scaling Laws", "year": 2022, "citations": 180, "venue": "ICML"},
+        "out": "$p4"
+      },
+      {
+        "type": "create-collection",
+        "value": ["$p1", "$p2", "$p3", "$p4"],
+        "out": "$papers"
+      },
+      {
+        "type": "size",
+        "target": "$papers",
+        "out": "$papers_size"
+      },
+      {
+        "type": "if",
+        "condition": {"type": "equals", "target": "$papers_size", "value": 4},
+        "then": [{"type": "say", "value": "✓ PASS: $papers has 4 papers"}],
+        "else": [{"type": "say", "value": "✗ FAIL: create-collection items not added. Expected 4 papers, got $papers_size. Check if $p1-$p4 resolved to Note IDs."}]
+      },
+      {
+        "type": "create-note",
+        "value": {"id": "A", "author": "Alice", "affiliation": "MIT"},
+        "out": "$a1"
+      },
+      {
+        "type": "create-note",
+        "value": {"id": "B", "author": "Bob", "affiliation": "Stanford"},
+        "out": "$a2"
+      },
+      {
+        "type": "create-note",
+        "value": {"id": "E", "author": "Eve", "affiliation": "Berkeley"},
+        "out": "$a3"
+      },
+      {
+        "type": "create-collection",
+        "value": ["$a1", "$a2", "$a3"],
+        "out": "$authors"
+      },
+      {
+        "type": "size",
+        "target": "$authors",
+        "out": "$authors_size"
+      },
+      {
+        "type": "if",
+        "condition": {"type": "equals", "target": "$authors_size", "value": 3},
+        "then": [{"type": "say", "value": "✓ PASS: $authors has 3 authors"}],
+        "else": [{"type": "say", "value": "✗ FAIL: create-collection items not added. Expected 3 authors, got $authors_size. Check if $a1-$a3 resolved to Note IDs."}]
+      }
+    ],
+    "reasoning": "Creates test data for JSON SQL primitive tests",
+    "success": true,
+    "skip_validation": true
+  },
+  "out": "$result",
+  "parameters": {},
+  "saved_at": "2025-11-25T12:00:00.000000"
+}

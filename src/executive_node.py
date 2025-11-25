@@ -694,7 +694,8 @@ class ZenohExecutiveNode:
     def _handle_execute_saved_plan(self, sample):
         """Handle execute_saved_plan command - load and execute a saved plan."""
         try:
-            data = json.loads(sample.payload)
+            payload_bytes = sample.payload.to_bytes()
+            data = json.loads(payload_bytes.decode('utf-8'))
             plan_name = data.get("plan_name")
             
             if not plan_name:

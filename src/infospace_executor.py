@@ -201,6 +201,7 @@ class InfospaceExecutor:
             # Level 4: Structured data operations
             'project': self._execute_project,
             'pluck': self._execute_pluck,
+            'head': self._execute_head,
             'filter-structured': self._execute_filter_structured,
             'sort': self._execute_sort,
             'join': self._execute_join,
@@ -2570,6 +2571,51 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         
         return {'status': 'failed', 'reason': 'Failed to create projected Collection'}
     
+    def _execute_head(self, action: Dict) -> Dict:
+        """
+        Take first N items from Collection.
+        
+        Required: target, out
+        Optional: count (default 1)
+        """
+        error = self._validate_required_fields(action, 'target', 'out')
+        if error:
+            return {'status': 'failed', 'reason': error}
+        
+        target_arg = action.get('target')
+        count = action.get('count', action.get('args', {}).get('count', 1))
+        out_var = action.get('out')
+        
+        if not isinstance(target_arg, str) or not target_arg.startswith('$'):
+            return {'status': 'failed', 'reason': 'head target must be $variable'}
+        
+        if not isinstance(count, int) or count < 1:
+            return {'status': 'failed', 'reason': 'head count must be positive integer'}
+        
+        collection_var = target_arg[1:]
+        note_ids = self._dereference_collection(collection_var)
+        
+        if not isinstance(note_ids, list):
+            return {'status': 'failed', 'reason': 'head target must be a Collection'}
+        
+        # Take first N items
+        head_ids = note_ids[:count]
+        
+        # Create new Collection
+        collection_id = self._persist_collection(head_ids, f'head_{count}')
+        if not collection_id:
+            return {'status': 'failed', 'reason': 'Failed to create Collection'}
+        
+        self.plan_bindings[out_var] = collection_id
+        logger.info(f"Took first {len(head_ids)}/{len(note_ids)} items → ${out_var}")
+        
+        return {
+            'status': 'success',
+            'out': out_var,
+            'result': collection_id,
+            'text': f'head: took first {len(head_ids)} items from {len(note_ids)}'
+        }
+
     def _execute_pluck(self, action: Dict) -> Dict:
         """
         Extract a single field value from each Note in a Collection.
@@ -3656,7 +3702,8 @@ Make sure the string is in a format that can be parsed by the json.loads functio
             map_name=self.map_name,
             llm_client=self.llm_client,
             available_tools=self.available_tools,
-            executive_node=self.executive_node
+            executive_node=self.executive_node,
+            resource_manager=self.resource_manager
         )
         
         # Copy initial bindings if provided
@@ -3834,7 +3881,8 @@ Make sure the string is in a format that can be parsed by the json.loads functio
                 executed_steps += 1
                 
                 # Publish action result for UI display (if executive_node available)
-                if self.executive_node:
+                # Skip say/ask - they self-publish with proper text field
+                if self.executive_node and stype not in ('say', 'ask'):
                     self.executive_node._publish_action_result(step, result, stype, datetime.now())
                 
                 # Check for suspension (ask action)
@@ -4062,7 +4110,8 @@ Make sure the string is in a format that can be parsed by the json.loads functio
                 executed_steps += 1
                 
                 # Publish action result for UI display (if executive_node available)
-                if self.executive_node:
+                # Skip say/ask - they self-publish with proper text field
+                if self.executive_node and stype not in ('say', 'ask'):
                     self.executive_node._publish_action_result(step, result, stype, datetime.now())
                 
                 # Check for ask suspension

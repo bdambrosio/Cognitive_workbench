@@ -1,0 +1,30 @@
+{
+  "goal": "Goal Test project primitive: ; actors: Jill; termination:",
+  "plan": {
+    "plan": [
+      {
+        "type": "project",
+        "target": "$papers",
+        "fields": ["title", "year"],
+        "out": "$projected"
+      },
+      {
+        "type": "size",
+        "target": "$projected",
+        "out": "$projected_size"
+      },
+      {
+        "type": "if",
+        "condition": {"type": "equals", "target": "$projected_size", "value": 4},
+        "then": [{"type": "say", "value": "✓ PASS: project returned 4 items"}],
+        "else": [{"type": "say", "value": "✗ FAIL: project expected 4, got $projected_size"}]
+      }
+    ],
+    "reasoning": "Tests project primitive - extracts title and year fields from papers",
+    "success": true,
+    "skip_validation": true
+  },
+  "out": "$result",
+  "parameters": {},
+  "saved_at": "2025-11-25T12:00:00.000000"
+}

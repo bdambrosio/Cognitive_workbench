@@ -1,0 +1,31 @@
+{
+  "goal": "Goal Test sort primitive: ; actors: Jill; termination:",
+  "plan": {
+    "plan": [
+      {
+        "type": "sort",
+        "target": "$papers",
+        "by": "year",
+        "order": "desc",
+        "out": "$sorted"
+      },
+      {
+        "type": "size",
+        "target": "$sorted",
+        "out": "$sorted_size"
+      },
+      {
+        "type": "if",
+        "condition": {"type": "equals", "target": "$sorted_size", "value": 4},
+        "then": [{"type": "say", "value": "✓ PASS: sort returned 4 papers (should be 2023,2022,2021,2020)"}],
+        "else": [{"type": "say", "value": "✗ FAIL: sort expected 4, got $sorted_size"}]
+      }
+    ],
+    "reasoning": "Tests sort primitive - sorts papers by year descending",
+    "success": true,
+    "skip_validation": true
+  },
+  "out": "$result",
+  "parameters": {},
+  "saved_at": "2025-11-25T12:00:00.000000"
+}

@@ -3598,11 +3598,7 @@ Generated: {generated_at}
         
         // Saved Plans List Functions
         async function executeSavedPlan(planName) {
-            const character = currentCharacter;
-            if (!character) {
-                showNotification('❌ No character selected', 'error');
-                return;
-            }
+            const character = activeCharacter || 'Jill';
             
             try {
                 showNotification(`▶️  Executing ${planName}...`, 'info');

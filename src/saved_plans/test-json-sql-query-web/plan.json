@@ -1,0 +1,90 @@
+{
+  "goal": "Goal Test JSON SQL primitives with query-web output; actors: Jill; termination:",
+  "plan": {
+    "plan": [
+      {
+        "type": "query-web",
+        "args": {"query": "Python programming tutorial"},
+        "out": "$web_results",
+        "expect": "should get web search results"
+      },
+      {
+        "type": "size",
+        "target": "$web_results",
+        "out": "$web_count"
+      },
+      {
+        "type": "if",
+        "condition": {"type": "equals", "target": "$web_count", "value": 0},
+        "then": [{"type": "say", "value": "✗ FAIL: query-web returned no results"}],
+        "else": [{"type": "say", "value": "✓ query-web returned $web_count results"}]
+      },
+      {
+        "type": "project",
+        "target": "$web_results",
+        "fields": ["metadata.uri", "metadata.domain", "char_count"],
+        "out": "$urls_only"
+      },
+      {
+        "type": "size",
+        "target": "$urls_only",
+        "out": "$urls_count"
+      },
+      {
+        "type": "if",
+        "condition": {"type": "equals", "target": "$urls_count", "value": "$web_count"},
+        "then": [{"type": "say", "value": "✓ PASS: project preserved all $urls_count items"}],
+        "else": [{"type": "say", "value": "✗ FAIL: project expected $web_count items, got $urls_count"}]
+      },
+      {
+        "type": "pluck",
+        "target": "$web_results",
+        "field": "metadata.uri",
+        "out": "$first_url"
+      },
+      {
+        "type": "say",
+        "value": "✓ PASS: pluck extracted URI: $first_url"
+      },
+      {
+        "type": "filter-structured",
+        "target": "$web_results",
+        "where": "char_count > 100",
+        "out": "$long_results"
+      },
+      {
+        "type": "size",
+        "target": "$long_results",
+        "out": "$long_count"
+      },
+      {
+        "type": "say",
+        "value": "✓ filter-structured: $long_count results with char_count > 100"
+      },
+      {
+        "type": "sort",
+        "target": "$web_results",
+        "by": "char_count",
+        "order": "desc",
+        "out": "$sorted_results"
+      },
+      {
+        "type": "pluck",
+        "target": "$sorted_results",
+        "field": "char_count",
+        "out": "$top_char_count"
+      },
+      {
+        "type": "say",
+        "value": "✓ PASS: sort by char_count desc - top result has $top_char_count chars"
+      }
+    ],
+    "reasoning": "Tests JSON SQL primitives (project, pluck, filter-structured, sort) with real query-web output",
+    "success": true,
+    "skip_validation": true
+  },
+  "out": "$result",
+  "parameters": {},
+  "saved_at": "2025-11-25T12:00:00.000000"
+}
+
