@@ -2602,7 +2602,7 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         head_ids = note_ids[:count]
         
         # Create new Collection
-        collection_id = self._persist_collection(head_ids, f'head_{count}')
+        collection_id = self._create_collection(head_ids, f'head_{count}')
         if not collection_id:
             return {'status': 'failed', 'reason': 'Failed to create Collection'}
         
