@@ -439,14 +439,14 @@ def build_tool_catalog(available_tools: Dict[str, Dict], primitives_reference: s
             "schema_hint": {"target": "$variable (Collection of dict Notes)", "by": "string (field path)", "order": "string (optional, 'asc' or 'desc', default 'asc')", "out": "$variable"}
         },
         "filter-structured": {
-            "description": "Filter Collection by field conditions (SQL WHERE with structured predicates). Supports operators: eq, ne, gt, lt, gte, lte, contains, in. Use for filtering by metadata like year>2020 or score>=0.5.",
-            "full_description": "Filter a Collection using structured field conditions. Input Collection must contain JSON/dict Notes. Conditions specify field, operator, and value. Operators: eq (equals), ne (not equals), gt (greater than), lt (less than), gte (>=), lte (<=), contains (substring/membership), in (value in list). Multiple conditions are AND-ed together. Notes missing fields fail the condition.",
+            "description": "Filter Collection by field conditions (SQL WHERE clause). Use SQL-like syntax: field > value, field >= value, field == value, field != value, field < value, field <= value. Supports AND/OR for multiple conditions.",
+            "full_description": "Filter a Collection using SQL-like WHERE clause syntax. Input Collection must contain JSON/dict Notes with the specified fields. WHERE clause syntax: 'field > 100', 'year >= 2020', 'score == 1.0', 'title != null'. Multiple conditions: 'year > 2020 AND citations >= 100'. Field paths use dot notation: 'metadata.year > 2020'. Notes missing fields are excluded from results.",
             "examples": [
-                '{"type":"filter-structured","target":"$papers","conditions":[{"field":"metadata.year","operator":"gte","value":2020}],"out":"$recent"}',
-                '{"type":"filter-structured","target":"$results","conditions":[{"field":"metadata.score","operator":"gt","value":0.5}],"out":"$high_quality"}',
-                '{"type":"filter-structured","target":"$papers","conditions":[{"field":"metadata.venue","operator":"contains","value":"NeurIPS"}],"out":"$neurips_papers"}'
+                '{"type":"filter-structured","target":"$papers","where":"metadata.year >= 2020","out":"$recent"}',
+                '{"type":"filter-structured","target":"$results","where":"metadata.score > 0.5","out":"$high_quality"}',
+                '{"type":"filter-structured","target":"$papers","where":"metadata.citations >= 100 AND metadata.year < 2025","out":"$highly_cited_recent"}'
             ],
-            "schema_hint": {"target": "$variable (Collection of dict Notes)", "conditions": "array of {field, operator, value}", "out": "$variable"}
+            "schema_hint": {"target": "$variable (Collection of dict Notes)", "where": "string (SQL WHERE clause)", "out": "$variable"}
         },
         "join": {
             "description": "Join two Collections on a common field (SQL JOIN). Creates new Collection of merged Notes where field values match. Inner join: only matching pairs included.",
