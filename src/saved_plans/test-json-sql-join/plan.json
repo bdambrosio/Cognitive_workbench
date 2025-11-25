@@ -1,0 +1,32 @@
+{
+  "goal": "Goal Test join primitive: ; actors: Jill; termination:",
+  "plan": {
+    "plan": [
+      {
+        "type": "join",
+        "target": "$papers",
+        "value": "$authors",
+        "args": {"on": "id"},
+        "out": "$joined"
+      },
+      {
+        "type": "size",
+        "target": "$joined",
+        "out": "$joined_size"
+      },
+      {
+        "type": "if",
+        "condition": {"type": "equals", "target": "$joined_size", "value": 2},
+        "then": [{"type": "say", "value": "✓ PASS: join returned 2 matches (id A and B)"}],
+        "else": [{"type": "say", "value": "✗ FAIL: join expected 2 (papers A,B match authors A,B), got $joined_size"}]
+      }
+    ],
+    "reasoning": "Tests join primitive - inner join papers and authors on id",
+    "success": true,
+    "skip_validation": true
+  },
+  "out": "$result",
+  "parameters": {},
+  "saved_at": "2025-11-25T12:00:00.000000"
+}
+

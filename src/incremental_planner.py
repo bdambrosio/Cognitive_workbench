@@ -162,20 +162,21 @@ Variable Syntax:
 - Literal strings: Use directly without $ (e.g., "hello")
 
 Operation Compatibility:
-┌─────────────────────────────────┬──────┬────────────┬─────────────────────────────────┐
-│ Operation                       │ Note │ Collection │ Purpose                         │
-├─────────────────────────────────┼──────┼────────────┼─────────────────────────────────┤
-│ expand                          │  ✓   │     ❌     │ Note structure → Collection     │
-│ flatten                         │  ❌  │     ✓      │ Collection → single Note        │
-│ as-json, refine, coerce         │  ✓   │     ❌     │ Transform Note content          │
-│ summarize, relate               │  ✓   │     ✓      │ Generate new content            │
-│ map                             │  ❌  │     ✓      │ Apply op to each Collection item│
-│ project, pluck, sort, filter    │  ❌  │     ✓      │ SQL-like Collection ops         │
-│ join                            │  ❌  │     ✓      │ Merge 2 Collections (SQL JOIN)  │
-│ display                         │  ✓   │     ✓      │ Show content to user            │
-│ search-notes, search-collections│  N/A │     N/A    │ Global discovery (return Coll.) │
-│ search-within-collection        │  ❌  │     ✓      │ Search indexed Collection       │
-└─────────────────────────────────┴──────┴────────────┴─────────────────────────────────┘
+┌──────────────────────────────────┬──────┬────────────┬─────────────────────────────────┐
+│ Operation                        │ Note │ Collection │ Purpose                         │
+├──────────────────────────────────┼──────┼────────────┼─────────────────────────────────┤
+│ expand                           │  ✓   │     ❌     │ Note structure → Collection     │
+│ flatten                          │  ❌  │     ✓      │ Collection → single Note        │
+│ as-json, refine, coerce          │  ✓   │     ❌     │ Transform Note content          │
+│ summarize, relate                │  ✓   │     ✓      │ Generate new content            │
+│ map                              │  ❌  │     ✓      │ Apply op to each Collection item│
+│ project, pluck, sort, filter     │  ❌  │     ✓      │ SQL-like Collection ops         │
+│ head                             │  ❌  │     ✓      │ Take first N items              │
+│ join                             │  ❌  │     ✓      │ Merge 2 Collections (SQL JOIN)  │
+│ display                          │  ✓   │     ✓      │ Show content to user            │
+│ search-notes, search-collections │  N/A │     N/A    │ Global discovery (return Coll.) │
+│ search-within-collection         │  ❌  │     ✓      │ Search indexed Collection       │
+└──────────────────────────────────┴──────┴────────────┴─────────────────────────────────┘
 
 Key distinctions:
 - expand (Note→Coll): Transforms internal structure (array/lines) into separate items
@@ -203,6 +204,7 @@ SQL-like Collection Operations (require dict/JSON Notes):
 - pluck: Extract single field as simple values → Collection of values  
 - filter-structured: Filter by field conditions (WHERE clauses) → filtered Collection
 - sort: Sort by field value (ORDER BY) → sorted Collection
+- head: Take first N items (LIMIT) → smaller Collection preserving original Notes
 - join: Combine two Collections on matching field (INNER JOIN) → merged Collection
 
 Use cases:
@@ -210,6 +212,7 @@ Use cases:
 - pluck: Get just titles as simple list, extract scores for analysis
 - filter-structured: Papers after 2020, results with score>0.5, venue contains "NeurIPS"
 - sort: Rank by score (descending), chronological by year, alphabetical by title
+- head: Get top 5 after sorting, take first result from search
 - join: Merge papers with citation data, combine user info with profiles
 
 Efficiency Rules:
@@ -415,15 +418,25 @@ def build_tool_catalog(available_tools: Dict[str, Dict], primitives_reference: s
             ],
             "schema_hint": {"target": "$variable (Collection of dict Notes)", "field": "string (field path)", "out": "$variable"}
         },
-        "sort": {
-            "description": "Sort Collection by a field value (SQL ORDER BY). Notes must be JSON/dict with sortable field. Default ascending order, use reverse:true for descending.",
-            "full_description": "Sort a Collection by comparing a field in each Note. Input Collection must contain JSON/dict Notes with the specified field. Field must contain sortable values (numbers, strings, dates). Default is ascending order (A-Z, 0-9), set reverse:true for descending (Z-A, 9-0). Notes missing the sort field are placed at end.",
+        "head": {
+            "description": "Take first N items from Collection (default 1). Preserves original Notes. Use after sort to get top-ranked items.",
+            "full_description": "Head returns a new Collection containing the first N items from the input Collection. Items are taken in their current order, so combine with sort to get top/bottom ranked items. Default count is 1. All original Note content is preserved.",
             "examples": [
-                '{"type":"sort","target":"$papers","field":"metadata.year","out":"$sorted_papers"}',
-                '{"type":"sort","target":"$results","field":"metadata.score","reverse":true,"out":"$ranked"}',
-                '{"type":"sort","target":"$items","field":"title","out":"$alphabetical"}'
+                '{"type":"head","target":"$sorted_papers","count":5,"out":"$top_5"}',
+                '{"type":"head","target":"$results","out":"$first_result"}',
+                '{"type":"head","target":"$ranked_items","count":10,"out":"$top_10"}'
             ],
-            "schema_hint": {"target": "$variable (Collection of dict Notes)", "field": "string (field path)", "reverse": "boolean (optional, default false)", "out": "$variable"}
+            "schema_hint": {"target": "$variable (Collection)", "count": "int (optional, default 1)", "out": "$variable"}
+        },
+        "sort": {
+            "description": "Sort Collection by a field value (SQL ORDER BY). Notes must be JSON/dict with sortable field. Default ascending order, use order:'desc' for descending.",
+            "full_description": "Sort a Collection by comparing a field in each Note. Input Collection must contain JSON/dict Notes with the specified field. Field must contain sortable values (numbers, strings, dates). Default is ascending order (A-Z, 0-9), set order:'desc' for descending (Z-A, 9-0). Notes missing the sort field are placed at end.",
+            "examples": [
+                '{"type":"sort","target":"$papers","by":"metadata.year","out":"$sorted_papers"}',
+                '{"type":"sort","target":"$results","by":"metadata.score","order":"desc","out":"$ranked"}',
+                '{"type":"sort","target":"$items","by":"title","out":"$alphabetical"}'
+            ],
+            "schema_hint": {"target": "$variable (Collection of dict Notes)", "by": "string (field path)", "order": "string (optional, 'asc' or 'desc', default 'asc')", "out": "$variable"}
         },
         "filter-structured": {
             "description": "Filter Collection by field conditions (SQL WHERE with structured predicates). Supports operators: eq, ne, gt, lt, gte, lte, contains, in. Use for filtering by metadata like year>2020 or score>=0.5.",
@@ -437,12 +450,12 @@ def build_tool_catalog(available_tools: Dict[str, Dict], primitives_reference: s
         },
         "join": {
             "description": "Join two Collections on a common field (SQL JOIN). Creates new Collection of merged Notes where field values match. Inner join: only matching pairs included.",
-            "full_description": "Join two Collections by matching a field in Notes from both Collections. Input Collections must contain JSON/dict Notes with the specified join field. For each Note in left Collection, finds matching Notes in right Collection where field values are equal. Creates new Notes by merging matched pairs (right fields overwrite left on conflict). Only matched pairs are included (inner join). Use for combining related data from different sources.",
+            "full_description": "Join two Collections by matching a field in Notes from both Collections. Input Collections must contain JSON/dict Notes with the specified join field. For each Note in target (left) Collection, finds matching Notes in value (right) Collection where field values are equal. Creates new Notes by merging matched pairs (right fields overwrite left on conflict). Only matched pairs are included (inner join). Use for combining related data from different sources.",
             "examples": [
-                '{"type":"join","left":"$papers","right":"$citations","on":"paper_id","out":"$papers_with_citations"}',
-                '{"type":"join","left":"$users","right":"$profiles","on":"user_id","out":"$user_profiles"}'
+                '{"type":"join","target":"$papers","value":"$citations","args":{"on":"paper_id"},"out":"$papers_with_citations"}',
+                '{"type":"join","target":"$users","value":"$profiles","args":{"on":"user_id"},"out":"$user_profiles"}'
             ],
-            "schema_hint": {"left": "$variable (Collection)", "right": "$variable (Collection)", "on": "string (field name to join on)", "out": "$variable"}
+            "schema_hint": {"target": "$variable (left Collection)", "value": "$variable (right Collection)", "args": {"on": "string (field name to join on)"}, "out": "$variable"}
         },
         "coerce": {
             "description": "Convert Note content to different type/format. Supports: to-string, to-int, to-float, to-bool, to-json (parse JSON string), to-list (split string or wrap value). Use for type conversion before operations requiring specific types.",

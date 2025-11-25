@@ -1,0 +1,108 @@
+{
+  "goal": "Goal Test JSON SQL primitives with semantic-scholar output; actors: Jill; termination:",
+  "plan": {
+    "plan": [
+      {
+        "type": "semantic-scholar",
+        "args": {"query": "transformer neural networks"},
+        "out": "$papers",
+        "expect": "should get academic papers"
+      },
+      {
+        "type": "size",
+        "target": "$papers",
+        "out": "$paper_count"
+      },
+      {
+        "type": "if",
+        "condition": {"type": "equals", "target": "$paper_count", "value": 0},
+        "then": [{"type": "say", "value": "✗ FAIL: semantic-scholar returned no results"}],
+        "else": [{"type": "say", "value": "✓ semantic-scholar returned $paper_count papers"}]
+      },
+      {
+        "type": "project",
+        "target": "$papers",
+        "fields": ["metadata.title", "metadata.year", "metadata.citations"],
+        "out": "$paper_meta"
+      },
+      {
+        "type": "size",
+        "target": "$paper_meta",
+        "out": "$meta_count"
+      },
+      {
+        "type": "if",
+        "condition": {"type": "equals", "target": "$meta_count", "value": "$paper_count"},
+        "then": [{"type": "say", "value": "✓ PASS: project preserved all $meta_count papers"}],
+        "else": [{"type": "say", "value": "✗ FAIL: project expected $paper_count papers, got $meta_count"}]
+      },
+      {
+        "type": "pluck",
+        "target": "$papers",
+        "field": "metadata.title",
+        "out": "$first_title"
+      },
+      {
+        "type": "say",
+        "value": "✓ PASS: pluck extracted title: $first_title"
+      },
+      {
+        "type": "filter-structured",
+        "target": "$papers",
+        "where": "metadata.citations > 0",
+        "out": "$cited_papers"
+      },
+      {
+        "type": "size",
+        "target": "$cited_papers",
+        "out": "$cited_count"
+      },
+      {
+        "type": "say",
+        "value": "✓ filter-structured: $cited_count papers with citations > 0"
+      },
+      {
+        "type": "sort",
+        "target": "$papers",
+        "by": "metadata.citations",
+        "order": "desc",
+        "out": "$sorted_papers"
+      },
+      {
+        "type": "size",
+        "target": "$sorted_papers",
+        "out": "$sorted_count"
+      },
+      {
+        "type": "if",
+        "condition": {"type": "equals", "target": "$sorted_count", "value": "$paper_count"},
+        "then": [{"type": "say", "value": "✓ PASS: sort preserved all $sorted_count papers in citation order"}],
+        "else": [{"type": "say", "value": "✗ FAIL: sort expected $paper_count papers, got $sorted_count"}]
+      },
+      {
+        "type": "head",
+        "target": "$sorted_papers",
+        "count": 3,
+        "out": "$top_3_papers"
+      },
+      {
+        "type": "size",
+        "target": "$top_3_papers",
+        "out": "$top_3_count"
+      },
+      {
+        "type": "if",
+        "condition": {"type": "equals", "target": "$top_3_count", "value": 3},
+        "then": [{"type": "say", "value": "✓ PASS: head extracted top 3 papers (original full Notes, sorted by citations)"}],
+        "else": [{"type": "say", "value": "✗ FAIL: head expected 3 papers, got $top_3_count"}]
+      }
+    ],
+    "reasoning": "Tests JSON SQL primitives (project, pluck, filter-structured, sort) with real semantic-scholar output",
+    "success": true,
+    "skip_validation": true
+  },
+  "out": "$result",
+  "parameters": {},
+  "saved_at": "2025-11-25T12:00:00.000000"
+}
+

@@ -1,0 +1,30 @@
+{
+  "goal": "Goal Test filter-structured primitive: ; actors: Jill; termination:",
+  "plan": {
+    "plan": [
+      {
+        "type": "filter-structured",
+        "target": "$papers",
+        "where": "citations > 100",
+        "out": "$high_cited"
+      },
+      {
+        "type": "size",
+        "target": "$high_cited",
+        "out": "$high_cited_size"
+      },
+      {
+        "type": "if",
+        "condition": {"type": "equals", "target": "$high_cited_size", "value": 2},
+        "then": [{"type": "say", "value": "✓ PASS: filter returned 2 papers (Transformers:250, Scaling Laws:180)"}],
+        "else": [{"type": "say", "value": "✗ FAIL: filter expected 2 papers with citations>100, got $high_cited_size"}]
+      }
+    ],
+    "reasoning": "Tests filter-structured primitive - filters papers with citations > 100",
+    "success": true,
+    "skip_validation": true
+  },
+  "out": "$result",
+  "parameters": {},
+  "saved_at": "2025-11-25T12:00:00.000000"
+}

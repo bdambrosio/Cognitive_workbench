@@ -1,0 +1,30 @@
+{
+  "goal": "Goal Test pluck primitive: ; actors: Jill; termination:",
+  "plan": {
+    "plan": [
+      {
+        "type": "pluck",
+        "target": "$papers",
+        "field": "title",
+        "out": "$titles"
+      },
+      {
+        "type": "size",
+        "target": "$titles",
+        "out": "$titles_size"
+      },
+      {
+        "type": "if",
+        "condition": {"type": "equals", "target": "$titles_size", "value": 4},
+        "then": [{"type": "say", "value": "✓ PASS: pluck returned 4 titles"}],
+        "else": [{"type": "say", "value": "✗ FAIL: pluck expected 4, got $titles_size"}]
+      }
+    ],
+    "reasoning": "Tests pluck primitive - extracts title field from each paper",
+    "success": true,
+    "skip_validation": true
+  },
+  "out": "$result",
+  "parameters": {},
+  "saved_at": "2025-11-25T12:00:00.000000"
+}

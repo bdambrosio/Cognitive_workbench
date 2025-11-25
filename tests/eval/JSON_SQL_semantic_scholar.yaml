@@ -1,0 +1,19 @@
+# Test: JSON SQL Primitives with Semantic Scholar
+# Tests project, pluck, filter-structured, sort, and head on real academic paper data
+
+name: "JSON SQL Operations on Academic Papers"
+description: "Tests SQL-like Collection operations (project, pluck, filter, sort, head) on semantic-scholar results"
+
+test_goal: >
+  goal: Search semantic scholar for papers on transformer neural networks.
+  Use project to extract title, year, and citation fields.
+  Use pluck to get the first paper's title.
+  Use filter-structured to find papers with citations > 0.
+  Use sort to rank papers by citations descending.
+  Use head to get the top 3 most-cited papers.
+  Display the results showing that all operations preserved paper count correctly and final result contains original full paper Notes.
+
+expected_metrics:
+  plan_completed: true
+  type_violations: 0
+
