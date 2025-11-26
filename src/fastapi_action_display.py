@@ -1044,6 +1044,122 @@ Generated: {generated_at}
                 logger.error(f"Error executing saved plan: {e}")
                 return {"success": False, "message": f"Error: {str(e)}"}
         
+        @self.app.get("/api/test_goals")
+        async def list_test_goals():
+            """List all goals from goals directory."""
+            try:
+                import yaml
+                goals_dir = Path('goals')
+                if not goals_dir.exists():
+                    return {"success": True, "goals": []}
+                
+                goals = []
+                for yaml_file in goals_dir.glob('*.yaml'):
+                    try:
+                        content = yaml.safe_load(yaml_file.read_text())
+                        if content:
+                            goals.append({
+                                "name": yaml_file.stem,
+                                "title": content.get("name", yaml_file.stem),
+                                "description": content.get("description", ""),
+                                "test_goal": content.get("test_goal", ""),
+                                "filename": yaml_file.name
+                            })
+                    except Exception as e:
+                        logger.warning(f"Error reading {yaml_file}: {e}")
+                
+                goals.sort(key=lambda x: x["name"])
+                return {"success": True, "goals": goals}
+            except Exception as e:
+                logger.error(f"Error listing goals: {e}")
+                return {"success": False, "message": f"Error: {str(e)}"}
+        
+        @self.app.get("/api/goal_details/{goal_name}")
+        async def get_goal_details(goal_name: str):
+            """Get full details of a goal."""
+            try:
+                import yaml
+                yaml_file = Path(f'goals/{goal_name}.yaml')
+                if not yaml_file.exists():
+                    return {"success": False, "message": "Goal not found"}
+                
+                content = yaml.safe_load(yaml_file.read_text())
+                return {"success": True, "content": content, "raw": yaml_file.read_text()}
+            except Exception as e:
+                logger.error(f"Error reading goal {goal_name}: {e}")
+                return {"success": False, "message": f"Error: {str(e)}"}
+        
+        @self.app.get("/api/plan_details/{plan_name}")
+        async def get_plan_details(plan_name: str):
+            """Get full details of a saved plan."""
+            try:
+                plan_path = Path(f'saved_plans/{plan_name}/plan.json')
+                if not plan_path.exists():
+                    return {"success": False, "message": "Plan not found"}
+                
+                content = json.loads(plan_path.read_text())
+                return {"success": True, "content": content, "raw": plan_path.read_text()}
+            except Exception as e:
+                logger.error(f"Error reading plan {plan_name}: {e}")
+                return {"success": False, "message": f"Error: {str(e)}"}
+        
+        @self.app.post("/api/execute_test_goal")
+        async def execute_test_goal(request: Request):
+            """Execute a goal."""
+            try:
+                import yaml
+                data = await request.json()
+                goal_file = data.get("goal_file")
+                character = data.get("character")
+                
+                if not goal_file:
+                    return {"success": False, "message": "goal_file required"}
+                
+                if not character:
+                    return {"success": False, "message": "character required"}
+                
+                goal_path = Path(f'goals/{goal_file}')
+                if not goal_path.exists():
+                    return {"success": False, "message": f"Goal {goal_file} not found"}
+                
+                # Read goal from YAML
+                goal_data = yaml.safe_load(goal_path.read_text())
+                test_goal = goal_data.get('test_goal', '')
+                
+                if not test_goal:
+                    return {"success": False, "message": "No test_goal found in YAML"}
+                
+                # Send goal via sense_data (same mechanism as text input)
+                sense_data = {
+                    'timestamp': datetime.now().isoformat(),
+                    'sequence_id': 0,
+                    'mode': 'text',
+                    'content': json.dumps({
+                        'text': test_goal,  # Goal text (already includes 'goal:' prefix in YAML)
+                        'source': 'User'
+                    })
+                }
+                
+                topic = f"cognitive/{character}/sense_data"
+                self.session.put(topic, json.dumps(sense_data).encode('utf-8'))
+                
+                # Publish User's action so it appears in UI/trace
+                user_action = {
+                    'type': 'say',
+                    'action_id': f'user_goal_{int(time.time() * 1000)}',
+                    'timestamp': datetime.now().isoformat(),
+                    'text': test_goal,
+                    'source': 'User',
+                    'target': character
+                }
+                self.user_action_publisher.put(json.dumps(user_action))
+                
+                logger.info(f"Executing goal {goal_file} for {character}")
+                return {"success": True, "message": f"Executing {goal_file}"}
+            except Exception as e:
+                logger.error(f"Error executing goal: {e}")
+                return {"success": False, "message": f"Error: {str(e)}"}
+        
         @self.app.get("/api/plan_bindings/{character}")
         async def get_plan_bindings(character: str):
             """Get current plan bindings for a character."""
@@ -1954,7 +2070,8 @@ Generated: {generated_at}
                 <div class="character-data-tabs" id="characterDataTabs">
                     <div class="character-data-tab active" data-tab="plan">Plan</div>
                     <div class="character-data-tab" data-tab="bindings">Bindings</div>
-                    <div class="character-data-tab" data-tab="saved">Saved</div>
+                    <div class="character-data-tab" data-tab="goals">Goals</div>
+                    <div class="character-data-tab" data-tab="plans">Plans</div>
                 </div>
                 
                 <!-- Character data content -->
@@ -1977,8 +2094,17 @@ Generated: {generated_at}
                         </div>
                     </div>
                     
-                    <!-- Saved Plans tab content -->
-                    <div class="character-data-panel" id="savedPanel">
+                    <!-- Goals tab content -->
+                    <div class="character-data-panel" id="goalsPanel">
+                        <div id="goalsList">
+                            <div style="color: #888; font-style: italic; text-align: center; padding: 20px;">
+                                Loading test goals...
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Plans tab content -->
+                    <div class="character-data-panel" id="plansPanel">
                         <div id="savedPlansList">
                             <div style="color: #888; font-style: italic; text-align: center; padding: 20px;">
                                 Loading saved plans...
@@ -2024,7 +2150,6 @@ Generated: {generated_at}
                         <button onclick="saveAll()" style="background: #95e1d3; color: #1a1a1a; margin-right: 10px;" title="Save all resources and memory to disk">Save</button>
                         <button onclick="exportToObsidian()" style="background: #7c3aed; color: white; margin-right: 10px;" title="Export action log to Obsidian vault">Obsidian</button>
                         <button onclick="openResourceBrowser()" style="background: #0e639c; color: white; margin-right: 10px;" title="Open resource browser in new tab to view Notes and Collections">🔍 Browser</button>
-                        <button id="testButton" onclick="openTestRunner()" style="background: #555; color: #888; margin-right: 10px;" disabled title="Waiting for system startup...">🧪 Test</button>
                         <button onclick="shutdownWithSave()" style="background: #ff4757; color: white;" title="Save all data and shutdown the system">Shutdown</button>
                     </div>
                     <div style="margin-bottom: 15px; padding: 10px; background: #333; border-radius: 5px;">
@@ -2088,38 +2213,6 @@ Generated: {generated_at}
                 <pre id="modalContent"></pre>
             </div>
             <div class="modal-resize-handle" id="modalResizeHandle"></div>
-        </div>
-    </div>
-
-    <!-- Test Runner Modal -->
-    <div id="testModal" class="modal">
-        <div class="modal-content" style="max-width: 600px;">
-            <div class="modal-header">
-                <h2>🧪 Run Evaluation Test</h2>
-                <span class="modal-close" onclick="closeTestModal()">&times;</span>
-            </div>
-            <div class="modal-body">
-                <div style="margin-bottom: 15px;">
-                    <label style="display: block; margin-bottom: 5px; color: #ccc;">Select Character:</label>
-                    <select id="testCharacterSelect" style="width: 100%; padding: 8px; background: #1a1a1a; color: #e0e0e0; border: 1px solid #555; border-radius: 4px;">
-                        <option value="">-- Select Character --</option>
-                    </select>
-                </div>
-                <div style="margin-bottom: 15px;">
-                    <label style="display: block; margin-bottom: 5px; color: #ccc;">Available Test Files:</label>
-                    <select id="testFileSelect" size="8" style="width: 100%; padding: 8px; background: #1a1a1a; color: #e0e0e0; border: 1px solid #555; border-radius: 4px;">
-                        <option value="">Loading...</option>
-                    </select>
-                </div>
-                <div style="margin-bottom: 15px;">
-                    <button onclick="runSelectedTest()" style="background: #27ae60; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; width: 100%;">
-                        ▶️ Run Test
-                    </button>
-                </div>
-                <div id="testStatus" style="margin-top: 15px; padding: 10px; background: #2d2d2d; border-radius: 4px; min-height: 60px; max-height: 200px; overflow-y: auto;">
-                    <div style="color: #888;">Select a test file to see details...</div>
-                </div>
-            </div>
         </div>
     </div>
 
@@ -2444,8 +2537,12 @@ Generated: {generated_at}
                 if (activeCharacter) {
                     loadBindingsList(activeCharacter);
                 }
-            } else if (tabName === 'saved') {
-                document.getElementById('savedPanel').classList.add('active');
+            } else if (tabName === 'goals') {
+                document.getElementById('goalsPanel').classList.add('active');
+                // Load test goals list
+                loadGoalsList();
+            } else if (tabName === 'plans') {
+                document.getElementById('plansPanel').classList.add('active');
                 // Load saved plans list
                 loadSavedPlansList();
             }
@@ -3677,6 +3774,83 @@ Generated: {generated_at}
             }
         }
         
+        async function executeGoal(goalName) {
+            const character = activeCharacter || 'Jill';
+            
+            try {
+                showNotification(`▶️  Executing ${goalName}...`, 'info');
+                
+                const response = await fetch('/api/execute_test_goal', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({goal_file: goalName + '.yaml', character: character})
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showNotification(`✅ ${result.message}`, 'success');
+                    switchCharacterDataTab('plan');
+                } else {
+                    showNotification(`❌ ${result.message}`, 'error');
+                }
+            } catch (error) {
+                showNotification(`❌ Error: ${error.message}`, 'error');
+            }
+        }
+        
+        async function loadGoalsList() {
+            const listDiv = document.getElementById('goalsList');
+            listDiv.innerHTML = '<div style="color: #f39c12; text-align: center; padding: 20px;">⏳ Loading...</div>';
+            
+            try {
+                const response = await fetch('/api/test_goals');
+                const result = await response.json();
+                
+                if (!result.success) {
+                    listDiv.innerHTML = `<div style="color: #ff4757; text-align: center; padding: 20px;">❌ Error: ${result.message}</div>`;
+                    return;
+                }
+                
+                const goals = result.goals || [];
+                
+                if (goals.length === 0) {
+                    listDiv.innerHTML = '<div style="color: #888; font-style: italic; text-align: center; padding: 20px;">No goals found.</div>';
+                    return;
+                }
+                
+                let html = '';
+                goals.forEach((goal, idx) => {
+                    const description = goal.description || 'No description';
+                    const testGoal = goal.test_goal || '';
+                    const preview = testGoal.substring(0, 100) + (testGoal.length > 100 ? '...' : '');
+                    
+                    html += `
+                        <div class="character-data-item" style="transition: background 0.2s; cursor: pointer;" 
+                             onmouseover="this.style.background='#333'" 
+                             onmouseout="this.style.background='#1a1a1a'"
+                             onclick="event.target.tagName !== 'BUTTON' && showGoalDetails('${goal.name}')">
+                            <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 4px;">
+                                <div class="character-data-label" style="flex: 1; margin-bottom: 0;">${goal.title}</div>
+                                <button onclick="event.stopPropagation(); executeGoal('${goal.name}')" 
+                                        style="background: #00d4ff; color: #1a1a1a; border: none; border-radius: 4px; padding: 4px 8px; font-size: 11px; cursor: pointer; font-weight: bold;"
+                                        onmouseover="this.style.background='#00a8cc'" 
+                                        onmouseout="this.style.background='#00d4ff'">
+                                    ▶️ Execute
+                                </button>
+                            </div>
+                            <div style="color: #ccc; font-size: 12px; line-height: 1.3; margin-bottom: 4px;">${description}</div>
+                            <div style="color: #666; font-size: 10px;">${preview}</div>
+                        </div>
+                    `;
+                });
+                
+                listDiv.innerHTML = html;
+            } catch (error) {
+                listDiv.innerHTML = `<div style="color: #ff4757; text-align: center; padding: 20px;">❌ Error: ${error.message}</div>`;
+            }
+        }
+        
         async function loadSavedPlansList() {
             const listDiv = document.getElementById('savedPlansList');
             listDiv.innerHTML = '<div style="color: #f39c12; text-align: center; padding: 20px;">⏳ Loading...</div>';
@@ -3701,12 +3875,15 @@ Generated: {generated_at}
                 plans.forEach((plan, idx) => {
                     const savedDate = plan.saved_at ? new Date(plan.saved_at).toLocaleString() : 'Unknown';
                     html += `
-                        <div class="character-data-item" style="transition: background 0.2s;" onmouseover="this.style.background='#333'" onmouseout="this.style.background='#1a1a1a'">
+                        <div class="character-data-item" style="transition: background 0.2s; cursor: pointer;" 
+                             onmouseover="this.style.background='#333'" 
+                             onmouseout="this.style.background='#1a1a1a'"
+                             onclick="event.target.tagName !== 'BUTTON' && showPlanDetails('${plan.name}')">
                             <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 4px;">
                                 <div class="character-data-label" style="flex: 1; margin-bottom: 0;">${plan.name}</div>
                                 <div style="display: flex; gap: 8px; align-items: center;">
                                     <div style="font-size: 10px; color: #666;">${plan.action_count} actions</div>
-                                    <button onclick="executeSavedPlan('${plan.name}')" 
+                                    <button onclick="event.stopPropagation(); executeSavedPlan('${plan.name}')" 
                                             style="background: #00d4ff; color: #1a1a1a; border: none; border-radius: 4px; padding: 4px 8px; font-size: 11px; cursor: pointer; font-weight: bold;"
                                             onmouseover="this.style.background='#00a8cc'" 
                                             onmouseout="this.style.background='#00d4ff'">
@@ -3982,7 +4159,75 @@ Generated: {generated_at}
                 }
             }
         });
+        
+        // Goal/Plan details modal functions
+        async function showGoalDetails(goalName) {
+            const modal = document.getElementById('detailsModal');
+            const title = document.getElementById('detailsModalTitle');
+            const content = document.getElementById('detailsModalContent');
+            
+            title.textContent = `Goal: ${goalName}`;
+            content.innerHTML = '<div style="color: #f39c12; text-align: center; padding: 20px;">⏳ Loading...</div>';
+            modal.style.display = 'flex';
+            
+            try {
+                const response = await fetch(`/api/goal_details/${goalName}`);
+                const result = await response.json();
+                
+                if (result.success) {
+                    content.innerHTML = `<pre style="background: #1a1a1a; padding: 15px; border-radius: 5px; overflow-x: auto; color: #e0e0e0; font-size: 12px; line-height: 1.4;">${escapeHtml(result.raw)}</pre>`;
+                } else {
+                    content.innerHTML = `<div style="color: #ff4757;">Error: ${result.message}</div>`;
+                }
+            } catch (error) {
+                content.innerHTML = `<div style="color: #ff4757;">Error: ${error.message}</div>`;
+            }
+        }
+        
+        async function showPlanDetails(planName) {
+            const modal = document.getElementById('detailsModal');
+            const title = document.getElementById('detailsModalTitle');
+            const content = document.getElementById('detailsModalContent');
+            
+            title.textContent = `Plan: ${planName}`;
+            content.innerHTML = '<div style="color: #f39c12; text-align: center; padding: 20px;">⏳ Loading...</div>';
+            modal.style.display = 'flex';
+            
+            try {
+                const response = await fetch(`/api/plan_details/${planName}`);
+                const result = await response.json();
+                
+                if (result.success) {
+                    content.innerHTML = `<pre style="background: #1a1a1a; padding: 15px; border-radius: 5px; overflow-x: auto; color: #e0e0e0; font-size: 12px; line-height: 1.4;">${escapeHtml(JSON.stringify(result.content, null, 2))}</pre>`;
+                } else {
+                    content.innerHTML = `<div style="color: #ff4757;">Error: ${result.message}</div>`;
+                }
+            } catch (error) {
+                content.innerHTML = `<div style="color: #ff4757;">Error: ${error.message}</div>`;
+            }
+        }
+        
+        function closeDetailsModal() {
+            document.getElementById('detailsModal').style.display = 'none';
+        }
+        
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
     </script>
+    
+    <!-- Details Modal -->
+    <div id="detailsModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; justify-content: center; align-items: center;">
+        <div style="background: #252525; border-radius: 8px; max-width: 800px; max-height: 80vh; width: 90%; display: flex; flex-direction: column; box-shadow: 0 4px 20px rgba(0,0,0,0.5);">
+            <div style="padding: 15px; border-bottom: 1px solid #404040; display: flex; justify-content: space-between; align-items: center;">
+                <h3 id="detailsModalTitle" style="margin: 0; color: #00d4ff;">Details</h3>
+                <button onclick="closeDetailsModal()" style="background: transparent; border: none; color: #888; font-size: 24px; cursor: pointer; padding: 0; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center;" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='#888'">×</button>
+            </div>
+            <div id="detailsModalContent" style="padding: 20px; overflow-y: auto; flex: 1;"></div>
+        </div>
+    </div>
 </body>
 </html>
         """
@@ -4074,15 +4319,24 @@ Generated: {generated_at}
     def goal_callback(self, sample):
         """Handle incoming character goals."""
         try:
-            goal_data = json.loads(sample.payload.to_bytes().decode('utf-8'))
+            payload = sample.payload.to_bytes().decode('utf-8')
             
             # Extract character name from topic path
             topic_path = str(sample.key_expr)
             character_name = topic_path.split('/')[1]  # cognitive/{character}/goal
             
+            # Try to parse as JSON first, otherwise treat as plain text
+            try:
+                goal_data = json.loads(payload)
+                goal_text = goal_data.get('goal', '')
+            except json.JSONDecodeError:
+                # Plain text goal
+                goal_text = payload
+                goal_data = {'goal': goal_text}
+            
             # Store goal for this character
             with self.character_goals_lock:
-                self.character_goals[character_name] = goal_data.get('goal', '')
+                self.character_goals[character_name] = goal_text
             
             # Send goal update to web clients
             self._send_goal_to_websockets(goal_data, character_name)
