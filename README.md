@@ -43,6 +43,18 @@ This tight integration between thought and action enables complex research tasks
 
 [▶️ Incremental planning demo](https://github.com/bdambrosio/Cognitive_workbench/raw/main/docs/incremental_planning.mp4)
 
+### Information Space ("Infospace")
+Cognitive Workbench supports a working memory with layered semantics:
+- **Notes** and **Collections** are primitive persistent objects (Sets metaphor, set uniqueness is on Note ID, not content, for now)
+- **Structural Operations** basic CRUD for Notes and Collections
+- **Text Operations** (index, search, summarize, relate, filter, word-count, generate, ...)
+- **Structured Notes** produce / consume JSON structured Note content (e.g. search, query-web, semantic-scholar)
+- **Structured Collections** perform basic SQL-like operations on Collections of structured Notes ()
+- **Tools** are dynamically loaded prompt / Python skills executed within this space
+- most of these are built-in primitives, but several exist as extensions defined in a *tools* library (src/tools - add your own!), modelled after Anthropic Skills.
+
+*See: `src/infospace_executor.py`, `src/infospace_resource_manager.py`*
+
 ### New Interactive Primitives
 
 **`ask` Primitive:**
@@ -58,15 +70,6 @@ This tight integration between thought and action enables complex research tasks
 - Example: `{"type": "think", "value": "Should I verify these claims before proceeding?", "out": "$thought"}`
 
 *See: `src/infospace_executor.py`*
-
-### 2. Information Space ("Infospace")
-Information is treated as a spatial environment where:
-- **Notes** and **Collections** are primitive persistent objects (Items / Sets metaphor, but set uniqueness is on Note ID, not content, for now)
-- **Cognitive Operations** (search, index, summarize, relate, filter, map) are "spatial" actions
-- **Tools** are dynamically loaded prompt / Python  skills executed within this space
-- All operations use vector embeddings for semantic search and organization
-
-*See: `src/infospace_executor.py`, `src/infospace_resource_manager.py`*
 
 ### 3. Entity Modeling & Theory of Mind (ToM) (still there from older multi-agent version, not fully functional right now)
 Agents build mental models of their interlocutors:
@@ -362,43 +365,70 @@ Docs/                         # Design documents (may lag code)
 
 ---
 
-## 🛠️ Available Tools (32)
+## 🛠️ Available Tools & Primitives
 
-**Information Gathering:**
+**Information Gathering (tools):**
 - `query-web` - Web search with LLM-based extraction
 - `semantic-scholar` - Academic paper search
+- `fetch-text` - Fetch full text from URL or paper ID
 - `search-notes` - Semantic search over existing Notes
 - `search-collections` - Search Collections
+- `search-within-collection` - Search within a specific Collection
 
-**Transformation:**
+**Transformation (tools & primitives):**
 - `summarize` - Hierarchical text summarization
-- `filter-collection` - Semantic filtering with predicates
+- `filter-collection` - Semantic filtering with LLM predicates
 - `map` - Apply operation to each item in Collection
 - `expand` - Split Note into Collection (lines/JSON/etc.)
 - `flatten` - Merge Collection items into single Note
 - `relate` - Compare/relate multiple items
+- `coerce` - Convert between formats
 
-**Analysis:**
+**Structured Data Operations (primitives):**
+- `project` - Select specific fields from structured Notes (SQL SELECT)
+- `pluck` - Extract single field values from Notes
+- `filter-structured` - Filter by field conditions (SQL WHERE)
+- `sort` - Order Collection by field (SQL ORDER BY)
+- `join` - Combine Collections on matching field (SQL JOIN)
+- `head` - Take first N items from Collection (SQL LIMIT)
+
+**Set Operations (primitives):**
+- `size` - Count items in Collection
+- `union` - Combine two Collections
+- `intersection` - Items in both Collections
+- `difference` - Items in first but not second Collection
+- `add` - Add item to Collection
+- `remove` - Remove item from Collection
+
+**Analysis (tools):**
 - `extract-entities` - Named entity extraction
 - `extract-struct` - Structured data extraction
 - `assess` - Quality/relevance assessment
 - `as-json` - Parse/validate JSON content
+- `as-markdown` - Convert to markdown format
+- `word-count` - Text metrics
+- `is-empty` - Check if content is empty
+- `is-positive` - Sentiment check
+- `is-question` - Check if text is a question
+- `matches` - Pattern matching
+- `text-find` - Find text within content
 
-**Generation:**
+**Generation (tools & primitives):**
 - `generate-note` - LLM-generated content
 - `refine` - Iterative content refinement
 - `create-note` - Create Note with literal content
 - `create-collection` - Create Collection from items
 
-**Primitives (built-in):**
+**Core Primitives (built-in):**
 - `load` - Load Note or Collection by ID or name
-- `save` - Persist Note or Collection to disk
-- `delete` - Remove Note or Collection
+- `persist` - Save Note or Collection to disk
 - `display` - Show content in UI popup
-- `think` - Internal reasoning (logged, not executed externally)
+- `say` - Output text to user (appears in action log)
+- `think` - Internal reasoning (appended to planner context)
 - `ask` - Interactive user input (synchronous wait for response)
-- `tell` - Send message to another character
 - `index` - Build vector index for Collection search
+- `apply` - Execute a tool on a target
+- `focus` - Set planning context focus (rarely needed)
 
 ---
 
