@@ -5,7 +5,7 @@
       {
         "type": "project",
         "target": "$papers",
-        "fields": ["title", "year"],
+        "fields": ["metadata.title", "metadata.year"],
         "out": "$projected"
       },
       {

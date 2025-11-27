@@ -165,7 +165,7 @@ Operation Compatibility:
 ┌──────────────────────────────────┬──────┬────────────┬─────────────────────────────────┐
 │ Operation                        │ Note │ Collection │ Purpose                         │
 ├──────────────────────────────────┼──────┼────────────┼─────────────────────────────────┤
-│ expand                           │  ✓   │     ❌     │ Note structure → Collection     │
+│ split                            │  ✓   │     ❌     │ Note structure → Collection     │
 │ flatten                          │  ❌  │     ✓      │ Collection → single Note        │
 │ as-json, refine, coerce          │  ✓   │     ❌     │ Transform Note content          │
 │ summarize, relate                │  ✓   │     ✓      │ Generate new content            │
@@ -179,9 +179,9 @@ Operation Compatibility:
 └──────────────────────────────────┴──────┴────────────┴─────────────────────────────────┘
 
 Key distinctions:
-- expand (Note→Coll): Transforms internal structure (array/lines) into separate items
-- flatten (Coll→Note): Opposite of expand, merges Collection into single Note
-- display: Use to VIEW contents, not expand (common mistake)
+- split (Note→Coll): Transforms internal structure (array/lines) into separate items
+- flatten (Coll→Note): Opposite of split, merges Collection into single Note
+- display: Use to VIEW contents, not split (common mistake)
 
 Search Primitives:
 - search-notes: Global discovery across all Notes (no target needed). Returns Collection of structured Notes with text preview, metadata.source_id, metadata.uri, metadata.score, metadata.type.
@@ -218,7 +218,7 @@ Use cases:
 Efficiency Rules:
 - Use tools directly on Notes for single items
 - Create Collections only for 2+ Notes together
-- expand, refine, as-json work on Notes ONLY, not Collections
+- split, refine, as-json work on Notes ONLY, not Collections
 - Use map to apply Note operations to each Collection item
 
 Common Patterns:
@@ -343,13 +343,13 @@ def build_tool_catalog(available_tools: Dict[str, Dict], primitives_reference: s
             "description": "Apply operation to each item in Collection",
             "schema_hint": {"target": "$variable", "operation": "string", "out": "$variable"}
         },
-        "expand": {
+        "split": {
             "description": "Transform Note structure into Collection: JSON array → Collection of Notes (one per element), or newline-separated text → Collection of Notes (one per line). NOT for inspecting Collection contents. Use display or flatten to view Collection data.",
-            "full_description": "Expand transforms a single Note's internal structure into a Collection. Input must be a Note (not Collection) containing either: (1) JSON array - each element becomes a Note in output Collection, or (2) newline-separated text - each line becomes a Note. This is a STRUCTURE TRANSFORMATION, not content inspection. To view Collection contents, use display (show to user) or flatten (merge into single Note). Common mistake: trying to expand a Collection to 'see inside it' - Collections are already expanded, use display instead.",
+            "full_description": "Split transforms a single Note's internal structure into a Collection. Input must be a Note (not Collection) containing either: (1) JSON array - each element becomes a Note in output Collection, or (2) newline-separated text - each line becomes a Note. This is a STRUCTURE TRANSFORMATION, not content inspection. To view Collection contents, use display (show to user) or flatten (merge into single Note). Common mistake: trying to split a Collection to 'see inside it' - Collections are already split, use display instead.",
             "examples": [
-                '{"type":"expand","target":"$json_array_note","out":"$items"}  # [1,2,3] → Collection of 3 Notes',
-                '{"type":"expand","target":"$text_note","out":"$lines"}  # "a\\nb\\nc" → Collection of 3 Notes',
-                '{"type":"expand","target":"$nested_json","out":"$objects"}  # [{"x":1},{"x":2}] → Collection'
+                '{"type":"split","target":"$json_array_note","out":"$items"}  # [1,2,3] → Collection of 3 Notes',
+                '{"type":"split","target":"$text_note","out":"$lines"}  # "a\\nb\\nc" → Collection of 3 Notes',
+                '{"type":"split","target":"$nested_json","out":"$objects"}  # [{"x":1},{"x":2}] → Collection'
             ],
             "schema_hint": {"target": "$variable (Note with array/text)", "out": "$variable (Collection)"}
         },
@@ -404,7 +404,7 @@ def build_tool_catalog(available_tools: Dict[str, Dict], primitives_reference: s
             "full_description": "Project operation extracts specified fields from each Note in a Collection, similar to SQL SELECT. Input Collection must contain JSON/dict Notes. Output is a new Collection of projected Notes containing only the requested fields. Notes missing any requested field are excluded. Nested fields use dot notation (e.g., 'metadata.uri'). Common use: extract URLs from search results via project with fields=['metadata.uri'].",
             "examples": [
                 '{"type":"project","target":"$search_results","fields":["metadata.uri"],"out":"$urls"}',
-                '{"type":"project","target":"$papers","fields":["title","metadata.year"],"out":"$paper_info"}',
+                '{"type":"project","target":"$papers","fields":["metadata.title","metadata.year"],"out":"$paper_info"}',
                 '{"type":"project","target":"$results","fields":["metadata.source_id","metadata.score"],"out":"$filtered"}'
             ],
             "schema_hint": {"target": "$variable (Collection of dict Notes)", "fields": "array of field paths (strings)", "out": "$variable"}
@@ -631,6 +631,99 @@ def load_skill_docs(tool_names: List[str], available_tools: Dict[str, Dict]) -> 
     return total_docs
 
 
+def repair_json_string(json_str: str) -> Optional[Dict]:
+    """
+    Attempt to repair malformed JSON from LLM output.
+    
+    Handles common LLM JSON errors:
+    - Trailing extra braces
+    - Missing closing braces
+    - Code fences
+    - Newlines in wrong places
+    
+    Args:
+        json_str: Potentially malformed JSON string
+        
+    Returns:
+        Parsed dict if successful, None if repair fails
+    """
+    if not json_str:
+        return None
+    
+    response = json_str.strip()
+    
+    # Remove markdown code fences if present
+    response = response.replace("```json", "").replace("```", "").strip()
+    
+    # Try direct parse first
+    try:
+        return json.loads(response)
+    except json.JSONDecodeError:
+        pass
+    
+    # Repair attempt 1: Extract JSON if not at start
+    if not response.startswith('{') and '{' in response:
+        start = response.find('{')
+        end = response.rfind('}')
+        if start >= 0 and end >= start:
+            response = response[start:end+1]
+    
+    # Repair attempt 2: Remove newlines outside string values
+    in_string = False
+    result = []
+    i = 0
+    while i < len(response):
+        if response[i] == '"' and (i == 0 or response[i-1] != '\\'):
+            in_string = not in_string
+        if not in_string and response[i] == '\n':
+            i += 1
+            continue
+        result.append(response[i])
+        i += 1
+    response = ''.join(result)
+    
+    # Repair attempt 3: Find first complete JSON object by brace counting
+    brace_count = 0
+    json_end = 0
+    in_string = False
+    for i, char in enumerate(response):
+        if char == '"' and (i == 0 or response[i-1] != '\\'):
+            in_string = not in_string
+        if not in_string:
+            if char == '{':
+                brace_count += 1
+            elif char == '}':
+                brace_count -= 1
+                if brace_count == 0:
+                    json_end = i + 1
+                    break
+    
+    if json_end > 0:
+        response = response[:json_end]
+        try:
+            return json.loads(response)
+        except json.JSONDecodeError:
+            pass
+    
+    # Repair attempt 4: Add missing closing braces
+    if brace_count > 0:
+        response = response + ('}' * brace_count)
+        try:
+            return json.loads(response)
+        except json.JSONDecodeError:
+            pass
+    
+    # Repair attempt 5: Strip trailing extra braces
+    while response.endswith('}}'):
+        trimmed = response[:-1]
+        try:
+            return json.loads(trimmed)
+        except json.JSONDecodeError:
+            response = trimmed
+    
+    return None
+
+
 def sgl_to_infospace_action(tool_name: str, args_json: str, step: int, available_tools: Dict[str, Dict]) -> Dict:
     """
     Convert SGLang Stage 2 output to infospace action format.
@@ -646,10 +739,16 @@ def sgl_to_infospace_action(tool_name: str, args_json: str, step: int, available
     """
     try:
         args = json.loads(args_json) if args_json else {}
-    except json.JSONDecodeError:
-        logger.warning(f"Failed to parse args_json: {args_json}")
-        traceback.print_exc()
-        args = {}
+    except json.JSONDecodeError as e:
+        # Try robust JSON repair
+        repaired = repair_json_string(args_json)
+        if repaired is not None:
+            args = repaired
+            logger.info(f"Repaired malformed JSON for {tool_name}")
+        else:
+            logger.warning(f"Failed to parse/repair args_json: {args_json}")
+            logger.debug(f"JSON error: {e}")
+            args = {}
     
     # Fix double-nested args: if LLM generated {"args": {...}}, unwrap it
     # This happens when LLM copies the final action format instead of just the arguments
@@ -729,7 +828,7 @@ def sgl_to_infospace_action(tool_name: str, args_json: str, step: int, available
     
     # Ensure 'out' field if tool produces output
     output_producing = ["create-note", "create-collection", "load", "search-notes", "search-collections", "search-within-collection", "map", 
-                       "expand", "flatten", "query-web", "semantic-scholar", "summarize",
+                       "split", "flatten", "query-web", "semantic-scholar", "summarize",
                        "refine", "generate-note", "assess", "relate", "extract-entities", "filter-collection",
                        "fetch-text", "as-json", "as-markdown"]
     if tool_name in output_producing and "out" not in action:
@@ -1098,6 +1197,10 @@ if HAS_SGLANG:
             "  DONE: <YES or NO - is the entire GOAL satisfied?>\n"
             "  NEXT_TASK: <next high-level subgoal, or blank if DONE=YES>\n"
             "  REQUEST_TOOLS: <json array of tool names or empty array []>\n\n"
+            "  CRITICAL for DONE:\n"
+            "  - Only mark DONE: YES after ALL required actions are executed\n"
+            "  - If goal requires communicating to user, use 'say' primitive BEFORE marking done\n"
+            "  - When DONE=YES, NEXT_TASK must be blank (leave empty)\n\n"
             "  CRITICAL for REQUEST_TOOLS:\n"
             "  - Always output valid JSON array: [] or [\"tool1\", \"tool2\"]\n"
             "  - If no tools needed, output: []\n"
@@ -1123,8 +1226,8 @@ if HAS_SGLANG:
             s += assistant(
                 "TOOL_NAME: "
                 + gen(f"tool_name_{step}", max_tokens=32, stop="\n")
-                + "\nTOOL_ARGS_JSON: "
-                + gen(f"tool_args_{step}", max_tokens=512, stop="\n")
+                + "\nTOOL_ARGS_JSON (max 1024 tokens): "
+                + gen(f"tool_args_{step}", max_tokens=1024, stop="\n")
                 + "\n"
             )
             
@@ -1164,6 +1267,10 @@ if HAS_SGLANG:
                 logger.info(f"Step {step}: {tool_name} -> {tool_result[:100]}")
             
             # Stage 3: Reflect
+            result_display = tool_result[:512]
+            if len(tool_result) > 512:
+                result_display += f"\n... [TRUNCATED - showing 512 of {len(tool_result)} chars]"
+            
             s += user(
                 f"========================================\n"
                 f"STAGE 3 - TOOL EXECUTION COMPLETE (step {step + 1}/{max_steps})\n"
@@ -1171,7 +1278,7 @@ if HAS_SGLANG:
                 f"Tool executed: `{tool_name}`\n"
                 f"Arguments: {tool_args_json}\n\n"
                 f">>> ACTUAL RESULT (ground truth) >>>\n"
-                f"{tool_result[:512]}\n"
+                f"{result_display}\n"
                 f">>> END RESULT >>>\n\n"
                 f"INSTRUCTIONS:\n"
                 f"1. The result above is GROUND TRUTH. Use it exactly as shown.\n"
@@ -1241,8 +1348,16 @@ if HAS_SGLANG:
             # Check if done
             done_raw = s[f"done_{step}"].strip().upper()
             if done_raw.startswith("YES"):
-                s["final_answer"] = s[f"thoughts_{step}"]
-                #print (f"full trace:\n{s}")
+                # Generate final answer using NEXT_TASK as prompt, or generic goal-focused prompt
+                next_task_raw = s[f"next_task_{step}"].strip()
+                if next_task_raw and next_task_raw.lower() not in ["", "none", "null", "n/a"]:
+                    final_prompt = next_task_raw
+                else:
+                    final_prompt = "Summarize the results with focus on the original goal"
+                
+                s += user(f"FINAL TASK: {final_prompt}\nProvide a concise final answer.")
+                s += assistant(gen("final_answer", max_tokens=256, stop=["\n\n", "STAGE"]))
+                logger.info(f"FINAL_ANSWER: {s['final_answer']}")
                 break
             
             # Update current task for next iteration

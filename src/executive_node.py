@@ -349,6 +349,14 @@ class ZenohExecutiveNode:
         # ========================
         self.current_plan_publisher = self.session.declare_publisher(f"cognitive/{character_name}/current_plan")
         
+        # === ZENOH PUBLICATION ===
+        # NAME: plan_result
+        # TOPIC: cognitive/{character}/plan_result
+        # DESCRIPTION: Published when incremental planning completes
+        # PAYLOAD: {"status": str, "final_thoughts": str, "final_content": str, "bindings": dict}
+        # ========================
+        self.plan_result_publisher = self.session.declare_publisher(f"cognitive/{character_name}/plan_result")
+        
         
         # Backward compatibility properties
         @property
@@ -382,7 +390,8 @@ class ZenohExecutiveNode:
         if HAS_SGLANG and sgl_model_path:
             try:
                 logger.info(f"🚀 Initializing SGLang Runtime with model: {sgl_model_path}")
-                self.runtime = sgl.Runtime(
+                if sgl_model_path.startswith("allenai/Olmo-3"):
+                    self.runtime = sgl.Runtime(
                     model_path=sgl_model_path,
                     tokenizer_path=sgl_model_path,
                     device="cuda",
@@ -391,8 +400,18 @@ class ZenohExecutiveNode:
                     dtype="auto",
                     tp_size=1,
                     mem_fraction_static=0.82,
-                    tool_call_parser="qwen"
+                    attention_backend="flashinfer"
                 )
+                else:
+                    self.runtime = sgl.Runtime(
+                        model_path=sgl_model_path,
+                        tokenizer_path=sgl_model_path,
+                        device="cuda",
+                        context_length=32768,
+                        dtype="auto",
+                        tp_size=1,
+                        mem_fraction_static=0.82
+                    )
                 sgl.set_default_backend(self.runtime)
                 logger.info(f'🤖 SGLang Runtime initialized (model={sgl_model_path})')
             except Exception as e:
@@ -756,6 +775,21 @@ class ZenohExecutiveNode:
             
             # Start OODA loop
             while not self.shutdown_requested:
+                # Check if there's a goal in queue that should unpause execution
+                if self.execution_paused and self.text_input_queue:
+                    for queued in self.text_input_queue:
+                        content = queued.get('content', '')
+                        try:
+                            content_data = json.loads(content)
+                            text = content_data.get('text', '')
+                        except (json.JSONDecodeError, TypeError):
+                            text = content
+                        if text.strip().startswith('goal:'):
+                            logger.info(f'🚀 Goal in queue, unpausing execution')
+                            self.execution_paused = False
+                            self._publish_execution_state()
+                            break
+                
                 if self.execution_paused:
                     time.sleep(0.2)
                 else:
@@ -836,7 +870,8 @@ class ZenohExecutiveNode:
             }
             
             self.goal_publisher.put(json.dumps(goal_data))
-            logger.info(f'🎯 Published goal for {self.character_name}: {goal.to_string()}')
+            goal_preview = goal.to_string()[:80] + ('...' if len(goal.to_string()) > 80 else '')
+            logger.info(f'🎯 Published goal for {self.character_name}: {goal_preview}')
             
         except Exception as e:
             logger.error(f'Error publishing goal: {e}')
@@ -860,7 +895,7 @@ class ZenohExecutiveNode:
             # Add action-specific fields for UI display
             # Handle both hyphenated and non-hyphenated action types
             action_types_to_handle = ['create-note', 'createnote', 'create-collection', 'createcollection', 
-                                     'expand', 'flatten', 'map', 'summarize', 'query-web', 'semantic-scholar']
+                                     'split', 'flatten', 'map', 'summarize', 'query-web', 'semantic-scholar']
             if normalized_type in action_types_to_handle:
                 target = action.get('target', '')
                 value = action.get('value', '')
@@ -973,9 +1008,46 @@ class ZenohExecutiveNode:
             if self.infospace_executor and self.infospace_executor.plan_bindings:
                 logger.info(f'🔗 {self.character_name} current plan_bindings: {self.infospace_executor.plan_bindings}')
             
+            # Publish plan_result for external consumers
+            self._publish_plan_result()
+            
         except Exception as e:
             logger.error(f'Error publishing current plan: {e}')
 
+    def _publish_plan_result(self):
+        """Publish plan result for external consumers (e.g., MMLU eval)."""
+        if not self.current_plan:
+            return
+        
+        # Get bindings as Note IDs
+        bindings = {}
+        if self.infospace_executor and self.infospace_executor.plan_bindings:
+            bindings = dict(self.infospace_executor.plan_bindings)
+        
+        # Get final_thoughts from plan reasoning
+        final_thoughts = self.current_plan.get('reasoning', '')
+        
+        # Get final_content from last bound variable
+        final_content = ''
+        if bindings and self.infospace_executor:
+            last_var = list(bindings.keys())[-1] if bindings else None
+            if last_var:
+                last_note_id = bindings[last_var]
+                final_content = self.infospace_executor._get_content(last_note_id) or ''
+                if not isinstance(final_content, str):
+                    final_content = json.dumps(final_content)
+        
+        plan_result = {
+            'status': 'complete' if self.current_plan.get('success') else 'failed',
+            'final_thoughts': final_thoughts,
+            'final_content': final_content,
+            'bindings': bindings,
+            'timestamp': datetime.now().isoformat(),
+            'character': self.character_name
+        }
+        
+        self.plan_result_publisher.put(json.dumps(plan_result))
+        logger.info(f'📤 Published plan_result for {self.character_name}')
 
     def _process_text_input(self):
         """Process one queued text input."""
@@ -998,7 +1070,8 @@ class ZenohExecutiveNode:
             # Handle special commands from User BEFORE processing as dialog
             if source == 'User':
                 if clean_input.startswith('goal:'):
-                    logger.info(f'📥 {self.character_name} Received goal command from User: "{clean_input}"')
+                    goal_preview = clean_input[:80] + ('...' if len(clean_input) > 80 else '')
+                    logger.info(f'📥 {self.character_name} Received goal: "{goal_preview}"')
                     self.parse_and_set_goal(clean_input)
                     return  # Don't process as speech
             
@@ -1552,7 +1625,8 @@ class ZenohExecutiveNode:
             # Process if we have text input
             if text_input and text_input.strip():
                 self.text_input_queue.append(sense_data)
-                logger.info(f'📥 {self.character_name} Queued text input: "{text_input}" (source: {source}, queue size: {len(self.text_input_queue)})')
+                input_preview = text_input[:60] + ('...' if len(text_input) > 60 else '')
+                logger.info(f'📥 {self.character_name} Queued: "{input_preview}" (source: {source})')
                 if len(self.text_input_queue) > 3:
                     logger.warning(f'⚠️ Text input queue size {len(self.text_input_queue)} > 3, dropping oldest')
                     self.text_input_queue.pop(0)
@@ -1560,6 +1634,12 @@ class ZenohExecutiveNode:
                 # Add conversation entry to memory (default entity is "User")
                 entity_name = source if source != 'console' else "User"
                 self.memory.add_conversation_entry(entity_name, source, text_input)
+                
+                # Auto-unpause for goal commands so they execute immediately
+                if text_input.strip().startswith('goal:') and self.execution_paused:
+                    logger.info(f'🚀 Goal received, unpausing execution')
+                    self.execution_paused = False
+                    self._publish_execution_state()
                 
         except Exception as e:
             traceback.print_exc()

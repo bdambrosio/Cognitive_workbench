@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 # Operation compatibility table
-NOTE_ONLY_OPS = {"expand", "as-json", "refine"}
+NOTE_ONLY_OPS = {"split", "as-json", "refine"}
 COLLECTION_ONLY_OPS = {"map", "flatten"}
 BOTH_OPS = {"summarize", "relate"}
 

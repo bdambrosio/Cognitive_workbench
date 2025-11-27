@@ -778,14 +778,14 @@ Examples:
   {"type":"flatten","target":"$collection","out":"$combined_note"}
   {"type":"flatten","target":"$collection","separator":"\\n---\\n","out":"$combined"}
 
-## expand
+## split
 ⚠️ CRITICAL: Works on Notes ONLY. If you have multiple Notes in a Collection,
-use map to expand each Note: {"type":"map","target":"$collection","operation":"expand","out":"$expanded_items"}
-then use flatten if you need to combine the expanded Notes into a single Note.
+use map to split each Note: {"type":"map","target":"$collection","operation":"split","out":"$split_items"}
+then use flatten if you need to combine the split Notes into a single Note.
 
-⚠️ NOTE: Level 4 tools (query-web, semantic-scholar) return Collections directly - NO expand needed.
+⚠️ NOTE: Level 4 tools (query-web, semantic-scholar) return Collections directly - NO split needed.
 
-Description: Expand a Note into a Collection of Notes. Handles four cases:
+Description: Split a Note into a Collection of Notes. Handles four cases:
   1. Simple JSON array: Directly uses the array (e.g., [1, 2, 3])
   2. JSON object with array field: Extracts array from specified field (default "results")
   3. JSONL format: Multiple JSON objects, one per line (newlines required between objects)
@@ -799,10 +799,10 @@ Parameters:
 Preconditions: target variable must be bound to Note containing JSON array, JSON object with array field, JSONL, or plain text
 Postconditions: out variable bound to Collection with one Note per array element, JSONL object, or line
 Examples:
-  {"type":"expand","target":"$search_results","out":"$results_collection"}  # JSON array from Level 2/3 tool
-  {"type":"expand","target":"$data","field":"items","out":"$items_collection"}  # JSON array with custom field
-  {"type":"expand","target":"$jsonl_note","out":"$objects"}  # JSONL format (multiple JSON objects, one per line)
-  {"type":"expand","target":"$text_note","out":"$lines"}  # Plain text (splits on newlines)
+  {"type":"split","target":"$search_results","out":"$results_collection"}  # JSON array from Level 2/3 tool
+  {"type":"split","target":"$data","field":"items","out":"$items_collection"}  # JSON array with custom field
+  {"type":"split","target":"$jsonl_note","out":"$objects"}  # JSONL format (multiple JSON objects, one per line)
+  {"type":"split","target":"$text_note","out":"$lines"}  # Plain text (splits on newlines)
 
 ## coerce
 Description: Convert data format or structure (whole-value operations only)
