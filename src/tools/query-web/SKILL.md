@@ -65,7 +65,7 @@ When user needs direct answer, summarize Collection directly:
 ```
 
 ### Pattern 2: Search and process Collection
-Results are already a Collection - use map/filter directly (NO expand needed):
+Results are already a Collection - use map/filter directly (NO split needed):
 ```json
 {"type":"query-web","args":{"query":"transformer papers"},"out":"$results","expect":"should find papers"}
 {"type":"filter-collection","target":"$results","args":{"predicate":"contains arxiv.org"},"out":"$arxiv_only"}

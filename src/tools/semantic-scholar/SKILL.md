@@ -49,7 +49,7 @@ Requires `SEMANTIC_SCHOLAR_API_KEY` environment variable.
 ## Common Workflows
 
 ### Pattern 1: Quick summary
-Results are already a Collection - summarize directly (NO expand needed):
+Results are already a Collection - summarize directly (NO split needed):
 ```json
 {"type":"semantic-scholar","args":{"query":"BERT model"},"out":"$papers","expect":"should find BERT papers"}
 {"type":"summarize","target":"$papers","args":{"focus":"what is BERT"},"out":"$summary"}
@@ -65,7 +65,7 @@ Extract PDF URLs using project, then fetch full text:
 ```
 
 ### Pattern 3: Filter and analyze
-Filter Collection directly (NO expand needed):
+Filter Collection directly (NO split needed):
 ```json
 {"type":"semantic-scholar","args":{"query":"neural networks"},"out":"$papers","expect":"should find papers"}
 {"type":"filter-collection","target":"$papers","args":{"predicate":"citations > 1000"},"out":"$top_papers"}

@@ -91,7 +91,7 @@ def load_tools(tools_dir_path: str) -> Dict[str, Dict]:
         'move', 'say', 'think', 'take', 'place', 'inspect', 'use', 'scan',
         'apply', 'display', 'create-note', 'create-collection', 'persist', 'load', 'index', 'organize', 'search',
         'extract', 'filter', 'merge', 'coerce',
-        'aggregate', 'sort', 'group_by', 'compare', 'map', 'flatten', 'add', 'expand',
+        'aggregate', 'sort', 'group_by', 'compare', 'map', 'flatten', 'add', 'split',
         'while', 'if', 'wait', 'sleep', 'focus'
     }
     

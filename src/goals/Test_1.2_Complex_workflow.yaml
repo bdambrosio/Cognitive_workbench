@@ -4,7 +4,7 @@
 name: "Complex Multi-Step Workflow"
 description: "Tests a workflow with Notes, Collections, expansion, mapping, and summarization requiring type awareness"
 
-test_goal: "goal: Create two notes with lists, expand each into collections, combine them, apply summarize to each item via map, then create final summary"
+test_goal: "goal: Create two notes with lists, split each into collections, combine them, apply summarize to each item via map, then create final summary"
 
 expected_metrics:
   type_violations: 0

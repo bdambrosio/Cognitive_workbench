@@ -36,7 +36,7 @@ language in which plans are written and evaluated.
 
 Planning Language Architecture (4 Levels):
 1. Resource & Control: Primitives operating on Note/Collection IDs (create-note, create-collection, persist, load, add, remove, union, intersection, difference, size, if, while, wait)
-2. Text Operations: Primitives and tools operating on unstructured text Notes (expand, flatten, say, display, think, filter-collection, refine, assess, summarize, relate)
+2. Text Operations: Primitives and tools operating on unstructured text Notes (split, flatten, say, display, think, filter-collection, refine, assess, summarize, relate)
 3. Coercion: Tools that extract structure from text (as-json, as-markdown)
 4. Structured Operations: Tools/primitives that produce/consume Collections of structured Notes
    - Tools: query-web, semantic-scholar (produce Collections)
@@ -67,7 +67,7 @@ Argument Conventions:
 
 CONSTRAINTS
 - Use only primitives / tools listed in the AVAILABLE ACTIONS and TOOLS sections.
-- Variables must be created before use (create-note, create-collection, tools, search-notes, search-collections, search-within-collection, or index may bind them).
+- Variables must be created before use (create-note, create-collection, tools, search-notes, search-collections, search-within-collection, split, or index may bind them).
 - All JSON must be syntactically valid (no comments or trailing commas).
 - Keep plans concise (recommended: 12 steps or fewer).
 - Output only valid JSON.
@@ -77,10 +77,13 @@ CONSTRAINTS
 EFFICIENCY RULES
 - Use tools directly on Notes when processing single items
 - Create Collections only when you need to process 2+ Notes together
-- REMEMBER: expand, refine, as-json work on Notes ONLY, not Collections
+- REMEMBER: split, refine, as-json work on Notes ONLY, not Collections
 - Use map to apply Note operations to each item in a Collection
 
 TOOL SELECTION RULES
+- Do not use display unless explicitly asked to do so.
+- When you need to find information, use search-notes or search-collections first.
+- When you need to make information explicit, use generate with a query to see if you already know the information.
 - For academic papers (research, citations, scholarly articles): Use semantic-scholar first
 - For general web content, news, documentation, tutorials: Use query-web
 - semantic-scholar provides: abstracts, citations, authors, venue, PDF URLs (when available)
@@ -157,11 +160,11 @@ Pattern: Single vs. Multiple Item Processing
   
   WRONG - Applying Note-only operations to Collections:
   {"type":"create-collection","value":["$r1","$r2"],"out":"$both"}
-  {"type":"expand","target":"$both","out":"$items"}  // ❌ expand needs Note, not Collection
+  {"type":"split","target":"$both","out":"$items"}  // ❌ split needs Note, not Collection
   
-  RIGHT - Expand first, then combine:
-  {"type":"expand","target":"$r1","out":"$items1"}
-  {"type":"expand","target":"$r2","out":"$items2"}
+  RIGHT - Split first, then combine:
+  {"type":"split","target":"$r1","out":"$items1"}
+  {"type":"split","target":"$r2","out":"$items2"}
   {"type":"union","target":"$items1","value":"$items2","out":"$all_items"}
 
 Pattern: Universal LLM Transformations (refine, assess)
@@ -205,7 +208,7 @@ Pattern: Level 4 Structured Data Operations (SQL-like)
 ┌─────────────────────────┬──────┬────────────┐
 │ Operation               │ Note │ Collection │
 ├─────────────────────────┼──────┼────────────┤
-│ expand, as-json, refine │  ✓   │     ❌     │
+│ split, as-json, refine  │  ✓   │     ❌     │
 │ summarize, relate       │  ✓   │     ✓      │
 │ map, flatten            │  ❌  │     ✓      │
 │ create-collection       │  N/A │    N/A     │
@@ -318,7 +321,7 @@ class InfospacePlanner:
             'load': ['resource_id', 'out', 'expect'],
             'index': ['source'],
             'search': ['source', 'query', 'out', 'expect'],
-            'expand': ['target', 'out'],
+            'split': ['target', 'out'],
             'flatten': ['target', 'out'],
             'coerce': ['target', 'operation', 'out'],
             'add': ['target', 'value', 'out'],

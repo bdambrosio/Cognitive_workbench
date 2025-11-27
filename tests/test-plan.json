@@ -9,7 +9,7 @@
       "expect": "should find recent papers on transformer architecture improvements"
     },
     {
-      "type": "expand",
+      "type": "split",
       "target": "$search_results",
       "out": "$papers"
     },

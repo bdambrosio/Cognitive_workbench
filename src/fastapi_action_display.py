@@ -1518,7 +1518,7 @@ Generated: {generated_at}
     
     def _get_html_template(self) -> str:
         """Get the HTML template for the web UI."""
-        return """
+        return r"""
 <!DOCTYPE html>
 <html>
 <head>
@@ -2153,10 +2153,6 @@ Generated: {generated_at}
                         <button onclick="shutdownWithSave()" style="background: #ff4757; color: white;" title="Save all data and shutdown the system">Shutdown</button>
                     </div>
                     <div style="margin-bottom: 15px; padding: 10px; background: #333; border-radius: 5px;">
-                        <label for="timeSlider" style="display: block; margin-bottom: 5px; font-size: 14px; color: #ccc;">
-                            Turn Delay: <span id="timeSliderValue">0</span> minutes
-                        </label>
-                        <input type="range" id="timeSlider" min="0" max="30" value="0" style="width: 100%; margin-bottom: 10px;">
                         <div style="font-size: 12px; color: #888;">
                             <span>Simulation Time: </span><span id="simulationTime">Loading...</span>
                         </div>

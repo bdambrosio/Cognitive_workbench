@@ -191,7 +191,7 @@ class InfospaceExecutor:
             'map': self._execute_map,
             'flatten': self._execute_flatten,
             'add': self._execute_add,
-            'expand': self._execute_expand,
+            'split': self._execute_split,
             # Set operations
             'size': self._execute_size,
             'union': self._execute_union,
@@ -2125,9 +2125,9 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         
         return {'status': 'success', 'value': collection_id}
     
-    def _execute_expand(self, action: Dict) -> Dict:
+    def _execute_split(self, action: Dict) -> Dict:
         """
-        Expand a Note into a Collection of Notes.
+        Split a Note into a Collection of Notes.
         
         Handles four cases:
         1. Simple JSON array: Directly uses the array (e.g., [1, 2, 3])
@@ -2144,12 +2144,12 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         - out: variable name for resulting Collection
         
         Examples:
-        - Expand simple JSON array: {"type":"expand","target":"$json_note","out":"$items"} (where note contains [1,2,3])
-        - Expand structured data: {"type":"expand","target":"$data_note","out":"$items"} (where note contains {"results": [...]})
-        - Expand JSONL: {"type":"expand","target":"$jsonl_note","out":"$items"} (where note contains {"key":"val1"}\n{"key":"val2"})
-        - Expand text lines: {"type":"expand","target":"$text_note","out":"$lines"}
+        - Split simple JSON array: {"type":"split","target":"$json_note","out":"$items"} (where note contains [1,2,3])
+        - Split structured data: {"type":"split","target":"$data_note","out":"$items"} (where note contains {"results": [...]})
+        - Split JSONL: {"type":"split","target":"$jsonl_note","out":"$items"} (where note contains {"key":"val1"}\n{"key":"val2"})
+        - Split text lines: {"type":"split","target":"$text_note","out":"$lines"}
         
-        NOTE: query-web and semantic-scholar return Collections directly - NO expand needed.
+        NOTE: query-web and semantic-scholar return Collections directly - NO split needed.
         """
         error = self._validate_required_fields(action, 'target', 'out')
         if error:
@@ -2161,7 +2161,7 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         
         # Target must be Note variable
         if not isinstance(target_arg, str) or not target_arg.startswith('$'):
-            return {'status': 'failed', 'reason': 'expand target must be $variable'}
+            return {'status': 'failed', 'reason': 'split target must be $variable'}
         
         note_var = target_arg[1:]
         
@@ -2176,7 +2176,7 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         
         # Check for null Note
         if note_id == 'Note_null':
-            return {'status': 'failed', 'reason': 'Cannot expand null Note'}
+            return {'status': 'failed', 'reason': 'Cannot split null Note'}
         
         # Get Note content
         content = self._get_content(note_id)
@@ -2185,7 +2185,7 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         
         # Check for null content indicator
         if isinstance(content, str) and content.strip().lower() in ['note-null', 'null']:
-            return {'status': 'failed', 'reason': 'Cannot expand null content'}
+            return {'status': 'failed', 'reason': 'Cannot split null content'}
         
         array_data = None
         is_json = False
@@ -2237,17 +2237,17 @@ Make sure the string is in a format that can be parsed by the json.loads functio
                 return {'status': 'failed', 'reason': f'Note content must be a JSON array (e.g., ["item1", "item2"]), JSON object with "{field_name}" array field, JSONL, or plain text (got {type(content).__name__})'}
         
         if not array_data:
-            return {'status': 'failed', 'reason': 'No items to expand (empty array or no non-empty lines)'}
+            return {'status': 'failed', 'reason': 'No items to split (empty array or no non-empty lines)'}
         
         # Create Note for each array element/line
         note_ids = []
         for i, item in enumerate(array_data):
-            item_note_id = self._persist_note(item, f'expand_item_{i}')
+            item_note_id = self._persist_note(item, f'split_item_{i}')
             if item_note_id:
                 note_ids.append(item_note_id)
         
         # Create Collection from Notes
-        collection_id = self._create_collection(note_ids, 'expanded_collection')
+        collection_id = self._create_collection(note_ids, 'split_collection')
         if not collection_id:
             return {'status': 'failed', 'reason': 'Failed to create Collection'}
         
