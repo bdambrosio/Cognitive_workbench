@@ -506,13 +506,13 @@ End your response with:
 # Tool interface for infospace
 # ------------------------------
 
-def tool(value, runtime=None, **kwargs):
+def tool(value, **kwargs):
     """
     Web search tool using Google CSE + LLM extraction.
     
     Args:
         value: Search query string
-        **kwargs: agent_name (required), llm_generate (preferred) or llm_client (fallback)
+        **kwargs: agent_name (required), llm_generate (required)
     
     Returns:
         Collection ID containing structured Note for each search result
@@ -530,28 +530,13 @@ def tool(value, runtime=None, **kwargs):
             'reason': 'agent_name required in kwargs'
         }
     
-    # Get llm_generate function (preferred) or create fallback from llm_client
+    # Get llm_generate function (required)
     llm_generate = kwargs.get('llm_generate')
     if not llm_generate:
-        # Fallback: create llm_generate wrapper from llm_client if provided
-        llm_client = kwargs.get('llm_client')
-        if llm_client:
-            def llm_generate_wrapper(messages, bindings=None, max_tokens=2000, temperature=0.7, is_json=False, stops=None):
-                return llm_client.generate(
-                    messages=messages,
-                    bindings=bindings,
-                    max_tokens=max_tokens,
-                    temperature=temperature,
-                    is_json=is_json,
-                    stops=stops if stops else ['</end>']
-                )
-            llm_generate = llm_generate_wrapper
-        else:
-            # llm_generate is required
-            return {
-                    'status': 'failed',
-                    'reason': f'Failed to create LLM client: {e}'
-                }
+        return {
+            'status': 'failed',
+            'reason': 'llm_generate function required in kwargs'
+        }
     
     # Check for required API keys
     if not os.getenv('GOOGLE_API_KEY') or not os.getenv('GOOGLE_CX'):

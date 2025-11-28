@@ -590,6 +590,24 @@ class InfospaceResourceManager:
         self.resource_registry['Note_null'] = note_null_data
         logger.info("📝 Created system Note_null resource")
 
+    def _sync_counters_from_registry(self):
+        """Ensure counters match highest existing Note_/Collection_ IDs."""
+        max_note = self.note_counter
+        max_collection = self.collection_counter
+        for resource_id in self.resource_registry.keys():
+            if resource_id.startswith('Note_'):
+                suffix = resource_id.split('_', 1)[1]
+                if suffix.isdigit():
+                    max_note = max(max_note, int(suffix))
+            elif resource_id.startswith('Collection_'):
+                suffix = resource_id.split('_', 1)[1]
+                if suffix.isdigit():
+                    max_collection = max(max_collection, int(suffix))
+        if max_note != self.note_counter or max_collection != self.collection_counter:
+            logger.info(f"🔢 Resynced counters (notes={max_note}, collections={max_collection})")
+        self.note_counter = max_note
+        self.collection_counter = max_collection
+
     # ==================== Core Accessors ====================
 
     def get_resource(self, name_or_id: Optional[str]) -> Optional[Dict[str, Any]]:
@@ -1609,6 +1627,8 @@ class InfospaceResourceManager:
             
             # Load resources using existing load_resources method
             self.load_resources(save_data)
+            # Ensure counters match highest restored IDs
+            self._sync_counters_from_registry()
             
             logger.info(f"📂 Loaded resources from {target_file}")
             return True

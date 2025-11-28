@@ -235,26 +235,25 @@ class InfospaceExecutor:
                 try:
                     from utils.action_post_processing import process_action_expectation
                     
-                    # Create llm_generate wrapper that matches the interface
+                    # Create llm_generate wrapper that matches the interface (SGLang only)
                     def llm_generate_wrapper(messages, bindings=None, max_tokens=2000, temperature=0.7, is_json=False, stops=None):
-                        """Wrapper for action_post_processing that uses executor's llm_generate."""
-                        if self.runtime:
-                            # For SGLang, apply bindings to messages if provided
-                            if bindings and isinstance(messages, list):
-                                processed_messages = []
-                                for msg in messages:
-                                    if isinstance(msg, str):
-                                        # Apply template bindings
-                                        processed_msg = msg
-                                        for key, value in bindings.items():
-                                            processed_msg = processed_msg.replace(f"{{{{${key}}}}}", str(value))
-                                        processed_messages.append(processed_msg)
-                                    else:
-                                        processed_messages.append(msg)
-                                messages = processed_messages
-                            return self._sglang_generate(messages, max_tokens, temperature, stops, is_json=is_json)
-                        else:
-                            return self.llm_client.generate(messages, bindings=bindings, max_tokens=max_tokens, temperature=temperature, is_json=is_json, stops=stops)
+                        """Wrapper for action_post_processing using SGLang runtime."""
+                        if not self.runtime:
+                            raise RuntimeError("SGLang runtime not available")
+                        # Apply bindings to messages if provided
+                        if bindings and isinstance(messages, list):
+                            processed_messages = []
+                            for msg in messages:
+                                if isinstance(msg, str):
+                                    # Apply template bindings
+                                    processed_msg = msg
+                                    for key, value in bindings.items():
+                                        processed_msg = processed_msg.replace(f"{{{{${key}}}}}", str(value))
+                                    processed_messages.append(processed_msg)
+                                else:
+                                    processed_messages.append(msg)
+                            messages = processed_messages
+                        return self._sglang_generate(messages, max_tokens, temperature, stops, is_json=is_json)
                     
                     comparison = process_action_expectation(action, result, llm_generate_wrapper, self.resource_manager, debug=False)
                     if comparison and not comparison.get('matched'):
@@ -454,26 +453,25 @@ Only provide the result, followed by the </end> tag.""")
             
             full_prompt = "".join(prompt_parts)
             
-            # Create unified LLM generation wrapper (uses SGLang runtime if available, else llm_client)
+            # Create unified LLM generation wrapper (SGLang only)
             def llm_generate(messages, bindings=None, max_tokens=2000, temperature=0.7, is_json=False, stops=None):
-                """Unified LLM generation interface - uses SGLang runtime if available, else llm_client."""
-                if self.runtime:
-                    # For SGLang, apply bindings to messages if provided
-                    if bindings and isinstance(messages, list):
-                        processed_messages = []
-                        for msg in messages:
-                            if isinstance(msg, str):
-                                # Apply template bindings
-                                processed_msg = msg
-                                for key, value in bindings.items():
-                                    processed_msg = processed_msg.replace(f"{{{{${key}}}}}", str(value))
-                                processed_messages.append(processed_msg)
-                            else:
-                                processed_messages.append(msg)
-                        messages = processed_messages
-                    return self._sglang_generate(messages, max_tokens, temperature, stops, is_json=is_json)
-                else:
-                    return self.llm_client.generate(messages, bindings=bindings, max_tokens=max_tokens, temperature=temperature, is_json=is_json, stops=stops)
+                """Unified LLM generation interface using SGLang runtime."""
+                if not self.runtime:
+                    raise RuntimeError("SGLang runtime not available")
+                # Apply bindings to messages if provided
+                if bindings and isinstance(messages, list):
+                    processed_messages = []
+                    for msg in messages:
+                        if isinstance(msg, str):
+                            # Apply template bindings
+                            processed_msg = msg
+                            for key, value in bindings.items():
+                                processed_msg = processed_msg.replace(f"{{{{${key}}}}}", str(value))
+                            processed_messages.append(processed_msg)
+                        else:
+                            processed_messages.append(msg)
+                    messages = processed_messages
+                return self._sglang_generate(messages, max_tokens, temperature, stops, is_json=is_json)
             
             # Call LLM using unified wrapper
             llm_response = llm_generate(
@@ -779,32 +777,30 @@ Make sure the string is in a format that can be parsed by the json.loads functio
             for key, val in additional_args.items():
                 resolved_args[key] = self._resolve_value(val)
         
-        # Add map_name and llm_client to kwargs for tools that need them
+        # Add map_name and other kwargs for tools
         resolved_args['map_name'] = self.map_name
-        resolved_args['llm_client'] = self.llm_client
         resolved_args['agent_name'] = self.agent_name
         resolved_args['resource_manager'] = self.resource_manager
         
-        # Add unified LLM generation callback (uses SGLang runtime if available, else llm_client)
+        # Add unified LLM generation callback (SGLang only)
         def llm_generate(messages, bindings=None, max_tokens=2000, temperature=0.7, is_json=False, stops=None):
-            """Unified LLM generation interface - uses SGLang runtime if available, else llm_client."""
-            if self.runtime:
-                # For SGLang, apply bindings to messages if provided
-                if bindings and isinstance(messages, list):
-                    processed_messages = []
-                    for msg in messages:
-                        if isinstance(msg, str):
-                            # Apply template bindings
-                            processed_msg = msg
-                            for key, value in bindings.items():
-                                processed_msg = processed_msg.replace(f"{{{{${key}}}}}", str(value))
-                            processed_messages.append(processed_msg)
-                        else:
-                            processed_messages.append(msg)
-                    messages = processed_messages
-                return self._sglang_generate(messages, max_tokens, temperature, stops, is_json=is_json)
-            else:
-                return self.llm_client.generate(messages, bindings=bindings, max_tokens=max_tokens, temperature=temperature, is_json=is_json, stops=stops)
+            """Unified LLM generation interface using SGLang runtime."""
+            if not self.runtime:
+                raise RuntimeError("SGLang runtime not available - llm_generate requires SGLang")
+            # Apply bindings to messages if provided
+            if bindings and isinstance(messages, list):
+                processed_messages = []
+                for msg in messages:
+                    if isinstance(msg, str):
+                        # Apply template bindings
+                        processed_msg = msg
+                        for key, value in bindings.items():
+                            processed_msg = processed_msg.replace(f"{{{{${key}}}}}", str(value))
+                        processed_messages.append(processed_msg)
+                    else:
+                        processed_messages.append(msg)
+                messages = processed_messages
+            return self._sglang_generate(messages, max_tokens, temperature, stops, is_json=is_json)
         
         resolved_args['llm_generate'] = llm_generate
         
