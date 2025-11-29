@@ -18,6 +18,40 @@ If you are looking for a production-ready agent framework, this is likely not it
 
 ---
 
+## 💡 Design Philosophy
+
+**Cognitive Workbench takes a fundamentally different approach to 'reasoning'.**
+
+Traditional (RL) approaches treat agent behavior as a black box: train a policy network end-to-end with reinforcement learning, hope it generalizes, and debug by staring at reward curves. When the agent fails, you adjust hyperparameters and retrain.
+
+**We believe problem-solving strategy should be explicit and inspectable.**
+
+The core reasoning/planning logic lives in `src/incremental_planner.py`—not as learned weights, but as structured prompts and execution rules that you can read, understand, and modify directly. When the agent makes a poor decision, you can:
+
+1. **Read the planner trace** (`logs/planner_trace_{character}.txt`) to see exactly what the LLM saw and generated
+2. **Identify the failure mode** (bad tool selection? incorrect reasoning? missing information?)
+3. **Edit the planning specifications** (`INCREMENTAL_PLAN_SPECIFICATIONS`, `PRIMITIVE_DOCS`, `tool_planner_infospace`) to address the issue
+4. **Test immediately** without retraining
+
+This is **symbolic AI meets LLM capabilities**: the LLM provides language understanding and generation, while the structured planning framework provides guardrails, tool orchestration, and interpretable decision-making.
+
+**Enabled by SGLang's `@function` decorator:** The incremental planning approach is made practical by SGLang's ability to extend context and continue inference at minimal cost. Each planning step appends tool results to the conversation state and resumes generation—no prompt reconstruction or KV cache rebuilding required. This makes tight plan-execute-observe loops efficient enough for real-time interaction.
+
+**Benefits over RL-based agents:**
+- **Interpretability**: Every decision has a readable rationale
+- **Rapid iteration**: Fix bugs in minutes, not training runs
+- **Composability**: Add new tools without retraining the entire system
+- **Predictability**: Same input → same plan (with temperature=0)
+
+**Trade-offs:**
+- Requires manual prompt engineering for new capabilities
+- May not discover novel strategies that RL could find
+- Depends on LLM instruction-following quality
+
+The benchmarks in `tests/` (MMLU, HotpotQA) serve both as evaluation harnesses and as examples of how to integrate external tasks with the Cognitive Workbench API.
+
+---
+
 ## 🔬 Key Research Frontiers
 
 This workbench currently focuses on three main areas of cognitive agent research:
@@ -356,6 +390,10 @@ src/
     ├── word-count/            # Text metrics
     └── ...
 
+tests/
+├── mmlu_eval.py               # MMLU benchmark harness (see Benchmarks section)
+└── hotpotqa_eval.py           # HotpotQA benchmark harness
+
 scenarios/                     # Agent configuration YAML files
 data/                         # Persistent storage (Notes, Collections, memory)
 logs/                         # Execution logs and planner traces
@@ -378,14 +416,14 @@ Docs/                         # Design documents (may lag code)
 **Transformation (tools & primitives):**
 - `summarize` - Hierarchical text summarization
 - `filter-collection` - Semantic filtering with LLM predicates
-- `map` - Apply operation to each item in Collection
+- `map` - Apply operation to each item in Collection (supports additional args like `focus`, `max_length`)
 - `expand` - Split Note into Collection (lines/JSON/etc.)
 - `flatten` - Merge Collection items into single Note
 - `relate` - Compare/relate multiple items
 - `coerce` - Convert between formats
 
 **Structured Data Operations (primitives):**
-- `project` - Select specific fields from structured Notes (SQL SELECT)
+- `project` - Extract metadata fields from Notes or fields from structured Notes (not text content—use `refine` for that)
 - `pluck` - Extract single field values from Notes
 - `filter-structured` - Filter by field conditions (SQL WHERE)
 - `sort` - Order Collection by field (SQL ORDER BY)
@@ -414,8 +452,8 @@ Docs/                         # Design documents (may lag code)
 - `text-find` - Find text within content
 
 **Generation (tools & primitives):**
-- `generate-note` - LLM-generated content
-- `refine` - Iterative content refinement
+- `generate-note` - LLM-generated content (new text, code, analysis)
+- `refine` - Extract/transform information from unstructured text (does not add new content)
 - `create-note` - Create Note with literal content
 - `create-collection` - Create Collection from items
 
@@ -432,6 +470,70 @@ Docs/                         # Design documents (may lag code)
 
 ---
 
+## 📊 Benchmarks
+
+Cognitive Workbench includes evaluation harnesses for standard QA benchmarks. These serve dual purposes:
+1. **Benchmark evaluation**: Measure agent performance on established datasets
+2. **Integration examples**: Demonstrate how to connect external systems to the Cognitive Workbench API
+
+### MMLU Evaluation (`tests/mmlu_eval.py`)
+
+Evaluates on the [MMLU](https://huggingface.co/datasets/cais/mmlu) multiple-choice benchmark.
+
+**Modes:**
+- **Direct mode** (default): Uses Zenoh LLM API for raw generation—tests the underlying model
+- **Executive mode** (`--use-executive`): Sends goals through the full planner/executor pipeline—tests the agent
+
+```bash
+# Direct LLM evaluation (requires running Jill session)
+cd src
+python ../tests/mmlu_eval.py --subjects "high_school_physics" --k-shot 5 --max-test-per-subject 20
+
+# Full agent evaluation
+python ../tests/mmlu_eval.py --subjects "high_school_physics" --use-executive --max-test-per-subject 10
+```
+
+**Key features:**
+- Canonical 5-shot (or 0-shot) prompting per subject
+- Clears transient Notes between questions
+- Extracts "ANSWER: X" format from model output
+
+### HotpotQA Evaluation (`tests/hotpotqa_eval.py`)
+
+Evaluates on [HotpotQA](https://huggingface.co/datasets/hotpot_qa), a multi-hop reasoning benchmark with supporting context paragraphs.
+
+**Context modes:**
+- **inline**: Context paragraphs included directly in the goal text
+- **preload**: Context stored as Notes via Zenoh API before the question—tests the agent's memory retrieval
+
+```bash
+# Inline context (simpler, faster)
+python ../tests/hotpotqa_eval.py --character Jill --max-questions 20 --context-mode inline
+
+# Preload context (tests search-notes capability)
+python ../tests/hotpotqa_eval.py --character Jill --max-questions 10 --context-mode preload
+```
+
+**Evaluation metrics:**
+- **Exact Match (EM)**: Normalized prediction equals gold answer
+- **Contains Match (CM)**: Gold answer appears in prediction
+- **LLM Judge (LJ)**: LLM evaluates semantic correctness
+- **F1 Score**: Token-level overlap
+
+### Zenoh APIs for External Integration
+
+Both benchmarks demonstrate the Zenoh APIs added for external tool integration:
+
+| API Endpoint | Purpose |
+|--------------|---------|
+| `cognitive/{character}/llm/generate` | Direct LLM generation (bypasses planner) |
+| `cognitive/{character}/resource/create_note` | Create Notes programmatically |
+| `cognitive/{character}/resource/clear_transient` | Clear non-persistent Notes/Collections |
+
+These APIs enable building custom evaluation harnesses or integrating Cognitive Workbench with external systems.
+
+---
+
 ## ⚠️ Current Limitations
 
 1. **SGLang Required** - No longer optional; needed for planning
@@ -440,6 +542,7 @@ Docs/                         # Design documents (may lag code)
 4. **Memory persistence** is simple JSON (no graph DB)
 5. **UI is minimal** (research tool, not production-ready)
 6. **Documentation lags code** by design (code = truth)
+7. **LLM arithmetic unreliable** - Physics/math problems may get wrong numerical answers; consider adding a calculator tool for precise computation
 
 ---
 
@@ -454,6 +557,8 @@ If migrating from an earlier version:
 - Map node queryables (use resource_manager direct calls)
 - Physical world support
 - `server_name` and `model_name` in llm_config (use `sgl_model_path` only)
+- `parameter_source` mechanism in tool definitions (all parameters now flat)
+- Nested `args` structure in action JSON
 
 **Changed:**
 - Tool result format (now includes actual values)
@@ -461,6 +566,10 @@ If migrating from an earlier version:
 - `ask` primitive works synchronously (polls for response)
 - Tools receive `resource_manager` as kwarg
 - Startup is faster (planners initialized once)
+- **Action format simplified**: All tool parameters are now top-level fields
+  - Old: `{"type": "query-web", "args": {"query": "..."}}`
+  - New: `{"type": "query-web", "query": "..."}`
+- `search-notes` now returns full indexed text content (not 200-char preview)
 
 **Migration Guide:**
 1. Update `llm_config` in YAML - only `sgl_model_path` needed
@@ -505,16 +614,33 @@ If migrating from an earlier version:
    - 128-char truncation for long results
    - Planner sees both execution status and actual data
 
+6. **Simplified Action Format**
+   - Removed nested `args` structure from action JSON
+   - All tool parameters are now top-level fields
+   - Removed `parameter_source` mechanism from tool loader
+   - Reduces LLM confusion and parsing complexity
+
+7. **Added External Zenoh APIs**
+   - `cognitive/{character}/llm/generate`: Direct LLM access for external tools
+   - `cognitive/{character}/resource/create_note`: Programmatic Note creation
+   - `cognitive/{character}/resource/clear_transient`: Clear non-persistent Notes/Collections
+   - Enables benchmark harnesses and external system integration
+
+8. **Fixed Note/Collection ID Numbering**
+   - Counters now correctly reset on startup based on highest existing IDs
+   - Prevents ID collisions after loading saved state
+
 **Benefits:**
 - 40% reduction in inter-process communication
 - Simpler debugging (fewer nodes, direct calls)
 - Faster startup (single planner initialization)
 - Better planner feedback (sees actual tool results)
 - Cleaner codebase (~700 lines of dead code removed)
+- External tools can access LLM and memory system
 
 **Trade-offs:**
 - Less modularity (acceptable for research)
-- Executive node is larger (~2400 lines)
+- Executive node is larger (~2600 lines)
 - SGLang is now required (not optional)
 
 ---

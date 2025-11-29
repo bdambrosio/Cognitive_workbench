@@ -323,7 +323,7 @@ def evaluate_hotpotqa(
         print(f"[{idx:4d}] {status} EM={int(em)} CM={int(cm)} LJ={int(lj)} F1={f1:.2f} ({dt:.1f}s)")
         print(f"       Q: {question[:80]}...")
         print(f"       Gold: {gold_answer}")
-        print(f"       Pred: {pred_answer[:80]}")
+        print(f"       Pred: {pred_answer}")
     
     # Summary
     if results['total'] > 0:
@@ -350,7 +350,7 @@ def evaluate_hotpotqa(
         'errors': results['errors'],
     }
 
-
+#python ../tests/hotpotqa_eval.py --character Jill --max-questions 10 --context-mode preload
 def main():
     parser = argparse.ArgumentParser(description="HotpotQA evaluation for Cognitive Workbench")
     parser.add_argument(
