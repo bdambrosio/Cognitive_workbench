@@ -288,12 +288,13 @@ class InfospaceExecutor:
         action_type = action.get('type')
         
         # Reserved fields that are NOT tool parameters
-        reserved_fields = {'type', 'target', 'out', 'expect', 'reason'}
+        reserved_fields = {'type', 'target', 'value', 'out', 'expect', 'reason'}
         
-        # Direct format: type is the tool name, target is input data
+        # Direct format: type is the tool name, target or value is input data
         if action_type in self.available_tools:
             target = action_type  # Tool name
-            value = self._resolve_value(action.get('target', ''))  # Input data
+            # Input data: prefer 'target', fall back to 'value'
+            value = self._resolve_value(action.get('target') or action.get('value', ''))
         else:
             # Standard apply format: target is the tool name
             target = self._resolve_value(action.get('target'))
@@ -1631,33 +1632,24 @@ Make sure the string is in a format that can be parsed by the json.loads functio
     
     def _execute_think(self, action: Dict) -> Dict:
         """
-        Create an internal thought note (not communicated externally).
+        Internal reasoning - appended to planner context only, no Note created.
         
-        Required: type, value or target (accepts both for compatibility)
-        Optional: out (variable to bind the created note to)
+        Required: type, value or target
         """
-        # Accept both value and target (target preferred for consistency with other primitives)
+        # Accept both value and target
         value = self._resolve_value(action.get('value') or action.get('target'))
         
         if value is None:
             return {'status': 'failed', 'reason': 'think requires value or target'}
         
-        # Create and persist a note with the thought content
-        note_id = self._persist_note(str(value), 'think')
-        
-        if not note_id:
-            return {'status': 'failed', 'reason': 'Failed to persist thought note'}
-        
-        # Bind to output variable if specified
+        # Log error if out is specified - think does not create Notes
         out_var = action.get('out')
         if out_var:
-            self._bind_variable(out_var, note_id)
-            display_var = self._normalize_var_for_log(out_var)
-            logger.info(f"Think: created {note_id} → {display_var}")
-        else:
-            logger.info(f"Think: created {note_id}")
+            logger.error(f"Think: 'out' parameter ignored - think does not create Notes. Use generate-note or create-note instead.")
         
-        return {'status': 'success', 'value': note_id}
+        logger.info(f"Think: {str(value)[:100]}")
+        
+        return {'status': 'success', 'value': str(value)}
     
     def _execute_ask(self, action: Dict) -> Dict:
         """

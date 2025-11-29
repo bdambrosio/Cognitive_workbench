@@ -1,0 +1,61 @@
+{
+  "goal": "Goal Test calculate tool with arithmetic, trig, and variable substitution: ; actors: Jill; termination:",
+  "plan": {
+    "plan": [
+      {
+        "type": "calculate",
+        "value": "2 + 3 * 4",
+        "out": "$basic_result"
+      },
+      {
+        "type": "if",
+        "condition": {"type": "equals", "target": "$basic_result", "value": "14.00000000"},
+        "then": [{"type": "say", "value": "✓ PASS: basic arithmetic 2+3*4 = 14"}],
+        "else": [{"type": "say", "value": "✗ FAIL: basic arithmetic expected 14, got $basic_result"}]
+      },
+      {
+        "type": "calculate",
+        "value": "2 * 20 * sin(30 * pi / 180) / 9.8",
+        "out": "$physics_result"
+      },
+      {
+        "type": "say",
+        "value": "Physics result (projectile flight time): $physics_result seconds"
+      },
+      {
+        "type": "calculate",
+        "value": "2 * v * sin(theta * pi / 180) / g",
+        "variables": {"v": 20, "theta": 30, "g": 9.8},
+        "out": "$vars_result"
+      },
+      {
+        "type": "if",
+        "condition": {"type": "equals", "target": "$vars_result", "value": "$physics_result"},
+        "then": [{"type": "say", "value": "✓ PASS: variable substitution matches inline calculation"}],
+        "else": [{"type": "say", "value": "✗ FAIL: variable substitution mismatch - inline: $physics_result, vars: $vars_result"}]
+      },
+      {
+        "type": "calculate",
+        "value": "sqrt(16) + factorial(5)",
+        "out": "$sqrt_fact_result"
+      },
+      {
+        "type": "if",
+        "condition": {"type": "equals", "target": "$sqrt_fact_result", "value": "124.0000000"},
+        "then": [{"type": "say", "value": "✓ PASS: sqrt(16) + factorial(5) = 124"}],
+        "else": [{"type": "say", "value": "✗ FAIL: sqrt+factorial expected 124, got $sqrt_fact_result"}]
+      },
+      {
+        "type": "say",
+        "value": "Calculate tool test complete"
+      }
+    ],
+    "reasoning": "Tests calculate tool: basic arithmetic, trig with degrees conversion, variable substitution, and other functions (sqrt, factorial).",
+    "success": true,
+    "skip_validation": true
+  },
+  "out": "$result",
+  "parameters": {},
+  "saved_at": "2025-11-29T12:00:00.000000"
+}
+
