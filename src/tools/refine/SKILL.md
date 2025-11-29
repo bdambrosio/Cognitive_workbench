@@ -1,16 +1,13 @@
 ---
 name: refine
-description: Edit existing Note content according to natural language instruction (does not add new content)
+description: Extract or transform information from unstructured text content using LLM. Use for extracting facts, entities, or specific information from text. Does not add new content.
 type: python
 trusted: true
 flattens_collections: true
-parameters:
-  - name: instruction
-    type: string
-    description: Natural language instruction for transformation (REQUIRED)
 examples:
-  - '{"type":"refine","target":"$data","args":{"instruction":"extract schema as JSON"},"out":"$schema","expect":"should extract JSON schema"}'
-  - '{"type":"refine","target":"$paper","args":{"instruction":"list all citations in JSON format"},"out":"$citations","expect":"should find citation list"}'
+  - '{"type":"refine","target":"$bio","instruction":"extract the nationality","out":"$nationality"}'
+  - '{"type":"refine","target":"$article","instruction":"extract the main argument","out":"$argument"}'
+  - '{"type":"refine","target":"$data","instruction":"convert to bullet list","out":"$bullets"}'
 ---
 
 # Transform Note
@@ -25,14 +22,14 @@ Universal LLM-based transformation tool. **Edits existing Note content** accordi
 
 ## Input
 - `target`: Note to transform (REQUIRED - must exist and contain content)
-- `args.instruction`: Transformation instruction (REQUIRED, e.g., "extract schema", "convert to bullet list", "rewrite in formal tone")
+- `instruction`: Transformation instruction (REQUIRED, e.g., "extract schema", "convert to bullet list", "rewrite in formal tone")
 
 ## Output
 Returns Note containing the edited/transformed content based on the instruction.
 
 ## Usage
 ```json
-{"type":"refine","target":"$data","args":{"instruction":"extract schema as JSON"},"out":"$schema","expect":"should extract schema as JSON"}
+{"type":"refine","target":"$data","instruction":"extract schema as JSON","out":"$schema"}
 ```
 
 ## Examples

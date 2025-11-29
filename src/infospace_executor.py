@@ -278,54 +278,40 @@ class InfospaceExecutor:
         2. Direct:   {"type": "tool-name", "args": {...}, "out": "$var"}
         
         Required: type, out
-        Optional: target (format 1), value (input), reason (documentation), args (additional arguments)
+        Optional: target (input data), any tool-specific parameters at top level
         
-        Argument types:
-        - target: literal string (tool name) OR $variable (resolves to tool name)
-        - value: literal string/value OR $variable (resolves to Note/Collection content)
-        - args: dict of additional arguments (resolved if they're variables)
-        - out: literal string (variable name, no $ prefix)
+        All tool parameters are at top level (flat format):
+        - target: $variable (input data) - resolves to Note/Collection content
+        - out: literal string (variable name)
+        - Any other fields: tool-specific parameters (prompt, query, instruction, etc.)
         """
-        # Handle direct tool call format (type is the tool name)
         action_type = action.get('type')
         
-        # Check if this is direct tool call format (type is the tool name)
+        # Reserved fields that are NOT tool parameters
+        reserved_fields = {'type', 'target', 'out', 'expect', 'reason'}
+        
+        # Direct format: type is the tool name, target is input data
         if action_type in self.available_tools:
-            # Direct format: type is the tool name, target field is the input data
             target = action_type  # Tool name
-            value = self._resolve_value(action.get('target', action.get('value', '')))  # Input data
+            value = self._resolve_value(action.get('target', ''))  # Input data
         else:
             # Standard apply format: target is the tool name
             target = self._resolve_value(action.get('target'))
-            value = self._resolve_value(action.get('value', ''))
-        
-        reason = action.get('reason', '')
-        additional_args = action.get('args', {})
-        
-        # Fix double-nested args: if args contains only {"args": {...}}, unwrap it
-        if isinstance(additional_args, dict) and len(additional_args) == 1 and 'args' in additional_args:
-            nested_args = additional_args['args']
-            if isinstance(nested_args, dict):
-                additional_args = nested_args
+            value = ''
         
         out_var = action.get('out')
+        
+        # Extract tool parameters from top level (flat format)
+        additional_args = {}
+        for key, val in action.items():
+            if key not in reserved_fields:
+                additional_args[key] = val
         
         if not target:
             return {'status': 'failed', 'reason': 'apply requires target or tool name in type'}
         
         # Get tool info and route by type
         tool_info = self._get_tool_info(target)
-        
-        # Handle tools with custom parameter sources (e.g., args.query)
-        if tool_info:
-            param_source = tool_info.get('parameter_source')
-            if param_source and param_source.startswith('args.'):
-                # Extract parameter from args dict (e.g., 'args.query' -> additional_args['query'])
-                param_name = param_source.split('.', 1)[1]
-                if param_name in additional_args:
-                    value = self._resolve_value(additional_args.get(param_name))
-                    # Remove from args since it's now the main value
-                    additional_args = {k: v for k, v in additional_args.items() if k != param_name}
         
         if not tool_info:
             return {'status': 'failed', 'reason': f'Tool not found: {target}'}
@@ -786,13 +772,12 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         def llm_generate(messages, bindings=None, max_tokens=2000, temperature=0.7, is_json=False, stops=None):
             """Unified LLM generation interface using SGLang runtime."""
             if not self.runtime:
-                raise RuntimeError("SGLang runtime not available - llm_generate requires SGLang")
+                raise RuntimeError("SGLang runtime not available - ensure executive_node is started with sgl_model_path")
             # Apply bindings to messages if provided
             if bindings and isinstance(messages, list):
                 processed_messages = []
                 for msg in messages:
                     if isinstance(msg, str):
-                        # Apply template bindings
                         processed_msg = msg
                         for key, value in bindings.items():
                             processed_msg = processed_msg.replace(f"{{{{${key}}}}}", str(value))
@@ -1009,8 +994,19 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         # Get original content
         original_content = self._get_content(resource_id)
         
-        # Extract text preview (first paragraph, 200 chars)
-        text_preview, format_type = self._extract_text_preview(original_content, max_chars=200)
+        # Extract full text content (not truncated)
+        if isinstance(original_content, dict):
+            if 'text' in original_content:
+                full_text = str(original_content['text'])
+            else:
+                full_text = json.dumps(original_content)
+            format_type = 'json'
+        elif isinstance(original_content, list):
+            full_text = json.dumps(original_content)
+            format_type = 'json'
+        else:
+            full_text = str(original_content) if original_content else ''
+            format_type = 'text'
         
         # Build metadata
         metadata = {
@@ -1020,7 +1016,7 @@ Make sure the string is in a format that can be parsed by the json.loads functio
             'type': resource_result.get('type', 'Note')
         }
         
-        # If original Note has a URI in metadata, use that instead (reuse original_content from above)
+        # If original Note has a URI in metadata, use that instead
         if isinstance(original_content, dict) and 'metadata' in original_content:
             original_uri = original_content['metadata'].get('uri') or original_content['metadata'].get('url')
             if original_uri:
@@ -1036,10 +1032,10 @@ Make sure the string is in a format that can be parsed by the json.loads functio
                 metadata['note_name'] = resource_metadata['note_name']
         
         return {
-            'text': text_preview,
+            'text': full_text,
             'format': format_type,
             'metadata': metadata,
-            'char_count': len(text_preview)
+            'char_count': len(full_text)
         }
     
     def _persist_note(self, value: Any, source_context: str, properties: Optional[Dict] = None, note_name: str = '') -> Optional[str]:
@@ -1816,7 +1812,9 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         operation = action.get('operation')
         out_var = action.get('out')
         filter_null = action.get('filter_null', True)
-        additional_args = action.get('args', {})
+        # Extract additional args from top-level (excluding reserved fields)
+        reserved_fields = {'type', 'target', 'operation', 'out', 'filter_null', 'expect', 'reason'}
+        additional_args = {k: v for k, v in action.items() if k not in reserved_fields}
         
         # Target must be a Collection variable
         if not isinstance(target_arg, str) or not target_arg.startswith('$'):
@@ -2867,12 +2865,11 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         left_arg = action.get('target')
         right_arg = action.get('value')
         out_var = action.get('out')
-        args = action.get('args', {})
         
-        join_key = args.get('on')
-        join_type = args.get('type', 'inner')
-        left_key = args.get('left_key', join_key)
-        right_key = args.get('right_key', join_key)
+        join_key = action.get('on')
+        join_type = action.get('join_type', 'inner')
+        left_key = action.get('left_key', join_key)
+        right_key = action.get('right_key', join_key)
         
         if not isinstance(left_arg, str) or not left_arg.startswith('$'):
             return {'status': 'failed', 'reason': 'join target must be $variable'}
@@ -3702,6 +3699,9 @@ Make sure the string is in a format that can be parsed by the json.loads functio
             executive_node=self.executive_node,
             resource_manager=self.resource_manager
         )
+        
+        # Share runtime with isolated executor
+        isolated_executor.runtime = self.runtime
         
         # Copy initial bindings if provided
         if initial_bindings:

@@ -6,7 +6,7 @@
         "type": "join",
         "target": "$papers",
         "value": "$authors",
-        "args": {"on": "id"},
+        "on": "id",
         "out": "$joined"
       },
       {
@@ -29,4 +29,3 @@
   "parameters": {},
   "saved_at": "2025-11-25T12:00:00.000000"
 }
-

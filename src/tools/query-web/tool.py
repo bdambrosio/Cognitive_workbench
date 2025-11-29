@@ -511,16 +511,17 @@ def tool(value, **kwargs):
     Web search tool using Google CSE + LLM extraction.
     
     Args:
-        value: Search query string
-        **kwargs: agent_name (required), llm_generate (required)
+        value: Unused (for compatibility with executor interface)
+        **kwargs: query (required), agent_name (required), llm_generate (required)
     
     Returns:
         Collection ID containing structured Note for each search result
     """
-    if not isinstance(value, str):
+    query = kwargs.get('query', '')
+    if not query:
         return {
             'status': 'failed',
-            'reason': 'Query must be a string'
+            'reason': 'query parameter required'
         }
     
     agent_name = kwargs.get('agent_name')
@@ -548,7 +549,7 @@ def tool(value, **kwargs):
     # Perform search
     try:
         results = llm_search(
-            query=value,
+            query=query,
             llm_generate=llm_generate,
             max_chars=32000,
             max_urls=10,
@@ -588,7 +589,7 @@ def tool(value, **kwargs):
     if not collection_id:
         return {'status': 'failed', 'reason': 'Failed to create Collection'}
     
-    logger.info(f"query-web created Collection {collection_id} with {len(note_ids)} results for query: {value}")
+    logger.info(f"query-web created Collection {collection_id} with {len(note_ids)} results for query: {query}")
     return collection_id
 
 if __name__ == "__main__":

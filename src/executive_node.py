@@ -654,6 +654,18 @@ class ZenohExecutiveNode:
             f"cognitive/{character_name}/resource/remove/*",
             self._handle_resource_remove_query
         )
+        self.resource_clear_transient_queryable = self.session.declare_queryable(
+            f"cognitive/{character_name}/resource/clear_transient",
+            self._handle_resource_clear_transient_query
+        )
+        self.resource_create_note_queryable = self.session.declare_queryable(
+            f"cognitive/{character_name}/resource/create_note",
+            self._handle_resource_create_note_query
+        )
+        self.llm_generate_queryable = self.session.declare_queryable(
+            f"cognitive/{character_name}/llm/generate",
+            self._handle_llm_generate_query
+        )
         
         # Queryable for sync plan execution (character-specific)
         self.sync_plan_execution_queryable = self.session.declare_queryable(
@@ -1936,6 +1948,89 @@ class ZenohExecutiveNode:
                 'error': str(e)
             }
             query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
+    
+    def _handle_resource_clear_transient_query(self, query):
+        """Handle query to clear all non-persistent Notes and Collections."""
+        if not self.resource_manager:
+            response = {'success': False, 'error': 'Resource manager not available'}
+            query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
+            return
+        
+        deleted_notes = 0
+        deleted_collections = 0
+        to_delete = []
+        for resource_id, resource_data in self.resource_manager.resource_registry.items():
+            if not resource_data.get('properties', {}).get('persistent', False):
+                if resource_id.startswith('Note_') and resource_id != 'Note_null':
+                    to_delete.append(resource_id)
+                elif resource_id.startswith('Collection_'):
+                    to_delete.append(resource_id)
+        
+        for resource_id in to_delete:
+            success, _ = self.resource_manager.delete_resource(resource_id)
+            if success:
+                if resource_id.startswith('Note_'):
+                    deleted_notes += 1
+                else:
+                    deleted_collections += 1
+        
+        response = {'success': True, 'deleted_notes': deleted_notes, 'deleted_collections': deleted_collections}
+        query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
+        logger.info(f"Cleared {deleted_notes} transient Notes, {deleted_collections} transient Collections")
+    
+    def _handle_resource_create_note_query(self, query):
+        """Handle query to create a Note from external caller."""
+        if not self.resource_manager:
+            response = {'success': False, 'error': 'Resource manager not available'}
+            query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
+            return
+        
+        payload_bytes = query.payload.to_bytes() if query.payload else b'{}'
+        params = json.loads(payload_bytes.decode('utf-8')) if payload_bytes else {}
+        
+        content = params.get('content', '')
+        format_type = params.get('format', 'text')
+        note_name = params.get('name', '')
+        
+        success, note_id, error_msg, _ = self.resource_manager.create_note(
+            character_name=self.character_name,
+            content=content,
+            format_type=format_type,
+            source_skill='external',
+            source_value='',
+            note_name=note_name,
+            extra_props={}
+        )
+        
+        if success:
+            response = {'success': True, 'note_id': note_id}
+        else:
+            response = {'success': False, 'error': error_msg or 'Failed to create Note'}
+        query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
+    
+    def _handle_llm_generate_query(self, query):
+        """Handle LLM generation query from external caller."""
+        payload_bytes = query.payload.to_bytes() if query.payload else b'{}'
+        params = json.loads(payload_bytes.decode('utf-8')) if payload_bytes else {}
+        
+        messages = params.get('messages', [])
+        max_tokens = params.get('max_tokens', 2000)
+        temperature = params.get('temperature', 0.7)
+        is_json = params.get('is_json', False)
+        stops = params.get('stops')
+        
+        if not messages:
+            response = {'success': False, 'error': 'messages required'}
+            query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
+            return
+        
+        result = self.llm_generate(messages, max_tokens=max_tokens, temperature=temperature, is_json=is_json, stops=stops)
+        
+        if result.success:
+            response = {'success': True, 'text': result.text}
+        else:
+            response = {'success': False, 'error': getattr(result, 'error', 'Generation failed')}
+        query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
     
     def _plan_bindings_query_handler(self, query):
         """Handle query for current plan bindings."""

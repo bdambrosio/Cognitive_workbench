@@ -3,12 +3,10 @@ name: generate-note
 description: Generate new text or code content from scratch using natural language prompt via LLM
 type: python
 trusted: true
-parameters:
-  source: args.prompt
 examples:
-  - '{"type":"generate-note","args":{"prompt":"Write a Python function to calculate fibonacci numbers"},"out":"$code_note","expect":"should generate fibonacci function"}'
-  - '{"type":"generate-note","args":{"prompt":"Write a summary of quantum computing","style":"text"},"out":"$summary_note"}'
-  - '{"type":"generate-note","args":{"prompt":"Refactor this code to use async/await","style":"code","context":"$existing_code"},"out":"$refactored_code"}'
+  - '{"type":"generate-note","prompt":"Write a Python function to calculate fibonacci numbers","out":"$code_note"}'
+  - '{"type":"generate-note","prompt":"Write a summary of quantum computing","style":"text","out":"$summary_note"}'
+  - '{"type":"generate-note","prompt":"Refactor this code to use async/await","style":"code","context":"$existing_code","out":"$refactored_code"}'
 ---
 
 # Generate Note
@@ -16,9 +14,9 @@ examples:
 LLM-based content generation tool. Creates new text or code from scratch using natural language instructions.
 
 ## Input
-- `args.prompt`: Generation instruction (REQUIRED, e.g., "Write a tic-tac-toe game", "Explain quantum entanglement")
-- `args.style`: "code" or "text" (optional, default: "text")
-- `args.context`: Optional context - can be:
+- `prompt`: Generation instruction (REQUIRED, e.g., "Write a tic-tac-toe game", "Explain quantum entanglement")
+- `style`: "code" or "text" (optional, default: "text")
+- `context`: Optional context - can be:
   - Collection ID (e.g., "$context_collection"): Concatenates all Notes in Collection
   - Note ID (e.g., "$background_note"): Uses Note content as context
   - Plain text string: Used directly as context
@@ -30,24 +28,24 @@ Returns Note containing generated content (text or code).
 
 Generate code:
 ```json
-{"type":"generate-note","args":{"prompt":"Write a Python function to calculate fibonacci numbers","style":"code"},"out":"$fib_code"}
+{"type":"generate-note","prompt":"Write a Python function to calculate fibonacci numbers","style":"code","out":"$fib_code"}
 ```
 
 Generate text:
 ```json
-{"type":"generate-note","args":{"prompt":"Write a summary of quantum computing"},"out":"$summary"}
+{"type":"generate-note","prompt":"Write a summary of quantum computing","out":"$summary"}
 ```
 
 Generate with context Note:
 ```json
-{"type":"generate-note","args":{"prompt":"Refactor this code to use async/await","style":"code","context":"$existing_code"},"out":"$refactored"}
+{"type":"generate-note","prompt":"Refactor this code to use async/await","style":"code","context":"$existing_code","out":"$refactored"}
 ```
 
 Generate with context Collection (RAG pattern):
 ```json
 {"type":"search-notes","query":"conversation history","out":"$history"}
 {"type":"create-collection","value":["$history"],"out":"$context_collection"}
-{"type":"generate-note","args":{"prompt":"Write a response to the user based on conversation history","context":"$context_collection"},"out":"$response"}
+{"type":"generate-note","prompt":"Write a response to the user based on conversation history","context":"$context_collection","out":"$response"}
 ```
 
 ## Differences from refine

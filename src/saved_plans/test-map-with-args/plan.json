@@ -1,0 +1,52 @@
+{
+  "goal": "Goal Test map with tool args: ; actors: Jill; termination:",
+  "plan": {
+    "plan": [
+      {
+        "type": "create-note",
+        "value": "The quick brown fox jumps over the lazy dog. This sentence contains every letter of the alphabet.",
+        "out": "$n1"
+      },
+      {
+        "type": "create-note",
+        "value": "Machine learning is a subset of artificial intelligence that enables systems to learn from data.",
+        "out": "$n2"
+      },
+      {
+        "type": "create-collection",
+        "value": ["$n1", "$n2"],
+        "out": "$texts"
+      },
+      {
+        "type": "map",
+        "target": "$texts",
+        "operation": "summarize",
+        "focus": "key concepts only",
+        "max_length": 20,
+        "out": "$summaries"
+      },
+      {
+        "type": "size",
+        "target": "$summaries",
+        "out": "$count"
+      },
+      {
+        "type": "if",
+        "condition": {"type": "equals", "target": "$count", "value": 2},
+        "then": [{"type": "say", "value": "✓ PASS: map produced 2 summaries with focus arg"}],
+        "else": [{"type": "say", "value": "✗ FAIL: expected 2 summaries, got $count"}]
+      },
+      {
+        "type": "display",
+        "target": "$summaries"
+      }
+    ],
+    "reasoning": "Tests map primitive passing focus and max_length args to summarize tool",
+    "success": true,
+    "skip_validation": true
+  },
+  "out": "$result",
+  "parameters": {},
+  "saved_at": "2025-11-29T12:00:00.000000"
+}
+

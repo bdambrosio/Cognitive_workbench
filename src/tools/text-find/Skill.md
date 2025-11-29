@@ -2,9 +2,8 @@
 name: text-find
 description: Locate pattern or substring and return position with context
 type: prompt_augmentation
-parameters: pattern (required) - text or regex pattern to find; context_lines (optional) - lines of context to include
 examples:
-  - '{"type":"text-find","target":"$document","args":{"pattern":"conclusion"},"out":"$location"}'
+  - '{"type":"text-find","target":"$document","pattern":"conclusion","out":"$location"}'
 ---
 
 # Text Find
@@ -44,17 +43,17 @@ Returns null if no matches found.
 
 **Simple text search:**
 ```json
-{"type":"text-find","target":"$document","args":{"pattern":"TODO"},"out":"$todo_locations"}
+{"type":"text-find","target":"$document","pattern":"TODO","out":"$todo_locations"}
 ```
 
 **Pattern search with context:**
 ```json
-{"type":"text-find","target":"$log","args":{"pattern":"ERROR.*timeout","context_lines":3},"out":"$errors"}
+{"type":"text-find","target":"$log","pattern":"ERROR.*timeout","context_lines":3,"out":"$errors"}
 ```
 
 **Find email addresses:**
 ```json
-{"type":"text-find","target":"$contact_info","args":{"pattern":"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}"},"out":"$emails"}
+{"type":"text-find","target":"$contact_info","pattern":"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}","out":"$emails"}
 ```
 
 ## Guidelines

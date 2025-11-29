@@ -208,16 +208,17 @@ def tool(value, runtime=None, **kwargs):
     Semantic Scholar search tool.
     
     Args:
-        value: Search query string
-        **kwargs: agent_name (required), resource_manager (required), limit (optional)
+        value: Unused (for compatibility with executor interface)
+        **kwargs: query (required), agent_name (required), resource_manager (required), limit (optional)
         
     Returns:
         Collection ID containing structured Note for each paper result
     """
-    if not isinstance(value, str):
+    query = kwargs.get('query', '')
+    if not query:
         return {
             'status': 'failed',
-            'reason': 'Query must be a string'
+            'reason': 'query parameter required'
         }
     
     agent_name = kwargs.get('agent_name')
@@ -237,7 +238,7 @@ def tool(value, runtime=None, **kwargs):
     limit = kwargs.get('limit', 10)
     
     # Search papers
-    results = search_papers(value, limit=limit)
+    results = search_papers(query, limit=limit)
     
     if not results:
         # Return empty Collection for no results
@@ -263,7 +264,7 @@ def tool(value, runtime=None, **kwargs):
     if not collection_id:
         return {'status': 'failed', 'reason': 'Failed to create Collection'}
     
-    logger.info(f"semantic-scholar created Collection {collection_id} with {len(note_ids)} papers for query: {value}")
+    logger.info(f"semantic-scholar created Collection {collection_id} with {len(note_ids)} papers for query: {query}")
     return collection_id
 
 if __name__ == "__main__":
