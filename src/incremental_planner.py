@@ -1122,6 +1122,7 @@ if HAS_SGLANG:
             "In doing so, consider the tools you have selected, the goal you are trying to achieve, and the downstream tasks that will be required to achieve the goal.\n"
             "Respond with the following fields:\n"
             "ANALYSIS: <text>\n"
+            "CARDINALITY_CHECK: <\"SINGLE\" or \"MULTIPLE/LIST\">. Does the question imply a unique answer (e.g., 'date of birth') or a potentially multi-value answer (e.g., 'children')? If MULTIPLE, your plan must be exhaustive.\n"
             "SELECTED_TOOLS_JSON: <json list of tool names>\n"
             "FIRST_TASK: <high-level subgoal to tackle first>\n"
         )
@@ -1168,6 +1169,8 @@ if HAS_SGLANG:
             "  REQUEST_TOOLS: <json array of tool names or empty array []>\n\n"
             "  CRITICAL for DONE:\n"
             "  - Only mark DONE: YES after ALL required actions are executed\n"
+            "  - COMPLENESS CHECK: If the question asks for an attribute that can change over time (jobs, spouses, locations), you must verify if multiple values exist\n"
+            "  - DO NOT STOP at the first search result. If you find one answer (e.g., 'Ambassador to Czechoslovakia'), you must briefly verify no other equal-tier answers exist (e.g., 'Ambassador to Ghana') before finishing\n"
             "  - If goal requires communicating to user, use 'say' primitive BEFORE marking done\n"
             "  - When DONE=YES, NEXT_TASK must be blank (leave empty)\n\n"
             "  CRITICAL for REQUEST_TOOLS:\n"
