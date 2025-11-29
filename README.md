@@ -97,11 +97,11 @@ Cognitive Workbench supports a working memory with layered semantics:
 - UI shows pending question indicator in input area
 - Example: `{"type": "ask", "target": "user", "value": "Which paper should I focus on?", "out": "$user_choice"}`
 
-**`think` Primitive (Revised):**
+**`think` Primitive:**
 - Internal reasoning appended to SGLang conversation state
 - Not displayed externally, but logged for debugging
-- Creates actual Notes in infospace for later reference
-- Example: `{"type": "think", "value": "Should I verify these claims before proceeding?", "out": "$thought"}`
+- Does NOT create Notes (use `generate-note` or `create-note` to persist content)
+- Example: `{"type": "think", "value": "Should I verify these claims before proceeding?"}`
 
 *See: `src/infospace_executor.py`*
 

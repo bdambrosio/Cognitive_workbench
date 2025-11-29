@@ -295,7 +295,7 @@ def build_tool_catalog(available_tools: Dict[str, Dict], primitives_reference: s
             "description": "generate an internal reflection on the state of the plan. Use for reasoning about the goal or the state of the plan.",
             "full_description": "generate an internal thought that enriches the planning context for subsequent tool selections. The thought is appended to the internal SGLang conversation state, allowing the LLM to reference it in later reasoning. Thoughts are NOT persisted as Notes, NOT published to the UI, and NOT communicated to the user. Use this for tracking reasoning steps, making observations, or noting intermediate conclusions that inform later decisions.",
             "parameters": {
-                "value": "required: literal string or $variable referencing thought content"
+                "value": "required: literal string or $variable referencing thought prompt"
             },
             "examples": [
                 '{"type":"think","value":"The user wants a summary, but how long should it be?"}',
