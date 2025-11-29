@@ -1,12 +1,16 @@
 #!/usr/bin/env python3
 """
-Minimal MMLU harness using SGLang directly (no LightEval).
+MMLU evaluation harness using Zenoh LLM API.
 
 - Loads MMLU from HuggingFace: cais/mmlu
 - Canonical 5-shot (or 0-shot) per subject
-- Sends a single prompt per question to an SGLang Runtime
+- Uses Zenoh LLM API (requires running Jill session)
 - Expects model to end with a line: "ANSWER: X" where X in {A,B,C,D}
 - Reports per-subject and overall accuracy
+
+Modes:
+- Direct mode (default): Uses Zenoh LLM API for raw generation
+- Executive mode (--use-executive): Sends full goals through planner/executor
 """
 
 import argparse
@@ -19,28 +23,61 @@ from datetime import datetime
 
 from datasets import load_dataset
 import zenoh
-import sglang as sgl
-from sglang import function, system, user, gen
 
 ANSWER_LETTERS = ["A", "B", "C", "D"]
 
 
 # -----------------------------
-# SGLang function wrapper
+# Zenoh LLM API wrapper
 # -----------------------------
 
-@function
-def mmlu_query(s, prompt: str):
-    s += system("You are a helpful student taking an exam and trying for your best score.")
-    s += user(prompt + "\nThink step by step before answering.")
+def llm_generate(session: zenoh.Session, character: str, messages: list, max_tokens: int = 1500, temperature: float = 0.0, timeout: float = 60.0) -> tuple:
+    """Call LLM via Zenoh API. Returns (text, error) tuple."""
+    query_key = f"cognitive/{character}/llm/generate"
+    payload = json.dumps({'messages': messages, 'max_tokens': max_tokens, 'temperature': temperature})
+    replies = session.get(query_key, payload=payload.encode('utf-8'), timeout=timeout)
+    for reply in replies:
+        if hasattr(reply, 'ok') and reply.ok is not None:
+            result = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
+            if result.get('success'):
+                return result.get('text', ''), None
+            else:
+                return '', result.get('error', 'Unknown error')
+    return '', 'No response from LLM API'
+
+
+def mmlu_query_direct(session: zenoh.Session, character: str, prompt: str, temperature: float = 0.0) -> dict:
+    """Query LLM directly via Zenoh API for MMLU question."""
+    full_prompt = f"You are a helpful student taking an exam and trying for your best score.\n\n{prompt}\n\nThink step by step before answering. End with ANSWER: X where X is A, B, C, or D."
     
-    # 1. Allow the model to "think" (unconstrained generation)
-    # We use a distinct stop token or length limit for the thought process.
-    s += gen("reasoning", stop=["ANSWER:"], max_tokens=1024)
+    text, error = llm_generate(session, character, [full_prompt], max_tokens=1500, temperature=temperature)
     
-    # 2. Force the standard format for the final token
-    s += "ANSWER:" 
-    s += gen("answer", regex=r" [ABCD]")
+    if error:
+        return {'error': error, 'reasoning': '', 'answer': ''}
+    
+    # Split into reasoning and answer
+    if 'ANSWER:' in text.upper():
+        parts = text.upper().split('ANSWER:')
+        reasoning = text[:text.upper().rfind('ANSWER:')]
+        answer_part = parts[-1].strip()
+    else:
+        reasoning = text
+        answer_part = text
+    
+    return {'reasoning': reasoning, 'answer': answer_part}
+
+
+def clear_transient_notes(session: zenoh.Session, character: str, timeout: float = 10.0) -> int:
+    """Clear all non-persistent Notes and Collections via Zenoh API."""
+    query_key = f"cognitive/{character}/resource/clear_transient"
+    replies = session.get(query_key, timeout=timeout)
+    for reply in replies:
+        if hasattr(reply, 'ok') and reply.ok is not None:
+            payload = reply.ok.payload.to_bytes().decode('utf-8')
+            result = json.loads(payload)
+            if result.get('success'):
+                return result.get('deleted_notes', 0) + result.get('deleted_collections', 0)
+    return 0
 
 
 def mmlu_query_via_executive(
@@ -206,12 +243,10 @@ def extract_choice(text: str) -> str | None:
 
 
 def evaluate_subject(
-    model_path: str,
     subject: str,
     k_shot: int,
     max_test: int | None = None,
     temperature: float = 0.0,
-    top_p: float = 1.0,
     use_executive: bool = False,
     zenoh_session: zenoh.Session = None,
     character: str = "Jill",
@@ -220,9 +255,9 @@ def evaluate_subject(
     Evaluate a single MMLU subject.
 
     Args:
-        use_executive: If True, send queries via executive_node instead of direct SGLang
-        zenoh_session: Required if use_executive=True
-        character: Character name for executive mode (default: Jill)
+        use_executive: If True, send queries via executive_node (planner/executor)
+        zenoh_session: Zenoh session for LLM API
+        character: Character name (default: Jill)
 
     Returns:
         (accuracy, num_correct, num_total)
@@ -269,16 +304,14 @@ def evaluate_subject(
         t0 = time.time()
         
         if use_executive:
+            clear_transient_notes(zenoh_session, character)
             out = mmlu_query_via_executive(zenoh_session, character, prompt)
-            if 'error' in out and out['error']:
-                print(f"[{subject}] idx={idx:4d} ERROR: {out['error']}")
-                continue
         else:
-            out = mmlu_query.run(
-                prompt=prompt,
-                temperature=temperature,
-                top_p=top_p,
-            )
+            out = mmlu_query_direct(zenoh_session, character, prompt, temperature)
+        
+        if 'error' in out and out['error']:
+            print(f"[{subject}] idx={idx:4d} ERROR: {out['error']}")
+            continue
 
         # Access outputs to force completion before measuring time
         answer_text = out["answer"]
@@ -303,16 +336,10 @@ def evaluate_subject(
     )
     return acc, num_correct, num_total
 
-# python3 ../tests/mmlu_eval.py --model-path RedHatAI/Qwen2.5-14B-Instruct-FP8-dynamic --subjects "high_school_physics" --k-shot 1 --max-test-per-subject 10
+# python3 ../tests/mmlu_eval.py --subjects "high_school_physics" --k-shot 1 --max-test-per-subject 10
 
 def main():
-    parser = argparse.ArgumentParser(description="MMLU eval via SGLang")
-    parser.add_argument(
-        "--model-path",
-        type=str,
-        default="",
-        help="Path to SGLang model (required unless --use-executive).",
-    )
+    parser = argparse.ArgumentParser(description="MMLU eval via Zenoh LLM API")
     parser.add_argument(
         "--subjects",
         type=str,
@@ -336,37 +363,10 @@ def main():
         help="Max number of test questions per subject (for quick runs).",
     )
     parser.add_argument(
-        "--device", type=str, default="cuda", help="Device for SGLang Runtime."
-    )
-    parser.add_argument(
-        "--dtype",
-        type=str,
-        default="auto",
-        help='Dtype for SGLang Runtime ("auto", "float16", "bf16", ...).',
-    )
-    parser.add_argument(
-        "--context-length",
-        type=int,
-        default=32768,
-        help="Context length for SGLang Runtime.",
-    )
-    parser.add_argument(
         "--temperature",
         type=float,
         default=0.0,
         help="Temperature for generation (0.0 for deterministic).",
-    )
-    parser.add_argument(
-        "--top-p",
-        type=float,
-        default=1.0,
-        help="Top-p for sampling.",
-    )
-    parser.add_argument(
-        "--attention-backend",
-        type=str,
-        default=None,
-        help="Attention backend for SGLang Runtime (e.g., 'flashinfer'). Required for some GPU architectures.",
     )
     parser.add_argument(
         "--use-executive",
@@ -382,30 +382,16 @@ def main():
 
     args = parser.parse_args()
 
-    zenoh_session = None
+    # Both modes require running Jill session for Zenoh LLM API
+    print(f"Connecting to executive_node for character: {args.character}")
+    config = zenoh.Config()
+    zenoh_session = zenoh.open(config)
+    print("Zenoh session opened")
     
     if args.use_executive:
-        # Executive mode: connect to running session via Zenoh
-        print(f"Connecting to executive_node for character: {args.character}")
-        config = zenoh.Config()
-        zenoh_session = zenoh.open(config)
-        print("Zenoh session opened")
+        print("Mode: Executive (full planner/executor pipeline)")
     else:
-        # Direct SGLang mode
-        if not args.model_path:
-            parser.error("--model-path required unless --use-executive")
-        print("Initializing SGLang Runtime...")
-        runtime_kwargs = {
-            "model_path": args.model_path,
-            "tokenizer_path": args.model_path,
-            "device": args.device,
-            "context_length": args.context_length,
-            "dtype": args.dtype,
-            "mem_fraction_static": 0.82
-        }
-        if args.attention_backend:
-            runtime_kwargs["attention_backend"] = args.attention_backend
-        sgl.set_default_backend(sgl.Runtime(**runtime_kwargs))
+        print("Mode: Direct LLM (Zenoh API, bypasses planner)")
 
     # Decide subjects
     if args.subjects.strip():
@@ -427,12 +413,10 @@ def main():
 
     for subject in subjects:
         acc, n_corr, n_tot = evaluate_subject(
-            model_path=args.model_path,
             subject=subject,
             k_shot=args.k_shot,
             max_test=args.max_test_per_subject,
             temperature=args.temperature,
-            top_p=args.top_p,
             use_executive=args.use_executive,
             zenoh_session=zenoh_session,
             character=args.character,

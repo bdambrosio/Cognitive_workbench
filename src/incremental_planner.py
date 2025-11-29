@@ -189,27 +189,30 @@ Search Primitives:
 - search-within-collection: Search within a specific indexed Collection (requires target Collection, must be indexed first). Returns Collection of structured Notes with text preview, metadata.source_id, metadata.uri, metadata.score, metadata.type.
 
 All search primitives return structured Notes matching query-web/semantic-scholar format:
-- text: First paragraph preview (200 chars max)
+- text: Full text content from original Note
 - format: "text" or "json"
 - metadata.source_id: Original Note/Collection ID
 - metadata.uri: URI field (Note/Collection ID or extracted URI from source)
 - metadata.score: Search relevance score (0.0-1.0)
 - metadata.type: "Note" or "Collection"
-- char_count: Length of text preview
+- char_count: Length of text
 
-Use project with metadata.uri or metadata.source_id for consistent access across all search results.
+Use project to extract metadata fields (uri, source_id, score, etc.). For extracting information FROM text content, use refine (LLM-based).
 
 SQL-like Collection Operations (require dict/JSON Notes):
-- project: Extract specific fields (SELECT columns) → new Collection with subset of fields
+- project: Extract metadata/structured fields (SELECT columns) → new Collection with subset of fields
 - pluck: Extract single field as simple values → Collection of values  
 - filter-structured: Filter by field conditions (WHERE clauses) → filtered Collection
 - sort: Sort by field value (ORDER BY) → sorted Collection
 - head: Take first N items (LIMIT) → smaller Collection preserving original Notes
 - join: Combine two Collections on matching field (INNER JOIN) → merged Collection
 
+IMPORTANT: project/pluck extract NAMED FIELDS only (metadata.uri, metadata.title, etc.). They do NOT parse unstructured text.
+To extract information FROM text content, use refine (LLM-based extraction).
+
 Use cases:
-- project: Extract URLs from search results, get title+year from papers
-- pluck: Get just titles as simple list, extract scores for analysis
+- project: Extract metadata.uri from search results, get metadata.title+metadata.year from papers
+- pluck: Get just metadata.title as simple list, extract metadata.score for analysis
 - filter-structured: Papers after 2020, results with score>0.5, venue contains "NeurIPS"
 - sort: Rank by score (descending), chronological by year, alphabetical by title
 - head: Get top 5 after sorting, take first result from search
@@ -222,7 +225,7 @@ Efficiency Rules:
 - Use map to apply Note operations to each Collection item
 
 Common Patterns:
-- Add multiple Notes to Collection via map: {"type":"map","target":"$notes","operation":"add","args":{"target":"$collection"},"out":"$collection"}
+- Add multiple Notes to Collection via map: {"type":"map","target":"$notes","operation":"add","collection":"$collection","out":"$collection"}
 - Add all items from one Collection to another: {"type":"union","target":"$target_collection","value":"$source_collection","out":"$target_collection"}
 - Combine two Collections into new one: {"type":"union","target":"$coll1","value":"$coll2","out":"$combined"}
 
@@ -231,7 +234,8 @@ Tool Selection:
 - General web: query-web (broad coverage, recent content)
 - Single URL fetch: fetch-text (NOT for query-web/semantic-scholar results)
 - Generate new content: generate-note (creates text/code from scratch, no target needed)
-- Transform existing content: refine (transforms existing Note content)
+- Extract info from unstructured text: refine (LLM-based, use for text content)
+- Extract metadata/structured fields: project (field accessor, use for metadata.* fields)
 - as-markdown: EXTRACT existing markdown from mixed text (NOT for converting TO markdown)
 - as-json: EXTRACT existing JSON from mixed text (NOT for converting TO JSON)
 
@@ -376,7 +380,7 @@ def build_tool_catalog(available_tools: Dict[str, Dict], primitives_reference: s
             "schema_hint": {"target": "User (optional)", "value": "string (question text)", "out": "$variable"}
         },
         "add": {
-            "description": "Add a Note to an existing Collection (mutates Collection in place). CRITICAL: When used with map to add multiple Notes, the Collection must be in args.target, NOT top-level fields. Correct: {\"type\":\"map\",\"target\":\"$notes\",\"operation\":\"add\",\"args\":{\"target\":\"$collection\"},\"out\":\"$collection\"}. Wrong: {\"type\":\"map\",\"target\":\"$notes\",\"operation\":\"add\",\"out\":\"$collection\",\"value\":\"$collection\"}",
+            "description": "Add a Note to an existing Collection (mutates Collection in place). When used with map to add multiple Notes, use collection parameter: {\"type\":\"map\",\"target\":\"$notes\",\"operation\":\"add\",\"collection\":\"$collection\",\"out\":\"$collection\"}",
             "schema_hint": {"target": "$variable (Collection)", "value": "$variable or literal", "out": "$variable"}
         },
         "remove": {
@@ -400,8 +404,8 @@ def build_tool_catalog(available_tools: Dict[str, Dict], primitives_reference: s
             "schema_hint": {"target": "$variable (Collection)", "out": "$variable"}
         },
         "project": {
-            "description": "Extract specific fields from each Note in Collection (SQL SELECT). Each Note must be JSON/dict. Only Notes with ALL requested fields present (non-null) are included in result. Use to extract URLs, titles, or specific attributes from search results.",
-            "full_description": "Project operation extracts specified fields from each Note in a Collection, similar to SQL SELECT. Input Collection must contain JSON/dict Notes. Output is a new Collection of projected Notes containing only the requested fields. Notes missing any requested field are excluded. Nested fields use dot notation (e.g., 'metadata.uri'). Common use: extract URLs from search results via project with fields=['metadata.uri'].",
+            "description": "Extract metadata/structured fields from each Note in Collection (SQL SELECT). Extracts NAMED FIELDS only (metadata.uri, metadata.title, etc.), does NOT parse unstructured text. For extracting info FROM text content, use refine instead.",
+            "full_description": "Project operation extracts specified fields from each Note in a Collection, similar to SQL SELECT. Input Collection must contain JSON/dict Notes. Output is a new Collection of projected Notes containing only the requested fields. Notes missing any requested field are excluded. Nested fields use dot notation (e.g., 'metadata.uri'). IMPORTANT: project is a field accessor for structured data - it extracts metadata fields (metadata.uri, metadata.title, metadata.year) or top-level JSON fields. It does NOT interpret or parse unstructured text content. To extract information FROM text (e.g., 'extract the nationality'), use refine (LLM-based).",
             "examples": [
                 '{"type":"project","target":"$search_results","fields":["metadata.uri"],"out":"$urls"}',
                 '{"type":"project","target":"$papers","fields":["metadata.title","metadata.year"],"out":"$paper_info"}',
@@ -452,10 +456,10 @@ def build_tool_catalog(available_tools: Dict[str, Dict], primitives_reference: s
             "description": "Join two Collections on a common field (SQL JOIN). Creates new Collection of merged Notes where field values match. Inner join: only matching pairs included.",
             "full_description": "Join two Collections by matching a field in Notes from both Collections. Input Collections must contain JSON/dict Notes with the specified join field. For each Note in target (left) Collection, finds matching Notes in value (right) Collection where field values are equal. Creates new Notes by merging matched pairs (right fields overwrite left on conflict). Only matched pairs are included (inner join). Use for combining related data from different sources.",
             "examples": [
-                '{"type":"join","target":"$papers","value":"$citations","args":{"on":"paper_id"},"out":"$papers_with_citations"}',
-                '{"type":"join","target":"$users","value":"$profiles","args":{"on":"user_id"},"out":"$user_profiles"}'
+                '{"type":"join","target":"$papers","value":"$citations","on":"paper_id","out":"$papers_with_citations"}',
+                '{"type":"join","target":"$users","value":"$profiles","on":"user_id","out":"$user_profiles"}'
             ],
-            "schema_hint": {"target": "$variable (left Collection)", "value": "$variable (right Collection)", "args": {"on": "string (field name to join on)"}, "out": "$variable"}
+            "schema_hint": {"target": "$variable (left Collection)", "value": "$variable (right Collection)", "on": "string (field name to join on)", "out": "$variable"}
         },
         "coerce": {
             "description": "Convert Note content to different type/format. Supports: to-string, to-int, to-float, to-bool, to-json (parse JSON string), to-list (split string or wrap value). Use for type conversion before operations requiring specific types.",
@@ -490,8 +494,8 @@ def build_tool_catalog(available_tools: Dict[str, Dict], primitives_reference: s
         "query-web": "Search web and return Collection of structured Notes. Each Note has text (full content), format, metadata.uri (URL), metadata.domain, char_count. Use project with metadata.uri to extract URLs. NO need for fetch-text after this.",
         "fetch-text": "Fetch text from a SINGLE specific URL, Note ID, or Collection ID. For Note IDs, retrieves Note content directly. For Collection IDs, uses first Note. Use ONLY when you have one URL/ID to fetch directly.",
         "semantic-scholar": "Search academic papers and return Collection of structured Notes. Each Note has text (abstract), format, metadata.uri (PDF URL), metadata.title, metadata.authors, metadata.year, metadata.citations, metadata.venue. Use project with metadata.uri to extract URLs. NO need for fetch-text after this.",
-        "search-notes": "Global search across all Notes. Returns Collection of structured Notes with text preview (200 chars), metadata.source_id, metadata.uri, metadata.score, metadata.type. Format matches query-web/semantic-scholar.",
-        "search-collections": "Global search across all Collections. Returns Collection of structured Notes with text preview (200 chars), metadata.source_id, metadata.uri, metadata.score, metadata.type. Format matches query-web/semantic-scholar.",
+        "search-notes": "Global search across all Notes. Returns Collection of structured Notes with full text content, metadata.source_id, metadata.uri, metadata.score, metadata.type. Use project for metadata fields, refine for extracting info from text.",
+        "search-collections": "Global search across all Collections. Returns Collection of structured Notes with full text content, metadata.source_id, metadata.uri, metadata.score, metadata.type. Use project for metadata fields, refine for extracting info from text.",
         "search-within-collection": "Search within indexed Collection. Returns Collection of structured Notes with text preview (200 chars), metadata.source_id, metadata.uri, metadata.score, metadata.type. Format matches query-web/semantic-scholar.",
     }
     
@@ -787,44 +791,9 @@ def sgl_to_infospace_action(tool_name: str, args_json: str, step: int, available
                     args[field] = f"${val}"
                     logger.debug(f"Normalized '{field}' field: '{val}' -> '${val}'")
     
-    # Build action
+    # Build action - ALL fields at top level (flat format)
     action = {"type": tool_name}
-    
-    # Check if tool has parameter_source
-    tool_has_param_source = False
-    param_field_name = None
-    if tool_name in available_tools:
-        tool_meta = available_tools[tool_name]
-        param_source = tool_meta.get('parameter_source')
-        if param_source and param_source.startswith('args.'):
-            tool_has_param_source = True
-            param_field_name = param_source.split('.', 1)[1]
-    
-    # Core fields that are ALWAYS at top level (never inside args)
-    always_top_level = ['out', 'expect', 'resource_id', 'source', 'operation']
-    
-    if tool_name not in available_tools:
-        # Primitive: ALL fields at top level
-        action.update(args)
-    elif tool_has_param_source:
-        # Tool with parameter_source (e.g., query-web with args.query)
-        # Keep the parameter_source field in args, move others to top level
-        for field in always_top_level:
-            if field in args:
-                action[field] = args.pop(field)
-        # Keep param_field_name and any other args nested
-        if args:
-            action["args"] = args
-    else:
-        # Standard tool without parameter_source
-        # target, value, out, expect at top level; optional params (query, focus, mode) in args
-        standard_top_level = always_top_level + ['target', 'value']
-        for field in standard_top_level:
-            if field in args:
-                action[field] = args.pop(field)
-        # Remaining optional params (query, focus, mode, etc.) in nested args
-        if args:
-            action["args"] = args
+    action.update(args)
     
     # Ensure 'out' field if tool produces output
     output_producing = ["create-note", "create-collection", "load", "search-notes", "search-collections", "search-within-collection", "map", 

@@ -2,9 +2,8 @@
 name: as-markdown
 description: Extract markdown document structure and content from mixed/embedded text (NOT for converting plain text TO markdown)
 type: prompt_augmentation
-parameters: element (optional) - type to extract (headers|lists|links|code|section|all)
 examples:
-  - '{"type":"as-markdown","target":"$llm_response","args":{"element":"headers"},"out":"$toc"}'
+  - '{"type":"as-markdown","target":"$llm_response","element":"headers","out":"$toc"}'
 ---
 
 # As Markdown
@@ -55,22 +54,22 @@ Returns extracted elements:
 
 **Extract headers for TOC:**
 ```json
-{"type":"as-markdown","target":"$doc","args":{"element":"headers"},"out":"$toc"}
+{"type":"as-markdown","target":"$doc","element":"headers","out":"$toc"}
 ```
 
 **Extract specific section:**
 ```json
-{"type":"as-markdown","target":"$doc","args":{"element":"section","section":"Usage"},"out":"$usage"}
+{"type":"as-markdown","target":"$doc","element":"section","section":"Usage","out":"$usage"}
 ```
 
 **Extract first code block:**
 ```json
-{"type":"as-markdown","target":"$response","args":{"element":"code"},"out":"$code"}
+{"type":"as-markdown","target":"$response","element":"code","out":"$code"}
 ```
 
 **Extract all code blocks:**
 ```json
-{"type":"as-markdown","target":"$response","args":{"element":"code","all":true},"out":"$all_code"}
+{"type":"as-markdown","target":"$response","element":"code","all":true,"out":"$all_code"}
 ```
 
 ## Guidelines

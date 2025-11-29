@@ -4,21 +4,11 @@ description: Compress information with focus-aware adaptive compression and styl
 type: python
 trusted: true
 flattens_collections: true
-parameters:
-  - name: focus
-    type: string
-    description: Optional topic to guide summarization (enables leaky focus filtering)
-  - name: style
-    type: string
-    description: Output style - 'technical' (default), 'executive', or 'comprehensive'
-  - name: compression_ratio
-    type: float
-    description: Compression factor (default 3.0), applied to focused content
 examples:
-  - '{"type":"summarize","target":"$doc","out":"$summary","expect":"should provide balanced summary"}'
-  - '{"type":"summarize","target":"$papers","args":{"focus":"attention mechanisms","style":"technical"},"out":"$summary","expect":"should focus on attention"}'
-  - '{"type":"summarize","target":"$reports","args":{"style":"executive"},"out":"$brief","expect":"should provide executive summary"}'
-  - '{"type":"summarize","target":"$data","args":{"focus":"cost analysis","compression_ratio":2.0},"out":"$detailed","expect":"should provide detailed cost analysis"}'
+  - '{"type":"summarize","target":"$doc","out":"$summary"}'
+  - '{"type":"summarize","target":"$papers","focus":"attention mechanisms","style":"technical","out":"$summary"}'
+  - '{"type":"summarize","target":"$reports","style":"executive","out":"$brief"}'
+  - '{"type":"summarize","target":"$data","focus":"cost analysis","compression_ratio":2.0,"out":"$detailed"}'
 ---
 
 # Summarize Content
@@ -115,9 +105,7 @@ When focus is provided, content filtering is intentionally **lenient**:
 
 ### Executive Brief with Focus
 ```json
-{"type":"summarize","target":"$reports",
- "args":{"focus":"cost analysis","style":"executive"},
- "out":"$brief"}
+{"type":"summarize","target":"$reports","focus":"cost analysis","style":"executive","out":"$brief"}
 ```
 → Filters for cost-related content (leaky)
 → Caps output at 500 words regardless of input size
@@ -125,9 +113,7 @@ When focus is provided, content filtering is intentionally **lenient**:
 
 ### Detailed Focused Analysis
 ```json
-{"type":"summarize","target":"$papers",
- "args":{"focus":"transformer attention","compression_ratio":2.5},
- "out":"$detailed"}
+{"type":"summarize","target":"$papers","focus":"transformer attention","compression_ratio":2.5,"out":"$detailed"}
 ```
 → Filters for attention content
 → Low compression (2.5:1 = 40% of focused content)
@@ -135,9 +121,7 @@ When focus is provided, content filtering is intentionally **lenient**:
 
 ### Comprehensive Review
 ```json
-{"type":"summarize","target":"$document",
- "args":{"style":"comprehensive"},
- "out":"$full_analysis"}
+{"type":"summarize","target":"$document","style":"comprehensive","out":"$full_analysis"}
 ```
 → 2:1 compression, preserves nuance
 → Input: 20K tokens → Output: ~10K tokens

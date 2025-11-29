@@ -4,13 +4,9 @@ description: Test Note content against natural language predicate using LLM (ret
 type: python
 trusted: true
 flattens_collections: true
-parameters:
-  - name: predicate
-    type: string
-    description: Natural language question or test condition
 examples:
-  - '{"type":"if","condition":{"type":"tool_condition","tool":"assess","target":"$content","args":{"predicate":"contains citations?"}},"then":[...]}'
-  - '{"type":"assess","target":"$document","args":{"predicate":"discusses AI safety?"},"out":"$is_relevant","expect":"should return true or false"}'
+  - '{"type":"if","condition":{"type":"tool_condition","tool":"assess","target":"$content","predicate":"contains citations?"},"then":[...]}'
+  - '{"type":"assess","target":"$document","predicate":"discusses AI safety?","out":"$is_relevant"}'
 ---
 
 # Test Note
@@ -37,17 +33,17 @@ Returns "true" or "false" as string (for use in tool_condition).
 
 Test for citations:
 ```json
-{"type":"if","condition":{"type":"tool_condition","tool":"test-note","target":"$paper","args":{"predicate":"contains academic citations?"}},"then":[...]}
+{"type":"if","condition":{"type":"tool_condition","tool":"assess","target":"$paper","predicate":"contains academic citations?"},"then":[...]}
 ```
 
 Check data validity:
 ```json
-{"type":"if","condition":{"type":"tool_condition","tool":"test-note","target":"$data","args":{"predicate":"is valid JSON with 'results' field?"}},"then":[...]}
+{"type":"if","condition":{"type":"tool_condition","tool":"assess","target":"$data","predicate":"is valid JSON with 'results' field?"},"then":[...]}
 ```
 
 Content filtering:
 ```json
-{"type":"if","condition":{"type":"tool_condition","tool":"test-note","target":"$text","args":{"predicate":"discusses machine learning or AI?"}},"then":[...]}
+{"type":"if","condition":{"type":"tool_condition","tool":"assess","target":"$text","predicate":"discusses machine learning or AI?"},"then":[...]}
 ```
 
 ## Guidelines

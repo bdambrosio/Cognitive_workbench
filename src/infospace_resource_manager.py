@@ -592,8 +592,8 @@ class InfospaceResourceManager:
 
     def _sync_counters_from_registry(self):
         """Ensure counters match highest existing Note_/Collection_ IDs."""
-        max_note = self.note_counter
-        max_collection = self.collection_counter
+        max_note = 0
+        max_collection = 0
         for resource_id in self.resource_registry.keys():
             if resource_id.startswith('Note_'):
                 suffix = resource_id.split('_', 1)[1]

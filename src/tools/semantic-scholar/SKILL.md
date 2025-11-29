@@ -3,10 +3,8 @@ name: semantic-scholar
 type: python
 trusted: true
 description: "Search academic papers. Returns Collection of JSON Notes with fields text, metadata.title, metadata.authors, metadata.year, metadata.citations, metadata.uri (alias: pdf_url), metadata.venue (Level 4 tool)."
-parameters:
-  source: args.query
 examples:
-  - '{"type":"semantic-scholar","args":{"query":"transformer architecture"},"out":"$papers","expect":"should find papers on transformers"}'
+  - '{"type":"semantic-scholar","query":"transformer architecture","out":"$papers"}'
   - '{"type":"project","target":"$papers","fields":["metadata.title","metadata.year"],"out":"$titles"}'
   - '{"type":"project","target":"$papers","fields":["metadata.uri"],"out":"$urls"}'
   - '{"type":"filter-structured","target":"$papers","where":"metadata.citations > 100","out":"$high_impact"}'
@@ -51,15 +49,15 @@ Requires `SEMANTIC_SCHOLAR_API_KEY` environment variable.
 ### Pattern 1: Quick summary
 Results are already a Collection - summarize directly (NO split needed):
 ```json
-{"type":"semantic-scholar","args":{"query":"BERT model"},"out":"$papers","expect":"should find BERT papers"}
-{"type":"summarize","target":"$papers","args":{"focus":"what is BERT"},"out":"$summary"}
+{"type":"semantic-scholar","query":"BERT model","out":"$papers"}
+{"type":"summarize","target":"$papers","focus":"what is BERT","out":"$summary"}
 {"type":"say","target":"user","value":"$summary"}
 ```
 
 ### Pattern 2: Get full text from papers
 Extract PDF URLs using project, then fetch full text:
 ```json
-{"type":"semantic-scholar","args":{"query":"GPT architecture"},"out":"$papers","expect":"should find GPT papers"}
+{"type":"semantic-scholar","query":"GPT architecture","out":"$papers"}
 {"type":"project","target":"$papers","fields":["metadata.uri"],"out":"$urls"}
 {"type":"map","target":"$urls","operation":"fetch-text","out":"$full_texts"}
 ```
@@ -67,8 +65,8 @@ Extract PDF URLs using project, then fetch full text:
 ### Pattern 3: Filter and analyze
 Filter Collection directly (NO split needed):
 ```json
-{"type":"semantic-scholar","args":{"query":"neural networks"},"out":"$papers","expect":"should find papers"}
-{"type":"filter-collection","target":"$papers","args":{"predicate":"citations > 1000"},"out":"$top_papers"}
+{"type":"semantic-scholar","query":"neural networks","out":"$papers"}
+{"type":"filter-collection","target":"$papers","predicate":"citations > 1000","out":"$top_papers"}
 {"type":"relate","target":"$top_papers","out":"$analysis"}
 ```
 

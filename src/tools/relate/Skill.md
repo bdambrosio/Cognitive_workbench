@@ -3,16 +3,9 @@ name: relate
 description: Compare two Notes or Collections to find similarities, differences, and relationships
 type: python
 trusted: true
-parameters:
-  - name: other
-    type: string
-    description: Second Note/Collection to compare (REQUIRED)
-  - name: instruction
-    type: string
-    description: Optional natural language guidance for comparison focus
 examples:
   - '{"type":"relate","target":"$doc1","other":"$doc2","out":"$comparison"}'
-  - '{"type":"relate","target":"$scaling_laws","other":"$compute_optimal","args":{"instruction":"identify how scaling laws inform compute-optimal training strategies"},"out":"$comparison"}'
+  - '{"type":"relate","target":"$scaling_laws","other":"$compute_optimal","instruction":"identify how scaling laws inform compute-optimal training strategies","out":"$comparison"}'
 ---
 
 # Relate
@@ -30,7 +23,7 @@ Perform semantic comparison of two Notes or Collections to identify overlaps, co
 
 - `target`: First Note/Collection to compare
 - `other`: Second Note/Collection to compare (REQUIRED)
-- `args.instruction`: Optional natural language guidance (e.g., "focus on methodology differences", "compare cost implications")
+- `instruction`: Optional natural language guidance (e.g., "focus on methodology differences", "compare cost implications")
 
 Tool automatically flattens Collections (including nested Collections) and fetches Note content.
 
@@ -61,7 +54,7 @@ Basic comparison:
 
 With instruction:
 ```json
-{"type":"relate","target":"$scaling_laws","other":"$compute_optimal","args":{"instruction":"identify how scaling laws inform compute-optimal training strategies"},"out":"$comparison"}
+{"type":"relate","target":"$scaling_laws","other":"$compute_optimal","instruction":"identify how scaling laws inform compute-optimal training strategies","out":"$comparison"}
 ```
 
 ## Relationship Types

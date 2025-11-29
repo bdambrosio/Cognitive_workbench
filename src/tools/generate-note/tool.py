@@ -92,15 +92,16 @@ def tool(value, runtime=None, **kwargs):
     Generate new content using natural language prompt.
     
     Args:
-        value: Generation prompt (extracted from args.prompt via parameter_source)
-        **kwargs: Additional parameters
+        value: Unused (for compatibility with executor interface)
+        **kwargs: Tool parameters
+            - prompt: Generation instruction (REQUIRED)
             - style: "code" or "text" (optional, default: "text")
             - context: Optional context - Collection ID, Note ID, or plain text string
     
     Returns:
         Generated content as string
     """
-    prompt = str(value) if value else ''
+    prompt = kwargs.get('prompt', '')
     if not prompt:
         return "Error: prompt parameter required"
     

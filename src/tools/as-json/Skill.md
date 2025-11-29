@@ -2,9 +2,8 @@
 name: as-json
 description: Identify and extract JSON from mixed content, optionally extracting specific fields
 type: prompt_augmentation
-parameters: field (optional) - dot notation path to extract (e.g., "results[0].title")
 examples:
-  - '{"type":"as-json","target":"$llm_response","args":{"field":"data.title"},"out":"$title"}'
+  - '{"type":"as-json","target":"$llm_response","field":"data.title","out":"$title"}'
 ---
 
 # As JSON

@@ -2,9 +2,8 @@
 name: matches
 description: Check if text matches regex pattern or contains substring
 type: prompt_augmentation
-parameters: pattern (required) - text string or regex pattern to match; match_type (optional) - "substring"|"regex"|"exact"
 examples:
-  - '{"type":"if","condition":{"type":"tool_condition","tool":"matches","target":"$text","args":{"pattern":"error"}},"then":[...]}'
+  - '{"type":"if","condition":{"type":"tool_condition","tool":"matches","target":"$text","pattern":"error"},"then":[...]}'
 ---
 
 # Contains Pattern
@@ -40,17 +39,17 @@ Returns a Note containing:
 
 **Simple substring check:**
 ```json
-{"type":"contains-pattern","target":"$text","args":{"pattern":"error"},"out":"$has_error"}
+{"type":"matches","target":"$text","pattern":"error","out":"$has_error"}
 ```
 
 **Regex pattern match:**
 ```json
-{"type":"contains-pattern","target":"$email","args":{"pattern":"^[a-z]+@example\\.com$","match_type":"regex"},"out":"$is_valid_email"}
+{"type":"matches","target":"$email","pattern":"^[a-z]+@example\\.com$","match_type":"regex","out":"$is_valid_email"}
 ```
 
 **Exact match:**
 ```json
-{"type":"contains-pattern","target":"$status","args":{"pattern":"complete","match_type":"exact"},"out":"$is_complete"}
+{"type":"matches","target":"$status","pattern":"complete","match_type":"exact","out":"$is_complete"}
 ```
 
 ## Match Types

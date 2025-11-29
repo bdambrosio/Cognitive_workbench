@@ -206,12 +206,6 @@ def load_tools(tools_dir_path: str) -> Dict[str, Dict]:
         if not examples:
             logger.warning(f"Tool {tool_name} missing examples in SKILL.md frontmatter")
         
-        # Extract parameter source if specified (for special parameter handling)
-        parameters = metadata.get('parameters')
-        parameter_source = None
-        if parameters and isinstance(parameters, dict):
-            parameter_source = parameters.get('source')
-        
         tools[tool_name] = {
             'name': tool_name,
             'description': tool_description,
@@ -223,8 +217,7 @@ def load_tools(tools_dir_path: str) -> Dict[str, Dict]:
             'path': str(tool_dir.absolute()),
             'python_file': python_file,
             'additional_files': additional_files,
-            'plan_data': plan_data,
-            'parameter_source': parameter_source
+            'plan_data': plan_data
         }
         
         trust_info = " [TRUSTED]" if trusted else ""
