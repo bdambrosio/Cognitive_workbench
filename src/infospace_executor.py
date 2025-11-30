@@ -208,13 +208,24 @@ class InfospaceExecutor:
             'join': self._execute_join,
         }
         
-        # Validate 'out' field has $ prefix if present
+        # Validate 'out' field has $ prefix or is a named resource
         if 'out' in action:
             out_val = action['out']
             if isinstance(out_val, str) and out_val and not out_val.startswith('$'):
-                error_msg = f"Invalid 'out' field: '{out_val}' must start with $ (use '${out_val}')"
-                logger.error(error_msg)
-                return {'status': 'failed', 'reason': error_msg}
+                # Check if it's a named resource (Collection or Note)
+                if self.resource_manager:
+                    resource = self.resource_manager.get_resource(out_val)
+                    if resource:
+                        # Valid named resource - bind it to a variable with same name
+                        self._bind_variable(out_val, resource.get('name', out_val))
+                    else:
+                        error_msg = f"Invalid 'out' field: '{out_val}' must start with $ or be a named resource"
+                        logger.error(error_msg)
+                        return {'status': 'failed', 'reason': error_msg}
+                else:
+                    error_msg = f"Invalid 'out' field: '{out_val}' must start with $ (use '${out_val}')"
+                    logger.error(error_msg)
+                    return {'status': 'failed', 'reason': error_msg}
         
         logger.info(f"Executing action: {json.dumps(action)}")
         handler = handlers.get(action_type)
@@ -1230,11 +1241,10 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         if not source_arg:
             return {'status': 'failed', 'reason': 'index requires source'}
         
-        # Source should be a Collection variable
-        if not isinstance(source_arg, str) or not source_arg.startswith('$'):
-            return {'status': 'failed', 'reason': 'index source must be $variable referencing a Collection'}
-        
-        collection_var = source_arg[1:]
+        # Source should be a Collection variable or named resource
+        collection_var, error = self._resolve_target_var(source_arg)
+        if error:
+            return {'status': 'failed', 'reason': f'index: {error}'}
         
         # Get Collection ID from bindings
         if collection_var not in self.plan_bindings:
@@ -1287,11 +1297,10 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         if not target_arg or not query or not out_var:
             return {'status': 'failed', 'reason': 'search-within-collection requires target, value, and out'}
         
-        # Target should be a Collection variable
-        if not isinstance(target_arg, str) or not target_arg.startswith('$'):
-            return {'status': 'failed', 'reason': 'search-within-collection target must be $variable referencing an indexed Collection'}
-        
-        collection_var = target_arg[1:]
+        # Target should be a Collection variable or named resource
+        collection_var, error = self._resolve_target_var(target_arg)
+        if error:
+            return {'status': 'failed', 'reason': f'search-within-collection: {error}'}
         
         # Get Collection ID from bindings
         if collection_var not in self.plan_bindings:
@@ -1788,11 +1797,10 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         reserved_fields = {'type', 'target', 'operation', 'out', 'filter_null', 'expect', 'reason'}
         additional_args = {k: v for k, v in action.items() if k not in reserved_fields}
         
-        # Target must be a Collection variable
-        if not isinstance(target_arg, str) or not target_arg.startswith('$'):
-            return {'status': 'failed', 'reason': 'map target must be $variable referencing a Collection'}
-        
-        collection_var = target_arg[1:]
+        # Target must be a Collection variable or named resource
+        collection_var, error = self._resolve_target_var(target_arg)
+        if error:
+            return {'status': 'failed', 'reason': f'map: {error}'}
         
         # Get Collection Note IDs
         note_ids = self._dereference_collection(collection_var)
@@ -1944,11 +1952,10 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         out_var = action.get('out')
         separator = action.get('separator', '\n\n')
         
-        # Target must be Collection variable
-        if not isinstance(target_arg, str) or not target_arg.startswith('$'):
-            return {'status': 'failed', 'reason': 'flatten target must be $variable'}
-        
-        collection_var = target_arg[1:]
+        # Target must be Collection variable or named resource
+        collection_var, error = self._resolve_target_var(target_arg)
+        if error:
+            return {'status': 'failed', 'reason': f'flatten: {error}'}
         note_ids = self._dereference_collection(collection_var)
         
         if not isinstance(note_ids, list):
@@ -1996,11 +2003,10 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         value_arg = action.get('value')
         out_var = action.get('out')
         
-        # Target must be Collection variable
-        if not isinstance(target_arg, str) or not target_arg.startswith('$'):
-            return {'status': 'failed', 'reason': 'add target must be $variable'}
-        
-        collection_var = target_arg[1:]
+        # Target must be Collection variable or named resource
+        collection_var, error = self._resolve_target_var(target_arg)
+        if error:
+            return {'status': 'failed', 'reason': f'add: {error}'}
         
         # Get Collection ID from bindings
         if collection_var not in self.plan_bindings:
@@ -2125,11 +2131,10 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         field_name = action.get('field', 'results')
         out_var = action.get('out')
         
-        # Target must be Note variable
-        if not isinstance(target_arg, str) or not target_arg.startswith('$'):
-            return {'status': 'failed', 'reason': 'split target must be $variable'}
-        
-        note_var = target_arg[1:]
+        # Target must be Note variable or named resource
+        note_var, error = self._resolve_target_var(target_arg)
+        if error:
+            return {'status': 'failed', 'reason': f'split: {error}'}
         
         # Get Note ID from bindings
         if note_var not in self.plan_bindings:
@@ -2251,10 +2256,9 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         target_arg = action.get('target')
         out_var = action.get('out')
         
-        if not isinstance(target_arg, str) or not target_arg.startswith('$'):
-            return {'status': 'failed', 'reason': 'size target must be $variable'}
-        
-        collection_var = target_arg[1:]
+        collection_var, error = self._resolve_target_var(target_arg)
+        if error:
+            return {'status': 'failed', 'reason': f'size: {error}'}
         note_ids = self._dereference_collection(collection_var)
         
         if not isinstance(note_ids, list):
@@ -2284,13 +2288,12 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         value_arg = action.get('value')
         out_var = action.get('out')
         
-        if not isinstance(target_arg, str) or not target_arg.startswith('$'):
-            return {'status': 'failed', 'reason': 'union target must be $variable'}
-        if not isinstance(value_arg, str) or not value_arg.startswith('$'):
-            return {'status': 'failed', 'reason': 'union value must be $variable'}
-        
-        target_var = target_arg[1:]
-        value_var = value_arg[1:]
+        target_var, error = self._resolve_target_var(target_arg)
+        if error:
+            return {'status': 'failed', 'reason': f'union target: {error}'}
+        value_var, error = self._resolve_target_var(value_arg)
+        if error:
+            return {'status': 'failed', 'reason': f'union value: {error}'}
         
         target_ids = self._dereference_collection(target_var)
         value_ids = self._dereference_collection(value_var)
@@ -2324,13 +2327,12 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         value_arg = action.get('value')
         out_var = action.get('out')
         
-        if not isinstance(target_arg, str) or not target_arg.startswith('$'):
-            return {'status': 'failed', 'reason': 'intersection target must be $variable'}
-        if not isinstance(value_arg, str) or not value_arg.startswith('$'):
-            return {'status': 'failed', 'reason': 'intersection value must be $variable'}
-        
-        target_var = target_arg[1:]
-        value_var = value_arg[1:]
+        target_var, error = self._resolve_target_var(target_arg)
+        if error:
+            return {'status': 'failed', 'reason': f'intersection target: {error}'}
+        value_var, error = self._resolve_target_var(value_arg)
+        if error:
+            return {'status': 'failed', 'reason': f'intersection value: {error}'}
         
         target_ids = self._dereference_collection(target_var)
         value_ids = self._dereference_collection(value_var)
@@ -2364,13 +2366,12 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         value_arg = action.get('value')
         out_var = action.get('out')
         
-        if not isinstance(target_arg, str) or not target_arg.startswith('$'):
-            return {'status': 'failed', 'reason': 'difference target must be $variable'}
-        if not isinstance(value_arg, str) or not value_arg.startswith('$'):
-            return {'status': 'failed', 'reason': 'difference value must be $variable'}
-        
-        target_var = target_arg[1:]
-        value_var = value_arg[1:]
+        target_var, error = self._resolve_target_var(target_arg)
+        if error:
+            return {'status': 'failed', 'reason': f'difference target: {error}'}
+        value_var, error = self._resolve_target_var(value_arg)
+        if error:
+            return {'status': 'failed', 'reason': f'difference value: {error}'}
         
         target_ids = self._dereference_collection(target_var)
         value_ids = self._dereference_collection(value_var)
@@ -2405,10 +2406,9 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         value_arg = action.get('value')
         out_var = action.get('out')
         
-        if not isinstance(target_arg, str) or not target_arg.startswith('$'):
-            return {'status': 'failed', 'reason': 'remove target must be $variable'}
-        
-        collection_var = target_arg[1:]
+        collection_var, error = self._resolve_target_var(target_arg)
+        if error:
+            return {'status': 'failed', 'reason': f'remove: {error}'}
         
         if collection_var not in self.plan_bindings:
             return {'status': 'failed', 'reason': f'Collection variable not bound: {collection_var}'}
@@ -2464,8 +2464,9 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         out_var = action.get('out')
         fields = action.get('fields', action.get('args', {}).get('fields'))
         
-        if not isinstance(target_arg, str) or not target_arg.startswith('$'):
-            return {'status': 'failed', 'reason': 'project target must be $variable'}
+        collection_var, error = self._resolve_target_var(target_arg)
+        if error:
+            return {'status': 'failed', 'reason': f'project: {error}'}
         
         if not fields:
             return {'status': 'failed', 'reason': 'project requires fields list'}
@@ -2473,7 +2474,6 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         if not isinstance(fields, list):
             return {'status': 'failed', 'reason': 'fields must be a list'}
         
-        collection_var = target_arg[1:]
         note_ids = self._dereference_collection(collection_var)
         
         if not isinstance(note_ids, list):
@@ -2552,13 +2552,13 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         count = action.get('count', action.get('args', {}).get('count', 1))
         out_var = action.get('out')
         
-        if not isinstance(target_arg, str) or not target_arg.startswith('$'):
-            return {'status': 'failed', 'reason': 'head target must be $variable'}
+        collection_var, error = self._resolve_target_var(target_arg)
+        if error:
+            return {'status': 'failed', 'reason': f'head: {error}'}
         
         if not isinstance(count, int) or count < 1:
             return {'status': 'failed', 'reason': 'head count must be positive integer'}
         
-        collection_var = target_arg[1:]
         note_ids = self._dereference_collection(collection_var)
         
         if not isinstance(note_ids, list):
@@ -2599,13 +2599,13 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         field = action.get('field', action.get('args', {}).get('field'))
         out_var = action.get('out')
         
-        if not isinstance(target_arg, str) or not target_arg.startswith('$'):
-            return {'status': 'failed', 'reason': 'pluck target must be $variable'}
+        collection_var, error = self._resolve_target_var(target_arg)
+        if error:
+            return {'status': 'failed', 'reason': f'pluck: {error}'}
         
         if not field:
             return {'status': 'failed', 'reason': 'pluck requires field parameter'}
         
-        collection_var = target_arg[1:]
         note_ids = self._dereference_collection(collection_var)
         
         if not isinstance(note_ids, list):
@@ -2659,13 +2659,13 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         where_clause = action.get('where', action.get('args', {}).get('where'))
         out_var = action.get('out')
         
-        if not isinstance(target_arg, str) or not target_arg.startswith('$'):
-            return {'status': 'failed', 'reason': 'filter-structured target must be $variable'}
+        collection_var, error = self._resolve_target_var(target_arg)
+        if error:
+            return {'status': 'failed', 'reason': f'filter-structured: {error}'}
         
         if not where_clause:
             return {'status': 'failed', 'reason': 'filter-structured requires where clause'}
         
-        collection_var = target_arg[1:]
         note_ids = self._dereference_collection(collection_var)
         
         if not isinstance(note_ids, list):
@@ -2772,8 +2772,9 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         out_var = action.get('out')
         order = action.get('order', action.get('args', {}).get('order', 'asc'))
         
-        if not isinstance(target_arg, str) or not target_arg.startswith('$'):
-            return {'status': 'failed', 'reason': 'sort target must be $variable'}
+        collection_var, error = self._resolve_target_var(target_arg)
+        if error:
+            return {'status': 'failed', 'reason': f'sort: {error}'}
         
         if not sort_field:
             return {'status': 'failed', 'reason': 'sort requires by field'}
@@ -2781,7 +2782,6 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         if order not in ['asc', 'desc']:
             return {'status': 'failed', 'reason': 'sort order must be "asc" or "desc"'}
         
-        collection_var = target_arg[1:]
         note_ids = self._dereference_collection(collection_var)
         
         if not isinstance(note_ids, list):
@@ -2843,20 +2843,19 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         left_key = action.get('left_key', join_key)
         right_key = action.get('right_key', join_key)
         
-        if not isinstance(left_arg, str) or not left_arg.startswith('$'):
-            return {'status': 'failed', 'reason': 'join target must be $variable'}
+        left_var, error = self._resolve_target_var(left_arg)
+        if error:
+            return {'status': 'failed', 'reason': f'join target: {error}'}
         
-        if not isinstance(right_arg, str) or not right_arg.startswith('$'):
-            return {'status': 'failed', 'reason': 'join value must be $variable'}
+        right_var, error = self._resolve_target_var(right_arg)
+        if error:
+            return {'status': 'failed', 'reason': f'join value: {error}'}
         
         if not join_key and not (left_key and right_key):
             return {'status': 'failed', 'reason': 'join requires on key or left_key/right_key'}
         
         if join_type not in ['inner', 'left', 'right', 'outer']:
             return {'status': 'failed', 'reason': 'join type must be inner/left/right/outer'}
-        
-        left_var = left_arg[1:]
-        right_var = right_arg[1:]
         
         left_ids = self._dereference_collection(left_var)
         right_ids = self._dereference_collection(right_var)
@@ -3506,7 +3505,7 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         pattern = r'\$(\w+)'
         matches = re.findall(pattern, value)
         
-        # If no variable patterns found, check if it's a literal Note/Collection ID
+        # If no variable patterns found, check if it's a literal Note/Collection ID or named resource
         if not matches:
             # If literal ID format, fetch its content
             if value.startswith('Note_') or value.startswith('Collection_'):
@@ -3591,6 +3590,31 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         # Track last out resource for plan_result
         if self.executive_node:
             self.executive_node.last_out_resource_id = resource_id
+    
+    def _resolve_target_var(self, target_arg: str) -> tuple:
+        """
+        Resolve target argument to variable name, binding named resources if needed.
+        
+        Args:
+            target_arg: Either "$variable" or a named resource name
+            
+        Returns:
+            (var_name, error) - var_name is the variable name (without $), error is None on success
+        """
+        if not isinstance(target_arg, str):
+            return None, 'target must be string'
+        
+        if target_arg.startswith('$'):
+            return target_arg[1:], None
+        
+        # Try to resolve as named resource
+        if self.resource_manager:
+            resource = self.resource_manager.get_resource(target_arg)
+            if resource and resource.get('id'):
+                self._bind_variable(target_arg, resource['id'])
+                return target_arg, None
+        
+        return None, f'"{target_arg}" is not a bound variable or named resource'
     
     def _normalize_var_for_log(self, var_name: str) -> str:
         """
