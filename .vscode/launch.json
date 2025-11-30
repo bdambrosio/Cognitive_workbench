@@ -18,16 +18,31 @@
         },
 
        {
-            "name": "Clear Character Data",
+            "name": "chat_cli",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/src/memory_manager.py",
+            "program": "${workspaceFolder}/tests/chat_cli.py",
             "console": "integratedTerminal",
-            "cwd": "${workspaceFolder}/src",
+            "cwd": "${workspaceFolder}/tests",
             "env": {
                 "PYTHONPATH": "${workspaceFolder}/src"
             },
             "args": [],
+            "justMyCode": false,
+            "stopOnEntry": false,
+            "preLaunchTask": "setup-zenoh-environment"
+        },
+        {
+            "name": "hotpotqa_eval",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/tests/hotpotqa_eval.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/tests",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src"
+            },
+            "args": ["--character", "Jill", "--max-questions", "10", "--context-mode", "preload"],
             "justMyCode": false,
             "stopOnEntry": false,
             "preLaunchTask": "setup-zenoh-environment"

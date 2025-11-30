@@ -84,17 +84,15 @@ def clear_transient_notes(session: zenoh.Session, character: str, timeout: float
     return 0
 
 
-def create_note(session: zenoh.Session, character: str, content: str, name: str = '', timeout: float = 10.0) -> str:
-    """Create a Note via Zenoh API. Returns note_id or empty string on failure."""
-    query_key = f"cognitive/{character}/resource/create_note"
-    payload = json.dumps({'content': content, 'format': 'text', 'name': name})
+def execute_plan(session: zenoh.Session, character: str, plan: list, timeout: float = 30.0) -> dict:
+    """Execute a plan via Zenoh API. Returns result dict with success, bindings, last_result."""
+    query_key = f"cognitive/{character}/execute_plan_sync"
+    payload = json.dumps({'plan': plan})
     replies = session.get(query_key, payload=payload.encode('utf-8'), timeout=timeout)
     for reply in replies:
         if hasattr(reply, 'ok') and reply.ok is not None:
-            result = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
-            if result.get('success'):
-                return result.get('note_id', '')
-    return ''
+            return json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
+    return {'success': False, 'error': 'No response from execute_plan_sync'}
 
 
 def llm_generate(session: zenoh.Session, character: str, messages: list, max_tokens: int = 500, temperature: float = 0.0, timeout: float = 30.0) -> tuple:
@@ -288,11 +286,14 @@ def evaluate_hotpotqa(
         if context_mode == "inline":
             goal_text = build_inline_prompt(question, context, supporting_facts)
         else:
-            # Preload: create Notes via API first
+            # Preload: create Notes via execute_plan_sync API
+            create_actions = []
             for title, sentences in context:
                 if sentences:
                     para_text = f"[{title}]: " + ' '.join(sentences)
-                    create_note(session, character, para_text, name='')
+                    create_actions.append({"type": "create-note", "value": para_text, "out": "$ctx"})
+            if create_actions:
+                execute_plan(session, character, create_actions)
             goal_text = build_preload_prompt(question)
         
         t0 = time.time()

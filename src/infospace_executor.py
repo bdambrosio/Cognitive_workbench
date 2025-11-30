@@ -35,7 +35,6 @@ class InfospaceExecutor:
     - Storage: save, load, create
     - Indexing: index, search
     - Communication: say, think
-    - Spatial: focus
     
     Design principle: Content is opaque. Field-based operations delegated to tools.
     """
@@ -78,6 +77,9 @@ class InfospaceExecutor:
     def clear_plan_state(self):
         """Clear ephemeral plan state (call at start of new plan)"""
         self.plan_bindings = {}
+        if self.executive_node:
+            self.executive_node.last_say_text = ''
+            self.executive_node.last_out_resource_id = None
     
     def _create_collection(self, note_ids: list, source_context: str, collection_name: str = '', properties: Optional[Dict] = None) -> Optional[str]:
         """
@@ -172,7 +174,6 @@ class InfospaceExecutor:
         handlers = {
             # Phase 1: Core, Storage, Control, Communication
             'apply': self._execute_apply,
-            'focus': self._execute_focus,
             'create-note': self._execute_create_note,
             'create-collection': self._execute_create_collection,
             'persist': self._execute_persist,
@@ -684,24 +685,21 @@ Make sure the string is in a format that can be parsed by the json.loads functio
             if not plan_data:
                 return {'status': 'failed', 'reason': f'Plan tool {tool_name} missing plan_data'}
             
-            # Build initial bindings for plan tool
-            initial_bindings = {}
-            
             # Bind main input to $input variable
             if input_value is not None:
                 input_note_id = self._persist_note(input_value, f'{tool_name}_input')
                 if input_note_id:
-                    initial_bindings['input'] = input_note_id
+                    self.plan_bindings['input'] = input_note_id
             
             # Bind args dict values to named variables
             for key, val in additional_args.items():
                 resolved_val = self._resolve_value(val)
                 arg_note_id = self._persist_note(resolved_val, f'{tool_name}_{key}')
                 if arg_note_id:
-                    initial_bindings[key] = arg_note_id
+                    self.plan_bindings[key] = arg_note_id
             
-            # Execute plan synchronously with initial bindings
-            result = self.execute_plan_sync(plan_data, initial_bindings=initial_bindings)
+            # Execute plan synchronously
+            result = self.execute_plan_sync(plan_data)
             
             if result.get('status') == 'suspended':
                 # Plan suspended (ask/wait) - return suspension
@@ -813,26 +811,6 @@ Make sure the string is in a format that can be parsed by the json.loads functio
             logger.info(f"Python tool '{tool_name}' completed")
             return {'status': 'success', 'value': result}
 
-    def _execute_focus(self, action: Dict) -> Dict:
-        """
-        Focus on resource location.
-        
-        Required: type, target
-        """
-        target = self._resolve_value(action.get('target'))
-        
-        if not target:
-            return {'status': 'failed', 'reason': 'focus requires target'}
-        
-        # Request movement from map
-        request = {
-            'agent_name': self.agent_name,
-            'target': target
-        }
-        
-        logger.info(f"Focused on {target}")
-        return {'status': 'success', 'value': target}
-    
     def _execute_create_note(self, action: Dict) -> Dict:
         """
         Create a Note object as persistent spatial resource.
@@ -1582,6 +1560,8 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         }
         self.executive_node.action_publisher.put(json.dumps(action_data))
         self.executive_node.action_counter += 1
+        if hasattr(self.executive_node, 'last_say_text'):
+            self.executive_node.last_say_text = str(value)
         
         logger.info(f"Say [{target}]: {value}")
         return {'status': 'success', 'value': value}
@@ -3607,6 +3587,10 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         
         self.plan_bindings[var_name] = resource_id
         logger.debug(f"Bound ${var_name} → {resource_id}")
+        
+        # Track last out resource for plan_result
+        if self.executive_node:
+            self.executive_node.last_out_resource_id = resource_id
     
     def _normalize_var_for_log(self, var_name: str) -> str:
         """
@@ -3662,50 +3646,17 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         
         return None
     
-    def execute_plan_sync(self, plan: Dict, max_steps: int = 1000, max_depth: int = 10, initial_bindings: Dict = None) -> Dict:
+    def execute_plan_sync(self, plan: Dict, max_steps: int = 1000, max_depth: int = 10) -> Dict:
         """
-        Execute a plan synchronously without turn taking.
-        
-        Creates an isolated executor instance to prevent state leakage and enable recursion.
+        Execute a plan synchronously. Uses self.plan_bindings directly.
         
         Args:
             plan: Plan dict with 'plan' key containing list of actions
-            max_steps: Maximum number of steps to execute (prevents infinite loops)
-            max_depth: Maximum recursion depth for nested plans (prevents stack overflow)
-            initial_bindings: Optional dict of variable bindings to initialize in isolated executor
+            max_steps: Maximum steps to execute (prevents infinite loops)
+            max_depth: Maximum recursion depth for nested plans
             
         Returns:
-            Dict with:
-            - 'status': 'success', 'failed', or 'suspended'
-            - 'reason': Error message or suspension reason
-            - 'executed_steps': Number of steps executed
-            - 'continue': Callback function if suspended (for ask/wait)
-        """
-        # Create isolated executor instance
-        isolated_executor = InfospaceExecutor(
-            agent_name=self.agent_name,
-            session=self.session,
-            map_name=self.map_name,
-            llm_client=self.llm_client,
-            available_tools=self.available_tools,
-            executive_node=self.executive_node,
-            resource_manager=self.resource_manager
-        )
-        
-        # Share runtime with isolated executor
-        isolated_executor.runtime = self.runtime
-        
-        # Copy initial bindings if provided
-        if initial_bindings:
-            isolated_executor.plan_bindings.update(initial_bindings)
-        
-        return isolated_executor._execute_plan_sync_internal(plan, max_steps, max_depth)
-    
-    def _execute_plan_sync_internal(self, plan: Dict, max_steps: int, max_depth: int) -> Dict:
-        """
-        Internal synchronous plan execution implementation.
-        
-        Uses frame-based stack for control flow (if/while) and supports suspension (ask/wait).
+            Dict with 'status', 'reason', 'executed_steps', 'bindings'
         """
         # Extract plan steps
         if isinstance(plan, dict) and 'plan' in plan:
@@ -4186,11 +4137,6 @@ Make sure the string is in a format that can be parsed by the json.loads functio
                 'reason': 'test apply',
                 'out': 'test_output',
                 'expect': 'test output'
-            },
-            'focus': {
-                'type': 'focus',
-                'target': 'question-decomposer',
-                'expect': 'test focus'
             },
             'create': {
                 'type': 'create',

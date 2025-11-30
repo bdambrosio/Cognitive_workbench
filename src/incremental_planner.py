@@ -470,10 +470,6 @@ def build_tool_catalog(available_tools: Dict[str, Dict], primitives_reference: s
                 '{"type":"coerce","target":"$csv_line","coercion":"to-list","delimiter":",","out":"$fields"}'
             ],
             "schema_hint": {"target": "$variable (Note)", "coercion": "string (to-string|to-int|to-float|to-bool|to-json|to-list)", "delimiter": "string (optional, for to-list)", "out": "$variable"}
-        },
-        "focus": {
-            "description": "Set planning context focus (internal state). RARELY NEEDED. Most plans don't need explicit focus - use think for reasoning instead. Only use if explicitly managing planner attention across complex multi-phase workflows.",
-            "schema_hint": {"value": "string (focus description)"}
         }
     }
     

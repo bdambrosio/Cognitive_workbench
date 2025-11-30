@@ -1072,18 +1072,6 @@ Examples:
   {"type":"search","source":"$collection","query":"attention mechanisms","return_mode":"chunks","limit":10,"out":"$chunks","expect":"should return relevant text passages"}
   {"type":"search","source":"$papers","query":"transformer architecture","return_mode":"notes","limit":5,"out":"$relevant_papers","expect":"should return 5 papers discussing transformers"}
 
-## focus
-Description: Change current location or approach a resource
-Input: target: literal string or object → resource name or location
-Output: none
-Parameters:
-  - target (required): string resource name or {"location": [x,y]} object
-Preconditions: none
-Postconditions: agent position updated
-Examples:
-  {"type":"focus","target":"resource-name"}
-  {"type":"focus","target":{"location": [10, 20]}}
-
 ## if
 Description: Conditional branch
 Input: condition: condition object → boolean, then: array of actions, else: optional array

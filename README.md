@@ -466,7 +466,6 @@ Docs/                         # Design documents (may lag code)
 - `ask` - Interactive user input (synchronous wait for response)
 - `index` - Build vector index for Collection search
 - `apply` - Execute a tool on a target
-- `focus` - Set planning context focus (rarely needed)
 
 ---
 
