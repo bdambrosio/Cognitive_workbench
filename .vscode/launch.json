@@ -48,6 +48,21 @@
             "preLaunchTask": "setup-zenoh-environment"
         },
         {
+            "name": "mmlu_eval",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/tests/mmlu_eval.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/tests",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src"
+            },
+            "args": ["--subjects", "high_school_physics", "--k-shot", "5", "--max-test-per-subject", "10", "--use-executive"],
+            "justMyCode": false,
+            "stopOnEntry": false,
+            "preLaunchTask": "setup-zenoh-environment"
+        },
+        {
             "name": "Format Prompt",
             "type": "debugpy",
             "request": "launch",

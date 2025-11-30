@@ -169,7 +169,7 @@ def build_prompt(
     lines.append(f"  subject: {subject}")
     lines.append(f"  question: {question.strip()}") 
     #lines.append(f"  do not use display, query-web, or semantic-scholar in your reasoning. Only use generate to find information.")
-    lines.append(f"  do not use semantic-scholarin your reasoning.")
+    lines.append(f"  do not use semantic-scholar in your reasoning.")
     lines.append(f"  choices:")
     lines.append(f"    A: {choices[0].strip()}")
     lines.append(f"    B: {choices[1].strip()}")
@@ -204,7 +204,7 @@ def build_prompt(
     lines.append("ANSWER: X")
     lines.append("where X is A, B, C, or D.")
     if use_executive:
-        lines.append("Finally,say the answer to User")
+        lines.append("Finally, say the answer to User")
 
 
     return "\n".join(lines)

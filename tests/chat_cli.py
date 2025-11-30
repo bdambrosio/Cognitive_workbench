@@ -17,7 +17,7 @@ import threading
 import zenoh
 
 CHARACTER = "Jill"
-PROFILE_CONTENT = "I am Jill, a silly kitten"
+PROFILE_CONTENT = """"""
 
 
 def execute_plan(session, plan_steps: list) -> dict:
@@ -31,12 +31,17 @@ def execute_plan(session, plan_steps: list) -> dict:
     return {"success": False, "error": "No reply"}
 
 
-def create_note(session, content: str, name: str = "") -> dict:
+def create_note(session, content: str, name: str = "", add_to_conversation: bool = False) -> dict:
     """Create a Note via execute_plan_sync API."""
+    actions = []
     action = {"type": "create-note", "value": content, "out": "$note"}
+    actions.append(action)
+    if add_to_conversation:
+        action = {"type": "add", "target": "conversation", "value": "$note", "out": "conversation"}
+        actions.append(action)
     if name:
         action["name"] = name
-    return execute_plan(session, [action])
+    return execute_plan(session, actions)
 
 
 def send_goal(session, goal_text: str):
@@ -48,6 +53,22 @@ def send_goal(session, goal_text: str):
         "content": json.dumps({"source": "User", "text": f"goal: {goal_text}"})
     }
     session.put(f"cognitive/{CHARACTER}/sense_data", json.dumps(sense_data).encode('utf-8'))
+
+
+def shutdown_conversation(session):
+    """Summarize conversation and archive to pastConversations."""
+    print("\n📝 Summarizing conversation...")
+    plan_steps = [
+        {"type": "load", "resource_id": "conversation", "out": "$conv"},
+        {"type": "summarize", "target": "$conv", "out": "$summary"},
+        {"type": "load", "resource_id": "pastConversations", "out": "$past"},
+        {"type": "add", "target": "$past", "value": "$summary", "out": "$past"}
+    ]
+    result = execute_plan(session, plan_steps)
+    if result.get("success"):
+        print("✓ Conversation archived")
+    else:
+        print(f"✗ Archive failed: {result.get('error', result.get('reason', 'unknown'))}")
 
 
 def main():
@@ -85,6 +106,11 @@ def main():
         print(f"✓ Profile created: {PROFILE_CONTENT}")
     else:
         print(f"✗ Failed to create profile: {result.get('error', result.get('reason', 'unknown'))}")
+    result = execute_plan(session, [{"type": "create-collection", "name": "conversation", "out": "$conversation"}])
+    if result.get("success"):
+        print(f"✓ Conversation collection created")
+    else:
+        print(f"✗ Failed to create conversation collection: {result.get('error', result.get('reason', 'unknown'))}")
     
     print("\nType your messages (Ctrl+C to exit):")
     print("-" * 40)
@@ -96,22 +122,37 @@ def main():
             if not user_input:
                 continue
             
+            if user_input.lower() == 'shutdown':
+                shutdown_conversation(session)
+                break
+            
             turn += 1
             
             # Step 1: Create Note with user's message
             user_note_content = f"User says: {user_input}"
-            result = create_note(session, user_note_content)
+            result = create_note(session, user_note_content, add_to_conversation=True)
             if not result.get("success"):
                 print(f"[ERROR] Failed to create user note: {result}")
                 continue
             
             # Step 2: Send goal to Jill
-            goal_text = (
-                f"User just said: '{user_input}'. "
-                f"Generate a response to that in the context of the ongoing conversation "
-                f"and your current Note named 'profile' that defines your personality. Use 'say' to respond."
-            )
             
+            goal_text = (
+                f"goal:\n"
+                f"  subject: agent_response_generation\n"
+                f"  input_context: The user just said: '{user_input}'\n"
+                f"  conversation_history: see Collection named 'conversation'" 
+                f"\n"
+                f"  task: Generate the optimal response by strictly following this reasoning chain:\n"
+                f"    1. CONTEXT ANALYSIS: Analyze the input against the conversation history. Is this a subject change or a follow-up?\n"
+                f"    2. INTENT CLASSIFICATION: Identify what the user wants. Is this social chitchat, or is there an implicit/explicit request for data, calculation, or action?\n"
+                f"    3. TOOL FEASIBILITY CHECK: Review your available tools. Does satisfying the user's intent require or benefit from a tool? (e.g., semantic-scholar, calculator, etc.). *Do not assume you are tool-less.*\n"
+                f"    4. EXECUTION STRATEGY: \n"
+                f"       - If a tool is needed: Define the tool input and use it.\n"
+                f"       - If no tool is needed: Draft a response based on your internal knowledge.\n"
+                f"    5. PERSONA APPLICATION: Refine the final output to match your personality.\n"
+                f"    6. FINAL ACTION: Use 'say' to deliver the response."
+            )
             response_received.clear()
             response_data = {}
             
@@ -127,7 +168,8 @@ def main():
                     
                     # Create Note with Jill's response
                     jill_note_content = f"Jill responds: {final_content}"
-                    create_note(session, jill_note_content)
+                    create_note(session, jill_note_content, add_to_conversation=True)
+
                 else:
                     print("\n[No response content received]")
                     print(f"[DEBUG] Full response: {response_data}")
@@ -135,6 +177,7 @@ def main():
                 print("\n[Timeout waiting for response]")
                 
         except KeyboardInterrupt:
+            shutdown_conversation(session)
             print("\n\nGoodbye! 🐱")
             break
         except EOFError:
