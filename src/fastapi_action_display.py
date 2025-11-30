@@ -2530,9 +2530,8 @@ Generated: {generated_at}
             } else if (tabName === 'bindings') {
                 document.getElementById('bindingsPanel').classList.add('active');
                 // Load bindings list
-                if (activeCharacter) {
-                    loadBindingsList(activeCharacter);
-                }
+                const character = activeCharacter || 'Jill';
+                loadBindingsList(character);
             } else if (tabName === 'goals') {
                 document.getElementById('goalsPanel').classList.add('active');
                 // Load test goals list
@@ -3717,6 +3716,9 @@ Generated: {generated_at}
         
         async function loadBindingsList(character) {
             const listDiv = document.getElementById('bindingsList');
+            if (!listDiv) {
+                return;
+            }
             listDiv.innerHTML = '<div style="color: #f39c12; text-align: center; padding: 20px;">⏳ Loading...</div>';
             
             try {

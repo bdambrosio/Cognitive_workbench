@@ -357,6 +357,15 @@ class ZenohExecutiveNode:
         # ========================
         self.plan_result_publisher = self.session.declare_publisher(f"cognitive/{character_name}/plan_result")
         
+        # === ZENOH PUBLICATION ===
+        # NAME: bindings_update
+        # TOPIC: cognitive/{character}/bindings
+        # DESCRIPTION: Published when plan bindings change
+        # PAYLOAD: {"bindings": dict, "timestamp": str, "character": str}
+        # TRIGGERS: (UI updates)
+        # ========================
+        self.bindings_publisher = self.session.declare_publisher(f"cognitive/{character_name}/bindings")
+        
         
         # Backward compatibility properties
         @property
@@ -560,9 +569,14 @@ class ZenohExecutiveNode:
         self.observations = None
         self.text_input_queue = []
         self.action_history = []  # List of ActionRecord instances
+        self.last_say_text = ''
         
         # Ask primitive state
         self.awaiting_ask_response = False
+        
+        # Track last action outputs for plan_result
+        self.last_say_text = ''
+        self.last_out_resource_id = None
         
         # Plan execution state
         self.current_step = None
@@ -753,16 +767,7 @@ class ZenohExecutiveNode:
             
             logger.info(f'▶️  {self.character_name} executing saved plan: {plan_name}')
             
-            # Use executor's bindings as the shared global bindings
-            result = self.infospace_executor.execute_plan_sync(
-                self.current_plan,
-                initial_bindings=self.infospace_executor.plan_bindings
-            )
-            
-            # Merge returned bindings back into executor's bindings (cascade support)
-            if 'bindings' in result:
-                self.infospace_executor.plan_bindings.update(result['bindings'])
-                logger.info(f'📊 {self.character_name} bindings updated: {list(self.infospace_executor.plan_bindings.keys())}')
+            result = self.infospace_executor.execute_plan_sync(self.current_plan)
             
             if result['status'] == 'success':
                 logger.info(f'✅ {self.character_name} saved plan completed: {plan_name}')
@@ -1039,13 +1044,12 @@ class ZenohExecutiveNode:
         # Get final_thoughts from plan reasoning
         final_thoughts = self.current_plan.get('reasoning', '')
         
-        # Get final_content from last bound variable
-        final_content = ''
-        if bindings and self.infospace_executor:
-            last_var = list(bindings.keys())[-1] if bindings else None
-            if last_var:
-                last_note_id = bindings[last_var]
-                final_content = self.infospace_executor._get_content(last_note_id) or ''
+        # Get final_content: prefer last_say_text, else last_out_resource content
+        final_content = getattr(self, 'last_say_text', '') or ''
+        if not final_content:
+            last_out_id = getattr(self, 'last_out_resource_id', None)
+            if last_out_id and self.infospace_executor:
+                final_content = self.infospace_executor._get_content(last_out_id) or ''
                 if not isinstance(final_content, str):
                     final_content = json.dumps(final_content)
         
@@ -2062,7 +2066,17 @@ class ZenohExecutiveNode:
             query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
     
     def _sync_plan_execution_handler(self, query):
-        """Handle query for synchronous plan execution."""
+        """
+        Handle query for synchronous plan execution.
+        
+        Accepts saved_plan format:
+            {"plan": {"plan": [...], "reasoning": "..."}, "goal": "optional"}
+        Or simple format:
+            {"plan": [...], "max_steps": 1000}
+        
+        Returns:
+            success, status, reason, executed_steps, bindings, last_result
+        """
         try:
             if not self.infospace_executor:
                 response = {
@@ -2075,10 +2089,10 @@ class ZenohExecutiveNode:
             # Parse plan from query payload
             payload = query.payload.to_bytes().decode('utf-8')
             request_data = json.loads(payload)
-            plan = request_data.get('plan')
+            plan_data = request_data.get('plan')
             max_steps = request_data.get('max_steps', 1000)
             
-            if not plan:
+            if not plan_data:
                 response = {
                     'success': False,
                     'error': 'Plan is required'
@@ -2086,8 +2100,47 @@ class ZenohExecutiveNode:
                 query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
                 return
             
+            # Support saved_plan format: {"plan": {"plan": [...]}} or simple: {"plan": [...]}
+            if isinstance(plan_data, dict) and 'plan' in plan_data:
+                plan_steps = plan_data['plan']
+            elif isinstance(plan_data, list):
+                plan_steps = plan_data
+            else:
+                response = {
+                    'success': False,
+                    'error': 'Plan must be a list of actions or {"plan": [...]}'
+                }
+                query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
+                return
+            
+            # Validate each action has 'type'
+            for i, action in enumerate(plan_steps):
+                if not isinstance(action, dict) or 'type' not in action:
+                    response = {
+                        'success': False,
+                        'error': f'Action {i} missing "type" field'
+                    }
+                    query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
+                    return
+            
             # Execute plan synchronously
-            result = self.infospace_executor.execute_plan_sync(plan, max_steps=max_steps)
+            result = self.infospace_executor.execute_plan_sync(plan_data, max_steps=max_steps)
+            
+            # Get last result from bindings if available
+            last_result = None
+            bindings = result.get('bindings', {})
+            if bindings:
+                # Get the most recently bound value
+                last_var = list(bindings.keys())[-1] if bindings else None
+                if last_var:
+                    last_id = bindings[last_var]
+                    if self.resource_manager and isinstance(last_id, str):
+                        resource = self.resource_manager.get_resource_by_id(last_id)
+                        if resource:
+                            if last_id.startswith('Note_'):
+                                last_result = resource.get('properties', {}).get('content')
+                            elif last_id.startswith('Collection_'):
+                                last_result = resource.get('properties', {}).get('note_ids')
             
             # Return result
             response = {
@@ -2095,12 +2148,20 @@ class ZenohExecutiveNode:
                 'status': result.get('status'),
                 'reason': result.get('reason'),
                 'executed_steps': result.get('executed_steps', 0),
-                'bindings': result.get('bindings', {}),
+                'bindings': bindings,
+                'last_result': last_result,
                 'suspended': result.get('status') == 'suspended',
                 'suspension_reason': result.get('reason') if result.get('status') == 'suspended' else None
             }
             query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
             
+        except json.JSONDecodeError as e:
+            logger.error(f'Invalid JSON in plan execution request: {e}')
+            response = {
+                'success': False,
+                'error': f'Invalid JSON: {str(e)}'
+            }
+            query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
         except Exception as e:
             logger.error(f'Error handling sync plan execution query: {e}')
             import traceback
