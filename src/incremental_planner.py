@@ -1150,7 +1150,7 @@ if HAS_SGLANG:
                     s += user(expanded_docs)
                     s += assistant("I have reviewed the detailed documentation for the selected tools.\n")
                     logger.info(f"Stage 1.5: Injected detailed docs for {len(selected_tools)} tools")
-        except (json.JSONDecodeError, TypeError) as e:
+        except (KeyError, json.JSONDecodeError, TypeError) as e:
             logger.warning(f"Failed to parse selected tools for doc expansion: {e}")
         
         # Stage 2/3 format instructions
