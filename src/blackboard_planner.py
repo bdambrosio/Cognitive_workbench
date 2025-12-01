@@ -131,7 +131,7 @@ gen_tracer = GenTracer(tracer, tokenizer=None)  # or tokenizer=your_tokenizer
 _SGL_BACKEND_INITIALIZED = False
 try:
     import sglang as sgl
-    from sglang import function, system, user, assistant, gen
+    from sglang import function, system, user, assistant, gen, select
     HAS_SGLANG = True
     # Disable SGLang progress bars
     import os
@@ -829,6 +829,10 @@ def execute_infospace_action(action: Dict, executor, agent_name: str) -> str:
     # Constants for result formatting
     MAX_RESULT_LENGTH = 128
     
+    # Increase result length for display actions so the planner can see the content
+    if action.get('type') == 'display':
+        MAX_RESULT_LENGTH = 4096
+    
     def _format_result_value(value: Any) -> str:
         """Format a result value for display, with length limits and newline handling."""
         if value is None or value == '':
@@ -1058,7 +1062,7 @@ if HAS_SGLANG:
     
     @function
     def tool_planner_infospace(s, goal: str, character_context: str, recent_context: str, 
-                              tools_catalog_text: str, executor, trace_file=None, max_steps: int = 16):
+                              tools_catalog_text: str, executor, trace_file=None, max_steps: int = 16, initial_blackboard: Optional[str] = None):
         """
         SGLang incremental planner for infospace goals.
         
@@ -1085,8 +1089,12 @@ if HAS_SGLANG:
             "You can choose tools/primitives, call them via JSON arguments,",
             "and iteratively refine your plan until the goal is satisfied.\n"
         ]
-        
-        
+        if initial_blackboard:
+            system_parts.append(
+                "\nCRITICAL CONTEXT: You are a SUB-PLANNER working on a specific delegated task.\n"
+                "Do NOT decompose further unless absolutely necessary.\n"
+                "Prioritize DIRECT_EXECUTION strategies to finish the task quickly.\n"
+            )
         
         system_parts.append(f"\n{INCREMENTAL_PLAN_SPECIFICATIONS}\n")
         system_parts.append(
@@ -1189,59 +1197,90 @@ if HAS_SGLANG:
 
         # Main loop
         current_task = s["first_task"].strip()
+        
+        # Initialize blackboard from parent context if available, else empty
+        current_blackboard = initial_blackboard if initial_blackboard else "{}"
+        tool_result = ""
+        
         for step in range(max_steps):
-            # Stage 2: Choose tool + args
-            s += user(
-                f"STAGE 2 (step {step + 1}/{max_steps}):\n"
-                f"GOAL: {goal}\n"
-                f"CURRENT_TASK: {current_task}\n"
-                "Choose tool and JSON args using Stage 2 FORMAT.\n"
-            )
-            
-            s += assistant(
-                "TOOL_NAME: "
-                + gen(f"tool_name_{step}", max_tokens=32, stop="\n")
-                + "\nTOOL_ARGS_JSON (max 1024 tokens): "
-                + gen(f"tool_args_{step}", max_tokens=1024, stop="\n")
-                + "\n"
-            )
-            
-            # Execute tool
-            tool_name = s[f"tool_name_{step}"].strip()
-            tool_args_json = s[f"tool_args_{step}"].strip()
-            action = sgl_to_infospace_action(tool_name, tool_args_json, step, executor.available_tools)
-            
-            # Track resource bindings before execution
-            out_var = action.get('out', '')
+            # Initialize variables for this step
+            action = {} 
             resource_id_before = None
-            if out_var:
-                resource_id_before = executor.plan_bindings.get(out_var.lstrip('$'))
+            tool_name = "unknown"
+            tool_args_json = "{}"
             
-            # Special handling for 'think' - append to conversation state instead of executing
-            if tool_name == "think":
-                # Extract thought content from action
-                thought_value = action.get('value', '')
-                # Resolve if it's a variable reference
-                if isinstance(thought_value, str) and thought_value.startswith('$'):
-                    var_name = thought_value.lstrip('$')
-                    thought_value = executor.plan_bindings.get(var_name, thought_value)
+            # 1. Update the "Mental Model" (Blackboard) first
+            if step > 0: 
+                s = prompt_blackboard_update(s, current_blackboard, tool_result)
+                current_blackboard = s["blackboard_json"] 
+
+            # 2. The Meta-Cognitive Checkpoint
+            s = prompt_meta_strategy(s, current_blackboard, tools_catalog_text)
+            strategy = s["strategy_select"].strip()
+
+            tool_result = "" # Initialize for this turn
+
+            # 3. Branch based on strategy
+            if strategy == "DECOMPOSITION":
+                # HANDLING COMPLEX SUBGOALS
+                sub_goal = s["next_intent"]
+                s += assistant(f"I will delegate '{sub_goal}' to a sub-planner.\n")
                 
-                # Append thought to conversation state
-                s += assistant(f"[Internal thought: {thought_value}]\n")
+                # === Recursive Call Primitive ===
+                # Assuming executor has this primitive as requested
+                tool_name = "sub_planner"  # Virtual tool name for logging
+                tool_args_json = json.dumps({"goal": sub_goal})
                 
-                # Log for debugging
-                logger.info(f"💭 Think (internal): {thought_value}")
+                sub_plan_result = executor.call_subplanner(
+                    goal=sub_goal,
+                    context=current_blackboard, # Pass the parent's knowledge state
+                    initial_blackboard=initial_blackboard
+                )
+                tool_result = f"SUB-PLANNER REPORT:\n{sub_plan_result}"
+
+            elif strategy == "BACKTRACK":
+                # ERROR CORRECTION
+                s += assistant(f"Current path is invalid. Reverting state.\n")
+                # In a real implementation, you might revert the 's' object or flag the blackboard
+                tool_result = "Action: BACKTRACK. The agent decided the previous path was a dead end."
+                tool_name = "system_backtrack"
+
+            elif strategy == "REFLECTION":
+                # PURE THINKING
+                thought_content = s["strategy_rationale"]
+                tool_result = f"INTERNAL REFLECTION: {thought_content}"
+                tool_name = "think"
+
+            else: # strategy == "DIRECT_EXECUTION"
+                # === THE ORIGINAL STAGE 2 LOGIC GOES HERE ===
+                # Only now do we actually ask for a specific tool
                 
-                # Synthetic result for Stage 3 reflection
-                tool_result = f"[Thought recorded internally: {thought_value[:100]}{'...' if len(str(thought_value)) > 100 else ''}]"
-            
-            else:
-                # Normal external execution for all tools (including ask)
+                s += user(
+                    f"Strategy: DIRECT_EXECUTION.\n"
+                    f"Intent: {s['next_intent']}\n"
+                    "Select the precise tool and arguments to fulfill this intent.\n"
+                )
+                
+                s += assistant(
+                    "TOOL_NAME: "
+                    + gen(f"tool_name_{step}", max_tokens=32, stop="\n")
+                    + "\nTOOL_ARGS_JSON: "
+                    + gen(f"tool_args_{step}", max_tokens=1024, stop="\n")
+                    + "\n"
+                )
+                
+                # Execute standard tool (Your original execution logic)
+                tool_name = s[f"tool_name_{step}"].strip()
+                tool_args_json = s[f"tool_args_{step}"].strip()
+                action = sgl_to_infospace_action(tool_name, tool_args_json, step, executor.available_tools)
+                # FIX 2 (Part B): Capture resource_id_before ONLY here, where 'action' is valid
+                out_var = action.get('out', '')
+                if out_var:
+                    resource_id_before = executor.plan_bindings.get(out_var.lstrip('$'))
+
                 tool_result = execute_infospace_action(action, executor, executor.agent_name)
-                logger.info(f"Stage 2: Choose tool + args\n{tool_name} -> {tool_args_json}")
-                logger.info(f"Step {step}: {tool_name} -> {tool_result[:100]}")
-            
-            # Stage 3: Reflect
+
+            # 4. Proceed to Stage 3 (Reflection)
             result_display = tool_result[:512]
             if len(tool_result) > 512:
                 result_display += f"\n... [TRUNCATED - showing 512 of {len(tool_result)} chars]"
@@ -1288,7 +1327,7 @@ if HAS_SGLANG:
                 # Check if a new resource was bound in this step
                 out_var = action.get('out', '')
                 resource_id = None
-                if out_var:
+                if strategy == "DIRECT_EXECUTION" and out_var:
                     resource_id_after = executor.plan_bindings.get(out_var.lstrip('$'))
                     # If resource_id changed (new resource created) or didn't exist before
                     if resource_id_after and resource_id_after != resource_id_before:
@@ -1413,6 +1452,74 @@ def parse_request_tools(raw_text: str) -> Optional[List[str]]:
                 return tools
         return None
 
+def prompt_blackboard_update(s, current_blackboard, recent_observation):
+    """
+    Forces the model to explicitly update its mental model based on the last action.
+    Generates a single JSON string variable.
+    """
+    s += user(
+        f"### UPDATE KNOWLEDGE BLACKBOARD\n"
+        f"Review your PREVIOUS BLACKBOARD and the RECENT OBSERVATION.\n"
+        f"Update the blackboard to reflect the current state of investigation.\n\n"
+        f"PREVIOUS BLACKBOARD:\n{current_blackboard}\n\n"
+        f"RECENT OBSERVATION:\n{recent_observation}\n\n"
+        f"INSTRUCTIONS:\n"
+        f"Update the state JSON. Maintain these 4 fields:\n"
+        f"1. confirmed_facts: Verified information (Immutable unless disproven)\n"
+        f"2. open_hypotheses: Current intentions / theories\n"
+        f"3. discarded_paths: Failed searches (to avoid loops)\n"
+        f"4. pending_questions: Specific knowledge / informationgaps that need filling\n"
+        f"Output valid JSON only."
+    )
+    
+    s += assistant(
+        gen("blackboard_json", max_tokens=1024, stop="\n\n")
+    )
+
+    logging.info(f"Generated Blackboard Update:\n{s['blackboard_json']}")
+    return s
+
+def prompt_meta_strategy(s, blackboard_state, tools_catalog):
+    """
+    Decides the high-level move: Breakdown, Execute, or Pivot.
+    """
+    if isinstance(blackboard_state, dict):
+        blackboard_dict = blackboard_state
+    elif isinstance(blackboard_state, str):
+        parsed_blackboard = repair_json_string(blackboard_state)
+        blackboard_dict = parsed_blackboard if isinstance(parsed_blackboard, dict) else {}
+    else:
+        blackboard_dict = {}
+    
+    # Extract tool status to force the LLM to acknowledge it
+    has_tools = "Yes" if blackboard_dict.get('selected_tools') else "No"
+    
+    s += user(
+        f"### META-COGNITIVE STRATEGY CHECK\n"
+        f"Current Blackboard State: {blackboard_state}\n"
+        f"Tools Selected and Ready: {has_tools}\n\n"
+        f"Analyze your situation. Select the operational mode for the IMMEDIATE next step:\n\n"
+        f"A) DIRECT_EXECUTION\n"
+        f"   - Condition: You have identified specific tools (e.g., 'query-web') AND you know the specific input for the very first step.\n"
+        f"   - Behavior: Stop planning. Execute the first tool immediately.\n"
+        f"B) BACKTRACK\n"
+        f"   - Condition: The current path has failed or produced empty results. Revert.\n"
+        f"C) REFLECTION\n"
+        f"   - Condition: You are confused or need to read documentation before selecting tools.\n\n"
+        f"CRITICAL RULE: If you have already selected tools (e.g., query-web), you MUST choose DIRECT_EXECUTION to use them. Do not decompose an already-planned task.\n\n"
+        f"Respond with:\n"
+        f"STRATEGY: <A/B/C>\n"
+        f"RATIONALE: <One sentence justification>\n"
+        f"NEXT_INTENT: <The specific intent for the tool or sub-planner>"
+    )
+
+    s += assistant(
+        "STRATEGY: " + select("strategy_select", choices=["DIRECT_EXECUTION", "BACKTRACK", "REFLECTION"]) + "\n"
+        "RATIONALE: " + gen("strategy_rationale", max_tokens=64, stop="\n") + "\n"
+        "NEXT_INTENT: " + gen("next_intent", max_tokens=64, stop="\n")
+    )
+    logging.info(f"Generated Meta-Strategy:\n   Strategy: {s['strategy_select']}\n   Rationale: {s['strategy_rationale']}\n   Next Intent: {s['next_intent']}")
+    return s
 
 class IncrementalPlanner:
     """
@@ -1490,9 +1597,13 @@ class IncrementalPlanner:
             # Extract context components
             character_context = ""
             recent_context = ""
+            initial_blackboard = None
             if context:
                 character_context = context.get('character_context', '')
                 recent_context = context.get('recent_context', '')
+                initial_blackboard = context.get('initial_blackboard')
+            if hasattr(self.executor, 'character_context'):
+                self.executor.character_context = character_context
             
             # Run SGLang planner
             state = tool_planner_infospace.run(
@@ -1502,7 +1613,8 @@ class IncrementalPlanner:
                 tools_catalog_text=self.tools_catalog_text,
                 executor=self.executor,
                 trace_file=self.trace_file,
-                max_steps=max_steps
+                max_steps=max_steps,
+                initial_blackboard=initial_blackboard
             )
             
             # Extract plan actions from executor

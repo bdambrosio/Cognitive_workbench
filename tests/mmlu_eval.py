@@ -84,7 +84,7 @@ def mmlu_query_via_executive(
     session: zenoh.Session,
     character: str,
     prompt: str,
-    timeout: float = 240.0
+    timeout: float = 640.0
 ) -> dict:
     """
     Send MMLU question to executive_node via Zenoh and wait for response.

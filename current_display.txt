@@ -1,0 +1,23 @@
+    MAX_RESULT_LENGTH = 128
+    
+    def _format_result_value(value: Any) -> str:
+        """Format a result value for display, with length limits and newline handling."""
+        if value is None or value == '':
+            return ''
+        
+        # Convert to string
+        result_str = str(value)
+        
+        # Replace newlines with space-pipe-space for readability
+        result_str = result_str.replace('\n', ' | ')
+        
+        # Truncate if too long, breaking at word boundary
+        if len(result_str) > MAX_RESULT_LENGTH:
+            truncated = result_str[:MAX_RESULT_LENGTH]
+            # Find last space to avoid mid-word cut
+            last_space = truncated.rfind(' ')
+            if last_space > MAX_RESULT_LENGTH - 20:  # Only if reasonably close to end
+                truncated = truncated[:last_space]
+            result_str = truncated + '...'
+        
+        return result_str

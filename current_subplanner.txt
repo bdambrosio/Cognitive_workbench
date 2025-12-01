@@ -1,0 +1,65 @@
+    def call_subplanner(self, goal: str, context: Optional[str] = None, max_steps: int = 8, initial_blackboard: Optional[str] = None) -> str:
+        """
+        Run a nested IncrementalPlanner using a fresh InfospaceExecutor instance.
+        
+        Args:
+            goal: Delegated goal for the sub-planner
+            context: Optional context string (blackboard snapshot, etc.)
+            max_steps: Maximum planning steps for the nested planner
+        
+        Returns:
+            String summary/report from the nested planner (or error message).
+        """
+        try:
+            from templates import INFOSPACE_PRIMITIVES_REFERENCE
+            from blackboard_planner import IncrementalPlanner, HAS_SGLANG
+        except ImportError as e:
+            logger.error(f"Subplanner unavailable: {e}")
+            return f"Subplanner unavailable: {e}"
+        
+        if not HAS_SGLANG or not self.runtime:
+            msg = "Subplanner requires SGLang runtime; unavailable in current configuration"
+            logger.warning(msg)
+            return msg
+        
+        # Create fresh executor with isolated plan state but shared infrastructure
+        logger.info(f"Creating child executor for subplanner, goal: {goal}")
+        child_executor = InfospaceExecutor(
+            agent_name=self.agent_name,
+            session=self.session,
+            map_name=self.map_name,
+            llm_client=self.llm_client,
+            available_tools=self.available_tools,
+            executive_node=self.executive_node,
+            resource_manager=self.resource_manager
+        )
+        child_executor.runtime = self.runtime
+        child_executor.clear_plan_state()
+        
+        planner = IncrementalPlanner(
+            executor=child_executor,
+            available_tools=self.available_tools,
+            primitives_reference=INFOSPACE_PRIMITIVES_REFERENCE,
+            logger_instance=logger
+        )
+        
+        blackboard_state = initial_blackboard or context
+        character_context = getattr(self, 'character_context', '')
+        
+        planner_context: Dict[str, str] = {}
+        if character_context:
+            planner_context['character_context'] = character_context
+        if blackboard_state:
+            planner_context['initial_blackboard'] = blackboard_state
+        
+        try:
+            result = planner.generate_plan(goal=goal, context=planner_context or None, max_steps=max_steps)
+        except Exception as exc:
+            logger.error(f"Subplanner execution error: {exc}")
+            return f"Subplanner execution error: {exc}"
+        
+        if result.get('success'):
+            return result.get('reasoning', 'Subplanner completed successfully')
+        
+        return f"Subplanner failed: {result.get('error', 'unknown error')}"
+    
