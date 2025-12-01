@@ -305,10 +305,18 @@ class InfospaceExecutor:
             if isinstance(out_val, str) and out_val and not out_val.startswith('$'):
                 # Check if it's a named resource (Collection or Note)
                 if self.resource_manager:
-                    resource = self.resource_manager.get_resource(out_val)
-                    if resource:
-                        # Valid named resource - bind it to a variable with same name
-                        self._bind_variable(out_val, resource.get('name', out_val))
+                    # Use _resolve_resource_id to get the actual resource ID
+                    resolved_id = self.resource_manager._resolve_resource_id(out_val)
+                    if resolved_id:
+                        # Verify resource exists
+                        resource = self.resource_manager.get_resource(resolved_id)
+                        if resource:
+                            # Valid named resource - bind it to a variable with same name
+                            self._bind_variable(out_val, resolved_id)
+                        else:
+                            error_msg = f"Invalid 'out' field: '{out_val}' resolved to {resolved_id} but resource not found"
+                            logger.error(error_msg)
+                            return {'status': 'failed', 'reason': error_msg}
                     else:
                         error_msg = f"Invalid 'out' field: '{out_val}' must start with $ or be a named resource"
                         logger.error(error_msg)
@@ -1289,14 +1297,16 @@ Make sure the string is in a format that can be parsed by the json.loads functio
             else:
                 return {'status': 'failed', 'reason': f'Variable not bound: {var_name}'}
         
-        # Direct call to resource manager
+        # Direct call to resource manager (get_resource handles name resolution internally)
         resource = self.resource_manager.get_resource(resource_id)
         
         if not resource:
             return {'status': 'failed', 'reason': f'Resource not found: {resource_id}'}
         
-        # Get the actual resource ID
-        actual_id = resource.get('name') or resource_id
+        # Get the actual resource ID by resolving the name/id
+        actual_id = self.resource_manager._resolve_resource_id(resource_id)
+        if not actual_id:
+            return {'status': 'failed', 'reason': f'Could not resolve resource ID: {resource_id}'}
         
         # Bind the actual resource ID to variable
         self._bind_variable(out_var, actual_id)
@@ -3700,10 +3710,14 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         
         # Try to resolve as named resource
         if self.resource_manager:
-            resource = self.resource_manager.get_resource(target_arg)
-            if resource and resource.get('id'):
-                self._bind_variable(target_arg, resource['id'])
-                return target_arg, None
+            # Use _resolve_resource_id to get the actual resource ID
+            resolved_id = self.resource_manager._resolve_resource_id(target_arg)
+            if resolved_id:
+                # Verify resource exists
+                resource = self.resource_manager.get_resource(resolved_id)
+                if resource:
+                    self._bind_variable(target_arg, resolved_id)
+                    return target_arg, None
         
         return None, f'"{target_arg}" is not a bound variable or named resource'
     
