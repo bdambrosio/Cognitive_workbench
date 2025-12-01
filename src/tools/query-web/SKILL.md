@@ -4,7 +4,7 @@ type: python
 trusted: true
 description: "Search web using Google CSE. Returns Collection of JSON Notes with fields text, metadata.uri (alias: source_url), metadata.domain, format, char_count (Level 4 tool)."
 examples:
-  - '{"type":"query-web","query":"transformer architecture papers","out":"$results"}'
+  - '{"type":"query-web","value":"transformer architecture papers","out":"$results"}'
   - '{"type":"project","target":"$results","fields":["metadata.uri","metadata.domain"],"out":"$urls"}'
   - '{"type":"filter-structured","target":"$results","where":"char_count > 1000","out":"$long_articles"}'
 ---
@@ -57,7 +57,7 @@ Each Note in the returned Collection contains:
 ### Pattern 1: Search and summarize for user
 When user needs direct answer, summarize Collection directly:
 ```json
-{"type":"query-web","query":"what are transformers in AI","out":"$results"}
+{"type":"query-web","value":"what are transformers in AI","out":"$results"}
 {"type":"summarize","target":"$results","focus":"what are transformers","out":"$summary"}
 {"type":"say","target":"user","value":"$summary"}
 ```
@@ -65,14 +65,14 @@ When user needs direct answer, summarize Collection directly:
 ### Pattern 2: Search and process Collection
 Results are already a Collection - use map/filter directly (NO split needed):
 ```json
-{"type":"query-web","query":"transformer papers","out":"$results"}
+{"type":"query-web","value":"transformer papers","out":"$results"}
 {"type":"filter-collection","target":"$results","predicate":"contains arxiv.org","out":"$arxiv_only"}
 ```
 
 ### Pattern 3: Get full text from search results
 Extract URLs using project, then fetch full text:
 ```json
-{"type":"query-web","query":"transformer papers","out":"$results"}
+{"type":"query-web","value":"transformer papers","out":"$results"}
 {"type":"project","target":"$results","fields":["metadata.uri"],"out":"$urls"}
 {"type":"map","target":"$urls","operation":"fetch-text","out":"$full_texts"}
 ```

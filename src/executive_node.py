@@ -419,7 +419,7 @@ class ZenohExecutiveNode:
                         context_length=32768,
                         dtype="auto",
                         tp_size=1,
-                        mem_fraction_static=0.82
+                        mem_fraction_static=0.9
                     )
                 sgl.set_default_backend(self.runtime)
                 logger.info(f'🤖 SGLang Runtime initialized (model={sgl_model_path})')
@@ -523,14 +523,6 @@ class ZenohExecutiveNode:
         # Initialize planners (reused across all goals)
         from templates import INFOSPACE_PRIMITIVES_REFERENCE
         
-        # InfospacePlanner for plan verification
-        from infospace_planner import InfospacePlanner
-        self.infospace_planner = InfospacePlanner(
-            llm_client=self.llm_client,
-            available_tools=self.available_tools,
-            logger=logger
-        )
-        logger.info(f'📋 InfospacePlanner initialized for plan verification')
         
         # IncrementalPlanner for plan generation (SGLang-based)
         self.incremental_planner = None

@@ -511,17 +511,19 @@ def tool(value, **kwargs):
     Web search tool using Google CSE + LLM extraction.
     
     Args:
-        value: Unused (for compatibility with executor interface)
-        **kwargs: query (required), agent_name (required), llm_generate (required)
+        value: Query string (preferred)
+        **kwargs: legacy query (fallback), agent_name (required), llm_generate (required)
     
     Returns:
         Collection ID containing structured Note for each search result
     """
-    query = kwargs.get('query', '')
+    query = value or kwargs.get('value') or kwargs.get('query', '')
+    if not isinstance(query, str):
+        query = ''
     if not query:
         return {
             'status': 'failed',
-            'reason': 'query parameter required'
+            'reason': 'value parameter required (search query)'
         }
     
     agent_name = kwargs.get('agent_name')

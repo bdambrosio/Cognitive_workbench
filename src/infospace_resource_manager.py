@@ -669,9 +669,11 @@ class InfospaceResourceManager:
                 return resource_id
 
             props = resource_data.get('properties', {})
-            if props.get('note_name', '').capitalize() == canonical:
+            note_name = props.get('note_name')
+            if note_name and str(note_name).capitalize() == canonical:
                 return resource_id
-            if props.get('collection_name', '').capitalize() == canonical:
+            collection_name = props.get('collection_name')
+            if collection_name and str(collection_name).capitalize() == canonical:
                 return resource_id
         return None
 

@@ -208,17 +208,19 @@ def tool(value, runtime=None, **kwargs):
     Semantic Scholar search tool.
     
     Args:
-        value: Unused (for compatibility with executor interface)
-        **kwargs: query (required), agent_name (required), resource_manager (required), limit (optional)
+        value: Query string (preferred)
+        **kwargs: legacy query (fallback), agent_name (required), resource_manager (required), limit (optional)
         
     Returns:
         Collection ID containing structured Note for each paper result
     """
-    query = kwargs.get('query', '')
+    query = value or kwargs.get('value') or kwargs.get('query', '')
+    if not isinstance(query, str):
+        query = ''
     if not query:
         return {
             'status': 'failed',
-            'reason': 'query parameter required'
+            'reason': 'value parameter required (paper search query)'
         }
     
     agent_name = kwargs.get('agent_name')

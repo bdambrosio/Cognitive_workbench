@@ -59,6 +59,7 @@ class InfospaceExecutor:
         self.available_tools = available_tools
         self.executive_node = executive_node
         self.resource_manager = resource_manager
+        self.character_context: str = ""
         
         # Plan-local state (ephemeral, cleared each plan)
         self.plan_bindings = {}  # $var_name -> resource_id (Note_N or Collection_N)
@@ -80,6 +81,96 @@ class InfospaceExecutor:
         if self.executive_node:
             self.executive_node.last_say_text = ''
             self.executive_node.last_out_resource_id = None
+    
+    def call_subplanner(self, goal: str, context: Optional[str] = None, max_steps: int = 8, initial_blackboard: Optional[str] = None) -> str:
+        """
+        Run a nested IncrementalPlanner using a fresh InfospaceExecutor instance.
+        
+        Args:
+            goal: Delegated goal for the sub-planner
+            context: Optional context string (blackboard snapshot, etc.)
+            max_steps: Maximum planning steps for the nested planner
+        
+        Returns:
+            String summary/report from the nested planner (or error message).
+        """
+        try:
+            from templates import INFOSPACE_PRIMITIVES_REFERENCE
+            from incremental_planner import IncrementalPlanner, HAS_SGLANG
+        except ImportError as e:
+            logger.error(f"Subplanner unavailable: {e}")
+            return f"Subplanner unavailable: {e}"
+        
+        if not HAS_SGLANG or not self.runtime:
+            msg = "Subplanner requires SGLang runtime; unavailable in current configuration"
+            logger.warning(msg)
+            return msg
+        
+        # Create fresh executor with isolated plan state but shared infrastructure
+        logger.info(f"Creating child executor for subplanner, goal: {goal}")
+        child_executor = InfospaceExecutor(
+            agent_name=self.agent_name,
+            session=self.session,
+            map_name=self.map_name,
+            llm_client=self.llm_client,
+            available_tools=self.available_tools,
+            executive_node=self.executive_node,
+            resource_manager=self.resource_manager
+        )
+        child_executor.runtime = self.runtime
+        child_executor.clear_plan_state()
+        
+        planner = IncrementalPlanner(
+            executor=child_executor,
+            available_tools=self.available_tools,
+            primitives_reference=INFOSPACE_PRIMITIVES_REFERENCE,
+            logger_instance=logger
+        )
+        
+        blackboard_state = initial_blackboard or context
+        character_context = getattr(self, 'character_context', '')
+        
+        planner_context: Dict[str, str] = {}
+        if character_context:
+            planner_context['character_context'] = character_context
+        if blackboard_state:
+            planner_context['initial_blackboard'] = blackboard_state
+        
+        try:
+            result = planner.generate_plan(goal=goal, context=planner_context or None, max_steps=max_steps)
+        except Exception as exc:
+            logger.error(f"Subplanner execution error: {exc}")
+            return f"Subplanner execution error: {exc}"
+        
+        if result.get('success'):
+            reasoning = result.get('reasoning', 'Subplanner completed successfully')
+            
+            # Substitute bindings in reasoning
+            for var_name, res_id in child_executor.plan_bindings.items():
+                if res_id:
+                    # Replace variable ($note) with resource ID (Note_123)
+                    # Handle both with and without $ prefix in case of different usage
+                    reasoning = reasoning.replace(f"${var_name}", res_id)
+                    reasoning = reasoning.replace(var_name, res_id)
+            
+            # Retrieve executed plan actions
+            plan_actions = getattr(child_executor, '_plan_actions', [])
+            
+            # Format and substitute bindings in plan
+            formatted_plan = []
+            for action in plan_actions:
+                action_str = json.dumps(action)
+                for var_name, res_id in child_executor.plan_bindings.items():
+                    if res_id:
+                        action_str = action_str.replace(f"${var_name}", res_id)
+                        action_str = action_str.replace(var_name, res_id)
+                formatted_plan.append(action_str)
+            
+            plan_text = "\n".join([f"- {a}" for a in formatted_plan])
+            logger.info(f"Executed sub-plan: \n{reasoning}\n\nEXECUTED SUB-PLAN:\n{plan_text}")
+            return f"{reasoning}\n\nEXECUTED SUB-PLAN:\n{plan_text}"
+        
+        return f"Subplanner failed: {result.get('error', 'unknown error')}"
     
     def _create_collection(self, note_ids: list, source_context: str, collection_name: str = '', properties: Optional[Dict] = None) -> Optional[str]:
         """
