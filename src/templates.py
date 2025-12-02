@@ -1025,17 +1025,18 @@ Examples:
 
 ## load
 Description: Retrieve a persistent Note or Collection by resource ID or name
-Input: resource_id: literal string → resource ID or name (case-sensitive)
+Input: target: literal string or $variable → resource ID or name (case-sensitive)
 Output: out: $variable → Note or Collection
 Parameters:
-  - resource_id (required): string resource ID (e.g., "Note_123") or name (case-sensitive)
+  - target (required): string resource ID (e.g., "Note_123"), name (case-sensitive), or $variable
   - out (required): $variable name for resulting Note/Collection
-  - expect (required): string describing expected content
+  - expect (optional): string describing expected content
 Preconditions: resource must exist in persistent storage
 Postconditions: out variable bound to loaded Note or Collection
 Examples:
-  {"type":"load","resource_id":"Note_123","out":"$my_note","expect":"should contain previous data"}
-  {"type":"load","resource_id":"papers","out":"$papers","expect":"should have saved papers"}
+  {"type":"load","target":"Note_123","out":"$my_note","expect":"should contain previous data"}
+  {"type":"load","target":"papers","out":"$papers","expect":"should have saved papers"}
+  {"type":"load","target":"$resource_name","out":"$loaded_resource"}
 
 ## index
 Description: Build an embedding index for a Collection
