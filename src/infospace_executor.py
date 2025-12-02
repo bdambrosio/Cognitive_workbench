@@ -1913,6 +1913,8 @@ Make sure the string is in a format that can be parsed by the json.loads functio
             'display': self._execute_display,
             'say': self._execute_say,
             'think': self._execute_think,
+            'project': self._execute_project,
+            'pluck': self._execute_pluck,
         }
         
         # Apply operation to each Note
@@ -1941,9 +1943,69 @@ Make sure the string is in a format that can be parsed by the json.loads functio
                     elif operation in ['display', 'say', 'think']:
                         # Use 'value' field (display/say/think accept both value and target)
                         primitive_action['value'] = note_id
-                    
-                    # Execute primitive
-                    result = primitive_handlers[operation](primitive_action)
+                    # For project/pluck: extract fields directly from Note content
+                    elif operation == 'project':
+                        fields = additional_args.get('fields', additional_args.get('value', {}).get('fields'))
+                        if not fields or not isinstance(fields, list):
+                            result = {'status': 'failed', 'reason': 'project requires fields list'}
+                        elif not isinstance(content, dict):
+                            result = {'status': 'failed', 'reason': f'Cannot project from non-dict Note {note_id}'}
+                        else:
+                            # Extract fields from content (reuse logic from _execute_project)
+                            projected = {}
+                            all_fields_found = True
+                            for field in fields:
+                                value = content
+                                parts = field.split('.')
+                                for part in parts:
+                                    if isinstance(value, dict) and part in value:
+                                        value = value[part]
+                                    else:
+                                        value = None
+                                        break
+                                if value is None:
+                                    all_fields_found = False
+                                    break
+                                # Preserve nested structure
+                                if len(parts) == 1:
+                                    projected[parts[0]] = value
+                                else:
+                                    current = projected
+                                    for j, part in enumerate(parts[:-1]):
+                                        if part not in current:
+                                            current[part] = {}
+                                        current = current[part]
+                                    current[parts[-1]] = value
+                            
+                            if all_fields_found and projected:
+                                projected_id = self._persist_note(projected, f'project_map_{i}')
+                                result = {'status': 'success', 'value': projected_id}
+                            else:
+                                result = {'status': 'failed', 'reason': 'Fields not found or null'}
+                    elif operation == 'pluck':
+                        field = additional_args.get('field', additional_args.get('value', {}).get('field'))
+                        if not field:
+                            result = {'status': 'failed', 'reason': 'pluck requires field parameter'}
+                        elif not isinstance(content, dict):
+                            result = {'status': 'failed', 'reason': f'Cannot pluck from non-dict Note {note_id}'}
+                        else:
+                            # Extract field value (reuse logic from _execute_pluck)
+                            value = content
+                            for part in field.split('.'):
+                                if isinstance(value, dict) and part in value:
+                                    value = value[part]
+                                else:
+                                    value = None
+                                    break
+                            
+                            if value is not None:
+                                plucked_id = self._persist_note(value, f'pluck_map_{i}')
+                                result = {'status': 'success', 'value': plucked_id}
+                            else:
+                                result = {'status': 'failed', 'reason': f'Field "{field}" not found'}
+                    else:
+                        # Execute primitive
+                        result = primitive_handlers[operation](primitive_action)
                 else:
                     # Tool name - apply to content
                     result = self._apply_operation_to_value(operation, content, 
