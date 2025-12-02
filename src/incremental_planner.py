@@ -153,13 +153,19 @@ Types:
 - Collection: List of Note/Collection IDs (session-local only)
   - Can be named (e.g., "my-collection") for stable referencing via load
   - Named Collections can be loaded by name or by ID (e.g., "Collection_456")
-- Variables: Plan-local names referencing Notes/Collections
+- Variables: Plan-local names referencing Notes/Collections. Variables *always* start with "$".
 
-Variable Syntax:
+Action Field Syntax:
 - ALWAYS use "$variable" for references (target, value, source, out fields)
-- Correct: {"value": "$my_variable"}
-- Wrong: {"value": "my_variable"}
-- Literal strings: Use directly without $ (e.g., "hello")
+- Correct: {"target": "$my_variable"}
+- Wrong: {"target": "my_variable"}
+- Note reference by ID or name: Use directly without $ (e.g., "target": "Note_123" or "target": "attention-note")
+- Collection reference by ID or name: Use directly without $ (e.g., "target": "Collection_456" or "target": "research-papers")
+- Literal strings: Use directly without $ (e.g., "value": "hello")
+- Literal numbers: Use directly without $ (e.g., "value": 123)
+- Literal booleans: Use directly without $ (e.g., "value": true)
+
+
 
 Operation Compatibility:
 ┌──────────────────────────────────┬──────┬────────────┬─────────────────────────────────┐
@@ -173,7 +179,11 @@ Operation Compatibility:
 │ project, pluck, sort, filter     │  ❌  │     ✓      │ SQL-like Collection ops         │
 │ head                             │  ❌  │     ✓      │ Take first N items              │
 │ join                             │  ❌  │     ✓      │ Merge 2 Collections (SQL JOIN)  │
-│ display                          │  ✓   │     ✓      │ Show content to user            │
+│ add, remove, size                │  ❌  │     ✓      │ Collection mutation operations  │
+│ union, intersection, difference  │  ❌  │     ✓      │ Set operations on Collections    │
+│ load                             │  ✓   │     ✓      │ Load persistent resource        │
+│ persist                          │  ✓   │     ✓      │ Mark resource as persistent    │
+│ display                          │  ✓   │     ✓      │ Show content to user (UI only) │
 │ search-notes, search-collections │  N/A │     N/A    │ Global discovery (return Coll.) │
 │ search-within-collection         │  ❌  │     ✓      │ Search indexed Collection       │
 └──────────────────────────────────┴──────┴────────────┴─────────────────────────────────┘
@@ -181,7 +191,9 @@ Operation Compatibility:
 Key distinctions:
 - split (Note→Coll): Transforms internal structure (array/lines) into separate items
 - flatten (Coll→Note): Opposite of split, merges Collection into single Note
-- display: Use to VIEW contents, not split (common mistake)
+- load: Use to GET content into planner context (returns Note content or Collection Note IDs)
+- display: Use to SHOW content to user (UI popup, does NOT return content for planning)
+- persist: Mark resource as persistent (saved to filesystem)
 
 Search Primitives:
 - search-notes: Global discovery across all Notes (no target needed). Returns Collection of structured Notes with text preview, metadata.source_id, metadata.uri, metadata.score, metadata.type.
@@ -198,6 +210,18 @@ All search primitives return structured Notes matching query-web/semantic-schola
 - char_count: Length of text
 
 Use project to extract metadata fields (uri, source_id, score, etc.). For extracting information FROM text content, use refine (LLM-based).
+
+Persistence Operations:
+- load: Retrieve persistent Note or Collection by ID or name. Returns Note content (384 chars) or Collection Note IDs list (first 5). Use to get content into planner context.
+- persist: Mark Note or Collection as persistent (saved to filesystem). Use after creating resources you want to keep.
+
+Collection Mutation Operations (require Collection):
+- add: Add Note or Collection to existing Collection (mutates in place)
+- remove: Remove Note from Collection (mutates in place)
+- size: Get item count of Collection (returns Note with integer)
+- union: Combine two Collections (A ∪ B) - all items, deduplicated
+- intersection: Items in both Collections (A ∩ B)
+- difference: Items in A but not B (A - B)
 
 SQL-like Collection Operations (require dict/JSON Notes):
 - project: Extract metadata/structured fields (SELECT columns) → new Collection with subset of fields
@@ -244,6 +268,18 @@ Boolean Tools (return true/false):
 - is-positive: Check if number is > 0
 - is-question: Check if text contains a question
 Result shows as Note with boolean content (True/False) - inspect actual value when needed
+
+Conditions (for use with if, while, wait):
+- bound: {"type": "bound", "target": "$var"} - true if $var exists
+- notbound: {"type": "notbound", "target": "$var"} - true if $var doesn't exist
+- has_value: {"type": "has_value", "target": "$var"} - true if $var is truthy
+- empty: {"type": "empty", "target": "$var"} - true if Note is falsy/empty or Collection has 0 items
+- equals: {"type": "equals", "target": "$var", "value": "expected"}
+- not_equals: {"type": "not_equals", "target": "$var", "value": "unwanted"}
+- greater_than, less_than, gte, lte: Numeric comparisons
+- contains: {"type": "contains", "target": "$var", "value": "keyword"} - substring for Note, Note ID membership for Collection
+- not_contains: {"type": "not_contains", "target": "$var", "value": "unwanted"}
+- matches_pattern: {"type": "matches_pattern", "target": "$var", "pattern": "regex"}
 """
 
 
@@ -321,7 +357,7 @@ def build_tool_catalog(available_tools: Dict[str, Dict], primitives_reference: s
         },
         "load": {
             "description": "Load persistent Note or Collection by ID or name. Can load named Notes/Collections by name (e.g., 'my-note') or by ID (e.g., 'Note_123').",
-            "schema_hint": {"resource_id": "string (ID or name)", "out": "$variable", "expect": "string"}
+            "schema_hint": {"target": "string (ID or name) or $variable", "out": "$variable", "expect": "string"}
         },
         "persist": {
             "description": "Mark Note/Collection as persistent",
@@ -902,24 +938,111 @@ def execute_infospace_action(action: Dict, executor, agent_name: str) -> str:
             if bound_var:
                 resource_id = executor.plan_bindings.get(bound_var.lstrip('$'))
             
-            # For Notes: fetch actual content to show in result
-            if isinstance(actual_value, str) and actual_value.startswith('Note_'):
-                try:
-                    content = executor._get_content(actual_value)
-                    # Format the actual content
-                    actual_result_str = _format_result_value(content)
-                except Exception:
-                    # Fallback if content fetch fails
-                    actual_result_str = actual_value
-            else:
-                # For all other values, format directly
-                actual_result_str = _format_result_value(actual_value)
-            
             # Build result message in format: [SUCCESS] <result> | <action> | Bound: <var> to <resource>
             action_type = action['type']
             
-            # Special handling for Collections: keep current format (item count is more useful than contents)
-            if resource_id and resource_id.startswith('Collection_'):
+            # Special handling for load action
+            if action_type == 'load':
+                # For Notes: fetch actual content with longer truncation (384 chars)
+                if isinstance(actual_value, str) and actual_value.startswith('Note_'):
+                    try:
+                        content = executor._get_content(actual_value)
+                        if content is not None:
+                            # Format with 384 char limit for load
+                            content_str = str(content).replace('\n', ' | ')
+                            if len(content_str) > 384:
+                                truncated = content_str[:384]
+                                last_space = truncated.rfind(' ')
+                                if last_space > 364:  # Only if reasonably close to end
+                                    truncated = truncated[:last_space]
+                                actual_result_str = truncated + '...'
+                            else:
+                                actual_result_str = content_str
+                        else:
+                            actual_result_str = actual_value
+                    except Exception:
+                        actual_result_str = actual_value
+                # For Collections: show Note IDs list (first 5)
+                elif resource_id and resource_id.startswith('Collection_'):
+                    try:
+                        note_ids = executor._get_content(resource_id)
+                        if isinstance(note_ids, list) and note_ids:
+                            # Format first 5 Note IDs
+                            display_ids = note_ids[:5]
+                            note_list_str = ', '.join(display_ids)
+                            if len(note_ids) > 5:
+                                note_list_str += ', ...'
+                            actual_result_str = f"[{note_list_str}]"
+                        else:
+                            actual_result_str = "[]"
+                    except Exception:
+                        # Fallback to metadata if content fetch fails
+                        metadata = executor.get_resource_metadata(resource_id)
+                        if metadata:
+                            item_count = metadata.get('item_count', 0)
+                            actual_result_str = f"Collection ({item_count} items)"
+                        else:
+                            actual_result_str = "Collection"
+                else:
+                    # For other load results, format normally
+                    actual_result_str = _format_result_value(actual_value)
+            else:
+                # For display: use same formatting as load (384 chars for Notes, Note IDs for Collections)
+                if action_type == 'display':
+                    if isinstance(actual_value, str) and actual_value.startswith('Note_'):
+                        try:
+                            content = executor._get_content(actual_value)
+                            if content is not None:
+                                # Format with 384 char limit for display (matching load)
+                                content_str = str(content).replace('\n', ' | ')
+                                if len(content_str) > 384:
+                                    truncated = content_str[:384]
+                                    last_space = truncated.rfind(' ')
+                                    if last_space > 364:
+                                        truncated = truncated[:last_space]
+                                    actual_result_str = truncated + '...'
+                                else:
+                                    actual_result_str = content_str
+                            else:
+                                actual_result_str = actual_value
+                        except Exception:
+                            actual_result_str = actual_value
+                    elif resource_id and resource_id.startswith('Collection_'):
+                        try:
+                            note_ids = executor._get_content(resource_id)
+                            if isinstance(note_ids, list) and note_ids:
+                                display_ids = note_ids[:5]
+                                note_list_str = ', '.join(display_ids)
+                                if len(note_ids) > 5:
+                                    note_list_str += ', ...'
+                                actual_result_str = f"[{note_list_str}]"
+                            else:
+                                actual_result_str = "[]"
+                        except Exception:
+                            metadata = executor.get_resource_metadata(resource_id)
+                            if metadata:
+                                item_count = metadata.get('item_count', 0)
+                                actual_result_str = f"Collection ({item_count} items)"
+                            else:
+                                actual_result_str = "Collection"
+                    else:
+                        actual_result_str = _format_result_value(actual_value)
+                else:
+                    # For Notes: fetch actual content to show in result
+                    if isinstance(actual_value, str) and actual_value.startswith('Note_'):
+                        try:
+                            content = executor._get_content(actual_value)
+                            # Format the actual content
+                            actual_result_str = _format_result_value(content)
+                        except Exception:
+                            # Fallback if content fetch fails
+                            actual_result_str = actual_value
+                    else:
+                        # For all other values, format directly
+                        actual_result_str = _format_result_value(actual_value)
+            
+            # Special handling for Collections (non-load, non-display actions): keep current format
+            if action_type not in ('load', 'display') and resource_id and resource_id.startswith('Collection_'):
                 metadata = executor.get_resource_metadata(resource_id)
                 if metadata:
                     item_count = metadata.get('item_count', 0)
@@ -1123,7 +1246,7 @@ if HAS_SGLANG:
             "Err on the side of including additional tools in SELECTED_TOOLS_JSON for better coverage.\n"
             "Then, decompose the goal into a FIRST high-level task/subgoal to focus on.\n"
             "In doing so, consider the tools you have selected, the goal you are trying to achieve, and the downstream tasks that will be required to achieve the goal.\n"
-            "Respond with the following fields:\n"
+            "Respond with the following fields, be concise and to the point:\n"
             "ANALYSIS: <text>\n"
             "CARDINALITY_CHECK: <\"SINGLE\" or \"MULTIPLE/LIST\">. Does the question imply a unique answer (e.g., 'date of birth') or a potentially multi-value answer (e.g., 'children')? If MULTIPLE, your plan must be exhaustive.\n"
             "SELECTED_TOOLS_JSON: <json list of tool names>\n"
@@ -1132,11 +1255,11 @@ if HAS_SGLANG:
         
         s += assistant(
             "ANALYSIS: "
-            + gen("stage1_analysis", max_tokens=256, stop="\n")
+            + gen("stage1_analysis", max_tokens=128, stop="\n")
             + "\nSELECTED_TOOLS_JSON: "
-            + gen("selected_tools_json", max_tokens=256, stop="\n")
+            + gen("selected_tools_json", max_tokens=96, stop="\n")
             + "\nFIRST_TASK: "
-            + gen("first_task", max_tokens=128, stop="\n")
+            + gen("first_task", max_tokens=96, stop="\n")
             + "\n"
         )
         
@@ -1273,7 +1396,7 @@ if HAS_SGLANG:
                 + "\nNEXT_TASK: "
                 + gen(f"next_task_{step}", max_tokens=128, stop="\n")
                 + "\nREQUEST_TOOLS: "
-                + gen(f"request_tools_{step}", max_tokens=128, stop=["\n\n", "\n\nSTAGE"])
+                + gen(f"request_tools_{step}", max_tokens=96, stop=["\n\n", "\n\nSTAGE"])
                 + "\n"
             )
             logger.info(f"THOUGHTS: {s[f'thoughts_{step}']}")

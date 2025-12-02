@@ -1274,49 +1274,46 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         """
         Load a persistent Note or Collection by resource ID or name.
         
-        Required: resource_id, out
+        Required: target, out
         
         Retrieves an existing spatial resource from the map and binds it to a variable.
-        resource_id can be: Note_X, Collection_X, or a collection name.
+        target can be: $variable, Note_X, Collection_X, or a resource name.
         """
-        resource_id = action.get('resource_id')
+        target_arg = action.get('target')
         out_var = action.get('out')
         
-        if not resource_id:
-            return {'status': 'failed', 'reason': 'load requires resource_id'}
+        if not target_arg:
+            return {'status': 'failed', 'reason': 'load requires target'}
         
         if not out_var:
             return {'status': 'failed', 'reason': 'load requires out'}
-            
-        # Resolve variable if resource_id starts with $
-        if isinstance(resource_id, str) and resource_id.startswith('$'):
-            var_name = resource_id[1:]
-            if var_name in self.plan_bindings:
-                resource_id = self.plan_bindings[var_name]
-                logger.debug(f"Resolved load resource_id: ${var_name} -> {resource_id}")
-            else:
-                return {'status': 'failed', 'reason': f'Variable not bound: {var_name}'}
         
-        # Direct call to resource manager (get_resource handles name resolution internally)
+        # Resolve target (handles $var, resource names, and IDs)
+        # _resolve_target_var guarantees binding if it succeeds
+        var_name, error = self._resolve_target_var(target_arg)
+        if error:
+            return {'status': 'failed', 'reason': f'load: {error}'}
+        
+        # Get resource ID from bindings (guaranteed to exist after _resolve_target_var)
+        resource_id = self.plan_bindings[var_name]
+        
+        # Verify resource exists
+        if not self.resource_manager:
+            return {'status': 'failed', 'reason': 'Resource manager not available'}
+        
         resource = self.resource_manager.get_resource(resource_id)
-        
         if not resource:
             return {'status': 'failed', 'reason': f'Resource not found: {resource_id}'}
         
-        # Get the actual resource ID by resolving the name/id
-        actual_id = self.resource_manager._resolve_resource_id(resource_id)
-        if not actual_id:
-            return {'status': 'failed', 'reason': f'Could not resolve resource ID: {resource_id}'}
-        
-        # Bind the actual resource ID to variable
-        self._bind_variable(out_var, actual_id)
+        # Bind the resource ID to out variable
+        self._bind_variable(out_var, resource_id)
         
         # Determine resource type for logging
-        resource_type = "Collection" if actual_id.startswith('Collection_') else "Note" if actual_id.startswith('Note_') else "Resource"
+        resource_type = "Collection" if resource_id.startswith('Collection_') else "Note" if resource_id.startswith('Note_') else "Resource"
         display_var = self._normalize_var_for_log(out_var)
-        logger.info(f"Loaded {resource_id} → {display_var} ({resource_type})")
+        logger.info(f"Loaded {target_arg} → {display_var} = {resource_id} ({resource_type})")
         
-        return {'status': 'success', 'value': actual_id}
+        return {'status': 'success', 'value': resource_id}
     
     def _execute_index(self, action: Dict) -> Dict:
         """
@@ -3697,7 +3694,7 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         Resolve target argument to variable name, binding named resources if needed.
         
         Args:
-            target_arg: Either "$variable" or a named resource name
+            target_arg: Either "$variable", resource ID (e.g., "Note_21"), or named resource name
             
         Returns:
             (var_name, error) - var_name is the variable name (without $), error is None on success
@@ -3705,10 +3702,16 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         if not isinstance(target_arg, str):
             return None, 'target must be string'
         
+        # Extract variable name if $ prefix present
         if target_arg.startswith('$'):
-            return target_arg[1:], None
+            var_name = target_arg[1:]
+            # Check if variable is already bound
+            if var_name in self.plan_bindings:
+                return var_name, None
+            # Not bound - try resolving as resource name (fallback)
+            target_arg = var_name
         
-        # Try to resolve as named resource
+        # Try to resolve as named resource (handles both resource IDs and names)
         if self.resource_manager:
             # Use _resolve_resource_id to get the actual resource ID
             resolved_id = self.resource_manager._resolve_resource_id(target_arg)

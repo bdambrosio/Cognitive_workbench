@@ -56,12 +56,12 @@ def send_goal(session, goal_text: str):
 
 
 def shutdown_conversation(session):
-    """Summarize conversation and archive to pastConversations."""
+    """Summarize conversation and archive to conversation_history."""
     print("\n📝 Summarizing conversation...")
     plan_steps = [
-        {"type": "load", "resource_id": "conversation", "out": "$conv"},
+        {"type": "load", "target": "conversation", "out": "$conv"},
         {"type": "summarize", "target": "$conv", "out": "$summary"},
-        {"type": "load", "resource_id": "pastConversations", "out": "$past"},
+        {"type": "load", "target": "conversation_history", "out": "$past"},
         {"type": "add", "target": "$past", "value": "$summary", "out": "$past"}
     ]
     result = execute_plan(session, plan_steps)
@@ -99,14 +99,22 @@ def main():
         plan_result_callback
     )
     
-    # Create profile Note on startup
-    print(f"Creating profile Note...")
-    result = create_note(session, PROFILE_CONTENT, name="profile")
+    # Create conversation collection on startup
+    result = execute_plan(session, [
+        {"type": "load", "target": "conversation_history", "out": "$conversation_history"},
+        {"type": "if", "condition": {"type": "notbound", "target": "$conversation_history"}, 
+                        "then": [{"type": "create-collection","name": "conversation_history","out": "$conversation_history"},
+                                {"type": "index","source": "$conversation_history","store_name": "conversation_history","index_type": "semantic"},
+                                {"type": "persist", "target": "$conversation_history"}
+                                ] }])
     if result.get("success"):
-        print(f"✓ Profile created: {PROFILE_CONTENT}")
+        print(f"✓ Conversation_history collection created")
     else:
-        print(f"✗ Failed to create profile: {result.get('error', result.get('reason', 'unknown'))}")
-    result = execute_plan(session, [{"type": "create-collection", "name": "conversation", "out": "$conversation"}])
+        print(f"✗ Failed to create conversation_history collection: {result.get('error', result.get('reason', 'unknown'))}")
+  
+    print(f"Creating conversation collection...")
+    result = execute_plan(session, [{"type": "create-collection", "name": "conversation", "out": "$conversation"},
+                                    {"type": "index", "source": "$conversation", "index_type": "semantic"}])
     if result.get("success"):
         print(f"✓ Conversation collection created")
     else:
