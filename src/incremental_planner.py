@@ -165,28 +165,23 @@ Action Field Syntax:
 - Literal numbers: Use directly without $ (e.g., "value": 123)
 - Literal booleans: Use directly without $ (e.g., "value": true)
 
-
-
 Operation Compatibility:
-┌──────────────────────────────────┬──────┬────────────┬─────────────────────────────────┐
-│ Operation                        │ Note │ Collection │ Purpose                         │
-├──────────────────────────────────┼──────┼────────────┼─────────────────────────────────┤
-│ split                            │  ✓   │     ❌     │ Note structure → Collection     │
-│ flatten                          │  ❌  │     ✓      │ Collection → single Note        │
-│ as-json, refine, coerce          │  ✓   │     ❌     │ Transform Note content          │
-│ summarize, relate                │  ✓   │     ✓      │ Generate new content            │
-│ map                              │  ❌  │     ✓      │ Apply op to each Collection item│
-│ project, pluck, sort, filter     │  ❌  │     ✓      │ SQL-like Collection ops         │
-│ head                             │  ❌  │     ✓      │ Take first N items              │
-│ join                             │  ❌  │     ✓      │ Merge 2 Collections (SQL JOIN)  │
-│ add, remove, size                │  ❌  │     ✓      │ Collection mutation operations  │
-│ union, intersection, difference  │  ❌  │     ✓      │ Set operations on Collections    │
-│ load                             │  ✓   │     ✓      │ Load persistent resource        │
-│ persist                          │  ✓   │     ✓      │ Mark resource as persistent    │
-│ display                          │  ✓   │     ✓      │ Show content to user (UI only) │
-│ search-notes, search-collections │  N/A │     N/A    │ Global discovery (return Coll.) │
-│ search-within-collection         │  ❌  │     ✓      │ Search indexed Collection       │
-└──────────────────────────────────┴──────┴────────────┴─────────────────────────────────┘
+Operation_name: applicable to: <Note | Collection | Note, Collection>;   Purpose
+ - split: Note;  Note structure → Collection
+ - flatten: Collection;  Collection → single Note
+ - as-json, refine, coerce: Note;  Transform Note content
+ - summarize, relate: Note, Collection;  Generate new content
+ - map: Collection;  Apply op to each Collection item
+ - project, pluck, sort, filter: Collection;  SQL-like Collection ops
+ - head: Collection;  Take first N items
+ - join: Collection;  Merge 2 Collections (SQL JOIN)
+ - add, remove, size: Collection;  Collection mutation operations
+ - union, intersection, difference: Collection;  Set operations on Collections
+ - load: Note, Collection;  Load persistent resource
+ - persist: Note, Collection;  Mark resource as persistent
+ - display: Note, Collection;  Show content to user (UI only)
+ - search-notes, search-collections: N/A;  Global discovery (return Coll.)
+ - search-within-collection: Collection;  Search indexed Collection
 
 Key distinctions:
 - split (Note→Coll): Transforms internal structure (array/lines) into separate items
@@ -1194,6 +1189,10 @@ if HAS_SGLANG:
             executor: InfospaceExecutor instance (with _plan_actions attribute)
             max_steps: Maximum planning steps
         """
+        # Track which tools have had their skill docs loaded (re-initialized each call, persists across stages)
+        # Store in state so it persists across stages within this call, but reset at start of each new call
+        _loaded_skill_docs = set[Any]()          
+        
         # Stage 0: Resource retrieval (if executor available)
         available_resources_text = ""
         if executor:
@@ -1270,16 +1269,24 @@ if HAS_SGLANG:
         except KeyError as e:
             logger.warning(f"Stage 1 values not available: {e}")
         
-        # Stage 1.5: Load and inject detailed docs for selected tools
+        # Stage 1.5: Load and inject detailed docs for selected tools (only if not already loaded)
         try:
             selected_tools_json = s['selected_tools_json']
             selected_tools = json.loads(selected_tools_json)
             if isinstance(selected_tools, list) and selected_tools:
-                expanded_docs = load_skill_docs(selected_tools, executor.available_tools)
-                if expanded_docs:
-                    s += user(expanded_docs)
-                    s += assistant("I have reviewed the detailed documentation for the selected tools.\n")
-                    logger.info(f"Stage 1.5: Injected detailed docs for {len(selected_tools)} tools")
+                # Filter to only tools that haven't had docs loaded yet
+                tools_to_load = [tool for tool in selected_tools if tool not in _loaded_skill_docs]
+                
+                if tools_to_load:
+                    expanded_docs = load_skill_docs(tools_to_load, executor.available_tools)
+                    if expanded_docs:
+                        s += user(expanded_docs)
+                        s += assistant("I have reviewed the detailed documentation for the selected tools.\n")
+                        logger.info(f"Stage 1.5: Injected detailed docs for {len(tools_to_load)} tools")
+                        # Mark these tools as loaded
+                        _loaded_skill_docs.update(tools_to_load)
+                else:
+                    logger.debug(f"Stage 1.5: All {len(selected_tools)} selected tools already have docs loaded, skipping")
         except (KeyError, json.JSONDecodeError, TypeError) as e:
             logger.warning(f"Failed to parse selected tools for doc expansion: {e}")
         
