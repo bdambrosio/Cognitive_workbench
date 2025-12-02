@@ -3111,7 +3111,7 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         
         Args:
             tool_name: Name of the tool to invoke
-            value: Input value to the tool
+            value: Input value to the tool (Note content, passed as positional argument)
             reason: Reason for invoking (for logging)
             additional_args: Optional dict of additional arguments for the tool
             
@@ -3124,14 +3124,47 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         if not tool_info:
             return {'status': 'failed', 'reason': f'Tool not found: {tool_name}'}
         
+        # Mapping of tool names to their expected parameter names for the 'value' field in map actions.
+        # When map has 'value' field, it maps to these tool-specific parameters.
+        # If the tool-specific parameter is already present, it takes precedence (override).
+        TOOL_VALUE_PARAM_MAP = {
+            'refine': 'instruction',      # refine expects 'instruction' (required)
+            'summarize': 'focus',        # summarize expects 'focus' (optional)
+            'generate-note': 'prompt',   # generate-note expects 'prompt' (required)
+            'relate': 'instruction',     # relate expects 'instruction' (optional)
+            'text-find': 'pattern',      # text-find expects 'pattern' (required)
+            'matches': 'pattern',         # matches expects 'pattern' (required)
+            'filter-collection': 'predicate',  # filter-collection expects 'predicate' (required)
+            'assess': 'predicate',       # assess expects 'predicate' (required)
+        }
+        
+        # Clean up additional_args: remove 'value' if present (conflicts with positional value argument)
+        # Map 'value' -> tool-specific parameter if tool has a mapping and parameter not already present
+        cleaned_args = {}
+        if additional_args:
+            for key, val in additional_args.items():
+                if key == 'value':
+                    # Check if this tool has a parameter mapping
+                    mapped_param = TOOL_VALUE_PARAM_MAP.get(tool_name)
+                    if mapped_param:
+                        # Only map 'value' -> mapped_param if mapped_param is not already present
+                        # This allows planner to explicitly provide the parameter, which takes precedence
+                        if mapped_param not in additional_args:
+                            cleaned_args[mapped_param] = val
+                        # 'value' is skipped (already passed as positional argument)
+                    # For tools without mapping, skip 'value' (already passed as positional argument)
+                    # Note: tools should not expect 'value' as kwarg since it's positional
+                else:
+                    cleaned_args[key] = val
+        
         tool_type = tool_info.get('type')
         
         if tool_type == 'prompt_augmentation':
             # Execute locally using LLM
-            return self._execute_prompt_tool(tool_name, value, tool_info, additional_args or {})
+            return self._execute_prompt_tool(tool_name, value, tool_info, cleaned_args)
         elif tool_type == 'python':
             # Execute Python tool
-            return self._execute_python_tool(tool_name, value, tool_info, additional_args or {})
+            return self._execute_python_tool(tool_name, value, tool_info, cleaned_args)
         else:
             return {'status': 'failed', 'reason': f'Unknown tool type: {tool_type}'}
     
