@@ -20,6 +20,7 @@ LLM-based content generation tool. Creates new text or code from scratch using n
   - Collection ID (e.g., "$context_collection"): Concatenates all Notes in Collection
   - Note ID (e.g., "$background_note"): Uses Note content as context
   - Plain text string: Used directly as context
+  - ❌ **Arrays/Lists are NOT allowed**: Do not pass `["$note1", "$note2"]`. You MUST create a Collection first.
 
 ## Output
 Returns Note containing generated content (text or code).
