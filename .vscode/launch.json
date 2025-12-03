@@ -42,7 +42,7 @@
             "env": {
                 "PYTHONPATH": "${workspaceFolder}/src"
             },
-            "args": ["--verbose", "--clear"],
+            "args": ["--verbose"],
             "justMyCode": false,
             "stopOnEntry": false,
             "preLaunchTask": "setup-zenoh-environment"
