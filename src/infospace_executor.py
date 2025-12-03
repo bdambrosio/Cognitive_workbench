@@ -221,7 +221,9 @@ class InfospaceExecutor:
             logger.warning(f"Resource {resource_id} not found")
             return None
         
-        return resource.get('properties', {}).get('content')
+        content = resource.get('properties', {}).get('content')
+        logger.debug(f"_get_content({resource_id}): content type={type(content)}, is_none={content is None}, is_empty_str={content == ''}")
+        return content
     
     def get_resource_metadata(self, resource_id: str) -> Optional[Dict]:
         """
@@ -384,14 +386,12 @@ class InfospaceExecutor:
         """
         Apply tool to input data.
         
-        Supports two formats:
-        1. Standard: {"type": "apply", "target": "tool-name", "value": ..., "out": "$var"}
-        2. Direct:   {"type": "tool-name", "args": {...}, "out": "$var"}
+        Supports direct format: {"type": "tool-name", "target": ..., "out": "$var", ...}
         
         Required: type, out
         Optional: target (input data), any tool-specific parameters at top level
         
-        All tool parameters are at top level (flat format):
+        All tool parameters are at top level (flat format, no nested 'args' field):
         - target: $variable (input data) - resolves to Note/Collection content
         - out: literal string (variable name)
         - Any other fields: tool-specific parameters (prompt, query, instruction, etc.)
@@ -401,11 +401,27 @@ class InfospaceExecutor:
         # Reserved fields that are NOT tool parameters
         reserved_fields = {'type', 'target', 'value', 'out', 'expect', 'reason'}
         
-        # Direct format: type is the tool name, target or value is input data
+        # Direct format: type is the tool name, target is input data
         if action_type in self.available_tools:
             target = action_type  # Tool name
-            # Input data: prefer 'target', fall back to 'value'
-            value = self._resolve_value(action.get('target') or action.get('value', ''))
+            # Input data: use 'target' only (no fallback to 'value')
+            target_field = action.get('target')
+            if target_field:
+                try:
+                    value = self._resolve_value(target_field)
+                    logger.debug(f"_execute_apply: resolved target '{target_field}' -> value type={type(value)}, is_none={value is None}, is_empty={value == ''}, truthy={bool(value)}")
+                    # Check if target resolved to None or empty (unbound variable, Note not found, or empty content)
+                    if value is None:
+                        return {'status': 'failed', 'reason': f'target "{target_field}" resolved to None (variable unbound or resource not found)'}
+                    # Also check for empty string - some tools require non-empty input
+                    if value == '':
+                        logger.warning(f"target '{target_field}' resolved to empty string - tool may fail")
+                except ValueError as e:
+                    # Unbound variable
+                    logger.error(f"Unbound variable: {target_field}")
+                    return {'status': 'failed', 'reason': str(e)}
+            else:
+                value = ''
         else:
             # Standard apply format: target is the tool name
             target = self._resolve_value(action.get('target'))
@@ -1869,16 +1885,16 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         Apply operation to each item in a Collection.
         
         Required: type, target, operation, out
-        Optional: filter_null (bool), args (dict)
+        Optional: filter_null (bool), tool-specific parameters at top level
         
         operation can be:
         - String: tool name or primitive name (e.g., "tool-name", "add", "remove")
-        - Dict: {"tool": "name", "args": {...}} for tool with additional arguments
+        - Dict: {"tool": "name", ...} where all fields except "tool" are parameters (flat format)
         
         Argument types:
         - target: $variable (Collection to map over)
-        - operation: string or dict (string for tool/primitive, dict for tool with args)
-        - args: dict of additional arguments (merged with operation args if dict)
+        - operation: string or dict (string for tool/primitive, dict with "tool" field)
+        - Additional fields at top level: tool-specific parameters (instruction, pattern, etc.)
         - filter_null: bool (exclude null/None results, default: true)
         - out: $variable name for result Collection
         """
@@ -2012,9 +2028,9 @@ Make sure the string is in a format that can be parsed by the json.loads functio
                                                            f"map item {i}", additional_args)
             elif isinstance(operation, dict):
                 if 'tool' in operation:
-                    # Dict with tool name and args
+                    # Dict with tool name - all other fields are parameters (flat format)
                     tool_name = operation['tool']
-                    tool_args = operation.get('args', {})
+                    tool_args = {k: v for k, v in operation.items() if k != 'tool'}
                     tool_args.update(additional_args)  # Merge with action-level args
                     result = self._apply_operation_to_value(tool_name, content,
                                                            f"map item {i}", tool_args)
@@ -2265,23 +2281,35 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         1. Simple JSON array: Directly uses the array (e.g., [1, 2, 3])
         2. JSON object with array field: Extracts array from specified field (default 'results')
         3. JSONL format: Multiple JSON objects, one per line (newlines required between objects)
-        4. Plain text: Splits on newlines and filters empty lines
+        4. Plain text: Splits by delimiter (default: 'sentence' for semantic text processing)
         
         Required: target, out
-        Optional: field (default: 'results') - only used for JSON object case
+        Optional: 
+        - field (default: 'results') - only used for JSON object case
+        - delimiter (default: 'sentence') - for plain text: 'sentence', 'paragraph', 'line', or custom string
         
         Argument types:
         - target: $variable (Note containing JSON array, JSON object with array field, JSONL, or plain text)
         - field: literal string (name of array field, default 'results') - only used for JSON object case
+        - delimiter: literal string - 'sentence' (default, splits on . ! ? followed by space/newline), 
+                     'paragraph' (splits on double newlines), 'line' (splits on single newlines), 
+                     or custom delimiter string
         - out: variable name for resulting Collection
         
         Examples:
         - Split simple JSON array: {"type":"split","target":"$json_note","out":"$items"} (where note contains [1,2,3])
         - Split structured data: {"type":"split","target":"$data_note","out":"$items"} (where note contains {"results": [...]})
         - Split JSONL: {"type":"split","target":"$jsonl_note","out":"$items"} (where note contains {"key":"val1"}\n{"key":"val2"})
-        - Split text lines: {"type":"split","target":"$text_note","out":"$lines"}
+        - Split text by sentences (default): {"type":"split","target":"$text_note","out":"$sentences"}
+        - Split text by paragraphs: {"type":"split","target":"$text_note","delimiter":"paragraph","out":"$paragraphs"}
+        - Split text by lines: {"type":"split","target":"$text_note","delimiter":"line","out":"$lines"}
+        - Split text by custom delimiter: {"type":"split","target":"$text_note","delimiter":"---","out":"$sections"}
         
-        NOTE: query-web and semantic-scholar return Collections directly - NO split needed.
+        NOTE: 
+        - query-web and semantic-scholar return Collections directly - NO split needed.
+        - For plain text, default delimiter is 'sentence' which splits on sentence boundaries (. ! ? followed by space/newline)
+        - Internal newlines are removed and whitespace is normalized within each segment
+        - Empty segments are filtered out
         """
         error = self._validate_required_fields(action, 'target', 'out')
         if error:
@@ -2361,9 +2389,9 @@ Make sure the string is in a format that can be parsed by the json.loads functio
                 if jsonl_array is not None:
                     array_data = jsonl_array
                 else:
-                    # Fall back to plain text line splitting
-                    lines = [line.strip() for line in content.split('\n')]
-                    array_data = [line for line in lines if line]  # Filter empty lines
+                    # Plain text splitting - use delimiter parameter or default to sentence splitting
+                    delimiter = action.get('delimiter', 'sentence')
+                    array_data = self._split_text_by_delimiter(content, delimiter)
             else:
                 return {'status': 'failed', 'reason': f'Note content must be a JSON array (e.g., ["item1", "item2"]), JSON object with "{field_name}" array field, JSONL, or plain text (got {type(content).__name__})'}
         
@@ -2400,6 +2428,72 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         logger.info(f"Expanded {source_desc} ({len(note_ids)} items) → {display_var}")
         
         return {'status': 'success', 'value': collection_id}
+    
+    def _split_text_by_delimiter(self, text: str, delimiter: str) -> List[str]:
+        """
+        Split text by specified delimiter.
+        
+        Args:
+            text: Text content to split
+            delimiter: Split mode - 'sentence' (default), 'paragraph', 'line', or custom string
+            
+        Returns:
+            List of text segments (non-empty, normalized)
+        """
+        import re
+        
+        if delimiter == 'sentence':
+            # Split on sentence boundaries: . ! ? followed by space or newline
+            # Pattern: period/exclamation/question mark followed by space, newline, or end of string
+            # Use positive lookahead to split but keep the delimiter
+            pattern = r'(?<=[.!?])(?:\s+|\n+|$)'
+            parts = re.split(pattern, text)
+            segments = []
+            for part in parts:
+                part = part.strip()
+                if not part:
+                    continue
+                # Normalize internal whitespace (remove internal newlines, collapse multiple spaces)
+                part = re.sub(r'\s+', ' ', part)
+                if part:
+                    segments.append(part)
+            return segments
+            
+        elif delimiter == 'paragraph':
+            # Split on double newlines (paragraph breaks)
+            paragraphs = re.split(r'\n\n+', text)
+            segments = []
+            for para in paragraphs:
+                para = para.strip()
+                # Normalize internal whitespace (remove internal newlines, collapse multiple spaces)
+                para = re.sub(r'\s+', ' ', para)
+                if para:
+                    segments.append(para)
+            return segments
+            
+        elif delimiter == 'line':
+            # Split on single newlines (original behavior)
+            lines = text.split('\n')
+            segments = []
+            for line in lines:
+                line = line.strip()
+                # Normalize internal whitespace (collapse multiple spaces)
+                line = re.sub(r'\s+', ' ', line)
+                if line:
+                    segments.append(line)
+            return segments
+            
+        else:
+            # Custom delimiter string
+            parts = text.split(delimiter)
+            segments = []
+            for part in parts:
+                part = part.strip()
+                # Normalize internal whitespace
+                part = re.sub(r'\s+', ' ', part)
+                if part:
+                    segments.append(part)
+            return segments
     
     # ==================== Set Operations ====================
     
@@ -2622,7 +2716,7 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         
         target_arg = action.get('target')
         out_var = action.get('out')
-        fields = action.get('fields', action.get('args', {}).get('fields'))
+        fields = action.get('fields')
         
         collection_var, error = self._resolve_target_var(target_arg)
         if error:
@@ -2709,7 +2803,7 @@ Make sure the string is in a format that can be parsed by the json.loads functio
             return {'status': 'failed', 'reason': error}
         
         target_arg = action.get('target')
-        count = action.get('count', action.get('args', {}).get('count', 1))
+        count = action.get('count', 1)
         out_var = action.get('out')
         
         collection_var, error = self._resolve_target_var(target_arg)
@@ -2756,7 +2850,7 @@ Make sure the string is in a format that can be parsed by the json.loads functio
             return {'status': 'failed', 'reason': error}
         
         target_arg = action.get('target')
-        field = action.get('field', action.get('args', {}).get('field'))
+        field = action.get('field')
         out_var = action.get('out')
         
         collection_var, error = self._resolve_target_var(target_arg)
@@ -2816,7 +2910,7 @@ Make sure the string is in a format that can be parsed by the json.loads functio
             return {'status': 'failed', 'reason': error}
         
         target_arg = action.get('target')
-        where_clause = action.get('where', action.get('args', {}).get('where'))
+        where_clause = action.get('where')
         out_var = action.get('out')
         
         collection_var, error = self._resolve_target_var(target_arg)
@@ -2928,9 +3022,9 @@ Make sure the string is in a format that can be parsed by the json.loads functio
             return {'status': 'failed', 'reason': error}
         
         target_arg = action.get('target')
-        sort_field = action.get('by', action.get('args', {}).get('by'))
+        sort_field = action.get('by')
         out_var = action.get('out')
-        order = action.get('order', action.get('args', {}).get('order', 'asc'))
+        order = action.get('order', 'asc')
         
         collection_var, error = self._resolve_target_var(target_arg)
         if error:
@@ -3384,7 +3478,7 @@ Make sure the string is in a format that can be parsed by the json.loads functio
             "type": "tool_condition",
             "tool": "tool_name",
             "target": "$variable",
-            "args": {...}  # Optional additional arguments
+            ...  # Additional tool parameters at top level (flat format)
         }
         """
         tool_name = condition.get('tool')
@@ -3393,14 +3487,15 @@ Make sure the string is in a format that can be parsed by the json.loads functio
             return False
         
         target = self._resolve_value(condition.get('target'))
-        args = condition.get('args', {})
+        # All fields except 'tool' and 'target' are parameters (flat format)
+        tool_args = {k: v for k, v in condition.items() if k not in ('tool', 'target', 'type')}
         
         # Invoke tool with target value
         result = self._apply_operation_to_value(
             tool_name=tool_name,
             value=target,
             reason='condition evaluation',
-            additional_args=args
+            additional_args=tool_args
         )
         
         if result.get('status') != 'success':

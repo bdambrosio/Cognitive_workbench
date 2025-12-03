@@ -684,6 +684,12 @@ class ZenohExecutiveNode:
             self._plan_bindings_query_handler
         )
         
+        # Queryable for explicit planner bindings clearing (character-specific)
+        self.clear_planner_bindings_queryable = self.session.declare_queryable(
+            f"cognitive/{character_name}/clear_planner_bindings",
+            self._clear_planner_bindings_handler
+        )
+        
         # Shutdown flags
         self.shutdown_requested = False
         self._shutting_down = False
@@ -1325,8 +1331,8 @@ class ZenohExecutiveNode:
             except Exception:
                 self.percepts_at_plan = []
             
-            # Clear plan state for infospace
-            self.infospace_executor.clear_plan_state()
+            # Note: plan_bindings are NOT cleared here to preserve bindings from execute_plan_sync
+            # Use clear_planner_bindings API to explicitly clear if needed
             goal_text = goal.name + (': ' + goal.description if goal.description != goal.name else '')
             character_context = system_prompt  # Character description + drives
             self_entity_context = self.get_entity_context(self.character_name, 10)
@@ -1946,7 +1952,7 @@ class ZenohExecutiveNode:
             query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
     
     def _handle_resource_clear_transient_query(self, query):
-        """Handle query to clear all non-persistent Notes and Collections."""
+        """Handle query to clear all non-persistent Notes and Collections, and planner bindings."""
         if not self.resource_manager:
             response = {'success': False, 'error': 'Resource manager not available'}
             query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
@@ -1970,9 +1976,20 @@ class ZenohExecutiveNode:
                 else:
                     deleted_collections += 1
         
-        response = {'success': True, 'deleted_notes': deleted_notes, 'deleted_collections': deleted_collections}
+        # Also clear planner bindings
+        bindings_cleared = 0
+        if self.infospace_executor:
+            bindings_cleared = len(self.infospace_executor.plan_bindings)
+            self.infospace_executor.clear_plan_state()
+        
+        response = {
+            'success': True,
+            'deleted_notes': deleted_notes,
+            'deleted_collections': deleted_collections,
+            'bindings_cleared': bindings_cleared
+        }
         query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
-        logger.info(f"Cleared {deleted_notes} transient Notes, {deleted_collections} transient Collections")
+        logger.info(f"Cleared {deleted_notes} transient Notes, {deleted_collections} transient Collections, {bindings_cleared} planner bindings")
     
     def _handle_resource_create_note_query(self, query):
         """Handle query to create a Note from external caller."""
@@ -2054,6 +2071,43 @@ class ZenohExecutiveNode:
             query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
         except Exception as e:
             logger.error(f'Error in plan_bindings query handler: {e}')
+            response = {'success': False, 'error': str(e)}
+            query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
+    
+    def _clear_planner_bindings_handler(self, query):
+        """
+        Handle query for explicit clearing of planner bindings.
+        
+        Returns:
+            success, bindings_cleared (count)
+        """
+        try:
+            if not self.infospace_executor:
+                response = {
+                    'success': False,
+                    'error': 'Clear bindings only available for infospace characters'
+                }
+                query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
+                return
+            
+            # Get count before clearing
+            bindings_count = len(self.infospace_executor.plan_bindings)
+            
+            # Clear plan bindings
+            self.infospace_executor.clear_plan_state()
+            
+            logger.info(f'🔄 {self.character_name} cleared {bindings_count} planner bindings via API')
+            
+            # Return success
+            response = {
+                'success': True,
+                'bindings_cleared': bindings_count
+            }
+            query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
+            
+        except Exception as e:
+            logger.error(f'Error in clear_planner_bindings handler: {e}')
+            traceback.print_exc()
             response = {'success': False, 'error': str(e)}
             query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
     

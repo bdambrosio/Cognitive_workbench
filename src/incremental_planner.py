@@ -379,14 +379,16 @@ def build_tool_catalog(available_tools: Dict[str, Dict], primitives_reference: s
             "schema_hint": {"target": "$variable", "operation": "string", "out": "$variable"}
         },
         "split": {
-            "description": "Transform Note structure into Collection: JSON array → Collection of Notes (one per element), or newline-separated text → Collection of Notes (one per line). NOT for inspecting Collection contents. Use display or flatten to view Collection data.",
-            "full_description": "Split transforms a single Note's internal structure into a Collection. Input must be a Note (not Collection) containing either: (1) JSON array - each element becomes a Note in output Collection, or (2) newline-separated text - each line becomes a Note. This is a STRUCTURE TRANSFORMATION, not content inspection. To view Collection contents, use display (show to user) or flatten (merge into single Note). Common mistake: trying to split a Collection to 'see inside it' - Collections are already split, use display instead.",
+            "description": "Transform Note structure into Collection: JSON array → Collection of Notes (one per element), or plain text → Collection of Notes (default: by sentence). NOT for inspecting Collection contents. Use display or flatten to view Collection data.",
+            "full_description": "Split transforms a single Note's internal structure into a Collection. Input must be a Note (not Collection) containing either: (1) JSON array - each element becomes a Note in output Collection, (2) JSON object with array field - extracts array from specified field (default 'results'), (3) JSONL format - multiple JSON objects separated by newlines, or (4) plain text - splits by delimiter (default 'sentence' for semantic processing). For plain text, default delimiter is 'sentence' which splits on sentence boundaries (. ! ? followed by space/newline), normalizes whitespace (removes internal newlines), and filters empty segments. Optional delimiter parameter: 'sentence' (default), 'paragraph' (double newlines), 'line' (single newlines), or custom string. This is a STRUCTURE TRANSFORMATION, not content inspection. To view Collection contents, use display (show to user) or flatten (merge into single Note). Common mistake: trying to split a Collection to 'see inside it' - Collections are already split, use display instead.",
             "examples": [
                 '{"type":"split","target":"$json_array_note","out":"$items"}  # [1,2,3] → Collection of 3 Notes',
-                '{"type":"split","target":"$text_note","out":"$lines"}  # "a\\nb\\nc" → Collection of 3 Notes',
+                '{"type":"split","target":"$text_note","out":"$sentences"}  # "First. Second!" → Collection of 2 Notes (default: sentence splitting)',
+                '{"type":"split","target":"$text_note","delimiter":"paragraph","out":"$paragraphs"}  # Split by paragraphs',
+                '{"type":"split","target":"$text_note","delimiter":"line","out":"$lines"}  # Split by lines',
                 '{"type":"split","target":"$nested_json","out":"$objects"}  # [{"x":1},{"x":2}] → Collection'
             ],
-            "schema_hint": {"target": "$variable (Note with array/text)", "out": "$variable (Collection)"}
+            "schema_hint": {"target": "$variable (Note with array/text)", "delimiter": "string (optional: 'sentence', 'paragraph', 'line', or custom)", "out": "$variable (Collection)"}
         },
         "flatten": {
             "description": "Flatten Collection to single Note",

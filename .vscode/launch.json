@@ -33,6 +33,21 @@
             "preLaunchTask": "setup-zenoh-environment"
         },
         {
+            "name": "rfp_shredder_eval",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/tests/rfp_shredder_eval.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/tests",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src"
+            },
+            "args": ["--verbose", "--clear"],
+            "justMyCode": false,
+            "stopOnEntry": false,
+            "preLaunchTask": "setup-zenoh-environment"
+        },
+        {
             "name": "hotpotqa_eval",
             "type": "debugpy",
             "request": "launch",
