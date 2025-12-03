@@ -1386,6 +1386,10 @@ class ZenohExecutiveNode:
         if reason == 'plan completed':
             self._summarize_plan_execution()
         completed_plan = self.current_plan
+        
+        # Publish plan_result BEFORE clearing current_plan (so _publish_plan_result can access it)
+        self._publish_current_plan()
+        
         self.current_plan = None
         if self.infospace_executor:
             self.infospace_executor.plan_bindings.clear()
@@ -1402,8 +1406,6 @@ class ZenohExecutiveNode:
             self.awaiting_user_input = True
             logger.info(f'⏸️ {self.character_name} UI goal completed, awaiting user input')
         self.goal_source = None
-
-        self._publish_current_plan()
         
 
     def _summarize_plan_execution(self):
