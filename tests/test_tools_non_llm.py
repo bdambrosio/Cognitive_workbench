@@ -100,12 +100,11 @@ def validate_binding(result: dict, var_name: str) -> Tuple[bool, str]:
 
 
 def get_note_content_from_last_result(result: dict) -> Any:
-    """Extract content from last_result field."""
-    last_result = result.get('last_result')
-    if last_result is None:
-        return None
-    # last_result might be a string representation of the content
-    return last_result
+    """Extract content from last_action_result field (uniform format)."""
+    last_action_result = result.get('last_action_result')
+    if last_action_result and last_action_result.get('status') == 'success':
+        return last_action_result.get('value')
+    return None
 
 
 def run_test(
@@ -185,32 +184,45 @@ def run_test(
                 ]
                 load_result = execute_plan(session, character, load_plan, timeout=30.0)
                 if load_result.get('success'):
-                    actual_content = load_result.get('last_result')
-                    # Normalize float comparisons: convert both to float if numeric
-                    if actual_content == expected_content or str(actual_content) == str(expected_content):
-                        content_validated = True
-                        if verbose:
-                            print(f"  ✅ Content matches: {actual_content}")
+                    # Get content from last_action_result (uniform format)
+                    last_action_result = load_result.get('last_action_result')
+                    if last_action_result and last_action_result.get('status') == 'success':
+                        actual_content = last_action_result.get('value')
                     else:
-                        # Try numeric comparison for float tolerance
-                        try:
-                            actual_float = float(actual_content)
-                            expected_float = float(expected_content)
-                            if abs(actual_float - expected_float) < 1e-9:
-                                content_validated = True
-                                if verbose:
-                                    print(f"  ✅ Content matches (numeric): {actual_content} ≈ {expected_content}")
-                            else:
+                        actual_content = None
+                    
+                    if actual_content is not None:
+                        # Normalize float comparisons: convert both to float if numeric
+                        if actual_content == expected_content or str(actual_content) == str(expected_content):
+                            content_validated = True
+                            if verbose:
+                                print(f"  ✅ Content matches: {actual_content}")
+                        else:
+                            # Try numeric comparison for float tolerance
+                            try:
+                                actual_float = float(actual_content)
+                                expected_float = float(expected_content)
+                                if abs(actual_float - expected_float) < 1e-9:
+                                    content_validated = True
+                                    if verbose:
+                                        print(f"  ✅ Content matches (numeric): {actual_content} ≈ {expected_content}")
+                                else:
+                                    warnings.append(f"Content mismatch: expected {expected_content}, got {actual_content}")
+                            except (ValueError, TypeError):
                                 warnings.append(f"Content mismatch: expected {expected_content}, got {actual_content}")
-                        except (ValueError, TypeError):
-                            warnings.append(f"Content mismatch: expected {expected_content}, got {actual_content}")
+                    else:
+                        warnings.append(f"Failed to get content from last_action_result")
                 else:
                     warnings.append(f"Failed to load content for validation")
             else:
                 warnings.append(f"Cannot validate content: variable {expected_output_var} not bound")
         else:
-            # Try to get from last_result directly
-            actual_content = result.get('last_result')
+            # Try to get from last_action_result directly
+            last_action_result = result.get('last_action_result')
+            if last_action_result and last_action_result.get('status') == 'success':
+                actual_content = last_action_result.get('value')
+            else:
+                actual_content = None
             if actual_content == expected_content or str(actual_content) == str(expected_content):
                 content_validated = True
                 if verbose:

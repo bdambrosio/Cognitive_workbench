@@ -98,7 +98,7 @@ def mmlu_query_via_executive(
     Returns:
         {'reasoning': str, 'answer': str} or {'error': str}
     """
-    response = {'received': False, 'final_thoughts': '', 'final_content': ''}
+    response = {'received': False, 'final_thoughts': '', 'final_content': '', 'last_action_result': None}
     response_lock = threading.Lock()
     
     def plan_result_callback(sample):
@@ -109,8 +109,10 @@ def mmlu_query_via_executive(
                 response['received'] = True
                 response['final_thoughts'] = result.get('final_thoughts', '')
                 response['final_content'] = result.get('final_content', '')
+                response['last_action_result'] = result.get('last_action_result')
                 #print(f"Final thoughts: {response['final_thoughts']}")
                 #print(f"Final content: {response['final_content']}")
+                #print(f"Last action result: {response['last_action_result']}")
     
     # Subscribe to plan_result before sending
     subscriber = session.declare_subscriber(
@@ -143,7 +145,17 @@ def mmlu_query_via_executive(
     if not response['received']:
         return {'error': 'timeout', 'reasoning': '', 'answer': ''}
     
-    # Try to extract answer from both fields - final_thoughts often has "choice B" format
+    # Try to use last_action_result if available and action is 'say' (most reliable)
+    last_action_result = response.get('last_action_result')
+    if last_action_result and isinstance(last_action_result, dict):
+        action_type = last_action_result.get('action')
+        if action_type == 'say' and last_action_result.get('status') == 'success':
+            # Direct access to say output - most reliable
+            say_value = last_action_result.get('value', '')
+            if say_value:
+                return {'reasoning': response['final_thoughts'], 'answer': say_value}
+    
+    # Fallback: Try to extract answer from both fields - final_thoughts often has "choice B" format
     # Prioritize final_thoughts as it usually contains the answer determination
     combined = response['final_thoughts'] + '\n' + response['final_content']
     return {'reasoning': response['final_thoughts'], 'answer': combined}

@@ -214,16 +214,18 @@ def run_test(session: zenoh.Session, character: str, test_name: str, plan: list,
                 size_bindings = size_result.get('bindings', {})
                 if 'final_size' in size_bindings:
                     size_note_id = size_bindings['final_size']
-                    # Try to get size from last_result first
-                    last_result = size_result.get('last_result', '')
+                    # Try to get size from last_action_result first (uniform format)
+                    last_action_result = size_result.get('last_action_result')
                     actual_size = None
-                    if last_result:
-                        try:
-                            actual_size = int(last_result)
-                        except (ValueError, TypeError):
-                            pass
+                    if last_action_result and last_action_result.get('status') == 'success':
+                        size_value = last_action_result.get('value', '')
+                        if size_value:
+                            try:
+                                actual_size = int(size_value) if isinstance(size_value, str) else size_value
+                            except (ValueError, TypeError):
+                                pass
                     
-                    # If last_result didn't work, try querying resource content directly
+                    # If last_action_result didn't work, try querying resource content directly
                     if actual_size is None:
                         query_key = f"cognitive/{character}/resource/view/{size_note_id}"
                         try:
@@ -260,14 +262,16 @@ def run_test(session: zenoh.Session, character: str, test_name: str, plan: list,
                     if verbose:
                         print(f"  ⚠️  Size validation failed: {size_msg}")
     
-    # Content validation (basic check via last_result)
+    # Content validation (basic check via last_action_result)
     content_validated = False
     if success:
-        last_result = result.get('last_result', '')
-        if last_result:
-            content_validated = True
-            if verbose:
-                print(f"  ✅ Content validated")
+        last_action_result = result.get('last_action_result')
+        if last_action_result and last_action_result.get('status') == 'success':
+            last_result = last_action_result.get('value', '')
+            if last_result:
+                content_validated = True
+                if verbose:
+                    print(f"  ✅ Content validated")
         else:
             if verbose:
                 print(f"  ⚠️  No content to validate")

@@ -246,8 +246,8 @@ def tool(value, runtime=None, **kwargs):
         # Return empty Collection for no results
         empty_coll_id = _create_collection([], agent_name, resource_manager)
         if not empty_coll_id:
-            return {'status': 'failed', 'reason': 'Failed to create empty Collection'}
-        return empty_coll_id
+            return {'status': 'failed', 'reason': 'Failed to create empty Collection', 'value': None, 'resource_id': None}
+        return {'status': 'success', 'value': '0 items []', 'resource_id': empty_coll_id}
     
     # Create a Note for each paper result (each is structured JSON)
     note_ids = []
@@ -259,15 +259,23 @@ def tool(value, runtime=None, **kwargs):
             logger.warning(f"Failed to create Note for paper: {result.get('metadata', {}).get('title', 'unknown')}")
     
     if not note_ids:
-        return {'status': 'failed', 'reason': 'Failed to create any Notes from search results'}
+        return {'status': 'failed', 'reason': 'Failed to create any Notes from search results', 'value': None, 'resource_id': None}
     
     # Create Collection containing all paper Notes
     collection_id = _create_collection(note_ids, agent_name, resource_manager)
     if not collection_id:
-        return {'status': 'failed', 'reason': 'Failed to create Collection'}
+        return {'status': 'failed', 'reason': 'Failed to create Collection', 'value': None, 'resource_id': None}
+    
+    # Format collection value as "X items [Note_1, ...]"
+    item_count = len(note_ids)
+    display_ids = note_ids[:5]
+    note_list_str = ', '.join(display_ids)
+    if item_count > 5:
+        note_list_str += ', ...'
+    collection_value = f"{item_count} items [{note_list_str}]"
     
     logger.info(f"semantic-scholar created Collection {collection_id} with {len(note_ids)} papers for query: {query}")
-    return collection_id
+    return {'status': 'success', 'value': collection_value, 'resource_id': collection_id}
 
 if __name__ == "__main__":
     # Test

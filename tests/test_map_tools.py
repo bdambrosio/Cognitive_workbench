@@ -203,9 +203,15 @@ def run_test(
         ]
         size_result = execute_plan(session, character, size_plan, timeout=30.0)
         if size_result.get('success'):
-            actual_size_str = size_result.get('last_result', '')
+            # Get size from last_action_result (uniform format)
+            last_action_result = size_result.get('last_action_result')
+            if last_action_result and last_action_result.get('status') == 'success':
+                actual_size_str = last_action_result.get('value', '')
+            else:
+                actual_size_str = ''
+            
             try:
-                actual_size = int(actual_size_str)
+                actual_size = int(actual_size_str) if isinstance(actual_size_str, str) else actual_size_str
                 if actual_size == expected_size:
                     size_validated = True
                     if verbose:
@@ -242,7 +248,13 @@ def run_test(
             ]
             content_result = execute_plan(session, character, content_plan, timeout=30.0)
             if content_result.get('success'):
-                content = content_result.get('last_result', '')
+                # Get content from last_action_result (uniform format)
+                last_action_result = content_result.get('last_action_result')
+                if last_action_result and last_action_result.get('status') == 'success':
+                    content = last_action_result.get('value', '')
+                else:
+                    content = ''
+                
                 if content and (not isinstance(content, str) or len(content.strip()) > 0):
                     content_validated = True
                     if verbose:

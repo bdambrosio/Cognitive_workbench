@@ -723,6 +723,7 @@ class FastAPIActionDisplayNode:
                         "status": result.get('status'),
                         "executed_steps": result.get('executed_steps', 0),
                         "bindings": result.get('bindings', {}),
+                        "last_action_result": result.get('last_action_result'),  # Uniform format: {status, value, resource_id, reason}
                         "suspended": result.get('suspended', False),
                         "suspension_reason": result.get('suspension_reason')
                     }
@@ -731,7 +732,8 @@ class FastAPIActionDisplayNode:
                         "success": False,
                         "error": result.get('error', 'Unknown error'),
                         "status": result.get('status'),
-                        "reason": result.get('reason')
+                        "reason": result.get('reason'),
+                        "last_action_result": result.get('last_action_result')  # May contain last result even on failure
                     }
                     
             except Exception as e:
@@ -2864,6 +2866,7 @@ Generated: {generated_at}
                     }
                     // Display result field for all actions (not just scan)
                     // Check result field first, then value field as fallback
+                    // Also display resource_id if present (from uniform format)
                     if (actionData.result !== undefined && actionData.result !== null && actionData.result !== '') {
                         // Handle objects properly - serialize if needed, otherwise convert to string
                         const resultStr = typeof actionData.result === 'object' ? JSON.stringify(actionData.result) : String(actionData.result);
@@ -2889,6 +2892,11 @@ Generated: {generated_at}
                         } else {
                             actionDetails.push(`Value: ${clickableValue}`);
                         }
+                    }
+                    // Display resource_id if present (from uniform format)
+                    if (actionData.resource_id) {
+                        const clickableResourceId = makeResourceIdsClickable(String(actionData.resource_id));
+                        actionDetails.push(`Resource: ${clickableResourceId}`);
                     }
                     // Add scan-specific details
                     if (typeLower === 'scan') {
@@ -3122,10 +3130,26 @@ Generated: {generated_at}
                         const result = await response.json();
                         
                         if (result.success) {
-                            resultDiv.innerHTML = `<span class="success">Plan executed: ${result.executed_steps} steps completed</span>`;
+                            let resultMsg = `Plan executed: ${result.executed_steps} steps completed`;
+                            // Display last action result if available (uniform format)
+                            if (result.last_action_result) {
+                                const lastResult = result.last_action_result;
+                                if (lastResult.value) {
+                                    resultMsg += ` | Last: ${lastResult.value}`;
+                                }
+                                if (lastResult.resource_id) {
+                                    resultMsg += ` | Resource: ${lastResult.resource_id}`;
+                                }
+                            }
+                            resultDiv.innerHTML = `<span class="success">${resultMsg}</span>`;
                             document.getElementById('messageInput').value = '';
                         } else {
-                            resultDiv.innerHTML = `<span class="error">Plan execution failed: ${result.error || result.reason}</span>`;
+                            let errorMsg = `Plan execution failed: ${result.error || result.reason}`;
+                            // Display last action result if available even on failure
+                            if (result.last_action_result && result.last_action_result.value) {
+                                errorMsg += ` | Last result: ${result.last_action_result.value}`;
+                            }
+                            resultDiv.innerHTML = `<span class="error">${errorMsg}</span>`;
                         }
                         return;
                     }

@@ -859,31 +859,6 @@ def execute_infospace_action(action: Dict, executor, agent_name: str) -> str:
     Returns:
         Result text for Stage 3 reflection (format: [SUCCESS] <result> | <action> | Bound: <var>)
     """
-    # Constants for result formatting
-    MAX_RESULT_LENGTH = 128
-    
-    def _format_result_value(value: Any) -> str:
-        """Format a result value for display, with length limits and newline handling."""
-        if value is None or value == '':
-            return ''
-        
-        # Convert to string
-        result_str = str(value)
-        
-        # Replace newlines with space-pipe-space for readability
-        result_str = result_str.replace('\n', ' | ')
-        
-        # Truncate if too long, breaking at word boundary
-        if len(result_str) > MAX_RESULT_LENGTH:
-            truncated = result_str[:MAX_RESULT_LENGTH]
-            # Find last space to avoid mid-word cut
-            last_space = truncated.rfind(' ')
-            if last_space > MAX_RESULT_LENGTH - 20:  # Only if reasonably close to end
-                truncated = truncated[:last_space]
-            result_str = truncated + '...'
-        
-        return result_str
-    
     try:
         # Track action in executor's plan_actions if available
         if hasattr(executor, '_plan_actions'):
@@ -901,9 +876,13 @@ def execute_infospace_action(action: Dict, executor, agent_name: str) -> str:
             # Import ActionRecord from executive_node (avoid circular import by importing here)
             from executive_node import ActionRecord
             
+            # Format result string for backward compatibility
+            result_str = result.get('value', '') if result.get('status') == 'success' else result.get('reason', 'failed')
+            
             action_record = ActionRecord(
                 action=action,
-                result=result.get('value', '') if result.get('status') == 'success' else result.get('reason', 'failed'),
+                result=result_str,
+                result_dict=result.copy(),  # Store full uniform format
                 timestamp=now_ts,
                 step_id=executive_node.step_counter,
                 plan_id=getattr(executive_node, 'current_plan_id', None),
@@ -926,147 +905,31 @@ def execute_infospace_action(action: Dict, executor, agent_name: str) -> str:
             executor._compliance_tracker.check_action(action, result, executor.plan_bindings)
         
         if result.get('status') == 'success':
-            # Extract actual result value from executor
-            actual_value = result.get('result') or result.get('value', '')
+            # Extract value and resource_id from uniform return format
+            value = result.get('value', '')
+            resource_id = result.get('resource_id')
             
-            # Get bound variable and resource ID if present
+            # Get bound variable
             bound_var = action.get('out', '')
-            resource_id = None
-            if bound_var:
-                resource_id = executor.plan_bindings.get(bound_var.lstrip('$'))
-            
-            # Build result message in format: [SUCCESS] <result> | <action> | Bound: <var> to <resource>
             action_type = action['type']
             
-            # Special handling for load action
-            if action_type == 'load':
-                # For Notes: fetch actual content with longer truncation (384 chars)
-                if isinstance(actual_value, str) and actual_value.startswith('Note_'):
-                    try:
-                        content = executor._get_content(actual_value)
-                        if content is not None:
-                            # Format with 384 char limit for load
-                            content_str = str(content).replace('\n', ' | ')
-                            if len(content_str) > 384:
-                                truncated = content_str[:384]
-                                last_space = truncated.rfind(' ')
-                                if last_space > 364:  # Only if reasonably close to end
-                                    truncated = truncated[:last_space]
-                                actual_result_str = truncated + '...'
-                            else:
-                                actual_result_str = content_str
-                        else:
-                            actual_result_str = actual_value
-                    except Exception:
-                        actual_result_str = actual_value
-                # For Collections: show Note IDs list (first 5)
-                elif resource_id and resource_id.startswith('Collection_'):
-                    try:
-                        note_ids = executor._get_content(resource_id)
-                        if isinstance(note_ids, list) and note_ids:
-                            # Format first 5 Note IDs
-                            display_ids = note_ids[:5]
-                            note_list_str = ', '.join(display_ids)
-                            if len(note_ids) > 5:
-                                note_list_str += ', ...'
-                            actual_result_str = f"[{note_list_str}]"
-                        else:
-                            actual_result_str = "[]"
-                    except Exception:
-                        # Fallback to metadata if content fetch fails
-                        metadata = executor.get_resource_metadata(resource_id)
-                        if metadata:
-                            item_count = metadata.get('item_count', 0)
-                            actual_result_str = f"Collection ({item_count} items)"
-                        else:
-                            actual_result_str = "Collection"
-                else:
-                    # For other load results, format normally
-                    actual_result_str = _format_result_value(actual_value)
+            # Format value for display (already truncated to 384 chars in executor)
+            if value:
+                # Replace newlines with space-pipe-space for readability
+                value_str = str(value).replace('\n', ' | ')
             else:
-                # For display: use same formatting as load (384 chars for Notes, Note IDs for Collections)
-                if action_type == 'display':
-                    if isinstance(actual_value, str) and actual_value.startswith('Note_'):
-                        try:
-                            content = executor._get_content(actual_value)
-                            if content is not None:
-                                # Format with 384 char limit for display (matching load)
-                                content_str = str(content).replace('\n', ' | ')
-                                if len(content_str) > 384:
-                                    truncated = content_str[:384]
-                                    last_space = truncated.rfind(' ')
-                                    if last_space > 364:
-                                        truncated = truncated[:last_space]
-                                    actual_result_str = truncated + '...'
-                                else:
-                                    actual_result_str = content_str
-                            else:
-                                actual_result_str = actual_value
-                        except Exception:
-                            actual_result_str = actual_value
-                    elif resource_id and resource_id.startswith('Collection_'):
-                        try:
-                            note_ids = executor._get_content(resource_id)
-                            if isinstance(note_ids, list) and note_ids:
-                                display_ids = note_ids[:5]
-                                note_list_str = ', '.join(display_ids)
-                                if len(note_ids) > 5:
-                                    note_list_str += ', ...'
-                                actual_result_str = f"[{note_list_str}]"
-                            else:
-                                actual_result_str = "[]"
-                        except Exception:
-                            metadata = executor.get_resource_metadata(resource_id)
-                            if metadata:
-                                item_count = metadata.get('item_count', 0)
-                                actual_result_str = f"Collection ({item_count} items)"
-                            else:
-                                actual_result_str = "Collection"
-                    else:
-                        actual_result_str = _format_result_value(actual_value)
-                else:
-                    # For Notes: fetch actual content to show in result
-                    if isinstance(actual_value, str) and actual_value.startswith('Note_'):
-                        try:
-                            content = executor._get_content(actual_value)
-                            # Format the actual content
-                            actual_result_str = _format_result_value(content)
-                        except Exception:
-                            # Fallback if content fetch fails
-                            actual_result_str = actual_value
-                    else:
-                        # For all other values, format directly
-                        actual_result_str = _format_result_value(actual_value)
+                value_str = ''
             
-            # Special handling for Collections (non-load, non-display actions): keep current format
-            if action_type not in ('load', 'display') and resource_id and resource_id.startswith('Collection_'):
-                metadata = executor.get_resource_metadata(resource_id)
-                if metadata:
-                    item_count = metadata.get('item_count', 0)
-                    source_skill = metadata.get('source_skill', '')
-                    info_parts = [f"{item_count} items"]
-                    if source_skill:
-                        info_parts.append(f"from {source_skill}")
-                    collection_info = ', '.join(info_parts)
-                    if bound_var:
-                        return f"[SUCCESS] Collection ({collection_info}) | {action_type} completed | Bound: {bound_var} to {resource_id}"
-                    else:
-                        return f"[SUCCESS] Collection ({collection_info}) | {action_type} completed"
-            
-            # Result-first format for all other cases
-            if actual_result_str:
+            # Build result message
+            if value_str:
                 if bound_var and resource_id:
-                    # Don't duplicate resource ID if it's the same as the result
-                    if actual_result_str == resource_id:
-                        return f"[SUCCESS] {action_type} completed | Bound: {bound_var} to {resource_id}"
-                    else:
-                        return f"[SUCCESS] {actual_result_str} | {action_type} completed | Bound: {bound_var} to {resource_id}"
+                    return f"[SUCCESS] {value_str} | {action_type} completed | Bound: {bound_var} to {resource_id}"
                 elif bound_var:
-                    return f"[SUCCESS] {actual_result_str} | {action_type} completed | Bound: {bound_var}"
+                    return f"[SUCCESS] {value_str} | {action_type} completed | Bound: {bound_var}"
                 else:
-                    return f"[SUCCESS] {actual_result_str} | {action_type} completed"
+                    return f"[SUCCESS] {value_str} | {action_type} completed"
             else:
-                # No actual result to show, fallback to basic format
+                # No value to show, use resource_id if available
                 if bound_var and resource_id:
                     return f"[SUCCESS] {action_type} completed | Bound: {bound_var} to {resource_id}"
                 elif bound_var:

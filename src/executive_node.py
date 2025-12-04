@@ -224,8 +224,9 @@ def verify_plan(plan_json):
 class ActionRecord:
     """Record of an action and its result."""
     action: Dict[str, Any]
-    result: Optional[str]
+    result: Optional[str]  # Formatted result string (for backward compatibility)
     timestamp: datetime
+    result_dict: Optional[Dict[str, Any]] = None  # Full uniform result format: {status, value, resource_id, reason}
     # Optional telemetry fields (kept lightweight; None when not applicable)
     step_id: Optional[int] = None
     plan_id: Optional[str] = None
@@ -375,8 +376,22 @@ class ZenohExecutiveNode:
         
         @property
         def last_action_result(self):
-            """Get the last action result for backward compatibility."""
-            return self.action_history[-1].result if self.action_history else None
+            """Get the last action result in uniform format."""
+            if not self.action_history:
+                return None
+            last_record = self.action_history[-1]
+            # Return full uniform format if available, otherwise fall back to string result
+            if last_record.result_dict:
+                return last_record.result_dict
+            # Fallback: construct uniform format from string result (backward compatibility)
+            if last_record.result:
+                return {
+                    'status': 'success' if last_record.outcome_status == 'success' else 'failed',
+                    'value': last_record.result,
+                    'resource_id': None,
+                    'reason': None if last_record.outcome_status == 'success' else last_record.result
+                }
+            return None
         
         # LLM backend - Use SGLang.Runtime for infospace, ZenohLLMClient as fallback
         llm_config = self.character_config.get('llm_config', {})
@@ -923,19 +938,17 @@ class ZenohExecutiveNode:
                     if self.infospace_executor and var_name in self.infospace_executor.plan_bindings:
                         display_target = self.infospace_executor.plan_bindings[var_name]
                 
-                # Show what was created/processed
+                # Show what was created/processed (using uniform format)
                 if result.get('status') == 'success':
                     result_value = result.get('value', '')
+                    resource_id = result.get('resource_id')
                     if result_value:
                         action_data['result'] = result_value
-                        action_data['target'] = target  # Keep original target (variable name)
-                        action_data['resolved_target'] = display_target  # Show resolved value if different
-                        logger.debug(f'Published action result: {normalized_type} -> result={result_value}, target={target}')
-                    else:
-                        action_data['target'] = target
-                        action_data['resolved_target'] = display_target if display_target != target else None
-                        action_data['value'] = value
-                        logger.debug(f'Published action result: {normalized_type} -> no result_value, target={target}')
+                    if resource_id:
+                        action_data['resource_id'] = resource_id
+                    action_data['target'] = target  # Keep original target (variable name)
+                    action_data['resolved_target'] = display_target  # Show resolved value if different
+                    logger.debug(f'Published action result: {normalized_type} -> value={result_value}, resource_id={resource_id}, target={target}')
                 else:
                     action_data['target'] = target
                     action_data['resolved_target'] = display_target if display_target != target else None
@@ -1051,13 +1064,32 @@ class ZenohExecutiveNode:
                 if not isinstance(final_content, str):
                     final_content = json.dumps(final_content)
         
+        # Get last_action_result in uniform format and add action field for external API consumers
+        last_action_result = None
+        # Safely access property - it may return None if action_history is empty
+        if hasattr(self, 'action_history') and self.action_history:
+            try:
+                last_action_result = self.last_action_result
+            except (AttributeError, IndexError):
+                # Property may fail if action_history is in unexpected state
+                pass
+        
+        if last_action_result and isinstance(last_action_result, dict):
+            # Get action type from last action in history
+            if self.action_history:
+                last_action = self.action_history[-1].action
+                if isinstance(last_action, dict):
+                    last_action_result = last_action_result.copy()
+                    last_action_result['action'] = last_action.get('type', 'unknown')
+        
         plan_result = {
             'status': 'complete' if self.current_plan.get('success') else 'failed',
             'final_thoughts': final_thoughts,
             'final_content': final_content,
             'bindings': bindings,
             'timestamp': datetime.now().isoformat(),
-            'character': self.character_name
+            'character': self.character_name,
+            'last_action_result': last_action_result  # Uniform format: {status, value, resource_id, reason, action}
         }
         
         self.plan_result_publisher.put(json.dumps(plan_result))
@@ -2174,21 +2206,17 @@ class ZenohExecutiveNode:
             # Execute plan synchronously
             result = self.infospace_executor.execute_plan_sync(plan_data, max_steps=max_steps)
             
-            # Get last result from bindings if available
-            last_result = None
-            bindings = result.get('bindings', {})
-            if bindings:
-                # Get the most recently bound value
-                last_var = list(bindings.keys())[-1] if bindings else None
-                if last_var:
-                    last_id = bindings[last_var]
-                    if self.resource_manager and isinstance(last_id, str):
-                        resource = self.resource_manager.get_resource_by_id(last_id)
-                        if resource:
-                            if last_id.startswith('Note_'):
-                                last_result = resource.get('properties', {}).get('content')
-                            elif last_id.startswith('Collection_'):
-                                last_result = resource.get('properties', {}).get('note_ids')
+            # Get last action result in uniform format (already provided by execute_plan_sync)
+            last_action_result = result.get('last_action_result')
+            
+            # Add action field to last_action_result for external API consumers
+            if last_action_result and isinstance(last_action_result, dict):
+                # Get action type from last action in history
+                if self.action_history:
+                    last_action = self.action_history[-1].action
+                    if isinstance(last_action, dict):
+                        last_action_result = last_action_result.copy()
+                        last_action_result['action'] = last_action.get('type', 'unknown')
             
             # Return result
             response = {
@@ -2196,8 +2224,8 @@ class ZenohExecutiveNode:
                 'status': result.get('status'),
                 'reason': result.get('reason'),
                 'executed_steps': result.get('executed_steps', 0),
-                'bindings': bindings,
-                'last_result': last_result,
+                'bindings': result.get('bindings', {}),
+                'last_action_result': last_action_result,  # Uniform format: {status, value, resource_id, reason, action}
                 'suspended': result.get('status') == 'suspended',
                 'suspension_reason': result.get('reason') if result.get('status') == 'suspended' else None
             }
