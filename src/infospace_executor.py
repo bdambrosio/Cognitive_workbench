@@ -404,8 +404,10 @@ class InfospaceExecutor:
         # Direct format: type is the tool name, target is input data
         if action_type in self.available_tools:
             target = action_type  # Tool name
-            # Input data: use 'target' only (no fallback to 'value')
+            # Input data: use 'target' if present, otherwise fall back to 'value'
             target_field = action.get('target')
+            value_field = action.get('value')
+            
             if target_field:
                 try:
                     value = self._resolve_value(target_field)
@@ -420,6 +422,12 @@ class InfospaceExecutor:
                     # Unbound variable
                     logger.error(f"Unbound variable: {target_field}")
                     return {'status': 'failed', 'reason': str(e)}
+            elif value_field is not None:
+                # Use 'value' field as input (for tools like calculate that don't use target)
+                value = self._resolve_value(value_field)
+                logger.debug(f"_execute_apply: resolved value '{value_field}' -> value type={type(value)}, is_none={value is None}, is_empty={value == ''}, truthy={bool(value)}")
+                if value is None:
+                    return {'status': 'failed', 'reason': f'value "{value_field}" resolved to None (variable unbound or resource not found)'}
             else:
                 value = ''
         else:
@@ -1745,13 +1753,17 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         if value is None:
             return {'status': 'failed', 'reason': 'think requires value or target'}
         
-        # Log error if out is specified - think does not create Notes
+        # Optionally bind to variable if out is specified (for planner visibility)
         out_var = action.get('out')
         if out_var:
-            logger.error(f"Think: 'out' parameter ignored - think does not create Notes. Use generate-note or create-note instead.")
+            # Create a transient Note so the value can be referenced
+            thought_note_id = self._persist_note(str(value), 'think-reflection')
+            if thought_note_id:
+                self._bind_variable(out_var, thought_note_id)
         
         logger.info(f"Think: {str(value)[:100]}")
         
+        # Return the thought text so planner can see it
         return {'status': 'success', 'value': str(value)}
     
     def _execute_ask(self, action: Dict) -> Dict:
@@ -1827,15 +1839,17 @@ Make sure the string is in a format that can be parsed by the json.loads functio
                     if response_note_id:
                         self._bind_variable(out_var, response_note_id)
                         logger.info(f"✅ Ask response received: '{response_text[:50]}...' → {out_var} = {response_note_id}")
-                        return {'status': 'success', 'value': response_note_id}
+                        # Return the response text so planner can see it
+                        return {'status': 'success', 'value': response_text}
                     else:
                         self._bind_variable(out_var, "Note_null")
-                        return {'status': 'success', 'value': "Note_null"}
+                        return {'status': 'success', 'value': ""}
         
         # Timeout - no response received
         self.executive_node.awaiting_ask_response = False
         logger.warning(f"⏱️ Ask timeout after {timeout}s: no user response")
-        return {'status': 'failed', 'reason': f'User response timeout after {timeout}s'}
+        self._bind_variable(out_var, "Note_null")
+        return {'status': 'failed', 'reason': f'User response timeout after {timeout}s', 'value': ""}
     
     # ==================== Phase 2: Data Operations ====================
     
@@ -1843,20 +1857,96 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         """
         Coerce data format or structure.
         
-        Required: type, target, operation, out
+        Required: type, target, coercion (or operation), out
+        Optional: delimiter (for to-list)
         """
-        target = self._resolve_value(action.get('target'))
-        operation = action.get('operation')
+        target_arg = action.get('target')
+        # Accept both 'coercion' (preferred, matches planner docs) and 'operation' (backward compatibility)
+        coercion = action.get('coercion') or action.get('operation')
         out_var = action.get('out')
+        delimiter = action.get('delimiter', ',')  # Default delimiter for to-list
         
+        # Validate required fields (check for None/empty, but allow 0, False, empty string as valid values)
+        if target_arg is None or not coercion or not out_var:
+            return {'status': 'failed', 'reason': 'coerce requires target, coercion (or operation), and out'}
         
-        if not target or not operation or not out_var:
-            return {'status': 'failed', 'reason': 'coerce requires target, operation, and out'}
+        # Resolve target value (may raise ValueError if variable unbound)
+        try:
+            target = self._resolve_value(target_arg)
+        except ValueError as e:
+            return {'status': 'failed', 'reason': f'coerce: {str(e)}'}
+        
+        # Check if target resolved to None (but allow 0, False, empty string as valid coercion inputs)
+        if target is None:
+            return {'status': 'failed', 'reason': 'coerce target resolved to None'}
         
         result = None
         
-        if operation == 'flatten':
-            # Flatten nested lists
+        if coercion == 'to-string':
+            # Convert any value to string
+            result = str(target)
+        elif coercion == 'to-int':
+            # Convert string/number to integer
+            if isinstance(target, (int, float)):
+                result = int(target)
+            elif isinstance(target, str):
+                try:
+                    stripped = target.strip()
+                    result = int(float(stripped))  # Handle "3.14" -> 3, strip whitespace
+                except ValueError:
+                    return {'status': 'failed', 'reason': f'Cannot convert to int: {target}'}
+            else:
+                return {'status': 'failed', 'reason': f'Cannot convert {type(target).__name__} to int'}
+        elif coercion == 'to-float':
+            # Convert string/number to float
+            if isinstance(target, (int, float)):
+                result = float(target)
+            elif isinstance(target, str):
+                try:
+                    stripped = target.strip()
+                    result = float(stripped)  # Strip whitespace before conversion
+                except ValueError:
+                    return {'status': 'failed', 'reason': f'Cannot convert to float: {target}'}
+            else:
+                return {'status': 'failed', 'reason': f'Cannot convert {type(target).__name__} to float'}
+        elif coercion == 'to-bool':
+            # Convert string/number to boolean
+            if isinstance(target, bool):
+                result = target
+            elif isinstance(target, str):
+                lower = target.lower().strip()
+                if lower in ('true', '1', 'yes', 'on'):
+                    result = True
+                elif lower in ('false', '0', 'no', 'off', ''):
+                    result = False
+                else:
+                    return {'status': 'failed', 'reason': f'Cannot convert to bool: {target}'}
+            elif isinstance(target, (int, float)):
+                result = bool(target)
+            else:
+                result = bool(target)
+        elif coercion == 'to-json':
+            # Parse JSON string to object
+            if isinstance(target, str):
+                import json
+                try:
+                    result = json.loads(target)
+                except json.JSONDecodeError as e:
+                    return {'status': 'failed', 'reason': f'Invalid JSON: {str(e)}'}
+            elif isinstance(target, (dict, list)):
+                result = target  # Already JSON-compatible
+            else:
+                return {'status': 'failed', 'reason': f'Cannot parse JSON from {type(target).__name__}'}
+        elif coercion == 'to-list':
+            # Split string by delimiter, or wrap value in list
+            if isinstance(target, str):
+                result = [item.strip() for item in target.split(delimiter) if item.strip()]
+            elif isinstance(target, list):
+                result = target  # Already a list
+            else:
+                result = [target]  # Wrap single value in list
+        elif coercion == 'flatten':
+            # Flatten nested lists (backward compatibility)
             if isinstance(target, list):
                 result = []
                 for item in target:
@@ -1867,14 +1957,14 @@ Make sure the string is in a format that can be parsed by the json.loads functio
             else:
                 result = target
         else:
-            return {'status': 'failed', 'reason': f'Unknown coerce operation: {operation}'}
+            return {'status': 'failed', 'reason': f'Unknown coerce operation: {coercion}'}
         
         # Persist coerced result
-        info_id = self._persist_note(result, f'coerce_{operation}')
+        info_id = self._persist_note(result, f'coerce_{coercion}')
         if info_id:
             self._bind_variable(out_var, info_id)
             display_var = self._normalize_var_for_log(out_var)
-            logger.info(f"Coerced ({operation}) → Note {info_id} → {display_var}")
+            logger.info(f"Coerced ({coercion}) → Note {info_id} → {display_var}")
             return {'status': 'success', 'value': info_id}
         else:
             logger.error(f"Failed to persist coerce result")
@@ -1922,15 +2012,28 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         if not isinstance(note_ids, list):
             return {'status': 'failed', 'reason': 'map target must be a Collection'}
         
-        # Primitives that can be used in map operations
-        primitive_handlers = {
-            'add': self._execute_add,
-            'remove': self._execute_remove,
-            'display': self._execute_display,
-            'say': self._execute_say,
-            'think': self._execute_think,
-            'project': self._execute_project,
-            'pluck': self._execute_pluck,
+        # Blacklist: Primitives that need special handling or don't make sense in map context
+        # These are handled explicitly below, not via execute_action()
+        MAP_BLACKLIST = {
+            # Mutation primitives (mutate target Collection, need special result handling)
+            'add', 'remove',
+            # Side-effect primitives (don't create result Notes, need special handling)
+            'display', 'say', 'think',
+            # Optimized cases (have inline implementations for performance)
+            'project', 'pluck',
+            # Collection-only primitives (operate on Collections, not individual Notes)
+            'size', 'union', 'intersection', 'difference', 'join', 'filter-structured', 
+            'sort', 'head', 'flatten', 'split', 'map',
+            # Control flow (don't make sense in map context)
+            'if', 'while', 'wait',
+            # Search primitives (operate on global/indexed state, not individual Notes)
+            'search-notes', 'search-collections', 'search-within-collection',
+            # Persistence/resource operations (operate on resources, not content)
+            'persist', 'load', 'index', 'organize',
+            # Create operations (create new resources, not transform existing ones)
+            'create-note', 'create-collection',
+            # User interaction (doesn't make sense in map)
+            'ask',
         }
         
         # Apply operation to each Note
@@ -1944,30 +2047,30 @@ Make sure the string is in a format that can be parsed by the json.loads functio
             
             # Apply operation based on type
             if isinstance(operation, str):
-                # Check if it's a primitive
-                if operation in primitive_handlers:
-                    # Construct action dict for primitive
-                    primitive_action = {'type': operation}
-                    primitive_action.update(additional_args)
-                    
-                    # For add/remove: map item becomes 'value', target comes from args
+                # Check if operation is blacklisted (needs special handling)
+                if operation in MAP_BLACKLIST:
+                    # Special handling for blacklisted primitives
                     if operation in ['add', 'remove']:
+                        # Mutation primitives: map item becomes 'value', target comes from args
+                        primitive_action = {'type': operation}
+                        primitive_action.update(additional_args)
                         primitive_action['value'] = note_id
                         if 'out' not in primitive_action:
                             primitive_action['out'] = additional_args.get('target', out_var)
-                    # For side-effect primitives (display, say, think): map item becomes 'value' or 'target'
+                        result = self.execute_action(primitive_action)
                     elif operation in ['display', 'say', 'think']:
-                        # Use 'value' field (display/say/think accept both value and target)
-                        primitive_action['value'] = note_id
-                    # For project/pluck: extract fields directly from Note content
+                        # Side-effect primitives: map item becomes 'value'
+                        primitive_action = {'type': operation, 'value': note_id}
+                        primitive_action.update(additional_args)
+                        result = self.execute_action(primitive_action)
                     elif operation == 'project':
+                        # Optimized inline implementation
                         fields = additional_args.get('fields', additional_args.get('value', {}).get('fields'))
                         if not fields or not isinstance(fields, list):
                             result = {'status': 'failed', 'reason': 'project requires fields list'}
                         elif not isinstance(content, dict):
                             result = {'status': 'failed', 'reason': f'Cannot project from non-dict Note {note_id}'}
                         else:
-                            # Extract fields from content (reuse logic from _execute_project)
                             projected = {}
                             all_fields_found = True
                             for field in fields:
@@ -1982,7 +2085,6 @@ Make sure the string is in a format that can be parsed by the json.loads functio
                                 if value is None:
                                     all_fields_found = False
                                     break
-                                # Preserve nested structure
                                 if len(parts) == 1:
                                     projected[parts[0]] = value
                                 else:
@@ -1999,13 +2101,13 @@ Make sure the string is in a format that can be parsed by the json.loads functio
                             else:
                                 result = {'status': 'failed', 'reason': 'Fields not found or null'}
                     elif operation == 'pluck':
+                        # Optimized inline implementation
                         field = additional_args.get('field', additional_args.get('value', {}).get('field'))
                         if not field:
                             result = {'status': 'failed', 'reason': 'pluck requires field parameter'}
                         elif not isinstance(content, dict):
                             result = {'status': 'failed', 'reason': f'Cannot pluck from non-dict Note {note_id}'}
                         else:
-                            # Extract field value (reuse logic from _execute_pluck)
                             value = content
                             for part in field.split('.'):
                                 if isinstance(value, dict) and part in value:
@@ -2020,20 +2122,116 @@ Make sure the string is in a format that can be parsed by the json.loads functio
                             else:
                                 result = {'status': 'failed', 'reason': f'Field "{field}" not found'}
                     else:
-                        # Execute primitive
-                        result = primitive_handlers[operation](primitive_action)
+                        # Other blacklisted primitives (Collection ops, control flow, etc.) - not applicable in map
+                        result = {'status': 'failed', 'reason': f'Primitive "{operation}" not applicable in map context'}
                 else:
-                    # Tool name - apply to content
-                    result = self._apply_operation_to_value(operation, content, 
-                                                           f"map item {i}", additional_args)
+                    # Not blacklisted - try as primitive first
+                    # Most primitives expect 'target', but some might expect 'value'
+                    # Try with 'target' first (more common for Note operations)
+                    primitive_action = {'type': operation, 'target': note_id, 'out': f'$map_temp_{i}'}
+                    primitive_action.update(additional_args)
+                    # Try to execute as primitive
+                    result = self.execute_action(primitive_action)
+                    
+                    # If primitive execution failed with "unknown type" or similar, try as tool
+                    if result.get('status') == 'failed':
+                        reason = result.get('reason', '')
+                        if 'unknown' in reason.lower() or 'not found' in reason.lower() or 'missing type' in reason.lower() or 'missing' in reason.lower():
+                            # Fall back to tool handling
+                            result = self._apply_operation_to_value(operation, content, 
+                                                                   f"map item {i}", additional_args)
             elif isinstance(operation, dict):
                 if 'tool' in operation:
-                    # Dict with tool name - all other fields are parameters (flat format)
+                    # Dict with tool name - check if it's actually a primitive first
                     tool_name = operation['tool']
                     tool_args = {k: v for k, v in operation.items() if k != 'tool'}
                     tool_args.update(additional_args)  # Merge with action-level args
-                    result = self._apply_operation_to_value(tool_name, content,
-                                                           f"map item {i}", tool_args)
+                    
+                    # Check if this is a blacklisted primitive (needs special handling)
+                    if tool_name in MAP_BLACKLIST:
+                        # Handle as blacklisted primitive (same logic as string case)
+                        if tool_name in ['add', 'remove']:
+                            primitive_action = {'type': tool_name}
+                            primitive_action.update(tool_args)
+                            primitive_action['value'] = note_id
+                            if 'out' not in primitive_action:
+                                primitive_action['out'] = tool_args.get('target', out_var)
+                            result = self.execute_action(primitive_action)
+                        elif tool_name in ['display', 'say', 'think']:
+                            primitive_action = {'type': tool_name, 'value': note_id}
+                            primitive_action.update(tool_args)
+                            result = self.execute_action(primitive_action)
+                        elif tool_name == 'project':
+                            fields = tool_args.get('fields', tool_args.get('value', {}).get('fields'))
+                            if not fields or not isinstance(fields, list):
+                                result = {'status': 'failed', 'reason': 'project requires fields list'}
+                            elif not isinstance(content, dict):
+                                result = {'status': 'failed', 'reason': f'Cannot project from non-dict Note {note_id}'}
+                            else:
+                                projected = {}
+                                all_fields_found = True
+                                for field in fields:
+                                    value = content
+                                    parts = field.split('.')
+                                    for part in parts:
+                                        if isinstance(value, dict) and part in value:
+                                            value = value[part]
+                                        else:
+                                            value = None
+                                            break
+                                    if value is None:
+                                        all_fields_found = False
+                                        break
+                                    if len(parts) == 1:
+                                        projected[parts[0]] = value
+                                    else:
+                                        current = projected
+                                        for j, part in enumerate(parts[:-1]):
+                                            if part not in current:
+                                                current[part] = {}
+                                            current = current[part]
+                                        current[parts[-1]] = value
+                                
+                                if all_fields_found and projected:
+                                    projected_id = self._persist_note(projected, f'project_map_{i}')
+                                    result = {'status': 'success', 'value': projected_id}
+                                else:
+                                    result = {'status': 'failed', 'reason': 'Fields not found or null'}
+                        elif tool_name == 'pluck':
+                            field = tool_args.get('field', tool_args.get('value', {}).get('field'))
+                            if not field:
+                                result = {'status': 'failed', 'reason': 'pluck requires field parameter'}
+                            elif not isinstance(content, dict):
+                                result = {'status': 'failed', 'reason': f'Cannot pluck from non-dict Note {note_id}'}
+                            else:
+                                value = content
+                                for part in field.split('.'):
+                                    if isinstance(value, dict) and part in value:
+                                        value = value[part]
+                                    else:
+                                        value = None
+                                        break
+                                
+                                if value is not None:
+                                    plucked_id = self._persist_note(value, f'pluck_map_{i}')
+                                    result = {'status': 'success', 'value': plucked_id}
+                                else:
+                                    result = {'status': 'failed', 'reason': f'Field "{field}" not found'}
+                        else:
+                            result = {'status': 'failed', 'reason': f'Primitive "{tool_name}" not applicable in map context'}
+                    else:
+                        # Not blacklisted - try as primitive first
+                        primitive_action = {'type': tool_name, 'target': note_id, 'out': f'$map_temp_{i}'}
+                        primitive_action.update(tool_args)
+                        result = self.execute_action(primitive_action)
+                        
+                        # If primitive execution failed with "unknown type" or similar, try as tool
+                        if result.get('status') == 'failed':
+                            reason = result.get('reason', '')
+                            if 'unknown' in reason.lower() or 'not found' in reason.lower() or 'missing type' in reason.lower() or 'missing' in reason.lower():
+                                # Fall back to tool handling
+                                result = self._apply_operation_to_value(tool_name, content,
+                                                                       f"map item {i}", tool_args)
                 else:
                     return {'status': 'failed', 'reason': 'operation dict must have "tool" field'}
             else:
@@ -2932,7 +3130,12 @@ Make sure the string is in a format that can be parsed by the json.loads functio
             # Support: field > value, field < value, field == value, field >= value, field <= value
             # Support AND, OR operators
             
-            tokens = predicate.replace('>=', ' >= ').replace('<=', ' <= ').replace('==', ' == ').replace('>', ' > ').replace('<', ' < ').replace('!=', ' != ').split()
+            # Replace operators - use placeholder approach to avoid breaking multi-char operators
+            # First replace multi-char operators with placeholders, then single-char, then restore
+            temp = predicate.replace('>=', '__GE__').replace('<=', '__LE__').replace('==', '__EQ__').replace('!=', '__NE__')
+            temp = temp.replace('>', ' > ').replace('<', ' < ')
+            temp = temp.replace('__GE__', ' >= ').replace('__LE__', ' <= ').replace('__EQ__', ' == ').replace('__NE__', ' != ')
+            tokens = temp.split()
             
             # Simple recursive evaluation
             def evaluate_simple(field, op, value_str):

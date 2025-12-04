@@ -75,3 +75,5 @@ Result: `-1.0`
 
 Returns the numeric result as a string. Creates a Note containing the result value.
 
+**Note**: Results are returned as floats (e.g., `14.00000000` for integer calculations). If an integer result is required, use the `coerce` primitive with `coercion: "to-int"` to convert the result.
+
