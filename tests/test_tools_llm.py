@@ -120,7 +120,13 @@ def validate_content_non_empty(result: dict, var_name: str, session: zenoh.Sessi
     if not load_result.get('success'):
         return False, f"Failed to load content for validation"
     
-    content = load_result.get('last_result')
+    # Get content from last_action_result (uniform format)
+    last_action_result = load_result.get('last_action_result')
+    if last_action_result and last_action_result.get('status') == 'success':
+        content = last_action_result.get('value')
+    else:
+        content = None
+    
     if content is None or (isinstance(content, str) and len(content.strip()) == 0):
         return False, f"Content is empty"
     

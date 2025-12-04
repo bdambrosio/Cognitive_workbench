@@ -69,17 +69,23 @@ def tool(value: Any, runtime=None, **kwargs) -> str:
     if not predicate:
         logger.warning("No predicate provided; returning empty Collection")
         agent_name = kwargs.get('agent_name', 'system')
-        return _create_collection([], agent_name, resource_manager) or ""
+        empty_coll_id = _create_collection([], agent_name, resource_manager)
+        if not empty_coll_id:
+            return {'status': 'failed', 'reason': 'Failed to create empty Collection', 'value': None, 'resource_id': None}
+        return {'status': 'success', 'value': '0 items []', 'resource_id': empty_coll_id}
     
     mode = kwargs.get('mode', 'include')
     agent_name = kwargs.get('agent_name', 'system')
     llm_generate = kwargs.get('llm_generate')
     if not llm_generate:
-        raise ValueError("llm_generate callback is required")
+        return {'status': 'failed', 'reason': 'llm_generate callback is required', 'value': None, 'resource_id': None}
     
     if not isinstance(value, list):
         logger.warning("Input not a list; treating as empty Collection")
-        return _create_collection([], agent_name, resource_manager) or ""
+        empty_coll_id = _create_collection([], agent_name, resource_manager)
+        if not empty_coll_id:
+            return {'status': 'failed', 'reason': 'Failed to create empty Collection', 'value': None, 'resource_id': None}
+        return {'status': 'success', 'value': '0 items []', 'resource_id': empty_coll_id}
     
     filtered_ids = []
     for note_id in value:
@@ -116,6 +122,14 @@ def tool(value: Any, runtime=None, **kwargs) -> str:
     new_coll_id = _create_collection(filtered_ids, agent_name, resource_manager)
     if not new_coll_id:
         logger.error("Failed to create filtered Collection")
-        return ""
+        return {'status': 'failed', 'reason': 'Failed to create filtered Collection', 'value': None, 'resource_id': None}
     
-    return new_coll_id
+    # Format collection value as "X items [Note_1, ...]"
+    item_count = len(filtered_ids)
+    display_ids = filtered_ids[:5]
+    note_list_str = ', '.join(display_ids)
+    if item_count > 5:
+        note_list_str += ', ...'
+    collection_value = f"{item_count} items [{note_list_str}]"
+    
+    return {'status': 'success', 'value': collection_value, 'resource_id': new_coll_id}

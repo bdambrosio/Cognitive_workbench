@@ -239,14 +239,27 @@ def run_test(
                     warnings.append(f"Size validation failed for {var_name}: {size_result.get('error', 'Unknown')}")
                     continue
                 
-                # Get size value from last_result
-                actual_size = size_result.get('last_result')
-                if actual_size == expected_size:
-                    content_validated = True
-                    if verbose:
-                        print(f"  ✅ Size matches: {actual_size}")
+                # Get size value from last_action_result (uniform format)
+                last_action_result = size_result.get('last_action_result')
+                if last_action_result and last_action_result.get('status') == 'success':
+                    size_value = last_action_result.get('value')
+                    # Try to convert to int if it's a string
+                    if isinstance(size_value, str):
+                        try:
+                            actual_size = int(size_value)
+                        except ValueError:
+                            actual_size = size_value
+                    else:
+                        actual_size = size_value
+                    
+                    if actual_size == expected_size:
+                        content_validated = True
+                        if verbose:
+                            print(f"  ✅ Size matches: {actual_size}")
+                    else:
+                        warnings.append(f"Size mismatch for {var_name}: expected {expected_size}, got {actual_size}")
                 else:
-                    warnings.append(f"Size mismatch for {var_name}: expected {expected_size}, got {actual_size}")
+                    warnings.append(f"Failed to get size from last_action_result for {var_name}")
     
     # Report warnings
     if warnings:

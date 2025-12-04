@@ -207,7 +207,7 @@ def run_test(
                     warnings.append(f"Variable {var_name} not bound for content validation")
                     continue
                 
-                # Load the resource as last action to get content in last_result
+                # Load the resource as last action to get content in last_action_result
                 extract_plan = [
                     {
                         "type": "load",
@@ -221,14 +221,18 @@ def run_test(
                     warnings.append(f"Content extraction failed for {var_name}: {extract_result.get('error', 'Unknown')}")
                     continue
                 
-                # Get content from last_result
-                actual_content = extract_result.get('last_result')
-                if actual_content == expected_value:
-                    content_validated = True
-                    if verbose:
-                        print(f"  ✅ Content matches: {actual_content}")
+                # Get content from last_action_result (uniform format)
+                last_action_result = extract_result.get('last_action_result')
+                if last_action_result and last_action_result.get('status') == 'success':
+                    actual_content = last_action_result.get('value')
+                    if actual_content == expected_value:
+                        content_validated = True
+                        if verbose:
+                            print(f"  ✅ Content matches: {actual_content}")
+                    else:
+                        warnings.append(f"Content mismatch for {var_name}: expected {expected_value}, got {actual_content}")
                 else:
-                    warnings.append(f"Content mismatch for {var_name}: expected {expected_value}, got {actual_content}")
+                    warnings.append(f"Failed to get content from last_action_result for {var_name}")
             
             elif val_type == 'size_match':
                 # Validate Collection size by getting size as last action
@@ -275,14 +279,29 @@ def run_test(
                     warnings.append(f"Size validation failed for {var_name}: {size_result.get('error', 'Unknown')}")
                     continue
                 
-                # Get size value from last_result
-                actual_size = size_result.get('last_result')
-                if actual_size == expected_size:
-                    content_validated = True
-                    if verbose:
-                        print(f"  ✅ Size matches: {actual_size}")
+                # Get size value from last_action_result (uniform format)
+                # The last action is 'load' which returns content, so we need to parse the size from value
+                last_action_result = size_result.get('last_action_result')
+                if last_action_result and last_action_result.get('status') == 'success':
+                    # The value from load is the size Note's content (which is the size integer)
+                    size_value = last_action_result.get('value')
+                    # Try to convert to int if it's a string
+                    if isinstance(size_value, str):
+                        try:
+                            actual_size = int(size_value)
+                        except ValueError:
+                            actual_size = size_value
+                    else:
+                        actual_size = size_value
+                    
+                    if actual_size == expected_size:
+                        content_validated = True
+                        if verbose:
+                            print(f"  ✅ Size matches: {actual_size}")
+                    else:
+                        warnings.append(f"Size mismatch for {var_name}: expected {expected_size}, got {actual_size}")
                 else:
-                    warnings.append(f"Size mismatch for {var_name}: expected {expected_size}, got {actual_size}")
+                    warnings.append(f"Failed to get size from last_action_result for {var_name}")
             
             elif val_type == 'value_extract':
                 # Extract and compare a specific value (for coerce tests)
@@ -313,14 +332,28 @@ def run_test(
                     warnings.append(f"Value extraction failed for {var_name}: {extract_result.get('error', 'Unknown')}")
                     continue
                 
-                # Get coerced value from last_result
-                actual_value = extract_result.get('last_result')
-                if actual_value == expected_value:
-                    content_validated = True
-                    if verbose:
-                        print(f"  ✅ Value matches: {actual_value}")
+                # Get coerced value from last_action_result (uniform format)
+                last_action_result = extract_result.get('last_action_result')
+                if last_action_result and last_action_result.get('status') == 'success':
+                    actual_value = last_action_result.get('value')
+                    # Handle type conversion for numeric comparisons
+                    if isinstance(actual_value, str) and isinstance(expected_value, (int, float)):
+                        try:
+                            if isinstance(expected_value, int):
+                                actual_value = int(actual_value)
+                            else:
+                                actual_value = float(actual_value)
+                        except ValueError:
+                            pass
+                    
+                    if actual_value == expected_value:
+                        content_validated = True
+                        if verbose:
+                            print(f"  ✅ Value matches: {actual_value}")
+                    else:
+                        warnings.append(f"Value mismatch for {var_name}: expected {expected_value}, got {actual_value}")
                 else:
-                    warnings.append(f"Value mismatch for {var_name}: expected {expected_value}, got {actual_value}")
+                    warnings.append(f"Failed to get value from last_action_result for {var_name}")
     
     # Report warnings
     if warnings:

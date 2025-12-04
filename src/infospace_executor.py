@@ -247,6 +247,114 @@ class InfospaceExecutor:
         
         return resource.get('properties', {})
     
+    def _format_return_value(self, content: Any, max_chars: int = 384) -> str:
+        """
+        Format content for return value, truncating to max_chars with word boundary awareness.
+        
+        Args:
+            content: Content to format (string, dict, list, etc.)
+            max_chars: Maximum characters (default: 384)
+            
+        Returns:
+            Formatted string, truncated if necessary
+        """
+        if content is None:
+            return ''
+        
+        # Convert to string
+        if isinstance(content, (dict, list)):
+            content_str = json.dumps(content)
+        else:
+            content_str = str(content)
+        
+        if not content_str:
+            return ''
+        
+        # Replace newlines with space-pipe-space for readability
+        content_str = content_str.replace('\n', ' | ')
+        
+        # Truncate if too long, breaking at word boundary
+        if len(content_str) > max_chars:
+            truncated = content_str[:max_chars]
+            # Find last space to avoid mid-word cut
+            last_space = truncated.rfind(' ')
+            if last_space > max_chars - 20:  # Only if reasonably close to end
+                truncated = truncated[:last_space]
+            return truncated + '...'
+        
+        return content_str
+    
+    def _format_collection_value(self, collection_id: str) -> str:
+        """
+        Format collection value as "X items [Note_1, Note_2, ...]".
+        
+        Args:
+            collection_id: Collection ID
+            
+        Returns:
+            Formatted string like "35 items [Note_1, Note_2, ...]"
+        """
+        if not collection_id or not collection_id.startswith('Collection_'):
+            return ''
+        
+        # Get collection content (list of Note IDs) from resource manager
+        note_ids = None
+        if self.resource_manager:
+            resource = self.resource_manager.get_resource(collection_id)
+            if resource:
+                note_ids = resource.get('properties', {}).get('content', [])
+        
+        if not isinstance(note_ids, list):
+            return f"Collection {collection_id}"
+        
+        item_count = len(note_ids)
+        
+        # Format first few Note IDs
+        if item_count == 0:
+            return "0 items []"
+        
+        # Show up to 5 Note IDs, then ellipsis
+        display_ids = note_ids[:5]
+        note_list_str = ', '.join(display_ids)
+        if item_count > 5:
+            note_list_str += ', ...'
+        
+        return f"{item_count} items [{note_list_str}]"
+    
+    def _create_uniform_return(self, status: str, value: Any = None, resource_id: Optional[str] = None, reason: Optional[str] = None) -> Dict:
+        """
+        Create uniform return format for all actions.
+        
+        Args:
+            status: 'success' or 'failed'
+            value: Content value (will be truncated if string/too long)
+            resource_id: Resource ID if resource was created/referenced
+            reason: Error reason if failed
+            
+        Returns:
+            Uniform return dict with status, value, resource_id, reason
+        """
+        result = {
+            'status': status
+        }
+        
+        if status == 'failed':
+            result['reason'] = reason or 'Unknown error'
+            result['value'] = None
+            result['resource_id'] = None
+        else:
+            # Format value (truncate if needed)
+            if value is None:
+                result['value'] = None
+            elif isinstance(value, str) and len(value) > 384:
+                result['value'] = self._format_return_value(value, max_chars=384)
+            else:
+                result['value'] = self._format_return_value(value, max_chars=384)
+            
+            result['resource_id'] = resource_id
+        
+        return result
+    
     def execute_action(self, action: Dict) -> Dict:
         """
         Execute a single infospace action.
@@ -261,7 +369,7 @@ class InfospaceExecutor:
         
         if not action_type:
             logger.error("Action missing 'type' field")
-            return {'status': 'failed', 'reason': 'Missing type field'}
+            return self._create_uniform_return('failed', reason='Missing type field')
         
         # Route to appropriate handler
         handlers = {
@@ -318,15 +426,15 @@ class InfospaceExecutor:
                         else:
                             error_msg = f"Invalid 'out' field: '{out_val}' resolved to {resolved_id} but resource not found"
                             logger.error(error_msg)
-                            return {'status': 'failed', 'reason': error_msg}
+                            return self._create_uniform_return('failed', reason=error_msg)
                     else:
                         error_msg = f"Invalid 'out' field: '{out_val}' must start with $ or be a named resource"
                         logger.error(error_msg)
-                        return {'status': 'failed', 'reason': error_msg}
+                        return self._create_uniform_return('failed', reason=error_msg)
                 else:
                     error_msg = f"Invalid 'out' field: '{out_val}' must start with $ (use '${out_val}')"
                     logger.error(error_msg)
-                    return {'status': 'failed', 'reason': error_msg}
+                    return self._create_uniform_return('failed', reason=error_msg)
         
         logger.info(f"Executing action: {json.dumps(action)}")
         handler = handlers.get(action_type)
@@ -337,7 +445,7 @@ class InfospaceExecutor:
                 return self._execute_apply(action)
             else:
                 logger.error(f"Unknown action type: {action_type}")
-                return {'status': 'failed', 'reason': f'Unknown action: {action_type}'}
+                return self._create_uniform_return('failed', reason=f'Unknown action: {action_type}')
         
         try:
             result = handler(action)
@@ -378,7 +486,7 @@ class InfospaceExecutor:
         except Exception as e:
             logger.error(f"Error executing action {action_type}: {e}")
             logger.error(traceback.format_exc())
-            return {'status': 'failed', 'reason': f'Execution error: {str(e)}'}
+            return self._create_uniform_return('failed', reason=f'Execution error: {str(e)}')
     
     # ==================== Core Operations ====================
         
@@ -414,20 +522,20 @@ class InfospaceExecutor:
                     logger.debug(f"_execute_apply: resolved target '{target_field}' -> value type={type(value)}, is_none={value is None}, is_empty={value == ''}, truthy={bool(value)}")
                     # Check if target resolved to None or empty (unbound variable, Note not found, or empty content)
                     if value is None:
-                        return {'status': 'failed', 'reason': f'target "{target_field}" resolved to None (variable unbound or resource not found)'}
+                        return self._create_uniform_return('failed', reason=f'target "{target_field}" resolved to None (variable unbound or resource not found)')
                     # Also check for empty string - some tools require non-empty input
                     if value == '':
                         logger.warning(f"target '{target_field}' resolved to empty string - tool may fail")
                 except ValueError as e:
                     # Unbound variable
                     logger.error(f"Unbound variable: {target_field}")
-                    return {'status': 'failed', 'reason': str(e)}
+                    return self._create_uniform_return('failed', reason=str(e))
             elif value_field is not None:
                 # Use 'value' field as input (for tools like calculate that don't use target)
                 value = self._resolve_value(value_field)
                 logger.debug(f"_execute_apply: resolved value '{value_field}' -> value type={type(value)}, is_none={value is None}, is_empty={value == ''}, truthy={bool(value)}")
                 if value is None:
-                    return {'status': 'failed', 'reason': f'value "{value_field}" resolved to None (variable unbound or resource not found)'}
+                    return self._create_uniform_return('failed', reason=f'value "{value_field}" resolved to None (variable unbound or resource not found)')
             else:
                 value = ''
         else:
@@ -444,13 +552,13 @@ class InfospaceExecutor:
                 additional_args[key] = val
         
         if not target:
-            return {'status': 'failed', 'reason': 'apply requires target or tool name in type'}
+            return self._create_uniform_return('failed', reason='apply requires target or tool name in type')
         
         # Get tool info and route by type
         tool_info = self._get_tool_info(target)
         
         if not tool_info:
-            return {'status': 'failed', 'reason': f'Tool not found: {target}'}
+            return self._create_uniform_return('failed', reason=f'Tool not found: {target}')
         
         tool_type = tool_info.get('type')
         
@@ -461,37 +569,40 @@ class InfospaceExecutor:
             # Execute Python tool
             result = self._execute_python_tool(target, value, tool_info, additional_args)
         else:
-            return {'status': 'failed', 'reason': f'Unknown tool type: {tool_type}'}
+            return self._create_uniform_return('failed', reason=f'Unknown tool type: {tool_type}')
         
         if result.get('status') != 'success':
             return result
         
-        # Bind result if output variable specified
+        # Extract result components (already in uniform format from tool execution)
         result_value = result.get('value')
+        result_resource_id = result.get('resource_id')
+        
+        # Bind result if output variable specified
         if out_var:
-            # Special handling for Level 4 tools: return Collection ID directly
-            level4_tools = ['filter-collection', 'query-web', 'semantic-scholar']
-            if target in level4_tools and isinstance(result_value, str) and result_value.startswith('Collection_'):
-                # Result is already a Collection ID - bind directly
-                self._bind_variable(out_var, result_value)
-                # out_var might already have $ prefix, normalize for display
+            # Check if tool already returned a resource_id (e.g., Collection-creating tools)
+            if result_resource_id and (result_resource_id.startswith('Note_') or result_resource_id.startswith('Collection_')):
+                # Tool already created a resource - bind it
+                self._bind_variable(out_var, result_resource_id)
                 display_var = out_var if out_var.startswith('$') else f"${out_var}"
-                logger.info(f"Tool '{target}' executed, Collection {result_value} → {display_var}")
-                return {'status': 'success', 'value': result_value}
+                logger.info(f"Tool '{target}' executed, resource {result_resource_id} → {display_var}")
+                # Return uniform format with resource_id
+                return self._create_uniform_return('success', value=result_value, resource_id=result_resource_id)
             
-            # Default: Persist result as Note
+            # Tool returned content (not a resource ID) - persist as Note
             info_id = self._persist_note(result_value, f'apply_{target}')
             if info_id:
                 self._bind_variable(out_var, info_id)
-                # out_var might already have $ prefix, normalize for display
                 display_var = out_var if out_var.startswith('$') else f"${out_var}"
                 logger.info(f"Tool '{target}' executed, Note {info_id} → {display_var}")
-                return {'status': 'success', 'value': info_id}
+                # Return uniform format with Note ID as resource_id
+                return self._create_uniform_return('success', value=result_value, resource_id=info_id)
             else:
                 logger.error(f"Failed to persist result from '{target}'")
-                return {'status': 'failed', 'reason': 'Failed to persist result'}
+                return self._create_uniform_return('failed', reason='Failed to persist result')
         
-        return {'status': 'success', 'value': result_value}
+        # No out_var - return result as-is (already uniform format)
+        return result
 
     def _get_tool_info(self, tool_name: str) -> Optional[Dict]:
         """
@@ -817,7 +928,7 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         if tool_type == 'plan':
             plan_data = tool_info.get('plan_data')
             if not plan_data:
-                return {'status': 'failed', 'reason': f'Plan tool {tool_name} missing plan_data'}
+                return self._create_uniform_return('failed', reason=f'Plan tool {tool_name} missing plan_data')
             
             # Bind main input to $input variable
             if input_value is not None:
@@ -840,7 +951,7 @@ Make sure the string is in a format that can be parsed by the json.loads functio
                 return result
             
             if result.get('status') != 'success':
-                return {'status': 'failed', 'reason': f'Plan tool execution failed: {result.get("reason")}'}
+                return self._create_uniform_return('failed', reason=f'Plan tool execution failed: {result.get("reason")}')
             
             # Extract output from plan's 'out' variable (from plan_data)
             out_var = plan_data.get('out', 'result')
@@ -852,28 +963,28 @@ Make sure the string is in a format that can be parsed by the json.loads functio
             if out_var in bindings:
                 output_note_id = bindings[out_var]
                 output_content = self._get_content(output_note_id)
-                return {'status': 'success', 'value': output_content}
+                return self._create_uniform_return('success', value=output_content, resource_id=output_note_id)
             else:
-                return {'status': 'failed', 'reason': f'Plan tool output variable ${out_var} not bound'}
+                return self._create_uniform_return('failed', reason=f'Plan tool output variable ${out_var} not bound')
         
         # Handle Python-based tools
         # Check trust flag
         if not tool_info.get('trusted', False):
             tool_path = tool_info.get('path', 'unknown')
             skill_md_path = f"{tool_path}/SKILL.md" if tool_path != 'unknown' else f"tools/{tool_name}/SKILL.md"
-            return {'status': 'failed', 
-                   'reason': f'Untrusted Python tool: {tool_name}. Add "trusted: true" to frontmatter in {skill_md_path}'}
+            return self._create_uniform_return('failed', 
+                   reason=f'Untrusted Python tool: {tool_name}. Add "trusted: true" to frontmatter in {skill_md_path}')
         
         # Get Python file path
         python_file = tool_info.get('python_file')
         if not python_file:
-            return {'status': 'failed', 
-                   'reason': f'No Python file found for tool: {tool_name}'}
+            return self._create_uniform_return('failed', 
+                   reason=f'No Python file found for tool: {tool_name}')
         
         python_path = Path(python_file)
         if not python_path.exists():
-            return {'status': 'failed', 
-                   'reason': f'Python file not found: {python_path}'}
+            return self._create_uniform_return('failed', 
+                   reason=f'Python file not found: {python_path}')
         
         # Import module dynamically
         spec = importlib.util.spec_from_file_location(
@@ -885,8 +996,8 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         
         # Get tool function
         if not hasattr(tool_module, 'tool'):
-            return {'status': 'failed', 
-                   'reason': f'No tool() function in {python_path.name}'}
+            return self._create_uniform_return('failed', 
+                   reason=f'No tool() function in {python_path.name}')
         
         tool_func = tool_module.tool
         
@@ -928,32 +1039,49 @@ Make sure the string is in a format that can be parsed by the json.loads functio
             result = tool_func(input_value, **resolved_args)
         except Exception as e:
             logger.error(f"Python tool '{tool_name}' execution error: {e}", exc_info=True)
-            return {'status': 'failed', 'reason': f'Tool execution error: {str(e)}'}
+            return self._create_uniform_return('failed', reason=f'Tool execution error: {str(e)}')
         
-        # Handle result format
+        # Handle result format - convert to uniform format
         if isinstance(result, dict) and 'status' in result:
-            # Tool returned structured response
-            logger.info(f"Python tool '{tool_name}' completed with status: {result.get('status')}")
-            return result
+            # Tool returned structured response - ensure uniform format
+            status = result.get('status')
+            if status == 'failed':
+                return self._create_uniform_return('failed', reason=result.get('reason', 'Unknown error'))
+            else:
+                # Check if value is a resource ID
+                value = result.get('value')
+                resource_id = result.get('resource_id')
+                
+                # Detect resource ID if not explicitly set
+                if resource_id is None and isinstance(value, str):
+                    if value.startswith('Note_') or value.startswith('Collection_'):
+                        resource_id = value
+                        # Keep value as resource ID for now (will be content in later phases)
+                
+                return self._create_uniform_return('success', value=value, resource_id=resource_id)
         elif isinstance(result, str) and result.startswith('Error:'):
             # Tool returned error string
             error_msg = result
             logger.error(f"Python tool '{tool_name}' failed: {error_msg}")
-            return {'status': 'failed', 'reason': error_msg}
+            return self._create_uniform_return('failed', reason=error_msg)
         else:
             # Tool returned raw value
-            # Check for null indicator - return Note_null resource ID instead of string/None
+            # Check for null indicator
             if result is None:
-                logger.info(f"Python tool '{tool_name}' returned None, using Note_null resource")
-                return {'status': 'success', 'value': 'Note_null'}
+                logger.info(f"Python tool '{tool_name}' returned None")
+                return self._create_uniform_return('success', value=None, resource_id=None)
             elif isinstance(result, str):
                 stripped = result.strip()
                 if stripped.lower() == 'note-null' or stripped.lower() == 'null':
-                    logger.info(f"Python tool '{tool_name}' returned null indicator, using Note_null resource")
-                    return {'status': 'success', 'value': 'Note_null'}
+                    logger.info(f"Python tool '{tool_name}' returned null indicator")
+                    return self._create_uniform_return('success', value=None, resource_id=None)
+                # Check if result is a resource ID
+                elif stripped.startswith('Note_') or stripped.startswith('Collection_'):
+                    logger.info(f"Python tool '{tool_name}' returned resource ID: {stripped}")
+                    return self._create_uniform_return('success', value=stripped, resource_id=stripped)
             
             logger.info(f"Python tool '{tool_name}' completed")
-            return {'status': 'success', 'value': result}
+            return self._create_uniform_return('success', value=result, resource_id=None)
 
     def _execute_create_note(self, action: Dict) -> Dict:
         """
@@ -970,7 +1098,7 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         extra_props = action.get('properties')
         
         if not out_var:
-            return {'status': 'failed', 'reason': 'create-note requires out'}
+            return self._create_uniform_return('failed', reason='create-note requires out')
         
         value = self._resolve_value(value_arg) if value_arg is not None else ''
         
@@ -978,18 +1106,19 @@ Make sure the string is in a format that can be parsed by the json.loads functio
             self._bind_variable(out_var, "Note_null")
             display_var = self._normalize_var_for_log(out_var)
             logger.info(f"Created null Note → {display_var} = Note_null")
-            return {'status': 'success', 'value': "Note_null"}
+            return self._create_uniform_return('success', value=None, resource_id="Note_null")
         
         info_id = self._persist_note(value, 'create-note-primitive', extra_props, note_name)
         if info_id:
             self._bind_variable(out_var, info_id)
             display_var = self._normalize_var_for_log(out_var)
             logger.info(f"Created Note {info_id} → {display_var}")
-            return {'status': 'success', 'value': info_id}
+            # Return truncated content, resource_id is Note ID
+            return self._create_uniform_return('success', value=value, resource_id=info_id)
         
         display_var = self._normalize_var_for_log(out_var)
         logger.error(f"Note creation failed for {display_var}")
-        return {'status': 'failed', 'reason': 'Failed to create Note'}
+        return self._create_uniform_return('failed', reason='Failed to create Note')
     
     def _execute_create_collection(self, action: Dict) -> Dict:
         """
@@ -1006,7 +1135,7 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         extra_props = action.get('properties')
         
         if not out_var:
-            return {'status': 'failed', 'reason': 'create-collection requires out'}
+            return self._create_uniform_return('failed', reason='create-collection requires out')
         
         if value_arg is None:
             note_ids = []
@@ -1032,22 +1161,22 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         elif isinstance(value_arg, str) and value_arg.startswith('$'):
             var_name = value_arg[1:]
             if var_name not in self.plan_bindings:
-                return {'status': 'failed', 'reason': f'Variable {value_arg} not bound'}
+                return self._create_uniform_return('failed', reason=f'Variable {value_arg} not bound')
             bound_value = self.plan_bindings[var_name]
             if isinstance(bound_value, str) and bound_value.startswith('Collection_'):
                 # Dereference Collection to get its Note IDs
                 note_ids = self._dereference_collection(var_name)
                 if not isinstance(note_ids, list):
-                    return {'status': 'failed', 'reason': f'Failed to dereference Collection {value_arg}'}
+                    return self._create_uniform_return('failed', reason=f'Failed to dereference Collection {value_arg}')
             elif isinstance(bound_value, str) and bound_value.startswith('Note_'):
                 # Single Note - wrap in list
                 note_ids = [bound_value]
             elif isinstance(bound_value, list):
                 note_ids = bound_value
             else:
-                return {'status': 'failed', 'reason': f'Variable {value_arg} is not a Note/Collection or list'}
+                return self._create_uniform_return('failed', reason=f'Variable {value_arg} is not a Note/Collection or list')
         else:
-            return {'status': 'failed', 'reason': 'Collection value must be list or $variable'}
+            return self._create_uniform_return('failed', reason='Collection value must be list or $variable')
         
         collection_id = self._create_collection(note_ids, 'create-collection-primitive', collection_name, extra_props)
         if collection_id:
@@ -1055,11 +1184,13 @@ Make sure the string is in a format that can be parsed by the json.loads functio
             name_display = f" '{collection_name}'" if collection_name else ""
             display_var = self._normalize_var_for_log(out_var)
             logger.info(f"Created {collection_id}{name_display} → {display_var} ({len(note_ids)} items)")
-            return {'status': 'success', 'value': collection_id}
+            # Format as "X items [Note_1, ...]"
+            collection_value = self._format_collection_value(collection_id)
+            return self._create_uniform_return('success', value=collection_value, resource_id=collection_id)
         
         display_var = self._normalize_var_for_log(out_var)
         logger.error(f"Collection creation failed for {display_var}")
-        return {'status': 'failed', 'reason': 'Failed to create Collection'}
+        return self._create_uniform_return('failed', reason='Failed to create Collection')
     
     # ==================== Storage Operations ====================
     
@@ -1212,29 +1343,30 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         target_arg = action.get('target')
         
         if not target_arg:
-            return {'status': 'failed', 'reason': 'persist requires target'}
+            return self._create_uniform_return('failed', reason='persist requires target')
         
         if not isinstance(target_arg, str):
-            return {'status': 'failed', 'reason': 'persist target must be string'}
+            return self._create_uniform_return('failed', reason='persist target must be string')
         
         # Resolve to resource ID (handles both $var and literal IDs)
         resource_id = self._resolve_id(target_arg)
         
         if not isinstance(resource_id, str) or not (resource_id.startswith('Collection_') or resource_id.startswith('Note_')):
-            return {'status': 'failed', 'reason': f'Target must be a Note or Collection ID, got: {resource_id}'}
+            return self._create_uniform_return('failed', reason=f'Target must be a Note or Collection ID, got: {resource_id}')
         
         # Mark as persistent using resource manager
         if not self.resource_manager:
-            return {'status': 'failed', 'reason': 'Resource manager not available'}
+            return self._create_uniform_return('failed', reason='Resource manager not available')
         
         success, error_msg = self.resource_manager.mark_persistent(resource_id, self.agent_name)
         
         if success:
             logger.info(f"Marked {resource_id} as persistent")
-            return {'status': 'success', 'value': resource_id}
+            # Return empty value, resource_id is the persisted resource
+            return self._create_uniform_return('success', value=None, resource_id=resource_id)
         else:
             logger.error(f'Failed to persist resource: {error_msg}')
-            return {'status': 'failed', 'reason': error_msg or 'Unknown error'}
+            return self._create_uniform_return('failed', reason=error_msg or 'Unknown error')
     
     def search_resources(self, queries: List[str], k_notes: int = 3, k_collections: int = 2, threshold: float = 0.3) -> Dict:
         """
@@ -1317,37 +1449,41 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         out_var = action.get('out')
         
         if not target_arg:
-            return {'status': 'failed', 'reason': 'load requires target'}
+            return self._create_uniform_return('failed', reason='load requires target')
         
         if not out_var:
-            return {'status': 'failed', 'reason': 'load requires out'}
+            return self._create_uniform_return('failed', reason='load requires out')
         
         # Resolve target (handles $var, resource names, and IDs)
         # _resolve_target_var guarantees binding if it succeeds
         var_name, error = self._resolve_target_var(target_arg)
         if error:
-            return {'status': 'failed', 'reason': f'load: {error}'}
+            return self._create_uniform_return('failed', reason=f'load: {error}')
         
         # Get resource ID from bindings (guaranteed to exist after _resolve_target_var)
         resource_id = self.plan_bindings[var_name]
         
         # Verify resource exists
         if not self.resource_manager:
-            return {'status': 'failed', 'reason': 'Resource manager not available'}
+            return self._create_uniform_return('failed', reason='Resource manager not available')
         
         resource = self.resource_manager.get_resource(resource_id)
         if not resource:
-            return {'status': 'failed', 'reason': f'Resource not found: {resource_id}'}
+            return self._create_uniform_return('failed', reason=f'Resource not found: {resource_id}')
         
         # Bind the resource ID to out variable
         self._bind_variable(out_var, resource_id)
+        
+        # Get content for value (truncated to 384 chars)
+        content = self._get_content(resource_id)
         
         # Determine resource type for logging
         resource_type = "Collection" if resource_id.startswith('Collection_') else "Note" if resource_id.startswith('Note_') else "Resource"
         display_var = self._normalize_var_for_log(out_var)
         logger.info(f"Loaded {target_arg} → {display_var} = {resource_id} ({resource_type})")
         
-        return {'status': 'success', 'value': resource_id}
+        # Return truncated content (384 chars), resource_id is the loaded resource
+        return self._create_uniform_return('success', value=content, resource_id=resource_id)
     
     def _execute_index(self, action: Dict) -> Dict:
         """
@@ -1364,29 +1500,29 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         The Collection ID is used as the index identifier.
         """
         if not self.resource_manager:
-            return {'status': 'failed', 'reason': 'Resource manager not available'}
+            return self._create_uniform_return('failed', reason='Resource manager not available')
         
         source_arg = action.get('source')
         index_type = action.get('index_type', 'semantic')
         fields = action.get('fields', {})
         
         if not source_arg:
-            return {'status': 'failed', 'reason': 'index requires source'}
+            return self._create_uniform_return('failed', reason='index requires source')
         
         # Source should be a Collection variable or named resource
         collection_var, error = self._resolve_target_var(source_arg)
         if error:
-            return {'status': 'failed', 'reason': f'index: {error}'}
+            return self._create_uniform_return('failed', reason=f'index: {error}')
         
         # Get Collection ID from bindings
         if collection_var not in self.plan_bindings:
             logger.warning(f"Collection variable not bound: {collection_var}")
-            return {'status': 'failed', 'reason': f'Collection variable not bound: {collection_var}'}
+            return self._create_uniform_return('failed', reason=f'Collection variable not bound: {collection_var}')
         
         collection_id = self.plan_bindings[collection_var]
         
         if not isinstance(collection_id, str) or not collection_id.startswith('Collection_'):
-            return {'status': 'failed', 'reason': f'Variable {collection_var} is not a Collection'}
+            return self._create_uniform_return('failed', reason=f'Variable {collection_var} is not a Collection')
         
         # Call resource_manager directly
         success, indexed_count, error_msg = self.resource_manager.index_collection(
@@ -1397,10 +1533,11 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         )
         
         if not success:
-            return {'status': 'failed', 'reason': error_msg or 'Index failed'}
+            return self._create_uniform_return('failed', reason=error_msg or 'Index failed')
         
         logger.info(f"Indexed {indexed_count} chunks from {collection_id}")
-        return {'status': 'success', 'value': indexed_count}
+        # Return indexed count as value, Collection ID as resource_id
+        return self._create_uniform_return('success', value=str(indexed_count), resource_id=collection_id)
     
     def _execute_search_within_collection(self, action: Dict) -> Dict:
         """
@@ -1427,24 +1564,24 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         out_var = action.get('out')
         
         if not target_arg or not query or not out_var:
-            return {'status': 'failed', 'reason': 'search-within-collection requires target, value, and out'}
+            return self._create_uniform_return('failed', reason='search-within-collection requires target, value, and out')
         
         # Target should be a Collection variable or named resource
         collection_var, error = self._resolve_target_var(target_arg)
         if error:
-            return {'status': 'failed', 'reason': f'search-within-collection: {error}'}
+            return self._create_uniform_return('failed', reason=f'search-within-collection: {error}')
         
         # Get Collection ID from bindings
         if collection_var not in self.plan_bindings:
-            return {'status': 'failed', 'reason': f'Collection variable not bound: {collection_var}'}
+            return self._create_uniform_return('failed', reason=f'Collection variable not bound: {collection_var}')
         
         collection_id = self.plan_bindings[collection_var]
         
         if not isinstance(collection_id, str) or not collection_id.startswith('Collection_'):
-            return {'status': 'failed', 'reason': f'Variable {collection_var} is not a Collection'}
+            return self._create_uniform_return('failed', reason=f'Variable {collection_var} is not a Collection')
         
         if not self.resource_manager:
-            return {'status': 'failed', 'reason': 'Resource manager not available'}
+            return self._create_uniform_return('failed', reason='Resource manager not available')
         
         # Call resource_manager directly
         success, results, error_msg = self.resource_manager.search_collection(
@@ -1458,7 +1595,7 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         )
         
         if not success:
-            return {'status': 'failed', 'reason': error_msg or 'Search failed'}
+            return self._create_uniform_return('failed', reason=error_msg or 'Search failed')
         
         # Results is already a list of dicts with 'document', 'score', 'metadata' fields
         
@@ -1510,10 +1647,12 @@ Make sure the string is in a format that can be parsed by the json.loads functio
             self._bind_variable(out_var, result_collection_id)
             display_var = self._normalize_var_for_log(out_var)
             logger.info(f"Search-within-collection found {len(results)} results, created {result_collection_id} with {len(note_ids)} Notes → {display_var}")
-            return {'status': 'success', 'value': result_collection_id}
+            # Format as "X items [Note_1, ...]"
+            collection_value = self._format_collection_value(result_collection_id)
+            return self._create_uniform_return('success', value=collection_value, resource_id=result_collection_id)
         else:
             logger.error(f"Failed to create Collection for search results")
-            return {'status': 'failed', 'reason': 'Failed to create result Collection'}
+            return self._create_uniform_return('failed', reason='Failed to create result Collection')
     
     def _execute_search_notes(self, action: Dict) -> Dict:
         """
@@ -1534,13 +1673,13 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         out_var = action.get('out')
         
         if not query or not out_var:
-            return {'status': 'failed', 'reason': 'search-notes requires value and out'}
+            return self._create_uniform_return('failed', reason='search-notes requires value and out')
         
         # Search for Notes globally
         search_result = self.search_resources([query], k_notes=limit, k_collections=0, threshold=threshold)
         
         if search_result.get('status') != 'success':
-            return {'status': 'failed', 'reason': search_result.get('reason', 'Search failed')}
+            return self._create_uniform_return('failed', reason=search_result.get('reason', 'Search failed'))
         
         notes = search_result.get('notes', [])
         
@@ -1549,8 +1688,9 @@ Make sure the string is in a format that can be parsed by the json.loads functio
             empty_coll_id = self._create_collection([], 'search_notes_empty')
             if empty_coll_id:
                 self._bind_variable(out_var, empty_coll_id)
-                return {'status': 'success', 'value': empty_coll_id}
-            return {'status': 'failed', 'reason': 'No Notes found and failed to create empty Collection'}
+                collection_value = self._format_collection_value(empty_coll_id)
+                return self._create_uniform_return('success', value=collection_value, resource_id=empty_coll_id)
+            return self._create_uniform_return('failed', reason='No Notes found and failed to create empty Collection')
         
         # Create structured Notes for each search result (matching query-web/semantic-scholar format)
         note_ids = []
@@ -1573,7 +1713,7 @@ Make sure the string is in a format that can be parsed by the json.loads functio
                     note_ids.append(result_note_id)
         
         if not note_ids:
-            return {'status': 'failed', 'reason': 'No valid Note IDs found in search results'}
+            return self._create_uniform_return('failed', reason='No valid Note IDs found in search results')
         
         # Create Collection containing structured result Notes
         collection_id = self._create_collection(note_ids, 'search_notes_results')
@@ -1581,9 +1721,11 @@ Make sure the string is in a format that can be parsed by the json.loads functio
             self._bind_variable(out_var, collection_id)
             display_var = self._normalize_var_for_log(out_var)
             logger.info(f"Search-notes found {len(notes)} Notes, created {collection_id} with {len(note_ids)} structured results → {display_var}")
-            return {'status': 'success', 'value': collection_id}
+            # Format as "X items [Note_1, ...]"
+            collection_value = self._format_collection_value(collection_id)
+            return self._create_uniform_return('success', value=collection_value, resource_id=collection_id)
         else:
-            return {'status': 'failed', 'reason': 'Failed to create result Collection'}
+            return self._create_uniform_return('failed', reason='Failed to create result Collection')
     
     def _execute_search_collections(self, action: Dict) -> Dict:
         """
@@ -1604,13 +1746,13 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         out_var = action.get('out')
         
         if not query or not out_var:
-            return {'status': 'failed', 'reason': 'search-collections requires value and out'}
+            return self._create_uniform_return('failed', reason='search-collections requires value and out')
         
         # Search for Collections globally
         search_result = self.search_resources([query], k_notes=0, k_collections=limit, threshold=threshold)
         
         if search_result.get('status') != 'success':
-            return {'status': 'failed', 'reason': search_result.get('reason', 'Search failed')}
+            return self._create_uniform_return('failed', reason=search_result.get('reason', 'Search failed'))
         
         collections = search_result.get('collections', [])
         
@@ -1619,8 +1761,9 @@ Make sure the string is in a format that can be parsed by the json.loads functio
             empty_coll_id = self._create_collection([], 'search_collections_empty')
             if empty_coll_id:
                 self._bind_variable(out_var, empty_coll_id)
-                return {'status': 'success', 'value': empty_coll_id}
-            return {'status': 'failed', 'reason': 'No Collections found and failed to create empty Collection'}
+                collection_value = self._format_collection_value(empty_coll_id)
+                return self._create_uniform_return('success', value=collection_value, resource_id=empty_coll_id)
+            return self._create_uniform_return('failed', reason='No Collections found and failed to create empty Collection')
         
         # Create structured Notes for each search result (matching query-web/semantic-scholar format)
         note_ids = []
@@ -1643,7 +1786,7 @@ Make sure the string is in a format that can be parsed by the json.loads functio
                     note_ids.append(result_note_id)
         
         if not note_ids:
-            return {'status': 'failed', 'reason': 'No valid Collection IDs found in search results'}
+            return self._create_uniform_return('failed', reason='No valid Collection IDs found in search results')
         
         # Create Collection containing structured result Notes
         result_collection_id = self._create_collection(note_ids, 'search_collections_results')
@@ -1651,9 +1794,11 @@ Make sure the string is in a format that can be parsed by the json.loads functio
             self._bind_variable(out_var, result_collection_id)
             display_var = self._normalize_var_for_log(out_var)
             logger.info(f"Search-collections found {len(collections)} Collections, created {result_collection_id} with {len(note_ids)} structured results → {display_var}")
-            return {'status': 'success', 'value': result_collection_id}
+            # Format as "X items [Note_1, ...]"
+            collection_value = self._format_collection_value(result_collection_id)
+            return self._create_uniform_return('success', value=collection_value, resource_id=result_collection_id)
         else:
-            return {'status': 'failed', 'reason': 'Failed to create result Collection'}
+            return self._create_uniform_return('failed', reason='Failed to create result Collection')
     
     def _execute_say(self, action: Dict) -> Dict:
         """
@@ -1666,7 +1811,7 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         target = action.get('target', 'user')
         
         if value is None:
-            return {'status': 'failed', 'reason': 'say requires value'}
+            return self._create_uniform_return('failed', reason='say requires value')
         
         # Capitalize 'user' to 'User' for character name
         if target.lower() == 'user':
@@ -1705,7 +1850,8 @@ Make sure the string is in a format that can be parsed by the json.loads functio
             self.executive_node.last_say_text = str(value)
         
         logger.info(f"Say [{target}]: {value}")
-        return {'status': 'success', 'value': value}
+        # Return truncated message text, no resource_id
+        return self._create_uniform_return('success', value=str(value), resource_id=None)
     
     def _execute_display(self, action: Dict) -> Dict:
         """
@@ -1727,7 +1873,7 @@ Make sure the string is in a format that can be parsed by the json.loads functio
                 logger.warning(f"display: dereferenced resource to content (len={len(str(value))})")
         
         if value is None:
-            return {'status': 'failed', 'reason': 'display requires value or target'}
+            return self._create_uniform_return('failed', reason='display requires value or target')
         
         # Always display to User
         target = 'User'
@@ -1749,7 +1895,8 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         )
         
         logger.warning(f"Display [{target}]: published {len(str(value))} chars to action channel for modal")
-        return {'status': 'success', 'value': value}
+        # Return truncated content (384 chars), no resource_id
+        return self._create_uniform_return('success', value=str(value), resource_id=None)
     
     def _execute_think(self, action: Dict) -> Dict:
         """
@@ -1761,20 +1908,22 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         value = self._resolve_value(action.get('value') or action.get('target'))
         
         if value is None:
-            return {'status': 'failed', 'reason': 'think requires value or target'}
+            return self._create_uniform_return('failed', reason='think requires value or target')
         
         # Optionally bind to variable if out is specified (for planner visibility)
         out_var = action.get('out')
+        resource_id = None
         if out_var:
             # Create a transient Note so the value can be referenced
             thought_note_id = self._persist_note(str(value), 'think-reflection')
             if thought_note_id:
                 self._bind_variable(out_var, thought_note_id)
+                resource_id = thought_note_id
         
         logger.info(f"Think: {str(value)[:100]}")
         
-        # Return the thought text so planner can see it
-        return {'status': 'success', 'value': str(value)}
+        # Return truncated thought text, resource_id if Note was created
+        return self._create_uniform_return('success', value=str(value), resource_id=resource_id)
     
     def _execute_ask(self, action: Dict) -> Dict:
         """
@@ -1789,11 +1938,11 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         """
         out_var = action.get('out')
         if not out_var:
-            return {'status': 'failed', 'reason': 'ask requires out field'}
+            return self._create_uniform_return('failed', reason='ask requires out field')
         
         question_text = self._resolve_value(action.get('value'))
         if question_text is None:
-            return {'status': 'failed', 'reason': 'ask requires value'}
+            return self._create_uniform_return('failed', reason='ask requires value')
         
         target = action.get('target', 'User')
         
@@ -1849,17 +1998,17 @@ Make sure the string is in a format that can be parsed by the json.loads functio
                     if response_note_id:
                         self._bind_variable(out_var, response_note_id)
                         logger.info(f"✅ Ask response received: '{response_text[:50]}...' → {out_var} = {response_note_id}")
-                        # Return the response text so planner can see it
-                        return {'status': 'success', 'value': response_text}
+                        # Return truncated response text, resource_id is Note ID
+                        return self._create_uniform_return('success', value=response_text, resource_id=response_note_id)
                     else:
                         self._bind_variable(out_var, "Note_null")
-                        return {'status': 'success', 'value': ""}
+                        return self._create_uniform_return('success', value="", resource_id="Note_null")
         
         # Timeout - no response received
         self.executive_node.awaiting_ask_response = False
         logger.warning(f"⏱️ Ask timeout after {timeout}s: no user response")
         self._bind_variable(out_var, "Note_null")
-        return {'status': 'failed', 'reason': f'User response timeout after {timeout}s', 'value': ""}
+        return self._create_uniform_return('failed', reason=f'User response timeout after {timeout}s')
     
     # ==================== Phase 2: Data Operations ====================
     
@@ -1878,17 +2027,17 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         
         # Validate required fields (check for None/empty, but allow 0, False, empty string as valid values)
         if target_arg is None or not coercion or not out_var:
-            return {'status': 'failed', 'reason': 'coerce requires target, coercion (or operation), and out'}
+            return self._create_uniform_return('failed', reason='coerce requires target, coercion (or operation), and out')
         
         # Resolve target value (may raise ValueError if variable unbound)
         try:
             target = self._resolve_value(target_arg)
         except ValueError as e:
-            return {'status': 'failed', 'reason': f'coerce: {str(e)}'}
+            return self._create_uniform_return('failed', reason=f'coerce: {str(e)}')
         
         # Check if target resolved to None (but allow 0, False, empty string as valid coercion inputs)
         if target is None:
-            return {'status': 'failed', 'reason': 'coerce target resolved to None'}
+            return self._create_uniform_return('failed', reason='coerce target resolved to None')
         
         result = None
         
@@ -1904,9 +2053,9 @@ Make sure the string is in a format that can be parsed by the json.loads functio
                     stripped = target.strip()
                     result = int(float(stripped))  # Handle "3.14" -> 3, strip whitespace
                 except ValueError:
-                    return {'status': 'failed', 'reason': f'Cannot convert to int: {target}'}
+                    return self._create_uniform_return('failed', reason=f'Cannot convert to int: {target}')
             else:
-                return {'status': 'failed', 'reason': f'Cannot convert {type(target).__name__} to int'}
+                return self._create_uniform_return('failed', reason=f'Cannot convert {type(target).__name__} to int')
         elif coercion == 'to-float':
             # Convert string/number to float
             if isinstance(target, (int, float)):
@@ -1916,9 +2065,9 @@ Make sure the string is in a format that can be parsed by the json.loads functio
                     stripped = target.strip()
                     result = float(stripped)  # Strip whitespace before conversion
                 except ValueError:
-                    return {'status': 'failed', 'reason': f'Cannot convert to float: {target}'}
+                    return self._create_uniform_return('failed', reason=f'Cannot convert to float: {target}')
             else:
-                return {'status': 'failed', 'reason': f'Cannot convert {type(target).__name__} to float'}
+                return self._create_uniform_return('failed', reason=f'Cannot convert {type(target).__name__} to float')
         elif coercion == 'to-bool':
             # Convert string/number to boolean
             if isinstance(target, bool):
@@ -1930,7 +2079,7 @@ Make sure the string is in a format that can be parsed by the json.loads functio
                 elif lower in ('false', '0', 'no', 'off', ''):
                     result = False
                 else:
-                    return {'status': 'failed', 'reason': f'Cannot convert to bool: {target}'}
+                    return self._create_uniform_return('failed', reason=f'Cannot convert to bool: {target}')
             elif isinstance(target, (int, float)):
                 result = bool(target)
             else:
@@ -1942,11 +2091,11 @@ Make sure the string is in a format that can be parsed by the json.loads functio
                 try:
                     result = json.loads(target)
                 except json.JSONDecodeError as e:
-                    return {'status': 'failed', 'reason': f'Invalid JSON: {str(e)}'}
+                    return self._create_uniform_return('failed', reason=f'Invalid JSON: {str(e)}')
             elif isinstance(target, (dict, list)):
                 result = target  # Already JSON-compatible
             else:
-                return {'status': 'failed', 'reason': f'Cannot parse JSON from {type(target).__name__}'}
+                return self._create_uniform_return('failed', reason=f'Cannot parse JSON from {type(target).__name__}')
         elif coercion == 'to-list':
             # Split string by delimiter, or wrap value in list
             if isinstance(target, str):
@@ -1967,7 +2116,7 @@ Make sure the string is in a format that can be parsed by the json.loads functio
             else:
                 result = target
         else:
-            return {'status': 'failed', 'reason': f'Unknown coerce operation: {coercion}'}
+            return self._create_uniform_return('failed', reason=f'Unknown coerce operation: {coercion}')
         
         # Persist coerced result
         info_id = self._persist_note(result, f'coerce_{coercion}')
@@ -1975,10 +2124,11 @@ Make sure the string is in a format that can be parsed by the json.loads functio
             self._bind_variable(out_var, info_id)
             display_var = self._normalize_var_for_log(out_var)
             logger.info(f"Coerced ({coercion}) → Note {info_id} → {display_var}")
-            return {'status': 'success', 'value': info_id}
+            # Return truncated coerced result, resource_id is Note ID
+            return self._create_uniform_return('success', value=result, resource_id=info_id)
         else:
             logger.error(f"Failed to persist coerce result")
-            return {'status': 'failed', 'reason': 'Failed to persist result'}
+            return self._create_uniform_return('failed', reason='Failed to persist result')
     
     def _execute_map(self, action: Dict) -> Dict:
         """
@@ -2293,11 +2443,12 @@ Make sure the string is in a format that can be parsed by the json.loads functio
                     self._bind_variable(out_var, mutated_collection_id)
                     display_var = self._normalize_var_for_log(out_var)
                     logger.info(f"Mapped {len(note_ids)} items via {operation} → {display_var} = {mutated_collection_id}")
-                    return {'status': 'success', 'value': mutated_collection_id}
+                    collection_value = self._format_collection_value(mutated_collection_id)
+                    return self._create_uniform_return('success', value=collection_value, resource_id=mutated_collection_id)
                 else:
-                    return {'status': 'failed', 'reason': f'Mutation target {mutation_target} not bound'}
+                    return self._create_uniform_return('failed', reason=f'Mutation target {mutation_target} not bound')
             else:
-                return {'status': 'failed', 'reason': f'{operation} requires target in args'}
+                return self._create_uniform_return('failed', reason=f'{operation} requires target in args')
         elif isinstance(operation, str) and operation in ['display', 'say', 'think']:
             # Side-effect primitives - create empty Collection (side effects executed, no result Notes)
             operation_str = operation if isinstance(operation, str) else 'operation'
@@ -2306,10 +2457,11 @@ Make sure the string is in a format that can be parsed by the json.loads functio
                 self._bind_variable(out_var, collection_id)
                 display_var = self._normalize_var_for_log(out_var)
                 logger.info(f"Mapped {len(note_ids)} items via {operation} (side effects executed), created {collection_id} → {display_var}")
-                return {'status': 'success', 'value': collection_id}
+                collection_value = self._format_collection_value(collection_id)
+                return self._create_uniform_return('success', value=collection_value, resource_id=collection_id)
             else:
                 logger.error(f"Failed to create Collection for map results")
-                return {'status': 'failed', 'reason': 'Failed to create result Collection'}
+                return self._create_uniform_return('failed', reason='Failed to create result Collection')
         else:
             # Tool operation - create result Collection
             operation_str = operation if isinstance(operation, str) else 'operation'
@@ -2318,10 +2470,11 @@ Make sure the string is in a format that can be parsed by the json.loads functio
                 self._bind_variable(out_var, collection_id)
                 display_var = self._normalize_var_for_log(out_var)
                 logger.info(f"Mapped {len(note_ids)} → {len(result_note_ids)} Notes, created {collection_id} → {display_var}")
-                return {'status': 'success', 'value': collection_id}
+                collection_value = self._format_collection_value(collection_id)
+                return self._create_uniform_return('success', value=collection_value, resource_id=collection_id)
             else:
                 logger.error(f"Failed to create Collection for map results")
-                return {'status': 'failed', 'reason': 'Failed to create result Collection'}
+                return self._create_uniform_return('failed', reason='Failed to create result Collection')
     
     def _execute_flatten(self, action: Dict) -> Dict:
         """
@@ -2337,7 +2490,7 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         """
         error = self._validate_required_fields(action, 'target', 'out')
         if error:
-            return {'status': 'failed', 'reason': error}
+            return self._create_uniform_return('failed', reason=error)
         
         target_arg = action.get('target')
         out_var = action.get('out')
@@ -2346,11 +2499,11 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         # Target must be Collection variable or named resource
         collection_var, error = self._resolve_target_var(target_arg)
         if error:
-            return {'status': 'failed', 'reason': f'flatten: {error}'}
+            return self._create_uniform_return('failed', reason=f'flatten: {error}')
         note_ids = self._dereference_collection(collection_var)
         
         if not isinstance(note_ids, list):
-            return {'status': 'failed', 'reason': 'flatten target must be Collection'}
+            return self._create_uniform_return('failed', reason='flatten target must be Collection')
         
         # Fetch content for each Note and convert to strings
         str_items = []
@@ -2367,10 +2520,11 @@ Make sure the string is in a format that can be parsed by the json.loads functio
             self._bind_variable(out_var, info_id)
             display_var = self._normalize_var_for_log(out_var)
             logger.info(f"Flattened {len(note_ids)} Notes → Note {info_id} → {display_var}")
-            return {'status': 'success', 'value': info_id}
+            # Return truncated flattened content, resource_id is Note ID
+            return self._create_uniform_return('success', value=flattened, resource_id=info_id)
         else:
             logger.error(f"Failed to persist flatten result")
-            return {'status': 'failed', 'reason': 'Failed to persist result'}
+            return self._create_uniform_return('failed', reason='Failed to persist result')
     
     def _execute_add(self, action: Dict) -> Dict:
         """
@@ -2388,7 +2542,7 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         """
         error = self._validate_required_fields(action, 'target', 'value', 'out')
         if error:
-            return {'status': 'failed', 'reason': error}
+            return self._create_uniform_return('failed', reason=error)
         
         target_arg = action.get('target')
         value_arg = action.get('value')
@@ -2397,16 +2551,16 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         # Target must be Collection variable or named resource
         collection_var, error = self._resolve_target_var(target_arg)
         if error:
-            return {'status': 'failed', 'reason': f'add: {error}'}
+            return self._create_uniform_return('failed', reason=f'add: {error}')
         
         # Get Collection ID from bindings
         if collection_var not in self.plan_bindings:
-            return {'status': 'failed', 'reason': f'Collection variable not bound: {collection_var}'}
+            return self._create_uniform_return('failed', reason=f'Collection variable not bound: {collection_var}')
         
         collection_id = self.plan_bindings[collection_var]
         
         if not isinstance(collection_id, str) or not collection_id.startswith('Collection_'):
-            return {'status': 'failed', 'reason': f'Variable {collection_var} is not a Collection'}
+            return self._create_uniform_return('failed', reason=f'Variable {collection_var} is not a Collection')
         
         # Resolve value - could be Note, Collection, or literal
         note_ids_to_add = []
@@ -2415,7 +2569,7 @@ Make sure the string is in a format that can be parsed by the json.loads functio
             # Variable - check if Note or Collection
             var_name = value_arg[1:]
             if var_name not in self.plan_bindings:
-                return {'status': 'failed', 'reason': f'Variable not bound: {var_name}'}
+                return self._create_uniform_return('failed', reason=f'Variable not bound: {var_name}')
             
             value_id = self.plan_bindings[var_name]
             
@@ -2423,33 +2577,33 @@ Make sure the string is in a format that can be parsed by the json.loads functio
                 # Collection - get all its Note IDs
                 note_ids = self._dereference_collection(var_name)
                 if not isinstance(note_ids, list):
-                    return {'status': 'failed', 'reason': f'Failed to dereference Collection {value_arg}'}
+                    return self._create_uniform_return('failed', reason=f'Failed to dereference Collection {value_arg}')
                 note_ids_to_add = note_ids
             elif isinstance(value_id, str) and value_id.startswith('Note_'):
                 # Single Note
                 note_ids_to_add = [value_id]
             else:
-                return {'status': 'failed', 'reason': f'Variable {var_name} is not a Note or Collection'}
+                return self._create_uniform_return('failed', reason=f'Variable {var_name} is not a Note or Collection')
         elif isinstance(value_arg, str) and value_arg.startswith('Note_'):
             # Direct Note ID
             note_ids_to_add = [value_arg]
         elif isinstance(value_arg, str) and value_arg.startswith('Collection_'):
             # Direct Collection ID (edge case)
-            return {'status': 'failed', 'reason': 'Use $variable syntax for Collection references'}
+            return self._create_uniform_return('failed', reason='Use $variable syntax for Collection references')
         else:
             # Literal - create Note for it
             note_id = self._persist_note(value_arg, 'add_item')
             if not note_id:
-                return {'status': 'failed', 'reason': 'Failed to persist value as Note'}
+                return self._create_uniform_return('failed', reason='Failed to persist value as Note')
             note_ids_to_add = [note_id]
         
         if not self.resource_manager:
-            return {'status': 'failed', 'reason': 'Resource manager not available'}
+            return self._create_uniform_return('failed', reason='Resource manager not available')
         
         # Get current Collection content for deduplication
         target_collection = self.resource_manager.get_resource(collection_id)
         if not target_collection:
-            return {'status': 'failed', 'reason': f'Collection {collection_id} not found'}
+            return self._create_uniform_return('failed', reason=f'Collection {collection_id} not found')
         
         existing_ids = set(target_collection['properties'].get('content', []))
         
@@ -2486,7 +2640,10 @@ Make sure the string is in a format that can be parsed by the json.loads functio
             # Multiple items - show summary
             logger.info(f"Added {added_count} items to {collection_id} (skipped {skipped_count} duplicates) → {display_var}")
         
-        return {'status': 'success', 'value': collection_id}
+        # Return summary message, resource_id is mutated Collection
+        value_msg = f"Added {added_count} items" if added_count > 0 else f"Skipped {skipped_count} duplicates"
+        collection_value = self._format_collection_value(collection_id)
+        return self._create_uniform_return('success', value=collection_value, resource_id=collection_id)
     
     def _execute_split(self, action: Dict) -> Dict:
         """
@@ -2528,7 +2685,7 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         """
         error = self._validate_required_fields(action, 'target', 'out')
         if error:
-            return {'status': 'failed', 'reason': error}
+            return self._create_uniform_return('failed', reason=error)
         
         target_arg = action.get('target')
         field_name = action.get('field', 'results')
@@ -2537,29 +2694,29 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         # Target must be Note variable or named resource
         note_var, error = self._resolve_target_var(target_arg)
         if error:
-            return {'status': 'failed', 'reason': f'split: {error}'}
+            return self._create_uniform_return('failed', reason=f'split: {error}')
         
         # Get Note ID from bindings
         if note_var not in self.plan_bindings:
-            return {'status': 'failed', 'reason': f'Note variable not bound: {note_var}'}
+            return self._create_uniform_return('failed', reason=f'Note variable not bound: {note_var}')
         
         note_id = self.plan_bindings[note_var]
         
         if not isinstance(note_id, str) or not note_id.startswith('Note_'):
-            return {'status': 'failed', 'reason': f'Variable {note_var} is not a Note'}
+            return self._create_uniform_return('failed', reason=f'Variable {note_var} is not a Note')
         
         # Check for null Note
         if note_id == 'Note_null':
-            return {'status': 'failed', 'reason': 'Cannot split null Note'}
+            return self._create_uniform_return('failed', reason='Cannot split null Note')
         
         # Get Note content
         content = self._get_content(note_id)
         if content is None:
-            return {'status': 'failed', 'reason': f'Note {note_id} has no content'}
+            return self._create_uniform_return('failed', reason=f'Note {note_id} has no content')
         
         # Check for null content indicator
         if isinstance(content, str) and content.strip().lower() in ['note-null', 'null']:
-            return {'status': 'failed', 'reason': 'Cannot split null content'}
+            return self._create_uniform_return('failed', reason='Cannot split null content')
         
         array_data = None
         is_json = False
@@ -2631,10 +2788,10 @@ Make sure the string is in a format that can be parsed by the json.loads functio
                     delimiter = action.get('delimiter', 'sentence')
                     array_data = self._split_text_by_delimiter(content, delimiter)
             else:
-                return {'status': 'failed', 'reason': f'Note content must be a JSON array (e.g., ["item1", "item2"]), JSON object with "{field_name}" array field, JSONL, or plain text (got {type(content).__name__})'}
+                return self._create_uniform_return('failed', reason=f'Note content must be a JSON array (e.g., ["item1", "item2"]), JSON object with "{field_name}" array field, JSONL, or plain text (got {type(content).__name__})')
         
         if not array_data:
-            return {'status': 'failed', 'reason': 'No items to split (empty array or no non-empty lines)'}
+            return self._create_uniform_return('failed', reason='No items to split (empty array or no non-empty lines)')
         
         # Create Note for each array element/line
         note_ids = []
@@ -2646,7 +2803,7 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         # Create Collection from Notes
         collection_id = self._create_collection(note_ids, 'split_collection')
         if not collection_id:
-            return {'status': 'failed', 'reason': 'Failed to create Collection'}
+            return self._create_uniform_return('failed', reason='Failed to create Collection')
         
         # Bind to out variable
         self._bind_variable(out_var, collection_id)
@@ -2665,7 +2822,9 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         display_var = self._normalize_var_for_log(out_var)
         logger.info(f"Expanded {source_desc} ({len(note_ids)} items) → {display_var}")
         
-        return {'status': 'success', 'value': collection_id}
+        # Format as "X items [Note_1, ...]"
+        collection_value = self._format_collection_value(collection_id)
+        return self._create_uniform_return('success', value=collection_value, resource_id=collection_id)
     
     def _find_text_fields(self, obj: Any, found: List[str] = None) -> List[str]:
         """
@@ -2773,18 +2932,18 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         """
         error = self._validate_required_fields(action, 'target', 'out')
         if error:
-            return {'status': 'failed', 'reason': error}
+            return self._create_uniform_return('failed', reason=error)
         
         target_arg = action.get('target')
         out_var = action.get('out')
         
         collection_var, error = self._resolve_target_var(target_arg)
         if error:
-            return {'status': 'failed', 'reason': f'size: {error}'}
+            return self._create_uniform_return('failed', reason=f'size: {error}')
         note_ids = self._dereference_collection(collection_var)
         
         if not isinstance(note_ids, list):
-            return {'status': 'failed', 'reason': 'size target must be a Collection'}
+            return self._create_uniform_return('failed', reason='size target must be a Collection')
         
         size = len(note_ids)
         info_id = self._persist_note(size, 'size_result')
@@ -2792,9 +2951,10 @@ Make sure the string is in a format that can be parsed by the json.loads functio
             self._bind_variable(out_var, info_id)
             display_var = self._normalize_var_for_log(out_var)
             logger.info(f"Size of {collection_var}: {size} → {display_var}")
-            return {'status': 'success', 'value': info_id}
+            # Return size as string, resource_id is Note ID containing size
+            return self._create_uniform_return('success', value=str(size), resource_id=info_id)
         
-        return {'status': 'failed', 'reason': 'Failed to persist size result'}
+        return self._create_uniform_return('failed', reason='Failed to persist size result')
     
     def _execute_union(self, action: Dict) -> Dict:
         """
@@ -2804,7 +2964,7 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         """
         error = self._validate_required_fields(action, 'target', 'value', 'out')
         if error:
-            return {'status': 'failed', 'reason': error}
+            return self._create_uniform_return('failed', reason=error)
         
         target_arg = action.get('target')
         value_arg = action.get('value')
@@ -2812,16 +2972,16 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         
         target_var, error = self._resolve_target_var(target_arg)
         if error:
-            return {'status': 'failed', 'reason': f'union target: {error}'}
+            return self._create_uniform_return('failed', reason=f'union target: {error}')
         value_var, error = self._resolve_target_var(value_arg)
         if error:
-            return {'status': 'failed', 'reason': f'union value: {error}'}
+            return self._create_uniform_return('failed', reason=f'union value: {error}')
         
         target_ids = self._dereference_collection(target_var)
         value_ids = self._dereference_collection(value_var)
         
         if not isinstance(target_ids, list) or not isinstance(value_ids, list):
-            return {'status': 'failed', 'reason': 'union requires both arguments to be Collections'}
+            return self._create_uniform_return('failed', reason='union requires both arguments to be Collections')
         
         # Union: combine and deduplicate
         union_ids = list(dict.fromkeys(target_ids + value_ids))
@@ -2831,9 +2991,10 @@ Make sure the string is in a format that can be parsed by the json.loads functio
             self._bind_variable(out_var, collection_id)
             display_var = self._normalize_var_for_log(out_var)
             logger.info(f"Union {len(target_ids)} + {len(value_ids)} → {len(union_ids)} → {display_var}")
-            return {'status': 'success', 'value': collection_id}
+            collection_value = self._format_collection_value(collection_id)
+            return self._create_uniform_return('success', value=collection_value, resource_id=collection_id)
         
-        return {'status': 'failed', 'reason': 'Failed to create union Collection'}
+        return self._create_uniform_return('failed', reason='Failed to create union Collection')
     
     def _execute_intersection(self, action: Dict) -> Dict:
         """
@@ -2843,7 +3004,7 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         """
         error = self._validate_required_fields(action, 'target', 'value', 'out')
         if error:
-            return {'status': 'failed', 'reason': error}
+            return self._create_uniform_return('failed', reason=error)
         
         target_arg = action.get('target')
         value_arg = action.get('value')
@@ -2851,16 +3012,16 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         
         target_var, error = self._resolve_target_var(target_arg)
         if error:
-            return {'status': 'failed', 'reason': f'intersection target: {error}'}
+            return self._create_uniform_return('failed', reason=f'intersection target: {error}')
         value_var, error = self._resolve_target_var(value_arg)
         if error:
-            return {'status': 'failed', 'reason': f'intersection value: {error}'}
+            return self._create_uniform_return('failed', reason=f'intersection value: {error}')
         
         target_ids = self._dereference_collection(target_var)
         value_ids = self._dereference_collection(value_var)
         
         if not isinstance(target_ids, list) or not isinstance(value_ids, list):
-            return {'status': 'failed', 'reason': 'intersection requires both arguments to be Collections'}
+            return self._create_uniform_return('failed', reason='intersection requires both arguments to be Collections')
         
         # Intersection: items in both
         intersection_ids = [item for item in target_ids if item in value_ids]
@@ -2870,9 +3031,10 @@ Make sure the string is in a format that can be parsed by the json.loads functio
             self._bind_variable(out_var, collection_id)
             display_var = self._normalize_var_for_log(out_var)
             logger.info(f"Intersection {len(target_ids)} ∩ {len(value_ids)} → {len(intersection_ids)} → {display_var}")
-            return {'status': 'success', 'value': collection_id}
+            collection_value = self._format_collection_value(collection_id)
+            return self._create_uniform_return('success', value=collection_value, resource_id=collection_id)
         
-        return {'status': 'failed', 'reason': 'Failed to create intersection Collection'}
+        return self._create_uniform_return('failed', reason='Failed to create intersection Collection')
     
     def _execute_difference(self, action: Dict) -> Dict:
         """
@@ -2882,7 +3044,7 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         """
         error = self._validate_required_fields(action, 'target', 'value', 'out')
         if error:
-            return {'status': 'failed', 'reason': error}
+            return self._create_uniform_return('failed', reason=error)
         
         target_arg = action.get('target')
         value_arg = action.get('value')
@@ -2890,16 +3052,16 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         
         target_var, error = self._resolve_target_var(target_arg)
         if error:
-            return {'status': 'failed', 'reason': f'difference target: {error}'}
+            return self._create_uniform_return('failed', reason=f'difference target: {error}')
         value_var, error = self._resolve_target_var(value_arg)
         if error:
-            return {'status': 'failed', 'reason': f'difference value: {error}'}
+            return self._create_uniform_return('failed', reason=f'difference value: {error}')
         
         target_ids = self._dereference_collection(target_var)
         value_ids = self._dereference_collection(value_var)
         
         if not isinstance(target_ids, list) or not isinstance(value_ids, list):
-            return {'status': 'failed', 'reason': 'difference requires both arguments to be Collections'}
+            return self._create_uniform_return('failed', reason='difference requires both arguments to be Collections')
         
         # Difference: items in target but not in value
         value_set = set(value_ids)
@@ -2910,9 +3072,10 @@ Make sure the string is in a format that can be parsed by the json.loads functio
             self._bind_variable(out_var, collection_id)
             display_var = self._normalize_var_for_log(out_var)
             logger.info(f"Difference {len(target_ids)} - {len(value_ids)} → {len(difference_ids)} → {display_var}")
-            return {'status': 'success', 'value': collection_id}
+            collection_value = self._format_collection_value(collection_id)
+            return self._create_uniform_return('success', value=collection_value, resource_id=collection_id)
         
-        return {'status': 'failed', 'reason': 'Failed to create difference Collection'}
+        return self._create_uniform_return('failed', reason='Failed to create difference Collection')
     
     def _execute_remove(self, action: Dict) -> Dict:
         """
@@ -2922,7 +3085,7 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         """
         error = self._validate_required_fields(action, 'target', 'value', 'out')
         if error:
-            return {'status': 'failed', 'reason': error}
+            return self._create_uniform_return('failed', reason=error)
         
         target_arg = action.get('target')
         value_arg = action.get('value')
@@ -2930,34 +3093,35 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         
         collection_var, error = self._resolve_target_var(target_arg)
         if error:
-            return {'status': 'failed', 'reason': f'remove: {error}'}
+            return self._create_uniform_return('failed', reason=f'remove: {error}')
         
         if collection_var not in self.plan_bindings:
-            return {'status': 'failed', 'reason': f'Collection variable not bound: {collection_var}'}
+            return self._create_uniform_return('failed', reason=f'Collection variable not bound: {collection_var}')
         
         collection_id = self.plan_bindings[collection_var]
         
         if not isinstance(collection_id, str) or not collection_id.startswith('Collection_'):
-            return {'status': 'failed', 'reason': f'Variable {collection_var} is not a Collection'}
+            return self._create_uniform_return('failed', reason=f'Variable {collection_var} is not a Collection')
         
         # Resolve value to Note ID (handles both $var and literal Note IDs)
         note_id = self._resolve_id(value_arg)
         if not isinstance(note_id, str) or not note_id.startswith('Note_'):
-            return {'status': 'failed', 'reason': f'Value must be a Note ID, got: {note_id}'}
+            return self._create_uniform_return('failed', reason=f'Value must be a Note ID, got: {note_id}')
         
         # Get current Collection content
         note_ids = self._dereference_collection(collection_var)
         if note_id not in note_ids:
             logger.warning(f"Note {note_id} not in Collection {collection_id}, nothing to remove")
             self._bind_variable(out_var, collection_id)
-            return {'status': 'success', 'value': collection_id}
+            collection_value = self._format_collection_value(collection_id)
+            return self._create_uniform_return('success', value=collection_value, resource_id=collection_id)
         
         # Remove from list
         note_ids.remove(note_id)
         
         # Update Collection using resource manager
         if not self.resource_manager:
-            return {'status': 'failed', 'reason': 'Resource manager not available'}
+            return self._create_uniform_return('failed', reason='Resource manager not available')
         
         success, item_count, error_msg = self.resource_manager.add_to_collection(
             collection_id, None, self.agent_name, 'update', note_ids
@@ -2967,9 +3131,10 @@ Make sure the string is in a format that can be parsed by the json.loads functio
             self._bind_variable(out_var, collection_id)
             display_var = self._normalize_var_for_log(out_var)
             logger.info(f"Removed {note_id} from {collection_id} (now {len(note_ids)} items) → {display_var}")
-            return {'status': 'success', 'value': collection_id}
+            collection_value = self._format_collection_value(collection_id)
+            return self._create_uniform_return('success', value=collection_value, resource_id=collection_id)
         else:
-            return {'status': 'failed', 'reason': error_msg or 'Remove failed'}
+            return self._create_uniform_return('failed', reason=error_msg or 'Remove failed')
     
     def _execute_project(self, action: Dict) -> Dict:
         """
@@ -2980,7 +3145,7 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         """
         error = self._validate_required_fields(action, 'target', 'out')
         if error:
-            return {'status': 'failed', 'reason': error}
+            return self._create_uniform_return('failed', reason=error)
         
         target_arg = action.get('target')
         out_var = action.get('out')
@@ -2988,18 +3153,18 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         
         collection_var, error = self._resolve_target_var(target_arg)
         if error:
-            return {'status': 'failed', 'reason': f'project: {error}'}
+            return self._create_uniform_return('failed', reason=f'project: {error}')
         
         if not fields:
-            return {'status': 'failed', 'reason': 'project requires fields list'}
+            return self._create_uniform_return('failed', reason='project requires fields list')
         
         if not isinstance(fields, list):
-            return {'status': 'failed', 'reason': 'fields must be a list'}
+            return self._create_uniform_return('failed', reason='fields must be a list')
         
         note_ids = self._dereference_collection(collection_var)
         
         if not isinstance(note_ids, list):
-            return {'status': 'failed', 'reason': 'project target must be a Collection'}
+            return self._create_uniform_return('failed', reason='project target must be a Collection')
         
         # Project each Note
         projected_ids = []
@@ -3055,9 +3220,11 @@ Make sure the string is in a format that can be parsed by the json.loads functio
             self._bind_variable(out_var, collection_id)
             display_var = self._normalize_var_for_log(out_var)
             logger.info(f"Projected {len(projected_ids)} items with fields {fields} → {display_var}")
-            return {'status': 'success', 'value': collection_id}
+            # Format as "X items [Note_1, ...]"
+            collection_value = self._format_collection_value(collection_id)
+            return self._create_uniform_return('success', value=collection_value, resource_id=collection_id)
         
-        return {'status': 'failed', 'reason': 'Failed to create projected Collection'}
+        return self._create_uniform_return('failed', reason='Failed to create projected Collection')
     
     def _execute_head(self, action: Dict) -> Dict:
         """
@@ -3068,7 +3235,7 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         """
         error = self._validate_required_fields(action, 'target', 'out')
         if error:
-            return {'status': 'failed', 'reason': error}
+            return self._create_uniform_return('failed', reason=error)
         
         target_arg = action.get('target')
         count = action.get('count', 1)
@@ -3076,15 +3243,15 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         
         collection_var, error = self._resolve_target_var(target_arg)
         if error:
-            return {'status': 'failed', 'reason': f'head: {error}'}
+            return self._create_uniform_return('failed', reason=f'head: {error}')
         
         if not isinstance(count, int) or count < 1:
-            return {'status': 'failed', 'reason': 'head count must be positive integer'}
+            return self._create_uniform_return('failed', reason='head count must be positive integer')
         
         note_ids = self._dereference_collection(collection_var)
         
         if not isinstance(note_ids, list):
-            return {'status': 'failed', 'reason': 'head target must be a Collection'}
+            return self._create_uniform_return('failed', reason='head target must be a Collection')
         
         # Take first N items
         head_ids = note_ids[:count]
@@ -3092,18 +3259,15 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         # Create new Collection
         collection_id = self._create_collection(head_ids, f'head_{count}')
         if not collection_id:
-            return {'status': 'failed', 'reason': 'Failed to create Collection'}
+            return self._create_uniform_return('failed', reason='Failed to create Collection')
         
         self._bind_variable(out_var, collection_id)
         display_var = self._normalize_var_for_log(out_var)
         logger.info(f"Took first {len(head_ids)}/{len(note_ids)} items → {display_var}")
         
-        return {
-            'status': 'success',
-            'out': out_var,
-            'result': collection_id,
-            'text': f'head: took first {len(head_ids)} items from {len(note_ids)}'
-        }
+        # Format as "X items [Note_1, ...]"
+        collection_value = self._format_collection_value(collection_id)
+        return self._create_uniform_return('success', value=collection_value, resource_id=collection_id)
 
     def _execute_pluck(self, action: Dict) -> Dict:
         """
@@ -3115,7 +3279,7 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         """
         error = self._validate_required_fields(action, 'target', 'field', 'out')
         if error:
-            return {'status': 'failed', 'reason': error}
+            return self._create_uniform_return('failed', reason=error)
         
         target_arg = action.get('target')
         field = action.get('field')
@@ -3123,15 +3287,15 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         
         collection_var, error = self._resolve_target_var(target_arg)
         if error:
-            return {'status': 'failed', 'reason': f'pluck: {error}'}
+            return self._create_uniform_return('failed', reason=f'pluck: {error}')
         
         if not field:
-            return {'status': 'failed', 'reason': 'pluck requires field parameter'}
+            return self._create_uniform_return('failed', reason='pluck requires field parameter')
         
         note_ids = self._dereference_collection(collection_var)
         
         if not isinstance(note_ids, list):
-            return {'status': 'failed', 'reason': 'pluck target must be a Collection'}
+            return self._create_uniform_return('failed', reason='pluck target must be a Collection')
         
         # Extract field value from each Note
         plucked_ids = []
@@ -3162,9 +3326,11 @@ Make sure the string is in a format that can be parsed by the json.loads functio
             self._bind_variable(out_var, collection_id)
             display_var = self._normalize_var_for_log(out_var)
             logger.info(f"Plucked '{field}' from {len(plucked_ids)} items → {display_var}")
-            return {'status': 'success', 'value': collection_id}
+            # Format as "X items [Note_1, ...]"
+            collection_value = self._format_collection_value(collection_id)
+            return self._create_uniform_return('success', value=collection_value, resource_id=collection_id)
         
-        return {'status': 'failed', 'reason': 'Failed to create plucked Collection'}
+        return self._create_uniform_return('failed', reason='Failed to create plucked Collection')
     
     def _execute_filter_structured(self, action: Dict) -> Dict:
         """
@@ -3175,7 +3341,7 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         """
         error = self._validate_required_fields(action, 'target', 'where', 'out')
         if error:
-            return {'status': 'failed', 'reason': error}
+            return self._create_uniform_return('failed', reason=error)
         
         target_arg = action.get('target')
         where_clause = action.get('where')
@@ -3183,15 +3349,15 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         
         collection_var, error = self._resolve_target_var(target_arg)
         if error:
-            return {'status': 'failed', 'reason': f'filter-structured: {error}'}
+            return self._create_uniform_return('failed', reason=f'filter-structured: {error}')
         
         if not where_clause:
-            return {'status': 'failed', 'reason': 'filter-structured requires where clause'}
+            return self._create_uniform_return('failed', reason='filter-structured requires where clause')
         
         note_ids = self._dereference_collection(collection_var)
         
         if not isinstance(note_ids, list):
-            return {'status': 'failed', 'reason': 'filter-structured target must be a Collection'}
+            return self._create_uniform_return('failed', reason='filter-structured target must be a Collection')
         
         # Parse where clause (simple expression evaluator)
         def eval_predicate(content: dict, predicate: str) -> bool:
@@ -3279,9 +3445,10 @@ Make sure the string is in a format that can be parsed by the json.loads functio
             self._bind_variable(out_var, collection_id)
             display_var = self._normalize_var_for_log(out_var)
             logger.info(f"Filtered {len(filtered_ids)}/{len(note_ids)} items with '{where_clause}' → {display_var}")
-            return {'status': 'success', 'value': collection_id}
+            collection_value = self._format_collection_value(collection_id)
+            return self._create_uniform_return('success', value=collection_value, resource_id=collection_id)
         
-        return {'status': 'failed', 'reason': 'Failed to create filtered Collection'}
+        return self._create_uniform_return('failed', reason='Failed to create filtered Collection')
     
     def _execute_sort(self, action: Dict) -> Dict:
         """
@@ -3292,7 +3459,7 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         """
         error = self._validate_required_fields(action, 'target', 'by', 'out')
         if error:
-            return {'status': 'failed', 'reason': error}
+            return self._create_uniform_return('failed', reason=error)
         
         target_arg = action.get('target')
         sort_field = action.get('by')
@@ -3301,18 +3468,18 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         
         collection_var, error = self._resolve_target_var(target_arg)
         if error:
-            return {'status': 'failed', 'reason': f'sort: {error}'}
+            return self._create_uniform_return('failed', reason=f'sort: {error}')
         
         if not sort_field:
-            return {'status': 'failed', 'reason': 'sort requires by field'}
+            return self._create_uniform_return('failed', reason='sort requires by field')
         
         if order not in ['asc', 'desc']:
-            return {'status': 'failed', 'reason': 'sort order must be "asc" or "desc"'}
+            return self._create_uniform_return('failed', reason='sort order must be "asc" or "desc"')
         
         note_ids = self._dereference_collection(collection_var)
         
         if not isinstance(note_ids, list):
-            return {'status': 'failed', 'reason': 'sort target must be a Collection'}
+            return self._create_uniform_return('failed', reason='sort target must be a Collection')
         
         # Extract sort keys
         items_with_keys = []
@@ -3338,7 +3505,7 @@ Make sure the string is in a format that can be parsed by the json.loads functio
             sorted_items = sorted(items_with_keys, key=lambda x: x[1], reverse=(order == 'desc'))
             sorted_ids = [note_id for note_id, _ in sorted_items]
         except Exception as e:
-            return {'status': 'failed', 'reason': f'Sort failed: {e}'}
+            return self._create_uniform_return('failed', reason=f'Sort failed: {e}')
         
         # Create result Collection
         collection_id = self._create_collection(sorted_ids, f'sorted_{collection_var}')
@@ -3346,9 +3513,10 @@ Make sure the string is in a format that can be parsed by the json.loads functio
             self._bind_variable(out_var, collection_id)
             display_var = self._normalize_var_for_log(out_var)
             logger.info(f"Sorted {len(sorted_ids)} items by {sort_field} ({order}) → {display_var}")
-            return {'status': 'success', 'value': collection_id}
+            collection_value = self._format_collection_value(collection_id)
+            return self._create_uniform_return('success', value=collection_value, resource_id=collection_id)
         
-        return {'status': 'failed', 'reason': 'Failed to create sorted Collection'}
+        return self._create_uniform_return('failed', reason='Failed to create sorted Collection')
     
     def _execute_join(self, action: Dict) -> Dict:
         """
@@ -3359,7 +3527,7 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         """
         error = self._validate_required_fields(action, 'target', 'value', 'out')
         if error:
-            return {'status': 'failed', 'reason': error}
+            return self._create_uniform_return('failed', reason=error)
         
         left_arg = action.get('target')
         right_arg = action.get('value')
@@ -3372,23 +3540,23 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         
         left_var, error = self._resolve_target_var(left_arg)
         if error:
-            return {'status': 'failed', 'reason': f'join target: {error}'}
+            return self._create_uniform_return('failed', reason=f'join target: {error}')
         
         right_var, error = self._resolve_target_var(right_arg)
         if error:
-            return {'status': 'failed', 'reason': f'join value: {error}'}
+            return self._create_uniform_return('failed', reason=f'join value: {error}')
         
         if not join_key and not (left_key and right_key):
-            return {'status': 'failed', 'reason': 'join requires on key or left_key/right_key'}
+            return self._create_uniform_return('failed', reason='join requires on key or left_key/right_key')
         
         if join_type not in ['inner', 'left', 'right', 'outer']:
-            return {'status': 'failed', 'reason': 'join type must be inner/left/right/outer'}
+            return self._create_uniform_return('failed', reason='join type must be inner/left/right/outer')
         
         left_ids = self._dereference_collection(left_var)
         right_ids = self._dereference_collection(right_var)
         
         if not isinstance(left_ids, list) or not isinstance(right_ids, list):
-            return {'status': 'failed', 'reason': 'join requires two Collections'}
+            return self._create_uniform_return('failed', reason='join requires two Collections')
         
         # Build right index
         right_index = {}
@@ -3464,9 +3632,10 @@ Make sure the string is in a format that can be parsed by the json.loads functio
             self._bind_variable(out_var, collection_id)
             display_var = self._normalize_var_for_log(out_var)
             logger.info(f"Joined {len(left_ids)} + {len(right_ids)} items on {left_key}/{right_key} ({join_type}) → {display_var} ({len(joined_ids)} results)")
-            return {'status': 'success', 'value': collection_id}
+            collection_value = self._format_collection_value(collection_id)
+            return self._create_uniform_return('success', value=collection_value, resource_id=collection_id)
         
-        return {'status': 'failed', 'reason': 'Failed to create joined Collection'}
+        return self._create_uniform_return('failed', reason='Failed to create joined Collection')
     
     # ==================== Operation Application Helpers ====================
     
@@ -4407,13 +4576,17 @@ Make sure the string is in a format that can be parsed by the json.loads functio
                         'action': step,
                         'condition': cond,
                         'executed_steps': executed_steps,
-                        'continue': continue_wait
+                        'continue': continue_wait,
+                        'last_action_result': last_action_result if 'last_action_result' in locals() else None
                     }
             
             # Execute action
             try:
                 result = self.execute_action(step)
                 executed_steps += 1
+                
+                # Track last action result in uniform format
+                last_action_result = result.copy()
                 
                 # Publish action result for UI display (if executive_node available)
                 # Skip say/ask - they self-publish with proper text field
@@ -4459,7 +4632,8 @@ Make sure the string is in a format that can be parsed by the json.loads functio
                         'action': step,
                         'out_var': out_var,
                         'executed_steps': executed_steps,
-                        'continue': continue_ask
+                        'continue': continue_ask,
+                        'last_action_result': last_action_result
                     }
                 
                 # Handle while loop completion (checked in frame completion logic above)
@@ -4477,7 +4651,8 @@ Make sure the string is in a format that can be parsed by the json.loads functio
                 return {
                     'status': 'failed',
                     'reason': f'Execution error at step {executed_steps}: {str(e)}',
-                    'executed_steps': executed_steps
+                    'executed_steps': executed_steps,
+                    'last_action_result': last_action_result if 'last_action_result' in locals() else None
                 }
         
         # Execution complete
@@ -4485,13 +4660,15 @@ Make sure the string is in a format that can be parsed by the json.loads functio
             return {
                 'status': 'failed',
                 'reason': f'Max steps ({max_steps}) exceeded',
-                'executed_steps': executed_steps
+                'executed_steps': executed_steps,
+                'last_action_result': last_action_result if 'last_action_result' in locals() else None
             }
         
         return {
             'status': 'success',
             'executed_steps': executed_steps,
-            'bindings': self.plan_bindings.copy()  # Return final bindings for output extraction
+            'bindings': self.plan_bindings.copy(),  # Return final bindings for output extraction
+            'last_action_result': last_action_result if 'last_action_result' in locals() else None  # Last action result in uniform format
         }
     
     def _resume_sync_execution(self, state: Dict) -> Dict:
@@ -4636,13 +4813,17 @@ Make sure the string is in a format that can be parsed by the json.loads functio
                         'action': step,
                         'condition': cond,
                         'executed_steps': executed_steps,
-                        'continue': continue_wait
+                        'continue': continue_wait,
+                        'last_action_result': last_action_result if 'last_action_result' in locals() else None
                     }
             
             # Execute action
             try:
                 result = self.execute_action(step)
                 executed_steps += 1
+                
+                # Track last action result in uniform format
+                last_action_result = result.copy()
                 
                 # Publish action result for UI display (if executive_node available)
                 # Skip say/ask - they self-publish with proper text field
@@ -4682,7 +4863,8 @@ Make sure the string is in a format that can be parsed by the json.loads functio
                         'action': step,
                         'out_var': out_var,
                         'executed_steps': executed_steps,
-                        'continue': continue_ask
+                        'continue': continue_ask,
+                        'last_action_result': last_action_result
                     }
                 
                 # While loop completion handled in frame completion logic above
@@ -4698,20 +4880,23 @@ Make sure the string is in a format that can be parsed by the json.loads functio
                 return {
                     'status': 'failed',
                     'reason': f'Execution error at step {executed_steps}: {str(e)}',
-                    'executed_steps': executed_steps
+                    'executed_steps': executed_steps,
+                    'last_action_result': last_action_result if 'last_action_result' in locals() else None
                 }
         
         if executed_steps >= max_steps:
             return {
                 'status': 'failed',
                 'reason': f'Max steps ({max_steps}) exceeded',
-                'executed_steps': executed_steps
+                'executed_steps': executed_steps,
+                'last_action_result': last_action_result if 'last_action_result' in locals() else None
             }
         
         return {
             'status': 'success',
             'executed_steps': executed_steps,
-            'bindings': self.plan_bindings.copy()  # Return final bindings for output extraction
+            'bindings': self.plan_bindings.copy(),  # Return final bindings for output extraction
+            'last_action_result': last_action_result if 'last_action_result' in locals() else None
         }
     
     def test_primitives(self):

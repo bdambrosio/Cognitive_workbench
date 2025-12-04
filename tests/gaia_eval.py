@@ -190,7 +190,7 @@ def extract_answer(text: str) -> str:
 
 
 def execute_plan(session: zenoh.Session, character: str, plan: list, timeout: float = 60.0) -> dict:
-    """Execute a plan via Zenoh API. Returns result dict with success, bindings, last_result."""
+    """Execute a plan via Zenoh API. Returns result dict with success, bindings, last_action_result."""
     query_key = f"cognitive/{character}/execute_plan_sync"
     payload = json.dumps({'plan': plan})
     replies = session.get(query_key, payload=payload.encode('utf-8'), timeout=timeout)
