@@ -942,6 +942,16 @@ Make sure the string is in a format that can be parsed by the json.loads functio
             return {'status': 'failed', 'reason': error_msg}
         else:
             # Tool returned raw value
+            # Check for null indicator - return Note_null resource ID instead of string/None
+            if result is None:
+                logger.info(f"Python tool '{tool_name}' returned None, using Note_null resource")
+                return {'status': 'success', 'value': 'Note_null'}
+            elif isinstance(result, str):
+                stripped = result.strip()
+                if stripped.lower() == 'note-null' or stripped.lower() == 'null':
+                    logger.info(f"Python tool '{tool_name}' returned null indicator, using Note_null resource")
+                    return {'status': 'success', 'value': 'Note_null'}
+            
             logger.info(f"Python tool '{tool_name}' completed")
             return {'status': 'success', 'value': result}
 
@@ -2254,8 +2264,15 @@ Make sure the string is in a format that can be parsed by the json.loads functio
                 elif result_value is None:
                     if not filter_null:
                         result_note_ids.append("Note_null")
+                elif isinstance(result_value, str) and result_value == "Note_null":
+                    # Explicit null indicator - exclude if filter_null is True
+                    if not filter_null:
+                        result_note_ids.append("Note_null")
+                elif isinstance(result_value, str) and (result_value.startswith('Note_') or result_value.startswith('Collection_')):
+                    # Result is already a Note/Collection ID - use it directly
+                    result_note_ids.append(result_value)
                 else:
-                    # Create Note for result
+                    # Create Note for result content
                     result_note_id = self._persist_note(result_value, f'map_result_{i}')
                     if result_note_id and not (filter_null and result_value is None):
                         result_note_ids.append(result_note_id)
@@ -2575,7 +2592,30 @@ Make sure the string is in a format that can be parsed by the json.loads functio
                     if not isinstance(array_data, list):
                         return {'status': 'failed', 'reason': f'Field "{field_name}" exists but is not an array'}
                 else:
-                    return {'status': 'failed', 'reason': f'JSON content missing "{field_name}" array field'}
+                    # Field not found - check for "text" field as fallback
+                    text_fields = self._find_text_fields(content_obj)
+                    if text_fields:
+                        if len(text_fields) == 1:
+                            # Single text field - extract and split
+                            text_content = str(text_fields[0])
+                            # Default to paragraph splitting for long texts or fetch-text-like output
+                            # (JSON objects with "format" or "metadata" fields indicate structured documents)
+                            default_delimiter = 'paragraph' if (
+                                len(text_content) > 10000 or 
+                                isinstance(content_obj, dict) and ('format' in content_obj or 'metadata' in content_obj)
+                            ) else 'sentence'
+                            delimiter = action.get('delimiter', default_delimiter)
+                            array_data = self._split_text_by_delimiter(text_content, delimiter)
+                        else:
+                            # Multiple text fields - concatenate with separator and split
+                            separator = '\n\n---\n\n'
+                            combined_text = separator.join(str(t) for t in text_fields)
+                            # Default to paragraph splitting for long texts
+                            default_delimiter = 'paragraph' if len(combined_text) > 10000 else 'sentence'
+                            delimiter = action.get('delimiter', default_delimiter)
+                            array_data = self._split_text_by_delimiter(combined_text, delimiter)
+                    else:
+                        return {'status': 'failed', 'reason': f'JSON content missing "{field_name}" array field and no "text" field found'}
             else:
                 return {'status': 'failed', 'reason': f'JSON content must be an array or object with "{field_name}" field'}
         
@@ -2626,6 +2666,36 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         logger.info(f"Expanded {source_desc} ({len(note_ids)} items) → {display_var}")
         
         return {'status': 'success', 'value': collection_id}
+    
+    def _find_text_fields(self, obj: Any, found: List[str] = None) -> List[str]:
+        """
+        Recursively find all "text" field values in a JSON object.
+        
+        Args:
+            obj: JSON object (dict, list, or primitive)
+            found: Accumulator list (internal use)
+            
+        Returns:
+            List of text field values (as strings)
+        """
+        if found is None:
+            found = []
+        
+        if isinstance(obj, dict):
+            # Check top-level "text" field
+            if 'text' in obj:
+                text_value = obj['text']
+                # Convert to string (handles embedded JSON as string)
+                found.append(str(text_value))
+            # Recursively search nested structures
+            for value in obj.values():
+                self._find_text_fields(value, found)
+        elif isinstance(obj, list):
+            # Recursively search list items
+            for item in obj:
+                self._find_text_fields(item, found)
+        
+        return found
     
     def _split_text_by_delimiter(self, text: str, delimiter: str) -> List[str]:
         """

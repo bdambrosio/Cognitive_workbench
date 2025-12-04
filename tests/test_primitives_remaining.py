@@ -490,6 +490,42 @@ def test_split_text_sentence(session: zenoh.Session, character: str, verbose: bo
     return run_test(session, character, "split (text, sentence)", plan, validations, verbose)
 
 
+def test_split_json_text_field(session: zenoh.Session, character: str, verbose: bool = False) -> Dict:
+    """Test split with JSON object containing 'text' field (fetch-text format)."""
+    plan = [
+        {
+            "type": "create-note",
+            "value": {
+                "text": "First sentence. Second sentence! Third sentence?",
+                "format": "pdf",
+                "metadata": {"pages": 1},
+                "char_count": 50
+            },
+            "out": "$json_note"
+        },
+        {
+            "type": "split",
+            "target": "$json_note",
+            "out": "$split_coll"
+        }
+    ]
+    
+    validations = [
+        {
+            "type": "resource_id",
+            "variable": "split_coll",
+            "expected_prefix": "Collection_"
+        },
+        {
+            "type": "size_match",
+            "variable": "split_coll",
+            "expected_size": 3
+        }
+    ]
+    
+    return run_test(session, character, "split (JSON with text field)", plan, validations, verbose)
+
+
 def test_flatten(session: zenoh.Session, character: str, verbose: bool = False) -> Dict:
     """Test flatten Collection to single Note."""
     plan = [
@@ -780,6 +816,7 @@ def main():
             test_coerce_to_list,
             test_split_json_array,
             test_split_text_sentence,
+            test_split_json_text_field,
             test_flatten,
             test_display,
             test_think,
