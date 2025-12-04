@@ -1256,11 +1256,11 @@ if HAS_SGLANG:
         
         s += assistant(
             "ANALYSIS: "
-            + gen("stage1_analysis", max_tokens=128, stop="\n")
+            + gen("stage1_analysis", max_tokens=128, temperature=0.1, stop="\n")
             + "\nSELECTED_TOOLS_JSON: "
-            + gen("selected_tools_json", max_tokens=96, stop="\n")
+            + gen("selected_tools_json", max_tokens=96, temperature=0.1, stop="\n")
             + "\nFIRST_TASK: "
-            + gen("first_task", max_tokens=96, stop="\n")
+            + gen("first_task", max_tokens=96, temperature=0.1, stop="\n")
             + "\n"
         )
         
@@ -1332,9 +1332,9 @@ if HAS_SGLANG:
             
             s += assistant(
                 "TOOL_NAME: "
-                + gen(f"tool_name_{step}", max_tokens=32, stop="\n")
+                + gen(f"tool_name_{step}", max_tokens=32, temperature=0.1, stop="\n")
                 + "\nTOOL_ARGS_JSON (max 1024 tokens): "
-                + gen(f"tool_args_{step}", max_tokens=1024, stop="\n")
+                + gen(f"tool_args_{step}", max_tokens=1024, temperature=0.1, stop="\n")
                 + "\n"
             )
             
@@ -1349,29 +1349,10 @@ if HAS_SGLANG:
             if out_var:
                 resource_id_before = executor.plan_bindings.get(out_var.lstrip('$'))
             
-            # Special handling for 'think' - append to conversation state instead of executing
-            if tool_name == "think":
-                # Extract thought content from action
-                thought_value = action.get('value', '')
-                # Resolve if it's a variable reference
-                if isinstance(thought_value, str) and thought_value.startswith('$'):
-                    var_name = thought_value.lstrip('$')
-                    thought_value = executor.plan_bindings.get(var_name, thought_value)
-                
-                # Append thought to conversation state
-                s += assistant(f"[Internal thought: {thought_value}]\n")
-                
-                # Log for debugging
-                logger.info(f"💭 Think (internal): {thought_value}")
-                
-                # Synthetic result for Stage 3 reflection
-                tool_result = f"[Thought recorded internally: {thought_value[:100]}{'...' if len(str(thought_value)) > 100 else ''}]"
-            
-            else:
-                # Normal external execution for all tools (including ask)
-                tool_result = execute_infospace_action(action, executor, executor.agent_name)
-                logger.info(f"Stage 2: Choose tool + args\n{tool_name} -> {tool_args_json}")
-                logger.info(f"Step {step}: {tool_name} -> {tool_result[:100]}")
+            # Execute action normally - think/say/ask now return their text content
+            tool_result = execute_infospace_action(action, executor, executor.agent_name)
+            logger.info(f"Stage 2: Choose tool + args\n{tool_name} -> {tool_args_json}")
+            logger.info(f"Step {step}: {tool_name} -> {tool_result[:100]}")
             
             # Stage 3: Reflect
             result_display = tool_result[:512]
@@ -1399,13 +1380,13 @@ if HAS_SGLANG:
             
             s += assistant(
                 "THOUGHTS (Be concise): "
-                + gen(f"thoughts_{step}", max_tokens=128, stop="\n")
+                + gen(f"thoughts_{step}", max_tokens=128, temperature=0.1, stop="\n")
                 + "\nDONE: "
-                + gen(f"done_{step}", max_tokens=8, stop="\n")
+                + gen(f"done_{step}", max_tokens=8, temperature=0.1, stop="\n")
                 + "\nNEXT_TASK: "
-                + gen(f"next_task_{step}", max_tokens=128, stop="\n")
+                + gen(f"next_task_{step}", max_tokens=128, temperature=0.1, stop="\n")
                 + "\nREQUEST_TOOLS: "
-                + gen(f"request_tools_{step}", max_tokens=96, stop=["\n\n", "\n\nSTAGE"])
+                + gen(f"request_tools_{step}", max_tokens=96, temperature=0.1, stop=["\n\n", "\n\nSTAGE"])
                 + "\n"
             )
             logger.info(f"THOUGHTS: {s[f'thoughts_{step}']}")
@@ -1463,7 +1444,7 @@ if HAS_SGLANG:
                     final_prompt = "Summarize the results with focus on the original goal"
                 
                 s += user(f"FINAL TASK: {final_prompt}\nProvide a concise final answer.")
-                s += assistant(gen("final_answer", max_tokens=256, stop=["\n\n", "STAGE"]))
+                s += assistant(gen("final_answer", max_tokens=256, temperature=0.1, stop=["\n\n", "STAGE"]))
                 logger.info(f"FINAL_ANSWER: {s['final_answer']}")
                 break
             
