@@ -108,9 +108,60 @@ def tool(value, runtime=None, **kwargs):
     style = kwargs.get('style', 'text').lower()
     context_arg = kwargs.get('context', '')
     resource_manager = kwargs.get('resource_manager')
+    agent_name = kwargs.get('agent_name', 'generate-note')
     
     # Resolve context (handles Collection IDs, Note IDs, or plain text)
     context = _resolve_context(context_arg, resource_manager)
+    
+    # If context is very large, use semantic search to filter relevant parts
+    if len(context) > 16000 and resource_manager and prompt:
+        logger.info(f"generate-note: context ({len(context)} chars) exceeds 16k, using semantic filtering")
+        try:
+            # 1. Create Note with context content
+            success, note_id, error_msg, _ = resource_manager.create_note(
+                agent_name, context, 'text', 'generate-note_temp', context[:100], '', {}
+            )
+            if not success:
+                logger.warning(f"generate-note: failed to create temp Note: {error_msg}, using full context")
+            else:
+                # 2. Create Collection containing the Note
+                success, collection_id, error_msg, _ = resource_manager.create_collection(
+                    agent_name, [note_id], 'list', 'generate-note_temp', '1 item', '', {}
+                )
+                if not success:
+                    logger.warning(f"generate-note: failed to create temp Collection: {error_msg}, using full context")
+                else:
+                    # 3. Index Collection
+                    success, indexed_count, error_msg = resource_manager.index_collection(
+                        agent_name, collection_id, 'semantic', {'content': 'embed'}
+                    )
+                    if not success:
+                        logger.warning(f"generate-note: failed to index Collection: {error_msg}, using full context")
+                    else:
+                        # 4. Search using prompt as query
+                        success, results, error_msg = resource_manager.search_collection(
+                            agent_name, collection_id, prompt, 'semantic', limit=5, threshold=0.3, return_mode='chunks'
+                        )
+                        if success and results:
+                            # 5. Extract text from search results
+                            filtered_parts = []
+                            for result in results:
+                                if isinstance(result, dict):
+                                    text = result.get('text', '')
+                                    if text:
+                                        filtered_parts.append(text)
+                            if filtered_parts:
+                                filtered_context = '\n\n'.join(filtered_parts)
+                                logger.info(f"generate-note: filtered context from {len(context)} to {len(filtered_context)} chars")
+                                context = filtered_context
+                            else:
+                                logger.warning(f"generate-note: search returned no text content, using full context")
+                        else:
+                            logger.warning(f"generate-note: search failed: {error_msg}, using full context")
+        except Exception as e:
+            logger.warning(f"generate-note: semantic filtering failed: {e}, using full context")
+            import traceback
+            traceback.print_exc()
     
     # Build generation prompt based on style
     if style == 'code':

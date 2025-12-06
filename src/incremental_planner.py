@@ -1457,8 +1457,8 @@ class IncrementalPlanner:
             return {'error': 'SGLang not available'}
         
         try:
-            # Clear executor state for new plan
-            self.executor.clear_plan_state()
+            # Note: plan_bindings are NOT cleared here - they persist across plans unless explicitly cleared
+            # Only clear other plan state if needed, but preserve bindings
             
             # Attach plan_actions list to executor for tracking
             self.executor._plan_actions = []

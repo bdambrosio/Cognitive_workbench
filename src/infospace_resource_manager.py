@@ -49,8 +49,20 @@ class FAISSStore:
         self.metadata.append(metadata or {})
         self.original_contents.append(original_content if original_content is not None else document)
     
-    def search(self, query_embedding, limit=5, threshold=0.0):
-        """Search for similar documents"""
+    def search(self, query_embedding, limit=5, threshold=0.0, max_tokens=None, token_estimate_chars_per_token=4):
+        """
+        Search for similar documents.
+        
+        Args:
+            query_embedding: Query embedding vector
+            limit: Maximum number of chunks to return (chunk count limit)
+            threshold: Minimum similarity score
+            max_tokens: Optional maximum token count (if set, accumulates chunks until token budget reached)
+            token_estimate_chars_per_token: Characters per token for estimation (default 4)
+            
+        Returns:
+            List of result dicts with 'document', 'score', 'metadata', 'original_content'
+        """
         import faiss
         
         # Check if index has documents
@@ -61,20 +73,35 @@ class FAISSStore:
         faiss.normalize_L2(query_array)
         
         # Ensure k > 0 for FAISS
-        k = min(limit, len(self.documents))
+        # If max_tokens is set, we may need more chunks to accumulate tokens, so increase k
+        # Otherwise use limit as-is
+        k = min(limit if max_tokens is None else max(limit, limit * 3), len(self.documents))
         if k <= 0:
             return []
         
         # Search
         scores, indices = self.index.search(query_array, k)
         
-        # Filter by threshold and format results
+        # Filter by threshold and accumulate results (with token awareness if max_tokens set)
         results = []
+        cumulative_tokens = 0
+        
         for score, idx in zip(scores[0], indices[0]):
             if idx < 0:  # FAISS returns -1 for no match
                 continue
             if score < threshold:
                 continue
+            
+            # Check token limit if max_tokens is set
+            if max_tokens is not None:
+                chunk_text = self.documents[idx]
+                chunk_tokens = len(chunk_text) // token_estimate_chars_per_token
+                
+                # Stop if adding this chunk would exceed max_tokens
+                if cumulative_tokens + chunk_tokens > max_tokens:
+                    break
+                
+                cumulative_tokens += chunk_tokens
             
             results.append({
                 'document': self.documents[idx],
@@ -82,6 +109,10 @@ class FAISSStore:
                 'metadata': self.metadata[idx],
                 'original_content': self.original_contents[idx]
             })
+            
+            # Stop if we've reached chunk limit (when not using max_tokens)
+            if max_tokens is None and len(results) >= limit:
+                break
         
         return results
     
@@ -756,17 +787,21 @@ class InfospaceResourceManager:
     
     def _init_embedder(self):
         """Lazy init embedding model"""
+        # Recommended: BGE-Small (33MB, much smarter than MiniLM, 512 context)
+        # OR: 'BAAI/bge-base-en-v1.5' for a middle ground.
+        model_name = 'BAAI/bge-small-en-v1.5' 
+        
         if self.embedder is None:
             from sentence_transformers import SentenceTransformer
             try:
-                # Try offline first (uses cached model, no network calls)
-                self.embedder = SentenceTransformer('all-MiniLM-L6-v2', local_files_only=True)
-                logger.info("Initialized embedding model: all-MiniLM-L6-v2 (from cache)")
-            except Exception as e:
-                # First time or cache missing, download from HuggingFace
-                logger.info(f"Cache miss, downloading embedding model: {e}")
-                self.embedder = SentenceTransformer('all-MiniLM-L6-v2')
-                logger.info("Initialized embedding model: all-MiniLM-L6-v2 (downloaded)")
+                # Try offline first
+                self.embedder = SentenceTransformer(model_name, local_files_only=True)
+                logger.info(f"Initialized embedding model: {model_name} (from cache)")
+            except Exception:
+                # Fallback to download
+                logger.info(f"Cache miss, downloading embedding model: {model_name}")
+                self.embedder = SentenceTransformer(model_name)
+                logger.info(f"Initialized embedding model: {model_name} (downloaded)")
     
     # ==================== Note Creation ====================
     
@@ -1145,8 +1180,8 @@ class InfospaceResourceManager:
         # Extract content for embedding
         content_str = self._extract_content_for_embedding(note_content, fields)
         
-        # Create chunks with overlap
-        chunks = self._create_chunks(content_str, chunk_size=512, overlap=128)
+        # Create chunks with overlap (1024 chars aligns with best practices)
+        chunks = self._create_chunks(content_str, chunk_size=1024, overlap=128)
         
         # Index each chunk
         indexed_count = 0
@@ -1174,7 +1209,8 @@ class InfospaceResourceManager:
     
     def search_collection(self, agent_name: str, collection_id: str, query: str,
                          mode: str = 'semantic', limit: int = 5, threshold: float = 0.0,
-                         return_mode: str = 'chunks') -> Tuple[bool, Optional[List], Optional[str]]:
+                         return_mode: str = 'chunks', max_tokens: Optional[int] = None,
+                         token_estimate_chars_per_token: int = 4) -> Tuple[bool, Optional[List], Optional[str]]:
         """
         Search an indexed Collection.
         
@@ -1183,14 +1219,16 @@ class InfospaceResourceManager:
             collection_id: Collection to search
             query: Search query text
             mode: 'semantic', 'keyword', or 'hybrid'
-            limit: Max results to return
+            limit: Max chunks to return (chunk count limit)
             threshold: Minimum similarity threshold
             return_mode: 'chunks' or 'notes'
+            max_tokens: Optional maximum token count (if set, accumulates chunks until token budget reached)
+            token_estimate_chars_per_token: Characters per token for estimation (default 4)
             
         Returns:
             Tuple of (success, results, error_msg)
         """
-        logger.info(f"Search request from {agent_name}: '{query}' in {collection_id} (return_mode={return_mode})")
+        logger.info(f"Search request from {agent_name}: '{query}' in {collection_id} (return_mode={return_mode}, limit={limit}, max_tokens={max_tokens})")
         
         # Check if Collection is indexed
         if collection_id not in self.vector_stores:
@@ -1202,9 +1240,17 @@ class InfospaceResourceManager:
             # Generate query embedding
             query_embedding = self._generate_embedding(query)
             
-            # Search for chunks (get more than limit for notes mode deduplication)
-            search_limit = limit * 3 if return_mode == 'notes' else limit
-            chunk_results = store.search(query_embedding, search_limit, threshold)
+            # Search for chunks (get more than limit for notes mode deduplication or token accumulation)
+            # If max_tokens is set, we need more chunks to accumulate tokens, so increase search_limit
+            if return_mode == 'notes':
+                search_limit = limit * 3
+            elif max_tokens is not None:
+                # For token accumulation, get more chunks than limit to have enough to accumulate
+                search_limit = max(limit, limit * 3)
+            else:
+                search_limit = limit
+            
+            chunk_results = store.search(query_embedding, search_limit, threshold, max_tokens, token_estimate_chars_per_token)
             
             if return_mode == 'notes':
                 # Deduplicate by source_note_id, keeping best score per note

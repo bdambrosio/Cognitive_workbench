@@ -6,13 +6,16 @@ import base64
 import json
 import re
 import logging
+import tempfile
+import os
 from urllib.request import urlopen, Request
 from urllib.error import URLError, HTTPError
 from urllib.parse import urljoin, urlparse
 from html.parser import HTMLParser
 import pymupdf
 import warnings
-import os
+
+from utils.grobid import parse_pdf_grobid
 
 try:
     from unstructured.partition.html import partition_html
@@ -38,10 +41,14 @@ def tool(url_or_content: str, runtime=None, **kwargs) -> str:
     
     Args:
         url_or_content: URL string, base64-encoded PDF content, Note ID, or Collection ID
+        **kwargs: grobid_url (optional) - GROBID server URL for PDF parsing if available in config
         
     Returns:
         JSON string with text, format, metadata, page_count (if PDF), char_count
     """
+    # Extract grobid_url from kwargs if available (from YAML config)
+    grobid_url = kwargs.get('grobid_url')
+    
     if not url_or_content or not isinstance(url_or_content, str):
         return json.dumps({"error": "url_or_content parameter required"})
     
@@ -145,7 +152,7 @@ def tool(url_or_content: str, runtime=None, **kwargs) -> str:
     file_format = _detect_format(content, content_type, final_url)
     
     if file_format == "pdf":
-        return _extract_pdf_text(content, final_url)
+        return _extract_pdf_text(content, final_url, grobid_url=grobid_url)
     elif file_format == "html":
         return _extract_html_text(content, final_url)
     elif file_format == "markdown":
@@ -335,8 +342,71 @@ def _process_base64_pdf(content: str) -> str:
         return json.dumps({"error": f"Failed to decode PDF: {str(e)}"})
 
 
-def _extract_pdf_text(content: bytes, url: str) -> str:
-    """Extract text from PDF bytes."""
+def _extract_pdf_text(content: bytes, url: str, grobid_url: str = None) -> str:
+    """
+    Extract text from PDF bytes.
+    
+    Args:
+        content: PDF file bytes
+        url: Source URL or file path
+        grobid_url: Optional GROBID server URL for enhanced PDF parsing
+    """
+    # Use GROBID if available
+    if grobid_url:
+        try:
+            # Save content to temp file for GROBID
+            with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as tmp_file:
+                tmp_file.write(content)
+                tmp_filepath = tmp_file.name
+            
+            # Extract title from URL for temp filename
+            title = url.split('/')[-1].replace('.pdf', '') or "document"
+            
+            # Parse with GROBID
+            grobid_result = parse_pdf_grobid(pdf_filepath=tmp_filepath, title=title, grobid_url=grobid_url)
+            
+            # Clean up temp file
+            try:
+                os.unlink(tmp_filepath)
+            except:
+                pass
+            
+            if grobid_result:
+                # Concatenate chunks with section headers
+                chunks = grobid_result.get('chunks', [])
+                if chunks:
+                    chunk_texts = []
+                    for section_title, section_text in chunks:
+                        chunk_texts.append(f"{section_title}\n{section_text}")
+                    full_text = "\n\n".join(chunk_texts)
+                elif grobid_result.get('abstract'):
+                    full_text = grobid_result['abstract']
+                else:
+                    full_text = ""
+                
+                result = {
+                    "text": full_text,
+                    "format": "pdf",
+                    "metadata": {
+                        "source_url": url,
+                        "pdf_metadata": {
+                            "title": grobid_result.get("title", ""),
+                            "author": grobid_result.get("authors", ""),
+                            "subject": "",
+                            "creator": ""
+                        }
+                    },
+                    "page_count": len(chunks) if chunks else 0,
+                    "char_count": len(full_text)
+                }
+                
+                logger.info(f"Extracted {len(full_text)} chars from PDF using GROBID ({len(chunks)} chunks)")
+                return json.dumps(result, indent=2)
+        except Exception as e:
+            logger.warning(f"GROBID parsing failed, falling back to pymupdf: {str(e)}")
+            # Fall through to pymupdf extraction
+    
+    # Fallback to pymupdf extraction
     try:
         doc = pymupdf.open(stream=content, filetype="pdf")
         pages_text = []
@@ -366,7 +436,7 @@ def _extract_pdf_text(content: bytes, url: str) -> str:
             "char_count": len(full_text)
         }
         
-        logger.info(f"Extracted {len(full_text)} chars from {page_count} page PDF")
+        logger.info(f"Extracted {len(full_text)} chars from {page_count} page PDF using pymupdf")
         return json.dumps(result, indent=2)
     except Exception as e:
         logger.error(f"PDF extraction failed: {str(e)}")

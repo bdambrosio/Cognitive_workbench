@@ -14,25 +14,6 @@ logger = logging.getLogger(__name__)
 
 # Resource manager will be passed via kwargs
 
-# Module-level cached embedder (shared across all summarize tool calls)
-_embedder = None
-
-def _get_embedder():
-    """Get or initialize the shared SentenceTransformer embedder."""
-    global _embedder
-    if _embedder is None:
-        from sentence_transformers import SentenceTransformer
-        try:
-            # Try offline first (uses cached model, no network calls)
-            _embedder = SentenceTransformer('all-MiniLM-L6-v2', local_files_only=True)
-            logger.info("Initialized shared embedding model for summarize tool (from cache)")
-        except Exception as e:
-            # First time or cache missing, download from HuggingFace
-            logger.info(f"Cache miss, downloading embedding model: {e}")
-            _embedder = SentenceTransformer('all-MiniLM-L6-v2')
-            logger.info("Initialized shared embedding model for summarize tool (downloaded)")
-    return _embedder
-
 
 def _get_content(resource_id: str, resource_manager) -> any:
     """Fetch content for a resource ID."""
@@ -86,15 +67,16 @@ def _estimate_tokens(text):
 # _wait_for_response removed - no longer needed with direct method calls
 
 
-def _semantic_filter_direct(text_content: str, focus: str, target_tokens: int) -> str:
+def _semantic_filter_direct(text_content: str, focus: str, target_tokens: int, resource_manager) -> str:
     """
     Directly embed and search text chunks without creating temp Collections.
-    Uses local embedding model to avoid Zenoh overhead.
+    Uses resource_manager's embedder.
     
     Args:
         text_content: Full text to filter
         focus: Query string for semantic filtering
         target_tokens: Approx number of tokens needed in result
+        resource_manager: InfospaceResourceManager instance (for embedder access)
         
     Returns:
         Filtered text containing most relevant chunks
@@ -102,8 +84,12 @@ def _semantic_filter_direct(text_content: str, focus: str, target_tokens: int) -
     try:
         import numpy as np
         
-        # Use shared module-level embedder
-        embedder = _get_embedder()
+        # Use resource_manager's embedder (ensure initialized)
+        if not resource_manager:
+            logger.warning("summarize: resource_manager not available, using all content")
+            return text_content
+        resource_manager._init_embedder()
+        embedder = resource_manager.embedder
         
         # Chunk the text (paragraph-first, then sentences)
         chunks = []
@@ -119,7 +105,7 @@ def _semantic_filter_direct(text_content: str, focus: str, target_tokens: int) -
                 current_len = 0
                 for sent in sentences:
                     sent_len = len(sent)
-                    if current_len + sent_len > 512 and current_chunk:
+                    if current_len + sent_len > 1024 and current_chunk:
                         chunks.append('. '.join(current_chunk) + '.')
                         current_chunk = [sent]
                         current_len = sent_len
@@ -142,12 +128,24 @@ def _semantic_filter_direct(text_content: str, focus: str, target_tokens: int) -
         query_embedding_norm = query_embedding / np.linalg.norm(query_embedding)
         similarities = np.dot(chunk_embeddings_norm, query_embedding_norm)
         
-        # Get top chunks by similarity
-        avg_chunk_tokens = 128
-        target_chunks = max(1, int(target_tokens / avg_chunk_tokens))
-        limit = min(len(chunks), target_chunks * 3)  # 3x overshoot
+        # Filter by minimum similarity threshold (exclude low-relevance chunks)
+        min_similarity = 0.3
+        valid_indices = np.where(similarities >= min_similarity)[0]
         
-        top_indices = np.argsort(similarities)[::-1][:limit]
+        if len(valid_indices) == 0:
+            # If no chunks meet threshold, use top 10% anyway (fallback)
+            logger.debug(f"summarize: no chunks above similarity threshold {min_similarity}, using top 10%")
+            valid_indices = np.argsort(similarities)[::-1][:max(1, len(chunks) // 10)]
+        
+        # Calculate average chunk size dynamically
+        avg_chunk_tokens = sum(len(chunks[i]) // 4 for i in valid_indices) // len(valid_indices) if valid_indices.size > 0 else 256
+        target_chunks = max(1, int(target_tokens / avg_chunk_tokens))
+        limit = min(len(valid_indices), target_chunks * 3)  # 3x overshoot
+        
+        # Get top chunks from valid indices only
+        valid_similarities = similarities[valid_indices]
+        top_valid_idx = np.argsort(valid_similarities)[::-1][:limit]
+        top_indices = valid_indices[top_valid_idx]
         
         # Collect chunks up to max tokens
         selected_chunks = []
@@ -161,6 +159,11 @@ def _semantic_filter_direct(text_content: str, focus: str, target_tokens: int) -
                 break
             selected_chunks.append((idx, chunk))  # Keep index for ordering
             cumulative_tokens += chunk_tokens
+        
+        # Handle empty filtered results (fallback to original text)
+        if not selected_chunks:
+            logger.warning(f"summarize: semantic filter returned no chunks, using all content")
+            return text_content
         
         # Sort by original order to maintain coherence
         selected_chunks.sort(key=lambda x: x[0])
@@ -307,10 +310,12 @@ def tool(value, runtime=None, **kwargs):
         value = str(value)
     
     # Measure input
+    input_chars = len(value)
     input_tokens = _estimate_tokens(value)
     
     # Apply focus filtering via index+search if focus provided
     effective_tokens = input_tokens
+    filtered_chars = input_chars
     inclusion_pct = 100
     
     if focus:
@@ -318,8 +323,9 @@ def tool(value, runtime=None, **kwargs):
         
         # Use direct embedding approach (no temp Collections/Zenoh overhead)
         target_tokens = int(_compute_target_length(effective_tokens, style, compression_ratio))
-        filtered_text = _semantic_filter_direct(value, focus, target_tokens)
+        filtered_text = _semantic_filter_direct(value, focus, target_tokens, resource_manager)
         
+        filtered_chars = len(filtered_text)
         effective_tokens = _estimate_tokens(filtered_text)
         inclusion_pct = int((effective_tokens / input_tokens) * 100) if input_tokens > 0 else 100
         value = filtered_text
@@ -341,22 +347,24 @@ def tool(value, runtime=None, **kwargs):
     
     focus_guidance = f"\nFocus on: {focus}" if focus else ""
     
-    # Log summarization parameters
-    logger.debug(f"summarize: input={input_tokens}t, focus={'yes' if focus else 'no'}, "
-               f"filtered={effective_tokens}t ({inclusion_pct}%), target={target_tokens}t, "
-               f"style={style}, ratio={compression_ratio:.1f}")
+    # Log summarization metrics
+    logger.info(f"summarize: input={input_chars} chars ({input_tokens}t), "
+               f"after_filter={filtered_chars} chars ({effective_tokens}t), "
+               f"target={target_tokens}t")
     
     if chunk_count == 1:
         # Single chunk - direct summarization
         chunk_text = chunks[0][0]
         
-        prompt = f"""{style_instruction}{focus_guidance}
+        prompt = f"""{style_instruction}
+        
+{focus_guidance}
 
 Content:
 {chunk_text}
 
-Target length: approximately {target_tokens} tokens. Provide a summary highlighting key points.
-Do not include any introductory, reasoning, or explanatory text in your response. Only provide the summary, followed by the </end> tag.
+. Your response should be approximately {target_tokens} tokens in length. Do not exceed this length.
+Do not include any introductory, reasoning, or explanatory text in your response. Only provide the response, followed by the </end> tag.
 End your response with:
 </end>
 """
@@ -369,7 +377,7 @@ End your response with:
         response = llm_generate(
             messages=[prompt],
             max_tokens=3000,
-            temperature=0.3,
+            temperature=0.1,
             is_json=False,
             stops=['</end>']
         )
@@ -381,8 +389,9 @@ End your response with:
             logger.error(f"summarize failed: {response.error}")
             return f"Error: {response.error}"
         
+        output_chars = len(response.text)
         output_tokens = _estimate_tokens(response.text)
-        logger.info(f"summarize: output={output_tokens}t")
+        logger.info(f"summarize: output={output_chars} chars ({output_tokens}t)")
         
         return response.text
     
@@ -396,13 +405,15 @@ End your response with:
     # Step 1: Summarize each chunk
     chunk_summaries = []
     for i, (chunk_text, _) in enumerate(chunks):
-        prompt = f"""{style_instruction}{focus_guidance}
+        prompt = f"""{style_instruction}
+        
+{focus_guidance}
 
 Section:
 {chunk_text}
 
-Target length: approximately {tokens_per_chunk} tokens. Provide key points.
-Do not include any introductory, reasoning, or explanatory text in your response. Only provide the summary, followed by the </end> tag.
+Target length: approximately {tokens_per_chunk} words in length
+Do not include any introductory, reasoning, or explanatory text in your response. Only provide your response, followed by the </end> tag.
 End your response with:
 </end>
 """
@@ -416,7 +427,7 @@ End your response with:
         response = llm_generate(
             messages=[prompt],
             max_tokens=max_chunk_tokens,
-            temperature=0.3,
+            temperature=0.1,
             is_json=False,
             stops=['</end>']
         )
@@ -466,8 +477,9 @@ End your response with:
         logger.error(f"summarize synthesis failed: {response.error}")
         return f"Error: {response.error}"
     
+    output_chars = len(response.text)
     output_tokens = _estimate_tokens(response.text)
-    logger.info(f"summarize: output={output_tokens}t")
+    logger.info(f"summarize: output={output_chars} chars ({output_tokens}t)")
     
     return response.text
 

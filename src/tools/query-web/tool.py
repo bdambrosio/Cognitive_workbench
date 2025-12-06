@@ -21,6 +21,7 @@ import warnings
 
 import wordfreq as wf
 from unstructured.partition.html import partition_html
+from utils.grobid import parse_pdf_grobid
 
 # ------------------------------
 # Logging setup
@@ -307,7 +308,19 @@ def _detect_format_from_content(content: str, url: str) -> str:
     # Default to html for web search results
     return "html"
 
-def _process_url(url: str, query: str, llm_generate, per_url_timeout: float, max_chars: int, heartbeat=None) -> Dict[str, Any]:
+def _process_url(url: str, query: str, llm_generate, per_url_timeout: float, max_chars: int, heartbeat=None, grobid_url: str = None) -> Dict[str, Any]:
+    """
+    Process a single URL from search results.
+    
+    Args:
+        url: URL to process
+        query: Original search query
+        llm_generate: LLM generation function
+        per_url_timeout: Timeout per URL
+        max_chars: Maximum characters to extract
+        heartbeat: Optional heartbeat callback
+        grobid_url: Optional GROBID server URL for PDF parsing
+    """
     start = time.time()
     html = _http_get(url, timeout=per_url_timeout)
     if not html:
@@ -317,7 +330,46 @@ def _process_url(url: str, query: str, llm_generate, per_url_timeout: float, max
         # Detect format
         file_format = _detect_format_from_content(html, url)
         
-        # Extract filtered text (query-relevant excerpts)
+        # Handle PDF with GROBID if available
+        if file_format == "pdf" and grobid_url:
+            # Parse PDF with GROBID (handles download internally)
+            title = url.split('/')[-1].replace('.pdf', '') or "document"
+            grobid_result = parse_pdf_grobid(pdf_url=url, title=title, grobid_url=grobid_url)
+            if grobid_result:
+                    # Concatenate chunks with section headers
+                    chunks = grobid_result.get('chunks', [])
+                    if chunks:
+                        chunk_texts = []
+                        for section_title, section_text in chunks:
+                            chunk_texts.append(f"{section_title}\n{section_text}")
+                        extract = "\n\n".join(chunk_texts)
+                    elif grobid_result.get('abstract'):
+                        extract = grobid_result['abstract']
+                    else:
+                        extract = html[:max_chars]  # Fallback to raw content
+                    
+                    if len(extract) < 16:
+                        return _create_empty_result(url, start, file_format)
+                    
+                    # LLM filter for relevance
+                    remaining_time = max(3.0, per_url_timeout - (time.time() - start) - 1.0)
+                    tldr = _llm_tldr(llm_generate, extract, query=query, max_chars=max_chars, timeout=remaining_time, heartbeat=heartbeat)
+                    
+                    if tldr:
+                        return {
+                            "text": extract,
+                            "format": file_format,
+                            "metadata": {
+                                "source_url": url,
+                                "uri": url,
+                                "domain": _extract_domain(url),
+                                "elapsed_ms": int((time.time() - start) * 1000)
+                            },
+                            "char_count": len(extract)
+                        }
+                    return _create_empty_result(url, start, file_format)
+        
+        # Extract filtered text (query-relevant excerpts) for HTML
         extract, full_text = _html_to_text_extract(html, query=query, max_chars=max_chars)
         if not extract or len(extract) < 16:
             return _create_empty_result(url, start, file_format)
@@ -367,12 +419,15 @@ def _create_empty_result(url: str, start_time: float, file_format: str = "html")
 # Public entry point
 # ------------------------------
 
-def llm_search(query: str, llm_generate, max_chars: int = 8000, max_urls: int = 10, max_workers: int = 6, wall_time_limit: float = 20.0, heartbeat=None) -> List[Dict[str, Any]]:
+def llm_search(query: str, llm_generate, max_chars: int = 8000, max_urls: int = 10, max_workers: int = 6, wall_time_limit: float = 20.0, heartbeat=None, grobid_url: str = None) -> List[Dict[str, Any]]:
     """
     High-level:
       1) Google CSE for initial URL set (two phrasings interleaved).
       2) Concurrently fetch + extract + LLM TL;DR relevant slices.
       3) Return list of {domain, url, extract, elapsed_ms} (only those with content).
+    
+    Args:
+        grobid_url: Optional GROBID server URL for PDF parsing
     """
 
 
@@ -456,7 +511,7 @@ End your response with:
                 url = interleaved[idx]
                 idx += 1
                 per_url_timeout = max(8.0, wall_time_limit - (time.time() - t0 - 1.0))
-                fut = ex.submit(_process_url, url, query, llm_generate, per_url_timeout, max_chars/4, heartbeat)
+                fut = ex.submit(_process_url, url, query, llm_generate, per_url_timeout, max_chars/4, heartbeat, grobid_url)
                 #logger.info(f"Submitted task for url: {url}")
                 in_flight.append(fut)
 
@@ -512,11 +567,14 @@ def tool(value, **kwargs):
     
     Args:
         value: Query string (preferred)
-        **kwargs: legacy query (fallback), agent_name (required), llm_generate (required)
+        **kwargs: legacy query (fallback), agent_name (required), llm_generate (required), grobid_url (optional)
     
     Returns:
         Collection ID containing structured Note for each search result
     """
+    # Extract grobid_url from kwargs if available (from YAML config)
+    grobid_url = kwargs.get('grobid_url')
+    
     query = value or kwargs.get('value') or kwargs.get('query', '')
     if not isinstance(query, str):
         query = ''
@@ -557,7 +615,8 @@ def tool(value, **kwargs):
             max_urls=10,
             max_workers=6,
             wall_time_limit=20.0,
-            heartbeat=kwargs.get('heartbeat')
+            heartbeat=kwargs.get('heartbeat'),
+            grobid_url=grobid_url
         )
     except Exception as e:
         return {

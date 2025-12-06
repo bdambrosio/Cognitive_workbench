@@ -572,10 +572,11 @@ class InfospaceExecutor:
             return self._create_uniform_return('failed', reason=f'Unknown tool type: {tool_type}')
         
         if result.get('status') != 'success':
-            return result
+            # Failed result - convert to uniform format for API/planner
+            return self._create_uniform_return('failed', reason=result.get('reason', 'Unknown error'))
         
-        # Extract result components (already in uniform format from tool execution)
-        result_value = result.get('value')
+        # Extract result components (original_value is untruncated)
+        original_value = result.get('original_value')
         result_resource_id = result.get('resource_id')
         
         # Bind result if output variable specified
@@ -586,23 +587,23 @@ class InfospaceExecutor:
                 self._bind_variable(out_var, result_resource_id)
                 display_var = out_var if out_var.startswith('$') else f"${out_var}"
                 logger.info(f"Tool '{target}' executed, resource {result_resource_id} → {display_var}")
-                # Return uniform format with resource_id
-                return self._create_uniform_return('success', value=result_value, resource_id=result_resource_id)
+                # Return uniform format with truncated value for API/planner
+                return self._create_uniform_return('success', value=original_value, resource_id=result_resource_id)
             
-            # Tool returned content (not a resource ID) - persist as Note
-            info_id = self._persist_note(result_value, f'apply_{target}')
+            # Tool returned content (not a resource ID) - persist as Note with FULL content
+            info_id = self._persist_note(original_value, f'apply_{target}')
             if info_id:
                 self._bind_variable(out_var, info_id)
                 display_var = out_var if out_var.startswith('$') else f"${out_var}"
                 logger.info(f"Tool '{target}' executed, Note {info_id} → {display_var}")
-                # Return uniform format with Note ID as resource_id
-                return self._create_uniform_return('success', value=result_value, resource_id=info_id)
+                # Return uniform format with truncated value for API/planner (Note has full content)
+                return self._create_uniform_return('success', value=original_value, resource_id=info_id)
             else:
                 logger.error(f"Failed to persist result from '{target}'")
                 return self._create_uniform_return('failed', reason='Failed to persist result')
         
-        # No out_var - return result as-is (already uniform format)
-        return result
+        # No out_var - convert to uniform format for API/planner (truncated)
+        return self._create_uniform_return('success', value=original_value, resource_id=result_resource_id)
 
     def _get_tool_info(self, tool_name: str) -> Optional[Dict]:
         """
@@ -631,7 +632,7 @@ class InfospaceExecutor:
             # Extract SKILL.md content
             skill_content = tool_info.get('tool_md_content', '')
             if not skill_content:
-                return {'status': 'failed', 'reason': f'No SKILL.md content for {tool_name}'}
+                return {'status': 'failed', 'reason': f'No SKILL.md content for {tool_name}', 'original_value': None, 'resource_id': None}
             
             # Handle Collection input (list of Note IDs) - dereference and format
             if isinstance(input_value, list):
@@ -726,19 +727,19 @@ Only provide the result, followed by the </end> tag.""")
                 return {'status': 'failed', 'reason': 'LLM returned invalid response format'}
             
             if not result_text:
-                return {'status': 'failed', 'reason': 'LLM returned empty response'}
+                return {'status': 'failed', 'reason': 'LLM returned empty response', 'original_value': None, 'resource_id': None}
             logger.info(f"Prompt tool '{tool_name}' completed ({len(result_text)} chars)")
             
             # Check for null indicator - return Note_null resource ID instead of string
             if result_text.lower() == 'note-null' or result_text.lower() == 'null':
                 logger.info(f"Prompt tool '{tool_name}' returned null indicator, using Note_null resource")
-                return {'status': 'success', 'value': 'Note_null'}
+                return {'status': 'success', 'original_value': 'Note_null', 'resource_id': None}
             
-            return {'status': 'success', 'value': result_text}
+            return {'status': 'success', 'original_value': result_text, 'resource_id': None}
             
         except Exception as e:
             logger.error(f"Prompt tool execution failed: {e}")
-            return {'status': 'failed', 'reason': str(e)}
+            return {'status': 'failed', 'reason': str(e), 'original_value': None, 'resource_id': None}
 
     def _sglang_generate(self, messages, max_tokens=2000, temperature=0.7, stops=None, is_json=False):
         """
@@ -798,8 +799,7 @@ Only provide the result, followed by the </end> tag.""")
             
             return Response(success=True, text=result_text)
         except Exception as e:
-            logger.error(f"SGLang generation error: {e}")
-            traceback.print_exc()
+            logger.exception(f"SGLang generation error: {e}")
             return Response(success=False, error=str(e))
     
     def _parse_json_response(self, response_text, original_prompt=None):
@@ -928,7 +928,7 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         if tool_type == 'plan':
             plan_data = tool_info.get('plan_data')
             if not plan_data:
-                return self._create_uniform_return('failed', reason=f'Plan tool {tool_name} missing plan_data')
+                return {'status': 'failed', 'reason': f'Plan tool {tool_name} missing plan_data', 'original_value': None, 'resource_id': None}
             
             # Bind main input to $input variable
             if input_value is not None:
@@ -947,11 +947,11 @@ Make sure the string is in a format that can be parsed by the json.loads functio
             result = self.execute_plan_sync(plan_data)
             
             if result.get('status') == 'suspended':
-                # Plan suspended (ask/wait) - return suspension
+                # Plan suspended (ask/wait) - return suspension (already in uniform format)
                 return result
             
             if result.get('status') != 'success':
-                return self._create_uniform_return('failed', reason=f'Plan tool execution failed: {result.get("reason")}')
+                return {'status': 'failed', 'reason': f'Plan tool execution failed: {result.get("reason")}', 'original_value': None, 'resource_id': None}
             
             # Extract output from plan's 'out' variable (from plan_data)
             out_var = plan_data.get('out', 'result')
@@ -963,28 +963,31 @@ Make sure the string is in a format that can be parsed by the json.loads functio
             if out_var in bindings:
                 output_note_id = bindings[out_var]
                 output_content = self._get_content(output_note_id)
-                return self._create_uniform_return('success', value=output_content, resource_id=output_note_id)
+                return {'status': 'success', 'original_value': output_content, 'resource_id': output_note_id}
             else:
-                return self._create_uniform_return('failed', reason=f'Plan tool output variable ${out_var} not bound')
+                return {'status': 'failed', 'reason': f'Plan tool output variable ${out_var} not bound', 'original_value': None, 'resource_id': None}
         
         # Handle Python-based tools
         # Check trust flag
         if not tool_info.get('trusted', False):
             tool_path = tool_info.get('path', 'unknown')
             skill_md_path = f"{tool_path}/SKILL.md" if tool_path != 'unknown' else f"tools/{tool_name}/SKILL.md"
-            return self._create_uniform_return('failed', 
-                   reason=f'Untrusted Python tool: {tool_name}. Add "trusted: true" to frontmatter in {skill_md_path}')
+            return {'status': 'failed', 
+                   'reason': f'Untrusted Python tool: {tool_name}. Add "trusted: true" to frontmatter in {skill_md_path}',
+                   'original_value': None, 'resource_id': None}
         
         # Get Python file path
         python_file = tool_info.get('python_file')
         if not python_file:
-            return self._create_uniform_return('failed', 
-                   reason=f'No Python file found for tool: {tool_name}')
+            return {'status': 'failed', 
+                   'reason': f'No Python file found for tool: {tool_name}',
+                   'original_value': None, 'resource_id': None}
         
         python_path = Path(python_file)
         if not python_path.exists():
-            return self._create_uniform_return('failed', 
-                   reason=f'Python file not found: {python_path}')
+            return {'status': 'failed', 
+                   'reason': f'Python file not found: {python_path}',
+                   'original_value': None, 'resource_id': None}
         
         # Import module dynamically
         spec = importlib.util.spec_from_file_location(
@@ -996,8 +999,9 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         
         # Get tool function
         if not hasattr(tool_module, 'tool'):
-            return self._create_uniform_return('failed', 
-                   reason=f'No tool() function in {python_path.name}')
+            return {'status': 'failed', 
+                   'reason': f'No tool() function in {python_path.name}',
+                   'original_value': None, 'resource_id': None}
         
         tool_func = tool_module.tool
         
@@ -1033,20 +1037,28 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         
         resolved_args['llm_generate'] = llm_generate
         
+        # Extract grobid URL from config if available (for PDF processing tools)
+        if self.executive_node:
+            llm_config = self.executive_node.character_config.get('llm_config', {})
+            grobid_url = llm_config.get('grobid')
+            if grobid_url:
+                resolved_args['grobid_url'] = grobid_url
+        
         # Execute tool
         try:
             logger.debug(f"Calling tool '{tool_name}' with input_value type: {type(input_value)}, length: {len(str(input_value)) if isinstance(input_value, str) else 'N/A'}")
             result = tool_func(input_value, **resolved_args)
         except Exception as e:
             logger.error(f"Python tool '{tool_name}' execution error: {e}", exc_info=True)
-            return self._create_uniform_return('failed', reason=f'Tool execution error: {str(e)}')
+            return {'status': 'failed', 'reason': f'Tool execution error: {str(e)}', 'original_value': None, 'resource_id': None}
         
-        # Handle result format - convert to uniform format
+        # Handle result format - return original value (not truncated) for Note creation
+        # Truncation happens later in _execute_apply when creating uniform return for API/planner
         if isinstance(result, dict) and 'status' in result:
-            # Tool returned structured response - ensure uniform format
+            # Tool returned structured response
             status = result.get('status')
             if status == 'failed':
-                return self._create_uniform_return('failed', reason=result.get('reason', 'Unknown error'))
+                return {'status': 'failed', 'reason': result.get('reason', 'Unknown error'), 'original_value': None, 'resource_id': None}
             else:
                 # Check if value is a resource ID
                 value = result.get('value')
@@ -1056,32 +1068,31 @@ Make sure the string is in a format that can be parsed by the json.loads functio
                 if resource_id is None and isinstance(value, str):
                     if value.startswith('Note_') or value.startswith('Collection_'):
                         resource_id = value
-                        # Keep value as resource ID for now (will be content in later phases)
                 
-                return self._create_uniform_return('success', value=value, resource_id=resource_id)
+                return {'status': 'success', 'original_value': value, 'resource_id': resource_id}
         elif isinstance(result, str) and result.startswith('Error:'):
             # Tool returned error string
             error_msg = result
             logger.error(f"Python tool '{tool_name}' failed: {error_msg}")
-            return self._create_uniform_return('failed', reason=error_msg)
+            return {'status': 'failed', 'reason': error_msg, 'original_value': None, 'resource_id': None}
         else:
             # Tool returned raw value
             # Check for null indicator
             if result is None:
                 logger.info(f"Python tool '{tool_name}' returned None")
-                return self._create_uniform_return('success', value=None, resource_id=None)
+                return {'status': 'success', 'original_value': None, 'resource_id': None}
             elif isinstance(result, str):
                 stripped = result.strip()
                 if stripped.lower() == 'note-null' or stripped.lower() == 'null':
                     logger.info(f"Python tool '{tool_name}' returned null indicator")
-                    return self._create_uniform_return('success', value=None, resource_id=None)
+                    return {'status': 'success', 'original_value': None, 'resource_id': None}
                 # Check if result is a resource ID
                 elif stripped.startswith('Note_') or stripped.startswith('Collection_'):
                     logger.info(f"Python tool '{tool_name}' returned resource ID: {stripped}")
-                    return self._create_uniform_return('success', value=stripped, resource_id=stripped)
+                    return {'status': 'success', 'original_value': stripped, 'resource_id': stripped}
             
             logger.info(f"Python tool '{tool_name}' completed")
-            return self._create_uniform_return('success', value=result, resource_id=None)
+            return {'status': 'success', 'original_value': result, 'resource_id': None}
 
     def _execute_create_note(self, action: Dict) -> Dict:
         """
@@ -3697,12 +3708,20 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         
         if tool_type == 'prompt_augmentation':
             # Execute locally using LLM
-            return self._execute_prompt_tool(tool_name, value, tool_info, cleaned_args)
+            result = self._execute_prompt_tool(tool_name, value, tool_info, cleaned_args)
         elif tool_type == 'python':
-            # Execute Python tool
-            return self._execute_python_tool(tool_name, value, tool_info, cleaned_args)
+            # Execute Python tool (returns original_value, not truncated)
+            result = self._execute_python_tool(tool_name, value, tool_info, cleaned_args)
         else:
             return {'status': 'failed', 'reason': f'Unknown tool type: {tool_type}'}
+        
+        # Convert to uniform format with truncated value for map/coerce (no Note creation here)
+        if result.get('status') != 'success':
+            return self._create_uniform_return('failed', reason=result.get('reason', 'Unknown error'))
+        
+        original_value = result.get('original_value')
+        resource_id = result.get('resource_id')
+        return self._create_uniform_return('success', value=original_value, resource_id=resource_id)
     
 
     
