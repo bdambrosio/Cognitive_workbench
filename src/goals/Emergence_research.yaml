@@ -9,7 +9,8 @@ description: "Find arguments on both sides, assess their evidence quality, and t
 
 test_goal: >
   goal: I need to understand the debate around emergent capabilities in large models. 
-  Find arguments on both sides, assess their evidence quality, and tell me what questions remain unresolved.
+  Find arguments on both sides, assess their evidence quality and what questions remain unresolved. 
+  create a 200-300 word report on your findings.
 
 expected_metrics:
   plan_completed: true

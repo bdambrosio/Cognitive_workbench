@@ -8,6 +8,12 @@ import os
 import time
 import requests
 from typing import List, Dict, Any, Optional
+from urllib.error import HTTPError, URLError
+
+# Import grobid parser
+import sys
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
+from utils.grobid import parse_pdf_grobid
 
 logger = logging.getLogger(__name__)
 
@@ -57,6 +63,58 @@ def _create_collection(note_ids: List[str], agent_name: str, resource_manager, s
     else:
         logger.error(f"Failed to create Collection: {error_msg}")
         return None
+
+def _enhance_result_with_grobid(result: Dict[str, Any], grobid_url: str) -> Dict[str, Any]:
+    """
+    Enhance a search result with GROBID parsing if PDF is available.
+    
+    Args:
+        result: Search result dict with metadata containing pdf_url
+        grobid_url: GROBID server URL
+        
+    Returns:
+        Enhanced result dict (original if grobid fails)
+    """
+    pdf_url = result.get('metadata', {}).get('pdf_url')
+    if not pdf_url:
+        return result
+    
+    title = result.get('metadata', {}).get('title', 'Untitled')
+    
+    # Parse PDF with GROBID (handles download internally)
+    grobid_result = parse_pdf_grobid(pdf_url=pdf_url, title=title, grobid_url=grobid_url)
+    if not grobid_result:
+        logger.warning(f"GROBID parsing failed for {title}, keeping original result")
+        return result
+    
+    # Fill in missing fields (only if API value is missing or empty)
+    metadata = result.get('metadata', {})
+    if not metadata.get('title') or metadata.get('title') == 'Untitled':
+        if grobid_result.get('title') and grobid_result['title'] != 'Unknown':
+            metadata['title'] = grobid_result['title']
+    
+    if not metadata.get('authors') or len(metadata.get('authors', [])) == 0:
+        if grobid_result.get('authors'):
+            # Convert comma-separated string to list
+            authors_str = grobid_result['authors']
+            if authors_str:
+                metadata['authors'] = [a.strip() for a in authors_str.split(',') if a.strip()]
+    
+    # Replace text with concatenated chunks (with section headers)
+    chunks = grobid_result.get('chunks', [])
+    if chunks:
+        chunk_texts = []
+        for section_title, section_text in chunks:
+            chunk_texts.append(f"{section_title}\n{section_text}")
+        result['text'] = "\n\n".join(chunk_texts)
+        result['char_count'] = len(result['text'])
+    elif grobid_result.get('abstract'):
+        # If no chunks but we have abstract, use abstract as text
+        result['text'] = grobid_result['abstract']
+        result['char_count'] = len(result['text'])
+    
+    logger.info(f"Enhanced {title} with GROBID parsing: {len(chunks)} chunks, {result['char_count']} chars")
+    return result
 
 def search_papers(query: str, limit: int = 6) -> List[Dict[str, Any]]:
     """
@@ -209,11 +267,14 @@ def tool(value, runtime=None, **kwargs):
     
     Args:
         value: Query string (preferred)
-        **kwargs: legacy query (fallback), agent_name (required), resource_manager (required), limit (optional)
+        **kwargs: legacy query (fallback), agent_name (required), resource_manager (required), limit (optional), grobid_url (optional)
         
     Returns:
         Collection ID containing structured Note for each paper result
     """
+    # Extract grobid_url from kwargs if available (from YAML config)
+    grobid_url = kwargs.get('grobid_url')
+    
     query = value or kwargs.get('value') or kwargs.get('query', '')
     if not isinstance(query, str):
         query = ''
@@ -241,6 +302,15 @@ def tool(value, runtime=None, **kwargs):
     
     # Search papers
     results = search_papers(query, limit=limit)
+    
+    # Enhance results with GROBID if grobid_url is provided
+    if grobid_url and results:
+        logger.info(f"Enhancing {len(results)} results with GROBID parsing")
+        enhanced_results = []
+        for result in results:
+            enhanced = _enhance_result_with_grobid(result, grobid_url)
+            enhanced_results.append(enhanced)
+        results = enhanced_results
     
     if not results:
         # Return empty Collection for no results

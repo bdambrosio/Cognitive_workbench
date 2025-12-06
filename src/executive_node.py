@@ -1303,9 +1303,7 @@ class ZenohExecutiveNode:
                         logger.info(f'{self.character_name} generated goal: {goal.to_string()}')
                         self.current_goal = goal
                         self.current_plan = None  # Clear plan so _plan creates new one for this goal
-                        if self.infospace_executor:
-                            self.infospace_executor.plan_bindings.clear()
-                        logger.info(f'🔄 {self.character_name} cleared plan_bindings for new plan')
+                        # Note: plan_bindings are NOT cleared here - they persist across plans unless explicitly cleared
                         self.plan_bindings_cache = {}
                         self._publish_goal(goal)
                         return self.current_goal
@@ -1423,8 +1421,7 @@ class ZenohExecutiveNode:
         self._publish_current_plan()
         
         self.current_plan = None
-        if self.infospace_executor:
-            self.infospace_executor.plan_bindings.clear()
+        # Note: plan_bindings are NOT cleared here - they persist across plans unless explicitly cleared
         self.plan_bindings_cache = {}
         self.action_history = []
         if reason == 'manual goal override' or reason == 'manual plan override':
@@ -2286,8 +2283,7 @@ class ZenohExecutiveNode:
             
             # Immediately clear existing plan to interrupt execution
             self.current_plan = None
-            if self.infospace_executor:
-                self.infospace_executor.plan_bindings.clear()
+            # Note: plan_bindings are NOT cleared here - they persist across plans unless explicitly cleared
             self.plan_bindings_cache = {}
             self.goal_source = 'ui'
             self.awaiting_user_input = False
