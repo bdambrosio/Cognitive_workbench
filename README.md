@@ -81,7 +81,7 @@ sequenceDiagram
 
 **Key Innovation:** Tool execution happens **inside** the planning loop, for any instruct LLM SGLang can run locally. LLM need not be natively capable or reasoning or tool use, in fact better if it is just a plan *instruct* model.  The planner sees actual results (e.g., "Word count: 306") and adapts immediately.
 
-**Result Format:** Tools now return both status and actual values. Screen output (and in the context):
+**Result Format:** Tools now return status, resource (Note or Collection) ids created, and output (truncated for injection into SGLang state, full for return to caller. Screen output (and in the context):
 ```
 [SUCCESS] Word count: 306 | word-count completed | Bound: $count to Note_529
 ```
