@@ -64,6 +64,21 @@ The **Incremental Planner** implements **interleaved reasoning** where the agent
 - **Requests** additional tools dynamically as needs emerge
 - All within SGLang's `@function` context for efficient synchronous execution
 
+```mermaid
+sequenceDiagram
+    participant LLM as SGLang Stream
+    participant Exec as Executor
+    participant Mem as Infospace (Memory)
+    
+    LLM->>LLM: Generate Thought
+    LLM->>LLM: Select Tool (JSON)
+    LLM->>Exec: Call Tool
+    Exec->>Mem: Read/Write (Note/Collection)
+    Mem-->>Exec: Return Result
+    Exec-->>LLM: Inject Result (Text)
+    LLM->>LLM: Reflect & Next Step
+```
+
 **Key Innovation:** Tool execution happens **inside** the planning loop, for any instruct LLM SGLang can run locally. LLM need not be natively capable or reasoning or tool use, in fact better if it is just a plan *instruct* model.  The planner sees actual results (e.g., "Word count: 306") and adapts immediately.
 
 **Result Format:** Tools now return both status and actual values. Screen output (and in the context):
@@ -78,14 +93,14 @@ This tight integration between thought and action enables complex research tasks
 [▶️ Incremental planning demo](https://github.com/bdambrosio/Cognitive_workbench/raw/main/docs/incremental_planning.mp4)
 
 ### Information Space ("Infospace")
-Cognitive Workbench supports a working memory with layered semantics:
-- **Notes** and **Collections** are primitive persistent objects (Sets metaphor, set uniqueness is on Note ID, not content, for now)
-- **Structural Operations** basic CRUD for Notes and Collections
-- **Text Operations** (index, search, summarize, relate, filter, word-count, generate, ...)
-- **Structured Notes** produce / consume JSON structured Note content (e.g. search, query-web, semantic-scholar)
-- **Structured Collections** perform basic SQL-like operations on Collections of structured Notes ()
-- **Tools** are dynamically loaded prompt / Python skills executed within this space
-- most of these are built-in primitives, but several exist as extensions defined in a *tools* library (src/tools - add your own!), modelled after Anthropic Skills.
+Cognitive Workbench supports a working memory that acts like an **Operating System for Thoughts**:
+
+- **Notes (Files):** Persistent data units (text, JSON, code).
+- **Collections (Folders):** Ordered lists of Notes.
+- **Operations (Syscalls):** SQL-like manipulation of memory (split, map, filter, join, sort).
+
+This allows the agent to treat memory not as a fuzzy context window, but as a structured file system:
+*"I will save search results to a Collection, filter for 'relevance > 0.8', and summarize the remaining Notes."*
 
 *See: `src/infospace_executor.py`, `src/infospace_resource_manager.py`*
 
@@ -105,7 +120,29 @@ Cognitive Workbench supports a working memory with layered semantics:
 
 *See: `src/infospace_executor.py`*
 
-### 3. Entity Modeling & Theory of Mind (ToM) (still there from older multi-agent version, not fully functional right now)
+### 3. Schema-First Tool Definitions
+Tools are not just Python functions. They are defined by a **Natural Language Schema (`SKILL.md`)** and a **Python Implementation (`tool.py`)**.
+
+**SKILL.md (The Interface):**
+```markdown
+name: query-web
+description: "Search web using Google CSE. Returns Collection of JSON Notes..."
+examples:
+  - '{"type":"query-web","value":"transformer architecture papers","out":"$results"}'
+```
+
+**tool.py (The Logic):**
+```python
+def query_web(query: str, count: int = 10, **kwargs):
+    # Execute search, return structured data
+    return [...]
+```
+
+The planner uses the schema to understand *how* to use the tool, and the executor maps the JSON action to the Python logic.
+
+*See: `src/tools/`*
+
+### 4. Entity Modeling & Theory of Mind (ToM) (still there from older multi-agent version, not fully functional right now)
 Agents build mental models of their interlocutors:
 - Tracks every interaction indexed by other character (default: "User")
 - Maintains distinct **discourse states** for each relationship
