@@ -146,20 +146,14 @@ def main():
             # Step 2: Send goal to Jill
             
             goal_text = (
-                f"goal:\n"
-                f"  subject: agent_response_generation\n"
-                f"  input_context: The user just said: '{user_input}'\n"
-                f"  conversation_history: see Collection named 'conversation'" 
-                f"\n"
-                f"  task: Generate the optimal response by strictly following this reasoning chain:\n"
-                f"    1. CONTEXT ANALYSIS: Analyze the input against the conversation history. Is this a subject change or a follow-up?\n"
-                f"    2. INTENT CLASSIFICATION: Identify what the user wants. Is this social chitchat, or is there an implicit/explicit request for data, calculation, or action?\n"
-                f"    3. TOOL FEASIBILITY CHECK: Review your available tools. Does satisfying the user's intent require or benefit from a tool? (e.g., semantic-scholar, calculator, etc.). *Do not assume you are tool-less.*\n"
-                f"    4. EXECUTION STRATEGY: \n"
-                f"       - If a tool is needed: Define the tool input and use it.\n"
-                f"       - If no tool is needed: Draft a response based on your internal knowledge.\n"
-                f"    5. PERSONA APPLICATION: Refine the final output to match your personality.\n"
-                f"    6. FINAL ACTION: Use 'say' to deliver the response."
+                f"{user_input}'\n\n"
+                f"Context: the 'conversation' Collection contains the history of this conversation.\n"
+                f"  the 'conversation_history' Collection contains summaries of past conversations.\n\n"
+                f"When crafting your response:\n"
+                f"- If the user needs information you don't have, or you would benefit from thinking more deeply about user's input, use tools to find it\n"
+                f"- Use semantic-scholar for academic papers, query-web for web info, calculator for math\n"
+                f"- After gathering information (if needed), use 'say' to deliver your response\n"
+                f"- Match your personality in tone and style"
             )
             response_received.clear()
             response_data = {}
