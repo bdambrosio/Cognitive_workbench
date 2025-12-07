@@ -57,7 +57,7 @@ The benchmarks in `tests/` (MMLU, HotpotQA) serve both as evaluation harnesses a
 This workbench currently focuses on three main areas of cognitive agent research:
 
 ### 1. Incremental Planning with SGLang
-The **Incremental Planner** implements **interleaved reasoning** where the agent:
+The **Incremental Planner** implements **interleaved reasoning** within a single SGLang evolving state:
 - **Plans** incrementally, a few steps at a time
 - **Executes** tools **during planning** to progress on goal
 - **Adapts** the plan based on execution results  
