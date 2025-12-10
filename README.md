@@ -362,10 +362,11 @@ python3 -m venv zenoh_venv
 source zenoh_venv/bin/activate
 
 # Install dependencies
-pip install -r src/requirements.txt
+pip install -r requirements.txt
 ```
 
 ### Configuration
+Create src/logs/ (needed dir, autocreate on todo)
 Edit `scenarios/jill.yaml`:
 
 **Minimal Configuration:**
@@ -393,8 +394,7 @@ characters:
 ### Running an Experiment
 ```bash
 cd src
-python3 launcher.py ../scenarios/jill.yaml --ui
-```
+python3 launcher.py jill.yaml --ui --resource-browser --map-file infolab.py
 Startup can take a while, it loads llm, be patient...
 
 Access the UI at `http://localhost:3000`.
