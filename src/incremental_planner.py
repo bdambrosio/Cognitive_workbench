@@ -252,7 +252,14 @@ Common Patterns:
 - Add all items from one Collection to another: {"type":"union","target":"$target_collection","value":"$source_collection","out":"$target_collection"}
 - Combine two Collections into new one: {"type":"union","target":"$coll1","value":"$coll2","out":"$combined"}
 
-# Tool Selection (only if tool is in the tool catalog):
+#TOOLS
+Tool System
+  - Tools are defined as SKILL.md files with YAML frontmatter
+  - available tools are loaded from the tools directory and will be listed below
+  - prompt_augmentation - LLM-based tools (e.g. as-json, as-markdown, matches, text-find, extract-struct, is-question)
+  - python - Code execution tools (e.g. query-web, semantic-scholar, fetch-text, filter-collection, calculate, summarize, refine, assess, relate, generate-note, extract-entities, is-empty, is-positive, word-count)
+
+#Tool Selection (only if tool is in the tool catalog):
 General Tools:
 - Academic papers: semantic-scholar (provides abstracts, citations, PDFs)
 - General web: query-web (broad coverage, recent content)
@@ -862,7 +869,7 @@ def execute_infospace_action(action: Dict, executor, agent_name: str) -> str:
         agent_name: Agent name for logging
         
     Returns:
-        Result text for Stage 3 reflection (format: [SUCCESS] <result> | <action> | Bound: <var>)
+        Result text for Stage 3 reflection (format: SUCCESS | <result> | <action> | Bound: <var>)
     """
     try:
         # Track action in executor's plan_actions if available
@@ -928,26 +935,26 @@ def execute_infospace_action(action: Dict, executor, agent_name: str) -> str:
             # Build result message
             if value_str:
                 if bound_var and resource_id:
-                    return f"[SUCCESS] {value_str} | {action_type} completed | Bound: {bound_var} to {resource_id}"
+                    return f"SUCCESS | {value_str} | {action_type} completed | Bound: {bound_var} to {resource_id}"
                 elif bound_var:
-                    return f"[SUCCESS] {value_str} | {action_type} completed | Bound: {bound_var}"
+                    return f"SUCCESS | {value_str} | {action_type} completed | Bound: {bound_var}"
                 else:
-                    return f"[SUCCESS] {value_str} | {action_type} completed"
+                    return f"SUCCESS | {value_str} | {action_type} completed"
             else:
                 # No value to show, use resource_id if available
                 if bound_var and resource_id:
-                    return f"[SUCCESS] {action_type} completed | Bound: {bound_var} to {resource_id}"
+                    return f"SUCCESS | {action_type} completed | Bound: {bound_var} to {resource_id}"
                 elif bound_var:
-                    return f"[SUCCESS] {action_type} completed | Bound: {bound_var}"
+                    return f"SUCCESS | {action_type} completed | Bound: {bound_var}"
                 else:
-                    return f"[SUCCESS] {action_type} completed"
+                    return f"SUCCESS | {action_type} completed"
         else:
             error_reason = result.get('reason', 'Unknown error')
-            return f"[ERROR] {action['type']} failed: {error_reason}"
+            return f"ERROR | {action['type']} failed: {error_reason}"
     except Exception as e:
         logger.error(f"Execution error: {e}")
         traceback.print_exc()
-        return f"[ERROR] Exception: {str(e)}"
+        return f"ERROR | Exception: {str(e)}"
 
 
 if HAS_SGLANG:
@@ -1067,48 +1074,35 @@ if HAS_SGLANG:
         available_resources_text = ""
         if executor:
             try:
-                available_resources_text = stage0_resource_retrieval(goal=goal, executor=executor)
+                available_resources_text = stage0_resource_retrieval(goal=goal, executor=executor)  
             except Exception as e:
                 logger.warning(f"Stage 0: Failed to retrieve resources: {e}")
         
         # Stage 1: Analysis + tool selection
-        system_parts = [
-            "Your task is to achieve a stated goal in information space.",
-            "You choose tools/primitives (aka actions, if and as needed), call them via JSON arguments,",
-            "and iteratively execute-step / reflect / refine your plan until the goal is satisfied.\n"
-        ]
-        
+        system_parts = ["Your task is to achieve a stated goal in information space."]
+        system_parts.append("You choose tools/primitives (aka actions, if and as needed), call them via JSON arguments,")
+        system_parts.append("and iteratively execute-step / reflect / refine your plan until the goal is satisfied.")
         system_parts.append(f"\n{INCREMENTAL_PLAN_SPECIFICATIONS}\n")
-        system_parts.append(
+        system_parts.append(f"Tool catalog:\n{tools_catalog_text}\n#### END OF INFOSPACE TYPE SYSTEM, SPECIFICATIONS, AND TOOL CATALOG\n")
+        system_parts.append("""Follow this process to achieve the goal:
+            "Follow this process to achieve the goal:\n"
             "Stage 1 (once): Analyze goal, select relevant tools, decompose into FIRST_TASK.\n"
             "Stage 1.5 (once): Load and inject detailed docs for selected tools.\n"
             "Then you will work in repeated cycles to achieve the goal:\n"
             "    - Stage 2: Pick a single tool and JSON args for CURRENT_TASK.\n"
             "    - Stage 3: Reflect on result, decide if goal done, set NEXT_TASK.\n\n"
-            "ALWAYS follow all formatting instructions exactly."
-        )
+            "ALWAYS follow all formatting instructions exactly.""")
         
-        s += system("".join(system_parts))
-        
-        # Add character context if available - constant for run, so ok to add here
-        if character_context:
-            system_parts.append(f"\n# CHARACTER CONTEXT\n{character_context}\n")
-        
-        # Add recent context if available
-        if recent_context:
-            system_parts.append(f"{recent_context}\n")
-        
-        # Add available resources from Stage 0
         if available_resources_text:
             system_parts.append(f"\n{available_resources_text}\n")
         # Add current date and time
         import datetime
         current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         system_parts.append(f"\n# CURRENT CONTEXT\nCurrent date and time: {current_time}\n")
-
+        s += system("".join(system_parts))
+        
         s += user(
-            f"Goal: {goal}\n\n"
-            f"Tool catalog:\n{tools_catalog_text}\n\n"
+            f"#GOAL\n {goal}\n\n"
             "Stage 1: Analyze goal and identify relevant tools. Be concise in your analysis.\n"
             "Include tools you might need AND related/supporting tools.\n"
             "Err on the side of including additional tools in SELECTED_TOOLS_JSON for better coverage.\n"
