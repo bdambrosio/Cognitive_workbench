@@ -123,7 +123,6 @@ class InfospaceExecutor:
         planner = IncrementalPlanner(
             executor=child_executor,
             available_tools=self.available_tools,
-            primitives_reference=INFOSPACE_PRIMITIVES_REFERENCE,
             logger_instance=logger
         )
         

@@ -8,7 +8,7 @@ name: "Online research on emergent capabilities in large models"
 description: "Find arguments on both sides, assess their evidence quality, and tell me what questions remain unresolved."
 
 test_goal: >
-  goal: I need to understand the debate around emergent capabilities in large models. 
+  goal: Explain the debate around emergent capabilities in large language models. 
   Find arguments on both sides, assess their evidence quality and what questions remain unresolved. 
   create a 200-300 word report on your findings.
 

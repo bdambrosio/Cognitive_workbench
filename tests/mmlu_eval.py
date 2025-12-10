@@ -80,6 +80,18 @@ def clear_transient_notes(session: zenoh.Session, character: str, timeout: float
     return 0
 
 
+def send_planner_feedback(session: zenoh.Session, character: str, outcome: bool, timeout: float = 5.0) -> bool:
+    """Send feedback to planner about plan execution outcome."""
+    query_key = f"cognitive/{character}/planner/feedback"
+    payload = json.dumps({'outcome': outcome})
+    replies = session.get(query_key, payload=payload.encode('utf-8'), timeout=timeout)
+    for reply in replies:
+        if hasattr(reply, 'ok') and reply.ok is not None:
+            result = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
+            return result.get('success', False)
+    return False
+
+
 def mmlu_query_via_executive(
     session: zenoh.Session,
     character: str,
@@ -181,7 +193,7 @@ def build_prompt(
     lines.append(f"  subject: {subject}")
     lines.append(f"  question: {question.strip()}") 
     #lines.append(f"  do not use display, query-web, or semantic-scholar in your reasoning. Only use generate to find information.")
-    lines.append(f"  do not use semantic-scholar in your reasoning.")
+    lines.append(f"  do not use query-web or semantic-scholar in your reasoning. use generate or think to surface knownledge, or refine to extract information from text.")
     lines.append(f"  choices:")
     lines.append(f"    A: {choices[0].strip()}")
     lines.append(f"    B: {choices[1].strip()}")
@@ -337,6 +349,12 @@ def evaluate_subject(
         if correct:
             num_correct += 1
 
+        # Send feedback to planner if using executive mode
+        if use_executive:
+            feedback_sent = send_planner_feedback(zenoh_session, character, correct)
+            if not feedback_sent:
+                print(f"[{subject}] idx={idx:4d} WARNING: Failed to send planner feedback")
+
         print(
             f"[{subject}] idx={idx:4d} gold={gold} pred={pred or '?'} "
             f"{'✓' if correct else '✗'}  ({dt:.2f}s)"
@@ -416,7 +434,6 @@ def main():
             "college_mathematics",
             "formal_logic",
             "college_medicine",
-            "moral_disputes",
             "us_foreign_policy"
         ]
 

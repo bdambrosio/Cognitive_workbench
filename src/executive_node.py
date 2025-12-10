@@ -410,11 +410,11 @@ class ZenohExecutiveNode:
         except ImportError:
             pass
         
-        # Initialize SGLang.Runtime if available and configured
+        # Initialize SGLang.Runtime if available and configured 
         if HAS_SGLANG and sgl_model_path:
             try:
                 logger.info(f"🚀 Initializing SGLang Runtime with model: {sgl_model_path}")
-                if sgl_model_path.startswith("allenai/Olmo-3"):
+                if sgl_model_path.startswith("allenai/Olmo-3") or sgl_model_path.startswith("DevQuasar/Qwen.Qwen3-Next"):
                     self.runtime = sgl.Runtime(
                     model_path=sgl_model_path,
                     tokenizer_path=sgl_model_path,
@@ -438,10 +438,25 @@ class ZenohExecutiveNode:
                     )
                 sgl.set_default_backend(self.runtime)
                 logger.info(f'🤖 SGLang Runtime initialized (model={sgl_model_path})')
+                
+                # Start OpenAI-compatible API server on port 5000
+                try:
+                    from sglang_api_server import SGLangAPIServer
+                    self.api_server = SGLangAPIServer(
+                        runtime=self.runtime,
+                        model_path=sgl_model_path,
+                        port=5000
+                    )
+                    self.api_server.start()
+                    logger.info(f'🌐 OpenAI-compatible API server started on port 5000')
+                except Exception as e:
+                    logger.warning(f"Failed to start API server: {e}")
+                    self.api_server = None
             except Exception as e:
                 logger.error(f"Failed to initialize SGLang Runtime: {e}")
                 logger.info("Falling back to ZenohLLMClient")
                 self.runtime = None
+                self.api_server = None
         
         # Fallback to ZenohLLMClient if SGLang not available
         if not self.runtime:
@@ -522,13 +537,13 @@ class ZenohExecutiveNode:
         logger.info(f'📂 Loaded resources from file for {self.map_name}')
         
         self.infospace_executor = InfospaceExecutor(
-            character_name,
-            self.session,
-            self.map_name,
-            self.runtime or self.llm_client,  # Pass runtime if available, else llm_client
-            self.available_tools,
-            self,
-            self.resource_manager
+            agent_name=character_name,
+            session=self.session,
+            map_name=self.map_name,
+            llm_client=self.runtime or self.llm_client,  # Pass runtime if available, else llm_client
+            available_tools=self.available_tools,
+            executive_node=self,  # Pass actual executive node
+            resource_manager=self.resource_manager
         )
         # Share runtime with executor
         if self.runtime:
@@ -536,9 +551,7 @@ class ZenohExecutiveNode:
         logger.info(f'🧩 Infospace executor initialized for {character_name}')
         
         # Initialize planners (reused across all goals)
-        from templates import INFOSPACE_PRIMITIVES_REFERENCE
-        
-        
+ 
         # IncrementalPlanner for plan generation (SGLang-based)
         self.incremental_planner = None
         try:
@@ -547,12 +560,11 @@ class ZenohExecutiveNode:
             if HAS_SGLANG:
                 # Get SGLang model path from config
                 llm_config = self.character_config.get('llm_config', {})
-                sgl_model_path = llm_config.get('sgl_model_path')
+                sgl_model_path = llm_config.get('sgl_model_path')   
                 
                 self.incremental_planner = IncrementalPlanner(
                     executor=self.infospace_executor,
                     available_tools=self.available_tools,
-                    primitives_reference=INFOSPACE_PRIMITIVES_REFERENCE,
                     logger_instance=logger,
                     sgl_model_path=sgl_model_path
                 )
@@ -703,6 +715,12 @@ class ZenohExecutiveNode:
         self.clear_planner_bindings_queryable = self.session.declare_queryable(
             f"cognitive/{character_name}/clear_planner_bindings",
             self._clear_planner_bindings_handler
+        )
+        
+        # Queryable for planner feedback (character-specific)
+        self.planner_feedback_queryable = self.session.declare_queryable(
+            f"cognitive/{character_name}/planner/feedback",
+            self._planner_feedback_handler
         )
         
         # Shutdown flags
@@ -2142,6 +2160,52 @@ class ZenohExecutiveNode:
             response = {'success': False, 'error': str(e)}
             query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
     
+    def _planner_feedback_handler(self, query):
+        """
+        Handle query for planner feedback.
+        
+        Accepts:
+            {"outcome": true/false}
+        
+        Returns:
+            {"success": true/false, "error": "..." if failed}
+        """
+        try:
+            if not self.incremental_planner:
+                response = {
+                    'success': False,
+                    'error': 'IncrementalPlanner not available'
+                }
+                query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
+                return
+            
+            payload_bytes = query.payload.to_bytes() if query.payload else b'{}'
+            params = json.loads(payload_bytes.decode('utf-8')) if payload_bytes else {}
+            
+            outcome = params.get('outcome')
+            if outcome is None:
+                response = {'success': False, 'error': 'outcome field required'}
+                query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
+                return
+            
+            # Convert to bool if needed (handle string "true"/"false")
+            if isinstance(outcome, str):
+                outcome = outcome.lower() in ('true', '1', 'yes', 'on')
+            outcome = bool(outcome)
+            
+            # Call feedback method
+            result = self.incremental_planner._feedback(outcome)
+            
+            logger.info(f'📝 {self.character_name} received planner feedback: outcome={outcome}')
+            
+            query.reply(query.key_expr, json.dumps(result).encode('utf-8'))
+            
+        except Exception as e:
+            logger.error(f'Error in planner_feedback handler: {e}')
+            traceback.print_exc()
+            response = {'success': False, 'error': str(e)}
+            query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
+    
     def _sync_plan_execution_handler(self, query):
         """
         Handle query for synchronous plan execution.
@@ -2300,7 +2364,6 @@ class ZenohExecutiveNode:
             if self.current_plan:
                 self._publish_current_plan()
                 self.plan_just_generated = True
-                logger.info(f'📋 {self.character_name} generated plan with {len(self.current_plan["plan"])} steps')
             return
             
             # In manual mode, publish goal and auto-generate plan
@@ -2677,6 +2740,14 @@ class ZenohExecutiveNode:
                     logger.info(f'💾 Saved resource manager state for {self.map_name}')
                 except Exception as e:
                     logger.error(f'Error saving resource manager during shutdown: {e}')
+            
+            # Stop API server if running
+            if hasattr(self, 'api_server') and self.api_server:
+                try:
+                    self.api_server.stop()
+                    logger.info('🌐 API server stopped')
+                except Exception as e:
+                    logger.warning(f'Error stopping API server: {e}')
             
             # Publish shutdown event for cleanup
             try:
