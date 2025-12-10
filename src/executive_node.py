@@ -1133,6 +1133,8 @@ class ZenohExecutiveNode:
             
             # Handle special commands from User BEFORE processing as dialog
             if source == 'User':
+                if not clean_input.startswith('goal:'):
+                    clean_input = 'goal:' + clean_input
                 if clean_input.startswith('goal:'):
                     goal_preview = clean_input[:80] + ('...' if len(clean_input) > 80 else '')
                     logger.info(f'📥 {self.character_name} Received goal: "{goal_preview}"')
