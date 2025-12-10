@@ -1,7 +1,7 @@
 map: infolab.py
 # Cognitive Workbench Configuration
 llm_config:
-  sgl_model_path: "/home/bruce/vllm/models/Qwen3-Coder-30B-A3B-Instruct" ##Qwen/Qwen2.5-14B-Instruct" #microsoft/phi-4" #RedHatAI/Qwen2.5-14B-Instruct-FP8-dynamic"
+  sgl_model_path: "/home/bruce/vllm/models/Qwen3-Coder-30B-A3B-Instruct" #Qwen/Qwen2.5-14B-Instruct" #/home/bruce/vllm/models/Qwen3-Next-80B-A3B-Instruct-FP8"#/home/bruce/vllm/models/Qwen3-Coder-30B-A3B-Instruct" ##Qwen/Qwen2.5-14B-Instruct" #microsoft/phi-4" #RedHatAI/Qwen2.5-14B-Instruct-FP8-dynamic"
   grobid: "http://localhost:8070/"
   
 setting: |

@@ -75,7 +75,7 @@ class FAISSStore:
         # Ensure k > 0 for FAISS
         # If max_tokens is set, we may need more chunks to accumulate tokens, so increase k
         # Otherwise use limit as-is
-        k = min(limit if max_tokens is None else max(limit, limit * 3), len(self.documents))
+        k = min(limit if max_tokens is None else max(limit, limit * 2), len(self.documents))
         if k <= 0:
             return []
         
@@ -1180,8 +1180,8 @@ class InfospaceResourceManager:
         # Extract content for embedding
         content_str = self._extract_content_for_embedding(note_content, fields)
         
-        # Create chunks with overlap (1024 chars aligns with best practices)
-        chunks = self._create_chunks(content_str, chunk_size=1024, overlap=128)
+        # Create chunks with overlap
+        chunks = self._create_chunks(content_str, chunk_size=512, overlap=128)
         
         # Index each chunk
         indexed_count = 0
@@ -1243,10 +1243,10 @@ class InfospaceResourceManager:
             # Search for chunks (get more than limit for notes mode deduplication or token accumulation)
             # If max_tokens is set, we need more chunks to accumulate tokens, so increase search_limit
             if return_mode == 'notes':
-                search_limit = limit * 3
+                search_limit = limit * 2
             elif max_tokens is not None:
                 # For token accumulation, get more chunks than limit to have enough to accumulate
-                search_limit = max(limit, limit * 3)
+                search_limit = max(limit, limit * 2)
             else:
                 search_limit = limit
             

@@ -2,13 +2,15 @@ from ast import literal_eval
 from PyQt5.QtWidgets import (QApplication, QTextEdit, QVBoxLayout, QWidget, 
                             QPushButton, QDialog, QProgressDialog, QMessageBox,
                             QFileDialog)
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QThread, pyqtSignal, QUrl, QByteArray
+from PyQt5.QtNetwork import QNetworkAccessManager, QNetworkRequest, QNetworkReply
 from PyQt5.QtGui import QFont, QTextCursor
 from pathlib import Path
-import json, requests
+import json
 import sys
 import os
 import re
+from typing import Optional
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 
@@ -198,6 +200,145 @@ def clear_text():
     text_edit.setFont(textFont)
 
 
+# API configuration
+API_URL = "http://localhost:5000"
+_model_id_cache = None
+_network_manager = None
+
+
+def get_network_manager():
+    """Get or create QNetworkAccessManager."""
+    global _network_manager
+    if _network_manager is None:
+        _network_manager = QNetworkAccessManager()
+    return _network_manager
+
+
+def get_model_id(url: str = API_URL, callback=None):
+    """Get model ID from /v1/models endpoint. Uses Qt networking."""
+    global _model_id_cache
+    if _model_id_cache:
+        if callback:
+            callback(_model_id_cache)
+        return _model_id_cache
+    
+    manager = get_network_manager()
+    request = QNetworkRequest(QUrl(f"{url}/v1/models"))
+    request.setHeader(QNetworkRequest.ContentTypeHeader, "application/json")
+    
+    def handle_reply(reply):
+        global _model_id_cache
+        if reply.error() == QNetworkReply.NoError:
+            try:
+                data = json.loads(reply.readAll().data().decode('utf-8'))
+                if data.get("data") and len(data["data"]) > 0:
+                    _model_id_cache = data["data"][0]["id"]
+                    if callback:
+                        callback(_model_id_cache)
+            except Exception as e:
+                print(f"[WARNING] Failed to parse model ID: {e}")
+                if callback:
+                    callback(None)
+        else:
+            print(f"[WARNING] Failed to get model ID: {reply.errorString()}")
+            if callback:
+                callback(None)
+        reply.deleteLater()
+    
+    reply = manager.get(request)
+    reply.finished.connect(lambda: handle_reply(reply))
+    
+    return None  # Async, will call callback
+
+
+def submit_text():
+    """Submit current text to API and display response."""
+    raw_text = text_edit.toPlainText().strip()
+    if not raw_text:
+        QMessageBox.warning(window, "Warning", "No text to submit.")
+        return
+    
+    # Disable submit button during request
+    submit_button.setEnabled(False)
+    submit_button.setText("Submitting...")
+    
+    def send_chat_request(model_id, retry_count=0):
+        """Send chat request with given model ID."""
+        messages = [{"role": "user", "content": raw_text}]
+        payload = {
+            "model": model_id,
+            "messages": messages,
+            "temperature": 0.7,
+            "max_tokens": 2000
+        }
+        
+        manager = get_network_manager()
+        request = QNetworkRequest(QUrl(f"{API_URL}/v1/chat/completions"))
+        request.setHeader(QNetworkRequest.ContentTypeHeader, "application/json")
+        
+        payload_bytes = QByteArray(json.dumps(payload).encode('utf-8'))
+        
+        def handle_chat_reply(reply):
+            submit_button.setEnabled(True)
+            submit_button.setText("Submit")
+            
+            if reply.error() == QNetworkReply.NoError:
+                try:
+                    data = json.loads(reply.readAll().data().decode('utf-8'))
+                    if "choices" in data and len(data["choices"]) > 0:
+                        assistant_message = data["choices"][0]["message"]["content"]
+                        # Append response below the original text
+                        cursor = text_edit.textCursor()
+                        cursor.movePosition(QTextCursor.End)
+                        cursor.insertText("\n\n--- Response ---\n\n")
+                        cursor.insertText(assistant_message)
+                        text_edit.setTextCursor(cursor)
+                    else:
+                        QMessageBox.critical(window, "Error", f"Unexpected response format: {json.dumps(data, indent=2)}")
+                except Exception as e:
+                    QMessageBox.critical(window, "Error", f"Failed to parse response: {str(e)}")
+            else:
+                # Check if it's a model mismatch error
+                try:
+                    error_data = json.loads(reply.readAll().data().decode('utf-8'))
+                    error_detail = error_data.get("detail", "")
+                    
+                    # Check for model mismatch pattern: "Model 'X' not found. Available model: 'Y'"
+                    if "not found" in error_detail.lower() and "available model" in error_detail.lower():
+                        # Extract available model from error message
+                        import re
+                        match = re.search(r"Available model: ['\"]([^'\"]+)['\"]", error_detail)
+                        if match and retry_count == 0:
+                            available_model = match.group(1)
+                            global _model_id_cache
+                            _model_id_cache = available_model  # Update cache
+                            # Retry with correct model
+                            send_chat_request(available_model, retry_count=1)
+                            reply.deleteLater()
+                            return
+                    
+                    QMessageBox.critical(window, "Error", f"HTTP Error: {json.dumps(error_data, indent=2)}")
+                except:
+                    QMessageBox.critical(window, "Error", f"Request failed: {reply.errorString()}")
+            reply.deleteLater()
+        
+        reply = manager.post(request, payload_bytes)
+        reply.finished.connect(lambda: handle_chat_reply(reply))
+    
+    def on_model_id_received(model_id):
+        """Handle model ID and send chat request."""
+        if not model_id:
+            submit_button.setEnabled(True)
+            submit_button.setText("Submit")
+            QMessageBox.critical(window, "Error", "Could not determine model ID. Is the API server running?")
+            return
+        
+        send_chat_request(model_id)
+    
+    # Get model ID first (async)
+    get_model_id(API_URL, on_model_id_received)
+
+
 class ResponseDialog(QDialog):
     def __init__(self, response_text, parent=None):
         super().__init__(parent)
@@ -275,6 +416,13 @@ layout.addWidget(clear_button)
 
 # Connect the button's clicked signal to the function
 clear_button.clicked.connect(clear_text)
+
+# Create submit button for API calls
+submit_button = QPushButton("Submit")
+layout.addWidget(submit_button)
+
+# Connect submit button
+submit_button.clicked.connect(submit_text)
 
 # Set up the window
 window.setLayout(layout)

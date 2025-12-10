@@ -17,6 +17,9 @@ import sys
 from pathlib import Path
 from typing import Dict, List, Any, Optional
 
+# Global temperature setting for all gen() calls
+GEN_TEMPERATURE = 0.5
+
 # Configure logging with file handler
 # Add file handler directly to this module's logger (doesn't interfere with root logger config)
 logger = logging.getLogger(__name__)
@@ -278,7 +281,7 @@ Conditions (for use with if, while, wait):
 """
 
 
-def build_tool_catalog(available_tools: Dict[str, Dict], primitives_reference: str) -> Dict[str, Dict]:
+def build_tool_catalog(available_tools: Dict[str, Dict]) -> Dict[str, Dict]:
     """
     Build tool catalog from available tools + infospace primitives.
     
@@ -1068,9 +1071,9 @@ if HAS_SGLANG:
         
         # Stage 1: Analysis + tool selection
         system_parts = [
-            "You are a planning-and-acting assistant for information space operations.",
-            "You can choose tools/primitives, call them via JSON arguments,",
-            "and iteratively refine your plan until the goal is satisfied.\n"
+            "Your task is to achieve a stated goal in information space.",
+            "You choose tools/primitives (aka actions, if and as needed), call them via JSON arguments,",
+            "and iteratively execute-step / reflect / refineyour plan until the goal is satisfied.\n"
         ]
         
         
@@ -1112,18 +1115,18 @@ if HAS_SGLANG:
             "In doing so, consider the tools you have selected, the goal you are trying to achieve, and the downstream tasks that will be required to achieve the goal.\n"
             "Respond with the following fields, be concise and to the point:\n"
             "ANALYSIS: <text>\n"
-            "CARDINALITY_CHECK: <\"SINGLE\" or \"MULTIPLE/LIST\">. Does the question imply a unique answer (e.g., 'date of birth') or a potentially multi-value answer (e.g., 'children')? If MULTIPLE, your plan must be exhaustive.\n"
+            #"CARDINALITY_CHECK: <\"SINGLE\" or \"MULTIPLE/LIST\">. Does the question imply a unique answer (e.g., 'date of birth') or a potentially multi-value answer (e.g., 'children')? If MULTIPLE, your plan must be exhaustive.\n"
             "SELECTED_TOOLS_JSON: <json list of tool names>\n"
             "FIRST_TASK: <high-level subgoal to tackle first>\n"
         )
         
         s += assistant(
             "ANALYSIS: "
-            + gen("stage1_analysis", max_tokens=128, temperature=0.1, stop="\n")
+            + gen("stage1_analysis", max_tokens=128, temperature=GEN_TEMPERATURE, stop="\n")
             + "\nSELECTED_TOOLS_JSON: "
-            + gen("selected_tools_json", max_tokens=96, temperature=0.1, stop="\n")
+            + gen("selected_tools_json", max_tokens=96, temperature=GEN_TEMPERATURE, stop="\n")
             + "\nFIRST_TASK: "
-            + gen("first_task", max_tokens=96, temperature=0.1, stop="\n")
+            + gen("first_task", max_tokens=96, temperature=GEN_TEMPERATURE, stop="\n")
             + "\n"
         )
         
@@ -1195,9 +1198,9 @@ if HAS_SGLANG:
             
             s += assistant(
                 "TOOL_NAME: "
-                + gen(f"tool_name_{step}", max_tokens=32, temperature=0.1, stop="\n")
+                + gen(f"tool_name_{step}", max_tokens=32, temperature=GEN_TEMPERATURE, stop="\n")
                 + "\nTOOL_ARGS_JSON (max 1024 tokens): "
-                + gen(f"tool_args_{step}", max_tokens=1024, temperature=0.1, stop="\n")
+                + gen(f"tool_args_{step}", max_tokens=1024, temperature=GEN_TEMPERATURE, stop="\n")
                 + "\n"
             )
             
@@ -1243,13 +1246,13 @@ if HAS_SGLANG:
             
             s += assistant(
                 "THOUGHTS (Be concise): "
-                + gen(f"thoughts_{step}", max_tokens=128, temperature=0.1, stop="\n")
+                + gen(f"thoughts_{step}", max_tokens=128, temperature=GEN_TEMPERATURE, stop="\n")
                 + "\nDONE: "
-                + gen(f"done_{step}", max_tokens=8, temperature=0.1, stop="\n")
+                + gen(f"done_{step}", max_tokens=8, temperature=GEN_TEMPERATURE, stop="\n")
                 + "\nNEXT_TASK: "
-                + gen(f"next_task_{step}", max_tokens=128, temperature=0.1, stop="\n")
+                + gen(f"next_task_{step}", max_tokens=128, temperature=GEN_TEMPERATURE, stop="\n")
                 + "\nREQUEST_TOOLS: "
-                + gen(f"request_tools_{step}", max_tokens=96, temperature=0.1, stop=["\n\n", "\n\nSTAGE"])
+                + gen(f"request_tools_{step}", max_tokens=96, temperature=GEN_TEMPERATURE, stop=["\n\n", "\n\nSTAGE"])
                 + "\n"
             )
             logger.info(f"THOUGHTS: {s[f'thoughts_{step}']}")
@@ -1307,7 +1310,7 @@ if HAS_SGLANG:
                     final_prompt = "Summarize the results with focus on the original goal"
                 
                 s += user(f"FINAL TASK: {final_prompt}\nProvide a concise final answer.")
-                s += assistant(gen("final_answer", max_tokens=256, temperature=0.1, stop=["\n\n", "STAGE"]))
+                s += assistant(gen("final_answer", max_tokens=256, temperature=GEN_TEMPERATURE, stop=["\n\n", "STAGE"]))
                 logger.info(f"FINAL_ANSWER: {s['final_answer']}")
                 break
             
@@ -1396,7 +1399,7 @@ class IncrementalPlanner:
     """
     
     def __init__(self, executor, available_tools: Dict[str, Dict], 
-                 primitives_reference: str, logger_instance=None, sgl_model_path: str = None):
+                logger_instance=None, sgl_model_path: str = None):
         """
         Initialize incremental planner.
         
@@ -1412,7 +1415,6 @@ class IncrementalPlanner:
         
         self.executor = executor
         self.available_tools = available_tools
-        self.primitives_reference = primitives_reference
         self.logger = logger_instance or logger
         
         # SGLang runtime is now initialized in executive_node
@@ -1421,7 +1423,7 @@ class IncrementalPlanner:
             self.logger.warning("SGLang runtime not available in executor - incremental planner may have reduced functionality")
         
         # Build tool catalog
-        self.tools = build_tool_catalog(available_tools, primitives_reference)
+        self.tools = build_tool_catalog(available_tools)
         self.tools_catalog_text = tool_catalog_text(self.tools)
         self.logger.info(f"IncrementalPlanner initialized with {len(self.tools)} tools")
         
@@ -1462,7 +1464,7 @@ class IncrementalPlanner:
             
             # Attach plan_actions list to executor for tracking
             self.executor._plan_actions = []
-            
+            self.goal = goal
             # Extract context components
             character_context = ""
             recent_context = ""
@@ -1483,6 +1485,7 @@ class IncrementalPlanner:
             
             # Extract plan actions from executor
             plan_actions = getattr(self.executor, '_plan_actions', [])
+            self.executor._plan_actions = plan_actions
             
             # Extract final_answer from ProgramState (use bracket notation)
             try:
@@ -1501,3 +1504,37 @@ class IncrementalPlanner:
             traceback.print_exc()
             return {'error': str(e)}
 
+    def _feedback(self, outcome: bool) -> Dict:
+        """
+        Record feedback about plan execution outcome.
+        
+        Args:
+            outcome: True if plan was correct/successful, False otherwise
+            
+        Returns:
+            Dict with success status
+        """
+        feedback_dir = os.path.join(os.path.dirname(__file__), 'data', 'planner_feedback')
+        os.makedirs(feedback_dir, exist_ok=True)
+        
+        feedback_file = os.path.join(feedback_dir, 'jsonl')
+        
+        # Get goal and plan from current state
+        goal = getattr(self, 'goal', '')
+        plan_actions = getattr(self.executor, '_plan_actions', [])
+        
+        # Create feedback record
+        feedback_record = {
+            'outcome': outcome,
+            'goal': goal,
+            'plan': plan_actions
+        }
+        
+        # Append to JSONL file
+        with open(feedback_file, 'a', encoding='utf-8') as f:
+            json.dump(feedback_record, f, ensure_ascii=False)
+            f.write('\n')
+        
+        self.logger.info(f"Recorded feedback: outcome={outcome}, goal={goal[:50]}...")
+        
+        return {'success': True}
