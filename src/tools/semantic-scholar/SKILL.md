@@ -49,32 +49,21 @@ examples:
 
 ## Common Workflows
 
-### Pattern 1: Quick summary
-Results are already a Collection - summarize directly (NO split needed):
+**Search and summarize:**
 ```json
 {"type":"semantic-scholar","value":"BERT model","out":"$papers"}
 {"type":"summarize","target":"$papers","focus":"what is BERT","out":"$summary"}
-{"type":"say","target":"user","value":"$summary"}
 ```
 
-### Pattern 2: Get full text from papers
-With GROBID configured, full text is already in `text` field. No need for fetch-text:
+**Get full text (GROBID configured):**
 ```json
 {"type":"semantic-scholar","value":"GPT architecture","out":"$papers"}
 {"type":"pluck","target":"$papers","field":"text","out":"$full_texts"}
 ```
-Note: If GROBID is not configured, extract PDF URLs and use fetch-text:
-```json
-{"type":"semantic-scholar","value":"GPT architecture","out":"$papers"}
-{"type":"project","target":"$papers","fields":["metadata.uri"],"out":"$urls"}
-{"type":"map","target":"$urls","operation":"fetch-text","out":"$full_texts"}
-```
 
-### Pattern 3: Filter and analyze
-Filter Collection directly (NO split needed):
+**Filter results:**
 ```json
 {"type":"semantic-scholar","value":"neural networks","out":"$papers"}
 {"type":"filter-collection","target":"$papers","predicate":"citations > 1000","out":"$top_papers"}
-{"type":"relate","target":"$top_papers","out":"$analysis"}
 ```
 

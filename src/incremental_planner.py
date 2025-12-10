@@ -145,21 +145,22 @@ except ImportError:
     # Mock function decorator to avoid ImportErrors on definition
     def function(f): return f
 
-
 INCREMENTAL_PLAN_SPECIFICATIONS = """
 # INFOSPACE TYPE SYSTEM & RULES
 
 Types:
-- Note: Single value/document (persists across restarts)
+- Note: Single value/document 
   - Can be named (e.g., "my-note") for stable referencing via load
   - Named Notes can be loaded by name or by ID (e.g., "Note_123")
-- Collection: List of Note/Collection IDs (session-local only)
+- Collection: List of Note/Collection IDs 
   - Can be named (e.g., "my-collection") for stable referencing via load
   - Named Collections can be loaded by name or by ID (e.g., "Collection_456")
-- Variables: Plan-local names referencing Notes/Collections. Variables *always* start with "$".
+- Variable: a session-local name referencing Notes/Collections. Variables *always* start with "$".
 
-Action Field Syntax:
-- ALWAYS use "$variable" for references (target, value, source, out fields)
+Action Syntax:
+- An action is a JSON object specifying the application of a primitive or tool. 
+  - e.g. {"type": "primitive or tool name", "target": "$variable_a", "value": "literal_value", "out": "$variable_b"} 
+- ALWAYS use "$variable" for references (e.g. target, value, source, or out fields)
 - Correct: {"target": "$my_variable"}
 - Wrong: {"target": "my_variable"}
 - Note reference by ID or name: Use directly without $ (e.g., "target": "Note_123" or "target": "attention-note")
@@ -168,7 +169,7 @@ Action Field Syntax:
 - Literal numbers: Use directly without $ (e.g., "value": 123)
 - Literal booleans: Use directly without $ (e.g., "value": true)
 
-Operation Compatibility:
+Primitive Action / Type Compatibility:
 Operation_name: applicable to: <Note | Collection | Note, Collection>;   Purpose
  - split: Note;  Note structure → Collection
  - flatten: Collection;  Collection → single Note
@@ -251,7 +252,8 @@ Common Patterns:
 - Add all items from one Collection to another: {"type":"union","target":"$target_collection","value":"$source_collection","out":"$target_collection"}
 - Combine two Collections into new one: {"type":"union","target":"$coll1","value":"$coll2","out":"$combined"}
 
-Tool Selection:
+# Tool Selection (only if tool is in the tool catalog):
+General Tools:
 - Academic papers: semantic-scholar (provides abstracts, citations, PDFs)
 - General web: query-web (broad coverage, recent content)
 - Single URL fetch: fetch-text (NOT for query-web/semantic-scholar results)
@@ -267,7 +269,7 @@ Boolean Tools (return true/false):
 - is-question: Check if text contains a question
 Result shows as Note with boolean content (True/False) - inspect actual value when needed
 
-Conditions (for use with if, while, wait):
+Condition Tools:
 - bound: {"type": "bound", "target": "$var"} - true if $var exists
 - notbound: {"type": "notbound", "target": "$var"} - true if $var doesn't exist
 - has_value: {"type": "has_value", "target": "$var"} - true if $var is truthy
@@ -294,7 +296,7 @@ def build_tool_catalog(available_tools: Dict[str, Dict]) -> Dict[str, Dict]:
     # Expanded primitive documentation from INFOSPACE_PRIMITIVES_REFERENCE
     PRIMITIVE_DOCS = {
         "create-collection": {
-            "description": "Create a Collection object and bind to variable. IMPORTANT: The 'name' parameter (optional) creates a named Collection that can be loaded by name later. Variable names in 'out' (e.g., '$my_collection') are just bindings, NOT collection names.",
+            "description": "Create a Collection object and bind to variable.",
             "full_description": "Create a session-local Collection object and bind to variable. Collections store references to Notes. The optional 'name' parameter registers the Collection with a stable name for later loading (e.g., load by 'research' name). Variable names like '$my_collection' are temporary bindings during plan execution, not persistent names.",
             "parameters": {
                 "value": "required: array of $variables or empty array",
@@ -1073,18 +1075,17 @@ if HAS_SGLANG:
         system_parts = [
             "Your task is to achieve a stated goal in information space.",
             "You choose tools/primitives (aka actions, if and as needed), call them via JSON arguments,",
-            "and iteratively execute-step / reflect / refineyour plan until the goal is satisfied.\n"
+            "and iteratively execute-step / reflect / refine your plan until the goal is satisfied.\n"
         ]
-        
-        
         
         system_parts.append(f"\n{INCREMENTAL_PLAN_SPECIFICATIONS}\n")
         system_parts.append(
-            "You will work in repeated cycles:\n"
             "Stage 1 (once): Analyze goal, select relevant tools, decompose into FIRST_TASK.\n"
-            "Stage 2 (loop): Pick a single tool and JSON args for CURRENT_TASK.\n"
-            "Stage 3 (loop): Reflect on result, decide if goal done, set NEXT_TASK.\n\n"
-            "ALWAYS follow formatting instructions exactly."
+            "Stage 1.5 (once): Load and inject detailed docs for selected tools.\n"
+            "Then you will work in repeated cycles to achieve the goal:\n"
+            "    - Stage 2: Pick a single tool and JSON args for CURRENT_TASK.\n"
+            "    - Stage 3: Reflect on result, decide if goal done, set NEXT_TASK.\n\n"
+            "ALWAYS follow all formatting instructions exactly."
         )
         
         s += system("".join(system_parts))

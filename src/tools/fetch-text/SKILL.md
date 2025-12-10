@@ -42,13 +42,11 @@ HTML page:
 {"type":"fetch-text","target":"https://example.com/article.html","out":"$article_text"}
 ```
 
-Collection input (requires extracting URLs first):
+Collection input (extract URLs first):
 ```json
 {"type":"project","target":"$papers","fields":["metadata.uri"],"out":"$urls"}
 {"type":"fetch-text","target":"$urls","out":"$paper_text"}
 ```
-
-**Note**: `fetch-text` cannot directly process Collections of structured Notes (e.g., from `semantic-scholar`). You must first extract the URL field using `project`, then pass the resulting Collection of URL strings to `fetch-text`.
 
 ## Differences from query-web
 - **fetch-text**: Gets ALL text from a single URL (no filtering, no search)

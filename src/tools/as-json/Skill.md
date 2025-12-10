@@ -61,54 +61,24 @@ Accepts a Note containing JSON (clean or embedded):
 
 ## Examples
 
-**Example 1: Extract first match**
+**Extract first match:**
+Input: `{"results": [{"url": "https://example.com/1"}, {"url": "https://example.com/2"}]}`  
+field: "url"  
+Output: `https://example.com/1`
 
-Input:
-{"results": [
-  {"url": "https://example.com/1", "title": "First"},
-  {"url": "https://example.com/2", "title": "Second"}
-]}
+**Extract all matches:**
+Input: `{"results": [{"url": "https://example.com/1"}, {"url": "https://example.com/2"}]}`  
+field: "url", all: true  
+Output: `https://example.com/1\nhttps://example.com/2`
 
-field: "url"
+**Strip code fence:**
+Input: `Here's the data:\n\`\`\`json\n{"count": 42}\n\`\`\``  
+field: "count"  
+Output: `42`
 
-Output: 
-https://example.com/1
-
-**Example 2: Extract all matches**
-
-Input:
-{"results": [
-  {"url": "https://example.com/1", "title": "First"},
-  {"url": "https://example.com/2", "title": "Second"}
-]}
-
-field: "url", all: true
-
-Output: 
-https://example.com/1
-https://example.com/2
-
-**Example 3: Strip code fence**
-
-Input:
-Here's the data:
-```json
-{"status": "success", "count": 42}
-```
-
-field: "count"
-
-Output: 
-42
-
-**Example 4: Missing field returns null**
-
-Input: 
-{"name": "Alice"}
-
-Field: "email"
-
-Output: 
-note-null
+**Missing field:**
+Input: `{"name": "Alice"}`  
+field: "email"  
+Output: `note-null`
 
 Output ONLY the selected information as shown above, no introductory, explanatory, reasoning, code fences, etc.
