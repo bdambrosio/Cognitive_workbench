@@ -96,35 +96,25 @@ When focus is provided, content filtering is intentionally **lenient**:
 
 ## Example Usage Patterns
 
-### Default: Balanced Technical Summary
+**Default (technical, 3:1 compression):**
 ```json
 {"type":"summarize","target":"$papers","out":"$summary"}
 ```
-→ 3:1 compression, technical style, no filtering
-→ Input: 30K tokens → Output: ~10K tokens
 
-### Executive Brief with Focus
+**Executive brief with focus:**
 ```json
 {"type":"summarize","target":"$reports","focus":"cost analysis","style":"executive","out":"$brief"}
 ```
-→ Filters for cost-related content (leaky)
-→ Caps output at 500 words regardless of input size
-→ Input: 50K tokens → Filtered: 15K tokens → Output: 400 words
 
-### Detailed Focused Analysis
+**Detailed focused analysis:**
 ```json
 {"type":"summarize","target":"$papers","focus":"transformer attention","compression_ratio":2.5,"out":"$detailed"}
 ```
-→ Filters for attention content
-→ Low compression (2.5:1 = 40% of focused content)
-→ Input: 40K tokens → Filtered: 12K tokens → Output: ~5K tokens
 
-### Comprehensive Review
+**Comprehensive review:**
 ```json
 {"type":"summarize","target":"$document","style":"comprehensive","out":"$full_analysis"}
 ```
-→ 2:1 compression, preserves nuance
-→ Input: 20K tokens → Output: ~10K tokens
 
 ## Information-Theoretic Design
 

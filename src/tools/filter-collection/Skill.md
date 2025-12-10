@@ -108,84 +108,20 @@ Write predicates as natural language conditions. The tool evaluates each item's 
 
 ## Examples
 
-### Example 1: Content Filtering
+**Content filtering:**
+predicate: "contains code or implementation details"  
+Input: Collection with 3 items  
+Output: Collection with 2 matching items
 
-**Input (target):**
-```json
-[
-  {"id": "1", "content": "How to build a neural network from scratch with code examples"},
-  {"id": "2", "content": "Overview of deep learning theory and mathematical foundations"},
-  {"id": "3", "content": "Implementing transformers in PyTorch with complete tutorial"}
-]
-```
+**Complex logic:**
+predicate: "mentions safety AND published after 2024"  
+Input: Collection with 4 items  
+Output: Collection with 2 matching items
 
-**Parameters (args):**
-```json
-{
-  "predicate": "contains code or implementation details"
-}
-```
-
-**Output:**
-```json
-[
-  {"id": "1", "content": "How to build a neural network from scratch with code examples"},
-  {"id": "3", "content": "Implementing transformers in PyTorch with complete tutorial"}
-]
-```
-
-### Example 2: Complex Logic
-
-**Input (target):**
-```json
-[
-  {"title": "AI Safety Research Agenda", "date": "2025-01"},
-  {"title": "Historical AI Developments", "date": "2020-06"},
-  {"title": "AI Safety Implementation Guide", "date": "2024-12"},
-  {"title": "Machine Learning Basics", "date": "2025-02"}
-]
-```
-
-**Parameters (args):**
-```json
-{
-  "predicate": "mentions safety AND published after 2024"
-}
-```
-
-**Output:**
-```json
-[
-  {"title": "AI Safety Research Agenda", "date": "2025-01"},
-  {"title": "AI Safety Implementation Guide", "date": "2024-12"}
-]
-```
-
-### Example 3: Exclusion Mode
-
-**Input (target):**
-```json
-[
-  "Theoretical framework for AGI",
-  "Practical deployment of ML models in production",
-  "Abstract mathematical proofs in learning theory"
-]
-```
-
-**Parameters (args):**
-```json
-{
-  "predicate": "purely theoretical without practical applications",
-  "mode": "exclude"
-}
-```
-
-**Output:**
-```json
-[
-  "Practical deployment of ML models in production"
-]
-```
+**Exclusion mode:**
+predicate: "purely theoretical without practical applications", mode: "exclude"  
+Input: Collection with 3 items  
+Output: Collection with 1 non-matching item
 
 ## Error Handling
 

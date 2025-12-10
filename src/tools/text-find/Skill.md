@@ -65,27 +65,7 @@ Returns null if no matches found.
 
 ## Example
 
-**Input Note:**
-```
-Line 1: Normal text
-Line 2: TODO: Fix bug
-Line 3: More text
-Line 4: TODO: Review code
-```
-
-**Pattern:** "TODO"
-
-**Output Note:**
-```
-Found 2 matches:
-
-Match 1 (line 2):
-Line 1: Normal text
-Line 2: TODO: Fix bug
-Line 3: More text
-
-Match 2 (line 4):
-Line 3: More text
-Line 4: TODO: Review code
-```
+**Input:** Note with text containing "TODO" on lines 2 and 4  
+**Pattern:** "TODO"  
+**Output:** Note with 2 matches, each showing line number, matched text, and 1 line of context before/after
 

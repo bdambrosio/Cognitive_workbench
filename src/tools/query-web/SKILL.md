@@ -54,26 +54,15 @@ Each Note in the returned Collection contains:
 
 ## Common Workflows
 
-### Pattern 1: Search and summarize for user
-When user needs direct answer, summarize Collection directly:
+**Search and summarize:**
 ```json
 {"type":"query-web","value":"what are transformers in AI","out":"$results"}
 {"type":"summarize","target":"$results","focus":"what are transformers","out":"$summary"}
-{"type":"say","target":"user","value":"$summary"}
 ```
 
-### Pattern 2: Search and process Collection
-Results are already a Collection - use map/filter directly (NO split needed):
+**Filter results:**
 ```json
 {"type":"query-web","value":"transformer papers","out":"$results"}
 {"type":"filter-collection","target":"$results","predicate":"contains arxiv.org","out":"$arxiv_only"}
-```
-
-### Pattern 3: Get full text from search results
-Extract URLs using project, then fetch full text:
-```json
-{"type":"query-web","value":"transformer papers","out":"$results"}
-{"type":"project","target":"$results","fields":["metadata.uri"],"out":"$urls"}
-{"type":"map","target":"$urls","operation":"fetch-text","out":"$full_texts"}
 ```
 

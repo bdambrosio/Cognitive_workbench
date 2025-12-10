@@ -42,11 +42,9 @@ Generate with context Note:
 {"type":"generate-note","prompt":"Refactor this code to use async/await","style":"code","context":"$existing_code","out":"$refactored"}
 ```
 
-Generate with context Collection (RAG pattern):
+Generate with context Collection:
 ```json
-{"type":"search-notes","query":"conversation history","out":"$history"}
-{"type":"create-collection","value":["$history"],"out":"$context_collection"}
-{"type":"generate-note","prompt":"Write a response to the user based on conversation history","context":"$context_collection","out":"$response"}
+{"type":"generate-note","prompt":"Write a response based on conversation history","context":"$context_collection","out":"$response"}
 ```
 
 ## Differences from refine

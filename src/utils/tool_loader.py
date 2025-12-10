@@ -188,10 +188,7 @@ def load_tools(tools_dir_path: str) -> Dict[str, Dict]:
             
             if not python_file:
                 logger.warning(f"Tool {tool_name} type is 'python' but no tool.py or {tool_name}.py found")
-            
-            if not trusted:
-                logger.warning(f"Tool {tool_name} type is 'python' but trusted is not true")
-        
+                    
         # Collect additional files in the tool directory
         additional_files = [
             f.name for f in tool_dir.iterdir() 
