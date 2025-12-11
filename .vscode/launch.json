@@ -27,7 +27,7 @@
             "env": {
                 "PYTHONPATH": "${workspaceFolder}/src"
             },
-            "args": [],
+            "args": ["--scenario", "scenarios/jill.yaml"],
             "justMyCode": false,
             "stopOnEntry": false,
             "preLaunchTask": "setup-zenoh-environment"

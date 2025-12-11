@@ -8,12 +8,15 @@ Assumes Jill is running. Uses:
 - plan_result subscription to receive responses
 
 Usage:
-    python tests/chat_cli.py
+    python tests/chat_cli.py [--scenario SCENARIO_FILE]
 """
 
+import argparse
 import json
+import os
 import sys
 import threading
+import yaml
 import zenoh
 
 CHARACTER = "Jill"
@@ -72,12 +75,67 @@ def shutdown_conversation(session):
 
 
 def main():
+    parser = argparse.ArgumentParser(description='CLI chat demo using Cognitive Workbench Zenoh APIs')
+    parser.add_argument('--scenario', type=str, default=None, help='Path to scenario YAML file (e.g., scenarios/jill.yaml)')
+    args = parser.parse_args()
+    
     print("🐱 Silly Kitten Chat Demo")
     print("=" * 40)
     print(f"Connecting to {CHARACTER}...")
     
     config = zenoh.Config()
     session = zenoh.open(config)
+    
+    # Load scenario if provided and create note
+    scenario_note_name = None
+    if args.scenario:
+        try:
+            scenario_path = args.scenario
+            if not os.path.isabs(scenario_path):
+                # Try relative to project root
+                project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                scenario_path = os.path.join(project_root, scenario_path)
+            
+            with open(scenario_path, 'r') as f:
+                scenario_data = yaml.safe_load(f)
+            
+            characters = scenario_data.get('characters', {})
+            if characters:
+                # Get first character
+                first_char_name = list(characters.keys())[0]
+                char_data = characters[first_char_name]
+                
+                character_desc = char_data.get('character', '').strip()
+                backstory = char_data.get('backstory', '').strip()
+                drives = char_data.get('drives', [])
+                
+                # Format drives
+                if isinstance(drives, list):
+                    drives_text = '\n'.join(f"- {d}" for d in drives)
+                else:
+                    drives_text = str(drives)
+                
+                # Build scenario content
+                scenario_content = f"You are {first_char_name}\n\n"
+                if character_desc:
+                    scenario_content += f"{character_desc}\n\n"
+                if backstory:
+                    scenario_content += f"{backstory}\n\n"
+                if drives_text:
+                    scenario_content += f"{drives_text}\n\n"
+                scenario_content += "respond to User, who just said:\n\n"
+                
+                # Create note with scenario content
+                scenario_note_name = "scenario_context"
+                result = create_note(session, scenario_content, name=scenario_note_name)
+                if result.get("success"):
+                    print(f"✓ Created scenario note: {scenario_note_name}")
+                else:
+                    print(f"✗ Failed to create scenario note: {result.get('error', result.get('reason', 'unknown'))}")
+                    scenario_note_name = None
+        except Exception as e:
+            print(f"[WARNING] Failed to load scenario: {e}")
+            scenario_note_name = None
     
     # Response state
     response_received = threading.Event()
@@ -143,10 +201,18 @@ def main():
                 print(f"[ERROR] Failed to create user note: {result}")
                 continue
             
-            # Step 2: Send goal to Jill
+            # Step 2: Format goal text with scenario note load instruction if applicable
+            if scenario_note_name:
+                goal_text = (
+                    f"First load the note '{scenario_note_name}' to get context about your character and role.\n\n"
+                    f"{user_input}\n\n"
+                )
+            else:
+                goal_text = (
+                    f"{user_input}\n\n"
+                )
             
-            goal_text = (
-                f"{user_input}'\n\n"
+            goal_text += (
                 f"Context: the 'conversation' Collection contains the history of this conversation.\n"
                 f"  the 'conversation_history' Collection contains summaries of past conversations.\n\n"
                 f"When crafting your response:\n"
