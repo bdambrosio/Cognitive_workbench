@@ -589,6 +589,7 @@ class ZenohExecutiveNode:
         self.text_input_queue = []
         self.action_history = []  # List of ActionRecord instances
         self.last_say_text = ''
+        self._last_published_final_answer = None  # Track last published final_answer to prevent duplicates
         
         # Ask primitive state
         self.awaiting_ask_response = False
@@ -824,16 +825,20 @@ class ZenohExecutiveNode:
             # Start OODA loop
             while not self.shutdown_requested:
                 # Check if there's a goal in queue that should unpause execution
+                # (either explicit 'goal:' prefix or User text that will be converted to goal)
                 if self.execution_paused and self.text_input_queue:
                     for queued in self.text_input_queue:
                         content = queued.get('content', '')
                         try:
                             content_data = json.loads(content)
                             text = content_data.get('text', '')
+                            source = content_data.get('source', 'unknown')
                         except (json.JSONDecodeError, TypeError):
                             text = content
-                        if text.strip().startswith('goal:'):
-                            logger.info(f'🚀 Goal in queue, unpausing execution')
+                            source = 'console'
+                        # Unpause for explicit goals OR User text (which gets converted to goal)
+                        if text.strip().startswith('goal:') or source == 'User':
+                            logger.info(f'🚀 Goal/User input in queue, unpausing execution')
                             self.execution_paused = False
                             self._publish_execution_state()
                             break
@@ -1112,6 +1117,91 @@ class ZenohExecutiveNode:
         
         self.plan_result_publisher.put(json.dumps(plan_result))
         logger.info(f'📤 Published plan_result for {self.character_name}')
+        
+        # Publish final_answer as a "say" action to User so it appears in action log
+        # Only publish if final_thoughts is non-empty, meaningful, and different from last_say_text
+        # (to avoid duplicating the actual say action that was already published)
+        final_thoughts_clean = final_thoughts.strip() if final_thoughts else ''
+        # Require meaningful content: at least 20 chars and not just whitespace/punctuation
+        if final_thoughts_clean and len(final_thoughts_clean) >= 20 and final_thoughts_clean.replace(' ', '').replace('.', '').replace(',', '').replace('!', '').replace('?', '').strip():
+            last_say = (getattr(self, 'last_say_text', '') or '').strip()
+            # Only publish if final_thoughts is different from the last say action
+            # This prevents duplicating the actual say action content
+            if final_thoughts_clean != last_say:
+                # Check if we've already published this final_answer for this plan
+                plan_id = getattr(self, 'current_plan_id', None)
+                last_published_final = getattr(self, '_last_published_final_answer', None)
+                if last_published_final != final_thoughts_clean:
+                    final_answer_action = {
+                        'type': 'say',
+                        'action_type': 'say',
+                        'action_id': f'final_answer_{int(time.time() * 1000)}',
+                        'timestamp': datetime.now().isoformat(),
+                        'text': final_thoughts_clean,
+                        'source': self.character_name,
+                        'target': 'User',
+                        'is_text_only': True
+                    }
+                    self.action_publisher.put(json.dumps(final_answer_action))
+                    self._last_published_final_answer = final_thoughts_clean
+                    logger.info(f'📤 Published FINAL_ANSWER to action log: {final_thoughts_clean[:100]}...')
+                else:
+                    logger.debug(f'Skipping final_answer publication - already published for this plan')
+            else:
+                logger.debug(f'Skipping final_answer publication - same as last_say_text')
+        elif final_thoughts_clean:
+            # Log when we skip due to insufficient content (for debugging)
+            logger.debug(f'Skipping final_answer publication - content too short or only punctuation: "{final_thoughts_clean[:50]}..."')
+
+    def _create_character_note(self):
+        """
+        Create the character note with character_name as the note name.
+        Only creates if it doesn't already exist (once per session).
+        """
+        if not self.infospace_executor or not self.resource_manager:
+            logger.warning('Infospace executor or resource manager not available, skipping character note creation')
+            return False
+        
+        # Check if character note already exists
+        if self.character_name in self.resource_manager.named_notes:
+            logger.info(f'Character note "{self.character_name}" already exists, skipping creation')
+            return True
+        
+        # Build scenario content from character config
+        character_desc = self.character_config.get('character', '').strip()
+        backstory = self.character_config.get('backstory', '').strip()
+        drives = self.character_config.get('drives', [])
+        
+        # Format drives
+        if isinstance(drives, list):
+            drives_text = '\n'.join(f"- {d}" for d in drives)
+        else:
+            drives_text = str(drives)
+        
+        # Build scenario content
+        scenario_content = f"You are {self.character_name}\n\n"
+        if character_desc:
+            scenario_content += f"{character_desc}\n\n"
+        if backstory:
+            scenario_content += f"{backstory}\n\n"
+        if drives_text:
+            scenario_content += f"{drives_text}\n\n"
+        scenario_content += "respond to User, who just said:\n\n"
+        
+        # Create note with character_name as the note name
+        create_action = {
+            "type": "create-note",
+            "value": scenario_content,
+            "name": self.character_name,
+            "out": "$character_note"
+        }
+        result = self.infospace_executor.execute_action(create_action)
+        if result.get('status') == 'success':
+            logger.info(f'✓ Created character note: "{self.character_name}"')
+            return True
+        else:
+            logger.warning(f'Failed to create character note: {result.get("reason", "unknown")}')
+            return False
 
     def _process_text_input(self):
         """Process one queued text input."""
@@ -1133,12 +1223,30 @@ class ZenohExecutiveNode:
             
             # Handle special commands from User BEFORE processing as dialog
             if source == 'User':
-                if not clean_input.startswith('goal:'):
-                    clean_input = 'goal:' + clean_input
                 if clean_input.startswith('goal:'):
+                    # Explicit goal command - process as before
                     goal_preview = clean_input[:80] + ('...' if len(clean_input) > 80 else '')
                     logger.info(f'📥 {self.character_name} Received goal: "{goal_preview}"')
                     self.parse_and_set_goal(clean_input)
+                    return  # Don't process as speech
+                else:
+                    # Regular user input - ensure character note exists and load it
+                    # Create character note if it doesn't exist (only once per session)
+                    self._create_character_note()
+                    
+                    # Prepend load instruction to user input using character_name
+                    formatted_input = f"""First load the note '{self.character_name}' to get context about your character and role.\n
+Then plan and act to address the following User-provided task: \n\n{clean_input}\n\n
+Finally, using 'say', respond in character to User"""
+                    
+                    # Convert to goal format
+                    clean_input = 'goal:' + formatted_input
+                    goal_preview = clean_input[:80] + ('...' if len(clean_input) > 80 else '')
+                    logger.info(f'📥 {self.character_name} Received goal: "{goal_preview}"')
+                    self.parse_and_set_goal(clean_input)
+                    # Unpause execution so plan executes immediately (same as explicit goal: prefix)
+                    self.execution_paused = False
+                    self._publish_execution_state()
                     return  # Don't process as speech
             
             # Normal dialog processing

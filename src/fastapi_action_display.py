@@ -2779,12 +2779,7 @@ Generated: {generated_at}
         function addActionEntry(actionData) {
             console.log('Adding action entry:', actionData);
             
-            // Handle display action type - show in popup modal instead of inline
             const typeLower = (actionData.action_type || '').toLowerCase();
-            if (typeLower === 'display') {
-                showDisplayModal(actionData);
-                return;
-            }
             
             // Handle ask action type - show indicator
             if (typeLower === 'ask') {
@@ -4313,15 +4308,6 @@ Generated: {generated_at}
             if action_data.get('type') == 'announcement':
                 self._handle_character_announcement(action_data, character_name)
                 # Send announcement to web clients so tabs can be created
-                self._send_to_websockets(action_data, character_name)
-                return
-            
-            # Handle display actions - trigger UI modal
-            if action_data.get('type') == 'display':
-                logger.info(f"📺 Display action from {character_name}: {len(action_data.get('text', ''))} chars")
-                # Add display flag for UI to trigger modal
-                action_data['is_display_modal'] = True
-                # Send to web clients to trigger modal
                 self._send_to_websockets(action_data, character_name)
                 return
             
