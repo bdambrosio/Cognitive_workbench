@@ -550,6 +550,9 @@ class ZenohExecutiveNode:
             self.infospace_executor.runtime = self.runtime
         logger.info(f'🧩 Infospace executor initialized for {character_name}')
         
+        # Initialize conversation collections
+        self._initialize_conversation_collections()
+        
         # Initialize planners (reused across all goals)
  
         # IncrementalPlanner for plan generation (SGLang-based)
@@ -1145,6 +1148,9 @@ class ZenohExecutiveNode:
                     self.action_publisher.put(json.dumps(final_answer_action))
                     self._last_published_final_answer = final_thoughts_clean
                     logger.info(f'📤 Published FINAL_ANSWER to action log: {final_thoughts_clean[:100]}...')
+                    
+                    # Create note with FINAL_ANSWER and add to conversation collection
+                    self._add_to_conversation(f"Jill responds: {final_thoughts_clean}")
                 else:
                     logger.debug(f'Skipping final_answer publication - already published for this plan')
             else:
@@ -1152,6 +1158,141 @@ class ZenohExecutiveNode:
         elif final_thoughts_clean:
             # Log when we skip due to insufficient content (for debugging)
             logger.debug(f'Skipping final_answer publication - content too short or only punctuation: "{final_thoughts_clean[:50]}..."')
+
+    def _initialize_conversation_collections(self):
+        """
+        Initialize conversation collections on startup.
+        Creates 'conversation_history' collection if it doesn't exist and makes it persistent.
+        Creates 'conversation' collection if it doesn't exist.
+        """
+        if not self.infospace_executor:
+            logger.warning('Infospace executor not available, skipping conversation collection initialization')
+            return
+        
+        try:
+            # Check if conversation_history exists, create if not
+            load_action = {
+                "type": "load",
+                "target": "conversation_history",
+                "out": "$conv_history"
+            }
+            result = self.infospace_executor.execute_action(load_action)
+            
+            if result.get('status') != 'success' or not result.get('resource_id'):
+                # Collection doesn't exist, create it
+                create_action = {
+                    "type": "create-collection",
+                    "name": "conversation_history",
+                    "out": "$conv_history"
+                }
+                result = self.infospace_executor.execute_action(create_action)
+                if result.get('status') == 'success':
+                    # Make it persistent
+                    persist_action = {
+                        "type": "persist",
+                        "target": "$conv_history"
+                    }
+                    persist_result = self.infospace_executor.execute_action(persist_action)
+                    if persist_result.get('status') == 'success':
+                        logger.info(f'✓ Created and persisted conversation_history collection')
+                    else:
+                        logger.warning(f'Failed to persist conversation_history: {persist_result.get("reason", "unknown")}')
+                else:
+                    logger.warning(f'Failed to create conversation_history: {result.get("reason", "unknown")}')
+            else:
+                logger.info(f'✓ conversation_history collection already exists')
+            
+            # Check if conversation exists, create if not
+            load_action = {
+                "type": "load",
+                "target": "conversation",
+                "out": "$conv"
+            }
+            result = self.infospace_executor.execute_action(load_action)
+            
+            if result.get('status') != 'success' or not result.get('resource_id'):
+                # Collection doesn't exist, create it
+                create_action = {
+                    "type": "create-collection",
+                    "name": "conversation",
+                    "out": "$conv"
+                }
+                result = self.infospace_executor.execute_action(create_action)
+                if result.get('status') == 'success':
+                    logger.info(f'✓ Created conversation collection')
+                else:
+                    logger.warning(f'Failed to create conversation: {result.get("reason", "unknown")}')
+            else:
+                logger.info(f'✓ conversation collection already exists')
+                
+        except Exception as e:
+            logger.error(f'Error initializing conversation collections: {e}')
+            import traceback
+            traceback.print_exc()
+
+    def _add_to_conversation(self, content: str):
+        """
+        Create a note with content and add it to the 'conversation' collection.
+        Creates the collection if it doesn't exist.
+        """
+        if not self.infospace_executor:
+            logger.warning('Infospace executor not available, skipping conversation note creation')
+            return
+        
+        try:
+            # Create note with content
+            create_action = {
+                "type": "create-note",
+                "value": content,
+                "out": "$conv_note"
+            }
+            result = self.infospace_executor.execute_action(create_action)
+            if result.get('status') != 'success':
+                logger.warning(f'Failed to create conversation note: {result.get("reason", "unknown")}')
+                return
+            
+            note_id = result.get('resource_id')
+            if not note_id:
+                logger.warning(f'Created conversation note but no resource_id returned')
+                return
+            
+            # Ensure conversation collection exists
+            load_action = {
+                "type": "load",
+                "target": "conversation",
+                "out": "$conv"
+            }
+            load_result = self.infospace_executor.execute_action(load_action)
+            
+            if load_result.get('status') != 'success' or not load_result.get('resource_id'):
+                # Collection doesn't exist, create it
+                create_collection_action = {
+                    "type": "create-collection",
+                    "name": "conversation",
+                    "out": "$conv"
+                }
+                create_result = self.infospace_executor.execute_action(create_collection_action)
+                if create_result.get('status') != 'success':
+                    logger.warning(f'Failed to create conversation collection: {create_result.get("reason", "unknown")}')
+                    return
+            
+            # Add note to conversation collection
+            add_action = {
+                "type": "add",
+                "target": "conversation",
+                "value": "$conv_note",
+                "out": "conversation"
+            }
+            add_result = self.infospace_executor.execute_action(add_action)
+            if add_result.get('status') == 'success':
+                logger.debug(f'✓ Added note to conversation collection')
+            else:
+                logger.warning(f'Failed to add note to conversation: {add_result.get("reason", "unknown")}')
+                
+        except Exception as e:
+            logger.error(f'Error adding to conversation: {e}')
+            import traceback
+            traceback.print_exc()
 
     def _create_character_note(self):
         """
@@ -1234,8 +1375,12 @@ class ZenohExecutiveNode:
                     # Create character note if it doesn't exist (only once per session)
                     self._create_character_note()
                     
+                    # Create note with user input and add to conversation collection
+                    self._add_to_conversation(f"User says: {clean_input}")
+                    
                     # Prepend load instruction to user input using character_name
-                    formatted_input = f"""First load the note '{self.character_name}' to get context about your character and role.\n
+                    formatted_input = f""""Context: the Collection named 'conversation' contains the history of this conversation.
+First load the note '{self.character_name}' to get additional context about your character and role.\n
 Then plan and act to address the following User-provided task: \n\n{clean_input}\n\n
 Finally, using 'say', respond in character to User"""
                     
