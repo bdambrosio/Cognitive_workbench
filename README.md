@@ -398,12 +398,13 @@ python3 launcher.py jill.yaml --ui --resource-browser --map-file infolab.py
 Startup can take a while, it loads llm, be patient...
 
 Access the UI at `http://localhost:3000`.
+See also benchmarks below (tests/hotpotqa_eval.py, tests/mmlu_eval.py, tests/gaia_eval.py, tests/chat_cli.py), for examples of use of the zenoh api provided by launcher.py
 
 ---
 
 ## 📂 Repository Structure
 
-```
+<pre>
 src/
 ├── executive_node.py           # Main OODA loop, SGLang runtime, planning coordination
 ├── incremental_planner.py      # SGLang-based synchronous planning with tool execution
@@ -435,8 +436,7 @@ scenarios/                     # Agent configuration YAML files
 data/                         # Persistent storage (Notes, Collections, memory)
 logs/                         # Execution logs and planner traces
 Docs/                         # Design documents (may lag code)
-
-```
+</pre>
 
 ---
 
