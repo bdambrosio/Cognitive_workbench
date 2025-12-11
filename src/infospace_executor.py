@@ -1823,6 +1823,12 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         if value is None:
             return self._create_uniform_return('failed', reason='say requires value')
         
+        # Check for empty or whitespace-only value to prevent blank say actions
+        value_str = str(value).strip()
+        if not value_str:
+            logger.warning(f'Say action skipped - value is empty or whitespace only')
+            return self._create_uniform_return('failed', reason='say requires non-empty value')
+        
         # Capitalize 'user' to 'User' for character name
         if target.lower() == 'user':
             target = 'User'
@@ -1834,7 +1840,7 @@ Make sure the string is in a format that can be parsed by the json.loads functio
             'mode': 'text',
             'content': json.dumps({
                 'source': self.agent_name,
-                'text': str(value)
+                'text': value_str
             })
         }
         
@@ -1849,7 +1855,7 @@ Make sure the string is in a format that can be parsed by the json.loads functio
             'action_type': 'say',
             'action_id': f'action_{self.executive_node.action_counter}',
             'timestamp': datetime.now().isoformat(),
-            'text': str(value),
+            'text': value_str,
             'source': self.agent_name,
             'target': target,
             'is_text_only': True
@@ -1857,15 +1863,15 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         self.executive_node.action_publisher.put(json.dumps(action_data))
         self.executive_node.action_counter += 1
         if hasattr(self.executive_node, 'last_say_text'):
-            self.executive_node.last_say_text = str(value)
+            self.executive_node.last_say_text = value_str
         
-        logger.info(f"Say [{target}]: {value}")
+        logger.info(f"Say [{target}]: {value_str}")
         # Return truncated message text, no resource_id
-        return self._create_uniform_return('success', value=str(value), resource_id=None)
+        return self._create_uniform_return('success', value=value_str, resource_id=None)
     
     def _execute_display(self, action: Dict) -> Dict:
         """
-        Display formatted content in popup (similar to say but with popup UI).
+        Display formatted content to the UI action log pane.
         
         Required: type, value or target (accepts both for compatibility)
         """
@@ -1888,7 +1894,7 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         # Always display to User
         target = 'User'
         
-        # Publish display action to trigger FastAPI modal (not sense_data!)
+        # Publish display action to action log pane (not sense_data!)
         display_action = {
             'type': 'display',
             'character': self.agent_name,
@@ -1898,13 +1904,13 @@ Make sure the string is in a format that can be parsed by the json.loads functio
             'timestamp': datetime.now().isoformat()
         }
         
-        # Publish to action channel so FastAPI can show modal
+        # Publish to action channel so FastAPI can log to action log pane
         self.session.put(
             f"cognitive/{self.agent_name}/action",
             json.dumps(display_action)
         )
         
-        logger.warning(f"Display [{target}]: published {len(str(value))} chars to action channel for modal")
+        logger.info(f"Display [{target}]: published {len(str(value))} chars to action channel for action log pane")
         # Return truncated content (384 chars), no resource_id
         return self._create_uniform_return('success', value=str(value), resource_id=None)
     
