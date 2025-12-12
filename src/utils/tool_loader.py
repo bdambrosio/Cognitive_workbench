@@ -3,6 +3,7 @@ Tool loading utility for infospace operations.
 Scans tool directories and returns metadata for executor and planner.
 """
 import logging
+import re
 from pathlib import Path
 from typing import Dict, Optional
 import yaml
@@ -203,12 +204,27 @@ def load_tools(tools_dir_path: str) -> Dict[str, Dict]:
         if not examples:
             logger.warning(f"Tool {tool_name} missing examples in SKILL.md frontmatter")
         
+        # For instruction tools, extract body text (everything after frontmatter)
+        body_text = None
+        if tool_type == 'instruction':
+            # Match first complete frontmatter block: --- ... ---
+            frontmatter_match = re.search(r'^---\s*\n(.*?)\n---\s*\n', content, re.DOTALL)
+            if frontmatter_match:
+                # Extract content after the closing ---
+                body_text = content[frontmatter_match.end():].strip()
+            else:
+                # No frontmatter found, use full content
+                body_text = content.strip()
+            if not body_text:
+                logger.warning(f"Instruction tool {tool_name} has no body text after frontmatter")
+        
         tools[tool_name] = {
             'name': tool_name,
             'description': tool_description,
             'type': tool_type,
             'trusted': trusted,
             'tool_md_content': content,
+            'body_text': body_text,  # Body text for instruction tools
             'workflows': workflows,
             'examples': examples,
             'path': str(tool_dir.absolute()),

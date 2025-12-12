@@ -225,7 +225,7 @@ Updated queryable count: **22 → 24 queryables**
 // If results = [{...}, {...}] → Creates Collection_1
 
 // Index the Collection for search
-{"type": "index", "source": "$results", "store_name": "research", "index_type": "semantic"}
+{"type": "index", "target": "$results", "store_name": "research", "index_type": "semantic"}
 ```
 
 ### **World File Persistence**

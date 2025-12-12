@@ -335,14 +335,14 @@ def build_tool_catalog(available_tools: Dict[str, Dict]) -> Dict[str, Dict]:
             "schema_hint": {"value": "any content (string, number, boolean, array, object)", "name": "string (optional)", "out": "$variable"}
         },
         "think": {
-            "description": "generate an internal reflection on the state of the plan. Use for reasoning about the goal or the state of the plan.",
+            "description": "generate an internal reflection on the state of the plan. Use for reasoning about the goal or the state of the plan, or to surface internal knowledge.",
             "full_description": "generate an internal thought that enriches the planning context for subsequent tool selections. The thought is appended to the internal SGLang conversation state, allowing the LLM to reference it in later reasoning. Thoughts are NOT persisted as Notes, NOT published to the UI, and NOT communicated to the user. Use this for tracking reasoning steps, making observations, or noting intermediate conclusions that inform later decisions.",
             "parameters": {
                 "value": "required: literal string or $variable referencing thought prompt"
             },
             "examples": [
                 '{"type":"think","value":"The user wants a summary, but how long should it be?"}',
-                '{"type":"think","value":"I need more context before proceeding with the query, should I ask the user for more information?"}',
+                '{"type":"think","value":"Do I already have the information I need to answer the question?"}',
                 '{"type":"think","value":"$observation"}'
             ],
             "schema_hint": {"value": "string or $variable"}
@@ -367,11 +367,11 @@ def build_tool_catalog(available_tools: Dict[str, Dict]) -> Dict[str, Dict]:
             "schema_hint": {"target": "string (ID or name) or $variable", "out": "$variable", "expect": "string"}
         },
         "persist": {
-            "description": "Mark Note/Collection as persistent",
+            "description": "Mark Note/Collection as persistent. Use this to save the Note/Collection to the filesystem.",
             "schema_hint": {"target": "$variable"}
         },
         "search-notes": {
-            "description": "Global search across all Notes using embedding-based retrieval. Returns Collection of structured Notes with text preview (200 chars), metadata.source_id, metadata.uri, metadata.score, metadata.type. Format matches query-web/semantic-scholar for consistent project operations.",
+            "description": "Global search all Notes in the infospace using embedding-based retrieval. Returns Collection of structured Notes with text preview (200 chars), metadata.source_id, metadata.uri, metadata.score, metadata.type. Format matches query-web/semantic-scholar for consistent project operations.",
             "schema_hint": {"value": "string (query)", "out": "$variable", "limit": "int (optional, default 5)", "threshold": "float (optional, default 0.3)"}
         },
         "search-collections": {
@@ -383,11 +383,11 @@ def build_tool_catalog(available_tools: Dict[str, Dict]) -> Dict[str, Dict]:
             "schema_hint": {"target": "$variable (indexed Collection)", "value": "string (query)", "out": "$variable", "limit": "int (optional, default 5)", "threshold": "float (optional, default 0.0)", "return_mode": "string (optional, 'chunks' or 'notes', default 'chunks')"}
         },
         "index": {
-            "description": "Build embedding index for Collection",
-            "schema_hint": {"source": "$variable"}
+            "description": "Build embedding index for Collection. Use this when you want to search the Collection later.",
+            "schema_hint": {"target": "$variable"}
         },
         "map": {
-            "description": "Apply operation to each item in Collection",
+            "description": "Apply operation (primitive or tool)to each item in Collection. Use this to apply an operation to each item in a Collection.",
             "schema_hint": {"target": "$variable", "operation": "string", "out": "$variable"}
         },
         "split": {
@@ -403,7 +403,7 @@ def build_tool_catalog(available_tools: Dict[str, Dict]) -> Dict[str, Dict]:
             "schema_hint": {"target": "$variable (Note with array/text)", "delimiter": "string (optional: 'sentence', 'paragraph', 'line', or custom)", "out": "$variable (Collection)"}
         },
         "flatten": {
-            "description": "Flatten Collection to single Note",
+            "description": "Flatten Collection to single Note.",
             "schema_hint": {"target": "$variable", "out": "$variable"}
         },
         "display": {
@@ -417,7 +417,7 @@ def build_tool_catalog(available_tools: Dict[str, Dict]) -> Dict[str, Dict]:
             "schema_hint": PRIMITIVE_DOCS["think"]["schema_hint"]
         },
         "say": {
-            "description": "Output text to user",
+            "description": "Output text to user. Use this to report progress or results to the user.",
             "schema_hint": {"target": "user", "value": "string"}
         },
         "ask": {
@@ -822,8 +822,8 @@ def sgl_to_infospace_action(tool_name: str, args_json: str, step: int, available
     # Exception: 'value' in create-note/add/say/display/think/ask accepts literals, so don't normalize
     # These primitives accept both literals and variables - trust LLM to add $ when needed
     variable_fields = ['out', 'source']
-    # Primitives that accept literal values in 'value' field (don't normalize)
-    literal_value_primitives = ['create-note', 'add', 'say', 'display', 'think', 'ask']
+    # Primitives/tools that accept literal values in 'value' field (don't normalize)
+    literal_value_primitives = ['create-note', 'create-collection', 'add', 'remove', 'say', 'display', 'think', 'ask', 'query-web', 'semantic-scholar', 'search-notes', 'search-collections']
     if tool_name not in literal_value_primitives:
         variable_fields.extend(['target', 'value'])
     # For literal_value_primitives, 'value' accepts literals, so don't normalize
@@ -1325,6 +1325,7 @@ if HAS_SGLANG:
             trace_file.write(f"Planning session: {time.strftime('%Y-%m-%d %H:%M:%S')}\n")
             trace_file.write(f"Goal: {goal}\n")
             trace_file.write(f"total length: {len(str(s))}\n")
+            trace_file.write(f"token count: {tokenize_len(executor.tokenizer, str(s))}\n")
             trace_file.write(f"{'='*80}\n")
             trace_file.write(str(s)+"\n")
             trace_file.write(f"\n{'='*80}\n\n")

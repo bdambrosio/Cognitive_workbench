@@ -666,7 +666,7 @@ def test_index(session: zenoh.Session, character: str, verbose: bool = False) ->
         },
         {
             "type": "index",
-            "source": "$coll"
+            "target": "$coll"
         }
     ]
     
@@ -752,7 +752,7 @@ def test_search_within_collection(session: zenoh.Session, character: str, verbos
         },
         {
             "type": "index",
-            "source": "$coll"
+            "target": "$coll"
         },
         {
             "type": "search-within-collection",

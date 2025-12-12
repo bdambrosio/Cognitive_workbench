@@ -15,7 +15,7 @@
     },
     {
       "type": "index",
-      "source": "$papers",
+      "target": "$papers",
       "index_type": "semantic",
       "fields": {
         "title": "embed",

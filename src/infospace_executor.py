@@ -118,6 +118,7 @@ class InfospaceExecutor:
             resource_manager=self.resource_manager
         )
         child_executor.runtime = self.runtime
+        child_executor.tokenizer = self.tokenizer
         child_executor.clear_plan_state()
         
         planner = IncrementalPlanner(
@@ -561,7 +562,14 @@ class InfospaceExecutor:
         
         tool_type = tool_info.get('type')
         
-        if tool_type == 'prompt_augmentation':
+        if tool_type == 'instruction':
+            # Instruction tools: return body text directly
+            body_text = tool_info.get('body_text')
+            if not body_text:
+                return self._create_uniform_return('failed', reason=f'Instruction tool {target} has no body text')
+            # Return body text as result
+            result = {'status': 'success', 'original_value': body_text, 'resource_id': None}
+        elif tool_type == 'prompt_augmentation':
             # Execute locally using LLM
             result = self._execute_prompt_tool(target, value, tool_info, additional_args)
         elif tool_type == 'python':
@@ -1501,10 +1509,10 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         
         Index is created using Collection ID as the key. The Collection becomes searchable.
         
-        Required: source, index_type (optional)
+        Required: target, index_type (optional)
         
         Argument types:
-        - source: $variable (Collection of Notes to index)
+        - target: $variable (Collection of Notes to index)
         - index_type: literal string ('semantic' or 'keyword', default 'semantic')
         
         The Collection ID is used as the index identifier.
@@ -1512,15 +1520,15 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         if not self.resource_manager:
             return self._create_uniform_return('failed', reason='Resource manager not available')
         
-        source_arg = action.get('source')
+        target_arg = action.get('target')
         index_type = action.get('index_type', 'semantic')
         fields = action.get('fields', {})
         
-        if not source_arg:
-            return self._create_uniform_return('failed', reason='index requires source')
+        if not target_arg:
+            return self._create_uniform_return('failed', reason='index requires target')
         
-        # Source should be a Collection variable or named resource
-        collection_var, error = self._resolve_target_var(source_arg)
+        # Target should be a Collection variable or named resource
+        collection_var, error = self._resolve_target_var(target_arg)
         if error:
             return self._create_uniform_return('failed', reason=f'index: {error}')
         

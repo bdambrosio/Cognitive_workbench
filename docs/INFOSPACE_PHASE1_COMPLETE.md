@@ -249,7 +249,7 @@ characters:
     },
     {
       "type": "index",
-      "source": "$search_results",
+      "target": "$search_results",
       "store_name": "research_memory",
       "index_type": "semantic",
       "fields": {

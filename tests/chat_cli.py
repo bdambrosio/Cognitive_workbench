@@ -162,7 +162,7 @@ def main():
         {"type": "load", "target": "conversation_history", "out": "$conversation_history"},
         {"type": "if", "condition": {"type": "notbound", "target": "$conversation_history"}, 
                         "then": [{"type": "create-collection","name": "conversation_history","out": "$conversation_history"},
-                                {"type": "index","source": "$conversation_history","store_name": "conversation_history","index_type": "semantic"},
+                                {"type": "index","target": "$conversation_history","store_name": "conversation_history","index_type": "semantic"},
                                 {"type": "persist", "target": "$conversation_history"}
                                 ] }])
     if result.get("success"):
@@ -172,7 +172,7 @@ def main():
   
     print(f"Creating conversation collection...")
     result = execute_plan(session, [{"type": "create-collection", "name": "conversation", "out": "$conversation"},
-                                    {"type": "index", "source": "$conversation", "index_type": "semantic"}])
+                                    {"type": "index", "target": "$conversation", "index_type": "semantic"}])
     if result.get("success"):
         print(f"✓ Conversation collection created")
     else:

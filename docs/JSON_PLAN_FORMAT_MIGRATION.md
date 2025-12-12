@@ -328,7 +328,7 @@ else:
     {"type": "extract", "target": "$results", "field": "urls", "out": "urls"},
     {"type": "filter", "target": "$urls", "condition": {"field": "date", "operator": "after", "value": "2025-10-01"}, "out": "recent"},
     {"type": "sort", "target": "$recent", "by": "relevance", "order": "desc", "limit": 10, "out": "top"},
-    {"type": "index", "source": "$top", "store_name": "research_memory", "index_type": "semantic", "fields": {"title": "embed", "content": "embed"}},
+    {"type": "index", "target": "$top", "store_name": "research_memory", "index_type": "semantic", "fields": {"title": "embed", "content": "embed"}},
     {"type": "say", "target": "user", "value": "Research complete"}
   ]
 }
