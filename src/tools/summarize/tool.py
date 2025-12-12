@@ -4,6 +4,7 @@ Summarization tool with focus-aware compression and adaptive styling.
 """
 import logging
 import json
+import math
 import zenoh
 import time
 import uuid
@@ -254,13 +255,13 @@ def _compute_target_length(effective_tokens, style, compression_ratio):
     """Compute target summary length based on style and compression ratio."""
     if style == 'executive':
         # Fixed cap for executive summaries
-        return min(500, effective_tokens // 3)
+        return min(1500, effective_tokens // 3)
     elif style == 'comprehensive':
         # Low compression for detailed summaries
-        return effective_tokens // 2.0
+        return min(int(math.sqrt(effective_tokens)*15+1500), effective_tokens // 2.0)
     else:  # technical (default)
         # Use specified compression ratio
-        target = effective_tokens / compression_ratio
+        target = min(int(math.sqrt(effective_tokens)*15+1500), effective_tokens / compression_ratio)
         # Floor: never go below 300 tokens for very small inputs
         return max(target, 300)
 

@@ -1121,13 +1121,31 @@ class ZenohExecutiveNode:
         self.plan_result_publisher.put(json.dumps(plan_result))
         logger.info(f'📤 Published plan_result for {self.character_name}')
         
+        # Save response to conversation collection
+        # Prefer actual 'say' action content over FINAL_ANSWER if both exist
+        last_say = (getattr(self, 'last_say_text', '') or '').strip()
+        final_thoughts_clean = final_thoughts.strip() if final_thoughts else ''
+        
+        # Determine what to save to conversation
+        response_to_save = None
+        if last_say and len(last_say) > 0:
+            # Use actual 'say' action content if it exists
+            response_to_save = last_say
+            logger.debug(f'Using actual say action content for conversation: {last_say[:50]}...')
+        elif final_thoughts_clean and len(final_thoughts_clean) >= 20 and final_thoughts_clean.replace(' ', '').replace('.', '').replace(',', '').replace('!', '').replace('?', '').strip():
+            # Fall back to FINAL_ANSWER if no actual say action
+            response_to_save = final_thoughts_clean
+            logger.debug(f'Using FINAL_ANSWER for conversation (no say action found): {final_thoughts_clean[:50]}...')
+        
+        # Save to conversation if we have content
+        if response_to_save:
+            self._add_to_conversation(f"{self.character_name} responds: {response_to_save}")
+        
         # Publish final_answer as a "say" action to User so it appears in action log
         # Only publish if final_thoughts is non-empty, meaningful, and different from last_say_text
         # (to avoid duplicating the actual say action that was already published)
-        final_thoughts_clean = final_thoughts.strip() if final_thoughts else ''
         # Require meaningful content: at least 20 chars and not just whitespace/punctuation
         if final_thoughts_clean and len(final_thoughts_clean) >= 20 and final_thoughts_clean.replace(' ', '').replace('.', '').replace(',', '').replace('!', '').replace('?', '').strip():
-            last_say = (getattr(self, 'last_say_text', '') or '').strip()
             # Only publish if final_thoughts is different from the last say action
             # This prevents duplicating the actual say action content
             if final_thoughts_clean != last_say:
@@ -1148,9 +1166,6 @@ class ZenohExecutiveNode:
                     self.action_publisher.put(json.dumps(final_answer_action))
                     self._last_published_final_answer = final_thoughts_clean
                     logger.info(f'📤 Published FINAL_ANSWER to action log: {final_thoughts_clean[:100]}...')
-                    
-                    # Create note with FINAL_ANSWER and add to conversation collection
-                    self._add_to_conversation(f"Jill responds: {final_thoughts_clean}")
                 else:
                     logger.debug(f'Skipping final_answer publication - already published for this plan')
             else:
@@ -1229,6 +1244,99 @@ class ZenohExecutiveNode:
             logger.error(f'Error initializing conversation collections: {e}')
             import traceback
             traceback.print_exc()
+
+    def _archive_conversation(self):
+        """
+        Archive conversation on shutdown: summarize conversation collection and add to conversation_history.
+        Only archives if conversation collection exists and is not empty.
+        """
+        logger.info(f'📝 Starting conversation archiving for {self.character_name}...')
+        
+        if not self.infospace_executor:
+            logger.warning('Infospace executor not available, skipping conversation archiving')
+            return
+        
+        try:
+            # Load conversation collection
+            load_action = {"type": "load", "target": "conversation", "out": "$conv"}
+            result = self.infospace_executor.execute_action(load_action)
+            
+            if result.get('status') != 'success' or not result.get('resource_id'):
+                logger.info('No conversation collection found, skipping archiving')
+                return
+            
+            conv_collection_id = result.get('resource_id')
+            
+            # Check if collection is empty using size primitive
+            size_action = {"type": "size", "target": "$conv", "out": "$conv_size"}
+            size_result = self.infospace_executor.execute_action(size_action)
+            
+            if size_result.get('status') != 'success':
+                logger.warning(f'Failed to get conversation size: {size_result.get("reason", "unknown")}')
+                return
+            
+            # Get size value (should be an integer)
+            conv_size = size_result.get('value', 0)
+            try:
+                conv_size = int(conv_size) if isinstance(conv_size, str) else conv_size
+            except (ValueError, TypeError):
+                logger.warning(f'Invalid conversation size value: {conv_size}')
+                return
+            
+            if conv_size == 0:
+                logger.info('Conversation collection is empty, skipping archiving')
+                return
+            
+            logger.info(f'📝 Archiving conversation with {conv_size} items...')
+            
+            # Summarize conversation collection using summarize tool
+            # The summarize tool creates a Note and binds it to $summary
+            summarize_action = {"type": "summarize", "target":  "$conv", "out": "$summary"}
+            summarize_result = self.infospace_executor.execute_action(summarize_action)
+            
+            if summarize_result.get('status') != 'success':
+                logger.warning(f'Failed to summarize conversation: {summarize_result.get("reason", "unknown")}')
+                return
+            
+            # The summarize tool already created a Note and bound it to $summary
+            # Get the Note ID from the result (resource_id) or from plan_bindings
+            summary_note_id = summarize_result.get('resource_id')
+            if not summary_note_id:
+                # Try to get from plan_bindings
+                if 'summary' in self.infospace_executor.plan_bindings:
+                    summary_note_id = self.infospace_executor.plan_bindings['summary']
+                else:
+                    logger.warning('Summarize tool did not return a Note ID')
+                    return
+            
+            # Verify the summary note has content
+            summary_content = self.infospace_executor._get_content(summary_note_id)
+            if not summary_content or (isinstance(summary_content, str) and not summary_content.strip()):
+                logger.warning('Summarization returned empty result, skipping archiving')
+                return
+            
+            # Ensure summary note is persisted before adding to persistent collection
+            persist_action = {"type": "persist", "target": "$summary"}
+            persist_result = self.infospace_executor.execute_action(persist_action)
+            if persist_result.get('status') != 'success':
+                logger.warning(f'Failed to persist summary note: {persist_result.get("reason", "unknown")}')
+                # Continue anyway - note will be saved when resource manager saves
+            
+            # Add the summary note (already created by summarize tool) to conversation_history
+            add_action = {"type": "add", "target": "conversation_history", "value": "$summary", "out": "conversation_history"}
+            add_result = self.infospace_executor.execute_action(add_action)
+            
+            if add_result.get('status') == 'success':
+                logger.info(f'✓ Successfully archived conversation summary ({conv_size} items) to conversation_history')
+            else:
+                logger.warning(f'Failed to add summary to conversation_history: {add_result.get("reason", "unknown")}')
+                
+        except Exception as e:
+            logger.error(f'Error archiving conversation: {e}')
+            import traceback
+            traceback.print_exc()
+        finally:
+            logger.info(f'📝 Conversation archiving completed for {self.character_name}')
 
     def _add_to_conversation(self, content: str):
         """
@@ -2980,6 +3088,14 @@ Finally, using 'say', respond in character to User"""
             self._shutting_down = True
             
             logger.info(f'Executive Node shutdown initiated for {self.character_name}...')
+            
+            # Archive conversation if it exists and is not empty (do this first before saving state)
+            try:
+                self._archive_conversation()
+            except Exception as e:
+                logger.error(f'Error archiving conversation during shutdown: {e}')
+                import traceback
+                traceback.print_exc()
             
             # Save memory before shutdown
             try:
