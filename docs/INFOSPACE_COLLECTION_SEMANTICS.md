@@ -24,7 +24,7 @@ There is a semantic ambiguity in how "Collections" are treated in the infospace 
 **What actually happens:**
 
 ```json
-{"type":"index","source":"$my_data","store_name":"memory_store","index_type":"semantic"}
+{"type":"index","target":"$my_data","store_name":"memory_store","index_type":"semantic"}
 ```
 
 - Takes data from `$my_data` (could be Note or Collection content)
@@ -51,7 +51,7 @@ There is a semantic ambiguity in how "Collections" are treated in the infospace 
 **Implementation requires:**
 ```json
 {"type":"create","kind":"Collection","value":[],"out":"my_coll"}
-{"type":"index","source":"$my_coll","store_name":"my_coll_store"}
+{"type":"index","target":"$my_coll","store_name":"my_coll_store"}
 {"type":"search","store_name":"my_coll_store","query":"find","out":"results"}
 ```
 
@@ -98,7 +98,7 @@ Indexed Stores (have store_name):
     {"type":"save","value":"$doc1","out":"doc1_saved"},
     // Note: catalog/remove not yet implemented, would add to collection
     
-    {"type":"index","source":"$documents","store_name":"doc_index","index_type":"semantic"},
+    {"type":"index","target":"$documents","store_name":"doc_index","index_type":"semantic"},
     {"type":"search","store_name":"doc_index","query":"find topic","out":"matches"}
   ]
 }

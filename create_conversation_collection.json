@@ -3,7 +3,7 @@
     {"type": "load", "name": "conversation_history", "out": "$conversation_history"},
     {"type": "if", "condition": "not-bound", "value": "$conversation_history", 
              "then": [{"type": "create-collection","name": "conversation_history","out": "$conversation_history"},
-        {"type": "index","source": "$conversation_history","store_name": "conversation_history","index_type": "semantic"}]
+        {"type": "index","target": "$conversation_history","store_name": "conversation_history","index_type": "semantic"}]
     }
   ]
 }

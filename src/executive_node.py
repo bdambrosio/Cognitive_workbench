@@ -33,7 +33,7 @@ from utils.format_utils import format_map_types, format_views_compact
 from weakref import WeakValueDictionary
 from utils.format_utils import format_views_compact
 from utils.condition_utils import deref_plan_target
-
+from transformers import AutoTokenizer
 # Configure logging with unbuffered output
 # Console handler with WARNING level (less verbose)
 console_handler = logging.StreamHandler(sys.stdout)
@@ -414,17 +414,15 @@ class ZenohExecutiveNode:
         if HAS_SGLANG and sgl_model_path:
             try:
                 logger.info(f"🚀 Initializing SGLang Runtime with model: {sgl_model_path}")
-                if sgl_model_path.startswith("allenai/Olmo-3") or sgl_model_path.startswith("DevQuasar/Qwen.Qwen3-Next"):
+                self.tokenizer = AutoTokenizer.from_pretrained(sgl_model_path)
+                if sgl_model_path.startswith("allenai/Olmo-3"):
                     self.runtime = sgl.Runtime(
                     model_path=sgl_model_path,
-                    tokenizer_path=sgl_model_path,
-                    device="cuda",
                     context_length=32768,
                     cuda_graph_max_bs=4,
-                    dtype="auto",
                     tp_size=1,
                     mem_fraction_static=0.82,
-                    attention_backend="flashinfer"
+                    attention_backend="triton"
                 )
                 else:
                     self.runtime = sgl.Runtime(
@@ -548,6 +546,7 @@ class ZenohExecutiveNode:
         # Share runtime with executor
         if self.runtime:
             self.infospace_executor.runtime = self.runtime
+            self.infospace_executor.tokenizer = self.tokenizer
         logger.info(f'🧩 Infospace executor initialized for {character_name}')
         
         # Initialize conversation collections
@@ -2729,23 +2728,6 @@ Finally, using 'say', respond in character to User"""
                 self.plan_just_generated = True
             return
             
-            # In manual mode, publish goal and auto-generate plan
-            if self.manual:
-                self._publish_goal(self.current_goal)
-                
-                # Auto-generate plan from goal using LLM
-                logger.info(f'🤖 {self.character_name} auto-generating plan for manual goal: {parsed_goal}')
-                self._plan(self.current_goal)
-                
-                # Publish the generated plan to UI
-                if self.current_plan:
-                    self._publish_current_plan()
-                    self.plan_just_generated = True
-                    logger.info(f'📋 {self.character_name} auto-generated plan with {len(self.current_plan["plan"])} steps')
-                else:
-                    logger.warning(f'⚠️ {self.character_name} failed to auto-generate plan for goal: {parsed_goal}')
-            
-            return
         except Exception as e:
             logger.error(f"Goal parsing failed for {self.character_name}: {e}")
             traceback.print_exc()

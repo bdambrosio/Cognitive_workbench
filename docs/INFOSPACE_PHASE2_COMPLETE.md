@@ -516,7 +516,7 @@ Phase 2 primitives work seamlessly with Phase 1:
     {"type": "filter", "target": "$items", "condition": {...}, "out": "filtered"},
     
     // Phase 1: store and index
-    {"type": "index", "source": "$filtered", "store_name": "analysis_memory", ...},
+    {"type": "index", "target": "$filtered", "store_name": "analysis_memory", ...},
     
     // Phase 2: aggregate
     {"type": "aggregate", "target": "$filtered", "operation": "count", "out": "count"},

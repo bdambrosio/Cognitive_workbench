@@ -146,7 +146,7 @@
     
     {"type": "merge", "targets": ["$top", "$archived"], "strategy": "deduplicate", "deduplicate_by": "id", "out": "all"},
     
-    {"type": "index", "source": "$all", "store_name": "analysis_memory", "index_type": "semantic",
+    {"type": "index", "target": "$all", "store_name": "analysis_memory", "index_type": "semantic",
      "fields": {"summary": "embed", "metadata": "store"}},
     
     {"type": "say", "target": "user", "value": "Analysis complete and indexed"}
