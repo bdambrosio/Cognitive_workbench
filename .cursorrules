@@ -1,0 +1,24 @@
+# Cursor Rules for Cognitive Workbench
+
+## Code Formatting
+
+- Format dictionaries and action objects as single lines when the total length is less than 120 characters
+- Prefer single-line format for simple action dictionaries (e.g., `{"type": "load", "target": "conversation", "out": "$conv"}`)
+- Use multi-line format only when the dictionary exceeds 120 characters or improves readability significantly
+
+## Examples
+
+**Single-line (preferred when < 120 chars):**
+```python
+load_action = {"type": "load", "target": "conversation", "out": "$conv"}
+```
+
+**Multi-line (use when > 120 chars or improves readability):**
+```python
+load_action = {
+    "type": "load",
+    "target": "conversation",
+    "out": "$conv",
+    "additional_long_parameter": "very_long_value_that_makes_this_exceed_120_characters"
+}
+```
