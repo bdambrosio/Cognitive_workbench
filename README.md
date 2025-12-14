@@ -18,6 +18,14 @@ If you are looking for a production-ready agent framework, this is likely not it
 
 ---
 
+## 🔄 Recent Updates (Dec 2025)
+
+- **Abstract pre-planning layer** – `IncrementalPlanner` now calls a lightweight `_preplan()` helper that asks the LLM to emit a goal-specific strategy sketch (no tool calls) before the step-by-step planning loop begins. The abstract plan is injected into the planner prompt, giving the LLM a bird's-eye view of the task without constraining downstream execution.
+- **Plan guidance memory** – A new `PlanGuidance` module loads historical plan feedback from `src/data/planner_feedback/plan_guidance.jsonl`, embeds the goals, and surfaces high-similarity successes back to the planner. This lets new goals borrow structure from proven strategies while still remaining adaptive.
+- **Tracked feedback corpus** – The `plan_guidance.jsonl` file is now committed to the repo so collaborators can reproduce guidance behavior without rebuilding a feedback dataset from scratch. Add your own feedback records (one JSON object per line) to grow the shared memory.
+
+---
+
 ## 💡 Design Philosophy
 
 **Cognitive Workbench takes a fundamentally different approach to 'reasoning'.**
