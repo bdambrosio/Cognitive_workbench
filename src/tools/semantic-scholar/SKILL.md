@@ -3,6 +3,10 @@ name: semantic-scholar
 type: python
 trusted: true
 description: "Search academic papers. Returns Collection of JSON Notes with fields text (full paper text via GROBID when PDF available, otherwise abstract), metadata.title, metadata.authors, metadata.year, metadata.citations, metadata.uri (alias: pdf_url), metadata.venue (Level 4 tool)."
+schema_hint:
+  value: "string (query)"
+  out: "$variable"
+  limit: "int (optional, default 10)"
 examples:
   - '{"type":"semantic-scholar","value":"transformer architecture","out":"$papers"}'
   - '{"type":"project","target":"$papers","fields":["metadata.title","metadata.year"],"out":"$titles"}'

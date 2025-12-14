@@ -4,6 +4,11 @@ description: Extract or transform information from unstructured text content usi
 type: python
 trusted: true
 flattens_collections: true
+parameter_source: args.instruction
+schema_hint:
+  target: "$variable or Note ID"
+  instruction: "string (transformation instruction)"
+  out: "$variable"
 examples:
   - '{"type":"refine","target":"$bio","instruction":"extract the nationality","out":"$nationality"}'
   - '{"type":"refine","target":"$article","instruction":"extract the main argument","out":"$argument"}'
@@ -16,9 +21,9 @@ Universal LLM-based transformation tool. **Edits existing Note content** accordi
 
 ## Important: Refine Only Edits, Does Not Add
 
-- ✅ **Edits existing text**: Refine transforms the content of the target Note based on your instruction
-- ❌ **Does NOT add new text**: Refine will not add information that isn't already present in the target Note
-- ❌ **Does NOT create content**: For creating new content from scratch, use `generate-note` instead
+- **Edits existing text**: Refine transforms the content of the target Note based on your instruction
+- **Does NOT add new text**: Refine will not add information that isn't already present in the target Note
+- **Does NOT create content**: For creating new content from scratch, use `generate-note` instead
 
 ## Input
 - `target`: Note to transform (REQUIRED - must exist and contain content)

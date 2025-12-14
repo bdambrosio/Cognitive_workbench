@@ -3,6 +3,7 @@
 Universal LLM-based Note transformation tool.
 """
 import logging
+from utils.text_chunking import segment_text_boundary_aware
 
 logger = logging.getLogger(__name__)
 
@@ -21,14 +22,21 @@ def tool(value, runtime=None, **kwargs):
         Transformed content as string
     """
     instruction = kwargs.get('instruction')
+    # If no instruction but value is in kwargs (planner mistake: used 'value' instead of 'instruction'), use value as instruction
+    if not instruction and 'value' in kwargs:
+        instruction = kwargs.get('value')
+    
     if not instruction:
         return "Error: instruction parameter required"
     
     if not value:
         return "Error: value parameter required"
     
+    # Convert value to string if it's not already
+    text_value = str(value) if not isinstance(value, str) else value
+    
     # Segment long content into chunks
-    chunks = _segment_text(value, max_chunk_size=16000)
+    chunks = segment_text_boundary_aware(text_value, max_chunk_size=16000)
     logger.info(f"refine: {instruction[:50]}... ({len(chunks)} chunks)")
     
     results = []
@@ -80,64 +88,5 @@ End your response with:
     logger.info(f"refine complete: output_len={len(result)}")
     
     return result
-
-
-def _segment_text(text, max_chunk_size=16000):
-    """
-    Segment text into chunks at sentence or word boundaries.
-    
-    Returns list of (chunk_text, delimiter) tuples where delimiter
-    is the separator found at the split point (to preserve on concatenation).
-    """
-    if len(text) <= max_chunk_size:
-        return [(text, None)]
-    
-    chunks = []
-    pos = 0
-    
-    while pos < len(text):
-        # Determine chunk end position
-        end_pos = min(pos + max_chunk_size, len(text))
-        
-        if end_pos >= len(text):
-            # Last chunk
-            chunks.append((text[pos:], None))
-            break
-        
-        # Try to find sentence boundary near end_pos
-        # Look backward up to 500 chars for ". " or ".\n"
-        search_start = max(pos, end_pos - 500)
-        best_split = -1
-        best_delimiter = None
-        
-        # Search for sentence boundaries
-        for i in range(end_pos, search_start, -1):
-            if i < len(text) - 1:
-                if text[i] == '.' and text[i+1] in (' ', '\n'):
-                    best_split = i + 1  # Include the period
-                    best_delimiter = text[i+1]  # Space or newline
-                    break
-        
-        # Fall back to word boundary if no sentence boundary found
-        if best_split == -1:
-            for i in range(end_pos, search_start, -1):
-                if text[i] in (' ', '\n', '\t'):
-                    best_split = i
-                    best_delimiter = text[i]
-                    break
-        
-        # Fall back to hard split if no boundary found
-        if best_split == -1:
-            best_split = end_pos
-            best_delimiter = ''
-        
-        # Extract chunk (up to but not including delimiter)
-        chunk_text = text[pos:best_split]
-        chunks.append((chunk_text, best_delimiter))
-        
-        # Move position past the delimiter
-        pos = best_split + (1 if best_delimiter else 0)
-    
-    return chunks
 
 

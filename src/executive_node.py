@@ -2363,7 +2363,7 @@ Finally, using 'say', respond in character to User"""
             query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
     
     def _handle_resource_clear_transient_query(self, query):
-        """Handle query to clear all non-persistent Notes and Collections, and planner bindings."""
+        """Handle query to clear all Notes and Collections except Note_null, and planner bindings."""
         if not self.resource_manager:
             response = {'success': False, 'error': 'Resource manager not available'}
             query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
@@ -2373,11 +2373,10 @@ Finally, using 'say', respond in character to User"""
         deleted_collections = 0
         to_delete = []
         for resource_id, resource_data in self.resource_manager.resource_registry.items():
-            if not resource_data.get('properties', {}).get('persistent', False):
-                if resource_id.startswith('Note_') and resource_id != 'Note_null':
-                    to_delete.append(resource_id)
-                elif resource_id.startswith('Collection_'):
-                    to_delete.append(resource_id)
+            if resource_id.startswith('Note_') and resource_id != 'Note_null':
+                to_delete.append(resource_id)
+            elif resource_id.startswith('Collection_'):
+                to_delete.append(resource_id)
         
         for resource_id in to_delete:
             success, _ = self.resource_manager.delete_resource(resource_id)
@@ -2400,7 +2399,7 @@ Finally, using 'say', respond in character to User"""
             'bindings_cleared': bindings_cleared
         }
         query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
-        logger.info(f"Cleared {deleted_notes} transient Notes, {deleted_collections} transient Collections, {bindings_cleared} planner bindings")
+        logger.info(f"Cleared {deleted_notes} Notes, {deleted_collections} Collections, {bindings_cleared} planner bindings")
     
     def _handle_resource_create_note_query(self, query):
         """Handle query to create a Note from external caller."""

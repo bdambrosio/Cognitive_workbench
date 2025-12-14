@@ -3,6 +3,11 @@ name: relate
 description: Compare two Notes or Collections to find similarities, differences, and relationships
 type: python
 trusted: true
+schema_hint:
+  target: "$variable or Note ID or Collection ID"
+  other: "$variable or Note ID or Collection ID"
+  instruction: "string (optional, natural language guidance)"
+  out: "$variable"
 examples:
   - '{"type":"relate","target":"$doc1","other":"$doc2","out":"$comparison"}'
   - '{"type":"relate","target":"$scaling_laws","other":"$compute_optimal","instruction":"identify how scaling laws inform compute-optimal training strategies","out":"$comparison"}'

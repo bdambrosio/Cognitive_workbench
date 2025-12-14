@@ -515,6 +515,24 @@ class BlackboardPlanner(IncrementalPlanner):
             if hasattr(self.executor, 'character_context'):
                 self.executor.character_context = character_context
             
+            # Check total input size before calling tool_planner_infospace.run()
+            total_input_size = (
+                len(goal) +
+                len(character_context) +
+                len(recent_context) +
+                len(self.tools_catalog_text)
+            )
+            if total_input_size > 100000:
+                import traceback
+                logger.error(f"⚠️  Attempting to send {total_input_size:,} chars to tool_planner_infospace.run() via BlackboardPlanner (limit: 100,000)")
+                logger.error(f"  goal length: {len(goal):,}")
+                logger.error(f"  character_context length: {len(character_context):,}")
+                logger.error(f"  recent_context length: {len(recent_context):,}")
+                logger.error(f"  tools_catalog_text length: {len(self.tools_catalog_text):,}")
+                logger.error("Stack traceback:")
+                for line in traceback.format_stack():
+                    logger.error(line.rstrip())
+            
             # Run SGLang planner (blackboard version)
             state = tool_planner_infospace.run(
                 goal=goal,

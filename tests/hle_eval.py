@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
 """
-GAIA evaluation harness for Cognitive Workbench.
+Humanity's Last Exam (HLE) evaluation harness for Cognitive Workbench.
 
-- Loads GAIA from HuggingFace: gaia-benchmark/GAIA
-- Handles file attachments via fetch-text plan (loads into $context)
+- Loads HLE from HuggingFace (dataset name TBD)
 - Sends goals via Zenoh to executive_node
-- Evaluates with exact match (case-insensitive normalization)
+- Evaluates with exact match, contains match, F1, and LLM judge
 - Clears transient Notes between questions
 """
 
@@ -102,7 +101,7 @@ Reply with only YES or NO."""
 
 
 def clear_transient_notes(session: zenoh.Session, character: str, timeout: float = 10.0) -> int:
-    """Clear all non-persistent Notes via Zenoh API."""
+    """Clear all Notes and Collections except Note_null via Zenoh API."""
     query_key = f"cognitive/{character}/resource/clear_transient"
     replies = session.get(query_key, timeout=timeout)
     for reply in replies:
@@ -189,11 +188,6 @@ def extract_answer(text: str) -> str:
     if match:
         return match.group(1).strip()
     
-    # Try to extract numbers (common in GAIA)
-    numbers = re.findall(r'\b\d+(?:\.\d+)?\b', text)
-    if numbers:
-        return numbers[-1]  # Last number
-    
     # Fallback: last non-empty line
     lines = [l.strip() for l in text.strip().split('\n') if l.strip()]
     if lines:
@@ -201,55 +195,14 @@ def extract_answer(text: str) -> str:
     return text.strip()
 
 
-def execute_plan(session: zenoh.Session, character: str, plan: list, timeout: float = 60.0) -> dict:
-    """Execute a plan via Zenoh API. Returns result dict with success, bindings, last_action_result."""
-    query_key = f"cognitive/{character}/execute_plan_sync"
-    payload = json.dumps({'plan': plan})
-    replies = session.get(query_key, payload=payload.encode('utf-8'), timeout=timeout)
-    for reply in replies:
-        if hasattr(reply, 'ok') and reply.ok is not None:
-            return json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
-    return {'success': False, 'error': 'No response from execute_plan_sync'}
-
-
-def fetch_file_to_named_note(session: zenoh.Session, character: str, file_url: str, note_name: str = "gaia_context", timeout: float = 60.0) -> bool:
-    """Fetch file URL using fetch-text and create named Note. Returns True if successful."""
-    # Plan: fetch-text → create-note with name
-    # fetch-text returns JSON string with 'text' field - Note will contain the JSON
-    plan = [
-        {
-            "type": "fetch-text",
-            "value": file_url,
-            "out": "$fetched_data"
-        },
-        {
-            "type": "create-note",
-            "value": "$fetched_data",
-            "name": note_name,
-            "out": "$context_note"
-        }
-    ]
-    result = execute_plan(session, character, plan, timeout)
-    return result.get('success', False)
-
-
-def build_gaia_prompt(question: str, has_file: bool = False) -> str:
-    """Build goal prompt for GAIA question."""
+def build_hle_prompt(question: str) -> str:
+    """Build goal prompt for HLE question."""
     lines = ["goal:"]
     lines.append(f"  question: {question}")
-    
-    if has_file:
-        lines.append("")
-        lines.append("  instructions:")
-        lines.append("    - Load the file content from the note named 'gaia_context'")
-        lines.append("    - Use load with target: 'gaia_context' to get the file content")
-        lines.append("    - Answer the question using information from the loaded content")
-    else:
-        lines.append("")
-        lines.append("  instructions:")
-        lines.append("    - Use appropriate tools and your own innate knowledge and reasoning ability.")
-        lines.append("    - Answer the question accurately")
-    
+    lines.append("")
+    lines.append("  instructions:")
+    lines.append("    - Use appropriate tools (query-web, fetch-text, semantic-scholar, etc.) to find information")
+    lines.append("    - Answer the question accurately")
     lines.append("    - Provide a concise answer")
     lines.append("    - Format: ANSWER: <your answer>")
     lines.append("    - Finally, say the answer to User")
@@ -257,33 +210,27 @@ def build_gaia_prompt(question: str, has_file: bool = False) -> str:
     return '\n'.join(lines)
 
 
-def evaluate_gaia(
+def evaluate_hle(
     session: zenoh.Session,
     character: str,
+    dataset_name: str = "hle-benchmark/HLE",  # TBD: actual dataset name
     split: str = "test",
     max_questions: int = 50,
-    level: int = None,
     timeout: float = 600.0,
     start_question: int = 0,
     single_question: int = None,
 ) -> dict:
-    """Run GAIA evaluation."""
-    print(f"\n=== GAIA Evaluation (max={max_questions}, level={level or 'all'}) ===")
+    """Run HLE evaluation."""
+    print(f"\n=== HLE Evaluation (max={max_questions}) ===")
     
-    # Map level to config name
-    config_map = {1: '2023_level1', 2: '2023_level2', 3: '2023_level3', None: '2023_all'}
-    config_name = config_map.get(level, '2023_all')
-    
-    # Load dataset with appropriate config
+    # Load dataset
     try:
-        ds = load_dataset("gaia-benchmark/GAIA", config_name, split=split)
-        print(f"Loaded GAIA dataset: {config_name} split={split} ({len(ds)} questions)")
+        ds = load_dataset(dataset_name, split=split)
+        print(f"Loaded HLE dataset: {split} ({len(ds)} questions)")
     except Exception as e:
-        print(f"ERROR: Failed to load GAIA dataset: {e}")
-        print("Note: GAIA dataset may require HuggingFace authentication/agreement")
+        print(f"ERROR: Failed to load HLE dataset: {e}")
+        print("Note: HLE dataset may require HuggingFace authentication/agreement")
         return {'error': str(e)}
-    
-    # Note: Files are fetched via fetch-text plan, not downloaded to disk
     
     results = {
         'exact_match': 0,
@@ -292,18 +239,18 @@ def evaluate_gaia(
         'f1_sum': 0.0,
         'total': 0,
         'errors': 0,
-        'by_level': {1: {'correct': 0, 'total': 0}, 2: {'correct': 0, 'total': 0}, 3: {'correct': 0, 'total': 0}},
     }
     
-    # Filter out questions with placeholder answers or missing data
+    # Filter out questions with missing data
     valid_items = []
     for idx, item in enumerate(ds):
-        question = item.get('Question', '')
-        gold_answer = item.get('Final answer', item.get('Answer', ''))
-        if question and gold_answer and gold_answer != '?':
+        # TBD: Adjust field names based on actual dataset structure
+        question = item.get('question', item.get('Question', item.get('prompt', '')))
+        gold_answer = item.get('answer', item.get('Answer', item.get('gold_answer', '')))
+        if question and gold_answer:
             valid_items.append((idx, item))
     
-    print(f"Found {len(valid_items)} valid questions (skipped {len(ds) - len(valid_items)} with placeholder answers)")
+    print(f"Found {len(valid_items)} valid questions (skipped {len(ds) - len(valid_items)} with missing data)")
     
     # Apply start_question filter
     if start_question > 0:
@@ -325,43 +272,17 @@ def evaluate_gaia(
         valid_items = valid_items[:max_questions]
     
     for orig_idx, item in valid_items:
-        # Extract fields (GAIA uses 'Question', 'Final answer', 'Level', 'file_name')
-        question = item.get('Question', '')
-        gold_answer = item.get('Final answer', item.get('Answer', ''))
-        file_name = item.get('file_name', '')
-        question_level_str = item.get('Level', '0')
+        # Extract fields (TBD: adjust based on actual dataset structure)
+        question = item.get('question', item.get('Question', item.get('prompt', '')))
+        gold_answer = item.get('answer', item.get('Answer', item.get('gold_answer', '')))
         
-        # Convert Level string to integer
-        try:
-            question_level = int(question_level_str)
-        except (ValueError, TypeError):
-            question_level = 0
-        
-        # Clear transient notes FIRST (before fetching file)
+        # Clear transient notes FIRST
         cleared = clear_transient_notes(session, character)
         if cleared > 0:
-            print(f"  [Cleared {cleared} transient notes]")
+            print(f"  [Cleared {cleared} notes]")
         
-        # Handle file attachment - fetch and create named note
-        file_url = item.get('file_path', '')
-        # Construct full URL if file_path is relative (doesn't start with http/https)
-        if file_url and not file_url.startswith(('http://', 'https://')):
-            GAIA_BASE_URL = "https://huggingface.co/datasets/gaia-benchmark/GAIA/resolve/main/"
-            file_url = GAIA_BASE_URL + file_url.lstrip('/')
-        
-        has_file = False
-        if file_name and file_url:
-            print(f"  [Fetching file: {file_name} from {file_url}]")
-            if fetch_file_to_named_note(session, character, file_url, note_name="gaia_context", timeout=60.0):
-                has_file = True
-                print(f"  [File loaded into named note 'gaia_context']")
-            else:
-                print(f"  [WARNING: Failed to fetch file {file_name}, proceeding without it]")
-        elif file_name:
-            print(f"  [WARNING: File {file_name} has no URL (file_path missing), proceeding without it]")
-        
-        # Build prompt (references named note if file was fetched)
-        goal_text = build_gaia_prompt(question, has_file)
+        # Build prompt
+        goal_text = build_hle_prompt(question)
         
         # Send goal and wait
         t0 = time.time()
@@ -383,14 +304,8 @@ def evaluate_gaia(
         outcome = em or cm or lj
         
         results['total'] += 1
-        # Ensure level key exists (handle string keys)
-        level_key = int(question_level) if isinstance(question_level, str) else question_level
-        if level_key not in results['by_level']:
-            results['by_level'][level_key] = {'correct': 0, 'total': 0}
-        results['by_level'][level_key]['total'] += 1
         if em:
             results['exact_match'] += 1
-            results['by_level'][level_key]['correct'] += 1
         if cm:
             results['contains_match'] += 1
         if lj:
@@ -403,7 +318,7 @@ def evaluate_gaia(
             print(f"       WARNING: Failed to send planner feedback")
         
         status = '✓' if em else ('+' if cm or lj else ('~' if f1 > 0.5 else '✗'))
-        print(f"[{orig_idx:4d}] {status} EM={int(em)} CM={int(cm)} LJ={int(lj)} F1={f1:.2f} Level {question_level} ({dt:.1f}s)")
+        print(f"[{orig_idx:4d}] {status} EM={int(em)} CM={int(cm)} LJ={int(lj)} F1={f1:.2f} ({dt:.1f}s)")
         print(f"       Q: {question[:80]}...")
         print(f"       Gold: {gold_answer}")
         print(f"       Pred: {pred_answer}")
@@ -424,12 +339,6 @@ def evaluate_gaia(
     print(f"Average F1:     {avg_f1:.3f}")
     print(f"Errors:         {results['errors']}")
     
-    for level_num in [1, 2, 3]:
-        level_stats = results['by_level'][level_num]
-        if level_stats['total'] > 0:
-            level_acc = level_stats['correct'] / level_stats['total']
-            print(f"Level {level_num}: {level_acc:.3f} ({level_stats['correct']}/{level_stats['total']})")
-    
     return {
         'exact_match': em_acc,
         'contains_match': cm_acc,
@@ -437,15 +346,11 @@ def evaluate_gaia(
         'f1': avg_f1,
         'total': results['total'],
         'errors': results['errors'],
-        'by_level': {
-            k: {'accuracy': v['correct'] / v['total'] if v['total'] > 0 else 0.0, 'total': v['total']}
-            for k, v in results['by_level'].items()
-        }
     }
 
 
 def main():
-    parser = argparse.ArgumentParser(description="GAIA evaluation for Cognitive Workbench")
+    parser = argparse.ArgumentParser(description="HLE evaluation for Cognitive Workbench")
     parser.add_argument(
         "--character",
         type=str,
@@ -453,23 +358,22 @@ def main():
         help="Character name for executive_node (default: Jill)",
     )
     parser.add_argument(
+        "--dataset",
+        type=str,
+        default="cais/hle",
+        help="HuggingFace dataset name (default: cais/hle)",
+    )
+    parser.add_argument(
         "--split",
         type=str,
-        default="validation",
-        help="Dataset split: test or validation (default: validation - has answers)",
+        default="test",
+        help="Dataset split: test or validation (default: test)",
     )
     parser.add_argument(
         "--max-questions",
         type=int,
-        default=50,
-        help="Maximum questions to evaluate (default: 50)",
-    )
-    parser.add_argument(
-        "--level",
-        type=int,
-        choices=[1, 2, 3],
-        default=None,
-        help="Filter by difficulty level: 1, 2, or 3 (default: all levels)",
+        default=10,
+        help="Maximum questions to evaluate (default: 10)",
     )
     parser.add_argument(
         "--timeout",
@@ -496,12 +400,12 @@ def main():
     session = zenoh.open(config)
     print("Zenoh session opened")
     
-    results = evaluate_gaia(
+    results = evaluate_hle(
         session=session,
         character=args.character,
+        dataset_name=args.dataset,
         split=args.split,
         max_questions=args.max_questions,
-        level=args.level,
         timeout=args.timeout,
         start_question=args.start,
         single_question=args.question,

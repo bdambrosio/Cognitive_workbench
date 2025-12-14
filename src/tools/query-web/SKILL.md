@@ -3,6 +3,9 @@ name: query-web
 type: python
 trusted: true
 description: "Search web using Google CSE. Returns Collection of JSON Notes with fields text, metadata.uri (alias: source_url), metadata.domain, format, char_count (Level 4 tool)."
+schema_hint:
+  value: "string (query)"
+  out: "$variable"
 examples:
   - '{"type":"query-web","value":"transformer architecture papers","out":"$results"}'
   - '{"type":"project","target":"$results","fields":["metadata.uri","metadata.domain"],"out":"$urls"}'

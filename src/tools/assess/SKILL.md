@@ -4,6 +4,10 @@ description: Test Note content against natural language predicate using LLM (ret
 type: python
 trusted: true
 flattens_collections: true
+schema_hint:
+  target: "$variable or Note ID or Collection ID"
+  predicate: "string (natural language question)"
+  out: "$variable (optional)"
 examples:
   - '{"type":"if","condition":{"type":"tool_condition","tool":"assess","target":"$content","predicate":"contains citations?"},"then":[...]}'
   - '{"type":"assess","target":"$document","predicate":"discusses AI safety?","out":"$is_relevant"}'

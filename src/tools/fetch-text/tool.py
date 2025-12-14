@@ -29,6 +29,12 @@ try:
 except ImportError:
     HAS_PLAYWRIGHT = False
 
+try:
+    from docx import Document
+    HAS_DOCX = True
+except ImportError:
+    HAS_DOCX = False
+
 logger = logging.getLogger(__name__)
 warnings.filterwarnings('ignore', category=UserWarning, module='unstructured')
 
@@ -155,6 +161,8 @@ def tool(url_or_content: str, runtime=None, **kwargs) -> str:
         return _extract_pdf_text(content, final_url, grobid_url=grobid_url)
     elif file_format == "html":
         return _extract_html_text(content, final_url)
+    elif file_format == "docx":
+        return _extract_docx_text(content, final_url)
     elif file_format == "markdown":
         return _extract_text_plain(content, final_url, "markdown")
     else:
@@ -234,6 +242,12 @@ def _download_from_url(url: str) -> tuple:
     """Download content from URL. Returns (content_bytes, content_type, final_url)."""
     headers = {'User-Agent': 'Mozilla/5.0 (compatible; CognitiveWorkbench/1.0)'}
     
+    # Add HuggingFace authentication if URL is from HuggingFace and token is available
+    if 'huggingface.co' in url:
+        hf_token = os.getenv('HF_TOKEN') or os.getenv('HUGGINGFACE_TOKEN')
+        if hf_token:
+            headers['Authorization'] = f'Bearer {hf_token}'
+    
     try:
         request = Request(url, headers=headers)
         response = urlopen(request, timeout=30)
@@ -258,10 +272,18 @@ def _detect_format(content: bytes, content_type: str, url: str) -> str:
     # Check magic bytes first (most reliable)
     if content.startswith(b'%PDF'):
         return "pdf"
+    # DOCX files are ZIP archives (Office Open XML)
+    if content.startswith(b'PK') and len(content) > 4:
+        url_lower = url.lower()
+        # Check for DOCX (Microsoft Word)
+        if url_lower.endswith('.docx') or 'msword' in content_type or 'wordprocessingml' in content_type:
+            return "docx"
     
     # Check Content-Type header (more reliable than URL extension)
     if 'pdf' in content_type:
         return "pdf"
+    if 'msword' in content_type or 'wordprocessingml' in content_type:
+        return "docx"
     if 'markdown' in content_type:
         return "markdown"
     if 'html' in content_type:
@@ -276,6 +298,8 @@ def _detect_format(content: bytes, content_type: str, url: str) -> str:
     
     # Check URL extension (least reliable - only if content didn't indicate HTML)
     url_lower = url.lower()
+    if url_lower.endswith('.docx'):
+        return "docx"
     if url_lower.endswith('.md') or url_lower.endswith('.markdown'):
         return "markdown"
     if url_lower.endswith('.html') or url_lower.endswith('.htm'):
@@ -441,6 +465,65 @@ def _extract_pdf_text(content: bytes, url: str, grobid_url: str = None) -> str:
     except Exception as e:
         logger.error(f"PDF extraction failed: {str(e)}")
         return json.dumps({"error": f"PDF extraction failed: {str(e)}"})
+
+
+def _extract_docx_text(content: bytes, url: str) -> str:
+    """Extract text from DOCX content."""
+    if not HAS_DOCX:
+        return json.dumps({"error": "python-docx library not installed"})
+    
+    try:
+        # DOCX files are ZIP archives, need to write to temp file for python-docx
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.docx') as tmp_file:
+            tmp_file.write(content)
+            tmp_path = tmp_file.name
+        
+        try:
+            doc = Document(tmp_path)
+            
+            # Extract text from paragraphs
+            paragraphs = [para.text for para in doc.paragraphs if para.text.strip()]
+            
+            # Extract text from tables
+            for table in doc.tables:
+                for row in table.rows:
+                    row_text = []
+                    for cell in row.cells:
+                        if cell.text.strip():
+                            row_text.append(cell.text.strip())
+                    if row_text:
+                        paragraphs.append(' | '.join(row_text))
+            
+            full_text = '\n'.join(paragraphs)
+            
+            # Extract metadata
+            core_props = doc.core_properties
+            docx_metadata = {}
+            if core_props.title:
+                docx_metadata['title'] = core_props.title
+            if core_props.author:
+                docx_metadata['author'] = core_props.author
+            if core_props.subject:
+                docx_metadata['subject'] = core_props.subject
+            
+            result = {
+                "text": full_text,
+                "format": "docx",
+                "metadata": {
+                    "source_url": url,
+                    "docx_metadata": docx_metadata
+                },
+                "char_count": len(full_text)
+            }
+            
+            return json.dumps(result, ensure_ascii=False)
+        finally:
+            # Clean up temp file
+            if os.path.exists(tmp_path):
+                os.unlink(tmp_path)
+    except Exception as e:
+        logger.error(f"DOCX extraction failed: {str(e)}")
+        return json.dumps({"error": f"DOCX extraction failed: {str(e)}"})
 
 
 def _extract_html_text(content: bytes, url: str) -> str:

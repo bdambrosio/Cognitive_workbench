@@ -16,9 +16,11 @@ import os
 import sys
 from pathlib import Path
 from typing import Dict, List, Any, Optional
+from infospace_executor import InfospaceExecutor
+from plan_guidance import PlanGuidance
 
 # Global temperature setting for all gen() calls
-GEN_TEMPERATURE = 0.5
+GEN_TEMPERATURE = 0.4
 
 # Configure logging with file handler
 # Add file handler directly to this module's logger (doesn't interfere with root logger config)
@@ -256,8 +258,8 @@ Common Patterns:
 Tool System
   - Tools are defined as SKILL.md files with YAML frontmatter
   - available tools are loaded from the tools directory and will be listed below
-  - prompt_augmentation - LLM-based tools (e.g. as-json, as-markdown, matches, text-find, extract-struct, is-question)
-  - python - Code execution tools (e.g. query-web, semantic-scholar, fetch-text, filter-collection, calculate, summarize, refine, assess, relate, generate-note, extract-entities, is-empty, is-positive, word-count)
+  - prompt_augmentation - LLM-based tools (e.g. as-json, as-markdown, matches, text-find, extract-struct)
+  - python - Code execution tools (e.g. query-web, semantic-scholar, filter-collection, calculate, summarize, refine, assess, relate, generate-note)
 
 #Tool Selection (only if tool is in the tool catalog):
 General Tools:
@@ -532,26 +534,29 @@ def build_tool_catalog(available_tools: Dict[str, Dict]) -> Dict[str, Dict]:
     
     # Enhanced descriptions to prevent common confusions
     TOOL_DISAMBIGUATION = {
-        "query-web": "Search web and return Collection of structured Notes. Each Note has text (full content), format, metadata.uri (URL), metadata.domain, char_count. Use project with metadata.uri to extract URLs. NO need for fetch-text after this.",
-        "fetch-text": "Fetch text from a SINGLE specific URL, Note ID, or Collection ID. For Note IDs, retrieves Note content directly. For Collection IDs, uses first Note. Use ONLY when you have one URL/ID to fetch directly.",
-        "semantic-scholar": "Search academic papers and return Collection of structured Notes. Each Note has text (abstract), format, metadata.uri (PDF URL), metadata.title, metadata.authors, metadata.year, metadata.citations, metadata.venue. Use project with metadata.uri to extract URLs. NO need for fetch-text after this.",
+        "query-web": "Search web and return Collection of structured Notes. Each Note has text (full content), format, metadata.uri (URL), metadata.domain, char_count. Use project with metadata.uri to extract URLs.",
+        "semantic-scholar": "Search academic papers and return Collection of structured Notes. Each Note has text (abstract), format, metadata.uri (PDF URL), metadata.title, metadata.authors, metadata.year, metadata.citations, metadata.venue. Use project with metadata.uri to extract URLs.",
+        "fetch-text": "Fetch text from a SINGLE specific URL, Do NOT use on query-web or semantic-scholar results. Use ONLY when you have one URL/ID to fetch directly and do not already have the text.",
         "search-notes": "Global search across all Notes. Returns Collection of structured Notes with full text content, metadata.source_id, metadata.uri, metadata.score, metadata.type. Use project for metadata fields, refine for extracting info from text.",
         "search-collections": "Global search across all Collections. Returns Collection of structured Notes with full text content, metadata.source_id, metadata.uri, metadata.score, metadata.type. Use project for metadata fields, refine for extracting info from text.",
         "search-within-collection": "Search within indexed Collection. Returns Collection of structured Notes with text preview (200 chars), metadata.source_id, metadata.uri, metadata.score, metadata.type. Format matches query-web/semantic-scholar.",
     }
-    TOOL_SCHEMA_HINT_OVERRIDE = {
-        "query-web": {"value": "string (query)", "out": "$variable"},
-        "semantic-scholar": {"value": "string (query)", "out": "$variable", "limit": "int (optional, default 10)"}
-    }
+    TOOL_SCHEMA_HINT_OVERRIDE = {}
     
     # Add available tools from map
     for tool_name, tool_meta in available_tools.items():
         param_source = tool_meta.get('parameter_source')
         schema_hint = {}
         
-        if param_source and param_source.startswith('args.'):
+        # First, check if schema_hint is explicitly defined in SKILL.md frontmatter
+        if 'schema_hint' in tool_meta:
+            schema_hint = tool_meta['schema_hint'].copy()
+        # Otherwise, fall back to parameter_source (for backward compatibility)
+        elif param_source and param_source.startswith('args.'):
             param_name = param_source.split('.', 1)[1]
             schema_hint[param_name] = "string"
+        
+        # Override takes precedence (for tools that need special handling)
         override_hint = TOOL_SCHEMA_HINT_OVERRIDE.get(tool_name)
         if override_hint:
             schema_hint = override_hint.copy()
@@ -582,15 +587,27 @@ def tool_catalog_text(tools: Dict[str, Dict]) -> str:
         if 'examples' in meta and meta['examples']:
             lines.append(f"  examples:")
             for ex in meta['examples']:
-                lines.append(f"    {ex}")
+                # Format example as single-line JSON if it's a dict or string
+                if isinstance(ex, dict):
+                    ex_str = json.dumps(ex, separators=(',', ':'))
+                elif isinstance(ex, str):
+                    # Try to parse and re-serialize as single-line if it's JSON
+                    try:
+                        parsed = json.loads(ex)
+                        ex_str = json.dumps(parsed, separators=(',', ':'))
+                    except (json.JSONDecodeError, TypeError):
+                        ex_str = ex
+                else:
+                    ex_str = str(ex)
+                lines.append(f"    {ex_str}")
     
     # Add critical workflows to prevent common mistakes
     lines.append("\n# CRITICAL WORKFLOWS:")
-    lines.append("- query-web → summarize (NOT query-web → fetch-text)")
+    lines.append("- query-web → summarize / refine / filter-collection")
     lines.append("- query-web already returns full text in 'text' field of each Note")
-    lines.append("- semantic-scholar → summarize (NOT semantic-scholar → fetch-text)")
+    lines.append("- semantic-scholar → summarize / refine / filter-collection")
     lines.append("- fetch-text is for SINGLE URLs only, NOT for Collections from query-web/semantic-scholar")
-    lines.append("- Level 4 tools (query-web, semantic-scholar) return Collections with complete data")
+    lines.append("- Level 4 tools (query-web, semantic-scholar) return Collections with text content in the 'text' field of each Note")
     
     return "\n".join(lines)
 
@@ -949,9 +966,15 @@ def execute_infospace_action(action: Dict, executor, agent_name: str) -> str:
                 else:
                     return f"SUCCESS | {action_type} completed"
         else:
+            # Increment error counter
+            if hasattr(executor, '_plan_error_count'):
+                executor._plan_error_count += 1
             error_reason = result.get('reason', 'Unknown error')
             return f"ERROR | {action['type']} failed: {error_reason}"
     except Exception as e:
+        # Increment error counter for exceptions
+        if hasattr(executor, '_plan_error_count'):
+            executor._plan_error_count += 1
         logger.error(f"Execution error: {e}")
         traceback.print_exc()
         return f"ERROR | Exception: {str(e)}"
@@ -1047,13 +1070,12 @@ if HAS_SGLANG:
             
         except Exception as e:
             logger.warning(f"Stage 0: Error in resource retrieval: {e}")
-            import traceback
             traceback.print_exc()
             return ""
     
     @function
     def tool_planner_infospace(s, goal: str, character_context: str, recent_context: str, 
-                              tools_catalog_text: str, executor, trace_file=None, max_steps: int = 16):
+                              tools_catalog_text: str, executor, trace_file=None, max_steps: int = 16, similar_plan: Dict = None, preplan: str = None):
         """
         SGLang incremental planner for infospace goals.
         
@@ -1085,14 +1107,23 @@ if HAS_SGLANG:
         system_parts.append(f"\n{INCREMENTAL_PLAN_SPECIFICATIONS}\n")
         system_parts.append(f"Tool catalog:\n{tools_catalog_text}\n#### END OF INFOSPACE TYPE SYSTEM, SPECIFICATIONS, AND TOOL CATALOG\n")
         system_parts.append("""Follow this process to achieve the goal:
-            "Follow this process to achieve the goal:\n"
-            "Stage 1 (once): Analyze goal, select relevant tools, decompose into FIRST_TASK.\n"
-            "Stage 1.5 (once): Load and inject detailed docs for selected tools.\n"
-            "Then you will work in repeated cycles to achieve the goal:\n"
-            "    - Stage 2: Pick a single tool and JSON args for CURRENT_TASK.\n"
-            "    - Stage 3: Reflect on result, decide if goal done, set NEXT_TASK.\n\n"
-            "ALWAYS follow all formatting instructions exactly.""")
-        
+    Stage 1 (once): Analyze goal, select relevant tools, decompose into FIRST_TASK.
+    Stage 1.5 (once): Load and inject detailed docs for selected tools.
+    Then you will work in repeated cycles to achieve the goal:
+    - Stage 2: Pick a single tool and JSON args for CURRENT_TASK. Be concise in text value arguments.
+    - Stage 3: Reflect on result, decide if goal done, set NEXT_TASK.
+    ALWAYS follow all formatting instructions exactly.
+""")
+        system_parts.append(f"\n#GOAL\n {goal}\n\n")
+        if preplan:
+            system_parts.append(f"\n## ABSTRACT PLAN (Suggestions for overall approach)\n{preplan}\n")
+            system_parts.append(f"\n## END OF ABSTRACT PLAN\n")
+
+        if similar_plan:
+            system_parts.append(f"\n## EXAMPLE\nGOAL: {similar_plan['goal']}\n")
+            system_parts.append(f"PLAN:\n{similar_plan['plan']}\n")
+            system_parts.append(f"OUTCOME: {similar_plan['outcome']} ERRORS: {similar_plan['error_count']} PLAN LENGTH: {len(similar_plan['plan'])}\n")
+            system_parts.append(f"\n## END OF EXAMPLE\n")
         if available_resources_text:
             system_parts.append(f"\n{available_resources_text}\n")
         # Add current date and time
@@ -1102,10 +1133,8 @@ if HAS_SGLANG:
         s += system("".join(system_parts))
         
         s += user(
-            f"#GOAL\n {goal}\n\n"
             "Stage 1: Analyze goal and identify relevant tools. Be concise in your analysis.\n"
             "Include tools you might need AND related/supporting tools.\n"
-            "Err on the side of including additional tools in SELECTED_TOOLS_JSON for better coverage.\n"
             "Then, decompose the goal into a FIRST high-level task/subgoal to focus on.\n"
             "In doing so, consider the tools you have selected, the goal you are trying to achieve, and the downstream tasks that will be required to achieve the goal.\n"
             "Respond with the following fields, be concise and to the point:\n"
@@ -1135,8 +1164,9 @@ if HAS_SGLANG:
         # Stage 1.5: Load and inject detailed docs for selected tools (only if not already loaded)
         try:
             selected_tools_json = s['selected_tools_json']
-            selected_tools = json.loads(selected_tools_json)
-            if isinstance(selected_tools, list) and selected_tools:
+            # Use robust parsing that handles malformed JSON
+            selected_tools = parse_request_tools(selected_tools_json)
+            if selected_tools and isinstance(selected_tools, list) and selected_tools:
                 # Filter to only tools that haven't had docs loaded yet
                 tools_to_load = [tool for tool in selected_tools if tool not in _loaded_skill_docs]
                 
@@ -1186,7 +1216,7 @@ if HAS_SGLANG:
             # Stage 2: Choose tool + args
             s += user(
                 f"STAGE 2 (step {step + 1}/{max_steps}):\n"
-                f"GOAL: {goal}\n"
+                f"#GOAL: {goal}\n#END GOAL\n"
                 f"CURRENT_TASK: {current_task}\n"
                 "Choose tool and JSON args using Stage 2 FORMAT.\n"
             )
@@ -1394,7 +1424,7 @@ class IncrementalPlanner:
     Incremental planner using SGLang for iterative goal achievement.
     """
     
-    def __init__(self, executor, available_tools: Dict[str, Dict], 
+    def __init__(self, executor: InfospaceExecutor, available_tools: Dict[str, Dict], 
                 logger_instance=None, sgl_model_path: str = None):
         """
         Initialize incremental planner.
@@ -1430,6 +1460,9 @@ class IncrementalPlanner:
         trace_path = os.path.join(trace_dir, f'planner_trace_{character_name}.txt')
         self.trace_file = open(trace_path, 'a', encoding='utf-8')
         self.logger.info(f"Trace file opened: {trace_path}")
+        
+        # Initialize plan guidance system
+        self.plan_guidance = PlanGuidance(resource_manager=executor.resource_manager)
     
     def __del__(self):
         """Cleanup: close trace file on instance destruction."""
@@ -1460,13 +1493,41 @@ class IncrementalPlanner:
             
             # Attach plan_actions list to executor for tracking
             self.executor._plan_actions = []
+            self.executor._plan_error_count = 0  # Initialize error counter for this plan
             self.goal = goal
+
+            preplan = self._preplan(goal)
             # Extract context components
             character_context = ""
             recent_context = ""
             if context:
                 character_context = context.get('character_context', '')
                 recent_context = context.get('recent_context', '')
+                
+            # Find similar plans using plan guidance
+            similar_plans = self.plan_guidance.find_similar_plans(goal)
+            if similar_plans:
+                logger.info(f"Found {len(similar_plans)} similar plans")
+                for plan in similar_plans:
+                    logger.info(f"Similar plan: {plan['outcome']} errors: {plan['error_count']} plan length: {len(plan['plan'])}")
+                    #logger.info(f"Similar plan goal: {plan['goal']}")
+            
+            # Check total input size before calling tool_planner_infospace.run()
+            total_input_size = (
+                len(goal) +
+                len(character_context) +
+                len(recent_context) +
+                len(self.tools_catalog_text)
+            )
+            if total_input_size > 100000:
+                logger.error(f"⚠️  Attempting to send {total_input_size:,} chars to tool_planner_infospace.run() (limit: 100,000)")
+                logger.error(f"  goal length: {len(goal):,}")
+                logger.error(f"  character_context length: {len(character_context):,}")
+                logger.error(f"  recent_context length: {len(recent_context):,}")
+                logger.error(f"  tools_catalog_text length: {len(self.tools_catalog_text):,}")
+                logger.error("Stack traceback:")
+                for line in traceback.format_stack():
+                    logger.error(line.rstrip())
             
             # Run SGLang planner
             state = tool_planner_infospace.run(
@@ -1476,7 +1537,9 @@ class IncrementalPlanner:
                 tools_catalog_text=self.tools_catalog_text,
                 executor=self.executor,
                 trace_file=self.trace_file,
-                max_steps=max_steps
+                max_steps=max_steps,
+                preplan=preplan,
+                similar_plan=similar_plans[0] if similar_plans else None
             )
             
             # Extract plan actions from executor
@@ -1489,16 +1552,64 @@ class IncrementalPlanner:
             except (KeyError, TypeError):
                 final_answer = 'Planning completed'
             
+            error_count = getattr(self.executor, '_plan_error_count', 0)
             return {
                 'plan': plan_actions,
                 'reasoning': final_answer,
                 'success': True,
+                'error_count': error_count,
                 'skip_validation': True  # Plan already executed, no need to validate
             }
         except Exception as e:
             self.logger.error(f"Incremental planning failed: {e}")
             traceback.print_exc()
             return {'error': str(e)}
+
+
+    def _preplan(self, goal_text: str) -> str:
+        tool_names = list(self.tools.keys())
+        ABSTRACT_PLAN_PROMPT = f"""
+You will create a short, high-level problem-solving strategy for the goal below.
+This is NOT a domain explanation and NOT a tool invocation sequence.
+It is a goal-specific strategy sketch that guides downstream incremental planning.
+
+Only use tools that appear in the provided tool list.
+
+AVAILABLE_TOOLS:
+{tool_names}
+
+GOAL:
+{goal_text}
+
+When creating the strategy:
+
+1. Identify what *types of operations* the goal requires  
+   (e.g., retrieval, extraction from existing text, transformation, comparison, generation).
+
+2. Match these operation types to the available tools.  
+   - Do not assume tools that are absent.  
+   - If multiple tools could serve a role, state how to choose between them.
+
+3. Describe a minimal, ordered sequence of conceptual steps  
+   that a tool-using planner would follow to solve the goal.  
+   - Describe *what must be achieved*, not how to call tools.
+
+4. Include fallback logic **only if the goal plausibly needs it**  
+   (e.g., multi-source lookup, ambiguous values, missing information).
+
+5. Do not include JSON, tool calls, URLs, or domain-specific knowledge.  
+   The output must be a brief strategic outline, not an answer to the goal.
+
+Format:
+ABSTRACT_PLAN:
+- <step>
+- <step>
+- ...
+END_PLAN
+"""
+
+        abstract_plan = self.executor.llm_generate(ABSTRACT_PLAN_PROMPT, max_tokens=256, temperature=GEN_TEMPERATURE)
+        return abstract_plan.text.strip()
 
     def _feedback(self, outcome: bool) -> Dict:
         """
@@ -1518,12 +1629,14 @@ class IncrementalPlanner:
         # Get goal and plan from current state
         goal = getattr(self, 'goal', '')
         plan_actions = getattr(self.executor, '_plan_actions', [])
+        error_count = getattr(self.executor, '_plan_error_count', 0)
         
         # Create feedback record
         feedback_record = {
             'outcome': outcome,
             'goal': goal,
-            'plan': plan_actions
+            'plan': plan_actions,
+            'error_count': error_count
         }
         
         # Append to JSONL file

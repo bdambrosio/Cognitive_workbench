@@ -3,6 +3,11 @@ name: generate-note
 description: Generate new text or code content from scratch using natural language prompt via LLM
 type: python
 trusted: true
+schema_hint:
+  prompt: "string (generation instruction)"
+  style: "string (optional, 'code' or 'text', default 'text')"
+  context: "$variable or Note ID or Collection ID (optional)"
+  out: "$variable"
 examples:
   - '{"type":"generate-note","prompt":"Write a Python function to calculate fibonacci numbers","out":"$code_note"}'
   - '{"type":"generate-note","prompt":"Write a summary of quantum computing","style":"text","out":"$summary_note"}'
@@ -48,7 +53,7 @@ Generate with context Collection:
 ```
 
 ## Differences from refine
-- **generate-note**: Creates NEW content from scratch (no target Note required)
+- **generate-note**: Creates NEW content from scratch, following prompt. No target Note required, however, context information can be provided)
 - **refine**: Transforms EXISTING Note content (requires target Note)
 
 ## Context Assembly Pattern (RAG)

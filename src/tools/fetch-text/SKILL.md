@@ -3,6 +3,9 @@ name: fetch-text
 description: Fetch all text from URL or base64 PDF. Collection-aware (extracts first item if given Collection). Auto-detects format (PDF/HTML/MD/TXT) and extracts complete text content.
 type: python
 trusted: true
+schema_hint:
+  target: "$variable or Note ID or Collection ID or URL string"
+  out: "$variable"
 parameters:
   - name: url_or_content
     type: string

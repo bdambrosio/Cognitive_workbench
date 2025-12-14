@@ -3,6 +3,9 @@ name: is-positive
 description: Check if a number is positive
 type: python
 trusted: true
+schema_hint:
+  target: "$variable or Note ID"
+  out: "$variable (optional)"
 parameters: none
 examples:
   - '{"type":"if","condition":{"type":"tool_condition","tool":"is-positive","target":"$score"},"then":[...]}'

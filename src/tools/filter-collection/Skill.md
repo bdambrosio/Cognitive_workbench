@@ -3,6 +3,11 @@ name: filter-collection
 description: Evaluate complex criteria on each item in a Collection and return a new Collection of matching items
 type: python
 trusted: true
+schema_hint:
+  target: "$variable (Collection)"
+  predicate: "string (filter criteria)"
+  mode: "string (optional, 'include' or 'exclude', default 'include')"
+  out: "$variable"
 examples:
   - '{"type":"filter-collection","target":"$collection","predicate":"contains technical content","out":"$filtered"}'
 ---

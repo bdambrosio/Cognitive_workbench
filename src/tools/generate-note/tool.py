@@ -102,6 +102,10 @@ def tool(value, runtime=None, **kwargs):
         Generated content as string
     """
     prompt = kwargs.get('prompt', '')
+    # If no prompt but value is in kwargs (planner mistake: used 'value' instead of 'prompt'), use value as prompt
+    if not prompt and 'value' in kwargs:
+        prompt = kwargs.get('value')
+    
     if not prompt:
         return "Error: prompt parameter required"
     

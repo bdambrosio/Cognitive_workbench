@@ -63,6 +63,24 @@
             "preLaunchTask": "setup-zenoh-environment"
         },
         {
+            "name": "Format Prompt",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/format_prompt.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/src",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src",
+                "LD_LIBRARY_PATH": "${workspaceFolder}/zenoh_venv/lib/python3.12/site-packages/PyQt5/Qt5/lib:$LD_LIBRARY_PATH",
+                "QT_PLUGIN_PATH": "${workspaceFolder}/zenoh_venv/lib/python3.12/site-packages/PyQt5/Qt5/plugins",
+                "QT_QPA_PLATFORM_PLUGIN_PATH": ""
+            },
+            "args": [],
+            "justMyCode": false,
+            "stopOnEntry": false,
+            "preLaunchTask": "setup-zenoh-environment"
+        },
+        {
             "name": "mmlu_eval",
             "type": "debugpy",
             "request": "launch",
@@ -78,19 +96,46 @@
             "preLaunchTask": "setup-zenoh-environment"
         },
         {
-            "name": "Format Prompt",
+            "name": "gaia_eval",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/src/format_prompt.py",
+            "program": "${workspaceFolder}/tests/gaia_eval.py",
             "console": "integratedTerminal",
-            "cwd": "${workspaceFolder}/src",
+            "cwd": "${workspaceFolder}/tests",
             "env": {
-                "PYTHONPATH": "${workspaceFolder}/src",
-                "LD_LIBRARY_PATH": "${workspaceFolder}/zenoh_venv/lib/python3.12/site-packages/PyQt5/Qt5/lib:$LD_LIBRARY_PATH",
-                "QT_PLUGIN_PATH": "${workspaceFolder}/zenoh_venv/lib/python3.12/site-packages/PyQt5/Qt5/plugins",
-                "QT_QPA_PLATFORM_PLUGIN_PATH": ""
+                "PYTHONPATH": "${workspaceFolder}/src"
             },
-            "args": [],
+            "args": ["--character", "Jill", "--split", "validation", "--max-questions", "10", "--level", "1", "--timeout", "600.0"],
+            "justMyCode": false,
+            "stopOnEntry": false,
+            "preLaunchTask": "setup-zenoh-environment"
+        },
+        {
+            "name": "GDPval_eval",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/tests/gdpval_eval.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/tests",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src"
+            },
+            "args": ["--character", "Jill", "--max-tasks", "10", "--timeout", "600.0"],
+            "justMyCode": false,
+            "stopOnEntry": false,
+            "preLaunchTask": "setup-zenoh-environment"
+        },
+        {
+            "name": "hle_eval",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/tests/hle_eval.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/tests",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src"
+            },
+            "args": ["--character", "Jill", "--max-questions", "10", "--timeout", "600.0"],
             "justMyCode": false,
             "stopOnEntry": false,
             "preLaunchTask": "setup-zenoh-environment"
