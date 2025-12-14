@@ -4,6 +4,12 @@ description: Compress information with focus-aware adaptive compression and styl
 type: python
 trusted: true
 flattens_collections: true
+schema_hint:
+  target: "$variable or Note ID or Collection ID"
+  focus: "string (optional, topic to guide summarization)"
+  style: "string (optional, 'executive' or 'technical' or 'comprehensive', default 'technical')"
+  compression_ratio: "float (optional, default 3.0)"
+  out: "$variable"
 examples:
   - '{"type":"summarize","target":"$doc","out":"$summary"}'
   - '{"type":"summarize","target":"$papers","focus":"attention mechanisms","style":"technical","out":"$summary"}'

@@ -187,6 +187,18 @@ class SGLangAPIServer:
                     # Fallback: use last message content
                     user_text = request.messages[-1].content if request.messages else ""
                 
+                # Check total input size before calling generate_chat.run()
+                total_input_size = len(system_msg or "") + len(user_text)
+                if total_input_size > 100000:
+                    import traceback
+                    logger.error(f"⚠️  Attempting to send {total_input_size:,} chars to sglang via API server (limit: 100,000)")
+                    logger.error(f"  system_text length: {len(system_msg or ''):,}")
+                    logger.error(f"  user_text length: {len(user_text):,}")
+                    logger.error(f"  user_text preview (first 500 chars): {user_text[:500]}...")
+                    logger.error("Stack traceback:")
+                    for line in traceback.format_stack():
+                        logger.error(line.rstrip())
+                
                 # Run generation
                 state = generate_chat.run(
                     system_text=system_msg or "",

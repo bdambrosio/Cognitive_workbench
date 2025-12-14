@@ -22,6 +22,7 @@ import warnings
 import wordfreq as wf
 from unstructured.partition.html import partition_html
 from utils.grobid import parse_pdf_grobid
+from utils.text_chunking import segment_text_boundary_aware
 
 # ------------------------------
 # Logging setup
@@ -219,8 +220,33 @@ def _html_to_text_extract(html: str, query: str, max_chars: int) -> str:
 
 def _llm_tldr(llm_generate, text: str, query: str, max_chars: int, timeout: float = 12.0, heartbeat=None) -> str:
     """
-    Use llm_generate function for LLM calls.
+    Use llm_generate function for LLM calls with chunking for large text.
+    
+    Chunks text >80k chars to avoid oversized LLM requests, then tests each chunk
+    for relevance using OR aggregation (returns True if ANY chunk is relevant).
     """
+    # Chunk text if it's too large (leave room for prompt overhead)
+    # Use 80k as safe limit (prompt template adds ~500 chars)
+    chunks = segment_text_boundary_aware(text, max_chunk_size=80000)
+    
+    if len(chunks) == 1:
+        # Single chunk - direct test
+        chunk_text = chunks[0][0]
+        return _test_chunk_relevance(llm_generate, chunk_text, query, max_chars, heartbeat)
+    
+    # Multiple chunks - OR aggregation (true if ANY chunk matches)
+    logger.info(f"query-web: large text ({len(chunks)} chunks), testing each chunk for relevance")
+    
+    for i, (chunk_text, _) in enumerate(chunks):
+        if _test_chunk_relevance(llm_generate, chunk_text, query, max_chars, heartbeat):
+            logger.info(f"query-web: relevant content found in chunk {i+1}/{len(chunks)}")
+            return True
+    
+    return False
+
+
+def _test_chunk_relevance(llm_generate, chunk_text: str, query: str, max_chars: int, heartbeat=None) -> bool:
+    """Test a single chunk for relevance to the query."""
     prompt = ["Your task is to analyze the following Text to identify if it is relevant to the Query.\n",
               """Query:
 {{$query}}
@@ -240,7 +266,7 @@ Respond only with the JSON, no commentary, no code fences, no reasoning:
 
 """]
     try:
-        raw = llm_generate(messages=prompt, bindings={"query": query, "text": text}, max_tokens=max_chars, temperature=0.2, is_json=True)
+        raw = llm_generate(messages=prompt, bindings={"query": query, "text": chunk_text}, max_tokens=max_chars, temperature=0.2, is_json=True)
         
         # Send heartbeat after LLM call
         if heartbeat:
@@ -251,22 +277,21 @@ Respond only with the JSON, no commentary, no code fences, no reasoning:
             if str(raw.text.get("relevant", "")).lower().startswith("true"):
                 return True
             else:
-                #logger.warning(f"No relevant content found for query: {query}")
                 return False
         elif isinstance(raw.text, str):
-            # Fallback: try parsing string JSON (shouldn't happen with fix, but handle gracefully)
+            # Fallback: try parsing string JSON
             if raw.success:
                 if "true" in str(raw.text).lower():
                     return True
                 else:
-                    #logger.warning(f"No relevant content found for query: {query}")
                     return False
             else:
-                #logger.warning(f"No relevant content found for query: {query}")
                 return False
         else:
-            #logger.warning(f"No relevant content found for query: {query}")
             return False
+    except Exception as e:
+        logger.warning(f"query-web: relevance test failed: {e}")
+        return False
     except Exception as e:
         logger.error(f"LLM TLDR failed: {e}")
         traceback.print_exc()

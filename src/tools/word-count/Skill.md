@@ -3,6 +3,9 @@ name: word-count
 description: Count words in text
 type: python
 trusted: true
+schema_hint:
+  target: "$variable or Note ID"
+  out: "$variable"
 parameters: none
 examples:
   - '{"type":"word-count","target":"$text","out":"$count"}'

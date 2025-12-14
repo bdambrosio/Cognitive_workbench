@@ -310,6 +310,11 @@ def evaluate_gdpval(
             print(f"  [Fetching {len(reference_files)} reference file(s)]")
             for ref_file, ref_url in zip(reference_files, reference_file_urls):
                 if ref_url:
+                    # Construct full URL if ref_url is relative (doesn't start with http/https)
+                    if not ref_url.startswith(('http://', 'https://')):
+                        GDPVAL_BASE_URL = "https://huggingface.co/datasets/openai/gdpval/resolve/main/"
+                        ref_url = GDPVAL_BASE_URL + ref_url.lstrip('/')
+                    
                     # Use filename (without extension) as note name
                     note_name = ref_file.rsplit('.', 1)[0] if '.' in ref_file else ref_file
                     note_name = note_name.replace(' ', '_').replace('-', '_')

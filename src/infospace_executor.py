@@ -456,27 +456,7 @@ class InfospaceExecutor:
                 try:
                     from utils.action_post_processing import process_action_expectation
                     
-                    # Create llm_generate wrapper that matches the interface (SGLang only)
-                    def llm_generate_wrapper(messages, bindings=None, max_tokens=2000, temperature=0.7, is_json=False, stops=None):
-                        """Wrapper for action_post_processing using SGLang runtime."""
-                        if not self.runtime:
-                            raise RuntimeError("SGLang runtime not available")
-                        # Apply bindings to messages if provided
-                        if bindings and isinstance(messages, list):
-                            processed_messages = []
-                            for msg in messages:
-                                if isinstance(msg, str):
-                                    # Apply template bindings
-                                    processed_msg = msg
-                                    for key, value in bindings.items():
-                                        processed_msg = processed_msg.replace(f"{{{{${key}}}}}", str(value))
-                                    processed_messages.append(processed_msg)
-                                else:
-                                    processed_messages.append(msg)
-                            messages = processed_messages
-                        return self._sglang_generate(messages, max_tokens, temperature, stops, is_json=is_json)
-                    
-                    comparison = process_action_expectation(action, result, llm_generate_wrapper, self.resource_manager, debug=False)
+                    comparison = process_action_expectation(action, result, self.llm_generate, self.resource_manager, debug=False)
                     if comparison and not comparison.get('matched'):
                         logger.warning(f"Expectation mismatch for {action_type}: {comparison.get('response', '')}")
                 except Exception as e:
@@ -694,28 +674,8 @@ Only provide the result, followed by the </end> tag.""")
             
             full_prompt = "".join(prompt_parts)
             
-            # Create unified LLM generation wrapper (SGLang only)
-            def llm_generate(messages, bindings=None, max_tokens=2000, temperature=0.7, is_json=False, stops=None):
-                """Unified LLM generation interface using SGLang runtime."""
-                if not self.runtime:
-                    raise RuntimeError("SGLang runtime not available")
-                # Apply bindings to messages if provided
-                if bindings and isinstance(messages, list):
-                    processed_messages = []
-                    for msg in messages:
-                        if isinstance(msg, str):
-                            # Apply template bindings
-                            processed_msg = msg
-                            for key, value in bindings.items():
-                                processed_msg = processed_msg.replace(f"{{{{${key}}}}}", str(value))
-                            processed_messages.append(processed_msg)
-                        else:
-                            processed_messages.append(msg)
-                    messages = processed_messages
-                return self._sglang_generate(messages, max_tokens, temperature, stops, is_json=is_json)
-            
             # Call LLM using unified wrapper
-            llm_response = llm_generate(
+            llm_response = self.llm_generate(
                 messages=[full_prompt],
                 bindings={},
                 max_tokens=1000,
@@ -780,6 +740,17 @@ Only provide the result, followed by the </end> tag.""")
             else:
                 prompt = str(messages)
             
+            # Log and traceback if content is too large
+            prompt_length = len(prompt)
+            if prompt_length > 100000:
+                import traceback
+                logger.error(f"⚠️  Attempting to send {prompt_length:,} chars to sglang (limit: 100,000)")
+                logger.error(f"Prompt preview (first 500 chars): {prompt[:500]}...")
+                logger.error(f"Prompt preview (last 500 chars): ...{prompt[-500:]}")
+                logger.error("Stack traceback:")
+                for line in traceback.format_stack():
+                    logger.error(line.rstrip())
+            
             # Create a simple generation function
             @function
             def generate_text(s, prompt_text):
@@ -808,6 +779,24 @@ Only provide the result, followed by the </end> tag.""")
         except Exception as e:
             logger.exception(f"SGLang generation error: {e}")
             return Response(success=False, error=str(e))
+    
+    def llm_generate(self, messages, bindings=None, max_tokens=2000, temperature=0.7, is_json=False, stops=None):
+        """Unified LLM generation interface using SGLang runtime."""
+        if not self.runtime:
+            raise RuntimeError("SGLang runtime not available - ensure executive_node is started with sgl_model_path")
+        # Apply bindings to messages if provided
+        if bindings and isinstance(messages, list):
+            processed_messages = []
+            for msg in messages:
+                if isinstance(msg, str):
+                    processed_msg = msg
+                    for key, value in bindings.items():
+                        processed_msg = processed_msg.replace(f"{{{{${key}}}}}", str(value))
+                    processed_messages.append(processed_msg)
+                else:
+                    processed_messages.append(msg)
+            messages = processed_messages
+        return self._sglang_generate(messages, max_tokens, temperature, stops, is_json=is_json)
     
     def _parse_json_response(self, response_text, original_prompt=None):
         """
@@ -1024,25 +1013,7 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         resolved_args['resource_manager'] = self.resource_manager
         
         # Add unified LLM generation callback (SGLang only)
-        def llm_generate(messages, bindings=None, max_tokens=2000, temperature=0.7, is_json=False, stops=None):
-            """Unified LLM generation interface using SGLang runtime."""
-            if not self.runtime:
-                raise RuntimeError("SGLang runtime not available - ensure executive_node is started with sgl_model_path")
-            # Apply bindings to messages if provided
-            if bindings and isinstance(messages, list):
-                processed_messages = []
-                for msg in messages:
-                    if isinstance(msg, str):
-                        processed_msg = msg
-                        for key, value in bindings.items():
-                            processed_msg = processed_msg.replace(f"{{{{${key}}}}}", str(value))
-                        processed_messages.append(processed_msg)
-                    else:
-                        processed_messages.append(msg)
-                messages = processed_messages
-            return self._sglang_generate(messages, max_tokens, temperature, stops, is_json=is_json)
-        
-        resolved_args['llm_generate'] = llm_generate
+        resolved_args['llm_generate'] = self.llm_generate
         
         # Extract grobid URL from config if available (for PDF processing tools)
         if self.executive_node:
@@ -1929,10 +1900,11 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         Required: type, value or target
         """
         # Accept both value and target
-        value = self._resolve_value(action.get('value') or action.get('target'))
-        
-        if value is None:
+        value_arg = action.get('value') or action.get('target')
+        if not value_arg:
             return self._create_uniform_return('failed', reason='think requires value or target')
+        
+        value = self._resolve_value(value_arg)
         
         # Optionally bind to variable if out is specified (for planner visibility)
         out_var = action.get('out')

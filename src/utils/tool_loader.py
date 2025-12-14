@@ -218,6 +218,9 @@ def load_tools(tools_dir_path: str) -> Dict[str, Dict]:
             if not body_text:
                 logger.warning(f"Instruction tool {tool_name} has no body text after frontmatter")
         
+        # Extract schema_hint from frontmatter if present
+        schema_hint = metadata.get('schema_hint', {})
+        
         tools[tool_name] = {
             'name': tool_name,
             'description': tool_description,
@@ -227,6 +230,7 @@ def load_tools(tools_dir_path: str) -> Dict[str, Dict]:
             'body_text': body_text,  # Body text for instruction tools
             'workflows': workflows,
             'examples': examples,
+            'schema_hint': schema_hint,
             'path': str(tool_dir.absolute()),
             'python_file': python_file,
             'additional_files': additional_files,

@@ -84,6 +84,18 @@ def clear_transient_notes(session: zenoh.Session, character: str, timeout: float
     return 0
 
 
+def send_planner_feedback(session: zenoh.Session, character: str, outcome: bool, timeout: float = 5.0) -> bool:
+    """Send feedback to planner about plan execution outcome."""
+    query_key = f"cognitive/{character}/planner/feedback"
+    payload = json.dumps({'outcome': outcome})
+    replies = session.get(query_key, payload=payload.encode('utf-8'), timeout=timeout)
+    for reply in replies:
+        if hasattr(reply, 'ok') and reply.ok is not None:
+            result = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
+            return result.get('success', False)
+    return False
+
+
 def execute_plan(session: zenoh.Session, character: str, plan: list, timeout: float = 30.0) -> dict:
     """Execute a plan via Zenoh API. Returns result dict with success, bindings, last_action_result."""
     query_key = f"cognitive/{character}/execute_plan_sync"
@@ -311,6 +323,9 @@ def evaluate_hotpotqa(
         f1 = f1_score(pred_answer, gold_answer)
         lj, lj_response, lj_error = llm_judge(session, character, question, gold_answer, pred_answer)
         
+        # Outcome is True if ANY scoring method indicates correctness
+        outcome = em or cm or lj
+        
         results['total'] += 1
         if em:
             results['exact_match'] += 1
@@ -319,6 +334,11 @@ def evaluate_hotpotqa(
         if lj:
             results['llm_judge'] += 1
         results['f1_sum'] += f1
+        
+        # Send feedback to planner
+        feedback_sent = send_planner_feedback(session, character, outcome)
+        if not feedback_sent:
+            print(f"       WARNING: Failed to send planner feedback")
         
         status = '✓' if em else ('+' if cm or lj else ('~' if f1 > 0.5 else '✗'))
         print(f"[{idx:4d}] {status} EM={int(em)} CM={int(cm)} LJ={int(lj)} F1={f1:.2f} ({dt:.1f}s)")

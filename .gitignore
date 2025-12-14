@@ -30,7 +30,7 @@ Thumbs.db
 *.db-*
 
 # Cognitive framework data (private memories, etc.)
-data/
+/data/
 src/logs/llm_client.log
 src/logs/memory_node.log
 src/logs/situation_node.log
@@ -40,7 +40,10 @@ src/logs/sense_node.log
 src/logs/character_launcher.log
 src/logs/executive_node.log
 src/logs/fastapi_action_display.log
-src/data
+src/data/*
+# Exception: track plan guidance data for version control
+!src/data/planner_feedback/
+!src/data/planner_feedback/plan_guidance.jsonl
 src/logs/
 *.log
 src/logs/*.log

@@ -10,6 +10,7 @@ import time
 import uuid
 import traceback
 from zenoh import QueryTarget, ConsolidationMode
+from utils.text_chunking import segment_text_boundary_aware
 
 logger = logging.getLogger(__name__)
 
@@ -332,7 +333,7 @@ def tool(value, runtime=None, **kwargs):
         value = filtered_text
     
     # Check if segmentation needed (after filtering)
-    chunks = _segment_text(value, max_chunk_size=16000)
+    chunks = segment_text_boundary_aware(value, max_chunk_size=16000)
     chunk_count = len(chunks)
     
     # Compute target length
@@ -483,53 +484,4 @@ End your response with:
     logger.info(f"summarize: output={output_chars} chars ({output_tokens}t)")
     
     return response.text
-
-
-def _segment_text(text, max_chunk_size=16000):
-    """
-    Segment text into chunks at sentence boundaries.
-    Returns list of (chunk_text, delimiter) tuples.
-    """
-    if len(text) <= max_chunk_size:
-        return [(text, None)]
-    
-    chunks = []
-    pos = 0
-    
-    while pos < len(text):
-        end_pos = min(pos + max_chunk_size, len(text))
-        
-        if end_pos >= len(text):
-            chunks.append((text[pos:], None))
-            break
-        
-        # Find sentence boundary
-        search_start = max(pos, end_pos - 500)
-        best_split = -1
-        best_delimiter = None
-        
-        for i in range(end_pos, search_start, -1):
-            if i < len(text) - 1 and text[i] == '.' and text[i+1] in (' ', '\n'):
-                best_split = i + 1
-                best_delimiter = text[i+1]
-                break
-        
-        # Fall back to word boundary
-        if best_split == -1:
-            for i in range(end_pos, search_start, -1):
-                if text[i] in (' ', '\n', '\t'):
-                    best_split = i
-                    best_delimiter = text[i]
-                    break
-        
-        # Hard split if needed
-        if best_split == -1:
-            best_split = end_pos
-            best_delimiter = ''
-        
-        chunk_text = text[pos:best_split]
-        chunks.append((chunk_text, best_delimiter))
-        pos = best_split + (1 if best_delimiter else 0)
-    
-    return chunks
 
