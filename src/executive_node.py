@@ -432,7 +432,8 @@ class ZenohExecutiveNode:
                         context_length=32768,
                         dtype="auto",
                         tp_size=1,
-                        mem_fraction_static=0.9
+                        mem_fraction_static=0.85,
+                        attention_backend="flashinfer"
                     )
                 sgl.set_default_backend(self.runtime)
                 logger.info(f'🤖 SGLang Runtime initialized (model={sgl_model_path})')

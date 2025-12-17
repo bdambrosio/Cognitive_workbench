@@ -193,7 +193,7 @@ def build_prompt(
     lines.append(f"  subject: {subject}")
     lines.append(f"  question: {question.strip()}") 
     #lines.append(f"  do not use display, query-web, or semantic-scholar in your reasoning. Only use generate to find information.")
-    lines.append(f"  do not use query-web or semantic-scholar in your reasoning. use generate or think to surface knownledge, or refine to extract information from text.")
+    lines.append(f"  do not use query-web or semantic-scholar in your reasoning. use generate or think to surface knowledge, or refine to extract information from text.")
     lines.append(f"  choices:")
     lines.append(f"    A: {choices[0].strip()}")
     lines.append(f"    B: {choices[1].strip()}")
@@ -425,7 +425,18 @@ def main():
         print("Mode: Direct LLM (Zenoh API, bypasses planner)")
 
     # Decide subjects
-    if args.subjects.strip():
+    
+    if args.subjects.strip() == "all":
+        subjects = ['abstract_algebra', 'anatomy', 'astronomy', 'business_ethics', 'clinical_knowledge', 'college_biology', 
+        'college_chemistry', 'college_computer_science', 'college_mathematics', 'college_medicine', 'college_physics', 'computer_security', 
+        'conceptual_physics', 'econometrics', 'electrical_engineering', 'elementary_mathematics', 'formal_logic', 'global_facts', 'high_school_biology', 
+        'high_school_chemistry', 'high_school_computer_science', 'high_school_european_history', 'high_school_geography', 'high_school_government_and_politics', 
+        'high_school_macroeconomics', 'high_school_mathematics', 'high_school_microeconomics', 'high_school_physics', 'high_school_psychology', 'high_school_statistics', 
+        'high_school_us_history', 'high_school_world_history', 'human_aging', 'human_sexuality', 'international_law', 'jurisprudence', 'logical_fallacies', 
+        'machine_learning', 'management', 'marketing', 'medical_genetics', 'miscellaneous', 'moral_disputes', 'moral_scenarios', 'nutrition', 'philosophy', 
+        'prehistory', 'professional_accounting', 'professional_law', 'professional_medicine', 'professional_psychology', 'public_relations', 'security_studies', 
+        'sociology', 'us_foreign_policy', 'virology', 'world_religions']
+    elif args.subjects.strip():
         subjects = [s.strip() for s in args.subjects.split(",") if s.strip()]
     else:
         subjects = [
