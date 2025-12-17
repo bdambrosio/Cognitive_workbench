@@ -20,7 +20,7 @@ from infospace_executor import InfospaceExecutor
 from plan_guidance import PlanGuidance
 
 # Global temperature setting for all gen() calls
-GEN_TEMPERATURE = 0.4
+GEN_TEMPERATURE = 0.5
 
 # Configure logging with file handler
 # Add file handler directly to this module's logger (doesn't interfere with root logger config)
@@ -1105,7 +1105,7 @@ if HAS_SGLANG:
         system_parts.append("You choose tools/primitives (aka actions, if and as needed), call them via JSON arguments,")
         system_parts.append("and iteratively execute-step / reflect / refine your plan until the goal is satisfied.")
         system_parts.append(f"\n{INCREMENTAL_PLAN_SPECIFICATIONS}\n")
-        system_parts.append(f"Tool catalog:\n{tools_catalog_text}\n#### END OF INFOSPACE TYPE SYSTEM, SPECIFICATIONS, AND TOOL CATALOG\n")
+        system_parts.append(f"Complete primitive and tool catalog:\n{tools_catalog_text}\n#### END OF INFOSPACE TYPE SYSTEM, SPECIFICATIONS, AND TOOL CATALOG\n\n")
         system_parts.append("""Follow this process to achieve the goal:
     Stage 1 (once): Analyze goal, select relevant tools, decompose into FIRST_TASK.
     Stage 1.5 (once): Load and inject detailed docs for selected tools.
@@ -1116,14 +1116,12 @@ if HAS_SGLANG:
 """)
         system_parts.append(f"\n#GOAL\n {goal}\n\n")
         if preplan:
-            system_parts.append(f"\n## ABSTRACT PLAN (Suggestions for overall approach)\n{preplan}\n")
-            system_parts.append(f"\n## END OF ABSTRACT PLAN\n")
+            system_parts.append(f"\n## {preplan}\n")
+            system_parts.append(f"\n## End ABSTRACT_PLAN\n")
 
         if similar_plan:
-            system_parts.append(f"\n## EXAMPLE\nGOAL: {similar_plan['goal']}\n")
-            system_parts.append(f"PLAN:\n{similar_plan['plan']}\n")
-            system_parts.append(f"OUTCOME: {similar_plan['outcome']} ERRORS: {similar_plan['error_count']} PLAN LENGTH: {len(similar_plan['plan'])}\n")
-            system_parts.append(f"\n## END OF EXAMPLE\n")
+            system_parts.append(f"##PREVIOUS PLAN FOR SIMILAR GOAL:\n{similar_plan['plan']}\n")
+            system_parts.append(f"OUTCOME: {similar_plan['outcome']} ERRORS: {similar_plan['error_count']}\n")
         if available_resources_text:
             system_parts.append(f"\n{available_resources_text}\n")
         # Add current date and time
@@ -1133,25 +1131,32 @@ if HAS_SGLANG:
         s += system("".join(system_parts))
         
         s += user(
-            "Stage 1: Analyze goal and identify relevant tools. Be concise in your analysis.\n"
+            "#Stage 1: Analyze goal and identify relevant tools.\n"
             "Include tools you might need AND related/supporting tools.\n"
             "Then, decompose the goal into a FIRST high-level task/subgoal to focus on.\n"
             "In doing so, consider the tools you have selected, the goal you are trying to achieve, and the downstream tasks that will be required to achieve the goal.\n"
-            "Respond with the following fields, be concise and to the point:\n"
-            "ANALYSIS: <text>\n"
-            #"CARDINALITY_CHECK: <\"SINGLE\" or \"MULTIPLE/LIST\">. Does the question imply a unique answer (e.g., 'date of birth') or a potentially multi-value answer (e.g., 'children')? If MULTIPLE, your plan must be exhaustive.\n"
-            "SELECTED_TOOLS_JSON: <json list of tool names>\n"
-            "FIRST_TASK: <high-level subgoal to tackle first>\n"
+            "Respond using the following XML format:\n"
+            "<analysis>\n"
+            "YOUR REASONING AND THOUGHTS HERE.\n"
+            "</analysis>\n"
+            "<tools>\n"
+            "JSON LIST OF TOOLS HERE\n"
+            "</tools>\n"
+            "<first_task>\n"
+            "YOUR FIRST TASK HERE\n"
+            "</first_task>\n"
         )
         
         s += assistant(
-            "ANALYSIS: "
-            + gen("stage1_analysis", max_tokens=128, temperature=GEN_TEMPERATURE, stop="\n")
-            + "\nSELECTED_TOOLS_JSON: "
-            + gen("selected_tools_json", max_tokens=96, temperature=GEN_TEMPERATURE, stop="\n")
-            + "\nFIRST_TASK: "
-            + gen("first_task", max_tokens=96, temperature=GEN_TEMPERATURE, stop="\n")
-            + "\n"
+            "<analysis>\n"
+            + gen("stage1_analysis", max_tokens=192, temperature=GEN_TEMPERATURE, stop="</analysis>")
+            + "</analysis>\n"
+            "<tools>\n"
+            + gen("selected_tools_json", max_tokens=96, temperature=GEN_TEMPERATURE, stop="</tools>")
+            + "</tools>\n"
+            "<first_task>\n"
+            + gen("first_task", max_tokens=96, temperature=GEN_TEMPERATURE, stop="</first_task>")
+            + "</first_task>\n"
         )
         
         try:
@@ -1186,7 +1191,7 @@ if HAS_SGLANG:
         # Stage 2/3 format instructions
         s += user(
             "Stage 2 FORMAT:\n"
-            "  TOOL_NAME: <name>\n"
+            "TOOL_NAME: <name>\n"
             "  TOOL_ARGS_JSON: <json object>\n\n"
             "Stage 3 FORMAT:\n"
             "  THOUGHTS: <text>\n"
@@ -1327,6 +1332,25 @@ if HAS_SGLANG:
             # Check if done
             done_raw = s[f"done_{step}"].strip().upper()
             if done_raw.startswith("YES"):
+                # --- [START NEW VERIFICATION LOGIC] ---
+                # Intercept the completion to force a self-audit
+                s += user(
+                    "STOP. Before providing the final answer, perform a verification step:\n"
+                    "1. Generate a specific VERIFICATION_QUESTION to check if your logic is sound or if you missed any constraints.\n"
+                    "2. Provide a candid VERIFICATION_ANSWER."
+                )
+                
+                s += assistant(
+                    "VERIFICATION_QUESTION: "
+                    + gen("verif_q", max_tokens=96, temperature=GEN_TEMPERATURE, stop="\n")
+                    + "\nVERIFICATION_ANSWER: "
+                    + gen("verif_a", max_tokens=256, temperature=GEN_TEMPERATURE, stop="\n")
+                )
+                
+                logger.info(f"VERIFICATION Q: {s['verif_q']}")
+                logger.info(f"VERIFICATION A: {s['verif_a']}")
+                # --- [END NEW VERIFICATION LOGIC] ---                
+                # 
                 # Generate final answer using NEXT_TASK as prompt, or generic goal-focused prompt
                 next_task_raw = s[f"next_task_{step}"].strip()
                 if next_task_raw and next_task_raw.lower() not in ["", "none", "null", "n/a"]:
