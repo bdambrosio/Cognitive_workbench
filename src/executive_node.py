@@ -292,6 +292,11 @@ class ZenohExecutiveNode:
         self.manual = bool(self.character_config.get('manual', False))
         self.manual_response = bool(self.character_config.get('manual_response', False))
         
+        # Benchmark mode flag - disables conversation collection initialization and updates
+        self.benchmark_mode = bool(self.character_config.get('benchmark_mode', False))
+        if self.benchmark_mode:
+            logger.info(f'📊 Benchmark mode enabled for {self.character_name} - conversation collections disabled')
+        
         # Initialize Zenoh session
         config = zenoh.Config()
         self.session = zenoh.open(config)
@@ -1180,6 +1185,10 @@ class ZenohExecutiveNode:
         Creates 'conversation_history' collection if it doesn't exist and makes it persistent.
         Creates 'conversation' collection if it doesn't exist.
         """
+        if self.benchmark_mode:
+            logger.info('Benchmark mode: skipping conversation collection initialization')
+            return
+        
         if not self.infospace_executor:
             logger.warning('Infospace executor not available, skipping conversation collection initialization')
             return
@@ -1343,6 +1352,9 @@ class ZenohExecutiveNode:
         Create a note with content and add it to the 'conversation' collection.
         Creates the collection if it doesn't exist.
         """
+        if self.benchmark_mode:
+            return  # Skip adding to conversation in benchmark mode
+        
         if not self.infospace_executor:
             logger.warning('Infospace executor not available, skipping conversation note creation')
             return
@@ -2364,19 +2376,44 @@ Finally, using 'say', respond in character to User"""
             query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
     
     def _handle_resource_clear_transient_query(self, query):
-        """Handle query to clear all Notes and Collections except Note_null, and planner bindings."""
+        """Handle query to clear all Notes and Collections except Note_null, persistent resources, and conversation collections."""
         if not self.resource_manager:
             response = {'success': False, 'error': 'Resource manager not available'}
             query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
             return
         
+        # Collections to preserve (by name) - conversation collections should persist across benchmark runs
+        PRESERVED_COLLECTIONS = {'conversation', 'conversation_history'}
+        
         deleted_notes = 0
         deleted_collections = 0
         to_delete = []
         for resource_id, resource_data in self.resource_manager.resource_registry.items():
+            props = resource_data.get('properties', {})
+            
+            # Skip persistent resources
+            if props.get('persistent', False):
+                continue
+            
             if resource_id.startswith('Note_') and resource_id != 'Note_null':
                 to_delete.append(resource_id)
             elif resource_id.startswith('Collection_'):
+                # Skip preserved named Collections (conversation and conversation_history)
+                # These are special system Collections that should never be deleted by clear_transients
+                # Check both by collection_name property and by named_collections registry
+                collection_name = props.get('collection_name')
+                is_preserved = False
+                if collection_name and collection_name in PRESERVED_COLLECTIONS:
+                    is_preserved = True
+                # Also check if this resource_id is registered as a preserved collection name
+                # This provides double protection even if collection_name property is missing
+                for preserved_name in PRESERVED_COLLECTIONS:
+                    if self.resource_manager.named_collections.get(preserved_name) == resource_id:
+                        is_preserved = True
+                        break
+                if is_preserved:
+                    logger.debug(f"Preserving special Collection: {collection_name or resource_id}")
+                    continue
                 to_delete.append(resource_id)
         
         for resource_id in to_delete:
