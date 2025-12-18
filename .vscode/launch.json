@@ -2,7 +2,7 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Debug Launcher (jill)",
+            "name": "Jill",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/src/launcher.py",
@@ -12,6 +12,21 @@
                 "PYTHONPATH": "${workspaceFolder}/src"
             },
             "args": ["jill.yaml", "--ui", "--resource-browser", "--map-file", "infolab.py"],
+            "justMyCode": false,
+            "stopOnEntry": false,
+            "preLaunchTask": "setup-zenoh-environment"
+        },
+        {
+            "name": "Jill - Benchmark Mode",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/launcher.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/src",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src"
+            },
+            "args": ["jill_benchmark.yaml", "--ui", "--resource-browser", "--map-file", "infolab.py"],
             "justMyCode": false,
             "stopOnEntry": false,
             "preLaunchTask": "setup-zenoh-environment"
@@ -151,201 +166,6 @@
                 "PYTHONPATH": "${workspaceFolder}/src"
             },
             "args": [],
-            "justMyCode": false,
-            "stopOnEntry": false,
-            "preLaunchTask": "setup-zenoh-environment"
-        },
-        {
-            "name": "Test Discourse Tracker",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${workspaceFolder}/src/discourse.py",
-            "console": "integratedTerminal",
-            "cwd": "${workspaceFolder}/src",
-            "env": {
-                "PYTHONPATH": "${workspaceFolder}/src"
-            },
-            "args": [],
-            "justMyCode": false,
-            "stopOnEntry": false,
-            "preLaunchTask": "setup-zenoh-environment"
-        },
-        {
-            "name": "Test Semantic Plan Validation",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${workspaceFolder}/src/infospace_semantic_validator.py",
-            "console": "integratedTerminal",
-            "cwd": "${workspaceFolder}/src",
-            "env": {
-                "PYTHONPATH": "${workspaceFolder}/src"
-            },
-            "args": ["../tests/test-plan.json", "maps/infolab/tools/"],
-            "justMyCode": false,
-            "stopOnEntry": false,
-            "preLaunchTask": "setup-zenoh-environment"
-        },
-        {
-            "name": "Scenario Manager",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${workspaceFolder}/src/scenario_manager.py",
-            "console": "integratedTerminal",
-            "cwd": "${workspaceFolder}/src",
-            "env": {
-                "PYTHONPATH": "${workspaceFolder}/src"
-            },
-            "args": ["--port", "3100", "--ui-base-port", "3000"],
-            "justMyCode": false,
-            "stopOnEntry": false,
-            "preLaunchTask": "setup-zenoh-environment"
-        },
-        {
-            "name": "Launch Current Buffer",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${file}",
-            "console": "integratedTerminal",
-            "cwd": "${workspaceFolder}/src",
-            "env": {
-                "PYTHONPATH": "${workspaceFolder}/src"
-            },
-            "args": [],
-            "justMyCode": false,
-            "stopOnEntry": false,
-            "preLaunchTask": "setup-zenoh-environment"
-        },
-        {
-            "name": "Reflection Review",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${workspaceFolder}/src/reflection.py",
-            "console": "integratedTerminal",
-            "cwd": "${workspaceFolder}/src",
-            "env": {
-                "PYTHONPATH": "${workspaceFolder}/src"
-            },
-            "args": ["--v2", "--microbatch", "5", "--plans", "data/Michel-plans.jsonl", "--seed", "42", "--s1_out", "data/reflection_stage1.json"],
-            "justMyCode": false,
-            "stopOnEntry": false,
-            "preLaunchTask": "setup-zenoh-environment"
-        },
-        {
-            "name": "Infospace",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${workspaceFolder}/src/maps/infolab.py",
-            "console": "integratedTerminal",
-            "cwd": "${workspaceFolder}/src",
-            "env": {
-                "PYTHONPATH": "${workspaceFolder}/src"
-            },
-            "args": ["/home/bruce/Downloads/Cognitive_workbench/src/maps/skills"],
-            "justMyCode": false,
-            "stopOnEntry": false,
-            "preLaunchTask": "setup-zenoh-environment"
-        },
-        {
-            "name": "Trace Evaluation",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${workspaceFolder}/src/Metrics/trace-evaluation.py",
-            "console": "integratedTerminal",
-            "cwd": "${workspaceFolder}/src/Metrics",
-            "env": {
-                "PYTHONPATH": "${workspaceFolder}/src"
-            },
-            "args": ["--trace", "analysis/Joe-20250915-162859/Joe-plans.jsonl", "--scenario", "../../scenarios/lost.yaml", "--character", "Joe", "--server", "openai", "--model", "gpt-4.1"],
-            "justMyCode": false,
-            "stopOnEntry": false,
-            "preLaunchTask": "setup-zenoh-environment"
-        },
-        {
-            "name": "Scenario Analysis (ABetterLife)",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${workspaceFolder}/src/scenario_analysis.py",
-            "console": "integratedTerminal",
-            "cwd": "${workspaceFolder}/src",
-            "env": {
-                "PYTHONPATH": "${workspaceFolder}/src"
-            },
-            "args": ["--scenario", "../scenarios/ABetterLife.yaml", "--character", "all", "--ontology", "create", "--middle", "skip", "--activities", "create"],
-            "justMyCode": false,
-            "stopOnEntry": false,
-            "preLaunchTask": "setup-zenoh-environment"
-        },
-        {
-            "name": "Scenario Analysis (laTerre)",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${workspaceFolder}/src/scenario_analysis.py",
-            "console": "integratedTerminal",
-            "cwd": "${workspaceFolder}/src",
-            "env": {
-                "PYTHONPATH": "${workspaceFolder}/src"
-            },
-            "justMyCode": false,
-            "args": ["--scenario", "../scenarios/laTerre.yaml", "--character", "all", "--ontology", "load", "--discourse", "create", "--activities", "load"],
-            "stopOnEntry": false,
-            "preLaunchTask": "setup-zenoh-environment"
-        },
-        {
-            "name": "Scenario Analysis (CountryLife)",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${workspaceFolder}/src/scenario_analysis.py",
-            "console": "integratedTerminal",
-            "cwd": "${workspaceFolder}/src",
-            "env": {
-                "PYTHONPATH": "${workspaceFolder}/src"
-            },
-            "args": ["--scenario", "../scenarios/CountryLife.yaml", "--character", "all", "--ontology", "create", "--middle", "skip", "--activities", "create"],
-            "justMyCode": false,
-            "stopOnEntry": false,
-            "preLaunchTask": "setup-zenoh-environment"
-        },
-        {
-            "name": "Scenario Analysis (Jill)",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${workspaceFolder}/src/scenario_analysis.py",
-            "console": "integratedTerminal",
-            "cwd": "${workspaceFolder}/src",
-            "env": {
-                "PYTHONPATH": "${workspaceFolder}/src"
-            },
-            "args": ["--scenario", "../scenarios/jill.yaml", "--character", "Jill", "--ontology", "load", "--discourse", "skip", "--activities", "create"],
-            "justMyCode": false,
-            "stopOnEntry": false,
-            "preLaunchTask": "setup-zenoh-environment"
-        },
-        {
-            "name": "Scenario Analysis (lost)",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${workspaceFolder}/src/scenario_analysis.py",
-            "console": "integratedTerminal",
-            "cwd": "${workspaceFolder}/src",
-            "env": {
-                "PYTHONPATH": "${workspaceFolder}/src"
-            },
-            "args": ["--scenario", "../scenarios/lost.yaml", "--character", "all", "--ontology", "create", "--discourse", "skip", "--activities", "create"],
-            "justMyCode": false,
-            "stopOnEntry": false,
-            "preLaunchTask": "setup-zenoh-environment"
-        },
-        {
-            "name": "Scenario Analysis (sage)",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${workspaceFolder}/src/scenario_analysis.py",
-            "console": "integratedTerminal",
-            "cwd": "${workspaceFolder}/src",
-            "env": {
-                "PYTHONPATH": "${workspaceFolder}/src"
-            },
-            "args": ["--scenario", "../scenarios/sage.yaml", "--character", "all", "--ontology", "create", "--discourse", "skip", "--activities", "create"],
             "justMyCode": false,
             "stopOnEntry": false,
             "preLaunchTask": "setup-zenoh-environment"
