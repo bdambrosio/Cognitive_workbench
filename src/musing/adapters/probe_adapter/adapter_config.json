@@ -1,0 +1,18 @@
+{
+  "base_model_name_or_path": "Qwen/Qwen3-4B-Instruct-2507",
+  "peft_type": "LORA",
+  "task_type": "CAUSAL_LM",
+  "inference_mode": true,
+  "r": 1,
+  "lora_alpha": 50.0,
+  "lora_dropout": 0.0,
+  "bias": "none",
+  "fan_in_fan_out": false,
+  "target_modules": [
+    "o_proj"
+  ],
+  "layers_to_transform": [
+    35
+  ],
+  "layers_pattern": "model.layers"
+}

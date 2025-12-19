@@ -3,7 +3,7 @@ from typing import Dict, Optional
 
 import torch
 
-from .qwen3_adapter import AdapterSiteShape
+from .musing_types import AdapterSiteShape
 
 logger = logging.getLogger(__name__)
 

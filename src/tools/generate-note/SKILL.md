@@ -1,8 +1,7 @@
 ---
 name: generate-note
-description: Generate new text or code content from scratch using natural language prompt via LLM
+description: Generate new text or code content from scratch using natural language prompt via LLM. Use to collect thoughts or generate a coherent statement on a topic
 type: python
-trusted: true
 schema_hint:
   prompt: "string (generation instruction)"
   style: "string (optional, 'code' or 'text', default 'text')"

@@ -1,8 +1,7 @@
 ---
 name: summarize
-description: Compress information with focus-aware adaptive compression and styling
+description: Compress information with focus-aware adaptive compression and styling. Use to extract and prepare content in presentable form.
 type: python
-trusted: true
 flattens_collections: true
 schema_hint:
   target: "$variable or Note ID or Collection ID"

@@ -1,8 +1,7 @@
 ---
 name: relate
-description: Compare two Notes or Collections to find similarities, differences, and relationships
+description: Compare two Notes or Collections to find similarities, differences, and relationships. Use to identify semantic relationships between documents
 type: python
-trusted: true
 schema_hint:
   target: "$variable or Note ID or Collection ID"
   other: "$variable or Note ID or Collection ID"

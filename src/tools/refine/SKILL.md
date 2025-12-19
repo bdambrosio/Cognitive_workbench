@@ -2,7 +2,6 @@
 name: refine
 description: Extract or transform information from unstructured text content using LLM. Use for extracting facts, entities, or specific information from text. Does not add new content.
 type: python
-trusted: true
 flattens_collections: true
 parameter_source: args.instruction
 schema_hint:

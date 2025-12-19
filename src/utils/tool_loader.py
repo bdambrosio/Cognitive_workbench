@@ -133,7 +133,6 @@ def load_tools(tools_dir_path: str) -> Dict[str, Dict]:
             logger.warning(f"Missing 'description' in {tool_md_path}")
         
         tool_type = metadata.get('type', 'code_execution')
-        trusted = metadata.get('trusted', False)
         
         # Check for duplicate names
         if tool_name in tools:
@@ -225,7 +224,6 @@ def load_tools(tools_dir_path: str) -> Dict[str, Dict]:
             'name': tool_name,
             'description': tool_description,
             'type': tool_type,
-            'trusted': trusted,
             'tool_md_content': content,
             'body_text': body_text,  # Body text for instruction tools
             'workflows': workflows,
@@ -237,8 +235,7 @@ def load_tools(tools_dir_path: str) -> Dict[str, Dict]:
             'plan_data': plan_data
         }
         
-        trust_info = " [TRUSTED]" if trusted else ""
-        logger.info(f"Loaded tool: {tool_name} (type: {tool_type}){trust_info}")
+        logger.info(f"Loaded tool: {tool_name} (type: {tool_type})")
     
     logger.info(f"Successfully loaded {len(tools)} tools from {tools_dir_path}")
     

@@ -1,8 +1,7 @@
 ---
 name: assess
-description: Test Note content against natural language predicate using LLM (returns boolean)
+description: Test Note content against natural language predicate using LLM (returns boolean). Use to determine if a text Note meets criteria.
 type: python
-trusted: true
 flattens_collections: true
 schema_hint:
   target: "$variable or Note ID or Collection ID"
