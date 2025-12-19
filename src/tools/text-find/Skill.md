@@ -1,6 +1,6 @@
 ---
 name: text-find
-description: Locate pattern or substring and return position with context
+description: Locate pattern or substring and return position with context. Use to search for specific substring or pattern in a text document
 type: prompt_augmentation
 examples:
   - '{"type":"text-find","target":"$document","pattern":"conclusion","out":"$location"}'

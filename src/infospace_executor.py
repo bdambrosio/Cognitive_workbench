@@ -964,14 +964,6 @@ Make sure the string is in a format that can be parsed by the json.loads functio
                 return {'status': 'failed', 'reason': f'Plan tool output variable ${out_var} not bound', 'original_value': None, 'resource_id': None}
         
         # Handle Python-based tools
-        # Check trust flag
-        if not tool_info.get('trusted', False):
-            tool_path = tool_info.get('path', 'unknown')
-            skill_md_path = f"{tool_path}/SKILL.md" if tool_path != 'unknown' else f"tools/{tool_name}/SKILL.md"
-            return {'status': 'failed', 
-                   'reason': f'Untrusted Python tool: {tool_name}. Add "trusted: true" to frontmatter in {skill_md_path}',
-                   'original_value': None, 'resource_id': None}
-        
         # Get Python file path
         python_file = tool_info.get('python_file')
         if not python_file:

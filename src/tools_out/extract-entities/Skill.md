@@ -2,7 +2,6 @@
 name: extract-entities
 description: Extract named entities, topics, and relationships from text or structured content
 type: python
-trusted: true
 flattens_collections: true
 parameters: none
 examples:

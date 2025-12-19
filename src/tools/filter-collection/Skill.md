@@ -1,8 +1,7 @@
 --- 
 name: filter-collection
-description: Evaluate complex criteria on each item in a Collection and return a new Collection of matching items
+description: Evaluate complex text criteria on each item in a Collection and return a new Collection of matching items. Use to identify relevant items in a Collection.
 type: python
-trusted: true
 schema_hint:
   target: "$variable (Collection)"
   predicate: "string (filter criteria)"

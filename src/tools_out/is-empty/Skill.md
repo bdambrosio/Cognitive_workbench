@@ -2,7 +2,6 @@
 name: is-empty
 description: Check if text is null, empty, or only whitespace
 type: python
-trusted: true
 schema_hint:
   target: "$variable or Note ID"
   out: "$variable (optional)"

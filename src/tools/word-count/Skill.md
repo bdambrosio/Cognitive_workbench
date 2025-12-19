@@ -1,8 +1,7 @@
 ---
 name: word-count
-description: Count words in text
+description: Count words in text. Use to determine length of a document, e.g. to determine if it needs to be summarized before further use.
 type: python
-trusted: true
 schema_hint:
   target: "$variable or Note ID"
   out: "$variable"

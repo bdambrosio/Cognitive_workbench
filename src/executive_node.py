@@ -437,6 +437,11 @@ class ZenohExecutiveNode:
                         context_length=32768,
                         dtype="auto",
                         tp_size=1,
+                        enable_lora=True, 
+                        # OPTIONAL: Defaults to 8. Controls how many distinct LoRAs can run in a single batch.
+                        max_loras_per_batch=1,
+                        lora_paths = {'musing_adapter': '/home/bruce/Downloads/Cognitive_workbench/src/musing/adapters/probe_adapter'},
+
                         mem_fraction_static=0.85,
                         attention_backend="flashinfer"
                     )

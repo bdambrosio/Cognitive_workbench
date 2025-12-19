@@ -2,7 +2,6 @@
 name: is-positive
 description: Check if a number is positive
 type: python
-trusted: true
 schema_hint:
   target: "$variable or Note ID"
   out: "$variable (optional)"
