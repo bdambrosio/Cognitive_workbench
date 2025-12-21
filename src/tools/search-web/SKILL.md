@@ -1,12 +1,12 @@
 ---
-name: query-web
+name: search-web
 type: python
 description: "Search web using Google CSE. Returns Collection of JSON Notes with fields text, metadata.uri (alias: source_url), metadata.domain, format, char_count). Use to find information on the web."
 schema_hint:
   value: "string (query)"
   out: "$variable"
 examples:
-  - '{"type":"query-web","value":"transformer architecture papers","out":"$results"}'
+  - '{"type":"search-web","value":"transformer architecture papers","out":"$results"}'
   - '{"type":"project","target":"$results","fields":["metadata.uri","metadata.domain"],"out":"$urls"}'
   - '{"type":"filter-structured","target":"$results","where":"char_count > 1000","out":"$long_articles"}'
 ---
@@ -58,13 +58,13 @@ Each Note in the returned Collection contains:
 
 **Search and summarize:**
 ```json
-{"type":"query-web","value":"what are transformers in AI","out":"$results"}
+{"type":"search-web","value":"what are transformers in AI","out":"$results"}
 {"type":"summarize","target":"$results","focus":"what are transformers","out":"$summary"}
 ```
 
 **Filter results:**
 ```json
-{"type":"query-web","value":"transformer papers","out":"$results"}
+{"type":"search-web","value":"transformer papers","out":"$results"}
 {"type":"filter-collection","target":"$results","predicate":"contains arxiv.org","out":"$arxiv_only"}
 ```
 

@@ -37,7 +37,7 @@ warnings.filterwarnings('ignore', category=UserWarning, module='unstructured')
 # Helpers for creating Notes/Collections
 # ------------------------------
 
-def _create_note(content: Any, agent_name: str, resource_manager, source_skill: str = 'query-web') -> str:
+def _create_note(content: Any, agent_name: str, resource_manager, source_skill: str = 'search-web') -> str:
     """Create a Note and return its ID."""
     if not resource_manager:
         logger.error("Resource manager not available")
@@ -54,7 +54,7 @@ def _create_note(content: Any, agent_name: str, resource_manager, source_skill: 
         logger.error(f"Failed to create Note: {error_msg}")
         return None
 
-def _create_collection(note_ids: List[str], agent_name: str, resource_manager, source_skill: str = 'query-web') -> str:
+def _create_collection(note_ids: List[str], agent_name: str, resource_manager, source_skill: str = 'search-web') -> str:
     """Create a Collection and return its ID."""
     if not resource_manager:
         logger.error("Resource manager not available")
@@ -235,11 +235,11 @@ def _llm_tldr(llm_generate, text: str, query: str, max_chars: int, timeout: floa
         return _test_chunk_relevance(llm_generate, chunk_text, query, max_chars, heartbeat)
     
     # Multiple chunks - OR aggregation (true if ANY chunk matches)
-    logger.info(f"query-web: large text ({len(chunks)} chunks), testing each chunk for relevance")
+        logger.info(f"search-web: large text ({len(chunks)} chunks), testing each chunk for relevance")
     
     for i, (chunk_text, _) in enumerate(chunks):
         if _test_chunk_relevance(llm_generate, chunk_text, query, max_chars, heartbeat):
-            logger.info(f"query-web: relevant content found in chunk {i+1}/{len(chunks)}")
+            logger.info(f"search-web: relevant content found in chunk {i+1}/{len(chunks)}")
             return True
     
     return False
@@ -290,7 +290,7 @@ Respond only with the JSON, no commentary, no code fences, no reasoning:
         else:
             return False
     except Exception as e:
-        logger.warning(f"query-web: relevance test failed: {e}")
+        logger.warning(f"search-web: relevance test failed: {e}")
         return False
     except Exception as e:
         logger.error(f"LLM TLDR failed: {e}")
@@ -310,7 +310,7 @@ def _is_mostly_numbers(text: str) -> bool:
     return digits / len(alnum) > 0.5
 
 def _detect_format_from_content(content: str, url: str) -> str:
-    """Detect format from content and URL (simplified version for query-web)."""
+    """Detect format from content and URL (simplified version for search-web)."""
     url_lower = url.lower()
     
     # Check URL extension
@@ -490,7 +490,7 @@ End your response with:
             heartbeat()
         
         rephrase = response.text
-        #logger.info(f"LLM rephrased query-web query: {rephrase}")
+        #logger.info(f"LLM rephrased search-web query: {rephrase}")
     except Exception as e:
         logger.error(f"LLM rephrasing failed: {e}")
         traceback.print_exc()
@@ -683,7 +683,7 @@ def tool(value, **kwargs):
         note_list_str += ', ...'
     collection_value = f"{item_count} items [{note_list_str}]"
     
-    logger.info(f"query-web created Collection {collection_id} with {len(note_ids)} results for query: {query}")
+    logger.info(f"search-web created Collection {collection_id} with {len(note_ids)} results for query: {query}")
     return {'status': 'success', 'value': collection_value, 'resource_id': collection_id}
 
 if __name__ == "__main__":

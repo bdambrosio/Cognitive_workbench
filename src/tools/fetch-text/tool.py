@@ -73,7 +73,7 @@ def tool(url_or_content: str, runtime=None, **kwargs) -> str:
             else:
                 return json.dumps({"error": f"resource_manager not available"})
             
-            # If content is structured JSON (from query-web/semantic-scholar), extract text field
+            # If content is structured JSON (from search-web/semantic-scholar), extract text field
             if isinstance(content, dict):
                 # Check if it's a structured Note with 'text' field
                 if 'text' in content:

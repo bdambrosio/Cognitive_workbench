@@ -133,10 +133,10 @@ Tools are not just Python functions. They are defined by a **Natural Language Sc
 
 **SKILL.md (The Interface):**
 ```markdown
-name: query-web
+name: search-web
 description: "Search web using Google CSE. Returns Collection of JSON Notes..."
 examples:
-  - '{"type":"query-web","value":"transformer architecture papers","out":"$results"}'
+  - '{"type":"search-web","value":"transformer architecture papers","out":"$results"}'
 ```
 
 **tool.py (The Logic):**
@@ -209,7 +209,7 @@ The system is 100% **Infospace-only** (physical world support removed). It uses 
 
 FIRST_TASK: Conduct initial web and academic literature search
 
-Step 0: query-web → [SUCCESS] Bound $web_results to Collection_95 (6 items)
+Step 0: search-web → [SUCCESS] Bound $web_results to Collection_95 (6 items)
   THOUGHTS: Should summarize to understand key arguments, then proceed to academic papers
   DONE: NO
   NEXT_TASK: Summarize web search results
@@ -285,15 +285,15 @@ Step 12: create-note → [SUCCESS] Bound $synthesis to Note_356
   THOUGHTS: Synthesized key arguments. Should examine strong pro/con paper
   DONE: NO
   NEXT_TASK: Select paper representing emergence or non-emergence perspective
-  REQUEST_TOOLS: ["load", "query-web"]
+  REQUEST_TOOLS: ["load", "search-web"]
 
-Step 13: query-web → [SUCCESS] Bound $emergence_papers to Collection_100 (6 items)
+Step 13: search-web → [SUCCESS] Bound $emergence_papers to Collection_100 (6 items)
   THOUGHTS: Found pro-emergence papers. Now search anti-emergence for comparison
   DONE: NO
   NEXT_TASK: Search papers arguing against emergence
-  REQUEST_TOOLS: ["query-web"]
+  REQUEST_TOOLS: ["search-web"]
 
-Step 14: query-web → [SUCCESS] Bound $anti_emergence_papers to Collection_101 (4 items)
+Step 14: search-web → [SUCCESS] Bound $anti_emergence_papers to Collection_101 (4 items)
   THOUGHTS: Have both sides. Summarize understanding of debate and evidence quality
   DONE: NO
   NEXT_TASK: Create comprehensive summary with arguments, evidence, open questions
@@ -428,7 +428,7 @@ src/
 │   ├── action_post_processing.py  # Result validation utilities
 │   └── llm_api.py             # LLM client wrapper (legacy)
 └── tools/                     # 32+ dynamically loaded skills
-    ├── query-web/             # Web search & extraction
+    ├── search-web/             # Web search & extraction
     ├── semantic-scholar/      # Academic paper search
     ├── summarize/             # Text summarization
     ├── filter-collection/     # Semantic filtering
@@ -451,7 +451,7 @@ Docs/                         # Design documents (may lag code)
 ## 🛠️ Available Tools & Primitives
 
 **Information Gathering (tools):**
-- `query-web` - Web search with LLM-based extraction
+- `search-web` - Web search with LLM-based extraction
 - `semantic-scholar` - Academic paper search
 - `fetch-text` - Fetch full text from URL or paper ID
 - `search-notes` - Semantic search over existing Notes
@@ -611,8 +611,8 @@ If migrating from an earlier version:
 - Tools receive `resource_manager` as kwarg
 - Startup is faster (planners initialized once)
 - **Action format simplified**: All tool parameters are now top-level fields
-  - Old: `{"type": "query-web", "args": {"query": "..."}}`
-  - New: `{"type": "query-web", "query": "..."}`
+  - Old: `{"type": "search-web", "args": {"query": "..."}}`
+  - New: `{"type": "search-web", "query": "..."}`
 - `search-notes` now returns full indexed text content (not 200-char preview)
 
 **Migration Guide:**

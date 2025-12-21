@@ -201,7 +201,7 @@ def build_hle_prompt(question: str) -> str:
     lines.append(f"  question: {question}")
     lines.append("")
     lines.append("  instructions:")
-    lines.append("    - Use appropriate tools (query-web, fetch-text, semantic-scholar, etc.) to find information")
+    lines.append("    - Use appropriate tools (search-web, fetch-text, semantic-scholar, etc.) to find information")
     lines.append("    - Answer the question accurately")
     lines.append("    - Provide a concise answer")
     lines.append("    - Format: ANSWER: <your answer>")

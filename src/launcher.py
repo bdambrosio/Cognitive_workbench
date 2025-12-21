@@ -323,6 +323,9 @@ def main():
         # Extract LLM configuration (still needed by executive_node for SGLang)
         llm_config = config_data.get('llm_config', {})
         
+        # Extract ScienceWorld configuration (if present)
+        scienceworld_config = config_data.get('scienceworld_config', {})
+        
         # Extract optional map file from YAML (key: 'map')
         yaml_map_file = config_data.get('map')
         setting = config_data.get('setting', {})
@@ -346,6 +349,7 @@ def main():
                 new_config['activities'] = activities
                 new_config['characters'] = characters_config.copy()
                 new_config['llm_config'] = llm_config
+                new_config['scienceworld_config'] = scienceworld_config
                 new_config['setting'] = setting
                 launcher.add_character(name, new_config)
         elif isinstance(characters_config, list):
@@ -359,6 +363,7 @@ def main():
                     new_config['activities'] = activities
                     new_config['characters'] = characters_config
                     new_config['llm_config'] = llm_config
+                    new_config['scienceworld_config'] = scienceworld_config
                     new_config['setting'] = setting
                     launcher.add_character(name, new_config)
         

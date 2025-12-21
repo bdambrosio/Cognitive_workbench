@@ -7,7 +7,7 @@ Tests the `map` primitive with tools that take arguments beyond target/out:
 - calculate - with variables parameter
 - summarize - with focus/max_length parameters
 - relate - with other parameter (Note reference)
-- query-web - with query parameter (API-based, long timeout)
+- search-web - with query parameter (API-based, long timeout)
 - semantic-scholar - with query parameter (API-based, long timeout)
 
 Focus: Dict form of tool action (as planner generates): {"tool": "name", "arg": "value"}
@@ -440,7 +440,7 @@ def test_map_relate(session: zenoh.Session, character: str, verbose: bool = Fals
 
 
 def test_map_query_web(session: zenoh.Session, character: str, verbose: bool = False) -> Dict[str, Any]:
-    """Test map with query-web tool - mapped item becomes value (query string)."""
+    """Test map with search-web tool - mapped item becomes value (query string)."""
     plan = [
         {
             "type": "create-note",
@@ -461,15 +461,15 @@ def test_map_query_web(session: zenoh.Session, character: str, verbose: bool = F
             "type": "map",
             "target": "$coll",
             "operation": {
-                "tool": "query-web"
+                "tool": "search-web"
                 # Mapped item becomes 'value' parameter (query string)
             },
             "out": "$mapped"
         }
     ]
-    # Note: query-web may take longer, timeout handled in execute_plan
+    # Note: search-web may take longer, timeout handled in execute_plan
     return run_test(
-        session, character, "map query-web (simple queries)",
+        session, character, "map search-web (simple queries)",
         plan,
         expected_size=2,
         validate_content=True,
@@ -523,7 +523,7 @@ def main():
     parser = argparse.ArgumentParser(description='Test map operations on tools')
     parser.add_argument('--character', default='Jill', help='Character name (default: Jill)')
     parser.add_argument('--verbose', action='store_true', help='Verbose output')
-    parser.add_argument('--skip-api', action='store_true', help='Skip API-based tests (query-web, semantic-scholar)')
+    parser.add_argument('--skip-api', action='store_true', help='Skip API-based tests (search-web, semantic-scholar)')
     args = parser.parse_args()
     
     # Initialize Zenoh
@@ -551,9 +551,9 @@ def main():
             test_map_query_web,
             test_map_semantic_scholar,
         ])
-        print("\n⚠️  Note: API tests (query-web, semantic-scholar) may take longer.")
+        print("\n⚠️  Note: API tests (search-web, semantic-scholar) may take longer.")
     else:
-        print("\n⚠️  Skipping API tests (query-web, semantic-scholar).")
+        print("\n⚠️  Skipping API tests (search-web, semantic-scholar).")
     
     results = []
     total_time = 0.0

@@ -130,7 +130,7 @@ def stage0_query_generator(s, goal: str):
 
 ## Notes:
 - Note_42 ("market-share-memo"): Summary of Q3 earnings call. Created via summarize on $earnings_call.
-- Note_87 ("transformer-paper"): Research notes on attention mechanisms. Created via query-web + refine.
+- Note_87 ("transformer-paper"): Research notes on attention mechanisms. Created via search-web + refine.
 
 ## Collections:
 - Collection_15 ("research-papers"): 23 items from semantic-scholar on LLM interpretability.

@@ -1,9 +1,9 @@
 {
-  "goal": "Goal Test JSON SQL primitives with query-web output; actors: Jill; termination:",
+  "goal": "Goal Test JSON SQL primitives with search-web output; actors: Jill; termination:",
   "plan": {
     "plan": [
       {
-        "type": "query-web",
+        "type": "search-web",
         "query": "Python programming tutorial",
         "out": "$web_results",
         "expect": "should get web search results"
@@ -16,8 +16,8 @@
       {
         "type": "if",
         "condition": {"type": "equals", "target": "$web_count", "value": 0},
-        "then": [{"type": "say", "value": "✗ FAIL: query-web returned no results"}],
-        "else": [{"type": "say", "value": "✓ query-web returned $web_count results"}]
+        "then": [{"type": "say", "value": "✗ FAIL: search-web returned no results"}],
+        "else": [{"type": "say", "value": "✓ search-web returned $web_count results"}]
       },
       {
         "type": "project",
@@ -79,7 +79,7 @@
         "value": "✓ PASS: sort by char_count desc - top result has $top_char_count chars"
       }
     ],
-    "reasoning": "Tests JSON SQL primitives (project, pluck, filter-structured, sort) with real query-web output",
+    "reasoning": "Tests JSON SQL primitives (project, pluck, filter-structured, sort) with real search-web output",
     "success": true,
     "skip_validation": true
   },

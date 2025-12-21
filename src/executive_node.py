@@ -437,10 +437,10 @@ class ZenohExecutiveNode:
                         context_length=32768,
                         dtype="auto",
                         tp_size=1,
-                        enable_lora=True, 
+                        #enable_lora=True, 
                         # OPTIONAL: Defaults to 8. Controls how many distinct LoRAs can run in a single batch.
-                        max_loras_per_batch=1,
-                        lora_paths = {'musing_adapter': '/home/bruce/Downloads/Cognitive_workbench/src/musing/adapters/probe_adapter'},
+                        #max_loras_per_batch=1,
+                        #lora_paths = {'musing_adapter': '/home/bruce/Downloads/Cognitive_workbench/src/musing/adapters/probe_adapter'},
 
                         mem_fraction_static=0.85,
                         attention_backend="flashinfer"
@@ -560,6 +560,9 @@ class ZenohExecutiveNode:
             self.infospace_executor.tokenizer = self.tokenizer
         logger.info(f'🧩 Infospace executor initialized for {character_name}')
         
+        # Initialize ScienceWorld if configured (fetch actions and populate setting)
+        self._initialize_scienceworld_if_configured()
+        
         # Initialize conversation collections
         self._initialize_conversation_collections()
         
@@ -610,6 +613,9 @@ class ZenohExecutiveNode:
         # Track last action outputs for plan_result
         self.last_say_text = ''
         self.last_out_resource_id = None
+        
+        # ScienceWorld environment (set by scienceworld-reset tool)
+        self.scienceworld_env = None
         
         # Plan execution state
         self.current_step = None
@@ -740,9 +746,6 @@ class ZenohExecutiveNode:
         # Shutdown flags
         self.shutdown_requested = False
         self._shutting_down = False
-
-        self.inspections = {} # cache of inspections
-        self.uses = {} # cache of uses
 
         logger.info(f'🧠 Zenoh Executive Node initialized for character: {character_name}')
         logger.info(f'   - Subscribing to: cognitive/{character_name}/sense_data')
@@ -961,7 +964,7 @@ class ZenohExecutiveNode:
             # Add action-specific fields for UI display
             # Handle both hyphenated and non-hyphenated action types
             action_types_to_handle = ['create-note', 'createnote', 'create-collection', 'createcollection', 
-                                     'split', 'flatten', 'map', 'summarize', 'query-web', 'semantic-scholar']
+                                     'split', 'flatten', 'map', 'summarize', 'search-web', 'semantic-scholar']
             if normalized_type in action_types_to_handle:
                 target = action.get('target', '')
                 value = action.get('value', '')
@@ -1184,6 +1187,147 @@ class ZenohExecutiveNode:
             # Log when we skip due to insufficient content (for debugging)
             logger.debug(f'Skipping final_answer publication - content too short or only punctuation: "{final_thoughts_clean[:50]}..."')
 
+    def _initialize_scienceworld_if_configured(self):
+        """Initialize ScienceWorld environment if scienceworld_config exists, fetch actions, and populate setting."""
+        scienceworld_config = self.character_config.get('scienceworld_config')
+        if not scienceworld_config:
+            return
+        
+        scenario = scienceworld_config.get('scenario')
+        if not scenario:
+            logger.warning("scienceworld_config found but no 'scenario' specified, skipping ScienceWorld initialization")
+            return
+        
+        try:
+            from importlib.util import find_spec
+            if find_spec("scienceworld") is None:
+                logger.warning("scienceworld package not found, skipping ScienceWorld initialization")
+                return
+            
+            from scienceworld import ScienceWorldEnv
+            
+            variation_idx = scienceworld_config.get('difficulty', 0)  # Map difficulty to variationIdx
+            simplification_str = scienceworld_config.get('simplification', '')  # Optional simplification string
+            seed = scienceworld_config.get('seed', 42)  # Note: seed not supported in load(), stored for metadata only
+            
+            logger.info(f"Initializing ScienceWorld scenario '{scenario}' (variationIdx={variation_idx}, simplification='{simplification_str}', seed={seed})")
+            
+            # Initialize environment
+            # Note: ScienceWorld load() signature: load(taskName, variationIdx, simplificationStr, generateGoldPath)
+            # There is no seed parameter - seed is stored for metadata/reproducibility tracking only
+            env = ScienceWorldEnv()
+            env.load(scenario, variation_idx, simplification_str)
+            obs, info = env.reset()
+            
+            # Store environment in executive_node for use by scienceworld-act tool
+            self.scienceworld_env = env
+            
+            # Fetch task description and allowed actions
+            # Use snake_case API first (preferred), fall back to camelCase for backward compatibility
+            task_description = None
+            if hasattr(env, 'get_task_description'):
+                task_description = env.get_task_description()
+            elif hasattr(env, 'getTaskDescription'):
+                task_description = env.getTaskDescription()  # Deprecated camelCase
+            elif isinstance(info, dict) and 'task_description' in info:
+                task_description = info['task_description']
+            
+            # Try to get allowed actions from current state
+            # Get complete list of possible actions
+            # Try multiple methods to get comprehensive action list
+            allowed_actions = []
+            
+            # Method 1: Get from current state (may be limited)
+            if hasattr(env, 'get_possible_actions'):
+                state_actions = env.get_possible_actions()
+                if state_actions:
+                    allowed_actions.extend(state_actions)
+            elif hasattr(env, 'getPossibleActions'):
+                state_actions = env.getPossibleActions()  # Deprecated camelCase
+                if state_actions:
+                    allowed_actions.extend(state_actions)
+            
+            # Method 2: Extract from action templates (more comprehensive)
+            try:
+                if env:                
+                    # use affordance filtering to get filtered actions
+                    script_dir = Path(__file__).parent.parent / "tools" / "scienceworld-act" / "scripts"
+                    if script_dir.exists() and str(script_dir) not in sys.path:
+                        sys.path.insert(0, str(script_dir))
+                    
+                    from affordances import Heuristics, AffordanceFilter, extract_locations_from_observation  # type: ignore
+                    from scienceworld_interface import extract_actions_and_state  # type: ignore
+                    
+                    heur = Heuristics(locations={"kitchen", "bedroom", "bathroom", "living room", "hallway", "garage", "workshop", "greenhouse", "outside"})
+                    filt = AffordanceFilter(heur)
+                    # Note: env already reset above, no need to reset again
+                    raw_actions, ws = extract_actions_and_state(env)
+                    new_locs = extract_locations_from_observation(obs)
+                    heur.locations |= new_locs
+                    filtered_actions = filt.filter_actions(raw_actions, ws)
+                    allowed_actions = filtered_actions
+            except Exception as e:
+                logger.debug(f"Could not extract action templates: {e}")
+            
+            # Method 3: Check info dict
+            if not allowed_actions:
+                if isinstance(info, dict) and 'allowed_actions' in info:
+                    allowed_actions = info['allowed_actions']
+                elif isinstance(info, dict) and 'allowedActions' in info:
+                    allowed_actions = info['allowedActions']
+            
+            # Build ScienceWorld-specific setting text
+            sw_setting_parts = [
+                f"ScienceWorld: {scenario.title().replace('-', ' ')} Scenario",
+                ""
+            ]
+            
+            if task_description:
+                sw_setting_parts.append(f"Task: {task_description}")
+                sw_setting_parts.append("")
+            
+            if allowed_actions and len(allowed_actions) > 0:
+                # Format actions nicely - join with commas, no "etc."
+                if isinstance(allowed_actions, list):
+                    actions_str = "\n - ".join(sorted(allowed_actions))
+                else:
+                    actions_str = str(allowed_actions)
+                sw_setting_parts.append(f"Available ScienceWorld actions using scienceworld-act tool: \n - {actions_str}")
+            else:
+                # Fallback: comprehensive list of common ScienceWorld actions (no "etc.")
+                fallback_actions = [
+                    "look", "examine", "go [direction]", "take [object]", "use [object]",
+                    "open [object]", "close [object]", "read [object]", "focus [object]",
+                    "inventory", "put [object] in [container]", "drop [object]",
+                    "move [object]", "turn on [object]", "turn off [object]",
+                    "connect [object] to [object]", "disconnect [object] from [object]",
+                    "heat [object]", "cool [object]", "pour [substance] into [container]",
+                    "mix [object] with [object]", "measure [object]", "weigh [object]",
+                    "cut [object]", "break [object]", "repair [object]", "clean [object]"
+                ]
+                actions_str = "\n - ".join(fallback_actions)
+                sw_setting_parts.append(f"Available actions using scienceworld-act tool: {actions_str}")
+            
+            # Note: variation_idx and seed stored for metadata, but seed not used by ScienceWorld API
+            sw_setting_text = "\n".join(sw_setting_parts)
+            
+            # Append to existing setting or use as new setting
+            existing_setting = self.character_config.get('setting', '')
+            if existing_setting:
+                self.character_config['setting'] = f"{existing_setting}\n\n{sw_setting_text}"
+            else:
+                self.character_config['setting'] = sw_setting_text
+            
+            logger.info(f"ScienceWorld initialized: {len(allowed_actions) if isinstance(allowed_actions, list) else 'unknown'} allowed actions")
+            logger.info(f"ScienceWorld environment stored in executive_node.scienceworld_env")
+            
+        except Exception as e:
+            logger.warning(f"Failed to initialize ScienceWorld: {e}")
+            import traceback
+            traceback.print_exc()
+            # Ensure env is None if initialization failed
+            self.scienceworld_env = None
+    
     def _initialize_conversation_collections(self):
         """
         Initialize conversation collections on startup.
@@ -1483,6 +1627,7 @@ class ZenohExecutiveNode:
         
         if text_input and text_input.strip():
             clean_input = text_input.strip().strip('"').strip("'")
+            goal = clean_input.strip().strip('"').strip("'")
             
             # If awaiting ask response, the ask primitive is polling text_input_queue directly
             # So we should not process text inputs here - they'll be consumed by the polling loop
@@ -1493,7 +1638,7 @@ class ZenohExecutiveNode:
                     # Explicit goal command - process as before
                     goal_preview = clean_input[:80] + ('...' if len(clean_input) > 80 else '')
                     logger.info(f'📥 {self.character_name} Received goal: "{goal_preview}"')
-                    self.parse_and_set_goal(clean_input)
+                    self.parse_and_set_goal("", clean_input)
                     return  # Don't process as speech
                 else:
                     # Regular user input - ensure character note exists and load it
@@ -1504,16 +1649,14 @@ class ZenohExecutiveNode:
                     self._add_to_conversation(f"User says: {clean_input}")
                     
                     # Prepend load instruction to user input using character_name
-                    formatted_input = f""""Context: the Collection named 'conversation' contains the history of this conversation.
+                    template = """"goal: Context: the Collection named 'conversation' contains the history of this conversation.
 First load the note '{self.character_name}' to get additional context about your character and role.\n
 Then plan and act to address the following User-provided task: \n\n{clean_input}\n\n
 Finally, using 'say', respond in character to User"""
                     
                     # Convert to goal format
-                    clean_input = 'goal:' + formatted_input
-                    goal_preview = clean_input[:80] + ('...' if len(clean_input) > 80 else '')
-                    logger.info(f'📥 {self.character_name} Received goal: "{goal_preview}"')
-                    self.parse_and_set_goal(clean_input)
+                    logger.info(f'📥 {self.character_name} Received goal: "{goal}"')
+                    self.parse_and_set_goal(template, goal)
                     # Unpause execution so plan executes immediately (same as explicit goal: prefix)
                     self.execution_paused = False
                     self._publish_execution_state()
@@ -1548,28 +1691,10 @@ Finally, using 'say', respond in character to User"""
 
 
     def format_situation(self):
-        """Format the situation data for the LLM."""
+        """Format the situation data for the LLM (infospace only - no spatial data)."""
         formatted_situation = ''
         
-        # Map-based situation data not used (infospace only)
-        pass
-        
-        # world state updates disabled
-
-        if self.inspections:
-            formatted_situation += f"\n#You have inspected the following:\n"
-            for target, inspection in self.inspections.items():
-                if target:
-                    formatted_situation += f"\n\t{target}: {inspection}"
-            formatted_situation += '\n'
-
-        if self.uses:
-            formatted_situation += f"\n#You have used the following:\n"
-            for target, use in self.uses.items():
-                if target:
-                    formatted_situation += f"\n\t{target}: {use}"
-            formatted_situation += '\n'
-
+        # Only include plan summary if available (legacy inspections/uses removed - not used in infospace)
         if self.plan_summary:
             formatted_situation += f"\n#The summary of your most recent plan before the current one was:\n{self.plan_summary}\n"
 
@@ -1595,7 +1720,17 @@ Finally, using 'say', respond in character to User"""
     
     def _update_system_prompt(self):
         """Update the system prompt with the current situation."""
-        system_prompt = self.observations['static']
+        # Build system prompt fresh from character_config (not cached observations)
+        # This ensures ScienceWorld-populated setting is always current
+        system_prompt = ''
+        if self.character_config.get('character', None):
+            system_prompt = self.character_config['character']
+        if self.character_config.get('drives', None):
+            system_prompt += f"\n#Your drives are:\n\t{'\n\t'.join(self.character_config['drives'])}\n"
+        if self.character_config.get('setting', None):
+            system_prompt += f"\n#The overall setting is:\n{self.character_config['setting']}\n"
+        
+        # Add dynamic updates
         if self.current_goal:
             system_prompt += f"\n#Your current goal is:\n\t{self.current_goal.to_string()}\n"
         if self.current_plan:
@@ -1607,25 +1742,21 @@ Finally, using 'say', respond in character to User"""
         return system_prompt
 
     def _observe(self):
-        """Observe: Collect current situation and sense data. Stub."""
-        system_prompt = ''
-        user_prompt = ''
+        """Observe: Collect current situation and sense data (infospace only)."""
         try:
-            if self.character_config.get('character', None):
-                system_prompt = self.character_config['character']
-            if self.character_config.get('drives', None):
-                system_prompt += f"\n#Your drives are:\n\t{'\n\t'.join(self.character_config['drives'])}\n"
-            if self.character_config.get('setting', None):
-                system_prompt += f"\n#The overall setting is:\n{self.character_config['setting']}\n"
-
-            user_prompt += self.format_situation()
-            entity_context = None
+            # Use _update_system_prompt() to get fresh system prompt (includes ScienceWorld-populated setting)
+            system_prompt = self._update_system_prompt()
+            
+            # Build dynamic user prompt from situation, entity context, and action history
+            user_prompt = self.format_situation()
+            
             entity_context = self.get_entity_context(self.character_name, 10)
             if entity_context:
                 user_prompt += f'\n#Your most recent thoughts include:'
                 for i, memory in enumerate(entity_context['conversation_history']):  # Use last 2 memories
                     user_prompt += f"\n\t{memory['source']}: {memory['text'][:600]}..."
                 user_prompt += '\n'
+            
             if self.action_history:
                 last_action = self.action_history[-1]
                 result_str = self._truncate_result(last_action.result)
@@ -1637,6 +1768,9 @@ Finally, using 'say', respond in character to User"""
         except Exception as e:
             logger.error(f'Error in _observe: {e}')  
             traceback.print_exc()
+            # Fallback: build minimal observations
+            system_prompt = self._update_system_prompt()
+            user_prompt = self.format_situation()
             self.observations = {'static': system_prompt, 'dynamic': user_prompt}
             return self.observations
 
@@ -1725,7 +1859,7 @@ Finally, using 'say', respond in character to User"""
         return self.current_goal
 
 
-    def _plan(self, goal: Goal):
+    def _plan(self, template, goal: Goal):
         """Plan: Return existing plan or create single-action plan from goal."""
         # If we already have a plan, return it
         if self.current_plan is not None:
@@ -1753,11 +1887,8 @@ Finally, using 'say', respond in character to User"""
             directive = f"""\nrespond only with the JSON plan, no other text.\nend your response with </end>"""
 
             self.current_plan_prompt = system_prompt + user_prompt + goal_prompt
-            # Capture percepts at plan start (before LLM call)
-            try:
-                self.percepts_at_plan = self._capture_percepts_at_plan()
-            except Exception:
-                self.percepts_at_plan = []
+            # Capture percepts at plan start (always empty for infospace)
+            self.percepts_at_plan = []
             
             # Note: plan_bindings are NOT cleared here to preserve bindings from execute_plan_sync
             # Use clear_planner_bindings API to explicitly clear if needed
@@ -1798,9 +1929,10 @@ Finally, using 'say', respond in character to User"""
             # Use IncrementalPlanner if available, otherwise error
             if self.incremental_planner:
                 self.current_plan = self.incremental_planner.generate_plan(
+                    template=template,
                     goal=goal_text, 
                     context=context, 
-                    max_steps=24
+                    max_steps=21
                 )
             else:
                 logger.error("No planner available for infospace planning")
@@ -2744,10 +2876,10 @@ Finally, using 'say', respond in character to User"""
             logger.error(f'Error publishing dialog end to {source}: {e}')
  
 
-    def parse_and_set_goal(self, goal_text):
+    def parse_and_set_goal(self, template, goal_text):
         """Parse goal input from UI and set current goal."""
         try:
-            parsed_goal = goal_text.strip().strip('"').strip("'")[6:]
+            parsed_goal = goal_text.strip().strip('"').strip("'").replace('goal:', '').strip()
             
             # Immediately clear existing plan to interrupt execution
             self.current_plan = None
@@ -2764,7 +2896,7 @@ Finally, using 'say', respond in character to User"""
             # Skip goal rewriting and plan immediately (infospace mode)
             self._publish_goal(self.current_goal)
             logger.info(f'🧩 {self.character_name} infospace planning for goal: {parsed_goal}')
-            self._plan(self.current_goal)
+            self._plan(template, self.current_goal)
             if self.current_plan:
                 self._publish_current_plan()
                 self.plan_just_generated = True
@@ -2777,21 +2909,11 @@ Finally, using 'say', respond in character to User"""
 
     def _capture_percepts_at_plan(self) -> List[Dict[str, Any]]:
         """Capture a compact, normalized snapshot of percepts at plan start.
-
-        Limits size and fields to keep logs small. Returns [] on failure.
-        For infospace characters, returns empty list (no spatial percepts).
-        """
-        # Situation queries not used (infospace only, situation_node removed)
-        return []
         
-        snapshot: List[Dict[str, Any]] = []
-        try:
-            # Map-based situation queries removed (situation_node no longer exists)
-            # Return empty snapshot for now
-            pass
-        except Exception:
-            return []
-        return snapshot
+        For infospace characters, returns empty list (no spatial percepts).
+        Legacy method kept for compatibility but always returns [].
+        """
+        return []
 
     
     def _get_recent_chat_memories(self, num_entries: int) -> List[Dict[str, Any]]:
@@ -2829,8 +2951,7 @@ Finally, using 'say', respond in character to User"""
                 if (ar.action or {}).get('type', '').lower() == 'think' and ar.result:
                     thoughts.append(str(ar.result))
             thoughts_text = '\n'.join(thoughts)
-            inspects_map = dict(self.inspections or {})
-            uses_map = dict(self.uses or {})
+            # Legacy inspections/uses caches removed (not used in infospace)
             # Recent actions compact
             actions_text = ''
             for ar in (self.action_history or [])[-20:]:
@@ -2855,8 +2976,6 @@ Finally, using 'say', respond in character to User"""
                     "inventory": inventory_text,
                     "chats": chats_text,
                     "thoughts": thoughts_text,
-                    "inspects_map": inspects_map,
-                    "uses_map": uses_map,
                     "actions": actions_text
                 },
                 max_tokens=600,
