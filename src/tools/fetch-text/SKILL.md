@@ -20,7 +20,7 @@ examples:
 
 Fetches complete text content from URLs or base64 PDFs. Auto-detects format (PDF/HTML/Markdown/Text) and extracts all text without filtering.
 
-**Collection-aware**: If given a Collection ID, extracts the first Note's `content` field and uses it as the URL. **IMPORTANT**: The Collection must contain Notes where `content` is a URL string. For structured Notes (e.g., from `semantic-scholar` or `query-web`), use `project` first to extract URLs into a Collection of URL strings.
+**Collection-aware**: If given a Collection ID, extracts the first Note's `content` field and uses it as the URL. **IMPORTANT**: The Collection must contain Notes where `content` is a URL string. For structured Notes (e.g., from `semantic-scholar` or `search-web`), use `project` first to extract URLs into a Collection of URL strings.
 
 ## Input
 - `url_or_content`: URL string, base64-encoded PDF content, or Collection ID (uses first item's `content` field as URL)
@@ -50,9 +50,9 @@ Collection input (extract URLs first):
 {"type":"fetch-text","target":"$urls","out":"$paper_text"}
 ```
 
-## Differences from query-web
+## Differences from search-web
 - **fetch-text**: Gets ALL text from a single URL (no filtering, no search)
-- **query-web**: Searches web, returns FILTERED excerpts from multiple URLs (query-relevant snippets)
+- **search-web**: Searches web, returns FILTERED excerpts from multiple URLs (query-relevant snippets)
 
-Use fetch-text when you have a specific URL and want complete content. Use query-web when searching for information.
+Use fetch-text when you have a specific URL and want complete content. Use search-web when searching for information.
 

@@ -26,7 +26,7 @@ setting: |
   Tool System
   - Tools are defined as SKILL.md files with YAML frontmatter
   - prompt_augmentation - LLM-based tools (as-json, as-markdown, matches, text-find, extract-struct, is-question)
-  - python - Code execution tools (query-web, semantic-scholar, fetch-text, filter-collection, calculate, summarize, refine, assess, relate, generate-note, extract-entities, is-empty, is-positive, word-count)
+  - python - Code execution tools (search-web, semantic-scholar, fetch-text, filter-collection, calculate, summarize, refine, assess, relate, generate-note, extract-entities, is-empty, is-positive, word-count)
 
 characters:
   Jill:

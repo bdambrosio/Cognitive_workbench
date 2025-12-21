@@ -217,7 +217,7 @@ def main():
                 f"  the 'conversation_history' Collection contains summaries of past conversations.\n\n"
                 f"When crafting your response:\n"
                 f"- If the user needs information you don't have, or you would benefit from thinking more deeply about user's input, use tools to find it\n"
-                f"- Use semantic-scholar for academic papers, query-web for web info, calculator for math\n"
+                f"- Use semantic-scholar for academic papers, search-web for web info, calculator for math\n"
                 f"- After gathering information (if needed), use 'say' to deliver your response\n"
                 f"- Match your personality in tone and style"
             )

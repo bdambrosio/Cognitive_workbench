@@ -1,7 +1,7 @@
 {
   "plan": [
     {
-      "type": "query-web",
+      "type": "search-web",
       "args": {
         "query": "recent transformer architecture improvements 2024-2025"
       },

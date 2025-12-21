@@ -201,7 +201,7 @@ Search Primitives:
 - search-collections: Global discovery across all Collections (no target needed). Returns Collection of structured Notes with text preview, metadata.source_id, metadata.uri, metadata.score, metadata.type.
 - search-within-collection: Search within a specific indexed Collection (requires target Collection, must be indexed first). Returns Collection of structured Notes with text preview, metadata.source_id, metadata.uri, metadata.score, metadata.type.
 
-All search primitives return structured Notes matching query-web/semantic-scholar format:
+All search primitives return structured Notes matching search-web/semantic-scholar format:
 - text: Full text content from original Note
 - format: "text" or "json"
 - metadata.source_id: Original Note/Collection ID
@@ -259,13 +259,13 @@ Tool System
   - Tools are defined as SKILL.md files with YAML frontmatter
   - available tools are loaded from the tools directory and will be listed below
   - prompt_augmentation - LLM-based tools (e.g. as-json, as-markdown, matches, text-find, extract-struct)
-  - python - Code execution tools (e.g. query-web, semantic-scholar, filter-collection, calculate, summarize, refine, assess, relate, generate-note)
+  - python - Code execution tools (e.g. search-web, semantic-scholar, filter-collection, calculate, summarize, refine, assess, relate, generate-note)
 
 #Tool Selection (only if tool is in the tool catalog):
 General Tools:
 - Academic papers: semantic-scholar (provides abstracts, citations, PDFs)
-- General web: query-web (broad coverage, recent content)
-- Single URL fetch: fetch-text (NOT for query-web/semantic-scholar results)
+- General web: search-web (broad coverage, recent content)
+- Single URL fetch: fetch-text (NOT for search-web/semantic-scholar results)
 - Generate new content: generate-note (creates text/code from scratch, no target needed)
 - Extract info from unstructured text: refine (LLM-based, use for text content)
 - Extract metadata/structured fields: project (field accessor, use for metadata.* fields)
@@ -373,15 +373,15 @@ def build_tool_catalog(available_tools: Dict[str, Dict]) -> Dict[str, Dict]:
             "schema_hint": {"target": "$variable"}
         },
         "search-notes": {
-            "description": "Global search all Notes in the infospace using embedding-based retrieval. Returns Collection of structured Notes with text preview (200 chars), metadata.source_id, metadata.uri, metadata.score, metadata.type. Format matches query-web/semantic-scholar for consistent project operations.",
+            "description": "Global search all Notes in the infospace using embedding-based retrieval. Returns Collection of structured Notes with text preview (200 chars), metadata.source_id, metadata.uri, metadata.score, metadata.type. Format matches search-web/semantic-scholar for consistent project operations.",
             "schema_hint": {"value": "string (query)", "out": "$variable", "limit": "int (optional, default 5)", "threshold": "float (optional, default 0.3)"}
         },
         "search-collections": {
-            "description": "Global search across all Collections using embedding-based retrieval. Returns Collection of structured Notes with text preview (200 chars), metadata.source_id, metadata.uri, metadata.score, metadata.type. Format matches query-web/semantic-scholar for consistent project operations.",
+            "description": "Global search across all Collections using embedding-based retrieval. Returns Collection of structured Notes with text preview (200 chars), metadata.source_id, metadata.uri, metadata.score, metadata.type. Format matches search-web/semantic-scholar for consistent project operations.",
             "schema_hint": {"value": "string (query)", "out": "$variable", "limit": "int (optional, default 3)", "threshold": "float (optional, default 0.3)"}
         },
         "search-within-collection": {
-            "description": "Search within a specific indexed Collection. Returns Collection of structured Notes with text preview (200 chars), metadata.source_id, metadata.uri, metadata.score, metadata.type. Format matches query-web/semantic-scholar for consistent project operations. Requires Collection to be indexed first.",
+            "description": "Search within a specific indexed Collection. Returns Collection of structured Notes with text preview (200 chars), metadata.source_id, metadata.uri, metadata.score, metadata.type. Format matches search-web/semantic-scholar for consistent project operations. Requires Collection to be indexed first.",
             "schema_hint": {"target": "$variable (indexed Collection)", "value": "string (query)", "out": "$variable", "limit": "int (optional, default 5)", "threshold": "float (optional, default 0.0)", "return_mode": "string (optional, 'chunks' or 'notes', default 'chunks')"}
         },
         "index": {
@@ -534,12 +534,12 @@ def build_tool_catalog(available_tools: Dict[str, Dict]) -> Dict[str, Dict]:
     
     # Enhanced descriptions to prevent common confusions
     TOOL_DISAMBIGUATION = {
-        "query-web": "Search web and return Collection of structured Notes. Each Note has text (full content), format, metadata.uri (URL), metadata.domain, char_count. Use project with metadata.uri to extract URLs.",
+        "search-web": "Search web and return Collection of structured Notes. Each Note has text (full content), format, metadata.uri (URL), metadata.domain, char_count. Use project with metadata.uri to extract URLs.",
         "semantic-scholar": "Search academic papers and return Collection of structured Notes. Each Note has text (abstract), format, metadata.uri (PDF URL), metadata.title, metadata.authors, metadata.year, metadata.citations, metadata.venue. Use project with metadata.uri to extract URLs.",
-        "fetch-text": "Fetch text from a SINGLE specific URL, Do NOT use on query-web or semantic-scholar results. Use ONLY when you have one URL/ID to fetch directly and do not already have the text.",
+        "fetch-text": "Fetch text from a SINGLE specific URL, Do NOT use on search-web or semantic-scholar results. Use ONLY when you have one URL/ID to fetch directly and do not already have the text.",
         "search-notes": "Global search across all Notes. Returns Collection of structured Notes with full text content, metadata.source_id, metadata.uri, metadata.score, metadata.type. Use project for metadata fields, refine for extracting info from text.",
         "search-collections": "Global search across all Collections. Returns Collection of structured Notes with full text content, metadata.source_id, metadata.uri, metadata.score, metadata.type. Use project for metadata fields, refine for extracting info from text.",
-        "search-within-collection": "Search within indexed Collection. Returns Collection of structured Notes with text preview (200 chars), metadata.source_id, metadata.uri, metadata.score, metadata.type. Format matches query-web/semantic-scholar.",
+        "search-within-collection": "Search within indexed Collection. Returns Collection of structured Notes with text preview (200 chars), metadata.source_id, metadata.uri, metadata.score, metadata.type. Format matches search-web/semantic-scholar.",
     }
     TOOL_SCHEMA_HINT_OVERRIDE = {}
     
@@ -603,11 +603,11 @@ def tool_catalog_text(tools: Dict[str, Dict]) -> str:
     
     # Add critical workflows to prevent common mistakes
     lines.append("\n# CRITICAL WORKFLOWS:")
-    lines.append("- query-web → summarize / refine / filter-collection")
-    lines.append("- query-web already returns full text in 'text' field of each Note")
+    lines.append("- search-web → summarize / refine / filter-collection")
+    lines.append("- search-web already returns full text in 'text' field of each Note")
     lines.append("- semantic-scholar → summarize / refine / filter-collection")
-    lines.append("- fetch-text is for SINGLE URLs only, NOT for Collections from query-web/semantic-scholar")
-    lines.append("- Level 4 tools (query-web, semantic-scholar) return Collections with text content in the 'text' field of each Note")
+    lines.append("- fetch-text is for SINGLE URLs only, NOT for Collections from search-web/semantic-scholar")
+    lines.append("- Level 4 tools (search-web, semantic-scholar) return Collections with text content in the 'text' field of each Note")
     
     return "\n".join(lines)
 
@@ -840,7 +840,7 @@ def sgl_to_infospace_action(tool_name: str, args_json: str, step: int, available
     # These primitives accept both literals and variables - trust LLM to add $ when needed
     variable_fields = ['out', 'source']
     # Primitives/tools that accept literal values in 'value' field (don't normalize)
-    literal_value_primitives = ['create-note', 'create-collection', 'add', 'remove', 'say', 'display', 'think', 'ask', 'query-web', 'semantic-scholar', 'search-notes', 'search-collections']
+    literal_value_primitives = ['create-note', 'create-collection', 'add', 'remove', 'say', 'display', 'think', 'ask', 'search-web', 'semantic-scholar', 'search-notes', 'search-collections']
     if tool_name not in literal_value_primitives:
         variable_fields.extend(['target', 'value'])
     # For literal_value_primitives, 'value' accepts literals, so don't normalize
@@ -862,21 +862,21 @@ def sgl_to_infospace_action(tool_name: str, args_json: str, step: int, available
     
     # Ensure 'out' field if tool produces output
     output_producing = ["create-note", "create-collection", "load", "search-notes", "search-collections", "search-within-collection", "map", 
-                       "split", "flatten", "query-web", "semantic-scholar", "summarize",
+                       "split", "flatten", "search-web", "semantic-scholar", "summarize",
                        "refine", "generate-note", "assess", "relate", "extract-entities", "filter-collection",
                        "fetch-text", "as-json", "as-markdown"]
     if tool_name in output_producing and "out" not in action:
         action["out"] = f"$step_{step}_result"
     
     # Add expect if needed
-    uncertain_tools = ["query-web", "semantic-scholar", "search-notes", "search-collections", "search-within-collection", "load"]
+    uncertain_tools = ["search-web", "semantic-scholar", "search-notes", "search-collections", "search-within-collection", "load"]
     if tool_name in uncertain_tools and "expect" not in action:
         action["expect"] = f"should get result from {tool_name}"
     
     return action
 
 
-def execute_infospace_action(action: Dict, executor, agent_name: str) -> str:
+def execute_infospace_action(action: Dict, executor: InfospaceExecutor, agent_name: str) -> str:
     """
     Execute single action via infospace_executor, return result text.
     
@@ -1074,13 +1074,14 @@ if HAS_SGLANG:
             return ""
     
     @function
-    def tool_planner_infospace(s, goal: str, character_context: str, recent_context: str, 
+    def tool_planner_infospace(s, template, goal: str, character_context: str, recent_context: str, 
                               tools_catalog_text: str, executor, trace_file=None, max_steps: int = 16, similar_plan: Dict = None, preplan: str = None):
         """
         SGLang incremental planner for infospace goals.
         
         Args:
             s: SGLang state
+            template: Template text
             goal: Goal text
             character_context: Character description + drives
             recent_context: Recent thoughts/memories + last action
@@ -1114,7 +1115,8 @@ if HAS_SGLANG:
     - Stage 3: Reflect on result, decide if goal done, set NEXT_TASK.
     ALWAYS follow all formatting instructions exactly.
 """)
-        system_parts.append(f"\n#GOAL\n {goal}\n\n")
+        system_parts.append(f"Setting:\n{character_context}\n\n")
+        system_parts.append(f"Goal:\n\n{template}\n{goal}\n\n")
         if preplan:
             system_parts.append(f"\n## {preplan}\n")
             system_parts.append(f"\n## End ABSTRACT_PLAN\n")
@@ -1320,11 +1322,19 @@ if HAS_SGLANG:
             requested_tools = parse_request_tools(requested_tools_raw)
             if requested_tools:
                 logger.info(f"Step {step}: LLM requested additional tools: {requested_tools}")
-                expanded_docs = load_skill_docs(requested_tools, executor.available_tools)
-                if expanded_docs:
-                    s += user(f"ADDITIONAL TOOL DOCUMENTATION:\n{expanded_docs}")
-                    s += assistant("I have reviewed the additional tool documentation.\n")
-                    logger.info(f"Stage 3.5: Loaded docs for {len(requested_tools)} additional tools: {requested_tools}")
+                # Filter to only tools that haven't had docs loaded yet
+                tools_to_load = [tool for tool in requested_tools if tool not in _loaded_skill_docs]
+                
+                if tools_to_load:
+                    expanded_docs = load_skill_docs(tools_to_load, executor.available_tools)
+                    if expanded_docs:
+                        s += user(f"ADDITIONAL TOOL DOCUMENTATION:\n{expanded_docs}")
+                        s += assistant("I have reviewed the additional tool documentation.\n")
+                        logger.info(f"Stage 3.5: Loaded docs for {len(tools_to_load)} additional tools: {tools_to_load}")
+                        # Mark these tools as loaded
+                        _loaded_skill_docs.update(tools_to_load)
+                else:
+                    logger.debug(f"Stage 3.5: All {len(requested_tools)} requested tools already have docs loaded, skipping")
             elif requested_tools_raw and requested_tools_raw.lower() not in ["", "[]", "none", "null"]:
                 # Log warning only if there was actual content that failed to parse
                 logger.warning(f"Step {step}: Failed to parse REQUEST_TOOLS: {requested_tools_raw[:100]}")
@@ -1496,7 +1506,7 @@ class IncrementalPlanner:
             except Exception:
                 pass
     
-    def generate_plan(self, goal: str, context: Dict = None, max_steps: int = 16) -> Dict:
+    def generate_plan(self, template, goal: str, context: Dict = None, max_steps: int = 16) -> Dict:
         """
         Generate plan incrementally using SGLang.
         
@@ -1555,6 +1565,7 @@ class IncrementalPlanner:
             
             # Run SGLang planner
             state = tool_planner_infospace.run(
+                template=template,
                 goal=goal,
                 character_context=character_context,
                 recent_context=recent_context,

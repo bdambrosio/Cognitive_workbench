@@ -247,13 +247,48 @@ class InfospaceExecutor:
         
         return resource.get('properties', {})
     
+    def _truncate_text_fields(self, obj: Any, max_text_length: int = 128) -> Any:
+        """
+        Recursively truncate text fields in dicts/lists to max_text_length.
+        
+        Traverses dicts and lists, truncating string values (but not dict keys) to max_text_length
+        with "..." suffix if truncated. Preserves structure and non-string values.
+        
+        Args:
+            obj: Object to process (dict, list, or other)
+            max_text_length: Maximum length for text fields (default: 128)
+            
+        Returns:
+            Object with text fields truncated (same structure as input)
+        """
+        if isinstance(obj, dict):
+            truncated_dict = {}
+            for key, value in obj.items():
+                if isinstance(value, str):
+                    if len(value) > max_text_length:
+                        truncated_dict[key] = value[:max_text_length] + "..."
+                    else:
+                        truncated_dict[key] = value
+                elif isinstance(value, (dict, list)):
+                    truncated_dict[key] = self._truncate_text_fields(value, max_text_length)
+                else:
+                    truncated_dict[key] = value
+            return truncated_dict
+        elif isinstance(obj, list):
+            return [self._truncate_text_fields(item, max_text_length) for item in obj]
+        else:
+            return obj
+    
     def _format_return_value(self, content: Any, max_chars: int = 384) -> str:
         """
         Format content for return value, truncating to max_chars with word boundary awareness.
         
+        For dict/list content, truncates individual text fields to 128 chars first,
+        then truncates the overall JSON string if needed.
+        
         Args:
             content: Content to format (string, dict, list, etc.)
-            max_chars: Maximum characters (default: 384)
+            max_chars: Maximum characters for overall output (default: 384)
             
         Returns:
             Formatted string, truncated if necessary
@@ -263,7 +298,9 @@ class InfospaceExecutor:
         
         # Convert to string
         if isinstance(content, (dict, list)):
-            content_str = json.dumps(content)
+            # Truncate text fields in dict/list before JSON serialization
+            truncated_content = self._truncate_text_fields(content, max_text_length=192)
+            content_str = json.dumps(truncated_content)
         else:
             content_str = str(content)
         
@@ -1003,6 +1040,7 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         resolved_args['map_name'] = self.map_name
         resolved_args['agent_name'] = self.agent_name
         resolved_args['resource_manager'] = self.resource_manager
+        resolved_args['executive_node'] = self.executive_node  # For ScienceWorld state access
         
         # Add unified LLM generation callback (SGLang only)
         resolved_args['llm_generate'] = self.llm_generate
@@ -1013,6 +1051,14 @@ Make sure the string is in a format that can be parsed by the json.loads functio
             grobid_url = llm_config.get('grobid')
             if grobid_url:
                 resolved_args['grobid_url'] = grobid_url
+            
+            # Extract ScienceWorld config if available (for ScienceWorld tools)
+            scienceworld_config = self.executive_node.character_config.get('scienceworld_config', {})
+            if scienceworld_config:
+                resolved_args['scenario'] = scienceworld_config.get('scenario')
+                resolved_args['difficulty'] = scienceworld_config.get('difficulty', 0)  # Maps to variationIdx
+                resolved_args['simplification'] = scienceworld_config.get('simplification', '')  # Optional simplification string
+                resolved_args['seed'] = scienceworld_config.get('seed', 42)  # Stored for metadata, not used by ScienceWorld API
         
         # Execute tool
         try:
@@ -1216,7 +1262,7 @@ Make sure the string is in a format that can be parsed by the json.loads functio
     def _build_structured_search_result(self, resource_id: str, resource_result: Dict, 
                                        resource_metadata: Optional[Dict] = None) -> Dict:
         """
-        Build structured search result Note matching query-web/semantic-scholar format.
+        Build structured search result Note matching search-web/semantic-scholar format.
         
         Args:
             resource_id: Note or Collection ID
@@ -1580,7 +1626,7 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         
         # Results is already a list of dicts with 'document', 'score', 'metadata' fields
         
-        # Create structured Notes for each search result (matching query-web/semantic-scholar format)
+        # Create structured Notes for each search result (matching search-web/semantic-scholar format)
         note_ids = []
         for i, result in enumerate(results):
             document_content = result.get('document', '')
@@ -1673,7 +1719,7 @@ Make sure the string is in a format that can be parsed by the json.loads functio
                 return self._create_uniform_return('success', value=collection_value, resource_id=empty_coll_id)
             return self._create_uniform_return('failed', reason='No Notes found and failed to create empty Collection')
         
-        # Create structured Notes for each search result (matching query-web/semantic-scholar format)
+        # Create structured Notes for each search result (matching search-web/semantic-scholar format)
         note_ids = []
         for note_result in notes:
             note_id = note_result.get('resource_id')
@@ -1746,7 +1792,7 @@ Make sure the string is in a format that can be parsed by the json.loads functio
                 return self._create_uniform_return('success', value=collection_value, resource_id=empty_coll_id)
             return self._create_uniform_return('failed', reason='No Collections found and failed to create empty Collection')
         
-        # Create structured Notes for each search result (matching query-web/semantic-scholar format)
+        # Create structured Notes for each search result (matching search-web/semantic-scholar format)
         note_ids = []
         for coll_result in collections:
             coll_id = coll_result.get('resource_id')
@@ -2666,7 +2712,7 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         - Split text by custom delimiter: {"type":"split","target":"$text_note","delimiter":"---","out":"$sections"}
         
         NOTE: 
-        - query-web and semantic-scholar return Collections directly - NO split needed.
+        - search-web and semantic-scholar return Collections directly - NO split needed.
         - For plain text, default delimiter is 'sentence' which splits on sentence boundaries (. ! ? followed by space/newline)
         - Internal newlines are removed and whitespace is normalized within each segment
         - Empty segments are filtered out

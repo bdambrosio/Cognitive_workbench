@@ -221,7 +221,7 @@ def _search_papers_direct(query: str, limit: int, api_key: str = None) -> List[D
                         "paper_id": paper_id,
                         "doi": doi,
                         "pdf_url": pdf_url,
-                        "uri": pdf_url  # Standardized URI field for consistency with query-web and search primitives
+                        "uri": pdf_url  # Standardized URI field for consistency with search-web and search primitives
                     },
                     "char_count": len(abstract)
                 }

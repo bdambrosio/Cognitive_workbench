@@ -99,7 +99,7 @@ Input Note: `"Section 1---Section 2---Section 3"` → Collection of 3 Notes
 ## Important Notes
 
 - **NOT for inspecting Collections**: Collections are already split. Use `display` to view Collection contents or `flatten` to merge back into a single Note.
-- **query-web and semantic-scholar**: These tools return Collections directly - NO split needed.
+- **search-web and semantic-scholar**: These tools return Collections directly - NO split needed.
 - **Whitespace Normalization**: For plain text, internal newlines are removed and multiple spaces are collapsed to ensure clean semantic units.
 - **Empty Filtering**: Empty or whitespace-only segments are automatically filtered out.
 
