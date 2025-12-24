@@ -399,6 +399,28 @@ characters:
 - Activities list files (`*-activities.json`)
 - Simulation time configuration
 
+### External World Integration
+
+Cognitive Workbench supports interaction with external simulated worlds (e.g., OSWorld, ScienceWorld) via API-based tools. World-specific tools are located in `src/world-tools/<world-name>/` and are automatically loaded when a character's `world_config.world_name` is set.
+
+**OSWorld Integration:**
+To use OSWorld with Cognitive Workbench, you need a separate OSWorld wrapper service (separate repository to be created). The wrapper provides a REST API that exposes OSWorld's `DesktopEnv` functionality, allowing Jill to interact with the desktop environment through dedicated tools (`osworld-status`, `osworld-observe`, `osworld-execute`, `osworld-reset`, `osworld-version`).
+
+Configure OSWorld in your character YAML:
+```yaml
+world_config:
+  world_name: "osworld"
+  port: 3002  # Port where OSWorld wrapper service runs
+```
+
+**ScienceWorld Integration:**
+ScienceWorld tools (`scienceworld-act`, `scienceworld-reset`) are available in `src/world-tools/scienceworld/`. Configure ScienceWorld similarly:
+```yaml
+world_config:
+  world_name: "scienceworld"
+  port: 3001  # Port where ScienceWorld service runs
+```
+
 ### Running an Experiment
 ```bash
 cd src
@@ -427,14 +449,17 @@ src/
 ├── utils/
 │   ├── action_post_processing.py  # Result validation utilities
 │   └── llm_api.py             # LLM client wrapper (legacy)
-└── tools/                     # 32+ dynamically loaded skills
-    ├── search-web/             # Web search & extraction
-    ├── semantic-scholar/      # Academic paper search
-    ├── summarize/             # Text summarization
-    ├── filter-collection/     # Semantic filtering
-    ├── relate/                # Relationship analysis
-    ├── word-count/            # Text metrics
-    └── ...
+├── tools/                     # General tools (always loaded)
+│   ├── search-web/             # Web search & extraction
+│   ├── semantic-scholar/      # Academic paper search
+│   ├── summarize/             # Text summarization
+│   ├── filter-collection/     # Semantic filtering
+│   ├── relate/                # Relationship analysis
+│   ├── word-count/            # Text metrics
+│   └── ...
+└── world-tools/               # World-specific tools (loaded conditionally)
+    ├── osworld/                # OSWorld tools (status, observe, execute, reset, version)
+    └── scienceworld/           # ScienceWorld tools (act, reset)
 
 tests/
 ├── mmlu_eval.py               # MMLU benchmark harness (see Benchmarks section)
