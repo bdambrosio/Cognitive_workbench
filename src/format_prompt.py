@@ -1,10 +1,11 @@
 from ast import literal_eval
 from PyQt5.QtWidgets import (QApplication, QTextEdit, QVBoxLayout, QWidget, 
                             QPushButton, QDialog, QProgressDialog, QMessageBox,
-                            QFileDialog)
+                            QFileDialog, QComboBox, QLabel, QHBoxLayout, QLineEdit, QCheckBox, QShortcut)
 from PyQt5.QtCore import Qt, QThread, pyqtSignal, QUrl, QByteArray
 from PyQt5.QtNetwork import QNetworkAccessManager, QNetworkRequest, QNetworkReply
-from PyQt5.QtGui import QFont, QTextCursor
+from PyQt5.QtGui import QFont, QTextCursor, QKeySequence
+from PyQt5.QtGui import QTextDocument
 from pathlib import Path
 import json
 import sys
@@ -375,6 +376,57 @@ text_edit.setFont(textFont)
 text_edit.setAcceptRichText(False)
 layout.addWidget(text_edit)
 
+# Create search bar
+search_layout = QHBoxLayout()
+search_line_edit = QLineEdit()
+search_line_edit.setPlaceholderText("Search...")
+search_line_edit.setStyleSheet("background-color: #3E3E3E; color: ivory; padding: 4px;")
+case_checkbox = QCheckBox("Case")
+case_checkbox.setStyleSheet("color: ivory;")
+find_next_button = QPushButton("Find Next")
+find_next_button.setStyleSheet("padding: 4px 8px;")
+search_layout.addWidget(QLabel("Search:"))
+search_layout.addWidget(search_line_edit)
+search_layout.addWidget(case_checkbox)
+search_layout.addWidget(find_next_button)
+layout.addLayout(search_layout)
+
+# Search functionality
+def find_next():
+    """Find next occurrence of search term."""
+    search_term = search_line_edit.text()
+    if not search_term:
+        return
+    
+    flags = QTextDocument.FindFlag(0)
+    if case_checkbox.isChecked():
+        flags |= QTextDocument.FindCaseSensitively
+    
+    # Start search from current cursor position
+    found = text_edit.find(search_term, flags)
+    
+    if not found:
+        # Wrap around: move to start and try again
+        cursor = text_edit.textCursor()
+        cursor.movePosition(QTextCursor.Start)
+        text_edit.setTextCursor(cursor)
+        found = text_edit.find(search_term, flags)
+        
+        if not found:
+            QMessageBox.information(window, "Search", f"'{search_term}' not found.")
+
+def show_search():
+    """Show/focus search box."""
+    search_line_edit.setFocus()
+    search_line_edit.selectAll()
+
+find_next_button.clicked.connect(find_next)
+search_line_edit.returnPressed.connect(find_next)
+
+# Keyboard shortcuts
+QShortcut(QKeySequence("Ctrl+F"), window, show_search)
+QShortcut(QKeySequence("F3"), window, find_next)
+
 # Create a QPushButton to import files
 import_button = QPushButton("Import File")
 import_button.clicked.connect(import_file)
@@ -416,6 +468,96 @@ layout.addWidget(clear_button)
 
 # Connect the button's clicked signal to the function
 clear_button.clicked.connect(clear_text)
+
+def load_trace_section():
+    """Load section(s) of planner_trace_Jill.txt starting from last n ProgramState lines in trace file."""
+    trace_file_path = Path(__file__).parent / "logs" / "planner_trace_Jill.txt"
+    
+    # Check if trace file exists
+    if not trace_file_path.exists():
+        QMessageBox.critical(window, "Error", f"Trace file not found: {trace_file_path}")
+        return
+    
+    # Create dialog to ask for number of sections
+    dialog = QDialog(window)
+    dialog.setWindowTitle("Load Trace Sections")
+    dialog_layout = QVBoxLayout()
+    
+    label = QLabel("How many sections to load?")
+    dialog_layout.addWidget(label)
+    
+    combo = QComboBox()
+    combo.addItems(["1", "2", "3", "4", "5"])
+    combo.setCurrentIndex(0)  # Default to 1
+    dialog_layout.addWidget(combo)
+    
+    button_layout = QHBoxLayout()
+    ok_button = QPushButton("OK")
+    cancel_button = QPushButton("Cancel")
+    button_layout.addWidget(ok_button)
+    button_layout.addWidget(cancel_button)
+    dialog_layout.addLayout(button_layout)
+    
+    dialog.setLayout(dialog_layout)
+    
+    ok_button.clicked.connect(dialog.accept)
+    cancel_button.clicked.connect(dialog.reject)
+    
+    if dialog.exec_() != QDialog.Accepted:
+        return
+    
+    num_sections = int(combo.currentText())
+    
+    # Read trace file and find matching lines
+    try:
+        with open(trace_file_path, 'r', encoding='utf-8') as f:
+            trace_lines = f.readlines()
+    except Exception as e:
+        QMessageBox.critical(window, "Error", f"Failed to read trace file: {str(e)}")
+        return
+    
+    # Find all lines starting with "ProgramState(<|im_start|>system" in trace file
+    search_prefix = "ProgramState(<|im_start|>system"
+    match_indices = []
+    for i in range(len(trace_lines) - 1, -1, -1):
+        if trace_lines[i].startswith(search_prefix):
+            match_indices.append(i)
+    
+    if not match_indices:
+        QMessageBox.warning(window, "Error", f"No line starting with '{search_prefix}' found in trace file.")
+        return
+    
+    # Get the last n sections (or all if fewer than n exist)
+    if len(match_indices) < num_sections:
+        QMessageBox.information(window, "Info", f"Only {len(match_indices)} section(s) found, loading all.")
+        num_sections = len(match_indices)
+    
+    # Get the starting index (first of the last n sections)
+    start_index = match_indices[num_sections - 1]
+    
+    # Load from start_index to end of file
+    section_lines = trace_lines[start_index:]
+    section_text = ''.join(section_lines)
+    
+    # Get current window content
+    current_text = text_edit.toPlainText()
+    
+    # If window is empty, clear and load; otherwise append to end
+    if not current_text.strip():
+        text_edit.clear()
+        text_edit.setPlainText(section_text)
+        text_edit.setFont(textFont)
+    else:
+        cursor = text_edit.textCursor()
+        cursor.movePosition(QTextCursor.End)
+        cursor.insertText('\n\n' + section_text)
+        text_edit.setTextCursor(cursor)
+
+load_trace_button = QPushButton("Load Trace Section")
+layout.addWidget(load_trace_button)
+
+# Connect the button's clicked signal to the function
+load_trace_button.clicked.connect(load_trace_section)
 
 # Create submit button for API calls
 submit_button = QPushButton("Submit")

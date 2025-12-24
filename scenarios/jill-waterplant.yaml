@@ -8,10 +8,13 @@ llm_config:
   grobid: "http://localhost:8070/"
 
 # ================================
-# ScienceWorld Configuration
+# World Configuration (generalized for any external world API)
 # ================================
-scienceworld_config:
+world_config:
+  world_name: "scienceworld"
+  port: 5005
   scenario: "grow-plant"
+  simplification: "easy"
   difficulty: 0
   seed: 42
 
@@ -82,17 +85,26 @@ setting: |
   - infer affordances beyond what is explicitly allowed
   - access hidden state
 
-  You DO:
-  - observe
+  You act in scienceworld using the scienceworld-act tool.
+  The tool executes the scienceworld action contained in the 'action' parameter and returns the result.
+  You can use this tool to:
+  - observe the world
   - infer preconditions
-  - act
-  - re-observe
-  - revise hypotheses
+  - act in the world
+  - re-observe the world
 
   ScienceWorld may:
   - change independently over time
   - delay effects of actions
   - enforce hidden preconditions silently
+
+  IMPORTANT HINTS:
+  - Teleportation: You can use teleport to [location] to move instantly (e.g., teleport to greenhouse).
+  - Complex Actions: There is no grow command. To grow plants, you must:
+    - take seed (check the Living Room or Workshop if not in Kitchen).
+    - plant seed in [pot].
+    - wait (actions take time to have effect).
+  - Inventory: Regularly check look at self to see what you are holding.
 
   Unexpected outcomes indicate incorrect assumptions, not randomness.
 
@@ -100,9 +112,9 @@ setting: |
   III. ACTION AUTHORITY (CRITICAL)
   ==================================================
 
-  ScienceWorld provides, at each step, a list of VALID actions.
+  ScienceWorld provides, at each step, a partial list of VALID actions and affordances in the current state of the world.
 
-  THIS LIST IS AUTHORITATIVE.
+  THIS LIST IS AUTHORITATIVE, BUT TEMPORARY, MAY CHANGE, AND MAY NOT BE COMPLETE.
 
   Rules:
   - Only actions in the provided list are valid
@@ -170,20 +182,6 @@ setting: |
   Not every cycle requires action.
   Reasoning-only steps are expected and appropriate.
 
-  ==================================================
-  VI. TASK CONTEXT
-  ==================================================
-
-  Scenario: grow-plant
-
-  Goal:
-    Grow an apple plant from seed until it reaches the reproductive life stage.
-
-  Notes:
-    - Seeds can be found somewhere in the environment.
-    - Plant growth depends on environmental conditions and time.
-    - Some changes occur only after repeated observation.
-
 # ================================
 # CHARACTER DEFINITION
 # ================================
@@ -191,6 +189,7 @@ characters:
   Jill:
     manual: true
     manual_response: false
+    benchmark_mode: true
 
     character: |
       Jill is an AI research assistant working for a retired AI professor.
