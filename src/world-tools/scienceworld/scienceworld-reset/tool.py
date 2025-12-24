@@ -57,8 +57,12 @@ def tool(value, **kwargs):
 
     # ScienceWorld load() signature: load(taskName, variationIdx, simplificationStr, generateGoldPath)
     # There is no seed parameter - seed is stored for metadata/reproducibility tracking only
-    env = ScienceWorldEnv()
-    env.load(scenario, variation_idx, simplification_str)
+    if executive_node.scienceworld_env is None:
+        env = ScienceWorldEnv()
+        env.load(scenario, variation_idx, simplification_str)
+    else:
+        env = executive_node.scienceworld_env
+    #env.load(scenario, variation_idx, simplification_str)
     obs, info = env.reset()
 
     # Store env in executive_node (replaces global session store)

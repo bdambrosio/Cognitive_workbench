@@ -260,18 +260,39 @@ class ZenohExecutiveNode:
     """
     
     def _load_tools(self) -> Dict[str, Dict]:
-        """Load tools from src/tools directory."""
+        """
+        Load tools from src/tools directory and world-specific directories.
+        
+        Always loads general tools from src/tools/.
+        Conditionally loads world-specific tools from src/world-tools/<world_name>/ only if world_config.world_name is set.
+        
+        Note: load_tools() scans only immediate subdirectories (not recursive), so world-tools/ 
+        will not be picked up when scanning src/tools/.
+        """
         from utils.tool_loader import load_tools
         from pathlib import Path
         
-        tools_dir = Path(__file__).parent / 'tools'
         tools = {}
+        src_dir = Path(__file__).parent
         
+        # Always load general tools from src/tools (top-level tools directory)
+        tools_dir = src_dir / 'tools'
         if tools_dir.exists():
             logger.info(f"Loading tools from: {tools_dir}")
             tools.update(load_tools(str(tools_dir)))
         else:
             logger.warning(f"Tools directory not found: {tools_dir}")
+        
+        # Conditionally load world-specific tools from src/world-tools/<world_name>/ only if configured
+        world_config = self.character_config.get('world_config', {})
+        world_name = world_config.get('world_name')
+        if world_name:
+            world_tools_dir = src_dir / 'world-tools' / world_name
+            if world_tools_dir.exists():
+                logger.info(f"Loading {world_name} tools from: {world_tools_dir}")
+                tools.update(load_tools(str(world_tools_dir)))
+            else:
+                logger.debug(f"World tools directory not found: {world_tools_dir}")
         
         return tools
     
@@ -560,8 +581,7 @@ class ZenohExecutiveNode:
             self.infospace_executor.tokenizer = self.tokenizer
         logger.info(f'🧩 Infospace executor initialized for {character_name}')
         
-        # Initialize ScienceWorld if configured (fetch actions and populate setting)
-        self._initialize_scienceworld_if_configured()
+        # World initialization removed - worlds are assumed to run as separate servers
         
         # Initialize conversation collections
         self._initialize_conversation_collections()
@@ -614,8 +634,7 @@ class ZenohExecutiveNode:
         self.last_say_text = ''
         self.last_out_resource_id = None
         
-        # ScienceWorld environment (set by scienceworld-reset tool)
-        self.scienceworld_env = None
+        # World environments removed - worlds run as separate servers
         
         # Plan execution state
         self.current_step = None
@@ -1187,147 +1206,6 @@ class ZenohExecutiveNode:
             # Log when we skip due to insufficient content (for debugging)
             logger.debug(f'Skipping final_answer publication - content too short or only punctuation: "{final_thoughts_clean[:50]}..."')
 
-    def _initialize_scienceworld_if_configured(self):
-        """Initialize ScienceWorld environment if scienceworld_config exists, fetch actions, and populate setting."""
-        scienceworld_config = self.character_config.get('scienceworld_config')
-        if not scienceworld_config:
-            return
-        
-        scenario = scienceworld_config.get('scenario')
-        if not scenario:
-            logger.warning("scienceworld_config found but no 'scenario' specified, skipping ScienceWorld initialization")
-            return
-        
-        try:
-            from importlib.util import find_spec
-            if find_spec("scienceworld") is None:
-                logger.warning("scienceworld package not found, skipping ScienceWorld initialization")
-                return
-            
-            from scienceworld import ScienceWorldEnv
-            
-            variation_idx = scienceworld_config.get('difficulty', 0)  # Map difficulty to variationIdx
-            simplification_str = scienceworld_config.get('simplification', '')  # Optional simplification string
-            seed = scienceworld_config.get('seed', 42)  # Note: seed not supported in load(), stored for metadata only
-            
-            logger.info(f"Initializing ScienceWorld scenario '{scenario}' (variationIdx={variation_idx}, simplification='{simplification_str}', seed={seed})")
-            
-            # Initialize environment
-            # Note: ScienceWorld load() signature: load(taskName, variationIdx, simplificationStr, generateGoldPath)
-            # There is no seed parameter - seed is stored for metadata/reproducibility tracking only
-            env = ScienceWorldEnv()
-            env.load(scenario, variation_idx, simplification_str)
-            obs, info = env.reset()
-            
-            # Store environment in executive_node for use by scienceworld-act tool
-            self.scienceworld_env = env
-            
-            # Fetch task description and allowed actions
-            # Use snake_case API first (preferred), fall back to camelCase for backward compatibility
-            task_description = None
-            if hasattr(env, 'get_task_description'):
-                task_description = env.get_task_description()
-            elif hasattr(env, 'getTaskDescription'):
-                task_description = env.getTaskDescription()  # Deprecated camelCase
-            elif isinstance(info, dict) and 'task_description' in info:
-                task_description = info['task_description']
-            
-            # Try to get allowed actions from current state
-            # Get complete list of possible actions
-            # Try multiple methods to get comprehensive action list
-            allowed_actions = []
-            
-            # Method 1: Get from current state (may be limited)
-            if hasattr(env, 'get_possible_actions'):
-                state_actions = env.get_possible_actions()
-                if state_actions:
-                    allowed_actions.extend(state_actions)
-            elif hasattr(env, 'getPossibleActions'):
-                state_actions = env.getPossibleActions()  # Deprecated camelCase
-                if state_actions:
-                    allowed_actions.extend(state_actions)
-            
-            # Method 2: Extract from action templates (more comprehensive)
-            try:
-                if env:                
-                    # use affordance filtering to get filtered actions
-                    script_dir = Path(__file__).parent.parent / "tools" / "scienceworld-act" / "scripts"
-                    if script_dir.exists() and str(script_dir) not in sys.path:
-                        sys.path.insert(0, str(script_dir))
-                    
-                    from affordances import Heuristics, AffordanceFilter, extract_locations_from_observation  # type: ignore
-                    from scienceworld_interface import extract_actions_and_state  # type: ignore
-                    
-                    heur = Heuristics(locations={"kitchen", "bedroom", "bathroom", "living room", "hallway", "garage", "workshop", "greenhouse", "outside"})
-                    filt = AffordanceFilter(heur)
-                    # Note: env already reset above, no need to reset again
-                    raw_actions, ws = extract_actions_and_state(env)
-                    new_locs = extract_locations_from_observation(obs)
-                    heur.locations |= new_locs
-                    filtered_actions = filt.filter_actions(raw_actions, ws)
-                    allowed_actions = filtered_actions
-            except Exception as e:
-                logger.debug(f"Could not extract action templates: {e}")
-            
-            # Method 3: Check info dict
-            if not allowed_actions:
-                if isinstance(info, dict) and 'allowed_actions' in info:
-                    allowed_actions = info['allowed_actions']
-                elif isinstance(info, dict) and 'allowedActions' in info:
-                    allowed_actions = info['allowedActions']
-            
-            # Build ScienceWorld-specific setting text
-            sw_setting_parts = [
-                f"ScienceWorld: {scenario.title().replace('-', ' ')} Scenario",
-                ""
-            ]
-            
-            if task_description:
-                sw_setting_parts.append(f"Task: {task_description}")
-                sw_setting_parts.append("")
-            
-            if allowed_actions and len(allowed_actions) > 0:
-                # Format actions nicely - join with commas, no "etc."
-                if isinstance(allowed_actions, list):
-                    actions_str = "\n - ".join(sorted(allowed_actions))
-                else:
-                    actions_str = str(allowed_actions)
-                sw_setting_parts.append(f"Available ScienceWorld actions using scienceworld-act tool: \n - {actions_str}")
-            else:
-                # Fallback: comprehensive list of common ScienceWorld actions (no "etc.")
-                fallback_actions = [
-                    "look", "examine", "go [direction]", "take [object]", "use [object]",
-                    "open [object]", "close [object]", "read [object]", "focus [object]",
-                    "inventory", "put [object] in [container]", "drop [object]",
-                    "move [object]", "turn on [object]", "turn off [object]",
-                    "connect [object] to [object]", "disconnect [object] from [object]",
-                    "heat [object]", "cool [object]", "pour [substance] into [container]",
-                    "mix [object] with [object]", "measure [object]", "weigh [object]",
-                    "cut [object]", "break [object]", "repair [object]", "clean [object]"
-                ]
-                actions_str = "\n - ".join(fallback_actions)
-                sw_setting_parts.append(f"Available actions using scienceworld-act tool: {actions_str}")
-            
-            # Note: variation_idx and seed stored for metadata, but seed not used by ScienceWorld API
-            sw_setting_text = "\n".join(sw_setting_parts)
-            
-            # Append to existing setting or use as new setting
-            existing_setting = self.character_config.get('setting', '')
-            if existing_setting:
-                self.character_config['setting'] = f"{existing_setting}\n\n{sw_setting_text}"
-            else:
-                self.character_config['setting'] = sw_setting_text
-            
-            logger.info(f"ScienceWorld initialized: {len(allowed_actions) if isinstance(allowed_actions, list) else 'unknown'} allowed actions")
-            logger.info(f"ScienceWorld environment stored in executive_node.scienceworld_env")
-            
-        except Exception as e:
-            logger.warning(f"Failed to initialize ScienceWorld: {e}")
-            import traceback
-            traceback.print_exc()
-            # Ensure env is None if initialization failed
-            self.scienceworld_env = None
-    
     def _initialize_conversation_collections(self):
         """
         Initialize conversation collections on startup.
@@ -1932,7 +1810,7 @@ Finally, using 'say', respond in character to User"""
                     template=template,
                     goal=goal_text, 
                     context=context, 
-                    max_steps=21
+                    max_steps=16
                 )
             else:
                 logger.error("No planner available for infospace planning")

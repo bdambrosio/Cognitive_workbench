@@ -17,7 +17,22 @@
             "preLaunchTask": "setup-zenoh-environment"
         },
         {
-            "name": "Jill - Waterplant Scenario",
+            "name": "Jill - OSWorld",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/launcher.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/src",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src"
+            },
+            "args": ["jill-osworld.yaml", "--ui", "--resource-browser", "--map-file", "infolab.py"],
+            "justMyCode": false,
+            "stopOnEntry": false,
+            "preLaunchTask": "setup-zenoh-environment"
+        },
+        {
+            "name": "Jill - ScienceWorld",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/src/launcher.py",

@@ -4,6 +4,7 @@ Takes an action in an existing ScienceWorld session and returns the new observat
 """
 
 import logging
+import re
 import sys
 from pathlib import Path
 from typing import Any, Dict, Optional
@@ -65,10 +66,27 @@ def tool(value=None, **kwargs):
         # Clear the invalid environment
         executive_node.scienceworld_env = None
         return {"status": "failed", "reason": "ScienceWorld environment is no longer valid. Call scienceworld-reset to reinitialize."}
+    
+    # Check if action is a self-inspection command (look at agent/self/etc)
+    action_string = action.strip().lower()
+    # Regex matches: look/l/examine/x [at] agent/self/me/myself
+    is_self_inspection = re.match(r'^(look|l|examine|x)(\s+at)?\s+(agent|self|me|myself)$', action_string)
+    
     obs, reward, done, info = env.step(action)
 
     # Check for error indicators in observation
     obs_str = str(obs) if obs else ""
+    
+    # If self-inspection command, append inventory
+    if is_self_inspection:
+        try:
+            inv_obs, _, _, _ = env.step("inventory")
+            inv_obs_str = str(inv_obs) if inv_obs else ""
+            if inv_obs_str:
+                obs_str += f"\n[Auto-appended Inventory]: {inv_obs_str}"
+        except Exception as e:
+            logger.debug(f"Inventory call failed during self-inspection: {e}")
+            # Continue with original observation
     obs_lower = obs_str.lower()
     
     # Common ScienceWorld error patterns (specific to action failures)
@@ -110,7 +128,9 @@ def tool(value=None, **kwargs):
         raw_actions, ws = extract_actions_and_state(env)
         new_locs = extract_locations_from_observation(obs_str)
         heur.locations |= new_locs
-        filtered_actions = f"Available options for scienceworld-act 'action' parameter: {filt.filter_actions(raw_actions, ws)}"
+        filtered_actions = f"""Available options for scienceworld-act 'action' parameter: {filt.filter_actions(raw_actions, ws)}
+ - When choosing a ScienceWorld action, copy the action string verbatim from the most recent affordance list or select by index.
+ - Never paraphrase, truncate, or synthesize action text."""
     except Exception as e:
         logger.debug(f"Affordance filtering failed (non-critical): {e}")
         # Continue without filtered actions if filtering fails

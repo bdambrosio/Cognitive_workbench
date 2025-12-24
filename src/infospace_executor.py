@@ -82,7 +82,7 @@ class InfospaceExecutor:
             self.executive_node.last_say_text = ''
             self.executive_node.last_out_resource_id = None
     
-    def call_subplanner(self, goal: str, context: Optional[str] = None, max_steps: int = 8, initial_blackboard: Optional[str] = None) -> str:
+    def call_subplanner(self, goal: str, context: Optional[str] = None, max_steps: int = 8, trace: Optional[str] = None) -> str:
         """
         Run a nested IncrementalPlanner using a fresh InfospaceExecutor instance.
         
@@ -90,6 +90,7 @@ class InfospaceExecutor:
             goal: Delegated goal for the sub-planner
             context: Optional context string (blackboard snapshot, etc.)
             max_steps: Maximum planning steps for the nested planner
+            trace: Optional trace string (SGLang trace file)
         
         Returns:
             String summary/report from the nested planner (or error message).
@@ -106,7 +107,16 @@ class InfospaceExecutor:
             logger.warning(msg)
             return msg
         
-        # Create fresh executor with isolated plan state but shared infrastructure
+        # Create isolated resource manager for subplanner (in-memory only, no persistence)
+        from infospace_resource_manager import InfospaceResourceManager
+        subspace_world_name = f"{self.map_name}_subspace"
+        isolated_resource_manager = InfospaceResourceManager(
+            world_name=subspace_world_name,
+            session=None  # No Zenoh subscriber needed for in-memory only workspace
+        )
+        logger.info(f"Created isolated resource manager '{subspace_world_name}' for subplanner")
+        
+        # Create fresh executor with isolated plan state and isolated resource manager
         logger.info(f"Creating child executor for subplanner, goal: {goal}")
         child_executor = InfospaceExecutor(
             agent_name=self.agent_name,
@@ -115,7 +125,7 @@ class InfospaceExecutor:
             llm_client=self.llm_client,
             available_tools=self.available_tools,
             executive_node=self.executive_node,
-            resource_manager=self.resource_manager
+            resource_manager=isolated_resource_manager
         )
         child_executor.runtime = self.runtime
         child_executor.tokenizer = self.tokenizer
@@ -126,18 +136,9 @@ class InfospaceExecutor:
             available_tools=self.available_tools,
             logger_instance=logger
         )
-        
-        blackboard_state = initial_blackboard or context
-        character_context = getattr(self, 'character_context', '')
-        
-        planner_context: Dict[str, str] = {}
-        if character_context:
-            planner_context['character_context'] = character_context
-        if blackboard_state:
-            planner_context['initial_blackboard'] = blackboard_state
-        
+               
         try:
-            result = planner.generate_plan(goal=goal, context=planner_context or None, max_steps=max_steps)
+            result = planner.generate_plan(goal=goal, context=None, max_steps=max_steps)
         except Exception as exc:
             logger.error(f"Subplanner execution error: {exc}")
             return f"Subplanner execution error: {exc}"
@@ -780,13 +781,7 @@ Only provide the result, followed by the </end> tag.""")
             # Log and traceback if content is too large
             prompt_length = len(prompt)
             if prompt_length > 100000:
-                import traceback
-                logger.error(f"⚠️  Attempting to send {prompt_length:,} chars to sglang (limit: 100,000)")
-                logger.error(f"Prompt preview (first 500 chars): {prompt[:500]}...")
-                logger.error(f"Prompt preview (last 500 chars): ...{prompt[-500:]}")
-                logger.error("Stack traceback:")
-                for line in traceback.format_stack():
-                    logger.error(line.rstrip())
+                logger.warning(f"⚠️  Attempting to send {prompt_length} chars to sglang")
             
             # Create a simple generation function
             @function
@@ -1052,13 +1047,22 @@ Make sure the string is in a format that can be parsed by the json.loads functio
             if grobid_url:
                 resolved_args['grobid_url'] = grobid_url
             
-            # Extract ScienceWorld config if available (for ScienceWorld tools)
-            scienceworld_config = self.executive_node.character_config.get('scienceworld_config', {})
-            if scienceworld_config:
-                resolved_args['scenario'] = scienceworld_config.get('scenario')
-                resolved_args['difficulty'] = scienceworld_config.get('difficulty', 0)  # Maps to variationIdx
-                resolved_args['simplification'] = scienceworld_config.get('simplification', '')  # Optional simplification string
-                resolved_args['seed'] = scienceworld_config.get('seed', 42)  # Stored for metadata, not used by ScienceWorld API
+            # Extract world_config if available (generalized for any external world API)
+            world_config = self.executive_node.character_config.get('world_config', {})
+            if world_config:
+                world_name = world_config.get('world_name')
+                port = world_config.get('port')
+                
+                # Construct URL from world_name and port if url not explicitly provided
+                if world_config.get('url'):
+                    resolved_args['world_url'] = world_config.get('url')
+                elif world_name and port:
+                    resolved_args['world_url'] = f"http://localhost:{port}"
+                
+                # Pass all other config fields as-is (arbitrary args for world-specific tools)
+                for key, value in world_config.items():
+                    if key not in ('world_name', 'port', 'url'):  # Skip URL construction fields
+                        resolved_args[key] = value
         
         # Execute tool
         try:

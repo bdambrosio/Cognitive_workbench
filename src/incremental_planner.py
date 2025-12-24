@@ -147,6 +147,85 @@ except ImportError:
     # Mock function decorator to avoid ImportErrors on definition
     def function(f): return f
 
+
+EPISTEMIC_FRAME_SCHEMA = {
+  "EpistemicFrame": {
+    "version": "1.0",
+
+    "goal_context": {
+      "original_goal_text": "",
+      "current_task_interpretation": "",
+      "supersedes_original_goal": True
+    },
+
+    "hypotheses": {
+      "active": [
+        {
+          "id": "",
+          "statement": "",
+          "justification": "",
+          "confidence": "low | medium | high"
+        }
+      ],
+      "retired": [
+        {
+          "id": "",
+          "statement": "",
+          "retirement_reason": "contradicted | exhausted | reframed | invalid_assumption",
+          "evidence_summary": ""
+        }
+      ]
+    },
+
+    "inferred_world_facts": {
+      "positive": [
+        ""
+      ],
+      "negative": [
+        ""
+      ],
+      "invariants": [
+        ""
+      ]
+    },
+
+    "search_coverage": {
+      "exhausted_locations": [
+        ""
+      ],
+      "exhausted_objects": [
+        ""
+      ],
+      "unavailable_actions": [
+        ""
+      ]
+    },
+
+    "open_questions": [
+      {
+        "id": "",
+        "question": "",
+        "priority": "high | medium | low",
+        "requires_environment_interaction": True
+      }
+    ],
+
+    "exploration_constraints": {
+      "max_steps": 16,
+      "allowed_probe_types": ["observation | navigation | manipulation | transformation" ],
+      "discouraged / unproven_assumptions": [
+        ""
+      ]
+    },
+
+    "reflection_notes": {
+      "failure_mode": "",
+      "model_mismatch_summary": "",
+      "confidence_in_frame": "low | medium | high"
+    }
+  }
+}
+
 INCREMENTAL_PLAN_SPECIFICATIONS = """
 # INFOSPACE TYPE SYSTEM & RULES
 
@@ -1074,7 +1153,7 @@ if HAS_SGLANG:
             return ""
     
     @function
-    def tool_planner_infospace(s, template, goal: str, character_context: str, recent_context: str, 
+    def tool_planner_infospace(s, template, goal: str, epistemic_frame: Dict, character_context: str, recent_context: str, 
                               tools_catalog_text: str, executor, trace_file=None, max_steps: int = 16, similar_plan: Dict = None, preplan: str = None):
         """
         SGLang incremental planner for infospace goals.
@@ -1128,8 +1207,8 @@ if HAS_SGLANG:
             system_parts.append(f"\n{available_resources_text}\n")
         # Add current date and time
         import datetime
-        current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        system_parts.append(f"\n# CURRENT CONTEXT\nCurrent date and time: {current_time}\n")
+        system_parts.append(f"EPISTEMIC_FRAME: {json.dumps(epistemic_frame, indent=2)}\n")
+        system_parts.append(f"CURRENT_TIME: {datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}\n")
         s += system("".join(system_parts))
         
         s += user(
@@ -1197,9 +1276,22 @@ if HAS_SGLANG:
             "  TOOL_ARGS_JSON: <json object>\n\n"
             "Stage 3 FORMAT:\n"
             "  THOUGHTS: <text>\n"
+            "  HYPOTHESES: [<hypothesis1>, <hypothesis2>, ...]\n"
+            "  ASSUMPTIONS: - <hypothesis1>: {Supported / Unsupported / Contradicated}\n,..."
             "  DONE: <YES or NO - is the entire GOAL satisfied?>\n"
             "  NEXT_TASK: <next high-level subgoal, or blank if DONE=YES>\n"
             "  REQUEST_TOOLS: <json array of tool names or empty array []>\n\n"
+            "Stage 3 INSTRUCTIONS:\n"
+            "  AUDIT- You are an assumption auditor.\n"
+            "  - Input:\n"
+            "    - HYPOTHESES above\n"
+            "    - ACTUAL RESULT above\n"
+            "  - Task:\n"
+            "    For each hypothesis, assign exactly one label: SUPPORTED, UNSUPPORTED, or CONTRADICTED.\n"
+            "    - SUPPORTED: The ACTUAL RESULT directly confirms the claim in text\n"
+            "    - UNSUPPORTED: The ACTUAL RESULT does not explicitly confirm or deny the claim\n"
+            "    - CONTRADICTED: The ACTUAL RESULT contradicts the claim\n"
+            "    - If unsure, choose UNSUPPORTED.\n"
             "  CRITICAL for DONE:\n"
             "  - Only mark DONE: YES after ALL required actions are executed\n"
             "  - COMPLENESS CHECK: If the question asks for an attribute that can change over time (jobs, spouses, locations), you must verify if multiple values exist\n"
@@ -1263,9 +1355,9 @@ if HAS_SGLANG:
                 f"========================================\n\n"
                 f"Tool executed: `{tool_name}`\n"
                 f"Arguments: {tool_args_json}\n\n"
-                f">>> ACTUAL RESULT (ground truth) >>>\n"
+                f">> ACTUAL RESULT (ground truth) <<\n"
                 f"{result_display}\n"
-                f">>> END RESULT >>>\n\n"
+                f">> END RESULT <<\n\n"
                 f"INSTRUCTIONS:\n"
                 f"1. The result above is GROUND TRUTH. Use it exactly as shown.\n"
                 f"2. If reporting to user, use ONLY the values from the result above.\n"
@@ -1277,8 +1369,12 @@ if HAS_SGLANG:
             )
             
             s += assistant(
-                "THOUGHTS (Be concise): "
+                "\nTHOUGHTS (Be concise): "
                 + gen(f"thoughts_{step}", max_tokens=128, temperature=GEN_TEMPERATURE, stop="\n")
+                +"\nHYPOTHESES: "
+                + gen(f"hypotheses_{step}", max_tokens=128, temperature=GEN_TEMPERATURE, stop="\n")
+                +"You are an assumption auditor. Follow the instructions in Stage 3 INSTRUCTIONS - AUDIT."
+                + gen(f"assumption_audit_{step}",max_tokens=128,temperature=0.0,stop="\n\n")
                 + "\nDONE: "
                 + gen(f"done_{step}", max_tokens=8, temperature=GEN_TEMPERATURE, stop="\n")
                 + "\nNEXT_TASK: "
@@ -1288,6 +1384,8 @@ if HAS_SGLANG:
                 + "\n"
             )
             logger.info(f"THOUGHTS: {s[f'thoughts_{step}']}")
+            logger.info(f"HYPOTHESES: {s[f'hypotheses_{step}']}")
+            logger.info(f"ASSUMPTIONS: {s[f'assumption_audit_{step}']}")
             logger.info(f"DONE: {s[f'done_{step}']}")
             logger.info(f"NEXT_TASK: {s[f'next_task_{step}']}")
             logger.info(f"REQUEST_TOOLS: {s[f'request_tools_{step}']}")
@@ -1520,7 +1618,26 @@ class IncrementalPlanner:
         """
         if not HAS_SGLANG:
             return {'error': 'SGLang not available'}
-        
+        initial_epistemic_frame = EPISTEMIC_FRAME_SCHEMA.copy()
+        initial_epistemic_frame['EpistemicFrame']['goal_context']['original_goal_text'] = goal
+        initial_epistemic_frame['EpistemicFrame']['goal_context']['current_task_interpretation'] = ""
+        initial_epistemic_frame['EpistemicFrame']['goal_context']['supersedes_original_goal'] = False
+        initial_epistemic_frame['EpistemicFrame']['hypotheses']['active'] = []
+        initial_epistemic_frame['EpistemicFrame']['hypotheses']['retired'] = []
+        initial_epistemic_frame['EpistemicFrame']['inferred_world_facts']['positive'] = []
+        initial_epistemic_frame['EpistemicFrame']['inferred_world_facts']['negative'] = []
+        initial_epistemic_frame['EpistemicFrame']['inferred_world_facts']['invariants'] = []
+        initial_epistemic_frame['EpistemicFrame']['search_coverage']['exhausted_locations'] = []
+        initial_epistemic_frame['EpistemicFrame']['search_coverage']['exhausted_objects'] = []
+        initial_epistemic_frame['EpistemicFrame']['search_coverage']['unavailable_actions'] = []
+        initial_epistemic_frame['EpistemicFrame']['open_questions'] = []
+        initial_epistemic_frame['EpistemicFrame']['exploration_constraints']['max_steps'] = max_steps
+        initial_epistemic_frame['EpistemicFrame']['exploration_constraints']['allowed_probe_types'] = ["observation | navigation | manipulation | transformation"]
+        initial_epistemic_frame['EpistemicFrame']['exploration_constraints']['discouraged / unproven_assumptions'] = []
+        initial_epistemic_frame['EpistemicFrame']['reflection_notes']['failure_mode'] = ""
+        initial_epistemic_frame['EpistemicFrame']['reflection_notes']['model_mismatch_summary'] = ""
+        initial_epistemic_frame['EpistemicFrame']['reflection_notes']['confidence_in_frame'] = "low"
+
         try:
             # Note: plan_bindings are NOT cleared here - they persist across plans unless explicitly cleared
             # Only clear other plan state if needed, but preserve bindings
@@ -1564,9 +1681,11 @@ class IncrementalPlanner:
                     logger.error(line.rstrip())
             
             # Run SGLang planner
+            epistemic_frame = initial_epistemic_frame
             state = tool_planner_infospace.run(
                 template=template,
                 goal=goal,
+                epistemic_frame=epistemic_frame,
                 character_context=character_context,
                 recent_context=recent_context,
                 tools_catalog_text=self.tools_catalog_text,
@@ -1577,6 +1696,22 @@ class IncrementalPlanner:
                 similar_plan=similar_plans[0] if similar_plans else None
             )
             
+            epistemic_frame = self._reflect(goal, epistemic_frame, max_steps, str(state))
+            state = tool_planner_infospace.run(
+                template=template,
+                goal=goal,
+                epistemic_frame=epistemic_frame,
+                character_context=character_context,
+                recent_context=recent_context,
+                tools_catalog_text=self.tools_catalog_text,
+                executor=self.executor,
+                trace_file=self.trace_file,
+                max_steps=max_steps,
+                preplan="No preplan provided",
+                similar_plan=similar_plans[0] if similar_plans else None
+            )
+            
+
             # Extract plan actions from executor
             plan_actions = getattr(self.executor, '_plan_actions', [])
             self.executor._plan_actions = plan_actions
@@ -1682,3 +1817,135 @@ END_PLAN
         self.logger.info(f"Recorded feedback: outcome={outcome}, goal={goal[:50]}...")
         
         return {'success': True}
+
+    def _reflect(self, goal_text, epistemic_frame, steps, trace) -> Dict:
+        """
+        Reflect on the plan execution outcome.
+        Args:
+            state: SGLang state
+            goal_text: Original goal text
+            epistemic_frame: Epistemic frame from previous attempt
+            steps: Steps used
+            trace: Trace (str(s) from tool_planner_infospace.run())
+        Returns:
+            epistemic_frame: Revised epistemic frame
+        """
+        reflection_prompt = """ROLE
+You are a REFLECTIVE THEORIST operating inside the Cognitive Workbench.
+You do NOT act in the environment.
+You analyze a completed problem-solving attempt and revise the agent’s epistemic state.
+
+You may reason step by step internally and may use reasoning primitives (e.g., think),
+but your FINAL OUTPUT MUST BE A SINGLE VALID JSON OBJECT matching the EpistemicFrame schema.
+
+============================================================
+INPUTS (AUTHORITATIVE)
+============================================================
+
+1) PREVIOUS EPISTEMIC FRAME (JSON)
+---------------------------------
+{epistemic_frame}
+
+This frame represents the agent’s prior epistemic state.
+Retired hypotheses MUST NOT be resurrected unless explicitly overturned by evidence.
+
+2) FULL EXECUTION TRACE (COMPLETE, VERBATIM)
+--------------------------------------------
+{trace}
+
+The trace is the complete problem-solving context.
+All observations, hypotheses, audits, and failures are authoritative.
+
+3) ORIGINAL GOAL TEXT
+---------------------
+{goal_text}
+
+4) STEP BUDGET USED
+-------------------
+{steps}
+
+============================================================
+OBJECTIVE
+============================================================
+
+Analyze WHY the attempt failed or stalled, and produce a REVISED EpistemicFrame
+that will be used to initialize the NEXT planning attempt.
+
+Your job is NOT to plan actions.
+Your job is to update the agent’s MODEL OF THE WORLD AND TASK.
+
+Failure is an acceptable and informative outcome.
+
+============================================================
+REFLECTION PROCESS (FOLLOW IN ORDER)
+============================================================
+
+STEP 1 — Failure Mode Identification
+- Determine the dominant failure mode:
+  - incorrect world model
+  - incorrect task interpretation
+  - missing or unavailable affordances
+  - inappropriate or exhausted search strategy
+- Cite concrete evidence from the trace.
+
+STEP 2 — Hypothesis Audit and Retirement
+- Examine all hypotheses encountered in the trace.
+- RETIRE a hypothesis if it is:
+  - CONTRADICTED by evidence, OR
+  - repeatedly UNSUPPORTED after exhaustive, reasonable search.
+- Do NOT weaken hypotheses; either RETAIN or RETIRE them.
+
+STEP 3 — Infer Stable World Facts
+From repeated observations and absences, infer:
+- POSITIVE facts (what clearly exists or is true)
+- NEGATIVE facts (what does NOT exist, was NOT found, or is unavailable)
+- INVARIANTS (properties that appear stable across observations)
+
+Absence after exhaustive search counts as evidence.
+
+STEP 4 — Diagnose Model / Task Mismatch
+Explicitly answer:
+- Which assumptions were imported from the task description rather than learned?
+- Which of those assumptions appear false or incomplete?
+- Where did the agent behave correctly but was misled by the task framing?
+
+STEP 5 — Task Reframing
+Propose one or more alternative interpretations of the task or goal.
+Examples:
+- reinterpretation of key nouns (e.g., “seed”, “grow”)
+- implicit transformations rather than object discovery
+- missing prerequisite steps not stated in the original goal
+
+Do NOT propose concrete actions.
+
+STEP 6 — Open Questions (Optional)
+If uncertainty remains, list precise, testable questions
+that a future attempt may need to resolve.
+
+============================================================
+OUTPUT REQUIREMENTS (STRICT)
+============================================================
+
+- Output MUST be a SINGLE VALID JSON OBJECT
+- Output MUST conform to the EpistemicFrame schema
+- Do NOT include explanations outside JSON
+- Do NOT include actions, tools, or plans
+- Be concise but explicit
+
+============================================================
+OUTPUT (JSON ONLY)
+============================================================
+
+{EPISTEMIC_FRAME_SCHEMA}
+}
+"""
+        # Convert epistemic_frame to JSON string to avoid format() interpreting braces as placeholders
+        epistemic_frame_str = json.dumps(epistemic_frame, indent=2) if isinstance(epistemic_frame, dict) else str(epistemic_frame)
+        reflection_prompt = reflection_prompt.replace("{epistemic_frame}", epistemic_frame_str)
+        reflection_prompt = reflection_prompt.replace("{goal_text}", goal_text)
+        reflection_prompt = reflection_prompt.replace("{steps}", str(steps))
+        reflection_prompt = reflection_prompt.replace("{EPISTEMIC_FRAME_SCHEMA}", json.dumps(EPISTEMIC_FRAME_SCHEMA, indent=2))
+        reflection_prompt = reflection_prompt.replace("{trace}", trace)
+        reflection = self.executor.llm_generate(reflection_prompt, max_tokens=512, is_json=True, temperature=GEN_TEMPERATURE)
+        logger.info(f"Reflection: {json.dumps(reflection.text, indent=2)}")
+        return reflection.text
