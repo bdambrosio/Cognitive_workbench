@@ -2,20 +2,20 @@
 Is-positive tool - example Python condition tool.
 """
 
-def tool(value, runtime=None, **kwargs):
+def tool(input_value, runtime=None, **kwargs):
     """
-    Check if value is a positive number.
+    Check if input_value is a positive number.
     
     Args:
-        value: Number or string to check
+        input_value: Number or string to check
         **kwargs: Optional parameters (none used)
     
     Returns:
-        bool: True if value > 0, False otherwise
+        bool: True if input_value > 0, False otherwise
     """
     # Try to convert to number
     try:
-        num = float(value)
+        num = float(input_value)
         return num > 0
     except (ValueError, TypeError):
         # Not a valid number

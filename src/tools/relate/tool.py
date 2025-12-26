@@ -200,12 +200,12 @@ def _preprocess_element(element: any, resource_manager, focus: str = '', heartbe
     return content
 
 
-def tool(value, runtime=None, **kwargs):
+def tool(input_value, runtime=None, **kwargs):
     """
     Relate exactly two Notes/Collections to find similarities, differences, and relationships.
     
     Args:
-        value: First Note/Collection to compare (target)
+        input_value: First Note/Collection to compare (target)
         **kwargs: Optional parameters
             - other: Second Note/Collection to compare (REQUIRED)
             - instruction: Natural language guidance for comparison focus (optional)
@@ -214,7 +214,7 @@ def tool(value, runtime=None, **kwargs):
         Comparison analysis as JSON string
     """
     other = kwargs.get('other')
-    if not value or not other:
+    if not input_value or not other:
         return json.dumps({"error": "relate requires both target and other parameters"})
     
     instruction = kwargs.get('instruction', '')
@@ -225,7 +225,7 @@ def tool(value, runtime=None, **kwargs):
     focus = instruction if instruction else "key themes, facts, and perspectives for comparison"
     
     # Preprocess each element independently
-    element_a = _preprocess_element(value, resource_manager, focus, heartbeat, kwargs)
+    element_a = _preprocess_element(input_value, resource_manager, focus, heartbeat, kwargs)
     element_b = _preprocess_element(other, resource_manager, focus, heartbeat, kwargs)
     
     # Format for LLM comparison

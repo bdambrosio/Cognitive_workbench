@@ -48,12 +48,12 @@ def _create_collection(note_ids: List[str], agent_name: str, resource_manager, s
         return None
 
 
-def tool(value: Any, runtime=None, **kwargs) -> str:
+def tool(input_value: Any, runtime=None, **kwargs) -> str:
     """
     Filter Collection items by predicate, return new Collection ID.
     
     Args:
-        value: List of note_ids from input Collection
+        input_value: List of note_ids from input Collection
         **kwargs: 
             - predicate (required): Filtering condition
             - mode ('include'/'exclude', default 'include')
@@ -84,7 +84,7 @@ def tool(value: Any, runtime=None, **kwargs) -> str:
     if not llm_generate:
         return {'status': 'failed', 'reason': 'llm_generate callback is required', 'value': None, 'resource_id': None}
     
-    if not isinstance(value, list):
+    if not isinstance(input_value, list):
         logger.warning("Input not a list; treating as empty Collection")
         empty_coll_id = _create_collection([], agent_name, resource_manager)
         if not empty_coll_id:
@@ -92,7 +92,7 @@ def tool(value: Any, runtime=None, **kwargs) -> str:
         return {'status': 'success', 'value': '0 items []', 'resource_id': empty_coll_id}
     
     filtered_ids = []
-    for note_id in value:
+    for note_id in input_value:
         if not isinstance(note_id, str) or not note_id.startswith('Note_'):
             # Skip invalid IDs (could be sub-collections in future)
             continue

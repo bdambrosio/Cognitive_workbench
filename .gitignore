@@ -52,3 +52,6 @@ zenoh_venv/bin/pip3
 
 # Test evaluation scripts
 tests/rfp_shredder_eval.py
+
+# External bot reference (symlink to file outside workspace)
+src/world-tools/minecraft/bot-reference/

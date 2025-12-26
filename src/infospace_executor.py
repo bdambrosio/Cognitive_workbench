@@ -74,6 +74,100 @@ class InfospaceExecutor:
         self.runtime = None
         
         logger.info(f"InfospaceExecutor initialized for {agent_name} with {len(available_tools)} tools")
+        
+        # Load world-specific documentation if configured
+        self._load_world_documentation()
+    
+    def _load_world_documentation(self):
+        """
+        Load world-specific documentation from scenarios/<world_name>/ directory.
+        
+        If world_config.world_name is set and scenarios/<world_name>/ exists,
+        creates a Collection named <world_name> containing Notes for each .md file.
+        """
+        if not self.executive_node:
+            return
+        
+        world_config = self.executive_node.character_config.get('world_config', {})
+        world_name = world_config.get('world_name')
+        
+        if not world_name:
+            return
+        
+        # Check if scenarios directory exists
+        scenarios_dir = Path('scenarios') / world_name
+        if not scenarios_dir.exists() or not scenarios_dir.is_dir():
+            logger.debug(f"World documentation directory not found: {scenarios_dir}")
+            return
+        
+        # Check if Collection already exists (by name)
+        if self.resource_manager:
+            existing_id = self.resource_manager._resolve_resource_id(world_name)
+            if existing_id and existing_id.startswith('Collection_'):
+                logger.info(f"World documentation Collection '{world_name}' already exists, skipping load")
+                # Bind it to variable for consistency
+                self._bind_variable(world_name, existing_id)
+                return
+        
+        # Find all .md files
+        md_files = sorted(scenarios_dir.glob('*.md'))
+        if not md_files:
+            logger.debug(f"No .md files found in {scenarios_dir}")
+            return
+        
+        # Create Notes for each .md file
+        note_ids = []
+        for md_file in md_files:
+            try:
+                content = md_file.read_text(encoding='utf-8')
+                # Use filename (without .md) as note name
+                note_name = md_file.stem
+                note_id = self._persist_note(content, 'world-documentation', note_name=note_name)
+                if note_id:
+                    note_ids.append(note_id)
+                    logger.debug(f"Loaded world doc: {note_name} → {note_id}")
+            except Exception as e:
+                logger.warning(f"Failed to load world doc {md_file.name}: {e}")
+        
+        if not note_ids:
+            logger.warning(f"No world documentation Notes created from {scenarios_dir}")
+            return
+        
+        # Create Collection named <world_name>
+        collection_id = self._create_collection(
+            note_ids, 
+            'world-documentation-load',
+            collection_name=world_name,
+            properties={'world_name': world_name, 'source': 'scenarios'}
+        )
+        
+        if collection_id:
+            # Bind to variable for easy reference
+            self._bind_variable(world_name, collection_id)
+            logger.info(f"Loaded {len(note_ids)} world documentation files into Collection '{world_name}' ({collection_id})")
+            
+            # Mark Collection as persistent so it survives restart
+            if self.resource_manager:
+                success, error_msg = self.resource_manager.mark_persistent(collection_id, self.agent_name)
+                if success:
+                    logger.info(f"Marked world documentation Collection '{world_name}' as persistent")
+                else:
+                    logger.warning(f"Failed to mark world documentation Collection '{world_name}' as persistent: {error_msg}")
+            
+            # Index the Collection for semantic search
+            if self.resource_manager:
+                success, indexed_count, error_msg = self.resource_manager.index_collection(
+                    agent_name=self.agent_name,
+                    collection_id=collection_id,
+                    index_type='semantic',
+                    fields={}
+                )
+                if success:
+                    logger.info(f"Indexed world documentation Collection '{world_name}' ({indexed_count} chunks)")
+                else:
+                    logger.warning(f"Failed to index world documentation Collection '{world_name}': {error_msg}")
+        else:
+            logger.error(f"Failed to create world documentation Collection '{world_name}'")
     
     def clear_plan_state(self):
         """Clear ephemeral plan state (call at start of new plan)"""

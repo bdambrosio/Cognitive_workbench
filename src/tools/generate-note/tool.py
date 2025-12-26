@@ -87,12 +87,12 @@ def _resolve_context(context_arg: str, resource_manager) -> str:
     return context_str
 
 
-def tool(value, runtime=None, **kwargs):
+def tool(input_value=None, runtime=None, **kwargs):
     """
     Generate new content using natural language prompt.
     
     Args:
-        value: Unused (for compatibility with executor interface)
+        input_value: Unused (for compatibility with executor interface)
         **kwargs: Tool parameters
             - prompt: Generation instruction (REQUIRED)
             - style: "code" or "text" (optional, default: "text")

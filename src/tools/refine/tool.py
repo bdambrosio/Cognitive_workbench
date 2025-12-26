@@ -8,12 +8,12 @@ from utils.text_chunking import segment_text_boundary_aware
 logger = logging.getLogger(__name__)
 
 
-def tool(value, runtime=None, **kwargs):
+def tool(input_value, runtime=None, **kwargs):
     """
     Transform Note content using natural language instruction.
     
     Args:
-        value: Note content to transform
+        input_value: Note content to transform
         **kwargs: Additional parameters
             - instruction: Natural language instruction (REQUIRED)
             - llm_client: LLM client instance (optional, creates default if not provided)
@@ -29,11 +29,11 @@ def tool(value, runtime=None, **kwargs):
     if not instruction:
         return "Error: instruction parameter required"
     
-    if not value:
-        return "Error: value parameter required"
+    if not input_value:
+        return "Error: input_value parameter required"
     
-    # Convert value to string if it's not already
-    text_value = str(value) if not isinstance(value, str) else value
+    # Convert input_value to string if it's not already
+    text_value = str(input_value) if not isinstance(input_value, str) else input_value
     
     # Segment long content into chunks
     chunks = segment_text_boundary_aware(text_value, max_chunk_size=16000)

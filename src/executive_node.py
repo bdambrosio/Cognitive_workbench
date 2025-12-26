@@ -559,7 +559,8 @@ class ZenohExecutiveNode:
         from pathlib import Path
         
         # Create resource manager for direct resource access
-        self.resource_manager = InfospaceResourceManager(self.map_name, session=self.session)
+        world_config = self.character_config.get('world_config', {})
+        self.resource_manager = InfospaceResourceManager(self.map_name, session=self.session, world_config=world_config)
         logger.info(f'📦 Resource manager initialized for {self.map_name}')
         
         # Load resources from file on startup
