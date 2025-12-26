@@ -8,12 +8,12 @@ from utils.text_chunking import segment_text_boundary_aware
 logger = logging.getLogger(__name__)
 
 
-def tool(value, runtime=None, **kwargs):
+def tool(input_value, runtime=None, **kwargs):
     """
     Test Note content against natural language predicate with automatic chunking.
     
     Args:
-        value: Note content to test
+        input_value: Note content to test
         **kwargs: Optional parameters
             - predicate: Natural language question/test (required)
     
@@ -28,15 +28,15 @@ def tool(value, runtime=None, **kwargs):
     if not predicate:
         return "false"
     
-    if not value:
+    if not input_value:
         return "false"
     
     # Check if segmentation needed
-    chunks = segment_text_boundary_aware(value, max_chunk_size=16000)
+    chunks = segment_text_boundary_aware(input_value, max_chunk_size=16000)
     
     if len(chunks) == 1:
         # Single chunk - direct test
-        return _test_chunk(value, predicate, kwargs)
+        return _test_chunk(input_value, predicate, kwargs)
     
     # Multiple chunks - OR aggregation (true if ANY chunk matches)
     logger.info(f"assess: long document ({len(chunks)} chunks), using OR aggregation")

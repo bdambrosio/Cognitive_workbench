@@ -586,12 +586,12 @@ End your response with:
 # Tool interface for infospace
 # ------------------------------
 
-def tool(value, **kwargs):
+def tool(input_value, **kwargs):
     """
     Web search tool using Google CSE + LLM extraction.
     
     Args:
-        value: Query string (preferred)
+        input_value: Query string (preferred)
         **kwargs: legacy query (fallback), agent_name (required), llm_generate (required), grobid_url (optional)
     
     Returns:
@@ -600,13 +600,13 @@ def tool(value, **kwargs):
     # Extract grobid_url from kwargs if available (from YAML config)
     grobid_url = kwargs.get('grobid_url')
     
-    query = value or kwargs.get('value') or kwargs.get('query', '')
+    query = input_value or kwargs.get('value') or kwargs.get('query', '')
     if not isinstance(query, str):
         query = ''
     if not query:
         return {
             'status': 'failed',
-            'reason': 'value parameter required (search query)'
+            'reason': 'input_value parameter required (search query)'
         }
     
     agent_name = kwargs.get('agent_name')

@@ -21,19 +21,20 @@ def _require_scienceworld():
     return ScienceWorldEnv
 
 
-def tool(value=None, **kwargs):
+def tool(input_value=None, **kwargs):
     """
     Take an action in ScienceWorld.
 
     Args:
-        action: text command (required)
+        input_value: text command (preferred)
+        action: text command (alternative to input_value)
         executive_node: required (contains scienceworld_env)
 
     Returns:
         Dict with observation content (text, format, metadata, char_count, filtered).
         Executor will create Note from this content.
     """
-    action = kwargs.get("action") or value or ""
+    action = kwargs.get("action") or input_value or ""
     
     if not isinstance(action, str) or not action.strip():
         return {"status": "failed", "reason": "action required (string)"}

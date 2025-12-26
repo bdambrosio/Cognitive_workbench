@@ -340,7 +340,7 @@ def _parse_mcp_response(data: Any, query: str) -> List[Dict[str, Any]]:
 # Public entry point
 # ------------------------------
 
-def tool(value, **kwargs):
+def tool(input_value, **kwargs):
     """
     Obsidian Local REST API search tool.
     
@@ -351,19 +351,19 @@ def tool(value, **kwargs):
     4. Filtering by content match
     
     Args:
-        value: Query string (preferred)
+        input_value: Query string (preferred)
         **kwargs: legacy query (fallback), agent_name (required), resource_manager (required), max_results (optional)
     
     Returns:
         Collection ID containing structured Note for each search result
     """
-    query = value or kwargs.get('value') or kwargs.get('query', '')
+    query = input_value or kwargs.get('value') or kwargs.get('query', '')
     if not isinstance(query, str):
         query = ''
     if not query:
         return {
             'status': 'failed',
-            'reason': 'value parameter required (search query)'
+            'reason': 'input_value parameter required (search query)'
         }
     
     agent_name = kwargs.get('agent_name')

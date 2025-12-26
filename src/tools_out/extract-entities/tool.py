@@ -8,29 +8,29 @@ import json
 logger = logging.getLogger(__name__)
 
 
-def tool(value, runtime=None, **kwargs):
+def tool(input_value, runtime=None, **kwargs):
     """
     Extract entities from text with automatic chunking for long documents.
     
     Args:
-        value: Text content to extract entities from
+        input_value: Text content to extract entities from
         **kwargs: Optional parameters (entity_types, include_confidence, max_entities_per_type)
     
     Returns:
         JSON string with extracted entities
     """
-    if not value:
+    if not input_value:
         return json.dumps({"people": [], "organizations": [], "locations": [], 
                           "topics": [], "dates": [], "key_concepts": [], "relationships": []})
     
     # Check if segmentation needed
-    chunks = _segment_text(value, max_chunk_size=16000)
+    chunks = _segment_text(input_value, max_chunk_size=16000)
     
     heartbeat = kwargs.get('heartbeat')
     
     if len(chunks) == 1:
         # Single chunk - direct extraction
-        return _extract_from_chunk(value, heartbeat, kwargs)
+        return _extract_from_chunk(input_value, heartbeat, kwargs)
     
     # Multiple chunks - extract and merge
     logger.info(f"extract-entities: long document ({len(chunks)} chunks), extracting and merging")

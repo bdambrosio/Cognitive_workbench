@@ -278,7 +278,7 @@ Key distinctions:
 Search Primitives:
 - search-notes: Global discovery across all Notes (no target needed). Returns Collection of structured Notes with text preview, metadata.source_id, metadata.uri, metadata.score, metadata.type.
 - search-collections: Global discovery across all Collections (no target needed). Returns Collection of structured Notes with text preview, metadata.source_id, metadata.uri, metadata.score, metadata.type.
-- search-within-collection: Search within a specific indexed Collection (requires target Collection, must be indexed first). Returns Collection of structured Notes with text preview, metadata.source_id, metadata.uri, metadata.score, metadata.type.
+- search-within-collection: Search within a specific indexed Collection (requires target Collection, must be indexed first). Returns Collection of structured Notes including search-relevant text chunks, metadata.source_id, metadata.uri, metadata.score, metadata.type.
 
 All search primitives return structured Notes matching search-web/semantic-scholar format:
 - text: Full text content from original Note
@@ -460,7 +460,7 @@ def build_tool_catalog(available_tools: Dict[str, Dict]) -> Dict[str, Dict]:
             "schema_hint": {"value": "string (query)", "out": "$variable", "limit": "int (optional, default 3)", "threshold": "float (optional, default 0.3)"}
         },
         "search-within-collection": {
-            "description": "Search within a specific indexed Collection. Returns Collection of structured Notes with text preview (200 chars), metadata.source_id, metadata.uri, metadata.score, metadata.type. Format matches search-web/semantic-scholar for consistent project operations. Requires Collection to be indexed first.",
+            "description": "Search within a specific indexed Collection. Returns Collection of structured Notes each containing search-relevant text chunks (200 chars max), metadata.source_id, metadata.uri, metadata.score, metadata.type. Format matches search-web/semantic-scholar for consistent project operations. Requires Collection to be indexed first.",
             "schema_hint": {"target": "$variable (indexed Collection)", "value": "string (query)", "out": "$variable", "limit": "int (optional, default 5)", "threshold": "float (optional, default 0.0)", "return_mode": "string (optional, 'chunks' or 'notes', default 'chunks')"}
         },
         "index": {
@@ -919,7 +919,12 @@ def sgl_to_infospace_action(tool_name: str, args_json: str, step: int, available
     # These primitives accept both literals and variables - trust LLM to add $ when needed
     variable_fields = ['out', 'source']
     # Primitives/tools that accept literal values in 'value' field (don't normalize)
-    literal_value_primitives = ['create-note', 'create-collection', 'add', 'remove', 'say', 'display', 'think', 'ask', 'search-web', 'semantic-scholar', 'search-notes', 'search-collections']
+    literal_value_primitives = [
+        'create-note', 'create-collection', 'add', 'remove', 'say', 'display', 'think', 'ask',
+        'search-web', 'semantic-scholar', 'search-notes', 'search-collections',
+        # World tools that need literal values (block names, commands, etc.)
+        'mc-place', 'mc-say', 'osworld-execute', 'osworld-reset', 'scienceworld-act'
+    ]
     if tool_name not in literal_value_primitives:
         variable_fields.extend(['target', 'value'])
     # For literal_value_primitives, 'value' accepts literals, so don't normalize
@@ -1284,14 +1289,40 @@ if HAS_SGLANG:
             "Stage 3 INSTRUCTIONS:\n"
             "  AUDIT- You are an assumption auditor.\n"
             "  - Input:\n"
-            "    - HYPOTHESES above\n"
-            "    - ACTUAL RESULT above\n"
+            "    - HYPOTHESES (from HYPOTHESES section above)\n"
+            "    - ACTUAL RESULT (from ACTUAL RESULT section above)\n"
             "  - Task:\n"
-            "    For each hypothesis, assign exactly one label: SUPPORTED, UNSUPPORTED, or CONTRADICTED.\n"
-            "    - SUPPORTED: The ACTUAL RESULT directly confirms the claim in text\n"
-            "    - UNSUPPORTED: The ACTUAL RESULT does not explicitly confirm or deny the claim\n"
-            "    - CONTRADICTED: The ACTUAL RESULT contradicts the claim\n"
-            "    - If unsure, choose UNSUPPORTED.\n"
+            "    For each hypothesis, perform the following steps strictly and in order.\n"
+            "    1. DECLARE SCOPE  \n"
+            "    Classify the hypothesis as exactly one of:\n"
+            "    - observational: direct statement explicitly supported by a tool output\n"
+            "    - observed-set: comparison or claim limited to items actually observed\n"
+            "    - global: claim extending beyond observed data\n"
+            "    If the hypothesis does not explicitly state its scope, assume it is global.\n"
+            "\n"
+            "    2. AUDIT EVIDENCE VS SCOPE  \n"
+            "    Assign exactly one verdict:\n"
+            "    - SUPPORTED: evidence fully supports the claim within its declared scope\n"
+            "    - UNSUPPORTED: evidence is insufficient or the scope exceeds the evidence\n"
+            "    - CONTRADICTED: evidence directly conflicts with the claim\n"
+            "\n"
+            "    3. MANDATORY DOWNGRADES (apply without exception)\n"
+            "    - Hypotheses containing words such as 'nearest', 'closest', 'only', 'all', or 'none'\n"
+            "      require at least observed-set scope.\n"
+            "    - If tool output indicates sampling, partial, coarse, or non-exhaustive data,\n"
+            "      global hypotheses cannot be SUPPORTED.\n"
+            "    - Numeric or distance calculations do not imply optimality unless all candidates\n"
+            "      within the declared scope are explicitly compared.\n"
+            "\n"
+            "    4. OUTPUT FORMAT (strict)\n"       
+            "    For each hypothesis, output:\n"
+            "\n"
+            "    - <hypothesis text>\n"
+            "      scope: <observational | observed-set | global>\n"
+            "\n"
+            "      verdict: <SUPPORTED | UNSUPPORTED | CONTRADICTED>\n"
+            "    Do not reinterpret, soften, or add qualifiers to hypotheses. Audit only what is explicitly claimed.\n"
+            "\n"
             "  CRITICAL for DONE:\n"
             "  - Only mark DONE: YES after ALL required actions are executed\n"
             "  - COMPLENESS CHECK: If the question asks for an attribute that can change over time (jobs, spouses, locations), you must verify if multiple values exist\n"
@@ -1604,6 +1635,20 @@ class IncrementalPlanner:
             except Exception:
                 pass
     
+    def _find_last_step(self, state, max_steps: int) -> int:
+        """
+        Find the last step that has a done_<step> value.
+        Iterates forward, returns the last valid step found.
+        """
+        last_step = -1
+        for step in range(max_steps):
+            try:
+                if f'done_{step}' in state and state[f'done_{step}']:
+                    last_step = step
+            except (KeyError, AttributeError, TypeError):
+                break
+        return last_step if last_step >= 0 else max_steps - 1
+
     def generate_plan(self, template, goal: str, context: Dict = None, max_steps: int = 16) -> Dict:
         """
         Generate plan incrementally using SGLang.
@@ -1695,23 +1740,27 @@ class IncrementalPlanner:
                 preplan=preplan,
                 similar_plan=similar_plans[0] if similar_plans else None
             )
-            
-            epistemic_frame = self._reflect(goal, epistemic_frame, max_steps, str(state))
-            state = tool_planner_infospace.run(
-                template=template,
-                goal=goal,
-                epistemic_frame=epistemic_frame,
-                character_context=character_context,
-                recent_context=recent_context,
-                tools_catalog_text=self.tools_catalog_text,
-                executor=self.executor,
-                trace_file=self.trace_file,
-                max_steps=max_steps,
-                preplan="No preplan provided",
-                similar_plan=similar_plans[0] if similar_plans else None
-            )
-            
 
+            step = self._find_last_step(state, max_steps)
+            logger.info(f"Last step: {step}, done_{step}: {state[f'done_{step}']}")
+            if step < max_steps and state[f'done_{step}'] and state[f'done_{step}'].strip().upper().startswith("NO"):
+                #reflect and retry
+                logger.info(f"Step {step} failed, reflecting and retrying")
+                epistemic_frame = self._reflect(goal, epistemic_frame, max_steps, str(state))
+                state = tool_planner_infospace.run(
+                    template=template,
+                    goal=goal,
+                    epistemic_frame=epistemic_frame,
+                    character_context=character_context,
+                    recent_context=recent_context,
+                    tools_catalog_text=self.tools_catalog_text,
+                    executor=self.executor,
+                    trace_file=self.trace_file,
+                    max_steps=max_steps,
+                    preplan="No preplan provided",
+                    similar_plan=similar_plans[0] if similar_plans else None
+                )
+            
             # Extract plan actions from executor
             plan_actions = getattr(self.executor, '_plan_actions', [])
             self.executor._plan_actions = plan_actions

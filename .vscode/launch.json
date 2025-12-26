@@ -32,6 +32,21 @@
             "preLaunchTask": "setup-zenoh-environment"
         },
         {
+            "name": "Jill - Minecraft",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/launcher.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/src",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src"
+            },
+            "args": ["jill-minecraft.yaml", "--ui", "--resource-browser", "--map-file", "infolab.py"],
+            "justMyCode": false,
+            "stopOnEntry": false,
+            "preLaunchTask": "setup-zenoh-environment"
+        },
+        {
             "name": "Jill - ScienceWorld",
             "type": "debugpy",
             "request": "launch",

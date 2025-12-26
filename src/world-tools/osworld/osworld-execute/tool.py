@@ -14,13 +14,13 @@ logger = logging.getLogger(__name__)
 DEFAULT_OSWORLD_URL = os.getenv("OSWORLD_URL", "http://localhost:3002")
 
 
-def tool(value=None, **kwargs):
+def tool(input_value=None, **kwargs):
     """
     Execute Python code in OSWorld environment.
     
     Args:
-        value: Python code string (preferred)
-        python: Python code string (alternative to value)
+        input_value: Python code string (preferred)
+        python: Python code string (alternative to input_value)
         return_observation: bool (default: False) - include observation in response
         osworld_url: Optional URL override for OSWorld server (default: http://localhost:3002)
         
@@ -28,7 +28,7 @@ def tool(value=None, **kwargs):
         Dict with execution result (text, format, metadata, char_count).
         Executor will create Note from this content.
     """
-    python_code = kwargs.get("python") or value or ""
+    python_code = kwargs.get("python") or input_value or ""
     
     if not isinstance(python_code, str) or not python_code.strip():
         return {"status": "failed", "reason": "python code required (string)"}

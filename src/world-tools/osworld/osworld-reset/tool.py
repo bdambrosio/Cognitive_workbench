@@ -14,20 +14,20 @@ logger = logging.getLogger(__name__)
 DEFAULT_OSWORLD_URL = os.getenv("OSWORLD_URL", "http://localhost:3002")
 
 
-def tool(value=None, **kwargs):
+def tool(input_value=None, **kwargs):
     """
     Reset OSWorld environment.
     
     Args:
-        value: mode string ("soft" or "hard", preferred)
-        mode: mode string ("soft" or "hard", alternative to value)
+        input_value: mode string ("soft" or "hard", preferred)
+        mode: mode string ("soft" or "hard", alternative to input_value)
         osworld_url: Optional URL override for OSWorld server (default: http://localhost:3002)
         
     Returns:
         Dict with reset result (text, format, metadata, char_count).
         Executor will create Note from this content.
     """
-    mode = kwargs.get("mode") or value or "soft"
+    mode = kwargs.get("mode") or input_value or "soft"
     
     if mode not in ("soft", "hard"):
         return {"status": "failed", "reason": f"mode must be 'soft' or 'hard', got: {mode}"}

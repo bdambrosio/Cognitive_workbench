@@ -267,12 +267,12 @@ def _compute_target_length(effective_tokens, style, compression_ratio):
         return max(target, 300)
 
 
-def tool(value, runtime=None, **kwargs):
+def tool(input_value, runtime=None, **kwargs):
     """
     Summarize content with focus-aware compression and adaptive styling.
     
     Args:
-        value: Text content to summarize, or list (Collection) which will be flattened
+        input_value: Text content to summarize, or list (Collection) which will be flattened
         **kwargs: Optional parameters
             - focus: Topic to guide summarization (optional)
             - style: Output style - 'technical' (default), 'executive', or 'comprehensive'
@@ -281,7 +281,7 @@ def tool(value, runtime=None, **kwargs):
     Returns:
         Summary as string
     """
-    if not value:
+    if not input_value:
         return "No content to summarize"
     
     # Extract parameters
@@ -298,22 +298,22 @@ def tool(value, runtime=None, **kwargs):
     resource_manager = kwargs.get('resource_manager')
     
     # Flatten Collection if input is a list
-    if isinstance(value, list):
-        logger.debug(f"summarize: flattening Collection with {len(value)} items")
-        value = _flatten_list(value, resource_manager)
+    if isinstance(input_value, list):
+        logger.debug(f"summarize: flattening Collection with {len(input_value)} items")
+        input_value = _flatten_list(input_value, resource_manager)
     
     # Convert dict/object to JSON string if needed
-    if isinstance(value, dict):
+    if isinstance(input_value, dict):
         import json
         logger.debug(f"summarize: converting dict to JSON string for processing")
-        value = json.dumps(value, indent=2)
-    elif not isinstance(value, str):
+        input_value = json.dumps(input_value, indent=2)
+    elif not isinstance(input_value, str):
         # Convert any other type to string
-        value = str(value)
+        input_value = str(input_value)
     
     # Measure input
-    input_chars = len(value)
-    input_tokens = _estimate_tokens(value)
+    input_chars = len(input_value)
+    input_tokens = _estimate_tokens(input_value)
     
     # Apply focus filtering via index+search if focus provided
     effective_tokens = input_tokens
@@ -325,15 +325,15 @@ def tool(value, runtime=None, **kwargs):
         
         # Use direct embedding approach (no temp Collections/Zenoh overhead)
         target_tokens = int(_compute_target_length(effective_tokens, style, compression_ratio))
-        filtered_text = _semantic_filter_direct(value, focus, target_tokens, resource_manager)
+        filtered_text = _semantic_filter_direct(input_value, focus, target_tokens, resource_manager)
         
         filtered_chars = len(filtered_text)
         effective_tokens = _estimate_tokens(filtered_text)
         inclusion_pct = int((effective_tokens / input_tokens) * 100) if input_tokens > 0 else 100
-        value = filtered_text
+        input_value = filtered_text
     
     # Check if segmentation needed (after filtering)
-    chunks = segment_text_boundary_aware(value, max_chunk_size=16000)
+    chunks = segment_text_boundary_aware(input_value, max_chunk_size=16000)
     chunk_count = len(chunks)
     
     # Compute target length

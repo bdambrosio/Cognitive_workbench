@@ -14,12 +14,12 @@ logger = logging.getLogger(__name__)
 DEFAULT_OSWORLD_URL = os.getenv("OSWORLD_URL", "http://localhost:3002")
 
 
-def tool(value=None, **kwargs):
+def tool(input_value=None, **kwargs):
     """
     Get OSWorld server status.
     
     Args:
-        value: ignored
+        input_value: ignored
         osworld_url: Optional URL override for OSWorld server (default: http://localhost:3002)
         
     Returns:

@@ -14,12 +14,12 @@ logger = logging.getLogger(__name__)
 DEFAULT_OSWORLD_URL = os.getenv("OSWORLD_URL", "http://localhost:3002")
 
 
-def tool(value=None, **kwargs):
+def tool(input_value=None, **kwargs):
     """
     Get current observation from OSWorld environment.
     
     Args:
-        value: ignored
+        input_value: ignored
         include_screenshot: bool (default: True) - include screenshot in observation
         include_a11y: bool (default: True) - include accessibility tree in observation
         osworld_url: Optional URL override for OSWorld server (default: http://localhost:3002)

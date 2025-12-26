@@ -151,12 +151,13 @@ class ResourceIndexer:
     restart recovery.
     """
     
-    def __init__(self, resource_manager):
+    def __init__(self, resource_manager, base_dir: Path):
         """
         Initialize resource indexer.
         
         Args:
             resource_manager: InfospaceResourceManager instance (for embedder and resource access)
+            base_dir: Base directory for indexes (from resource_manager, e.g., scenarios/<world_name>/resources/)
         """
         self.resource_manager = resource_manager
         self.notes_index = FAISSStore(dimension=384, logger=logger)
@@ -170,9 +171,8 @@ class ResourceIndexer:
         self.deleted_note_ids = set()
         self.deleted_collection_ids = set()
         
-        # Base directory for persistence
-        from pathlib import Path
-        self.index_dir = Path("data/vector")
+        # Base directory for persistence (use same directory as resources)
+        self.index_dir = base_dir
         self.index_dir.mkdir(parents=True, exist_ok=True)
     
     def _build_embedding_text_note(self, resource_id: str, resource_data: Dict, commentary: str = "") -> str:
@@ -543,13 +543,14 @@ class InfospaceResourceManager:
     - Persistence helpers
     """
     
-    def __init__(self, world_name: str, session=None):
+    def __init__(self, world_name: str, session=None, world_config: Optional[Dict] = None):
         """
         Initialize the resource manager.
         
         Args:
             world_name: Name of the world (for persistence/index naming)
             session: Optional Zenoh session for save_all subscriber
+            world_config: Optional world config dict with 'world_name' field for world-specific directory
         """
         self.world_name = world_name
         self.resource_types = ResourceTypeRegistry(InfospaceResources)
@@ -570,12 +571,22 @@ class InfospaceResourceManager:
         # Embedding model (lazy loaded)
         self.embedder = None
         
-        # Resource indexer for Stage 0 retrieval
-        self.resource_indexer = ResourceIndexer(self)
+        # Determine base directory for resources and indexes
+        # If world_config.world_name is set, use scenarios/<world_name>/resources/
+        # Otherwise, use data/resources/ and data/vector/
+        if world_config and world_config.get('world_name'):
+            world_dir_name = world_config['world_name']
+            self.base_dir = Path(f"scenarios/{world_dir_name}/resources")
+        else:
+            self.base_dir = Path("data/resources")
+        
+        self.base_dir.mkdir(parents=True, exist_ok=True)
         
         # File persistence path
-        self.resources_file = Path(f"data/resources/{self.world_name}_resources.json")
-        self.resources_file.parent.mkdir(parents=True, exist_ok=True)
+        self.resources_file = self.base_dir / "resources.json"
+        
+        # Resource indexer for Stage 0 retrieval (pass base_dir for indexes)
+        self.resource_indexer = ResourceIndexer(self, self.base_dir)
         
         # Zenoh session for save_all subscriber
         self.session = session

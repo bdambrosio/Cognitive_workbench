@@ -19,15 +19,15 @@ def _require_scienceworld():
     return ScienceWorldEnv
 
 
-def tool(value, **kwargs):
+def tool(input_value=None, **kwargs):
     """
     Start a ScienceWorld episode.
     
     Reads scenario, difficulty, and seed from scienceworld_config (passed via kwargs).
-    The 'value' parameter is ignored (scenario comes from config).
+    The 'input_value' parameter is ignored (scenario comes from config).
 
     Args:
-        value: ignored (scenario comes from config)
+        input_value: ignored (scenario comes from config)
         scenario: string (from scienceworld_config, required)
         difficulty: int (from scienceworld_config, default 0)
         seed: int (from scienceworld_config, default 42)

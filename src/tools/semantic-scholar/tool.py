@@ -261,12 +261,12 @@ def _search_papers_direct(query: str, limit: int, api_key: str = None) -> List[D
     logger.error("Unexpected error in Semantic Scholar search")
     return []
         
-def tool(value, runtime=None, **kwargs):
+def tool(input_value, runtime=None, **kwargs):
     """
     Semantic Scholar search tool.
     
     Args:
-        value: Query string (preferred)
+        input_value: Query string (preferred)
         **kwargs: legacy query (fallback), agent_name (required), resource_manager (required), limit (optional), grobid_url (optional)
         
     Returns:
@@ -275,13 +275,13 @@ def tool(value, runtime=None, **kwargs):
     # Extract grobid_url from kwargs if available (from YAML config)
     grobid_url = kwargs.get('grobid_url')
     
-    query = value or kwargs.get('value') or kwargs.get('query', '')
+    query = input_value or kwargs.get('value') or kwargs.get('query', '')
     if not isinstance(query, str):
         query = ''
     if not query:
         return {
             'status': 'failed',
-            'reason': 'value parameter required (paper search query)'
+            'reason': 'input_value parameter required (paper search query)'
         }
     
     agent_name = kwargs.get('agent_name')

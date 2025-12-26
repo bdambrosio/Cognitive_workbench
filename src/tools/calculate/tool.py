@@ -11,12 +11,12 @@ from sympy import (
 from sympy.core.sympify import SympifyError
 
 
-def tool(value, runtime=None, **kwargs):
+def tool(input_value, runtime=None, **kwargs):
     """
     Evaluate a mathematical expression numerically.
 
     Args:
-        value (str): Mathematical expression
+        input_value (str): Mathematical expression
         variables (dict): Optional numeric substitutions
         precision (int): Decimal places (default: 10)
 
@@ -28,10 +28,10 @@ def tool(value, runtime=None, **kwargs):
     # ----------------------------
     # Validate input
     # ----------------------------
-    if not isinstance(value, str):
+    if not isinstance(input_value, str):
         return {
             "status": "failed",
-            "reason": "value must be a string expression"
+            "reason": "input_value must be a string expression"
         }
 
     variables = kwargs.get("variables", {}) or {}
@@ -68,16 +68,16 @@ def tool(value, runtime=None, **kwargs):
     # ----------------------------
     # Convert single "=" to Eq(...)
     # ----------------------------
-    if "=" in value and "==" not in value and "!=" not in value:
-        parts = value.split("=", 1)
+    if "=" in input_value and "==" not in input_value and "!=" not in input_value:
+        parts = input_value.split("=", 1)
         if len(parts) == 2:
-            value = f"Eq({parts[0].strip()}, {parts[1].strip()})"
+            input_value = f"Eq({parts[0].strip()}, {parts[1].strip()})"
 
     # ----------------------------
     # Parse expression
     # ----------------------------
     try:
-        expr = sympify(value, locals=local_dict)
+        expr = sympify(input_value, locals=local_dict)
     except SympifyError as e:
         return {
             "status": "failed",
