@@ -1,4 +1,4 @@
-map: infolab.py
+
 # Cognitive Workbench Configuration - Benchmark Mode
 llm_config:
   sgl_model_path: "nvidia/Llama-3.3-70B-Instruct-FP8" #Qwen/Qwen3-4B-Instruct-2507" #Qwen/Qwen3-30B-A3B-Instruct-2507" #Qwen/Qwen3-VL-2B-Instruct" #Qwen/Qwen3-8B" # Qwen/Qwen3-VL-8B-Instruct" #Qwen/Qwen3-4B-Instruct-2507" #/home/bruce/vllm/models/Qwen3-Coder-30B-A3B-Instruct" 

@@ -109,10 +109,10 @@ class CharacterLauncher:
         self.characters.append(character)
         self.logger.info(f'Added character: {canonical_name}')
     
-    def launch_shared_services(self, map_file: str = None, launch_ui: bool = False, launch_resource_browser: bool = False, ui_port: int = 3000, setting: str = None, scenario_name: str = None):
+    def launch_shared_services(self, world_name: str = None, launch_ui: bool = False, launch_resource_browser: bool = False, ui_port: int = 3000, setting: str = None, scenario_name: str = None):
         """Launch shared services (map node, optional UI, optional resource browser)."""
         self.logger.info('Launching shared services...')
-        world_label = scenario_name or (Path(map_file).stem if map_file else 'infospace')
+        world_label = world_name or scenario_name or 'infospace'
         
         # Launch FastAPI Action Display Node (optional UI)
         if launch_ui:
@@ -161,11 +161,11 @@ class CharacterLauncher:
         except Exception as e:
             self.logger.error(f'❌ Failed to launch {character.name} executive_node: {e}')
     
-    def launch_all_characters(self, map_file: str = None, launch_ui: bool = False, launch_resource_browser: bool = False, ui_port: int = 3000, setting: str = None, scenario_name: str = None):
+    def launch_all_characters(self, world_name: str = None, launch_ui: bool = False, launch_resource_browser: bool = False, ui_port: int = 3000, setting: str = None, scenario_name: str = None):
         """Launch all character instances."""
         self.logger.info(f'Launching {len(self.characters)} characters...')
         
-        world_label = scenario_name or (Path(map_file).stem if map_file else 'infospace')
+        world_label = world_name or scenario_name or 'infospace'
         
         # Add infospace flag and map name to all character configs
         for character in self.characters:
@@ -173,7 +173,7 @@ class CharacterLauncher:
             character.config['map_name'] = world_label
         
         # Launch shared services first
-        self.launch_shared_services(map_file, launch_ui, launch_resource_browser, ui_port, setting, scenario_name)
+        self.launch_shared_services(world_name, launch_ui, launch_resource_browser, ui_port, setting, scenario_name)
         time.sleep(2)  # Give shared services time to start
         
         # Launch each character
@@ -295,7 +295,6 @@ def main():
     parser.add_argument('config_file', help='YAML configuration file with character and LLM settings')
     parser.add_argument('--characters', nargs='+', help='Character names to launch (overrides config file)')
     parser.add_argument('--list-only', action='store_true', help='List available characters and exit')
-    parser.add_argument('--map-file', help='Legacy map file or world label for the shared infospace node (overrides YAML "map" if provided)')
     parser.add_argument('--ui', action='store_true', help='Launch FastAPI web UI')
     parser.add_argument('--ui-port', type=int, default=3000, help='Port for FastAPI web UI (default: 3000)')
     parser.add_argument('--resource-browser', action='store_true', help='Launch Resource Browser for debugging (port 3001)')
@@ -325,9 +324,8 @@ def main():
         
         # Extract world configuration (if present) - generalized for any external world API
         world_config = config_data.get('world_config', {})
+        world_name = world_config.get('world_name') if world_config else None
         
-        # Extract optional map file from YAML (key: 'map')
-        yaml_map_file = config_data.get('map')
         setting = config_data.get('setting', {})
         # Optional: scenario-level max_turns (documented in YAML; can be commented out with #)
         max_turns_yaml = config_data.get('max_turns', None)
@@ -388,12 +386,12 @@ def main():
         return
     
     try:
-        world_label_source = args.map_file or yaml_map_file or scenario_name
-        world_name = Path(world_label_source).stem if world_label_source else 'infospace'
-        world_file = Path(f"data/world/{world_name}_world.json")
+        # Use world_name from world_config as authoritative, fallback to scenario_name
+        final_world_name = world_name or scenario_name or 'infospace'
+        world_file = Path(f"data/world/{final_world_name}_world.json")
 
         if world_file.exists():
-            print(f"\nFound existing world data for '{world_name}'")
+            print(f"\nFound existing world data for '{final_world_name}'")
             reuse = input("Reuse existing world? (y/n): ").strip().lower()
             if reuse in ['n', 'no']:
                 confirm_delete = input("Are you sure you want to delete existing world data and create new? (y/n): ").strip().lower()
@@ -401,7 +399,7 @@ def main():
                     print("Creating new world...")
                     try:
                         world_file.unlink()
-                        print(f"Removed existing world data for '{world_name}'")
+                        print(f"Removed existing world data for '{final_world_name}'")
                     except Exception as e:
                         print(f"Failed to remove existing world data: {e}")
                     
@@ -443,11 +441,11 @@ def main():
                                     except Exception as e:
                                         print(f"Failed to remove RAG store for {char_name}: {e}")
                 else:
-                    print(f"Reusing existing world '{world_name}'")
+                    print(f"Reusing existing world '{final_world_name}'")
             else:
-                print(f"Reusing existing world '{world_name}'")
+                print(f"Reusing existing world '{final_world_name}'")
 
-        launcher.launch_all_characters(world_label_source, args.ui, args.resource_browser, ui_port=args.ui_port, setting=setting, scenario_name=scenario_name or world_name)
+        launcher.launch_all_characters(world_name, args.ui, args.resource_browser, ui_port=args.ui_port, setting=setting, scenario_name=scenario_name)
         
         # Monitor processes
         launcher.monitor_processes()
