@@ -531,10 +531,14 @@ class ZenohExecutiveNode:
         
         # Initialize memory module (wraps EntityModel and discourse)
         from memory import Memory
+        from pathlib import Path
+        # Memory path relative to project root (where data/ directory exists)
+        project_root = Path(__file__).parent.parent  # src/ -> project root
+        memory_path = project_root / "data" / "memory" / f"{self.character_name}_memory.json"
         self.memory = Memory(
             character_name=self.character_name,
             llm_generate=self.llm_generate,
-            persistence_path=f"data/memory/{self.character_name}_memory.json"
+            persistence_path=str(memory_path)
         )
         logger.info(f'🧠 Memory module initialized for {self.character_name}')
         

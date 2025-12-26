@@ -574,11 +574,19 @@ class InfospaceResourceManager:
         # Determine base directory for resources and indexes
         # If world_config.world_name is set, use scenarios/<world_name>/resources/
         # Otherwise, use data/resources/ and data/vector/
+        # Paths are relative to project root (where scenarios/ directory exists)
         if world_config and world_config.get('world_name'):
             world_dir_name = world_config['world_name']
-            self.base_dir = Path(f"scenarios/{world_dir_name}/resources")
+            # Find project root (where scenarios/ directory exists)
+            # Start from this file's directory and walk up to find scenarios/
+            current_dir = Path(__file__).parent
+            project_root = current_dir.parent  # src/ -> project root
+            self.base_dir = project_root / "scenarios" / world_dir_name / "resources"
         else:
-            self.base_dir = Path("data/resources")
+            # Find project root for data/ directory
+            current_dir = Path(__file__).parent
+            project_root = current_dir.parent  # src/ -> project root
+            self.base_dir = project_root / "data" / "resources"
         
         self.base_dir.mkdir(parents=True, exist_ok=True)
         
@@ -1223,7 +1231,7 @@ class InfospaceResourceManager:
                          return_mode: str = 'chunks', max_tokens: Optional[int] = None,
                          token_estimate_chars_per_token: int = 4) -> Tuple[bool, Optional[List], Optional[str]]:
         """
-        Search an indexed Collection.
+        Search an indexed Collection. Always returns chunks (the actual matched text).
         
         Args:
             agent_name: Agent requesting search
@@ -1232,14 +1240,15 @@ class InfospaceResourceManager:
             mode: 'semantic', 'keyword', or 'hybrid'
             limit: Max chunks to return (chunk count limit)
             threshold: Minimum similarity threshold
-            return_mode: 'chunks' or 'notes'
+            return_mode: Deprecated, always returns chunks
             max_tokens: Optional maximum token count (if set, accumulates chunks until token budget reached)
             token_estimate_chars_per_token: Characters per token for estimation (default 4)
             
         Returns:
             Tuple of (success, results, error_msg)
+            results: List of dicts with 'document' (chunk text), 'score', 'metadata' fields
         """
-        logger.info(f"Search request from {agent_name}: '{query}' in {collection_id} (return_mode={return_mode}, limit={limit}, max_tokens={max_tokens})")
+        logger.info(f"Search request from {agent_name}: '{query}' in {collection_id} (limit={limit}, max_tokens={max_tokens})")
         
         # Check if Collection is indexed
         if collection_id not in self.vector_stores:
@@ -1251,11 +1260,9 @@ class InfospaceResourceManager:
             # Generate query embedding
             query_embedding = self._generate_embedding(query)
             
-            # Search for chunks (get more than limit for notes mode deduplication or token accumulation)
+            # Search for chunks
             # If max_tokens is set, we need more chunks to accumulate tokens, so increase search_limit
-            if return_mode == 'notes':
-                search_limit = limit * 2
-            elif max_tokens is not None:
+            if max_tokens is not None:
                 # For token accumulation, get more chunks than limit to have enough to accumulate
                 search_limit = max(limit, limit * 2)
             else:
@@ -1263,39 +1270,9 @@ class InfospaceResourceManager:
             
             chunk_results = store.search(query_embedding, search_limit, threshold, max_tokens, token_estimate_chars_per_token)
             
-            if return_mode == 'notes':
-                # Deduplicate by source_note_id, keeping best score per note
-                note_scores = {}
-                note_chunks = {}
-                for result in chunk_results:
-                    source_note_id = result['metadata'].get('source_note_id')
-                    if source_note_id:
-                        score = result['score']
-                        if source_note_id not in note_scores or score > note_scores[source_note_id]:
-                            note_scores[source_note_id] = score
-                            note_chunks[source_note_id] = result
-                
-                # Sort by score and limit
-                sorted_notes = sorted(note_scores.items(), key=lambda x: x[1], reverse=True)[:limit]
-                
-                # Return original content for each note
-                results = []
-                for note_id, score in sorted_notes:
-                    result = note_chunks[note_id]
-                    results.append({
-                        'document': result.get('original_content', result['document']),
-                        'score': score,
-                        'metadata': {
-                            'source_note_id': note_id,
-                            'return_mode': 'notes'
-                        }
-                    })
-                
-                logger.info(f"Search found {len(chunk_results)} chunks → {len(results)} unique notes")
-            else:
-                # Return chunks as-is
-                results = chunk_results
-                logger.info(f"Search found {len(results)} chunk results")
+            # Always return chunks as-is
+            results = chunk_results
+            logger.info(f"Search found {len(results)} chunk results")
             
             return True, results, None
         else:

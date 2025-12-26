@@ -14,6 +14,7 @@ import importlib.util
 from pathlib import Path
 from typing import Dict, List, Any, Optional, Tuple
 from datetime import datetime
+from infospace_resource_manager import InfospaceResourceManager
 
 # Try to import SGLang for runtime support
 try:
@@ -58,7 +59,7 @@ class InfospaceExecutor:
         self.llm_client = llm_client
         self.available_tools = available_tools
         self.executive_node = executive_node
-        self.resource_manager = resource_manager
+        self.resource_manager: InfospaceResourceManager = resource_manager
         self.character_context: str = ""
         
         # Plan-local state (ephemeral, cleared each plan)
@@ -1669,7 +1670,7 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         Search within a specific indexed Collection.
         
         Required: target, value, out
-        Optional: mode, limit, threshold, return_mode
+        Optional: mode, limit, threshold
         
         Argument types:
         - target: $variable (indexed Collection to search within)
@@ -1677,7 +1678,6 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         - mode: literal string ('semantic' or 'keyword', default 'semantic')
         - limit: int (max results to return, default 5)
         - threshold: float (minimum similarity score, default 0.0)
-        - return_mode: literal string ('chunks' or 'notes', default 'chunks')
         - out: literal string (variable name to store results)
         """
         target_arg = action.get('target')
@@ -1685,7 +1685,6 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         mode = action.get('mode', 'semantic')
         limit = action.get('limit', 5)
         threshold = action.get('threshold', 0.0)
-        return_mode = action.get('return_mode', 'chunks')
         out_var = action.get('out')
         
         if not target_arg or not query or not out_var:
@@ -1708,7 +1707,7 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         if not self.resource_manager:
             return self._create_uniform_return('failed', reason='Resource manager not available')
         
-        # Call resource_manager directly
+        # Call resource_manager directly - always return chunks
         success, results, error_msg = self.resource_manager.search_collection(
             agent_name=self.agent_name,
             collection_id=collection_id,
@@ -1716,7 +1715,7 @@ Make sure the string is in a format that can be parsed by the json.loads functio
             mode=mode,
             limit=limit,
             threshold=threshold,
-            return_mode=return_mode
+            return_mode='chunks'
         )
         
         if not success:
@@ -1732,30 +1731,29 @@ Make sure the string is in a format that can be parsed by the json.loads functio
             score = result.get('score', 0.0)
             source_note_id = metadata.get('source_note_id')
             
-            # Extract text preview (first paragraph, 200 chars)
-            text_preview, format_type = self._extract_text_preview(document_content, max_chars=200)
+            # Extract full chunk text (not truncated)
+            if isinstance(document_content, (dict, list)):
+                chunk_text = json.dumps(document_content)
+                format_type = 'json'
+            else:
+                chunk_text = str(document_content) if document_content else ''
+                format_type = 'text'
             
             # Build structured result with metadata in content.metadata (not properties)
             structured_result = {
-                'text': text_preview,
+                'text': chunk_text,
                 'format': format_type,
                 'metadata': {
                     'source_id': source_note_id if source_note_id else f'chunk_{i}',
                     'uri': source_note_id if source_note_id else f'chunk_{i}',  # URI field for consistency
                     'score': score,
                     'type': 'Note',
-                    'return_mode': return_mode
+                    'chunk_index': metadata.get('chunk_index'),
+                    'chunk_total': metadata.get('chunk_total'),
+                    'is_complete_note': metadata.get('is_complete_note', False)
                 },
-                'char_count': len(text_preview)
+                'char_count': len(chunk_text)
             }
-            
-            # Add chunk-specific metadata if in chunks mode
-            if return_mode == 'chunks':
-                structured_result['metadata']['chunk_index'] = metadata.get('chunk_index')
-                structured_result['metadata']['chunk_total'] = metadata.get('chunk_total')
-                structured_result['metadata']['is_complete_note'] = metadata.get('is_complete_note', False)
-            else:
-                structured_result['metadata']['is_complete_note'] = True
             
             # Remove None values from metadata
             structured_result['metadata'] = {k: v for k, v in structured_result['metadata'].items() if v is not None}

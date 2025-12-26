@@ -276,17 +276,18 @@ Key distinctions:
 - persist: Mark resource as persistent (saved to filesystem)
 
 Search Primitives:
-- search-notes: Global discovery across all Notes (no target needed). Returns Collection of structured Notes with text preview, metadata.source_id, metadata.uri, metadata.score, metadata.type.
-- search-collections: Global discovery across all Collections (no target needed). Returns Collection of structured Notes with text preview, metadata.source_id, metadata.uri, metadata.score, metadata.type.
-- search-within-collection: Search within a specific indexed Collection (requires target Collection, must be indexed first). Returns Collection of structured Notes including search-relevant text chunks, metadata.source_id, metadata.uri, metadata.score, metadata.type.
+- search-notes: Global discovery across all Notes (no target needed). Returns Collection of structured Notes with full text content, metadata.source_id, metadata.uri, metadata.score, metadata.type.
+- search-collections: Global discovery across all Collections (no target needed). Returns Collection of structured Notes with full text content, metadata.source_id, metadata.uri, metadata.score, metadata.type.
+- search-within-collection: Search within a specific indexed Collection (requires target Collection, must be indexed first). Returns Collection of structured Notes with full matched chunk text, metadata.source_id, metadata.uri, metadata.score, metadata.type, metadata.chunk_index, metadata.chunk_total.
 
 All search primitives return structured Notes matching search-web/semantic-scholar format:
-- text: Full text content from original Note
+- text: Full text content (for search-within-collection: the matched chunk text; for search-notes/search-collections: full Note content)
 - format: "text" or "json"
-- metadata.source_id: Original Note/Collection ID
+- metadata.source_id: Original Note/Collection ID (use project to extract: project with fields=["metadata.source_id"])
 - metadata.uri: URI field (Note/Collection ID or extracted URI from source)
 - metadata.score: Search relevance score (0.0-1.0)
 - metadata.type: "Note" or "Collection"
+- metadata.chunk_index, metadata.chunk_total: (search-within-collection only) Chunk position info
 - char_count: Length of text
 
 Use project to extract metadata fields (uri, source_id, score, etc.). For extracting information FROM text content, use refine (LLM-based).
@@ -460,8 +461,8 @@ def build_tool_catalog(available_tools: Dict[str, Dict]) -> Dict[str, Dict]:
             "schema_hint": {"value": "string (query)", "out": "$variable", "limit": "int (optional, default 3)", "threshold": "float (optional, default 0.3)"}
         },
         "search-within-collection": {
-            "description": "Search within a specific indexed Collection. Returns Collection of structured Notes each containing search-relevant text chunks (200 chars max), metadata.source_id, metadata.uri, metadata.score, metadata.type. Format matches search-web/semantic-scholar for consistent project operations. Requires Collection to be indexed first.",
-            "schema_hint": {"target": "$variable (indexed Collection)", "value": "string (query)", "out": "$variable", "limit": "int (optional, default 5)", "threshold": "float (optional, default 0.0)", "return_mode": "string (optional, 'chunks' or 'notes', default 'chunks')"}
+            "description": "Search within a specific indexed Collection. Returns Collection of structured Notes each containing the full matched chunk text, metadata.source_id, metadata.uri, metadata.score, metadata.type, metadata.chunk_index, metadata.chunk_total. Format matches search-web/semantic-scholar for consistent project operations. Requires Collection to be indexed first.",
+            "schema_hint": {"target": "$variable (indexed Collection)", "value": "string (query)", "out": "$variable", "limit": "int (optional, default 5)", "threshold": "float (optional, default 0.0)"}
         },
         "index": {
             "description": "Build embedding index for Collection. Use this when you want to search the Collection later.",
@@ -618,7 +619,7 @@ def build_tool_catalog(available_tools: Dict[str, Dict]) -> Dict[str, Dict]:
         "fetch-text": "Fetch text from a SINGLE specific URL, Do NOT use on search-web or semantic-scholar results. Use ONLY when you have one URL/ID to fetch directly and do not already have the text.",
         "search-notes": "Global search across all Notes. Returns Collection of structured Notes with full text content, metadata.source_id, metadata.uri, metadata.score, metadata.type. Use project for metadata fields, refine for extracting info from text.",
         "search-collections": "Global search across all Collections. Returns Collection of structured Notes with full text content, metadata.source_id, metadata.uri, metadata.score, metadata.type. Use project for metadata fields, refine for extracting info from text.",
-        "search-within-collection": "Search within indexed Collection. Returns Collection of structured Notes with text preview (200 chars), metadata.source_id, metadata.uri, metadata.score, metadata.type. Format matches search-web/semantic-scholar.",
+        "search-within-collection": "Search within indexed Collection. Returns Collection of structured Notes with full matched chunk text, metadata.source_id, metadata.uri, metadata.score, metadata.type, metadata.chunk_index, metadata.chunk_total. Format matches search-web/semantic-scholar.",
     }
     TOOL_SCHEMA_HINT_OVERRIDE = {}
     

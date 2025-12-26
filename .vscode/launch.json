@@ -2,7 +2,7 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Jill",
+            "name": "Jill - Infospace",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/src/launcher.py",
@@ -11,7 +11,7 @@
             "env": {
                 "PYTHONPATH": "${workspaceFolder}/src"
             },
-            "args": ["jill.yaml", "--ui", "--resource-browser", "--map-file", "infolab.py"],
+            "args": ["jill-infospace.yaml", "--ui", "--resource-browser"],
             "justMyCode": false,
             "stopOnEntry": false,
             "preLaunchTask": "setup-zenoh-environment"
@@ -26,7 +26,7 @@
             "env": {
                 "PYTHONPATH": "${workspaceFolder}/src"
             },
-            "args": ["jill-osworld.yaml", "--ui", "--resource-browser", "--map-file", "infolab.py"],
+            "args": ["jill-osworld.yaml", "--ui", "--resource-browser"],
             "justMyCode": false,
             "stopOnEntry": false,
             "preLaunchTask": "setup-zenoh-environment"
@@ -41,7 +41,7 @@
             "env": {
                 "PYTHONPATH": "${workspaceFolder}/src"
             },
-            "args": ["jill-minecraft.yaml", "--ui", "--resource-browser", "--map-file", "infolab.py"],
+            "args": ["jill-minecraft.yaml", "--ui", "--resource-browser"],
             "justMyCode": false,
             "stopOnEntry": false,
             "preLaunchTask": "setup-zenoh-environment"
@@ -56,7 +56,7 @@
             "env": {
                 "PYTHONPATH": "${workspaceFolder}/src"
             },
-            "args": ["jill-waterplant.yaml", "--ui", "--resource-browser", "--map-file", "infolab.py"],
+            "args": ["jill-scienceworld.yaml", "--ui", "--resource-browser"],
             "justMyCode": false,
             "stopOnEntry": false,
             "preLaunchTask": "setup-zenoh-environment"
@@ -71,7 +71,7 @@
             "env": {
                 "PYTHONPATH": "${workspaceFolder}/src"
             },
-            "args": ["jill_benchmark.yaml", "--ui", "--resource-browser", "--map-file", "infolab.py"],
+            "args": ["jill_benchmark.yaml", "--ui", "--resource-browser"],
             "justMyCode": false,
             "stopOnEntry": false,
             "preLaunchTask": "setup-zenoh-environment"
