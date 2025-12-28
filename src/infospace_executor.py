@@ -73,6 +73,9 @@ class InfospaceExecutor:
         
         # SGLang runtime (set by IncrementalPlanner if available)
         self.runtime = None
+
+        # Global interrupt flag (can be set by UI via executive_node control channel)
+        self.interrupt_requested: bool = False
         
         logger.info(f"InfospaceExecutor initialized for {agent_name} with {len(available_tools)} tools")
         
@@ -375,7 +378,7 @@ class InfospaceExecutor:
         else:
             return obj
     
-    def _format_return_value(self, content: Any, max_chars: int = 384) -> str:
+    def _format_return_value(self, content: Any, max_chars: int = 1024) -> str:
         """
         Format content for return value, truncating to max_chars with word boundary awareness.
         
@@ -384,7 +387,7 @@ class InfospaceExecutor:
         
         Args:
             content: Content to format (string, dict, list, etc.)
-            max_chars: Maximum characters for overall output (default: 384)
+            max_chars: Maximum characters for overall output (default: 1024)
             
         Returns:
             Formatted string, truncated if necessary
@@ -395,7 +398,7 @@ class InfospaceExecutor:
         # Convert to string
         if isinstance(content, (dict, list)):
             # Truncate text fields in dict/list before JSON serialization
-            truncated_content = self._truncate_text_fields(content, max_text_length=192)
+            truncated_content = self._truncate_text_fields(content, max_text_length=1024)
             content_str = json.dumps(truncated_content)
         else:
             content_str = str(content)
@@ -479,10 +482,10 @@ class InfospaceExecutor:
             # Format value (truncate if needed)
             if value is None:
                 result['value'] = None
-            elif isinstance(value, str) and len(value) > 384:
-                result['value'] = self._format_return_value(value, max_chars=384)
+            elif isinstance(value, str) and len(value) > 1024:
+                result['value'] = self._format_return_value(value, max_chars=1024)
             else:
-                result['value'] = self._format_return_value(value, max_chars=384)
+                result['value'] = self._format_return_value(value, max_chars=1024)
             
             result['resource_id'] = resource_id
         
@@ -582,19 +585,6 @@ class InfospaceExecutor:
         
         try:
             result = handler(action)
-            if True: # bypass expectation comparison for now
-                return result
-            # Process expectation comparison if action has 'expect' field
-            if action.get('expect') and result.get('status') == 'success':
-                try:
-                    from utils.action_post_processing import process_action_expectation
-                    
-                    comparison = process_action_expectation(action, result, self.llm_generate, self.resource_manager, debug=False)
-                    if comparison and not comparison.get('matched'):
-                        logger.warning(f"Expectation mismatch for {action_type}: {comparison.get('response', '')}")
-                except Exception as e:
-                    logger.debug(f"Expectation processing failed (non-critical): {e}")
-            
             return result
         except Exception as e:
             logger.error(f"Error executing action {action_type}: {e}")
@@ -1600,7 +1590,7 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         # Bind the resource ID to out variable
         self._bind_variable(out_var, resource_id)
         
-        # Get content for value (truncated to 384 chars)
+        # Get content for value (truncated to 1024 chars)
         content = self._get_content(resource_id)
         
         # Determine resource type for logging
@@ -1608,7 +1598,7 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         display_var = self._normalize_var_for_log(out_var)
         logger.info(f"Loaded {target_arg} → {display_var} = {resource_id} ({resource_type})")
         
-        # Return truncated content (384 chars), resource_id is the loaded resource
+        # Return truncated content (1024 chars), resource_id is the loaded resource
         return self._create_uniform_return('success', value=content, resource_id=resource_id)
     
     def _execute_index(self, action: Dict) -> Dict:
@@ -2024,7 +2014,7 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         )
         
         logger.info(f"Display [{target}]: published {len(str(value))} chars to action channel for action log pane")
-        # Return truncated content (384 chars), no resource_id
+        # Return truncated content (1024 chars), no resource_id
         return self._create_uniform_return('success', value=str(value), resource_id=None)
     
     def _execute_think(self, action: Dict) -> Dict:
