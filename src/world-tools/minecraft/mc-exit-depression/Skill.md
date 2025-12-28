@@ -3,6 +3,7 @@ name : mc-exit-depression
 description: Exit a shallow depression or uneven terrain by finding a nearby position from which vertical progress is possible without constructing a staircase.
 type: method
 resummable: yes
+invalidates: [position, orientation, visibility, groundedness]
 ---
 
 #PURPOSE:
@@ -24,6 +25,11 @@ If these do not hold, this skill should terminate as INAPPLICABLE.
 - Do not commit to a single direction for long; explore locally.
 Violations may cause failure and replanning.
 
+#LIMITATIONS:
+- Method tools cannot invoke other method tools (prevents recursion and complexity)
+- To loop within a method, use "Return to STEP X" (internal loop within this method execution), not recursive method calls
+- If a method needs another method's functionality, return control to the outer planner which can chain methods
+
 #RUNTIME STATE (LOCAL TO THIS SKILL)
 - attempted_directions : set of cardinal directions (initially empty)
 
@@ -42,7 +48,7 @@ STEP 2 — ASSESS FORWARD MOVE
 - If forward distance ≥ 1.0:
       Candidate for movement → proceed to STEP 3.
 - Else:
-      Mark this direction as attempted and return to STEP 1.
+      Mark this direction as attempted and loop back to STEP 1 (within this method execution).
 
 ---
 STEP 3 — ATTEMPT STEP-UP
@@ -73,7 +79,7 @@ STEP 6 — CLEAR PATH & RETRY <-- RENAMED & LOGIC FIXED
   -  If SOLID: Issue mc-dig (forward:1, up:1).
 - Retry:
   - If ANY digging occurred: Return to STEP 3 (Try Jump Again).
-  - If NO digging was possible (blocks are Air or Indestructible): Mark direction as attempted and return to STEP 1 (Give Up).
+  - If NO digging was possible (blocks are Air or Indestructible): Mark direction as attempted and loop back to STEP 1 (within this method execution).
      
 #TERMINATION CONDITIONS
 

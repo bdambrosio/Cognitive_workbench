@@ -665,6 +665,7 @@ class ZenohExecutiveNode:
         # Execution control (replaces turn management)
         self.execution_paused = True  # Start paused, wait for step/run command
         self.execution_mode = 'step'  # 'step' or 'run'
+        self.interrupt_requested = False  # Global interrupt flag (checked once per planner step)
         
         # Subscribers for direct execution control from UI
         self.control_step_subscriber = self.session.declare_subscriber(
@@ -678,6 +679,10 @@ class ZenohExecutiveNode:
         self.control_stop_subscriber = self.session.declare_subscriber(
             f"cognitive/{character_name}/control/stop",
             self.handle_stop_command
+        )
+        self.control_interrupt_subscriber = self.session.declare_subscriber(
+            f"cognitive/{character_name}/control/interrupt",
+            self.handle_interrupt_command
         )
         
         # === ZENOH PUBLICATION ===
@@ -984,6 +989,10 @@ class ZenohExecutiveNode:
                 'character': self.character_name,
                 'status': result.get('status', 'unknown')
             }
+            
+            # Add inner loop metadata if present
+            if '_inner_loop' in action:
+                action_data['inner_loop'] = action['_inner_loop']
             
             # Add action-specific fields for UI display
             # Handle both hyphenated and non-hyphenated action types
@@ -2134,6 +2143,21 @@ Finally, using 'say', respond in character to User"""
             self._publish_execution_state()
         except Exception as e:
             logger.error(f'Error handling stop command: {e}')
+            traceback.print_exc()
+
+    def handle_interrupt_command(self, sample):
+        """Handle interrupt command - request planner interrupt and pause execution."""
+        try:
+            logger.warning(f'🛑 Interrupt command received by {self.character_name}')
+            self.interrupt_requested = True
+            if self.infospace_executor:
+                self.infospace_executor.interrupt_requested = True
+            # Pause execution immediately; planner will notice interrupt at next step boundary
+            self.execution_mode = 'step'
+            self.execution_paused = True
+            self._publish_execution_state()
+        except Exception as e:
+            logger.error(f'Error handling interrupt command: {e}')
             traceback.print_exc()
     
     def _publish_execution_state(self):

@@ -1,8 +1,9 @@
 ---
 name: mc-staircase
 description: Automates escaping a deep pit by digging and jumping to build a spiral staircase.
-type: instruction
+type: method
 resumable: yes
+invalidates: [position, orientation, visibility, groundedness, inventory]
 ---
 
 # Minecraft Staircase tool
@@ -30,6 +31,11 @@ If these preconditions do not hold, this skill should not be used.
 - Tool failures do not, by themselves, imply incorrect geometry.
 
 Violations of these constraints may cause failure and replanning.
+
+#LIMITATIONS:
+- Method tools cannot invoke other method tools (prevents recursion and complexity)
+- To loop within a method, use "Return to STEP X" (internal loop within this method execution), not recursive method calls
+- If a method needs another method's functionality, return control to the outer planner which can chain methods
 
 #RUNTIME STATE (LOCAL TO THIS SKILL)
 
@@ -115,7 +121,7 @@ STEP 7 — COLLECT / SETTLE
 STEP 8 — LOOP
 ---
 
-- Return to STEP 1.
+- Loop back to STEP 1 (within this method execution).
 
 ---
 STEP 9 — SAFE REPOSITION (FALLBACK)
@@ -124,7 +130,7 @@ STEP 9 — SAFE REPOSITION (FALLBACK)
 This step is used only when no valid step is found in any direction.
 
 - If reposition_used_this_cycle is true:
-      Return to STEP 1.
+      Loop back to STEP 1 (within this method execution).
 
 - Verify (by observation) that:
       - The block at (forward:0, up:-1) is solid.
@@ -133,7 +139,7 @@ This step is used only when no valid step is found in any direction.
       - The block at (forward:1, up:1) is AIR.
 
 - If any appear unsafe:
-      Return to STEP 1.
+      Loop back to STEP 1 (within this method execution).
 
 - Otherwise:
       - Execute mc-move with:
@@ -141,7 +147,7 @@ This step is used only when no valid step is found in any direction.
             jump: false
       - Execute mc-wait for 0.5 seconds.
       - Set reposition_used_this_cycle := true.
-      - Return to STEP 1.
+      - Loop back to STEP 1 (within this method execution).
 
 #TERMINATION CONDITIONS
 

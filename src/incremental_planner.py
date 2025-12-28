@@ -644,10 +644,14 @@ def build_tool_catalog(available_tools: Dict[str, Dict]) -> Dict[str, Dict]:
         # Use enhanced description if available, otherwise use original
         description = TOOL_DISAMBIGUATION.get(tool_name, tool_meta.get('description', 'No description'))
         
+        # Extract type from tool metadata (important for method tools)
+        tool_type = tool_meta.get('type', 'code_execution')
+        
         tools[tool_name] = {
             "fn": None,  # Placeholder
             "description": description,
-            "schema_hint": schema_hint
+            "schema_hint": schema_hint,
+            "type": tool_type
         }
     
     return tools
@@ -659,7 +663,9 @@ def tool_catalog_text(tools: Dict[str, Dict]) -> str:
     for name, meta in sorted(tools.items()):
         # Use expanded description if available (from PRIMITIVE_DOCS)
         description = meta.get('full_description') or meta.get('description', 'No description')
+        tool_type = meta.get('type', 'code_execution')
         lines.append(f"- {name}: {description}")
+        lines.append(f"  type: {tool_type}")
         schema = json.dumps(meta['schema_hint'])
         lines.append(f"  expected_args_schema: {schema}")
         
@@ -1461,25 +1467,19 @@ if HAS_SGLANG:
 
         # Main loop
         current_task = s["first_task"].strip()
-        active_method_name = None
-        active_method_step = None
         for step in range(max_steps):
+            if _interrupt_requested(executor):
+                _clear_interrupt(executor)
+                s["final_answer"] = "Interrupted by user."
+                break
+
             # Stage 2: Choose tool + args
-            if active_method_name:
-                method_step_info = f"CURRENT METHOD STEP: {active_method_step}\n" if active_method_step else ""
-                s += user(
-                    f"#Stage 2 INSTRUCTION MODE: Executing {active_method_name}.\n"
-                    f"{method_step_info}"
-                    "Select the tool explicitly required by the current Method Step.\n"
-                    "FORMAT: State the current Method Step before choosing the tool."
-                )
-            else:
-                s += user(
-                    f"STAGE 2 (step {step + 1}/{max_steps}):\n"
-                    f"#GOAL: {goal_for_step}\n#END GOAL\n"
-                    f"CURRENT_TASK: {current_task}\n"
-                    "Choose tool and JSON args using Stage 2 FORMAT.\n"
-                )
+            s += user(
+                f"STAGE 2 (step {step + 1}/{max_steps}):\n"
+                f"#GOAL: {goal_for_step}\n#END GOAL\n"
+                f"CURRENT_TASK: {current_task}\n"
+                "Choose tool and JSON args using Stage 2 FORMAT.\n"
+            )
             
             s += assistant(
                 "TOOL_NAME: "
@@ -1502,13 +1502,11 @@ if HAS_SGLANG:
             
             # Execute action normally - think/say/ask now return their text content
             
-            # Check if this is a 'method' tool (Skill/Protocol) and intercept execution
+            # Execute (method tools run in an inner loop but count as one outer step)
             tool_info = executor.available_tools.get(tool_name, {})
             if tool_info.get('type') == 'method':
-                active_method_name = tool_name
-                active_method_step = "STEP 1"
-                tool_result = f"SUCCESS | Method {tool_name} loaded. YOU are the executor. MANUAL EXECUTION REQUIRED. This method does NOT execute automatically. YOU must manually execute the tools for STEP 1 now."
-                logger.info(f"Step {step}: Activated Protocol {tool_name}")
+                logger.info(f"Step {step}: Running method tool {tool_name} (inner loop, max_steps={max_steps})")
+                tool_result = run_method_protocol(s, executor, tool_name, max_steps, step, _loaded_skill_docs)
             else:
                 tool_result = execute_infospace_action(action, executor, executor.agent_name)
             
@@ -1520,45 +1518,24 @@ if HAS_SGLANG:
             if len(tool_result) > 512:
                 result_display += f"\n... [TRUNCATED - showing 512 of {len(tool_result)} chars]"
             
-            if active_method_name:
-                s += user(
-                    f"=====\n"
-                    f"STAGE 3 - TOOL EXECUTION COMPLETE (step {step + 1}/{max_steps})\n"
-                    f"=====\n\n"
-                    f"Tool executed: `{tool_name}`\n"
-                    f"Arguments: {tool_args_json}\n\n"
-                    f">> ACTUAL RESULT (ground truth) <<\n"
-                    f"{result_display}\n"
-                    f">> END RESULT <<\n\n"
-                    f"METHOD NEXT_TASK INSTRUCTIONS:\n"
-                    f"Identify the Exact Step defined in the {active_method_name} manual that matches the ACTUAL RESULT above.\n"
-                    f"NEXT_TASK must be written as: [METHOD: STEP X] <Instruction from manual>.\n"
-                    f"WARNING: The method does NOT execute automatically. YOU must select the tools to perform the NEXT_TASK.\n"
-                    f"Do not invent new steps. If the method says 'Return to STEP 1', your NEXT_TASK is 'Return to STEP 1'.\n"
-                    f"TERMINATION: When the Method says 'TERMINATE: SUCCESS', write 'METHOD COMPLETE' in THOUGHTS. Then, if the original GOAL is not yet done, proceed to the next high-level task.\n"
-                    f"DONE: YES is forbidden until the Method says 'TERMINATE: SUCCESS'.\n\n"
-                    f"Respond using Stage 3 FORMAT. Be concise.\n"
-                    f"Ensure the REQUEST_TOOLS list is a valid JSON list of tool names.\n"
-                )
-            else:
-                s += user(
-                    f"=====\n"
-                    f"STAGE 3 - TOOL EXECUTION COMPLETE (step {step + 1}/{max_steps})\n"
-                    f"=====\n\n"
-                    f"Tool executed: `{tool_name}`\n"
-                    f"Arguments: {tool_args_json}\n\n"
-                    f">> ACTUAL RESULT (ground truth) <<\n"
-                    f"{result_display}\n"
-                    f">> END RESULT <<\n\n"
-                    f"INSTRUCTIONS:\n"
-                    f"1. The result above is GROUND TRUTH. Use it exactly as shown.\n"
-                    f"2. If reporting to user, use ONLY the values from the result above.\n"
-                    f"3. Do NOT approximate, summarize, or invent values.\n"
-                    f"4. Evaluate: Is the goal complete, including actual execution of all planned actions? If yes, respond DONE: YES.\n"
-                    f"   If no, determine the next action needed.\n\n"
-                    f"Respond using Stage 3 FORMAT. Be concise.\n"
-                    f"Ensure the REQUEST_TOOLS list is a valid JSON list of tool names.\n"
-                )
+            s += user(
+                f"=====\n"
+                f"STAGE 3 - TOOL EXECUTION COMPLETE (step {step + 1}/{max_steps})\n"
+                f"=====\n\n"
+                f"Tool executed: `{tool_name}`\n"
+                f"Arguments: {tool_args_json}\n\n"
+                f">> ACTUAL RESULT (ground truth) <<\n"
+                f"{result_display}\n"
+                f">> END RESULT <<\n\n"
+                f"INSTRUCTIONS:\n"
+                f"1. The result above is GROUND TRUTH. Use it exactly as shown.\n"
+                f"2. If reporting to user, use ONLY the values from the result above.\n"
+                f"3. Do NOT approximate, summarize, or invent values.\n"
+                f"4. Evaluate: Is the goal complete, including actual execution of all planned actions? If yes, respond DONE: YES.\n"
+                f"   If no, determine the next action needed.\n\n"
+                f"Respond using Stage 3 FORMAT. Be concise.\n"
+                f"Ensure the REQUEST_TOOLS list is a valid JSON list of tool names.\n"
+            )
             
             s += assistant(
                 "\nTHOUGHTS: "
@@ -1668,20 +1645,6 @@ if HAS_SGLANG:
             if next_task_raw and next_task_raw.lower() not in ["", "none", "null", "n/a"]:
                 current_task = next_task_raw
                 logger.info(f"Step {step}: Next task: {current_task}")
-                
-                # Parse Method Step from NEXT_TASK if in method mode
-                if active_method_name:
-                    # Check for explicit completion signal in THOUGHTS
-                    if 'METHOD COMPLETE' in thoughts_text.upper():
-                        logger.info(f"Step {step}: Method {active_method_name} completed. Exiting instruction mode.")
-                        active_method_name = None
-                        active_method_step = None
-                    else:
-                        # Look for [METHOD: STEP X] pattern
-                        step_match = re.search(r'\[METHOD:\s*(STEP\s*\w+)\]', next_task_raw, re.IGNORECASE)
-                        if step_match:
-                            active_method_step = step_match.group(1).upper()
-                            logger.info(f"Step {step}: Identified Method Step: {active_method_step}")
             else:
                 logger.warning(f"Step {step}: No NEXT_TASK provided, keeping current task")
         
@@ -1755,6 +1718,160 @@ def parse_request_tools(raw_text: str) -> Optional[List[str]]:
             if tools:
                 return tools
         return None
+
+
+def _interrupt_requested(executor: "InfospaceExecutor") -> bool:
+    """Return True if an interrupt has been requested via executor or executive_node."""
+    if getattr(executor, "interrupt_requested", False):
+        return True
+    exec_node = getattr(executor, "executive_node", None)
+    if exec_node and getattr(exec_node, "interrupt_requested", False):
+        return True
+    return False
+
+
+def _clear_interrupt(executor: "InfospaceExecutor") -> None:
+    """Clear interrupt flags so a single interrupt request is consumed once."""
+    if hasattr(executor, "interrupt_requested"):
+        executor.interrupt_requested = False
+    exec_node = getattr(executor, "executive_node", None)
+    if exec_node and hasattr(exec_node, "interrupt_requested"):
+        exec_node.interrupt_requested = False
+
+
+def run_method_protocol(s, executor: "InfospaceExecutor", method_name: str, max_steps: int, outer_step: int,
+                        loaded_skill_docs: set) -> str:
+    """
+    Execute a 'method' tool as an inner loop (bounded by max_steps).
+    Returns a short summary string for the outer loop (so the method counts as 1 outer step).
+    """
+    method_task = "STEP 1"
+    last_tool_result = ""
+    for mstep in range(max_steps):
+        if _interrupt_requested(executor):
+            _clear_interrupt(executor)
+            return f"FAILED | Method {method_name} interrupted by user"
+
+        s += user(
+            f"#METHOD EXECUTION MODE: {method_name} (internal step {mstep + 1}/{max_steps})\n"
+            f"CURRENT METHOD STEP: {method_task}\n"
+            "Select the tool explicitly required by the current Method Step.\n"
+            "Choose tool and JSON args using Stage 2 FORMAT.\n"
+        )
+
+        tool_name_key = f"m_tool_name_{outer_step}_{mstep}"
+        tool_args_key = f"m_tool_args_{outer_step}_{mstep}"
+        s += assistant(
+            "TOOL_NAME: "
+            + gen(tool_name_key, max_tokens=32, temperature=GEN_TEMPERATURE, stop="TOOL_ARGS_JSON")
+            + "\nTOOL_ARGS_JSON: "
+            + gen(tool_args_key, max_tokens=1024, temperature=GEN_TEMPERATURE, stop="\n")
+            + "\n"
+        )
+
+        tool_name = s[tool_name_key].strip()
+        tool_args_json = s[tool_args_key].strip()
+
+        # Prevent method recursion (KISS)
+        tool_info = executor.available_tools.get(tool_name, {})
+        if tool_info.get('type') == 'method':
+            return f"FAILED | Method {method_name} cannot invoke method tool '{tool_name}'"
+
+        action = sgl_to_infospace_action(tool_name, tool_args_json, outer_step * 1000 + mstep, executor.available_tools)
+        
+        # Add inner loop metadata for UI display
+        action['_inner_loop'] = {"method_name": method_name, "inner_step": mstep + 1, "max_steps": max_steps, "outer_step": outer_step}
+
+        # Track resource bindings before execution (for commentary update)
+        out_var = action.get('out', '')
+        resource_id_before = None
+        if out_var:
+            resource_id_before = executor.plan_bindings.get(out_var.lstrip('$'))
+
+        last_tool_result = execute_infospace_action(action, executor, executor.agent_name)
+        result_display = last_tool_result[:512]
+        if len(last_tool_result) > 512:
+            result_display += f"\n... [TRUNCATED - showing 512 of {len(last_tool_result)} chars]"
+
+        s += user(
+            f"=====\n"
+            f"METHOD STAGE 3 - TOOL EXECUTION COMPLETE (internal step {mstep + 1}/{max_steps})\n"
+            f"=====\n\n"
+            f"Tool executed: `{tool_name}`\n"
+            f"Arguments: {tool_args_json}\n\n"
+            f">> ACTUAL RESULT (ground truth) <<\n"
+            f"{result_display}\n"
+            f">> END RESULT <<\n\n"
+            f"METHOD NEXT_TASK INSTRUCTIONS:\n"
+            f"Identify the Exact Step defined in the {method_name} manual that matches the ACTUAL RESULT above.\n"
+            f"NEXT_TASK must be written as: [METHOD: STEP X] <Instruction from manual>.\n"
+            f"Do not invent new steps.\n"
+            f"TERMINATION: When the Method says terminate (SUCCESS/FAILED/INAPPLICABLE), write 'METHOD COMPLETE' in THOUGHTS.\n\n"
+            f"Respond using Stage 3 FORMAT. Be concise.\n"
+            f"Ensure the REQUEST_TOOLS list is a valid JSON list of tool names.\n"
+        )
+
+        thoughts_key = f"m_thoughts_{outer_step}_{mstep}"
+        hypotheses_key = f"m_hyp_{outer_step}_{mstep}"
+        audit_key = f"m_audit_{outer_step}_{mstep}"
+        done_key = f"m_done_{outer_step}_{mstep}"
+        next_task_key = f"m_next_{outer_step}_{mstep}"
+        req_tools_key = f"m_req_{outer_step}_{mstep}"
+
+        s += assistant(
+            "\nTHOUGHTS: "
+            + gen(thoughts_key, max_tokens=128, temperature=GEN_TEMPERATURE, stop="HYPOTHESES: ")
+            + "\nHYPOTHESES: "
+            + gen(hypotheses_key, max_tokens=128, temperature=GEN_TEMPERATURE, stop="\nAUDIT: ")
+            + "\nAUDIT: "
+            + gen(audit_key, max_tokens=128, temperature=0.0, stop="\nDONE: ")
+            + "\nDONE: "
+            + gen(done_key, max_tokens=8, temperature=GEN_TEMPERATURE, stop="\nNEXT_TASK: ")
+            + "\nNEXT_TASK: "
+            + gen(next_task_key, max_tokens=128, temperature=GEN_TEMPERATURE, stop="\nREQUEST_TOOLS: ")
+            + "\nREQUEST_TOOLS: "
+            + gen(req_tools_key, max_tokens=96, temperature=GEN_TEMPERATURE, stop=["\n\n"])
+            + "\n"
+        )
+
+        thoughts_text = s[thoughts_key].strip()
+
+        # Stage 3.1: Update resource indexes with commentary (same behavior as outer loop)
+        if thoughts_text:
+            out_var = action.get('out', '')
+            resource_id = None
+            if out_var:
+                resource_id_after = executor.plan_bindings.get(out_var.lstrip('$'))
+                if resource_id_after and resource_id_after != resource_id_before:
+                    if resource_id_after.startswith('Note_') or resource_id_after.startswith('Collection_'):
+                        resource_id = resource_id_after
+            if resource_id:
+                if executor.resource_manager:
+                    executor.resource_manager.update_resource_commentary(resource_id, thoughts_text)
+
+        # Stage 3.5: Dynamic tool loading (if requested)
+        requested_tools_raw = s[req_tools_key].strip()
+        requested_tools = parse_request_tools(requested_tools_raw)
+        if requested_tools:
+            tools_to_load = [tool for tool in requested_tools if tool not in loaded_skill_docs]
+            if tools_to_load:
+                expanded_docs = load_skill_docs(tools_to_load, executor.available_tools)
+                if expanded_docs:
+                    s += user(f"ADDITIONAL TOOL DOCUMENTATION:\n{expanded_docs}")
+                    s += assistant("I have reviewed the additional tool documentation.\n")
+                    loaded_skill_docs.update(tools_to_load)
+
+        if 'METHOD COMPLETE' in thoughts_text.upper():
+            summary = thoughts_text.replace("\n", " ")
+            if len(summary) > 240:
+                summary = summary[:240] + "..."
+            return f"SUCCESS | Method {method_name} complete | {summary}"
+
+        next_task_raw = s[next_task_key].strip()
+        if next_task_raw and next_task_raw.lower() not in ["", "none", "null", "n/a"]:
+            method_task = next_task_raw
+
+    return f"FAILED | Method {method_name} exceeded max_steps ({max_steps}) | last_result={last_tool_result[:120]}"
 
 
 class IncrementalPlanner:

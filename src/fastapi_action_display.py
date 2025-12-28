@@ -663,6 +663,43 @@ class FastAPIActionDisplayNode:
             self._store_text_input_in_memory(message, actual_character_name)
             
             return {"success": True, "message": f"Sent to {actual_character_name}: {message}"}
+
+        @self.app.post("/api/interrupt")
+        async def interrupt_character(data: Dict[str, Any]):
+            """Request an interrupt for the specified character (pauses + interrupts current planner loop)."""
+            character_name = data.get('character', '')
+
+            # If no character specified, use last character (same behavior as /api/text_input)
+            if not character_name:
+                if not self.last_character_name:
+                    return {"success": False, "error": "No character specified and no previous character"}
+                character_name = self.last_character_name
+
+            # Find actual character name (case-insensitive)
+            actual_character_name = None
+            for active_char in self.active_characters:
+                if active_char.lower() == character_name.lower():
+                    actual_character_name = active_char
+                    break
+
+            if not actual_character_name:
+                return {"success": False, "error": f"Character '{character_name}' not found. Available: {', '.join(sorted(self.active_characters))}"}
+
+            # Store as last character used
+            self.last_character_name = actual_character_name
+
+            # Publish interrupt control message (payload content is ignored by subscriber)
+            payload = {
+                "timestamp": datetime.now().isoformat(),
+                "source": "ui",
+                "command": "interrupt"
+            }
+            self.session.put(
+                f"cognitive/{actual_character_name}/control/interrupt",
+                json.dumps(payload).encode("utf-8")
+            )
+
+            return {"success": True, "message": f"Interrupt requested for {actual_character_name}"}
         
         @self.app.post("/api/execute_plan_sync")
         async def execute_plan_sync(data: Dict[str, Any]):
@@ -825,7 +862,7 @@ class FastAPIActionDisplayNode:
         
         @self.app.post("/api/turn/stop")
         async def stop_turns():
-            """Stop execution."""
+            """Stop execution and trigger interrupt."""
             try:
                 if self.active_character_name is None:
                     return {"success": False, "message": "No character available yet"}
@@ -835,10 +872,22 @@ class FastAPIActionDisplayNode:
                 with self.turn_state_lock:
                     self.turn_state['mode'] = 'step'
                 
+                # Publish stop command (pauses execution)
                 self.control_stop_publisher.put(json.dumps({"timestamp": datetime.now().isoformat()}).encode())
-                logger.info(f"🛑 Stop command sent to {self.active_character_name}")
                 
-                return {"success": True, "message": "Stop command sent"}
+                # Also publish interrupt command (interrupts planner loop + pauses)
+                interrupt_payload = {
+                    "timestamp": datetime.now().isoformat(),
+                    "source": "ui",
+                    "command": "interrupt"
+                }
+                self.session.put(
+                    f"cognitive/{self.active_character_name}/control/interrupt",
+                    json.dumps(interrupt_payload).encode("utf-8")
+                )
+                logger.info(f"🛑 Stop and interrupt commands sent to {self.active_character_name}")
+                
+                return {"success": True, "message": "Stop and interrupt commands sent"}
             except Exception as e:
                 logger.error(f"Error in stop_turns: {e}")
                 return {"success": False, "message": f"Error: {str(e)}"}
