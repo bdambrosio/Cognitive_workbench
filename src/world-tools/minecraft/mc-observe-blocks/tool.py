@@ -25,9 +25,9 @@ def tool(input_value=None, **kwargs):
     Args:
         input_value: ignored
         minecraft_url: Optional URL override for Minecraft bot server (default: http://localhost:3003)
-        radius: Optional observation radius (default: 5)
-        blocks_radius: Optional blocks observation radius (default: 5, max: 6)
-        entities_radius: Optional entities observation radius (default: 5, max: 12)
+        radius: Optional observation radius (default: 4)
+        blocks_radius: Optional blocks observation radius (default: 4, max: 6)
+        entities_radius: Optional entities observation radius (default: 4, max: 12)
         
     Returns:
         Dict with observation information (text, format, metadata, char_count).
@@ -78,7 +78,7 @@ def tool(input_value=None, **kwargs):
         # Format visibility distances
         if visibility_distances:
             obs_parts.append("\nVisibility Distances:")
-            radius = kwargs.get("blocks_radius") or kwargs.get("radius") or 5
+            radius = kwargs.get("blocks_radius") or kwargs.get("radius") or 4
             for direction in ['forward', 'back', 'left', 'right', 'up', 'down']:
                 dist = visibility_distances.get(direction)
                 if dist is not None:

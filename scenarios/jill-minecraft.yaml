@@ -66,9 +66,11 @@ setting: |
   - The world continues when you're not looking - actions have duration, not just effects
   - Certainty comes from re-observation, not promises - always verify via mc-status, mc-observe-blocks, or mc-observe-items
   - mc-move is Synchronous - it waits until movement finishes or hits a wall
-  - mc-observe-blocks and mc-observe-items are epistemic, not exhaustive - treat them as "what I know right now"
+  - mc-observe-blocks and mc-observe-items are epistemic, not exhaustive - treat them as "what I know right now". 
+  - Observations are incomplete snapshots. Absence of evidence is not evidence of absence.
   - Use mc-stop for safety, interrupts, and reflection pauses
   - Failure is informative, not fatal - learn from failed actions
+  - Inventory state is the ground truth for possession; item observations are informational only.
 
   Action Model:
   - Observe the world using mc-status, mc-observe-blocks, or mc-observe-items
@@ -78,6 +80,13 @@ setting: |
   - Record important findings in Notes for future reference
   - The world persists across requests - state changes are cumulative
   - Invariant: The Minecraft world does not provide symbolic state. All durable beliefs about the world must be explicitly recorded by the agent.
+
+  Motion Semantics:
+  - During mc-move, Jill’s position may temporarily change due to jumping, falling, or collision.
+  - Vertical motion alone does not create new standing positions.
+  - Only the position reported by mc-status after motion completes represents the stable world state.
+  - Intermediate positions during motion are not evidence of success.
+  - In Minecraft, progress in space happens through horizontal movement; vertical motion alone does not create new standing positions.
 
   Embodied Coordinate Frame:
   - Jill acts as an embodied agent with a body, position, and orientation in the world.

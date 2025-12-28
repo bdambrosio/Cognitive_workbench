@@ -193,7 +193,7 @@ function listNearbyEntities(radius = 12, filterItems = null, maxTimeMs = 10) {
     if (e.id === bot.entity.id) continue
     
     // Check if entity is an item
-    const isItem = (e.objectType === 'Item' || e.entityType === 'item')
+    const isItem = (e.displayName === 'Item' || e.entityType === 'item')
     
     // Apply filter
     if (filterItems === true && !isItem) continue  // Items only
@@ -1021,7 +1021,7 @@ app.post('/act/pickup', async (req, res) => {
     for (const id of Object.keys(bot.entities)) {
       const e = bot.entities[id]
       if (!e || !e.position) continue
-      if (e.objectType !== 'Item' && e.entityType !== 'item') continue
+      if (e.displayName !== 'Item' && e.entityType !== 'item') continue
       
       const dist = e.position.distanceTo(myPos)
       if (dist > radius) continue

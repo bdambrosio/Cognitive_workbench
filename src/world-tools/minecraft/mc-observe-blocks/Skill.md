@@ -34,6 +34,8 @@ examples:
     - `visibility_distances`: dict with distances to nearest opaque block in 6 directions (forward, back, left, right, up, down)
       - Each value is a number (distance in blocks) or `null` if no block found within radius (reported as `">{radius} blocks"`)
 
+**IMPORTANT**: The EXACT_RESULT reported in tool execution traces is **truncated** for display purposes. To see the complete observation data including all blocks and entities, use the `load` primitive to load the Note bound to the `out` variable (e.g., `{"type":"load","target":"$obs","out":"$obs_full"}`).
+
 ## Configuration
 - Configured via `world_config.port` (defaults to `http://localhost:3003`)
 - Can be overridden with `world_config.url` or `MINECRAFT_URL` environment variable
