@@ -40,6 +40,81 @@ def _distance(x1: float, y1: float, z1: float, x2: float, y2: float, z2: float) 
     return math.sqrt((x2 - x1)**2 + (y2 - y1)**2 + (z2 - z1)**2)
 
 
+def _compile_map_forward(map_collection_id: str, resource_manager) -> List[Dict]:
+    """
+    Compile forward: Load all Notes from Collection, deduplicate by (x,y,z), keep latest.
+    
+    Args:
+        map_collection_id: Collection ID containing map Notes
+        resource_manager: Resource manager instance
+        
+    Returns:
+        List of compiled map entries (one per unique location, latest observation)
+    """
+    if not resource_manager:
+        return []
+    
+    # Load Collection
+    map_resource = resource_manager.get_resource(map_collection_id)
+    if not map_resource:
+        return []
+    
+    # Get Note IDs from Collection content
+    note_ids = map_resource.get('properties', {}).get('content', [])
+    if not isinstance(note_ids, list):
+        return []
+    
+    # Load all Notes and compile
+    location_map = {}  # (x,y,z) -> entry with latest timestamp
+    waypoint_map = {}  # (x,y,z) -> set of waypoint names
+    
+    for note_id in note_ids:
+        if not isinstance(note_id, str) or not note_id.startswith('Note_'):
+            continue
+        
+        note_resource = resource_manager.get_resource(note_id)
+        if not note_resource:
+            continue
+        
+        entry = note_resource.get('properties', {}).get('content')
+        if not isinstance(entry, dict):
+            continue
+        
+        # Extract coordinates
+        x = _round_coordinate(entry.get('x', 0))
+        y = _round_coordinate(entry.get('y', 0))
+        z = _round_coordinate(entry.get('z', 0))
+        key = (x, y, z)
+        
+        # Collect waypoints
+        waypoints = entry.get('waypoints', [])
+        if isinstance(waypoints, list) and waypoints:
+            if key not in waypoint_map:
+                waypoint_map[key] = set()
+            waypoint_map[key].update(waypoints)
+        
+        # Get timestamp
+        timestamp = entry.get('timestamp', '')
+        
+        # Keep latest entry for each location
+        if key not in location_map:
+            location_map[key] = entry
+        else:
+            existing_timestamp = location_map[key].get('timestamp', '')
+            if timestamp > existing_timestamp:
+                location_map[key] = entry
+    
+    # Merge waypoints into compiled entries
+    compiled = []
+    for key, entry in location_map.items():
+        compiled_entry = entry.copy()
+        if key in waypoint_map:
+            compiled_entry['waypoints'] = sorted(list(waypoint_map[key]))
+        compiled.append(compiled_entry)
+    
+    return compiled
+
+
 def tool(input_value=None, **kwargs):
     """
     Query persistent spatial map for strategic information.
@@ -65,7 +140,9 @@ def tool(input_value=None, **kwargs):
     """
     resource_manager = kwargs.get('resource_manager')
     agent_name = kwargs.get('agent_name', 'system')
-    map_name = kwargs.get('map_name', DEFAULT_MAP_NAME)
+    # Default to agent-specific map name
+    default_map_name = f"{agent_name}-minecraft_map"
+    map_name = kwargs.get('map_name') or default_map_name
     query_type = kwargs.get('query', 'location')
     
     if not resource_manager:
@@ -83,7 +160,8 @@ def tool(input_value=None, **kwargs):
     if not map_collection_id:
         return {
             "status": "success",
-            "text": "Map not found - no locations explored yet",
+            "value": "Map not found - no locations explored yet",
+            "text": "Map not found - no locations explored yet",  # Keep for backward compatibility
             "format": "text",
             "metadata": {
                 "map_name": map_name,
@@ -93,19 +171,8 @@ def tool(input_value=None, **kwargs):
             "char_count": 0
         }
     
-    map_resource = resource_manager.get_resource(map_collection_id)
-    if not map_resource:
-        return {
-            "status": "failed",
-            "reason": "Map Collection not found",
-            "text": "Failed to query map: Collection not found",
-            "format": "text",
-            "char_count": 0
-        }
-    
-    map_content = map_resource.get('properties', {}).get('content', [])
-    if not isinstance(map_content, list):
-        map_content = []
+    # Compile forward: Load all Notes, deduplicate by (x,y,z), keep latest
+    map_content = _compile_map_forward(map_collection_id, resource_manager)
     
     results = []
     result_text_parts = []
@@ -316,7 +383,8 @@ def tool(input_value=None, **kwargs):
     
     return {
         "status": "success",
-        "text": result_text,
+        "value": result_text,
+        "text": result_text,  # Keep for backward compatibility
         "format": "text",
         "metadata": {
             "map_name": map_name,

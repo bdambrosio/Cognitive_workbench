@@ -40,14 +40,14 @@ class InfospaceExecutor:
     Design principle: Content is opaque. Field-based operations delegated to tools.
     """
     
-    def __init__(self, agent_name: str, session, map_name: str, llm_client, available_tools: Dict[str, Dict], executive_node=None, resource_manager=None):
+    def __init__(self, agent_name: str, session, world_name: str, llm_client, available_tools: Dict[str, Dict], executive_node=None, resource_manager=None):
         """
         Initialize infospace executor.
         
         Args:
             agent_name: Name of the agent
             session: Zenoh session for communication
-            map_name: Name of the map (for Zenoh topics)
+            world_name: Name of the world (for tool loading and resource management)
             llm_client: LLM client for tool execution
             available_tools: Dict of tool_name -> metadata (from tool_loader)
             executive_node: Reference to ZenohExecutiveNode (for ask action)
@@ -55,7 +55,7 @@ class InfospaceExecutor:
         """
         self.agent_name = agent_name
         self.session = session
-        self.map_name = map_name
+        self.world_name = world_name
         self.llm_client = llm_client
         self.available_tools = available_tools
         self.executive_node = executive_node
@@ -63,7 +63,9 @@ class InfospaceExecutor:
         self.character_context: str = ""
         
         # Plan-local state (ephemeral, cleared each plan)
-        self.plan_bindings = {}  # $var_name -> resource_id (Note_N or Collection_N)
+        # Binding stack: list of dicts, each dict is a scope level
+        # Top of stack (last element) is current scope, bottom (first) is outer scope
+        self.plan_bindings = [{}]  # Stack of scopes: [$var_name -> resource_id]
         
         # Agent state (persistent across plans)
         self.agent_position = None
@@ -175,7 +177,7 @@ class InfospaceExecutor:
     
     def clear_plan_state(self):
         """Clear ephemeral plan state (call at start of new plan)"""
-        self.plan_bindings = {}
+        self.plan_bindings = [{}]  # Reset to single empty scope
         if self.executive_node:
             self.executive_node.last_say_text = ''
             self.executive_node.last_out_resource_id = None
@@ -207,7 +209,7 @@ class InfospaceExecutor:
         
         # Create isolated resource manager for subplanner (in-memory only, no persistence)
         from infospace_resource_manager import InfospaceResourceManager
-        subspace_world_name = f"{self.map_name}_subspace"
+        subspace_world_name = f"{self.world_name}_subspace"
         isolated_resource_manager = InfospaceResourceManager(
             world_name=subspace_world_name,
             session=None  # No Zenoh subscriber needed for in-memory only workspace
@@ -219,7 +221,7 @@ class InfospaceExecutor:
         child_executor = InfospaceExecutor(
             agent_name=self.agent_name,
             session=self.session,
-            map_name=self.map_name,
+            world_name=self.world_name,
             llm_client=self.llm_client,
             available_tools=self.available_tools,
             executive_node=self.executive_node,
@@ -630,9 +632,16 @@ class InfospaceExecutor:
                     if value == '':
                         logger.warning(f"target '{target_field}' resolved to empty string - tool may fail")
                 except ValueError as e:
-                    # Unbound variable
-                    logger.error(f"Unbound variable: {target_field}")
-                    return self._create_uniform_return('failed', reason=str(e))
+                    # Unbound variable - for map tools, let them handle default
+                    tool_name = action_type
+                    if tool_name in ['mc-map-visualize', 'mc-map-query', 'mc-map-update', 'mc-waypoint']:
+                        # Map tools handle target defaults internally - pass through as None
+                        logger.debug(f"Unbound variable {target_field} for map tool {tool_name}, tool will use default")
+                        value = None
+                    else:
+                        # Other tools - fail
+                        logger.error(f"Unbound variable: {target_field}")
+                        return self._create_uniform_return('failed', reason=str(e))
             elif value_field is not None:
                 # Use 'value' field as input (for tools like calculate that don't use target)
                 value = self._resolve_value(value_field)
@@ -870,7 +879,7 @@ Only provide the result, followed by the </end> tag.""")
             
             # Create a simple generation function
             @function
-            def generate_text(s, prompt_text):
+            def generate_text(s, prompt_text, is_json=False):
                 s += user(prompt_text)
                 # Convert stops list to string (SGLang uses stop as string, take first if list)
                 stop_str = None
@@ -941,8 +950,9 @@ Only provide the result, followed by the </end> tag.""")
         # Try direct parse first
         try:
             return json.loads(response)
-        except json.JSONDecodeError:
-            pass
+        except json.JSONDecodeError as e:
+            logger.error(f'Simple JSON repair failed: {e}')
+            logger.debug(f'Failed to parse JSON from: {response_text[:200]}...')
         
         # Repair attempt 1: Extract JSON if not at start
         if not response.startswith('{') and '{' in response:
@@ -1047,14 +1057,14 @@ Make sure the string is in a format that can be parsed by the json.loads functio
             if input_value is not None:
                 input_note_id = self._persist_note(input_value, f'{tool_name}_input')
                 if input_note_id:
-                    self.plan_bindings['input'] = input_note_id
+                    self._bind_variable('input', input_note_id)
             
             # Bind args dict values to named variables
             for key, val in additional_args.items():
                 resolved_val = self._resolve_value(val)
                 arg_note_id = self._persist_note(resolved_val, f'{tool_name}_{key}')
                 if arg_note_id:
-                    self.plan_bindings[key] = arg_note_id
+                    self._bind_variable(key, arg_note_id)
             
             # Execute plan synchronously
             result = self.execute_plan_sync(plan_data)
@@ -1114,10 +1124,23 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         resolved_args = {}
         if additional_args:
             for key, val in additional_args.items():
-                resolved_args[key] = self._resolve_value(val)
+                try:
+                    resolved_args[key] = self._resolve_value(val)
+                except ValueError as e:
+                    # If resolution fails (unbound variable), for 'target' parameter of certain tools,
+                    # treat as literal string (strip $ prefix if present)
+                    if key == 'target' and isinstance(val, str) and val.startswith('$'):
+                        # For tools like mc-map-visualize that accept literal map names,
+                        # strip $ and pass as literal string
+                        resolved_args[key] = val.lstrip('$')
+                        logger.warning(f"Could not resolve {val} for {key}, treating as literal string: {resolved_args[key]}")
+                    else:
+                        # For other parameters, re-raise the error
+                        raise
         
-        # Add map_name and other kwargs for tools
-        resolved_args['map_name'] = self.map_name
+        # Add world_name and other kwargs for tools (don't override if tool already set it)
+        if 'world_name' not in resolved_args:
+            resolved_args['world_name'] = self.world_name
         resolved_args['agent_name'] = self.agent_name
         resolved_args['resource_manager'] = self.resource_manager
         resolved_args['executive_node'] = self.executive_node  # For ScienceWorld state access
@@ -1260,10 +1283,10 @@ Make sure the string is in a format that can be parsed by the json.loads functio
             for i, item in enumerate(value_arg):
                 if isinstance(item, str) and item.startswith('$'):
                     var_name = item[1:]
-                    if var_name not in self.plan_bindings:
+                    note_id = self._get_binding(var_name)
+                    if note_id is None:
                         logger.warning(f"Variable {item} not bound, skipping")
                         continue
-                    note_id = self.plan_bindings[var_name]
                     if isinstance(note_id, str) and (note_id.startswith('Note_') or note_id.startswith('Collection_')):
                         note_ids.append(note_id)
                     else:
@@ -1276,9 +1299,9 @@ Make sure the string is in a format that can be parsed by the json.loads functio
                         logger.warning(f"Failed to persist collection item {i}, skipping")
         elif isinstance(value_arg, str) and value_arg.startswith('$'):
             var_name = value_arg[1:]
-            if var_name not in self.plan_bindings:
+            bound_value = self._get_binding(var_name)
+            if bound_value is None:
                 return self._create_uniform_return('failed', reason=f'Variable {value_arg} not bound')
-            bound_value = self.plan_bindings[var_name]
             if isinstance(bound_value, str) and bound_value.startswith('Collection_'):
                 # Dereference Collection to get its Note IDs
                 note_ids = self._dereference_collection(var_name)
@@ -1455,6 +1478,7 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         Target can be:
         - $variable referencing a Note or Collection
         - Literal Note_ID (e.g., "Note_123") or Collection_ID (e.g., "Collection_456")
+        - Named resource name (e.g., "minecraft_map", "Jill-minecraft_map")
         """
         target_arg = action.get('target')
         
@@ -1464,8 +1488,23 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         if not isinstance(target_arg, str):
             return self._create_uniform_return('failed', reason='persist target must be string')
         
-        # Resolve to resource ID (handles both $var and literal IDs)
-        resource_id = self._resolve_id(target_arg)
+        # Resolve to resource ID (handles $var, literal IDs, and named resources)
+        try:
+            resource_id = self._resolve_id(target_arg)
+        except ValueError:
+            # Variable unbound - try as named resource
+            resource_id = None
+        
+        # If not resolved as variable or literal ID, try as named resource
+        if not isinstance(resource_id, str) or not (resource_id.startswith('Collection_') or resource_id.startswith('Note_')):
+            if self.resource_manager:
+                resolved_id = self.resource_manager._resolve_resource_id(target_arg)
+                if resolved_id:
+                    resource_id = resolved_id
+                else:
+                    return self._create_uniform_return('failed', reason=f'Target "{target_arg}" is not a bound variable, resource ID, or named resource')
+            else:
+                return self._create_uniform_return('failed', reason=f'Target "{target_arg}" is not a bound variable or resource ID, and resource manager not available')
         
         if not isinstance(resource_id, str) or not (resource_id.startswith('Collection_') or resource_id.startswith('Note_')):
             return self._create_uniform_return('failed', reason=f'Target must be a Note or Collection ID, got: {resource_id}')
@@ -1577,7 +1616,9 @@ Make sure the string is in a format that can be parsed by the json.loads functio
             return self._create_uniform_return('failed', reason=f'load: {error}')
         
         # Get resource ID from bindings (guaranteed to exist after _resolve_target_var)
-        resource_id = self.plan_bindings[var_name]
+        resource_id = self._get_binding(var_name)
+        if resource_id is None:
+            return self._create_uniform_return('failed', reason=f'Variable ${var_name} not bound')
         
         # Verify resource exists
         if not self.resource_manager:
@@ -1631,11 +1672,10 @@ Make sure the string is in a format that can be parsed by the json.loads functio
             return self._create_uniform_return('failed', reason=f'index: {error}')
         
         # Get Collection ID from bindings
-        if collection_var not in self.plan_bindings:
+        collection_id = self._get_binding(collection_var)
+        if collection_id is None:
             logger.warning(f"Collection variable not bound: {collection_var}")
             return self._create_uniform_return('failed', reason=f'Collection variable not bound: {collection_var}')
-        
-        collection_id = self.plan_bindings[collection_var]
         
         if not isinstance(collection_id, str) or not collection_id.startswith('Collection_'):
             return self._create_uniform_return('failed', reason=f'Variable {collection_var} is not a Collection')
@@ -1686,10 +1726,9 @@ Make sure the string is in a format that can be parsed by the json.loads functio
             return self._create_uniform_return('failed', reason=f'search-within-collection: {error}')
         
         # Get Collection ID from bindings
-        if collection_var not in self.plan_bindings:
+        collection_id = self._get_binding(collection_var)
+        if collection_id is None:
             return self._create_uniform_return('failed', reason=f'Collection variable not bound: {collection_var}')
-        
-        collection_id = self.plan_bindings[collection_var]
         
         if not isinstance(collection_id, str) or not collection_id.startswith('Collection_'):
             return self._create_uniform_return('failed', reason=f'Variable {collection_var} is not a Collection')
@@ -2558,8 +2597,8 @@ Make sure the string is in a format that can be parsed by the json.loads functio
             mutation_target = additional_args.get('target')
             if mutation_target:
                 target_var = mutation_target[1:] if mutation_target.startswith('$') else mutation_target
-                if target_var in self.plan_bindings:
-                    mutated_collection_id = self.plan_bindings[target_var]
+                mutated_collection_id = self._get_binding(target_var)
+                if mutated_collection_id is not None:
                     self._bind_variable(out_var, mutated_collection_id)
                     display_var = self._normalize_var_for_log(out_var)
                     logger.info(f"Mapped {len(note_ids)} items via {operation} → {display_var} = {mutated_collection_id}")
@@ -2674,10 +2713,9 @@ Make sure the string is in a format that can be parsed by the json.loads functio
             return self._create_uniform_return('failed', reason=f'add: {error}')
         
         # Get Collection ID from bindings
-        if collection_var not in self.plan_bindings:
+        collection_id = self._get_binding(collection_var)
+        if collection_id is None:
             return self._create_uniform_return('failed', reason=f'Collection variable not bound: {collection_var}')
-        
-        collection_id = self.plan_bindings[collection_var]
         
         if not isinstance(collection_id, str) or not collection_id.startswith('Collection_'):
             return self._create_uniform_return('failed', reason=f'Variable {collection_var} is not a Collection')
@@ -2688,10 +2726,9 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         if isinstance(value_arg, str) and value_arg.startswith('$'):
             # Variable - check if Note or Collection
             var_name = value_arg[1:]
-            if var_name not in self.plan_bindings:
+            value_id = self._get_binding(var_name)
+            if value_id is None:
                 return self._create_uniform_return('failed', reason=f'Variable not bound: {var_name}')
-            
-            value_id = self.plan_bindings[var_name]
             
             if isinstance(value_id, str) and value_id.startswith('Collection_'):
                 # Collection - get all its Note IDs
@@ -2817,10 +2854,9 @@ Make sure the string is in a format that can be parsed by the json.loads functio
             return self._create_uniform_return('failed', reason=f'split: {error}')
         
         # Get Note ID from bindings
-        if note_var not in self.plan_bindings:
+        note_id = self._get_binding(note_var)
+        if note_id is None:
             return self._create_uniform_return('failed', reason=f'Note variable not bound: {note_var}')
-        
-        note_id = self.plan_bindings[note_var]
         
         if not isinstance(note_id, str) or not note_id.startswith('Note_'):
             return self._create_uniform_return('failed', reason=f'Variable {note_var} is not a Note')
@@ -3215,10 +3251,9 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         if error:
             return self._create_uniform_return('failed', reason=f'remove: {error}')
         
-        if collection_var not in self.plan_bindings:
+        collection_id = self._get_binding(collection_var)
+        if collection_id is None:
             return self._create_uniform_return('failed', reason=f'Collection variable not bound: {collection_var}')
-        
-        collection_id = self.plan_bindings[collection_var]
         
         if not isinstance(collection_id, str) or not collection_id.startswith('Collection_'):
             return self._create_uniform_return('failed', reason=f'Variable {collection_var} is not a Collection')
@@ -3907,8 +3942,8 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         
         # Check if target is Collection
         target_var = target_arg[1:]
-        if target_var in self.plan_bindings:
-            target_id = self.plan_bindings[target_var]
+        target_id = self._get_binding(target_var)
+        if target_id is not None:
             if isinstance(target_id, str) and target_id.startswith('Collection_'):
                 note_ids = self._dereference_collection(target_var)
                 return len(note_ids) == 0
@@ -3989,8 +4024,8 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         
         # Check if target is Collection
         target_var = target_arg[1:]
-        if target_var in self.plan_bindings:
-            target_id = self.plan_bindings[target_var]
+        target_id = self._get_binding(target_var)
+        if target_id is not None:
             if isinstance(target_id, str) and target_id.startswith('Collection_'):
                 # Collection membership check - resolve value to Note ID
                 note_ids = self._dereference_collection(target_var)
@@ -4000,8 +4035,8 @@ Make sure the string is in a format that can be parsed by the json.loads functio
                 # Resolve value to Note ID
                 if isinstance(value_arg, str) and value_arg.startswith('$'):
                     value_var = value_arg[1:]
-                    if value_var in self.plan_bindings:
-                        value_id = self.plan_bindings[value_var]
+                    value_id = self._get_binding(value_var)
+                    if value_id is not None:
                         return value_id in note_ids
                     return False
                 else:
@@ -4129,11 +4164,10 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         Returns:
             List of Note IDs in the Collection
         """
-        if collection_var not in self.plan_bindings:
+        collection_id = self._get_binding(collection_var)
+        if collection_id is None:
             logger.warning(f"Collection variable not bound: {collection_var}")
             return []
-        
-        collection_id = self.plan_bindings[collection_var]
         
         # Check if it's a Collection_N ID
         if isinstance(collection_id, str) and collection_id.startswith('Collection_'):
@@ -4325,15 +4359,15 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         if not isinstance(value, str):
             return value
         
-        # If $variable, lookup in bindings and return ID (no content fetch)
+        # If $variable, lookup in bindings (searching stack) and return ID (no content fetch)
         if value.startswith('$'):
             var_name = value[1:]
-            if var_name not in self.plan_bindings:
+            resource_id = self._get_binding(var_name)
+            if resource_id is None:
                 error_msg = f"Unbound variable: {value}"
                 logger.error(error_msg)
                 raise ValueError(error_msg)
             
-            resource_id = self.plan_bindings[var_name]
             # Return ID directly (no _get_content call)
             return resource_id
         
@@ -4376,12 +4410,11 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         # If entire string is a single variable reference (starts with $)
         if value.startswith('$') and len(matches) == 1 and value == f'${matches[0]}':
             var_name = matches[0]
-            if var_name not in self.plan_bindings:
+            resource_id = self._get_binding(var_name)
+            if resource_id is None:
                 error_msg = f"Unbound variable: {value}"
                 logger.error(error_msg)
                 raise ValueError(error_msg)
-            
-            resource_id = self.plan_bindings[var_name]
             
             # If it's a resource ID, fetch content from resource manager
             if isinstance(resource_id, str) and (resource_id.startswith('Note_') or resource_id.startswith('Collection_')):
@@ -4394,8 +4427,8 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         result = value
         for var_name in set(matches):  # Use set to process each unique variable once
             var_ref = f'${var_name}'
-            if var_name in self.plan_bindings:
-                resource_id = self.plan_bindings[var_name]
+            resource_id = self._get_binding(var_name)
+            if resource_id is not None:
                 logger.debug(f"Resolving template variable {var_ref} → {resource_id}")
                 
                 # If it's a resource ID, fetch content from resource manager
@@ -4427,10 +4460,9 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         if var_name.startswith('$'):
             var_name = var_name[1:]
         
-        if var_name not in self.plan_bindings:
-            return None
-        
-        value = self.plan_bindings[var_name]
+        value = self._get_binding(var_name)
+        if value is None:
+            return 'Note'  # Default if not bound
         # Check if value is a Collection_N ID
         if isinstance(value, str) and value.startswith('Collection_'):
             return 'Collection'
@@ -4438,16 +4470,82 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         return 'Collection' if isinstance(value, list) else 'Note'
     
     def _bind_variable(self, var_name: str, resource_id: str):
-        """Bind variable name to resource ID"""
+        """Bind variable name to resource ID in current scope (top of stack)"""
         if var_name.startswith('$'):
             var_name = var_name[1:]
         
-        self.plan_bindings[var_name] = resource_id
-        logger.debug(f"Bound ${var_name} → {resource_id}")
+        # Bind to top scope (most recent)
+        if not self.plan_bindings:
+            self.plan_bindings = [{}]
+        self.plan_bindings[-1][var_name] = resource_id
+        logger.debug(f"Bound ${var_name} → {resource_id} (scope depth: {len(self.plan_bindings)})")
         
         # Track last out resource for plan_result
         if self.executive_node:
             self.executive_node.last_out_resource_id = resource_id
+    
+    def push_binding_scope(self, copy_outer: bool = True):
+        """
+        Push a new binding scope onto the stack.
+        
+        Args:
+            copy_outer: If True, copy outer scope bindings for read access.
+                       If False, start with empty scope.
+        """
+        if copy_outer and self.plan_bindings:
+            # Copy outer scope for read access
+            new_scope = self.plan_bindings[-1].copy()
+        else:
+            new_scope = {}
+        self.plan_bindings.append(new_scope)
+        logger.debug(f"Pushed binding scope (copy_outer={copy_outer}), stack depth: {len(self.plan_bindings)}")
+    
+    def pop_binding_scope(self) -> Dict[str, str]:
+        """
+        Pop the current binding scope from the stack.
+        
+        Returns:
+            The popped scope dict (for inspection/debugging)
+        """
+        if len(self.plan_bindings) <= 1:
+            logger.warning("Attempted to pop binding scope when only one scope exists")
+            return {}
+        
+        popped = self.plan_bindings.pop()
+        logger.debug(f"Popped binding scope, stack depth: {len(self.plan_bindings)}")
+        return popped
+    
+    def _get_binding(self, var_name: str) -> Optional[str]:
+        """
+        Get binding for variable name, searching from top scope to bottom.
+        
+        Args:
+            var_name: Variable name without $ prefix
+            
+        Returns:
+            Resource ID if found, None otherwise
+        """
+        # Search from top (most recent) to bottom (outermost)
+        for scope in reversed(self.plan_bindings):
+            if var_name in scope:
+                return scope[var_name]
+        return None
+    
+    def _has_binding(self, var_name: str) -> bool:
+        """Check if variable is bound in any scope."""
+        return self._get_binding(var_name) is not None
+    
+    @property
+    def plan_bindings_flat(self) -> Dict[str, str]:
+        """
+        Backward compatibility: return merged view of all scopes (top scope wins).
+        Use for read-only access like .get() calls.
+        """
+        merged = {}
+        # Merge from bottom to top (top wins on conflicts)
+        for scope in self.plan_bindings:
+            merged.update(scope)
+        return merged
     
     def _resolve_target_var(self, target_arg: str) -> tuple:
         """
@@ -4466,7 +4564,7 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         if target_arg.startswith('$'):
             var_name = target_arg[1:]
             # Check if variable is already bound
-            if var_name in self.plan_bindings:
+            if self._has_binding(var_name):
                 return var_name, None
             # Not bound - try resolving as resource name (fallback)
             target_arg = var_name
@@ -5178,7 +5276,13 @@ Make sure the string is in a format that can be parsed by the json.loads functio
             logger.info(f"🧪 FAILED: {', '.join(failed_list)}")
         
         # Restore state
-        self.plan_bindings = saved_bindings
+        # Handle backward compatibility: if saved_bindings is a dict, convert to stack
+        if isinstance(saved_bindings, dict):
+            self.plan_bindings = [saved_bindings]
+        elif isinstance(saved_bindings, list):
+            self.plan_bindings = saved_bindings
+        else:
+            self.plan_bindings = [{}]
         
         logger.info("🧪 ================================================")
         

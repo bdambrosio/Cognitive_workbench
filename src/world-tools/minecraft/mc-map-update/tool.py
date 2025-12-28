@@ -55,7 +55,19 @@ def tool(input_value=None, **kwargs):
     """
     resource_manager = kwargs.get('resource_manager')
     agent_name = kwargs.get('agent_name', 'system')
-    map_name = kwargs.get('map_name', DEFAULT_MAP_NAME)
+    # Default to agent-specific map name
+    default_map_name = f"{agent_name}-minecraft_map"
+    provided_map_name = kwargs.get('map_name')
+    
+    if not provided_map_name:
+        # Not provided - use agent-specific default
+        map_name = default_map_name
+    elif provided_map_name in ['minecraft', 'infolab', 'scienceworld', 'osworld']:
+        # Executor set world name - use agent-specific default instead
+        map_name = default_map_name
+    else:
+        # Explicitly provided - use it
+        map_name = provided_map_name
     
     if not resource_manager:
         return {
@@ -166,16 +178,8 @@ def tool(input_value=None, **kwargs):
     
     # Load or create map Collection
     map_collection_id = resource_manager.named_collections.get(map_name)
-    map_content = []
     
-    if map_collection_id:
-        # Load existing map
-        map_resource = resource_manager.get_resource(map_collection_id)
-        if map_resource:
-            map_content = map_resource.get('properties', {}).get('content', [])
-            if not isinstance(map_content, list):
-                map_content = []
-    else:
+    if not map_collection_id:
         # Create new map Collection
         success, collection_id, error_msg, location = resource_manager.create_collection(
             agent_name, [], 'list', 'mc-map-update', 'Initial map creation', map_name, {}
@@ -194,21 +198,6 @@ def tool(input_value=None, **kwargs):
                 "char_count": 0
             }
     
-    # Find existing entry for this coordinate
-    entry_key = f"{x_block},{y_block},{z_block}"
-    existing_entry = None
-    existing_index = None
-    
-    for i, entry in enumerate(map_content):
-        if isinstance(entry, dict):
-            entry_x = _round_coordinate(entry.get('x', 0))
-            entry_y = _round_coordinate(entry.get('y', 0))
-            entry_z = _round_coordinate(entry.get('z', 0))
-            if entry_x == x_block and entry_y == y_block and entry_z == z_block:
-                existing_entry = entry
-                existing_index = i
-                break
-    
     # Prepare observation summary (extract structured data if available)
     observed_data = {}
     if isinstance(observation_data, dict):
@@ -223,63 +212,63 @@ def tool(input_value=None, **kwargs):
         # Store text observation
         observed_data = {'text': observation_data}
     
-    # Create or update entry
+    # Create entry for this observation
     timestamp = datetime.now().isoformat()
+    entry = {
+        'x': x_block,
+        'y': y_block,
+        'z': z_block,
+        'observed': observed_data,
+        'timestamp': timestamp
+    }
     
-    if existing_entry:
-        # Update existing entry
-        existing_entry['observed'] = observed_data
-        existing_entry['last_visit'] = timestamp
-        existing_entry['visit_count'] = existing_entry.get('visit_count', 0) + 1
-        # Preserve waypoints if they exist
-        if 'waypoints' not in existing_entry:
-            existing_entry['waypoints'] = []
-        map_content[existing_index] = existing_entry
-    else:
-        # Create new entry
-        new_entry = {
-            'x': x_block,
-            'y': y_block,
-            'z': z_block,
-            'observed': observed_data,
-            'first_visit': timestamp,
-            'last_visit': timestamp,
-            'visit_count': 1,
-            'waypoints': []
-        }
-        map_content.append(new_entry)
+    # Create a Note with this entry
+    success, note_id, error_msg, location = resource_manager.create_note(
+        agent_name, entry, 'json', 'mc-map-update', f"Map entry ({x_block}, {y_block}, {z_block})", '', {}
+    )
     
-    # Update Collection content
-    map_resource = resource_manager.get_resource(map_collection_id)
-    if map_resource:
-        map_resource['properties']['content'] = map_content
-        map_resource['properties']['item_count'] = len(map_content)
-        # Mark as persistent
-        resource_manager.mark_persistent(map_collection_id, agent_name)
-        
-        result_text = f"Map updated: ({x_block}, {y_block}, {z_block}) - {len(map_content)} locations total"
-        
-        return {
-            "status": "success",
-            "text": result_text,
-            "format": "text",
-            "metadata": {
-                "map_name": map_name,
-                "map_id": map_collection_id,
-                "location": {"x": x_block, "y": y_block, "z": z_block},
-                "total_locations": len(map_content),
-                "visit_count": existing_entry['visit_count'] if existing_entry else 1
-            },
-            "char_count": len(result_text)
-        }
-    else:
+    if not success:
         return {
             "status": "failed",
-            "reason": "Map Collection not found after update",
-            "text": "Failed to update map: Collection not found",
+            "reason": f"Failed to create map Note: {error_msg}",
+            "text": f"Failed to create map Note: {error_msg}",
             "format": "text",
             "char_count": 0
         }
+    
+    # Add Note to Collection
+    success, item_count, error_msg = resource_manager.add_to_collection(
+        map_collection_id, note_id, agent_name, 'add', None
+    )
+    
+    if not success:
+        return {
+            "status": "failed",
+            "reason": f"Failed to add Note to Collection: {error_msg}",
+            "text": f"Failed to add Note to Collection: {error_msg}",
+            "format": "text",
+            "char_count": 0
+        }
+    
+    # Mark Collection as persistent
+    resource_manager.mark_persistent(map_collection_id, agent_name)
+    
+    result_text = f"Map updated: ({x_block}, {y_block}, {z_block}) - {item_count} observations total"
+    
+    return {
+        "status": "success",
+        "value": result_text,
+        "text": result_text,  # Keep for backward compatibility
+        "format": "text",
+        "metadata": {
+            "map_name": map_name,
+            "map_id": map_collection_id,
+            "note_id": note_id,
+            "location": {"x": x_block, "y": y_block, "z": z_block},
+            "total_observations": item_count
+        },
+        "char_count": len(result_text)
+    }
 
 
 if __name__ == "__main__":

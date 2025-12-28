@@ -571,10 +571,14 @@ class ZenohExecutiveNode:
         self.resource_manager.load_from_file()
         logger.info(f'📂 Loaded resources from file for {self.map_name}')
         
+        # Get world_name from world_config if available, otherwise use map_name (legacy fallback)
+        world_config = self.character_config.get('world_config', {})
+        world_name = world_config.get('world_name') or self.map_name
+        
         self.infospace_executor = InfospaceExecutor(
             agent_name=character_name,
             session=self.session,
-            map_name=self.map_name,
+            world_name=world_name,
             llm_client=self.runtime or self.llm_client,  # Pass runtime if available, else llm_client
             available_tools=self.available_tools,
             executive_node=self,  # Pass actual executive node
@@ -851,7 +855,7 @@ class ZenohExecutiveNode:
             else:
                 logger.error(f'❌ {self.character_name} saved plan failed: {plan_name}')
                 logger.error(f'  Step {result.get("executed_steps", 0)}: {result.get("reason", "unknown")}')
-                logger.error(f'  Bindings at failure: {list(self.infospace_executor.plan_bindings.keys())}')
+                logger.error(f'  Bindings at failure: {list(self.infospace_executor.plan_bindings_flat.keys())}')
         
         except Exception as e:
             logger.error(f'Error executing saved plan: {e}')
@@ -1007,8 +1011,10 @@ class ZenohExecutiveNode:
                 display_target = target
                 if isinstance(target, str) and target.startswith('$'):
                     var_name = target[1:]
-                    if self.infospace_executor and var_name in self.infospace_executor.plan_bindings:
-                        display_target = self.infospace_executor.plan_bindings[var_name]
+                    if self.infospace_executor:
+                        binding = self.infospace_executor.plan_bindings_flat.get(var_name)
+                        if binding:
+                            display_target = binding
                 
                 # Show what was created/processed (using uniform format)
                 if result.get('status') == 'success':
@@ -1071,8 +1077,10 @@ class ZenohExecutiveNode:
             try:
                 if isinstance(raw_target, str) and raw_target.startswith('$'):
                     var_name = raw_target[1:]
-                    if self.infospace_executor and var_name in self.infospace_executor.plan_bindings:
-                        display_target = self.infospace_executor.plan_bindings[var_name]
+                    if self.infospace_executor:
+                        binding = self.infospace_executor.plan_bindings_flat.get(var_name)
+                        if binding:
+                            display_target = binding
             except Exception:
                 pass
 
@@ -1121,8 +1129,8 @@ class ZenohExecutiveNode:
         
         # Get bindings as Note IDs
         bindings = {}
-        if self.infospace_executor and self.infospace_executor.plan_bindings:
-            bindings = dict(self.infospace_executor.plan_bindings)
+        if self.infospace_executor:
+            bindings = self.infospace_executor.plan_bindings_flat
         
         # Get final_thoughts from plan reasoning
         final_thoughts = self.current_plan.get('reasoning', '')
@@ -1353,11 +1361,10 @@ class ZenohExecutiveNode:
             summary_note_id = summarize_result.get('resource_id')
             if not summary_note_id:
                 # Try to get from plan_bindings
-                if 'summary' in self.infospace_executor.plan_bindings:
-                    summary_note_id = self.infospace_executor.plan_bindings['summary']
-                else:
-                    logger.warning('Summarize tool did not return a Note ID')
-                    return
+                summary_note_id = self.infospace_executor.plan_bindings_flat.get('summary')
+            if not summary_note_id:
+                logger.warning('Summarize tool did not return a Note ID')
+                return
             
             # Verify the summary note has content
             summary_content = self.infospace_executor._get_content(summary_note_id)
@@ -1737,7 +1744,7 @@ Finally, using 'say', respond in character to User"""
                 logger.error(f'LLM call failed: {response.error}')
                 self.current_plan = None
                 if self.infospace_executor:
-                    self.infospace_executor.plan_bindings.clear()
+                    self.infospace_executor.clear_plan_state()
                 self.current_goal = Goal('sleep', actors=[self.character_name])
                 self._publish_goal(self.current_goal)
 
@@ -1807,7 +1814,7 @@ Finally, using 'say', respond in character to User"""
             
             # Build context for planner (always needed for infospace)
             context = {
-                'variables': self.infospace_executor.plan_bindings if self.infospace_executor else {},
+                'variables': self.infospace_executor.plan_bindings_flat if self.infospace_executor else {},
                 'character_context': character_context,
                 'recent_context': recent_context,
                 'executor': self.infospace_executor  # Pass executor for incremental planner
@@ -2471,7 +2478,7 @@ Finally, using 'say', respond in character to User"""
         # Also clear planner bindings
         bindings_cleared = 0
         if self.infospace_executor:
-            bindings_cleared = len(self.infospace_executor.plan_bindings)
+            bindings_cleared = len(self.infospace_executor.plan_bindings_flat)
             self.infospace_executor.clear_plan_state()
         
         response = {
@@ -2543,8 +2550,8 @@ Finally, using 'say', respond in character to User"""
             bindings_data = {}
             # Get bindings from infospace_executor (where incremental planner stores them)
             bindings = {}
-            if self.infospace_executor and hasattr(self.infospace_executor, 'plan_bindings'):
-                bindings = self.infospace_executor.plan_bindings
+            if self.infospace_executor and hasattr(self.infospace_executor, 'plan_bindings_flat'):
+                bindings = self.infospace_executor.plan_bindings_flat
             
             for var_name, value in bindings.items():
                 if isinstance(value, str):
@@ -2583,7 +2590,7 @@ Finally, using 'say', respond in character to User"""
                 return
             
             # Get count before clearing
-            bindings_count = len(self.infospace_executor.plan_bindings)
+            bindings_count = len(self.infospace_executor.plan_bindings_flat)
             
             # Clear plan bindings
             self.infospace_executor.clear_plan_state()
