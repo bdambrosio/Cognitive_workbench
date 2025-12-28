@@ -14,7 +14,7 @@ schema_hint:
   from_x: "starting x coordinate (for nearest/unexplored queries)"
   from_y: "starting y coordinate (for nearest/unexplored queries)"
   from_z: "starting z coordinate (for nearest/unexplored queries)"
-  map_name: "optional map Collection name (default: 'minecraft_map')"
+  map_name: "optional map Collection name (default: '<agent_name>-minecraft_map', computed automatically)"
   out: "$variable"
 examples:
   - '{"type":"mc-map-query","query":"location","x":-112,"y":71,"z":-123,"out":"$loc"}'
@@ -37,7 +37,7 @@ examples:
 - Property parameters: `property` (path like `"geom.stair"`), `value` (to match)
 - Waypoint parameter: `waypoint` (name string)
 - From parameters: `from_x`, `from_y`, `from_z` (starting position for nearest/unexplored)
-- `map_name`: Optional map Collection name (default: `"minecraft_map"`)
+- `map_name`: Optional map Collection name (default: `<agent_name>-minecraft_map`, computed automatically)
 
 ## Output
 - Note ID (bound to `out` variable) containing:

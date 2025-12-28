@@ -1112,7 +1112,7 @@ def execute_infospace_action(action: Dict, executor: InfospaceExecutor, agent_na
         
         # Track compliance if evaluator is active
         if hasattr(executor, '_compliance_tracker') and executor._compliance_tracker:
-            executor._compliance_tracker.check_action(action, result, executor.plan_bindings)
+            executor._compliance_tracker.check_action(action, result, executor.plan_bindings_flat)
         
         if result.get('status') == 'success':
             # Extract value and resource_id from uniform return format
@@ -1498,7 +1498,7 @@ if HAS_SGLANG:
             out_var = action.get('out', '')
             resource_id_before = None
             if out_var:
-                resource_id_before = executor.plan_bindings.get(out_var.lstrip('$'))
+                resource_id_before = executor.plan_bindings_flat.get(out_var.lstrip('$'))
             
             # Execute action normally - think/say/ask now return their text content
             
@@ -1567,7 +1567,7 @@ if HAS_SGLANG:
                 out_var = action.get('out', '')
                 resource_id = None
                 if out_var:
-                    resource_id_after = executor.plan_bindings.get(out_var.lstrip('$'))
+                    resource_id_after = executor.plan_bindings_flat.get(out_var.lstrip('$'))
                     # If resource_id changed (new resource created) or didn't exist before
                     if resource_id_after and resource_id_after != resource_id_before:
                         if resource_id_after.startswith('Note_') or resource_id_after.startswith('Collection_'):
@@ -1744,24 +1744,31 @@ def run_method_protocol(s, executor: "InfospaceExecutor", method_name: str, max_
     """
     Execute a 'method' tool as an inner loop (bounded by max_steps).
     Returns a short summary string for the outer loop (so the method counts as 1 outer step).
+    
+    Pushes a new binding scope for the method (with copy of outer scope for read access),
+    and pops it when the method completes.
     """
+    # Push new binding scope for method (copy outer scope for read access)
+    executor.push_binding_scope(copy_outer=True)
+    
     method_task = "STEP 1"
     last_tool_result = ""
-    for mstep in range(max_steps):
-        if _interrupt_requested(executor):
-            _clear_interrupt(executor)
-            return f"FAILED | Method {method_name} interrupted by user"
+    try:
+        for mstep in range(max_steps):
+            if _interrupt_requested(executor):
+                _clear_interrupt(executor)
+                return f"FAILED | Method {method_name} interrupted by user"
 
-        s += user(
+            s += user(
             f"#METHOD EXECUTION MODE: {method_name} (internal step {mstep + 1}/{max_steps})\n"
-            f"CURRENT METHOD STEP: {method_task}\n"
-            "Select the tool explicitly required by the current Method Step.\n"
-            "Choose tool and JSON args using Stage 2 FORMAT.\n"
-        )
+                f"CURRENT METHOD STEP: {method_task}\n"
+                "Select the tool explicitly required by the current Method Step.\n"
+                "Choose tool and JSON args using Stage 2 FORMAT.\n"
+            )
 
-        tool_name_key = f"m_tool_name_{outer_step}_{mstep}"
-        tool_args_key = f"m_tool_args_{outer_step}_{mstep}"
-        s += assistant(
+            tool_name_key = f"m_tool_name_{outer_step}_{mstep}"
+            tool_args_key = f"m_tool_args_{outer_step}_{mstep}"
+            s += assistant(
             "TOOL_NAME: "
             + gen(tool_name_key, max_tokens=32, temperature=GEN_TEMPERATURE, stop="TOOL_ARGS_JSON")
             + "\nTOOL_ARGS_JSON: "
@@ -1769,31 +1776,31 @@ def run_method_protocol(s, executor: "InfospaceExecutor", method_name: str, max_
             + "\n"
         )
 
-        tool_name = s[tool_name_key].strip()
-        tool_args_json = s[tool_args_key].strip()
+            tool_name = s[tool_name_key].strip()
+            tool_args_json = s[tool_args_key].strip()
 
-        # Prevent method recursion (KISS)
-        tool_info = executor.available_tools.get(tool_name, {})
-        if tool_info.get('type') == 'method':
-            return f"FAILED | Method {method_name} cannot invoke method tool '{tool_name}'"
+            # Prevent method recursion (KISS)
+            tool_info = executor.available_tools.get(tool_name, {})
+            if tool_info.get('type') == 'method':
+                return f"FAILED | Method {method_name} cannot invoke method tool '{tool_name}'"
 
-        action = sgl_to_infospace_action(tool_name, tool_args_json, outer_step * 1000 + mstep, executor.available_tools)
-        
-        # Add inner loop metadata for UI display
-        action['_inner_loop'] = {"method_name": method_name, "inner_step": mstep + 1, "max_steps": max_steps, "outer_step": outer_step}
+            action = sgl_to_infospace_action(tool_name, tool_args_json, outer_step * 1000 + mstep, executor.available_tools)
+            
+            # Add inner loop metadata for UI display
+            action['_inner_loop'] = {"method_name": method_name, "inner_step": mstep + 1, "max_steps": max_steps, "outer_step": outer_step}
 
-        # Track resource bindings before execution (for commentary update)
-        out_var = action.get('out', '')
-        resource_id_before = None
-        if out_var:
-            resource_id_before = executor.plan_bindings.get(out_var.lstrip('$'))
+            # Track resource bindings before execution (for commentary update)
+            out_var = action.get('out', '')
+            resource_id_before = None
+            if out_var:
+                resource_id_before = executor.plan_bindings_flat.get(out_var.lstrip('$'))
 
-        last_tool_result = execute_infospace_action(action, executor, executor.agent_name)
-        result_display = last_tool_result[:512]
-        if len(last_tool_result) > 512:
-            result_display += f"\n... [TRUNCATED - showing 512 of {len(last_tool_result)} chars]"
+            last_tool_result = execute_infospace_action(action, executor, executor.agent_name)
+            result_display = last_tool_result[:512]
+            if len(last_tool_result) > 512:
+                result_display += f"\n... [TRUNCATED - showing 512 of {len(last_tool_result)} chars]"
 
-        s += user(
+            s += user(
             f"=====\n"
             f"METHOD STAGE 3 - TOOL EXECUTION COMPLETE (internal step {mstep + 1}/{max_steps})\n"
             f"=====\n\n"
@@ -1808,70 +1815,73 @@ def run_method_protocol(s, executor: "InfospaceExecutor", method_name: str, max_
             f"Do not invent new steps.\n"
             f"TERMINATION: When the Method says terminate (SUCCESS/FAILED/INAPPLICABLE), write 'METHOD COMPLETE' in THOUGHTS.\n\n"
             f"Respond using Stage 3 FORMAT. Be concise.\n"
-            f"Ensure the REQUEST_TOOLS list is a valid JSON list of tool names.\n"
-        )
+                f"Ensure the REQUEST_TOOLS list is a valid JSON list of tool names.\n"
+            )
 
-        thoughts_key = f"m_thoughts_{outer_step}_{mstep}"
-        hypotheses_key = f"m_hyp_{outer_step}_{mstep}"
-        audit_key = f"m_audit_{outer_step}_{mstep}"
-        done_key = f"m_done_{outer_step}_{mstep}"
-        next_task_key = f"m_next_{outer_step}_{mstep}"
-        req_tools_key = f"m_req_{outer_step}_{mstep}"
+            thoughts_key = f"m_thoughts_{outer_step}_{mstep}"
+            hypotheses_key = f"m_hyp_{outer_step}_{mstep}"
+            audit_key = f"m_audit_{outer_step}_{mstep}"
+            done_key = f"m_done_{outer_step}_{mstep}"
+            next_task_key = f"m_next_{outer_step}_{mstep}"
+            req_tools_key = f"m_req_{outer_step}_{mstep}"
 
-        s += assistant(
-            "\nTHOUGHTS: "
-            + gen(thoughts_key, max_tokens=128, temperature=GEN_TEMPERATURE, stop="HYPOTHESES: ")
-            + "\nHYPOTHESES: "
-            + gen(hypotheses_key, max_tokens=128, temperature=GEN_TEMPERATURE, stop="\nAUDIT: ")
-            + "\nAUDIT: "
-            + gen(audit_key, max_tokens=128, temperature=0.0, stop="\nDONE: ")
-            + "\nDONE: "
-            + gen(done_key, max_tokens=8, temperature=GEN_TEMPERATURE, stop="\nNEXT_TASK: ")
-            + "\nNEXT_TASK: "
-            + gen(next_task_key, max_tokens=128, temperature=GEN_TEMPERATURE, stop="\nREQUEST_TOOLS: ")
-            + "\nREQUEST_TOOLS: "
-            + gen(req_tools_key, max_tokens=96, temperature=GEN_TEMPERATURE, stop=["\n\n"])
-            + "\n"
-        )
+            s += assistant(
+                "\nTHOUGHTS: "
+                + gen(thoughts_key, max_tokens=128, temperature=GEN_TEMPERATURE, stop="HYPOTHESES: ")
+                + "\nHYPOTHESES: "
+                + gen(hypotheses_key, max_tokens=128, temperature=GEN_TEMPERATURE, stop="\nAUDIT: ")
+                + "\nAUDIT: "
+                + gen(audit_key, max_tokens=128, temperature=0.0, stop="\nDONE: ")
+                + "\nDONE: "
+                + gen(done_key, max_tokens=8, temperature=GEN_TEMPERATURE, stop="\nNEXT_TASK: ")
+                + "\nNEXT_TASK: "
+                + gen(next_task_key, max_tokens=128, temperature=GEN_TEMPERATURE, stop="\nREQUEST_TOOLS: ")
+                + "\nREQUEST_TOOLS: "
+                + gen(req_tools_key, max_tokens=96, temperature=GEN_TEMPERATURE, stop=["\n\n"])
+                + "\n"
+            )
 
-        thoughts_text = s[thoughts_key].strip()
+            thoughts_text = s[thoughts_key].strip()
 
-        # Stage 3.1: Update resource indexes with commentary (same behavior as outer loop)
-        if thoughts_text:
-            out_var = action.get('out', '')
-            resource_id = None
-            if out_var:
-                resource_id_after = executor.plan_bindings.get(out_var.lstrip('$'))
-                if resource_id_after and resource_id_after != resource_id_before:
-                    if resource_id_after.startswith('Note_') or resource_id_after.startswith('Collection_'):
-                        resource_id = resource_id_after
-            if resource_id:
-                if executor.resource_manager:
-                    executor.resource_manager.update_resource_commentary(resource_id, thoughts_text)
+            # Stage 3.1: Update resource indexes with commentary (same behavior as outer loop)
+            if thoughts_text:
+                out_var = action.get('out', '')
+                resource_id = None
+                if out_var:
+                    resource_id_after = executor.plan_bindings_flat.get(out_var.lstrip('$'))
+                    if resource_id_after and resource_id_after != resource_id_before:
+                        if resource_id_after.startswith('Note_') or resource_id_after.startswith('Collection_'):
+                            resource_id = resource_id_after
+                if resource_id:
+                    if executor.resource_manager:
+                        executor.resource_manager.update_resource_commentary(resource_id, thoughts_text)
 
-        # Stage 3.5: Dynamic tool loading (if requested)
-        requested_tools_raw = s[req_tools_key].strip()
-        requested_tools = parse_request_tools(requested_tools_raw)
-        if requested_tools:
-            tools_to_load = [tool for tool in requested_tools if tool not in loaded_skill_docs]
-            if tools_to_load:
-                expanded_docs = load_skill_docs(tools_to_load, executor.available_tools)
-                if expanded_docs:
-                    s += user(f"ADDITIONAL TOOL DOCUMENTATION:\n{expanded_docs}")
-                    s += assistant("I have reviewed the additional tool documentation.\n")
-                    loaded_skill_docs.update(tools_to_load)
+            # Stage 3.5: Dynamic tool loading (if requested)
+            requested_tools_raw = s[req_tools_key].strip()
+            requested_tools = parse_request_tools(requested_tools_raw)
+            if requested_tools:
+                tools_to_load = [tool for tool in requested_tools if tool not in loaded_skill_docs]
+                if tools_to_load:
+                    expanded_docs = load_skill_docs(tools_to_load, executor.available_tools)
+                    if expanded_docs:
+                        s += user(f"ADDITIONAL TOOL DOCUMENTATION:\n{expanded_docs}")
+                        s += assistant("I have reviewed the additional tool documentation.\n")
+                        loaded_skill_docs.update(tools_to_load)
 
-        if 'METHOD COMPLETE' in thoughts_text.upper():
-            summary = thoughts_text.replace("\n", " ")
-            if len(summary) > 240:
-                summary = summary[:240] + "..."
-            return f"SUCCESS | Method {method_name} complete | {summary}"
+            if 'METHOD COMPLETE' in thoughts_text.upper():
+                summary = thoughts_text.replace("\n", " ")
+                if len(summary) > 240:
+                    summary = summary[:240] + "..."
+                return f"SUCCESS | Method {method_name} complete | {summary}"
 
-        next_task_raw = s[next_task_key].strip()
-        if next_task_raw and next_task_raw.lower() not in ["", "none", "null", "n/a"]:
-            method_task = next_task_raw
+            next_task_raw = s[next_task_key].strip()
+            if next_task_raw and next_task_raw.lower() not in ["", "none", "null", "n/a"]:
+                method_task = next_task_raw
 
-    return f"FAILED | Method {method_name} exceeded max_steps ({max_steps}) | last_result={last_tool_result[:120]}"
+        return f"FAILED | Method {method_name} exceeded max_steps ({max_steps}) | last_result={last_tool_result[:120]}"
+    finally:
+        # Always pop the method scope when done
+        executor.pop_binding_scope()
 
 
 class IncrementalPlanner:
@@ -2483,7 +2493,7 @@ OUTPUT (JSON ONLY)
         reflection_prompt = reflection_prompt.replace("{steps}", str(steps))
         reflection_prompt = reflection_prompt.replace("{EPISTEMIC_FRAME_SCHEMA}", json.dumps(EPISTEMIC_FRAME_SCHEMA, indent=2))
         reflection_prompt = reflection_prompt.replace("{trace}", trace)
-        reflection = self.executor.llm_generate(reflection_prompt, max_tokens=512, is_json=True, temperature=GEN_TEMPERATURE)
+        reflection = self.executor.llm_generate(reflection_prompt, max_tokens=1024, is_json=True, temperature=GEN_TEMPERATURE)
         logger.info(f"Reflection: {json.dumps(reflection.text, indent=2)}")
 
 

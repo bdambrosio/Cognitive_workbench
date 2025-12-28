@@ -8,7 +8,7 @@ schema_hint:
   x: "optional x coordinate (defaults to extracting from observation)"
   y: "optional y coordinate (defaults to extracting from observation)"
   z: "optional z coordinate (defaults to extracting from observation)"
-  map_name: "optional map Collection name (default: 'minecraft_map')"
+  map_name: "optional map Collection name (default: '<agent_name>-minecraft_map', computed automatically)"
   out: "$variable"
 examples:
   - '{"type":"mc-observe-blocks","out":"$obs"}'
@@ -21,7 +21,7 @@ examples:
 ## Input
 - `value` or `observation`: Observation data from `mc-observe-blocks` (Note ID or dict)
 - `x`, `y`, `z`: Optional explicit coordinates (defaults to extracting from observation)
-- `map_name`: Optional map Collection name (default: `"minecraft_map"`)
+- `map_name`: Optional map Collection name (default: `<agent_name>-minecraft_map`, computed automatically)
 
 ## Output
 - Note ID (bound to `out` variable) containing:

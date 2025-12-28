@@ -52,7 +52,9 @@ def tool(input_value=None, **kwargs):
     """
     resource_manager = kwargs.get('resource_manager')
     agent_name = kwargs.get('agent_name', 'system')
-    map_name = kwargs.get('map_name', DEFAULT_MAP_NAME)
+    # Default to agent-specific map name
+    default_map_name = f"{agent_name}-minecraft_map"
+    map_name = kwargs.get('map_name') or default_map_name
     waypoint_name = kwargs.get('name')
     
     if not resource_manager:
@@ -96,16 +98,8 @@ def tool(input_value=None, **kwargs):
     
     # Load or create map Collection
     map_collection_id = resource_manager.named_collections.get(map_name)
-    map_content = []
     
-    if map_collection_id:
-        # Load existing map
-        map_resource = resource_manager.get_resource(map_collection_id)
-        if map_resource:
-            map_content = map_resource.get('properties', {}).get('content', [])
-            if not isinstance(map_content, list):
-                map_content = []
-    else:
+    if not map_collection_id:
         # Create new map Collection
         success, collection_id, error_msg, location = resource_manager.create_collection(
             agent_name, [], 'list', 'mc-waypoint', 'Initial map creation', map_name, {}
@@ -124,75 +118,64 @@ def tool(input_value=None, **kwargs):
                 "char_count": 0
             }
     
-    # Find existing entry for this coordinate
-    existing_entry = None
-    existing_index = None
+    # Create entry with waypoint label
+    from datetime import datetime
+    timestamp = datetime.now().isoformat()
+    entry = {
+        'x': x_block,
+        'y': y_block,
+        'z': z_block,
+        'waypoints': [waypoint_name],
+        'timestamp': timestamp
+    }
     
-    for i, entry in enumerate(map_content):
-        if isinstance(entry, dict):
-            entry_x = _round_coordinate(entry.get('x', 0))
-            entry_y = _round_coordinate(entry.get('y', 0))
-            entry_z = _round_coordinate(entry.get('z', 0))
-            if entry_x == x_block and entry_y == y_block and entry_z == z_block:
-                existing_entry = entry
-                existing_index = i
-                break
+    # Create a Note with this waypoint entry
+    success, note_id, error_msg, location = resource_manager.create_note(
+        agent_name, entry, 'json', 'mc-waypoint', f"Waypoint {waypoint_name} at ({x_block}, {y_block}, {z_block})", '', {}
+    )
     
-    # Add waypoint label
-    if existing_entry:
-        # Update existing entry
-        waypoints = existing_entry.get('waypoints', [])
-        if not isinstance(waypoints, list):
-            waypoints = []
-        if waypoint_name not in waypoints:
-            waypoints.append(waypoint_name)
-        existing_entry['waypoints'] = waypoints
-        map_content[existing_index] = existing_entry
-    else:
-        # Create new entry with waypoint
-        from datetime import datetime
-        new_entry = {
-            'x': x_block,
-            'y': y_block,
-            'z': z_block,
-            'observed': {},
-            'first_visit': datetime.now().isoformat(),
-            'last_visit': datetime.now().isoformat(),
-            'visit_count': 0,
-            'waypoints': [waypoint_name]
-        }
-        map_content.append(new_entry)
-    
-    # Update Collection content
-    map_resource = resource_manager.get_resource(map_collection_id)
-    if map_resource:
-        map_resource['properties']['content'] = map_content
-        map_resource['properties']['item_count'] = len(map_content)
-        # Mark as persistent
-        resource_manager.mark_persistent(map_collection_id, agent_name)
-        
-        result_text = f"Waypoint '{waypoint_name}' created at ({x_block}, {y_block}, {z_block})"
-        
-        return {
-            "status": "success",
-            "text": result_text,
-            "format": "text",
-            "metadata": {
-                "map_name": map_name,
-                "map_id": map_collection_id,
-                "waypoint": waypoint_name,
-                "location": {"x": x_block, "y": y_block, "z": z_block}
-            },
-            "char_count": len(result_text)
-        }
-    else:
+    if not success:
         return {
             "status": "failed",
-            "reason": "Map Collection not found after update",
-            "text": "Failed to create waypoint: Collection not found",
+            "reason": f"Failed to create waypoint Note: {error_msg}",
+            "text": f"Failed to create waypoint Note: {error_msg}",
             "format": "text",
             "char_count": 0
         }
+    
+    # Add Note to Collection
+    success, item_count, error_msg = resource_manager.add_to_collection(
+        map_collection_id, note_id, agent_name, 'add', None
+    )
+    
+    if not success:
+        return {
+            "status": "failed",
+            "reason": f"Failed to add Note to Collection: {error_msg}",
+            "text": f"Failed to add Note to Collection: {error_msg}",
+            "format": "text",
+            "char_count": 0
+        }
+    
+    # Mark Collection as persistent
+    resource_manager.mark_persistent(map_collection_id, agent_name)
+    
+    result_text = f"Waypoint '{waypoint_name}' created at ({x_block}, {y_block}, {z_block})"
+    
+    return {
+        "status": "success",
+        "value": result_text,
+        "text": result_text,  # Keep for backward compatibility
+        "format": "text",
+        "metadata": {
+            "map_name": map_name,
+            "map_id": map_collection_id,
+            "note_id": note_id,
+            "waypoint": waypoint_name,
+            "location": {"x": x_block, "y": y_block, "z": z_block}
+        },
+        "char_count": len(result_text)
+    }
 
 
 if __name__ == "__main__":

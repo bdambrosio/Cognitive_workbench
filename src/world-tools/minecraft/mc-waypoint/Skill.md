@@ -8,7 +8,7 @@ schema_hint:
   x: "x coordinate (required)"
   y: "y coordinate (required)"
   z: "z coordinate (required)"
-  map_name: "optional map Collection name (default: 'minecraft_map')"
+  map_name: "optional map Collection name (default: '<agent_name>-minecraft_map', computed automatically)"
   out: "$variable"
 examples:
   - '{"type":"mc-status","out":"$status"}'
@@ -21,7 +21,7 @@ examples:
 ## Input
 - `name`: Waypoint name (required) - e.g., `"Base_Camp"`, `"Pit_Exit_1"`
 - `x`, `y`, `z`: Coordinates (required) - block position to label
-- `map_name`: Optional map Collection name (default: `"minecraft_map"`)
+- `map_name`: Optional map Collection name (default: `<agent_name>-minecraft_map`, computed automatically)
 
 ## Output
 - Note ID (bound to `out` variable) containing:
