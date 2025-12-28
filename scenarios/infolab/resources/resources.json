@@ -1,0 +1,31 @@
+{
+  "world_name": "infolab",
+  "timestamp": "2025-12-26T18:57:16.855277",
+  "note_instances": {},
+  "note_counter": 13,
+  "collection_instances": {
+    "Collection_1": {
+      "name": "Collection_1",
+      "location": [
+        0,
+        0
+      ],
+      "description": "Collection artifact created by create-collection-primitive",
+      "properties": {
+        "content": [],
+        "format": "list",
+        "created_by": "Jill",
+        "created_at": "2025-12-26T15:06:52.070393",
+        "source_skill": "create-collection-primitive",
+        "source_value": "0 items",
+        "item_count": 0,
+        "collection_name": "conversation_history",
+        "embedding_text": "conversation_history\ncreate-collection-primitive on 0 items\n0 items",
+        "persistent": true,
+        "persisted_at": "2025-12-26T15:09:26.450388",
+        "persisted_by": "Jill"
+      }
+    }
+  },
+  "collection_counter": 3
+}

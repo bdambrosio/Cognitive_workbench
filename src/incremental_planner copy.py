@@ -789,7 +789,6 @@ def repair_json_string(json_str: str) -> Optional[Dict]:
     - Missing closing braces
     - Code fences
     - Newlines in wrong places
-    - Arithmetic expressions in numeric fields (e.g., "1.0236+3.14159")
     
     Args:
         json_str: Potentially malformed JSON string
@@ -804,40 +803,6 @@ def repair_json_string(json_str: str) -> Optional[Dict]:
     
     # Remove markdown code fences if present
     response = response.replace("```json", "").replace("```", "").strip()
-    
-    # Pre-process: Evaluate arithmetic expressions in numeric fields before parsing
-    # This handles cases like {"yaw": 1.0236+3.14159} which are invalid JSON
-    def eval_arithmetic_in_json(text):
-        """Find and evaluate arithmetic expressions in JSON-like strings."""
-        import re
-        # Pattern: "key": value where value might be an arithmetic expression
-        # Match unquoted numeric expressions after colons
-        # Pattern matches: "key": 1.23+4.56 or "key": "1.23+4.56"
-        pattern = r'"([^"]+)":\s*("?)([0-9.+\-*/().\s]+)("?)'
-        
-        def replace(match):
-            key = match.group(1)
-            open_quote = match.group(2)
-            expr = match.group(3).strip()
-            close_quote = match.group(4)
-            
-            # Only process if it contains arithmetic operators and isn't a variable reference
-            if any(op in expr for op in ['+', '-', '*', '/']) and not expr.startswith('$'):
-                try:
-                    import ast
-                    result = ast.literal_eval(expr)
-                    if isinstance(result, (int, float)):
-                        return f'"{key}": {result}'
-                except (ValueError, SyntaxError, TypeError):
-                    pass
-            
-            # Return original if evaluation fails
-            return match.group(0)
-        
-        return re.sub(pattern, replace, text)
-    
-    # Try evaluating arithmetic expressions before parsing
-    response = eval_arithmetic_in_json(response)
     
     # Try direct parse first
     try:
@@ -908,42 +873,6 @@ def repair_json_string(json_str: str) -> Optional[Dict]:
     return None
 
 
-def safe_eval_numeric(value):
-    """
-    Safely evaluate simple arithmetic expressions to numeric values.
-    
-    Only evaluates strings that contain arithmetic operators and produces numeric results.
-    Uses ast.literal_eval() for safety (no function calls, no imports).
-    
-    Args:
-        value: Value to evaluate (int, float, or string)
-        
-    Returns:
-        Numeric value if evaluation succeeds, original value otherwise
-    """
-    if isinstance(value, (int, float)):
-        return value
-    
-    if isinstance(value, str):
-        # Only evaluate if it looks like arithmetic (contains operators)
-        # Skip if it's a variable reference, URL, or other non-numeric string
-        if any(op in value for op in ['+', '-', '*', '/', '(', ')']) and not value.startswith('$'):
-            try:
-                import ast
-                # ast.literal_eval only evaluates literals and simple expressions
-                # It's safe - no function calls, no imports, no side effects
-                result = ast.literal_eval(value)
-                if isinstance(result, (int, float)):
-                    logger.debug(f"Evaluated numeric expression '{value}' -> {result}")
-                    return result
-            except (ValueError, SyntaxError, TypeError) as e:
-                logger.debug(f"Could not evaluate '{value}' as numeric expression: {e}")
-                # Return original value if evaluation fails
-                pass
-    
-    return value
-
-
 def sgl_to_infospace_action(tool_name: str, args_json: str, step: int, available_tools: Dict[str, Dict]) -> Dict:
     """
     Convert SGLang Stage 2 output to infospace action format.
@@ -1011,25 +940,6 @@ def sgl_to_infospace_action(tool_name: str, args_json: str, step: int, available
                 if re.match(r'^[a-zA-Z_]\w*$', val) and not val.startswith(('Note_', 'Collection_', 'http://', 'https://')):
                     args[field] = f"${val}"
                     logger.debug(f"Normalized '{field}' field: '{val}' -> '${val}'")
-    
-    # Resolve numeric expressions in known numeric fields
-    # Common numeric fields across tools
-    numeric_fields = [
-        # Minecraft tools
-        'yaw', 'pitch', 'duration', 'forward', 'back', 'right', 'left', 'up', 'down',
-        'x', 'y', 'z', 'rel_x', 'rel_y', 'rel_z', 'radius', 'blocks_radius', 'entities_radius',
-        'count', 'limit', 'threshold', 'compression_ratio',
-        # General numeric fields
-        'precision', 'step', 'offset'
-    ]
-    
-    for field in numeric_fields:
-        if field in args:
-            original_value = args[field]
-            evaluated_value = safe_eval_numeric(original_value)
-            if evaluated_value != original_value:
-                args[field] = evaluated_value
-                logger.info(f"Resolved numeric expression in {tool_name}.{field}: '{original_value}' -> {evaluated_value}")
     
     # Build action - ALL fields at top level (flat format)
     action = {"type": tool_name}
@@ -1385,106 +1295,82 @@ if HAS_SGLANG:
         
         # Stage 2/3 format instructions
         s += user(
-            "#Stage 2 FORMAT:\n"
-            "  TOOL_NAME: <name>\n"
+            "Stage 2 FORMAT:\n"
+            "TOOL_NAME: <name>\n"
             "  TOOL_ARGS_JSON: <json object>\n\n"
-            "#Stage 2 NUMERIC ARGUMENTS:\n"
-            "  IMPORTANT: All numeric tool arguments (integers, floats) must be simple literals.\n"
-            "  Perform calculations in the THOUGHTS block first, then pass only the final computed value.\n"
-            "  Example: If you need yaw = current_yaw + pi, calculate it mentally (e.g., 1.0236 + 3.14159 = 4.16519),\n"
-            "           then use {\"yaw\": 4.16519} - NOT {\"yaw\": \"1.0236+3.14159\"}.\n"
-            "  Arithmetic expressions in JSON will cause parsing errors.\n\n"
-            "#Stage 3 FORMAT:\n"
+            "Stage 3 FORMAT:\n"
             "  THOUGHTS: <text>\n"
             "  HYPOTHESES: [<hypothesis1>, <hypothesis2>, ...]\n"
-            "  AUDIT: - <hypothesis1>: {Supported / Unsupported / Contradicated}\n,...\n"
+            "  ASSUMPTIONS: - <hypothesis1>: {Supported / Unsupported / Contradicated}\n,..."
             "  DONE: <YES or NO - is the entire GOAL satisfied?>\n"
             "  NEXT_TASK: <next high-level subgoal, or blank if DONE=YES>\n"
-            "  REQUEST_TOOLS: <json array of tool names or empty array []>\n"
-            "#Stage 3 INSTRUCTIONS:\n"
-            "  HYPOTHESIS Instructions:\n"
-            "   - Identify unverified beliefs influencing your next step. Consider the following categories of hypotheses:\n"
-            "      1. DATA: Claims about completeness or optimality (e.g., 'These are the only results').\n"
-            "      2. SYSTEM: Beliefs about tool logic or failures (e.g., 'The tool failed because the query was too long').\n"
-            "      3. WORLD: Causal theories about the goal (e.g., 'The user likely wants the cheapest option, not the fastest').\n"
-            "  AUDIT Instructions:\n"
-            "    - For each hypothesis, perform the following steps strictly and in order.\n"
-            "    - Do not reinterpret, soften, or add qualifiers to hypotheses. Audit only what is explicitly claimed:\n"
-            "      1. DECLARE SCOPE  \n"
-            "      - Classify the hypothesis as exactly one of:\n"
-            "        - observational: direct statement explicitly supported by a tool output\n"
-            "        - observed-set: comparison or claim limited to items actually observed\n"
-            "        - global: claim extending beyond observed data\n"
-            "        - If the hypothesis does not explicitly state its scope, assume it is global.\n"
-            "      2. AUDIT EVIDENCE VS SCOPE  \n"
-            "        - Assign exactly one verdict:\n"
-            "        - SUPPORTED: evidence fully supports the claim within its declared scope\n"
-            "        - UNSUPPORTED: evidence is insufficient or the scope exceeds the evidence\n"
-            "        - CONTRADICTED: evidence directly conflicts with the claim\n"
-            "      3. MANDATORY DOWNGRADES (apply without exception)\n"
-            "        - Hypotheses containing words such as 'nearest', 'closest', 'only', 'all', or 'none'\n"
-            "          require at least observed-set scope.\n"
-            "        - If tool output indicates sampling, partial, coarse, or non-exhaustive data,\n"
-            "          global hypotheses cannot be SUPPORTED.\n"
-            "        - Numeric or distance calculations do not imply optimality unless all candidates\n"
-            "          within the declared scope are explicitly compared.\n"
-            "      4. OUTPUT FORMAT (strict)\n"       
-            "        - For each hypothesis, output:\n"
-            "        - <hypothesis text>\n"
-            "        - scope: <observational | observed-set | global>\n"
-            "        - verdict: <SUPPORTED | UNSUPPORTED | CONTRADICTED>\n"
-            "  DONE Instructions:\n"
+            "  REQUEST_TOOLS: <json array of tool names or empty array []>\n\n"
+            "Stage 3 INSTRUCTIONS:\n"
+            "  AUDIT- You are an assumption auditor.\n"
+            "  - Input:\n"
+            "    - HYPOTHESES (from HYPOTHESES section above)\n"
+            "    - ACTUAL RESULT (from ACTUAL RESULT section above)\n"
+            "  - Task:\n"
+            "    For each hypothesis, perform the following steps strictly and in order.\n"
+            "    1. DECLARE SCOPE  \n"
+            "    Classify the hypothesis as exactly one of:\n"
+            "    - observational: direct statement explicitly supported by a tool output\n"
+            "    - observed-set: comparison or claim limited to items actually observed\n"
+            "    - global: claim extending beyond observed data\n"
+            "    If the hypothesis does not explicitly state its scope, assume it is global.\n"
+            "\n"
+            "    2. AUDIT EVIDENCE VS SCOPE  \n"
+            "    Assign exactly one verdict:\n"
+            "    - SUPPORTED: evidence fully supports the claim within its declared scope\n"
+            "    - UNSUPPORTED: evidence is insufficient or the scope exceeds the evidence\n"
+            "    - CONTRADICTED: evidence directly conflicts with the claim\n"
+            "\n"
+            "    3. MANDATORY DOWNGRADES (apply without exception)\n"
+            "    - Hypotheses containing words such as 'nearest', 'closest', 'only', 'all', or 'none'\n"
+            "      require at least observed-set scope.\n"
+            "    - If tool output indicates sampling, partial, coarse, or non-exhaustive data,\n"
+            "      global hypotheses cannot be SUPPORTED.\n"
+            "    - Numeric or distance calculations do not imply optimality unless all candidates\n"
+            "      within the declared scope are explicitly compared.\n"
+            "\n"
+            "    4. OUTPUT FORMAT (strict)\n"       
+            "    For each hypothesis, output:\n"
+            "      - <hypothesis text>\n"
+            "      - scope: <observational | observed-set | global>\n"
+            "      - verdict: <SUPPORTED | UNSUPPORTED | CONTRADICTED>\n"
+            "    Do not reinterpret, soften, or add qualifiers to hypotheses. Audit only what is explicitly claimed.\n\n"
+            "  DONE:\n"
             "  - Only mark DONE: YES after ALL required actions are executed\n"
             "  - COMPLENESS CHECK: If the question asks for an attribute that can change over time (jobs, spouses, locations), you must verify if multiple values exist\n"
             "  - DO NOT STOP at the first search result. If you find one answer (e.g., 'Ambassador to Czechoslovakia'), you must briefly verify no other equal-tier answers exist (e.g., 'Ambassador to Ghana') before finishing\n"
             "  - If goal requires communicating to user, use 'say' primitive BEFORE marking done\n"
             "  - When DONE=YES, NEXT_TASK must be blank (leave empty)\n\n"
-            "  NEXT_TASK Instructions:\n"
-            "  - If AUDIT yields any UNSUPPORTED or CONTRADICTED verdicts, the NEXT_TASK must be a remediation step (e.g., 'Broaden search', 'Switch tool', 'Verify source').\n"
-            "  - If AUDIT is fully SUPPORTED, propose the next logical step toward the #GOAL.\n"
-            "  - Must be concise, actionable, and distinct from the current task.\n"
-            "  - If DONE=YES, this field must be empty.\n\n"
-            "  REQUEST_TOOLS Instructions:\n"
+            "  REQUEST_TOOLS:\n"
             "  - Always output valid JSON array: [] or [\"tool1\", \"tool2\"]\n"
             "  - If no tools needed, output: []\n"
             "  - If tools needed, output complete array on single line\n"
             "  - Example: [\"project\", \"filter-structured\"]\n\n"
             "  - If you realize you need a tool not initially selected, add it to REQUEST_TOOLS.\n"
             "  - You'll receive its full documentation before the next step.\n\n"
-            "  METHOD TOOL Instructions:\n"
-            "  - A 'Method' is a text-based protocol YOU must execute step-by-step.\n"
-            "  - It is NOT an automated background process.\n"
-            "  - When you select a Method, you load its manual and must strictly follow its instructions yourself.\n\n"
             "Follow these formats exactly."
         )
         s += assistant("Understood.\n")
 
         # Main loop
         current_task = s["first_task"].strip()
-        active_method_name = None
-        active_method_step = None
         for step in range(max_steps):
             # Stage 2: Choose tool + args
-            if active_method_name:
-                method_step_info = f"CURRENT METHOD STEP: {active_method_step}\n" if active_method_step else ""
-                s += user(
-                    f"#Stage 2 INSTRUCTION MODE: Executing {active_method_name}.\n"
-                    f"{method_step_info}"
-                    "Select the tool explicitly required by the current Method Step.\n"
-                    "FORMAT: State the current Method Step before choosing the tool."
-                )
-            else:
-                s += user(
-                    f"STAGE 2 (step {step + 1}/{max_steps}):\n"
-                    f"#GOAL: {goal_for_step}\n#END GOAL\n"
-                    f"CURRENT_TASK: {current_task}\n"
-                    "Choose tool and JSON args using Stage 2 FORMAT.\n"
-                )
+            s += user(
+                f"STAGE 2 (step {step + 1}/{max_steps}):\n"
+                f"#GOAL: {goal_for_step}\n#END GOAL\n"
+                f"CURRENT_TASK: {current_task}\n"
+                "Choose tool and JSON args using Stage 2 FORMAT.\n"
+            )
             
             s += assistant(
                 "TOOL_NAME: "
-                + gen(f"tool_name_{step}", max_tokens=32, temperature=GEN_TEMPERATURE, stop="TOOL_ARGS_JSON")
-                + "\nTOOL_ARGS_JSON: "
+                + gen(f"tool_name_{step}", max_tokens=32, temperature=GEN_TEMPERATURE, stop="\n")
+                + "\nTOOL_ARGS_JSON (max 1024 tokens): "
                 + gen(f"tool_args_{step}", max_tokens=1024, temperature=GEN_TEMPERATURE, stop="\n")
                 + "\n"
             )
@@ -1501,17 +1387,7 @@ if HAS_SGLANG:
                 resource_id_before = executor.plan_bindings.get(out_var.lstrip('$'))
             
             # Execute action normally - think/say/ask now return their text content
-            
-            # Check if this is a 'method' tool (Skill/Protocol) and intercept execution
-            tool_info = executor.available_tools.get(tool_name, {})
-            if tool_info.get('type') == 'method':
-                active_method_name = tool_name
-                active_method_step = "STEP 1"
-                tool_result = f"SUCCESS | Method {tool_name} loaded. YOU are the executor. MANUAL EXECUTION REQUIRED. This method does NOT execute automatically. YOU must manually execute the tools for STEP 1 now."
-                logger.info(f"Step {step}: Activated Protocol {tool_name}")
-            else:
-                tool_result = execute_infospace_action(action, executor, executor.agent_name)
-            
+            tool_result = execute_infospace_action(action, executor, executor.agent_name)
             logger.info(f"Stage 2: Choose tool + args\n{tool_name} -> {tool_args_json}")
             logger.info(f"Step {step}: {tool_name} -> {tool_result[:100]}")
             
@@ -1520,59 +1396,38 @@ if HAS_SGLANG:
             if len(tool_result) > 512:
                 result_display += f"\n... [TRUNCATED - showing 512 of {len(tool_result)} chars]"
             
-            if active_method_name:
-                s += user(
-                    f"=====\n"
-                    f"STAGE 3 - TOOL EXECUTION COMPLETE (step {step + 1}/{max_steps})\n"
-                    f"=====\n\n"
-                    f"Tool executed: `{tool_name}`\n"
-                    f"Arguments: {tool_args_json}\n\n"
-                    f">> ACTUAL RESULT (ground truth) <<\n"
-                    f"{result_display}\n"
-                    f">> END RESULT <<\n\n"
-                    f"METHOD NEXT_TASK INSTRUCTIONS:\n"
-                    f"Identify the Exact Step defined in the {active_method_name} manual that matches the ACTUAL RESULT above.\n"
-                    f"NEXT_TASK must be written as: [METHOD: STEP X] <Instruction from manual>.\n"
-                    f"WARNING: The method does NOT execute automatically. YOU must select the tools to perform the NEXT_TASK.\n"
-                    f"Do not invent new steps. If the method says 'Return to STEP 1', your NEXT_TASK is 'Return to STEP 1'.\n"
-                    f"TERMINATION: When the Method says 'TERMINATE: SUCCESS', write 'METHOD COMPLETE' in THOUGHTS. Then, if the original GOAL is not yet done, proceed to the next high-level task.\n"
-                    f"DONE: YES is forbidden until the Method says 'TERMINATE: SUCCESS'.\n\n"
-                    f"Respond using Stage 3 FORMAT. Be concise.\n"
-                    f"Ensure the REQUEST_TOOLS list is a valid JSON list of tool names.\n"
-                )
-            else:
-                s += user(
-                    f"=====\n"
-                    f"STAGE 3 - TOOL EXECUTION COMPLETE (step {step + 1}/{max_steps})\n"
-                    f"=====\n\n"
-                    f"Tool executed: `{tool_name}`\n"
-                    f"Arguments: {tool_args_json}\n\n"
-                    f">> ACTUAL RESULT (ground truth) <<\n"
-                    f"{result_display}\n"
-                    f">> END RESULT <<\n\n"
-                    f"INSTRUCTIONS:\n"
-                    f"1. The result above is GROUND TRUTH. Use it exactly as shown.\n"
-                    f"2. If reporting to user, use ONLY the values from the result above.\n"
-                    f"3. Do NOT approximate, summarize, or invent values.\n"
-                    f"4. Evaluate: Is the goal complete, including actual execution of all planned actions? If yes, respond DONE: YES.\n"
-                    f"   If no, determine the next action needed.\n\n"
-                    f"Respond using Stage 3 FORMAT. Be concise.\n"
-                    f"Ensure the REQUEST_TOOLS list is a valid JSON list of tool names.\n"
-                )
+            s += user(
+                f"=====\n"
+                f"STAGE 3 - TOOL EXECUTION COMPLETE (step {step + 1}/{max_steps})\n"
+                f"=====\n\n"
+                f"Tool executed: `{tool_name}`\n"
+                f"Arguments: {tool_args_json}\n\n"
+                f">> ACTUAL RESULT (ground truth) <<\n"
+                f"{result_display}\n"
+                f">> END RESULT <<\n\n"
+                f"INSTRUCTIONS:\n"
+                f"1. The result above is GROUND TRUTH. Use it exactly as shown.\n"
+                f"2. If reporting to user, use ONLY the values from the result above.\n"
+                f"3. Do NOT approximate, summarize, or invent values.\n"
+                f"4. Evaluate: Is the goal complete, including actual execution of all planned actions? If yes, respond DONE: YES.\n"
+                f"   If no, determine the next action needed.\n\n"
+                f"Respond using Stage 3 FORMAT. Be concise.\n"
+                f"Ensure the REQUEST_TOOLS list is a valid JSON list of tool names.\n"
+            )
             
             s += assistant(
                 "\nTHOUGHTS: "
-                + gen(f"thoughts_{step}", max_tokens=128, temperature=GEN_TEMPERATURE, stop="HYPOTHESES: ")
+                + gen(f"thoughts_{step}", max_tokens=128, temperature=GEN_TEMPERATURE, stop="\n")
                 +"\nHYPOTHESES: "
-                + gen(f"hypotheses_{step}", max_tokens=128, temperature=GEN_TEMPERATURE, stop="\nAUDIT: ")
-                +"\nAUDIT: "
-                + gen(f"assumption_audit_{step}",max_tokens=128,temperature=0.0,stop="\nDONE: ")
+                + gen(f"hypotheses_{step}", max_tokens=128, temperature=GEN_TEMPERATURE, stop="\n")
+                +"ASSUMPTIONS"
+                + gen(f"assumption_audit_{step}",max_tokens=128,temperature=0.0,stop="\n\n")
                 + "\nDONE: "
-                + gen(f"done_{step}", max_tokens=8, temperature=GEN_TEMPERATURE, stop="\nNEXT_TASK: ")
+                + gen(f"done_{step}", max_tokens=8, temperature=GEN_TEMPERATURE, stop="\n")
                 + "\nNEXT_TASK: "
-                + gen(f"next_task_{step}", max_tokens=128, temperature=GEN_TEMPERATURE, stop="\nREQUEST_TOOLS: ")
+                + gen(f"next_task_{step}", max_tokens=128, temperature=GEN_TEMPERATURE, stop="\n")
                 + "\nREQUEST_TOOLS: "
-                + gen(f"request_tools_{step}", max_tokens=96, temperature=GEN_TEMPERATURE, stop=["\n\n"])
+                + gen(f"request_tools_{step}", max_tokens=96, temperature=GEN_TEMPERATURE, stop=["\n\n", "\n\nSTAGE"])
                 + "\n"
             )
             logger.info(f"THOUGHTS: {s[f'thoughts_{step}']}")
@@ -1668,20 +1523,6 @@ if HAS_SGLANG:
             if next_task_raw and next_task_raw.lower() not in ["", "none", "null", "n/a"]:
                 current_task = next_task_raw
                 logger.info(f"Step {step}: Next task: {current_task}")
-                
-                # Parse Method Step from NEXT_TASK if in method mode
-                if active_method_name:
-                    # Check for explicit completion signal in THOUGHTS
-                    if 'METHOD COMPLETE' in thoughts_text.upper():
-                        logger.info(f"Step {step}: Method {active_method_name} completed. Exiting instruction mode.")
-                        active_method_name = None
-                        active_method_step = None
-                    else:
-                        # Look for [METHOD: STEP X] pattern
-                        step_match = re.search(r'\[METHOD:\s*(STEP\s*\w+)\]', next_task_raw, re.IGNORECASE)
-                        if step_match:
-                            active_method_step = step_match.group(1).upper()
-                            logger.info(f"Step {step}: Identified Method Step: {active_method_step}")
             else:
                 logger.warning(f"Step {step}: No NEXT_TASK provided, keeping current task")
         
@@ -2073,6 +1914,7 @@ END_PLAN
         # State tracking
         first_goal = None
         current_goal_prefix = None
+        hypothesis_set = set()  # Track full hypothesis set for delta computation
         seen_keys = {}  # Track duplicate content by key
         
         i = 0
@@ -2115,7 +1957,7 @@ END_PLAN
             
             # CALL event (TOOL_NAME + TOOL_ARGS_JSON)
             elif 'TOOL_NAME:' in section:
-                tool_match = re.search(r'TOOL_NAME:\s*([\w-]+)', section)
+                tool_match = re.search(r'TOOL_NAME:\s*(\w+)', section)
                 args_match = re.search(r'TOOL_ARGS_JSON[^:]*:\s*(\{.*?\})', section, re.DOTALL)
                 
                 if tool_match:
@@ -2142,7 +1984,7 @@ END_PLAN
             
             # RESULT event (STAGE 3 + ACTUAL RESULT)
             elif 'STAGE 3 - TOOL EXECUTION COMPLETE' in section:
-                tool_match = re.search(r'Tool executed: `([\w-]+)`', section)
+                tool_match = re.search(r'Tool executed: `(\w+)`', section)
                 result_match = re.search(r'>> ACTUAL RESULT.*?<<\n(.*?)\n>> END RESULT', section, re.DOTALL)
                 bound_match = re.search(r'Bound: (\$\w+)', section)
                 status_match = re.search(r'(SUCCESS|FAILED)', section)
@@ -2170,31 +2012,45 @@ END_PLAN
             # THOUGHT event
             elif 'THOUGHTS' in section or 'HYPOTHESES:' in section or 'DONE:' in section:
                 thoughts_match = re.search(r'THOUGHTS[^:]*:\s*(.*?)(?:\nHYPOTHESES|$)', section, re.DOTALL)
-                hyp_match = re.search(r'HYPOTHESES:\s*(.*?)(?:\nASSUMPTIONS|$)', section, re.DOTALL)
+                hyp_match = re.search(r'HYPOTHESES:\s*(.*?)(?:\n|$)', section)
                 assump_match = re.search(r'ASSUMPTIONS:\s*(.*?)(?:\nDONE|$)', section, re.DOTALL)
                 done_match = re.search(r'DONE:\s*(.*?)(?:\nNEXT_TASK|$)', section)
                 next_match = re.search(r'NEXT_TASK:\s*(.*?)(?:\nREQUEST_TOOLS|$)', section)
-                request_tools_match = re.search(r'REQUEST_TOOLS:\s*(.*?)(?:\n|$)', section, re.DOTALL)
                 
                 thoughts = thoughts_match.group(1).strip() if thoughts_match else None
                 hypotheses = hyp_match.group(1).strip() if hyp_match else None
                 assumptions = assump_match.group(1).strip() if assump_match else None
                 done = done_match.group(1).strip() if done_match else None
                 next_task = next_match.group(1).strip() if next_match else None
-                request_tools = request_tools_match.group(1).strip() if request_tools_match else None
+                
+                # Track hypotheses from assumptions
+                if assumptions:
+                    for hyp_match in re.finditer(r'- ([^:]+):\s*\{([^}]+)\}', assumptions):
+                        hyp_name = hyp_match.group(1).strip()
+                        hyp_state = hyp_match.group(2).strip()
+                        hypothesis_set.add(hyp_name)
                 
                 # Build thought event
                 event_parts = ["[THOUGHT]"]
                 if thoughts:
+                    # Keep complete entire thought (not just intent)
                     event_parts.append(f"THOUGHTS: {thoughts}")
                 
                 if hypotheses:
-                    # Include complete hypotheses (no delta tracking)
-                    event_parts.append(f"HYPOTHESES: {hypotheses}")
-                
-                if assumptions:
-                    # Include complete assumptions (no delta tracking)
-                    event_parts.append(f"ASSUMPTIONS: {assumptions}")
+                    # Compute deltas (new hypotheses)
+                    hyp_list = []
+                    try:
+                        hyp_json = json.loads(hypotheses)
+                        if isinstance(hyp_json, list):
+                            for h in hyp_json:
+                                if h not in hypothesis_set:
+                                    hyp_list.append(f"+{h}")
+                                    hypothesis_set.add(h)
+                    except:
+                        # Not JSON, try parsing as text
+                        pass
+                    if hyp_list:
+                        event_parts.append(f"HYPOTHESES: {', '.join(hyp_list)}")
                 
                 # Check for duplicates
                 if done:
@@ -2208,12 +2064,6 @@ END_PLAN
                     if next_key not in seen_keys:
                         event_parts.append(f"NEXT: {next_task}")
                         seen_keys[next_key] = True
-                
-                if request_tools:
-                    tools_key = f"REQUEST_TOOLS:{request_tools}"
-                    if tools_key not in seen_keys:
-                        event_parts.append(f"REQUEST_TOOLS: {request_tools}")
-                        seen_keys[tools_key] = True
                 
                 if len(event_parts) > 1:  # More than just [THOUGHT]
                     compressed_events.append('\n'.join(event_parts) + '\n')

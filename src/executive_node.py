@@ -455,7 +455,7 @@ class ZenohExecutiveNode:
                         model_path=sgl_model_path,
                         tokenizer_path=sgl_model_path,
                         device="cuda",
-                        context_length=32768,
+                        context_length=65536,
                         dtype="auto",
                         tp_size=1,
                         #enable_lora=True, 
@@ -463,7 +463,7 @@ class ZenohExecutiveNode:
                         #max_loras_per_batch=1,
                         #lora_paths = {'musing_adapter': '/home/bruce/Downloads/Cognitive_workbench/src/musing/adapters/probe_adapter'},
 
-                        mem_fraction_static=0.85,
+                        mem_fraction_static=0.9,
                         attention_backend="flashinfer"
                     )
                 sgl.set_default_backend(self.runtime)
@@ -1815,7 +1815,7 @@ Finally, using 'say', respond in character to User"""
                     template=template,
                     goal=goal_text, 
                     context=context, 
-                    max_steps=16
+                    max_steps=24
                 )
             else:
                 logger.error("No planner available for infospace planning")
