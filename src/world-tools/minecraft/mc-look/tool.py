@@ -36,14 +36,16 @@ def tool(input_value=None, **kwargs):
     if yaw is None or pitch is None:
         return {"status": "failed", "reason": "yaw and pitch required (radians)"}
     
+    url = f"{minecraft_url}/act/look"
+    body = {"yaw": float(yaw), "pitch": float(pitch)}
+    
     try:
-        response = requests.post(
-            f"{minecraft_url}/act/look",
-            json={"yaw": float(yaw), "pitch": float(pitch)},
-            timeout=10.0
-        )
+        logger.info(f"🔍 mc-look: POST {url} body={body}")
+        response = requests.post(url, json=body, timeout=10.0)
+        logger.info(f"📥 mc-look: Response status={response.status_code}, headers={dict(response.headers)}")
         response.raise_for_status()
         data = response.json()
+        logger.debug(f"📥 mc-look: Response body={data}")
         
         # Format acknowledgement
         ack_text = f"Look command accepted (yaw: {yaw:.2f}, pitch: {pitch:.2f})"

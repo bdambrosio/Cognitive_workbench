@@ -231,19 +231,18 @@ def tool(input_value=None, **kwargs):
     minecraft_url = kwargs.get("world_url") or kwargs.get("minecraft_url") or DEFAULT_MINECRAFT_URL
     
     try:
-        params = {}
-        if kwargs.get("blocks_radius") is not None:
-            params["blocks_radius"] = kwargs.get("blocks_radius")
-        if kwargs.get("entities_radius") is not None:
-            params["entities_radius"] = kwargs.get("entities_radius")
-        if kwargs.get("radius") is not None:
-            params["blocks_radius"] = kwargs.get("radius")
+        # New minescript API uses simple radius parameter
+        radius = kwargs.get("blocks_radius") or kwargs.get("radius") or 5
+        radius = max(1, min(6, int(radius)))  # Clamp to valid range
         
-        params["entity_filter"] = "non-items"
-        
-        response = requests.get(f"{minecraft_url}/observe", params=params, timeout=10.0)
+        params = {"radius": radius}
+        url = f"{minecraft_url}/observe"
+        logger.info(f"🔍 mc-observe-blocks: GET {url} params={params}")
+        response = requests.get(url, params=params, timeout=10.0)
+        logger.info(f"📥 mc-observe-blocks: Response status={response.status_code}, headers={dict(response.headers)}")
         response.raise_for_status()
         data = response.json()
+        logger.debug(f"📥 mc-observe-blocks: Response body keys={list(data.keys())}, blocks_count={len(data.get('perception', {}).get('nearby_blocks', []))}")
         
         status = data.get('status', {})
         perception = data.get('perception', {})
@@ -447,10 +446,36 @@ def tool(input_value=None, **kwargs):
         
         summary_text = "\n".join(summary_parts)
         
+        # Build structured data dict for mc-map-update (planner still sees text SUMMARY)
+        structured_data = {
+            "pose": {
+                "x": px,
+                "y": py,
+                "z": pz,
+                "yaw": yaw,
+                "pitch": pitch
+            },
+            "dirs": dirs_info,
+            "support": support_info,
+            "clear": clear_info,
+            "blocks": {
+                "seen": sorted(list(seen_blocks)),
+                "fluid": sorted(list(fluid_blocks)),
+                "hazard": sorted(list(hazard_blocks))
+            },
+            "geom": geom,
+            "aff": aff,
+            "conf": conf,
+            "note": note
+        }
+        
         return {
-            "text": summary_text,
+            "text": summary_text,  # Planner sees this
             "format": "text",
-            "metadata": data,
+            "metadata": {
+                **data,  # Include raw API response
+                **structured_data  # Include structured fields for mc-map-update
+            },
             "char_count": len(summary_text)
         }
     except requests.exceptions.RequestException as e:

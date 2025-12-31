@@ -2,6 +2,9 @@
 name: extract-struct
 description: Extract structured metadata (title, authors, year) from paper text using LLM. Use to convert online search results metadata to JSON
 type: prompt_augmentation
+schema_hint:
+  target: "$variable or Note ID (paper text)"
+  out: "$variable"
 parameters:
   - name: paper_text
     type: string
