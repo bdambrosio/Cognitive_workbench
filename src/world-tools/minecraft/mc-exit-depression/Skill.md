@@ -1,9 +1,11 @@
 ---
 name : mc-exit-depression
-description: Exit a shallow depression or uneven terrain by finding a nearby position from which vertical progress is possible without constructing a staircase.
+description: Pathfinding utility to escape pits, holes, or uneven terrain. Scans for natural exits via horizontal movement and minimal terrain modification. Does not build structures.
 type: method
 resummable: yes
 invalidates: [position, orientation, visibility, groundedness]
+examples:
+  - '{"type":"mc-exit-depression","out":"$result"}'
 ---
 
 #PURPOSE:

@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Map Visualization - Jill-minecraft_map</title>
+    <meta charset="UTF-8">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 20px;
+        }
+        .header {
+            background: #252526;
+            padding: 15px 20px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        h1 {
+            font-size: 20px;
+            font-weight: 500;
+            color: #cccccc;
+        }
+        .stats {
+            font-size: 14px;
+            color: #888;
+        }
+        .controls {
+            background: #252526;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        button {
+            background: #0e639c;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+        button:hover { background: #1177bb; }
+        button:active { background: #0d5585; }
+        .container {
+            display: flex;
+            gap: 20px;
+        }
+        .map-area {
+            flex: 1;
+            background: #252526;
+            border-radius: 4px;
+            padding: 20px;
+            position: relative;
+        }
+        canvas {
+            border: 1px solid #3e3e42;
+            border-radius: 4px;
+            background: #1e1e1e;
+            cursor: crosshair;
+        }
+        .sidebar {
+            width: 300px;
+            background: #252526;
+            border-radius: 4px;
+            padding: 15px;
+            max-height: 800px;
+            overflow-y: auto;
+        }
+        .section {
+            margin-bottom: 20px;
+        }
+        .section-title {
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            color: #888;
+            margin-bottom: 10px;
+            letter-spacing: 0.5px;
+        }
+        .waypoint-item {
+            padding: 6px 10px;
+            margin: 4px 0;
+            background: #2a2d2e;
+            border-radius: 3px;
+            font-size: 13px;
+            cursor: pointer;
+        }
+        .waypoint-item:hover {
+            background: #3a3d3e;
+        }
+        .location-item {
+            padding: 6px 10px;
+            margin: 4px 0;
+            background: #2a2d2e;
+            border-radius: 3px;
+            font-size: 12px;
+            font-family: 'Consolas', monospace;
+        }
+        .info-panel {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(30, 30, 30, 0.9);
+            padding: 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            display: none;
+            border: 1px solid #3e3e42;
+        }
+        .info-panel.visible {
+            display: block;
+        }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #1e1e1e; }
+        ::-webkit-scrollbar-thumb { background: #424242; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #4e4e4e; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🗺️ Map Visualization: Jill-minecraft_map</h1>
+        <div class="stats">
+            1 visited • 39 observed • 0 waypoints
+        </div>
+    </div>
+    
+    <div class="controls">
+        <button onclick="resetView()">Reset View</button>
+        <button onclick="fitToBounds()">Fit All</button>
+        <button onclick="toggleWaypoints()">Toggle Waypoints</button>
+        <button onclick="exportData()">Export JSON</button>
+    </div>
+    
+    <div class="container">
+        <div class="map-area">
+            <canvas id="mapCanvas" width="800" height="600"></canvas>
+            <div id="infoPanel" class="info-panel"></div>
+        </div>
+        
+        <div class="sidebar">
+            <div class="section">
+                <div class="section-title">Waypoints (0)</div>
+                <div id="waypointsList">
+
+                </div>
+            </div>
+            
+            <div class="section">
+                <div class="section-title">Recent Locations</div>
+                <div id="locationsList">
+
+                    <div class="location-item" onclick="focusLocation(-79, -113)">
+                        (-79, 71, -113)<br>
+                        <span style="color: #888; font-size: 11px;">
+                            Visits: 0
+                            
+                        </span>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        const canvas = document.getElementById('mapCanvas');
+        const ctx = canvas.getContext('2d');
+        const infoPanel = document.getElementById('infoPanel');
+        
+        // Map data
+        const locations = [{"x": -79, "y": 71, "z": -113, "visit_count": 0, "waypoints": [], "first_visit": "", "last_visit": "", "observation": {"aff": {"step": false, "jump": true, "descend": true, "sky": true}, "geom": {"pit": true, "stair": false, "slope": false}, "blocks": {"seen": ["minecraft:dirt", "minecraft:grass_block[snowy=true]", "minecraft:snow[layers=1]"], "fluid": [], "hazard": []}, "support": {"here": {"type": "solid", "block": "minecraft:grass_block[snowy=true]"}, "fwd": {"type": "solid", "block": "minecraft:grass_block[snowy=true]", "forward_block": "minecraft:snow[layers=1]"}}, "clear": {"fwd": {"body": true, "head": true}, "up": {"body": true, "head": true}}}}];
+        const observedBlocks = [{"x": -79, "y": 71, "z": -112, "name": "minecraft:snow[layers=1]", "dy": 0}, {"x": -78, "y": 71, "z": -113, "name": "minecraft:snow[layers=1]", "dy": 0}, {"x": -78, "y": 71, "z": -111, "name": "minecraft:snow[layers=1]", "dy": 0}, {"x": -77, "y": 71, "z": -112, "name": "minecraft:snow[layers=1]", "dy": 0}, {"x": -78, "y": 70, "z": -112, "name": "minecraft:grass_block[snowy=true]", "dy": -1}, {"x": -80, "y": 71, "z": -112, "name": "minecraft:snow[layers=1]", "dy": 0}, {"x": -78, "y": 71, "z": -114, "name": "minecraft:snow[layers=1]", "dy": 0}, {"x": -78, "y": 71, "z": -110, "name": "minecraft:snow[layers=1]", "dy": 0}, {"x": -79, "y": 70, "z": -112, "name": "minecraft:grass_block[snowy=true]", "dy": -1}, {"x": -78, "y": 70, "z": -113, "name": "minecraft:grass_block[snowy=true]", "dy": -1}, {"x": -78, "y": 70, "z": -111, "name": "minecraft:grass_block[snowy=true]", "dy": -1}, {"x": -77, "y": 70, "z": -112, "name": "minecraft:grass_block[snowy=true]", "dy": -1}, {"x": -81, "y": 71, "z": -112, "name": "minecraft:grass_block[snowy=true]", "dy": 0}, {"x": -80, "y": 71, "z": -113, "name": "minecraft:snow[layers=1]", "dy": 0}, {"x": -80, "y": 71, "z": -111, "name": "minecraft:snow[layers=1]", "dy": 0}, {"x": -79, "y": 71, "z": -114, "name": "minecraft:snow[layers=1]", "dy": 0}, {"x": -78, "y": 71, "z": -115, "name": "minecraft:snow[layers=1]", "dy": 0}, {"x": -80, "y": 70, "z": -112, "name": "minecraft:grass_block[snowy=true]", "dy": -1}, {"x": -79, "y": 70, "z": -113, "name": "minecraft:grass_block[snowy=true]", "dy": -1}, {"x": -78, "y": 70, "z": -114, "name": "minecraft:grass_block[snowy=true]", "dy": -1}, {"x": -82, "y": 71, "z": -112, "name": "minecraft:grass_block[snowy=true]", "dy": 0}, {"x": -81, "y": 71, "z": -113, "name": "minecraft:snow[layers=1]", "dy": 0}, {"x": -81, "y": 71, "z": -111, "name": "minecraft:grass_block[snowy=true]", "dy": 0}, {"x": -80, "y": 71, "z": -114, "name": "minecraft:snow[layers=1]", "dy": 0}, {"x": -80, "y": 71, "z": -110, "name": "minecraft:grass_block[snowy=true]", "dy": 0}, {"x": -79, "y": 71, "z": -115, "name": "minecraft:snow[layers=1]", "dy": 0}, {"x": -78, "y": 71, "z": -116, "name": "minecraft:snow[layers=1]", "dy": 0}, {"x": -80, "y": 70, "z": -113, "name": "minecraft:grass_block[snowy=true]", "dy": -1}, {"x": -79, "y": 70, "z": -114, "name": "minecraft:grass_block[snowy=true]", "dy": -1}, {"x": -81, "y": 72, "z": -112, "name": "minecraft:snow[layers=1]", "dy": 1}, {"x": -83, "y": 71, "z": -112, "name": "minecraft:grass_block[snowy=true]", "dy": 0}, {"x": -82, "y": 71, "z": -113, "name": "minecraft:grass_block[snowy=true]", "dy": 0}, {"x": -81, "y": 71, "z": -114, "name": "minecraft:snow[layers=1]", "dy": 0}, {"x": -80, "y": 71, "z": -115, "name": "minecraft:snow[layers=1]", "dy": 0}, {"x": -78, "y": 71, "z": -117, "name": "minecraft:snow[layers=1]", "dy": 0}, {"x": -81, "y": 70, "z": -113, "name": "minecraft:grass_block[snowy=true]", "dy": -1}, {"x": -80, "y": 70, "z": -114, "name": "minecraft:grass_block[snowy=true]", "dy": -1}, {"x": -79, "y": 70, "z": -115, "name": "minecraft:grass_block[snowy=true]", "dy": -1}, {"x": -74, "y": 70, "z": -112, "name": "minecraft:snow[layers=1]", "dy": -1}];
+        const waypoints = [];
+        const bounds = {
+            minX: -83,
+            maxX: -74,
+            minZ: -117,
+            maxZ: -110,
+            rangeX: 9,
+            rangeZ: 7
+        };
+        
+        // View state
+        let scale = 1;
+        let offsetX = 0;
+        let offsetZ = 0;
+        let showWaypoints = true;
+        let isDragging = false;
+        let dragStart = {x: 0, z: 0};
+        
+        // Convert world coordinates to canvas coordinates
+        function worldToCanvas(x, z) {
+            const canvasX = ((x - bounds.minX) / bounds.rangeX) * canvas.width * scale + offsetX;
+            const canvasZ = ((z - bounds.minZ) / bounds.rangeZ) * canvas.height * scale + offsetZ;
+            return {x: canvasX, z: canvasZ};
+        }
+        
+        // Convert canvas coordinates to world coordinates
+        function canvasToWorld(canvasX, canvasZ) {
+            const worldX = ((canvasX - offsetX) / scale) * bounds.rangeX / canvas.width + bounds.minX;
+            const worldZ = ((canvasZ - offsetZ) / scale) * bounds.rangeZ / canvas.height + bounds.minZ;
+            return {x: worldX, z: worldZ};
+        }
+        
+        // Draw map
+        function drawMap() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw grid
+            ctx.strokeStyle = '#2a2d2e';
+            ctx.lineWidth = 1;
+            const gridSpacing = 50 * scale;
+            for (let x = -offsetX % gridSpacing; x < canvas.width; x += gridSpacing) {
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, canvas.height);
+                ctx.stroke();
+            }
+            for (let z = -offsetZ % gridSpacing; z < canvas.height; z += gridSpacing) {
+                ctx.beginPath();
+                ctx.moveTo(0, z);
+                ctx.lineTo(canvas.width, z);
+                ctx.stroke();
+            }
+            
+            // Draw observed blocks (smaller, lighter)
+            observedBlocks.forEach(block => {
+                const pos = worldToCanvas(block.x, block.z);
+                ctx.fillStyle = 'rgba(150, 150, 150, 0.4)';
+                ctx.beginPath();
+                ctx.arc(pos.x, pos.z, 1.5, 0, Math.PI * 2);
+                ctx.fill();
+            });
+            
+            // Draw visited locations (larger, colored)
+            locations.forEach(loc => {
+                const pos = worldToCanvas(loc.x, loc.z);
+                const radius = Math.max(3, Math.min(8, 3 + loc.visit_count * 0.5));
+                
+                // Color based on visit count
+                const intensity = Math.min(255, 100 + loc.visit_count * 30);
+                ctx.fillStyle = `rgb(${intensity}, 150, 100)`;
+                ctx.beginPath();
+                ctx.arc(pos.x, pos.z, radius, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Border
+                ctx.strokeStyle = '#4ec9b0';
+                ctx.lineWidth = 1;
+                ctx.stroke();
+            });
+            
+            // Draw waypoints
+            if (showWaypoints) {
+                waypoints.forEach(wp => {
+                    const pos = worldToCanvas(wp.x, wp.z);
+                    ctx.fillStyle = '#ffd700';
+                    ctx.beginPath();
+                    ctx.arc(pos.x, pos.z, 6, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.strokeStyle = '#ffaa00';
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+                    
+                    // Label
+                    ctx.fillStyle = '#ffd700';
+                    ctx.font = '12px sans-serif';
+                    ctx.fillText(wp.name, pos.x + 8, pos.z - 8);
+                });
+            }
+        }
+        
+        // Mouse events
+        canvas.addEventListener('mousedown', (e) => {
+            isDragging = true;
+            dragStart.x = e.offsetX;
+            dragStart.z = e.offsetY;
+        });
+        
+        canvas.addEventListener('mousemove', (e) => {
+            if (isDragging) {
+                offsetX += e.offsetX - dragStart.x;
+                offsetZ += e.offsetY - dragStart.z;
+                dragStart.x = e.offsetX;
+                dragStart.z = e.offsetY;
+                drawMap();
+            } else {
+                // Show info panel
+                const worldPos = canvasToWorld(e.offsetX, e.offsetY);
+                const nearby = locations.filter(loc => 
+                    Math.abs(loc.x - worldPos.x) < 1 && Math.abs(loc.z - worldPos.z) < 1
+                );
+                if (nearby.length > 0) {
+                    const loc = nearby[0];
+                    let infoHtml = `<strong>Location</strong><br>X: ${loc.x}, Y: ${loc.y}, Z: ${loc.z}<br>Visits: ${loc.visit_count}<br>`;
+                    
+                    if (loc.waypoints && loc.waypoints.length > 0) {
+                        infoHtml += `Waypoints: ${loc.waypoints.join(', ')}<br>`;
+                    }
+                    
+                    // Show observation details if available
+                    if (loc.observation) {
+                        const obs = loc.observation;
+                        infoHtml += `<br><strong>Observation:</strong><br>`;
+                        
+                        // Affordances
+                        if (obs.aff) {
+                            const affs = [];
+                            if (obs.aff.step) affs.push('Step');
+                            if (obs.aff.jump) affs.push('Jump');
+                            if (obs.aff.descend) affs.push('Descend');
+                            if (obs.aff.sky) affs.push('Sky');
+                            if (affs.length > 0) {
+                                infoHtml += `Affordances: ${affs.join(', ')}<br>`;
+                            }
+                        }
+                        
+                        // Geometry
+                        if (obs.geom) {
+                            const geoms = [];
+                            if (obs.geom.pit) geoms.push('Pit');
+                            if (obs.geom.stair) geoms.push('Stair');
+                            if (obs.geom.slope) geoms.push('Slope');
+                            if (geoms.length > 0) {
+                                infoHtml += `Geometry: ${geoms.join(', ')}<br>`;
+                            }
+                        }
+                        
+                        // Block types
+                        if (obs.blocks && obs.blocks.seen && obs.blocks.seen.length > 0) {
+                            const blockTypes = obs.blocks.seen.slice(0, 5);
+                            infoHtml += `Blocks: ${blockTypes.join(', ')}`;
+                            if (obs.blocks.seen.length > 5) {
+                                infoHtml += ` (+${obs.blocks.seen.length - 5} more)`;
+                            }
+                            infoHtml += `<br>`;
+                        }
+                    }
+                    
+                    infoPanel.innerHTML = infoHtml;
+                    infoPanel.classList.add('visible');
+                } else {
+                    // Check if hovering over observed block
+                    const nearbyBlocks = observedBlocks.filter(block => 
+                        Math.abs(block.x - worldPos.x) < 0.5 && Math.abs(block.z - worldPos.z) < 0.5
+                    );
+                    if (nearbyBlocks.length > 0) {
+                        const block = nearbyBlocks[0];
+                        let infoHtml = `<strong>Block</strong><br>X: ${block.x}, Y: ${block.y}, Z: ${block.z}<br>Type: ${block.name}<br>`;
+                        if (block.dy !== undefined) {
+                            const layerNames = {'-1': 'Support (y-1)', '0': 'Body (y)', '1': 'Head (y+1)'};
+                            infoHtml += `Layer: ${layerNames[block.dy] || 'y+' + block.dy}<br>`;
+                        }
+                        infoPanel.innerHTML = infoHtml;
+                        infoPanel.classList.add('visible');
+                    } else {
+                        infoPanel.classList.remove('visible');
+                    }
+                }
+            }
+        });
+        
+        canvas.addEventListener('mouseup', () => {
+            isDragging = false;
+        });
+        
+        canvas.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const delta = e.deltaY > 0 ? 0.9 : 1.1;
+            scale *= delta;
+            scale = Math.max(0.1, Math.min(5, scale));
+            drawMap();
+        });
+        
+        // Control functions
+        function resetView() {
+            scale = 1;
+            offsetX = 0;
+            offsetZ = 0;
+            drawMap();
+        }
+        
+        function fitToBounds() {
+            const padding = 20;
+            const scaleX = (canvas.width - padding * 2) / canvas.width;
+            const scaleZ = (canvas.height - padding * 2) / canvas.height;
+            scale = Math.min(scaleX, scaleZ);
+            offsetX = padding;
+            offsetZ = padding;
+            drawMap();
+        }
+        
+        function toggleWaypoints() {
+            showWaypoints = !showWaypoints;
+            drawMap();
+        }
+        
+        function focusLocation(x, z) {
+            const pos = worldToCanvas(x, z);
+            offsetX = canvas.width / 2 - pos.x;
+            offsetZ = canvas.height / 2 - pos.z;
+            scale = 2;
+            drawMap();
+        }
+        
+        function exportData() {
+            const data = {
+                map_name: 'Jill-minecraft_map',
+                locations: locations,
+                observed_blocks: observedBlocks,
+                waypoints: waypoints,
+                bounds: bounds,
+                exported_at: new Date().toISOString()
+            };
+            const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'Jill-minecraft_map_export.json';
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+        
+        // Initial draw
+        fitToBounds();
+    </script>
+</body>
+</html>

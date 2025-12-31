@@ -1,0 +1,351 @@
+import json
+import time
+import threading
+from http.server import BaseHTTPRequestHandler, HTTPServer
+
+import minescript as m  # pyright: ignore[reportMissingImports]
+
+HOST = "127.0.0.1"
+PORT = 3003
+
+# ------------------------------------------------------------------------------
+# Utilities
+# ------------------------------------------------------------------------------
+
+def now_ms():
+    return int(time.time() * 1000)
+
+def clamp(x, lo, hi):
+    return max(lo, min(hi, x))
+
+def read_json(handler):
+    length = int(handler.headers.get("Content-Length", 0))
+    if length <= 0:
+        return {}
+    return json.loads(handler.rfile.read(length).decode("utf-8"))
+
+def write_json(handler, obj, status=200):
+    body = json.dumps(obj).encode("utf-8")
+    handler.send_response(status)
+    handler.send_header("Content-Type", "application/json")
+    handler.send_header("Content-Length", str(len(body)))
+    handler.end_headers()
+    handler.wfile.write(body)
+
+# ------------------------------------------------------------------------------
+# Coordinate helpers
+# ------------------------------------------------------------------------------
+
+def rel_to_abs(rel):
+    """
+    rel may be:
+      {dx, dy, dz}        (world frame)
+      {forward, right, up} (egocentric)
+    """
+    px, py, pz = m.player_position()
+
+    # Cartesian
+    if any(k in rel for k in ("dx", "dy", "dz")):
+        return (
+            int(px + rel.get("dx", 0)),
+            int(py + rel.get("dy", 0)),
+            int(pz + rel.get("dz", 0)),
+        )
+
+    # Egocentric
+    # player_orientation() returns List[float] = [yaw, pitch]
+    orientation = m.player_orientation()
+    yaw = orientation[0] if orientation and len(orientation) >= 1 else 0.0
+    f = float(rel.get("forward", 0))
+    r = float(rel.get("right", 0))
+    u = float(rel.get("up", 0))
+
+    dx = -m.sin(yaw) * f - m.cos(yaw) * r
+    dz = -m.cos(yaw) * f + m.sin(yaw) * r
+
+    return (
+        int(round(px + dx)),
+        int(round(py + u)),
+        int(round(pz + dz)),
+    )
+
+# ------------------------------------------------------------------------------
+# Core state
+# ------------------------------------------------------------------------------
+
+current_action = {
+    "id": None,
+    "type": None,
+    "started_at": 0,
+    "note": "",
+}
+
+def set_action(kind, note=""):
+    current_action.update({
+        "id": f"{kind}-{now_ms()}",
+        "type": kind,
+        "started_at": now_ms(),
+        "note": note,
+    })
+
+# ------------------------------------------------------------------------------
+# Observations
+# ------------------------------------------------------------------------------
+
+def _try_get_player_attr(*attr_names, default=None):
+    """Try to get a player attribute using multiple possible names."""
+    for attr_name in attr_names:
+        try:
+            attr = getattr(m, attr_name, None)
+            if attr and callable(attr):
+                return attr()
+        except (AttributeError, TypeError):
+            continue
+    return default
+
+def status_payload():
+    """
+    Get player status using minescript API.
+    
+    Based on minescript.net/docs API reference:
+    - player_position() -> (x, y, z)
+    - player_orientation() -> List[float] = [yaw, pitch]
+    - player_health() -> float
+    - player() -> player object (may have additional properties)
+    """
+    x, y, z = m.player_position()
+    
+    # Orientation - player_orientation() returns List[float] = [yaw, pitch]
+    try:
+        orientation = m.player_orientation()
+        yaw = orientation[0] if orientation and len(orientation) >= 1 else None
+        pitch = orientation[1] if orientation and len(orientation) >= 2 else None
+    except Exception:
+        yaw, pitch = None, None
+    
+    # Health - confirmed exists in API
+    try:
+        health = m.player_health()
+    except AttributeError:
+        health = None
+    
+    # Try player() object for additional properties
+    # Note: minescript.net/docs shows player() exists and has .position property
+    # Other properties (food, on_ground, dimension) may not be exposed in minescript API
+    player_obj = None
+    try:
+        player_obj = m.player()
+    except (AttributeError, TypeError):
+        pass
+    
+    # Food/Hunger - minescript may not expose this directly
+    # Try player object properties, then direct functions
+    food = None
+    if player_obj:
+        # Check common property names
+        for prop_name in ['food', 'hunger', 'food_level', 'foodLevel']:
+            try:
+                food = getattr(player_obj, prop_name, None)
+                if food is not None:
+                    break
+            except Exception:
+                continue
+        # Try callable methods
+        if food is None:
+            for method_name in ['get_food', 'get_hunger', 'get_food_level', 'food_level']:
+                try:
+                    method = getattr(player_obj, method_name, None)
+                    if callable(method):
+                        food = method()
+                        if food is not None:
+                            break
+                except Exception:
+                    continue
+    
+    # On ground - minescript may not expose this directly
+    on_ground = None
+    if player_obj:
+        for prop_name in ['on_ground', 'is_on_ground', 'onGround', 'isOnGround']:
+            try:
+                on_ground = getattr(player_obj, prop_name, None)
+                if on_ground is not None:
+                    break
+            except Exception:
+                continue
+    
+    # Dimension - minescript may not expose this directly
+    dimension = None
+    if player_obj:
+        for prop_name in ['dimension', 'get_dimension', 'current_dimension']:
+            try:
+                attr = getattr(player_obj, prop_name, None)
+                if attr:
+                    dimension = attr() if callable(attr) else attr
+                    if dimension is not None:
+                        break
+            except Exception:
+                continue
+    
+    return {
+        "ok": True,
+        "position": {"x": x, "y": y, "z": z},
+        "yaw": yaw,
+        "pitch": pitch,
+        "health": health,
+        "food": food,
+        "onGround": on_ground,
+        "dimension": dimension,
+        "action": current_action,
+    }
+
+def observe_blocks(radius):
+    cx, cy, cz = map(int, m.player_position())
+    blocks = []
+
+    for dx in range(-radius, radius + 1):
+        for dy in range(-radius, radius + 1):
+            for dz in range(-radius, radius + 1):
+                bx, by, bz = cx + dx, cy + dy, cz + dz
+                b = m.get_block(bx, by, bz)
+                if not b or b.is_air():
+                    continue
+                blocks.append({
+                    "name": b.name,
+                    "position": {"x": bx, "y": by, "z": bz},
+                    "dx": dx,
+                    "dy": dy,
+                    "dz": dz,
+                })
+
+    return blocks
+
+# ------------------------------------------------------------------------------
+# Actions
+# ------------------------------------------------------------------------------
+
+def act_look(body):
+    yaw = float(body["yaw"])
+    pitch = clamp(float(body["pitch"]), -1.57, 1.57)
+    m.set_player_rotation(yaw, pitch)
+    set_action("look", f"yaw={yaw} pitch={pitch}")
+
+def act_move(body):
+    duration = clamp(int(body.get("duration_ms", 400)), 50, 60000)
+
+    keys = ["forward", "back", "left", "right", "jump", "sprint", "sneak"]
+    for k in keys:
+        if body.get(k):
+            m.key_down(k)
+
+    set_action("move", json.dumps(body))
+
+    start = m.player_position()
+    time.sleep(duration / 1000.0)
+    end = m.player_position()
+
+    for k in keys:
+        m.key_up(k)
+
+    dx = ((end[0] - start[0]) ** 2 + (end[2] - start[2]) ** 2) ** 0.5
+    if dx < 0.05:
+        return {"status": "collision", "final_position": dict(zip("xyz", end))}
+
+    return {"status": "success", "final_position": dict(zip("xyz", end))}
+
+def act_dig(body):
+    if "pos" in body:
+        x, y, z = body["pos"]["x"], body["pos"]["y"], body["pos"]["z"]
+    else:
+        x, y, z = rel_to_abs(body["rel"])
+
+    b = m.get_block(x, y, z)
+    if not b or b.is_air():
+        raise ValueError("target is air or missing")
+
+    m.dig_block(x, y, z)
+    set_action("dig", f"{b.name}@{x,y,z}")
+    return {"dug": {"name": b.name, "position": {"x": x, "y": y, "z": z}}}
+
+# ------------------------------------------------------------------------------
+# HTTP Handler
+# ------------------------------------------------------------------------------
+
+class Handler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        if self.path == "/status":
+            write_json(self, status_payload())
+            return
+
+        if self.path.startswith("/observe"):
+            # Parse query string from path
+            from urllib.parse import urlparse, parse_qs
+            parsed = urlparse(self.path)
+            query_params = parse_qs(parsed.query)
+            radius = clamp(int(query_params.get("radius", ["5"])[0]), 1, 6)
+            blocks = observe_blocks(radius)
+            write_json(self, {
+                "ok": True,
+                "status": status_payload(),
+                "perception": {
+                    "nearby_blocks": blocks
+                }
+            })
+            return
+
+        write_json(self, {"ok": False, "error": "not found"}, 404)
+
+    def do_POST(self):
+        body = read_json(self)
+
+        try:
+            if self.path == "/act/look":
+                act_look(body)
+                write_json(self, {"ok": True})
+                return
+
+            if self.path == "/act/move":
+                result = act_move(body)
+                write_json(self, {"ok": True, **result})
+                return
+
+            if self.path == "/act/dig":
+                result = act_dig(body)
+                write_json(self, {"ok": True, **result})
+                return
+
+        except Exception as e:
+            write_json(self, {"ok": False, "error": str(e)}, 400)
+            return
+
+        write_json(self, {"ok": False, "error": "unknown endpoint"}, 404)
+
+# ------------------------------------------------------------------------------
+# Server thread
+# ------------------------------------------------------------------------------
+
+def run():
+    try:
+        server = HTTPServer((HOST, PORT), Handler)
+        print(f"[bridge] listening on http://{HOST}:{PORT}")
+        server.serve_forever()
+    except OSError as e:
+        if e.errno == 98:  # Address already in use
+            print(f"[bridge] ERROR: Port {PORT} is already in use. Another bridge instance may be running.")
+            print(f"[bridge] To find and kill it: lsof -i :{PORT} or kill $(lsof -t -i:{PORT})")
+        else:
+            print(f"[bridge] ERROR: Failed to start server: {e}")
+        raise
+
+t = threading.Thread(target=run, daemon=True)
+t.start()
+
+# ---- KEEP MAIN THREAD ALIVE ----
+import time
+try:
+    while True:
+        time.sleep(1)
+except KeyboardInterrupt:
+    print("[bridge] shutting down")
+
+#threading.Thread(target=run, daemon=True).start()
+

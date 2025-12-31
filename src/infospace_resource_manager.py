@@ -257,6 +257,11 @@ class ResourceIndexer:
             logger.warning(f"ResourceIndexer: Note {resource_id} not found")
             return False
         
+        # Skip indexing if exclude_from_index flag is set
+        if resource.get('properties', {}).get('exclude_from_index', False):
+            logger.debug(f"ResourceIndexer: Skipping index for Note {resource_id} (exclude_from_index=True)")
+            return False
+        
         # Build embedding text
         embedding_text = self._build_embedding_text_note(resource_id, resource, commentary)
         
@@ -893,7 +898,7 @@ class InfospaceResourceManager:
             logger.warning(f"Failed to compute Note metadata: {e}")
         
         # Merge allowed extra properties
-        allowed_fields = {'kind', 'parent_id', 'order', 'span', 'section', 'source', 'entity', 'edge'}
+        allowed_fields = {'kind', 'parent_id', 'order', 'span', 'section', 'source', 'entity', 'edge', 'exclude_from_index'}
         for key in allowed_fields:
             if key in extra_props:
                 note_data['properties'][key] = extra_props[key]
@@ -908,8 +913,9 @@ class InfospaceResourceManager:
         else:
             logger.info(f"📝 Created Note instance: {note_id} by {canonical_character_name}")
         
-        # Index the Note immediately (for Stage 0 retrieval)
-        self.resource_indexer.index_note(note_id, commentary="")
+        # Index the Note immediately (for Stage 0 retrieval) unless excluded
+        if not note_data['properties'].get('exclude_from_index', False):
+            self.resource_indexer.index_note(note_id, commentary="")
         
         return True, note_id, None, location
     

@@ -298,6 +298,7 @@ class FastAPIActionDisplayNode:
         self.control_step_publisher = None
         self.control_run_publisher = None
         self.control_stop_publisher = None
+        self.control_continuous_publisher = None
         
         # Publisher for time management
         self.time_delay_publisher = self.session.declare_publisher("cognitive/map/time_delay_setting")
@@ -890,6 +891,84 @@ class FastAPIActionDisplayNode:
                 return {"success": True, "message": "Stop and interrupt commands sent"}
             except Exception as e:
                 logger.error(f"Error in stop_turns: {e}")
+                return {"success": False, "message": f"Error: {str(e)}"}
+        
+        @self.app.post("/api/turn/continuous")
+        async def toggle_continuous():
+            """Toggle continuous mode on/off."""
+            try:
+                if self.active_character_name is None:
+                    return {"success": False, "message": "No character available yet"}
+                
+                logger.info(f"🔄 Continuous toggle command received in FastAPI")
+                
+                # Publish continuous toggle command (enable=None means toggle)
+                self.control_continuous_publisher.put(json.dumps({"timestamp": datetime.now().isoformat(), "enable": None}).encode())
+                logger.info(f"🔄 Continuous toggle command sent to {self.active_character_name}")
+                
+                return {"success": True, "message": "Continuous toggle command sent"}
+            except Exception as e:
+                logger.error(f"Error in toggle_continuous: {e}")
+                return {"success": False, "message": f"Error: {str(e)}"}
+        
+        @self.app.post("/api/control/clear_epistemic_frame")
+        async def clear_epistemic_frame():
+            """Clear epistemic frame."""
+            try:
+                if self.active_character_name is None:
+                    return {"success": False, "message": "No character available yet"}
+                
+                logger.info(f"🗑️ Clear epistemic frame command received")
+                
+                # Publish clear epistemic frame command
+                topic = f"cognitive/{self.active_character_name}/control/clear_epistemic_frame"
+                publisher = self.session.declare_publisher(topic)
+                publisher.put(json.dumps({"timestamp": datetime.now().isoformat()}).encode())
+                logger.info(f"🗑️ Clear epistemic frame command sent to {self.active_character_name}")
+                
+                return {"success": True, "message": "Epistemic frame clear command sent"}
+            except Exception as e:
+                logger.error(f"Error in clear_epistemic_frame: {e}")
+                return {"success": False, "message": f"Error: {str(e)}"}
+        
+        @self.app.post("/api/control/clear_map")
+        async def clear_map():
+            """Clear map."""
+            try:
+                if self.active_character_name is None:
+                    return {"success": False, "message": "No character available yet"}
+                
+                logger.info(f"🗑️ Clear map command received")
+                
+                # Publish clear map command
+                topic = f"cognitive/{self.active_character_name}/control/clear_map"
+                publisher = self.session.declare_publisher(topic)
+                publisher.put(json.dumps({"timestamp": datetime.now().isoformat()}).encode())
+                logger.info(f"🗑️ Clear map command sent to {self.active_character_name}")
+                
+                return {"success": True, "message": "Map clear command sent"}
+            except Exception as e:
+                logger.error(f"Error in clear_map: {e}")
+                return {"success": False, "message": f"Error: {str(e)}"}
+        
+        @self.app.post("/api/control/clear_transients")
+        async def clear_transients():
+            """Clear transients."""
+            try:
+                if self.active_character_name is None:
+                    return {"success": False, "message": "No character available yet"}
+                
+                logger.info(f"🗑️ Clear transients command received")
+                
+                # Publish clear transients command
+                topic = f"cognitive/{self.active_character_name}/control/clear_transients"
+                publisher = self.session.declare_publisher(topic)
+                publisher.put(json.dumps({"timestamp": datetime.now().isoformat()}).encode())
+                logger.info(f"🗑️ Clear transients command sent to {self.active_character_name}")
+                
+                return {"success": True, "message": "Clear transients command sent"}
+            except Exception as e:
+                logger.error(f"Error in clear_transients: {e}")
                 return {"success": False, "message": f"Error: {str(e)}"}
         
         @self.app.post("/api/save")
@@ -2198,6 +2277,7 @@ Generated: {generated_at}
                         <button id="stepButton" onclick="stepTurn()" style="background: #555; margin-right: 10px;" disabled title="Advance execution by one step">Step Turn</button>
                         <button id="runButton" onclick="runTurns()" style="background: #555; color: #888; margin-right: 10px;" disabled title="Run execution continuously until stopped">Run</button>
                         <button onclick="stopTurns()" style="background: #ff6b6b; margin-right: 10px;" title="Pause execution">Stop</button>
+                        <button onclick="openControlPanel()" style="background: #6c5ce7; color: white; margin-right: 10px;" title="Open control panel">⚙️ Control</button>
                         <button onclick="saveAll()" style="background: #95e1d3; color: #1a1a1a; margin-right: 10px;" title="Save all resources and memory to disk">Save</button>
                         <button onclick="exportToObsidian()" style="background: #7c3aed; color: white; margin-right: 10px;" title="Export action log to Obsidian vault">Obsidian</button>
                         <button onclick="openResourceBrowser()" style="background: #0e639c; color: white; margin-right: 10px;" title="Open resource browser in new tab to view Notes and Collections">🔍 Browser</button>
@@ -2422,9 +2502,23 @@ Generated: {generated_at}
                                     const runButton = document.querySelector('button[onclick="runTurns()"]');
                                     const testButton = document.getElementById('testButton');
                                     if (currentTurnMode !== 'run') {
-                                        stepButton.disabled = false; stepButton.style.background = '#4ecdc4'; stepButton.title = 'Click to advance to next turn';
-                                        runButton.disabled = false; runButton.style.background = '#ffe66d'; runButton.style.color = '#1a1a1a'; runButton.title = 'Click to run multiple turns';
-                                        testButton.disabled = false; testButton.style.background = '#f39c12'; testButton.style.color = 'white'; testButton.title = 'Open test runner to run evaluation tests';
+                                        if (stepButton) {
+                                            stepButton.disabled = false;
+                                            stepButton.style.background = '#4ecdc4';
+                                            stepButton.title = 'Click to advance to next turn';
+                                        }
+                                        if (runButton) {
+                                            runButton.disabled = false;
+                                            runButton.style.background = '#ffe66d';
+                                            runButton.style.color = '#1a1a1a';
+                                            runButton.title = 'Click to run multiple turns';
+                                        }
+                                        if (testButton) {
+                                            testButton.disabled = false;
+                                            testButton.style.background = '#f39c12';
+                                            testButton.style.color = 'white';
+                                            testButton.title = 'Open test runner to run evaluation tests';
+                                        }
                                     }
                                 }
                             }
@@ -2530,19 +2624,33 @@ Generated: {generated_at}
             const runButton = document.getElementById('runButton');
             const testButton = document.getElementById('testButton');
             
-            stepButton.disabled = true;
-            stepButton.style.background = '#555';
-            stepButton.title = 'Waiting for system startup...';
+            if (stepButton) {
+                stepButton.disabled = true;
+                stepButton.style.background = '#555';
+                stepButton.title = 'Waiting for system startup...';
+            }
             
-            runButton.disabled = true;
-            runButton.style.background = '#555';
-            runButton.style.color = '#888';
-            runButton.title = 'Waiting for system startup...';
+            if (runButton) {
+                runButton.disabled = true;
+                runButton.style.background = '#555';
+                runButton.style.color = '#888';
+                runButton.title = 'Waiting for system startup...';
+            }
             
-            testButton.disabled = true;
-            testButton.style.background = '#555';
-            testButton.style.color = '#888';
-            testButton.title = 'Waiting for system startup...';
+            const continuousButton = document.getElementById('continuousButton');
+            if (continuousButton) {
+                continuousButton.disabled = false;  // Always enabled (it's a toggle)
+                continuousButton.style.background = '#555';
+                continuousButton.style.color = '#888';
+                continuousButton.title = 'Toggle continuous mode - goal will resubmit on completion';
+            }
+            
+            if (testButton) {
+                testButton.disabled = true;
+                testButton.style.background = '#555';
+                testButton.style.color = '#888';
+                testButton.title = 'Waiting for system startup...';
+            }
         });
         
         // Character Data Tab Functions
@@ -3032,12 +3140,16 @@ Generated: {generated_at}
                        `step_enabled=${stateData.buttons.step.enabled}, ` +
                        `progress=${stateData.turn.completed_count}/${stateData.turn.active_count}`);
             
+            // Store state for control panel access
+            window.lastTurnState = stateData;
+            
             // Clear command lock when backend sends state update
             commandInProgress = false;
             
             // Apply button states directly from backend computation
             const stepButton = document.getElementById('stepButton');
             const runButton = document.getElementById('runButton');
+            const continuousButton = document.getElementById('continuousButton');
             const stopButton = document.getElementById('stopButton');
             
             if (stepButton) {
@@ -3053,6 +3165,20 @@ Generated: {generated_at}
                 runButton.style.background = stateData.buttons.run.enabled ? '#ffe66d' : '#555';
                 runButton.style.color = stateData.buttons.run.enabled ? '#1a1a1a' : '#888';
                 runButton.title = stateData.buttons.run.tooltip;
+            }
+            
+            if (continuousButton && stateData.buttons.continuous) {
+                const isActive = stateData.buttons.continuous.active || false;
+                continuousButton.disabled = !stateData.buttons.continuous.enabled;
+                continuousButton.textContent = stateData.buttons.continuous.label;
+                continuousButton.style.background = isActive ? '#4ecdc4' : '#555';
+                continuousButton.style.color = isActive ? '#1a1a1a' : '#888';
+                continuousButton.title = stateData.buttons.continuous.tooltip;
+            }
+            
+            // Always update control panel button if continuous state exists
+            if (stateData.buttons.continuous) {
+                updateControlPanelContinuousButton();
             }
             
             if (stopButton) {
@@ -3270,14 +3396,56 @@ Generated: {generated_at}
             console.log('🔍 DEBUG: stepTurn() called - disabling Step button');
             
             // Immediately disable and shade the button for responsive UI
-            stepButton.disabled = true;
-            stepButton.style.background = '#555';
-            stepButton.title = 'Waiting for all characters to complete their turns...';
+            if (stepButton) {
+                stepButton.disabled = true;
+                stepButton.style.background = '#555';
+                stepButton.title = 'Waiting for all characters to complete their turns...';
+            }
             
             console.log('🔍 DEBUG: Step button disabled, commandInProgress =', commandInProgress);
             
             try {
                 const response = await fetch('/api/turn/step', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    if (resultDiv) resultDiv.innerHTML = `<span class="success">${result.message}</span>`;
+                    // Button state will be updated by backend via turn_state_update message
+                } else {
+                    if (resultDiv) resultDiv.innerHTML = `<span class="error">Error: ${result.message}</span>`;
+                    // Clear command lock on error so user can retry
+                    commandInProgress = false;
+                    if (stepButton) {
+                        stepButton.disabled = false;
+                        stepButton.style.background = '#4ecdc4';
+                        stepButton.title = 'Click to advance to next turn';
+                    }
+                }
+            } catch (error) {
+                if (resultDiv) resultDiv.innerHTML = `<span class="error">Error: ${error.message}</span>`;
+                // Clear command lock on error so user can retry
+                commandInProgress = false;
+                if (stepButton) {
+                    stepButton.disabled = false;
+                    stepButton.style.background = '#4ecdc4';
+                    stepButton.title = 'Click to advance to next turn';
+                }
+            }
+        }
+        
+        async function toggleContinuous() {
+            if (commandInProgress) return; // Prevent rapid clicks
+            commandInProgress = true;
+            
+            const resultDiv = document.getElementById('turnResult');
+            try {
+                const response = await fetch('/api/turn/continuous', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -3293,17 +3461,186 @@ Generated: {generated_at}
                     resultDiv.innerHTML = `<span class="error">Error: ${result.message}</span>`;
                     // Clear command lock on error so user can retry
                     commandInProgress = false;
-                    stepButton.disabled = false;
-                    stepButton.style.background = '#4ecdc4';
-                    stepButton.title = 'Click to advance to next turn';
                 }
             } catch (error) {
                 resultDiv.innerHTML = `<span class="error">Error: ${error.message}</span>`;
                 // Clear command lock on error so user can retry
                 commandInProgress = false;
-                stepButton.disabled = false;
-                stepButton.style.background = '#4ecdc4';
-                stepButton.title = 'Click to advance to next turn';
+            }
+        }
+        
+        function openControlPanel() {
+            console.log('🔧 openControlPanel() called');
+            try {
+                let modal = document.getElementById('controlPanelModal');
+                
+                // If modal doesn't exist or isn't in body, move it to body
+                if (!modal) {
+                    console.error('🔧 ERROR: controlPanelModal element not found!');
+                    alert('Control panel modal not found. Check console for details.');
+                    return;
+                }
+                
+                // Ensure modal is a direct child of body for proper stacking
+                if (modal.parentElement !== document.body) {
+                    console.log('🔧 Moving modal to body');
+                    document.body.appendChild(modal);
+                }
+                
+                // Set all necessary styles explicitly for full-screen overlay
+                modal.style.display = 'flex';
+                modal.style.position = 'fixed';
+                modal.style.top = '0px';
+                modal.style.left = '0px';
+                modal.style.right = '0px';
+                modal.style.bottom = '0px';
+                modal.style.width = '100vw';
+                modal.style.height = '100vh';
+                modal.style.margin = '0';
+                modal.style.padding = '0';
+                modal.style.background = 'rgba(0, 0, 0, 0.7)';
+                modal.style.zIndex = '99999'; // Very high z-index
+                modal.style.justifyContent = 'center';
+                modal.style.alignItems = 'center';
+                modal.style.visibility = 'visible';
+                modal.style.opacity = '1';
+                modal.style.pointerEvents = 'auto';
+                
+                // Check computed styles
+                const computed = window.getComputedStyle(modal);
+                console.log('🔧 Modal display:', computed.display, 'z-index:', computed.zIndex);
+                console.log('🔧 Modal rect:', modal.getBoundingClientRect());
+                
+                updateControlPanelContinuousButton();
+            } catch (error) {
+                console.error('🔧 ERROR in openControlPanel:', error);
+                alert('Error opening control panel: ' + error.message);
+            }
+        }
+        
+        // Make sure function is globally accessible
+        window.openControlPanel = openControlPanel;
+        
+        function closeControlPanel() {
+            const modal = document.getElementById('controlPanelModal');
+            const status = document.getElementById('controlPanelStatus');
+            if (modal) modal.style.display = 'none';
+            if (status) status.style.display = 'none';
+        }
+        
+        function updateControlPanelContinuousButton() {
+            const panelButton = document.getElementById('controlPanelContinuousButton');
+            if (!panelButton) return;
+            
+            // Try to get state from turn state data if available
+            if (window.lastTurnState && window.lastTurnState.buttons && window.lastTurnState.buttons.continuous) {
+                const continuous = window.lastTurnState.buttons.continuous;
+                const isActive = continuous.active || false;
+                panelButton.textContent = continuous.label || '🔄 Continuous';
+                panelButton.style.background = isActive ? '#4ecdc4' : '#555';
+                panelButton.style.color = isActive ? '#1a1a1a' : '#888';
+                panelButton.title = continuous.tooltip || 'Toggle continuous mode';
+            } else {
+                // Fallback to default state
+                panelButton.textContent = '🔄 Continuous';
+                panelButton.style.background = '#555';
+                panelButton.style.color = '#888';
+                panelButton.title = 'Toggle continuous mode - goal will resubmit on completion';
+            }
+        }
+        
+        async function toggleContinuousFromPanel() {
+            await toggleContinuous();
+            updateControlPanelContinuousButton();
+        }
+        
+        async function clearEpistemicFrame() {
+            if (!confirm('Are you sure you want to clear the Epistemic Frame? This cannot be undone.')) {
+                return;
+            }
+            
+            const statusDiv = document.getElementById('controlPanelStatus');
+            statusDiv.style.display = 'block';
+            statusDiv.innerHTML = '<span style="color: #888;">Clearing epistemic frame...</span>';
+            
+            try {
+                const response = await fetch('/api/control/clear_epistemic_frame', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    statusDiv.innerHTML = '<span style="color: #4ecdc4;">✓ Epistemic frame cleared successfully</span>';
+                } else {
+                    statusDiv.innerHTML = `<span style="color: #ff6b6b;">✗ Error: ${result.message || 'Unknown error'}</span>`;
+                }
+            } catch (error) {
+                statusDiv.innerHTML = `<span style="color: #ff6b6b;">✗ Error: ${error.message}</span>`;
+            }
+        }
+        
+        async function clearMap() {
+            if (!confirm('Are you sure you want to clear the Map? This will delete all map observations and cannot be undone.')) {
+                return;
+            }
+            
+            const statusDiv = document.getElementById('controlPanelStatus');
+            statusDiv.style.display = 'block';
+            statusDiv.innerHTML = '<span style="color: #888;">Clearing map...</span>';
+            
+            try {
+                const response = await fetch('/api/control/clear_map', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    statusDiv.innerHTML = '<span style="color: #4ecdc4;">✓ Map cleared successfully</span>';
+                } else {
+                    statusDiv.innerHTML = `<span style="color: #ff6b6b;">✗ Error: ${result.message || 'Unknown error'}</span>`;
+                }
+            } catch (error) {
+                statusDiv.innerHTML = `<span style="color: #ff6b6b;">✗ Error: ${error.message}</span>`;
+            }
+        }
+        
+        async function clearTransients() {
+            if (!confirm('Are you sure you want to clear all transient resources? This cannot be undone.')) {
+                return;
+            }
+            
+            const statusDiv = document.getElementById('controlPanelStatus');
+            statusDiv.style.display = 'block';
+            statusDiv.innerHTML = '<span style="color: #888;">Clearing transients...</span>';
+            
+            try {
+                const response = await fetch('/api/control/clear_transients', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    const deleted = result.deleted_notes || 0;
+                    const collections = result.deleted_collections || 0;
+                    const bindings = result.bindings_cleared || 0;
+                    statusDiv.innerHTML = `<span style="color: #4ecdc4;">✓ Cleared ${deleted} Notes, ${collections} Collections, ${bindings} bindings</span>`;
+                } else {
+                    statusDiv.innerHTML = `<span style="color: #ff6b6b;">✗ Error: ${result.message || 'Unknown error'}</span>`;
+                }
+            } catch (error) {
+                statusDiv.innerHTML = `<span style="color: #ff6b6b;">✗ Error: ${error.message}</span>`;
             }
         }
         
@@ -3989,6 +4326,10 @@ Generated: {generated_at}
             const slider = document.getElementById('timeSlider');
             const sliderValue = document.getElementById('timeSliderValue');
             
+            if (!slider || !sliderValue) {
+                return; // Elements don't exist, skip initialization
+            }
+            
             // Update display when slider moves
             slider.addEventListener('input', function() {
                 sliderValue.textContent = this.value;
@@ -4040,6 +4381,20 @@ Generated: {generated_at}
             getInitialSimulationTime();
             // Send initial delay value (0) to backend
             updateTimeDelay(0);
+            
+            // Set up control panel button event listener
+            const controlButton = document.querySelector('button[onclick="openControlPanel()"]');
+            if (controlButton) {
+                controlButton.removeAttribute('onclick');
+                controlButton.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    console.log('🔧 Control button clicked via event listener');
+                    openControlPanel();
+                });
+                console.log('🔧 Control panel button event listener attached');
+            } else {
+                console.warn('🔧 Control panel button not found for event listener setup');
+            }
         });
         
         async function getInitialSimulationTime() {
@@ -4294,6 +4649,32 @@ Generated: {generated_at}
             <div id="detailsModalContent" style="padding: 20px; overflow-y: auto; flex: 1;"></div>
         </div>
     </div>
+    
+    <!-- Control Panel Modal - Must be outside all containers for proper z-index -->
+    <div id="controlPanelModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.7); z-index: 10000; justify-content: center; align-items: center;">
+        <div style="background: #2a2d2e; border-radius: 8px; padding: 30px; max-width: 500px; width: 90%; box-shadow: 0 4px 20px rgba(0,0,0,0.5);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h2 style="margin: 0; color: #d4d4d4;">⚙️ Control Panel</h2>
+                <button onclick="closeControlPanel()" style="background: #555; color: #d4d4d4; border: none; padding: 5px 15px; border-radius: 4px; cursor: pointer; font-size: 18px;">×</button>
+            </div>
+            
+            <div style="margin-bottom: 20px;">
+                <h3 style="color: #d4d4d4; font-size: 16px; margin-bottom: 10px;">Execution Control</h3>
+                <button id="controlPanelContinuousButton" onclick="toggleContinuousFromPanel()" style="width: 100%; padding: 12px; margin-bottom: 10px; background: #555; color: #888; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">🔄 Continuous</button>
+            </div>
+            
+            <div style="margin-bottom: 20px; padding-top: 20px; border-top: 1px solid #3e3e42;">
+                <h3 style="color: #d4d4d4; font-size: 16px; margin-bottom: 10px;">Clear Data</h3>
+                <p style="color: #888; font-size: 12px; margin-bottom: 15px;">⚠️ These actions cannot be undone</p>
+                
+                <button onclick="clearEpistemicFrame()" style="width: 100%; padding: 12px; margin-bottom: 10px; background: #d32f2f; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">🗑️ Clear Epistemic Frame</button>
+                <button onclick="clearMap()" style="width: 100%; padding: 12px; margin-bottom: 10px; background: #d32f2f; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">🗑️ Clear Map</button>
+                <button onclick="clearTransients()" style="width: 100%; padding: 12px; background: #ff9800; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">🗑️ Clear Transients</button>
+            </div>
+            
+            <div id="controlPanelStatus" style="margin-top: 15px; padding: 10px; background: #333; border-radius: 4px; min-height: 20px; font-size: 12px; color: #888; display: none;"></div>
+        </div>
+    </div>
 </body>
 </html>
         """
@@ -4468,6 +4849,7 @@ Generated: {generated_at}
             
             paused = state_data.get('paused', True)
             mode = state_data.get('mode', 'step')
+            continuous_mode = state_data.get('continuous_mode', False)
             
             with self.turn_state_lock:
                 self.turn_state['mode'] = mode
@@ -4477,15 +4859,19 @@ Generated: {generated_at}
             # Stop enabled when running (not paused) or in run mode
             step_enabled = paused and mode == 'step'
             run_enabled = paused and mode == 'step'
-            stop_enabled = not paused or mode == 'run'
+            stop_enabled = not paused or mode == 'run' or continuous_mode
             
             # Format as turn_state_update for UI compatibility
+            continuous_enabled = True  # Continuous button is always enabled (it's a toggle)
+            continuous_label = '✅ Continuous' if continuous_mode else '🔄 Continuous'
+            continuous_tooltip = 'Continuous mode ON - click to disable' if continuous_mode else 'Continuous mode OFF - click to enable'
+            
             turn_state_update = {
                 'type': 'turn_state_update',
                 'turn': {
                     'number': 0,  # No turn numbers anymore
                     'mode': mode,
-                    'auto_progression': mode == 'run',
+                    'auto_progression': mode == 'run' or continuous_mode,
                     'active_count': 0 if paused else 1,
                     'completed_count': 0,
                     'active_characters': [] if paused else [state_data.get('character', '')],
@@ -4502,6 +4888,12 @@ Generated: {generated_at}
                         'enabled': run_enabled,
                         'label': '🏃 Run',
                         'tooltip': 'Ready - click to run continuously' if run_enabled else 'Execution in progress'
+                    },
+                    'continuous': {
+                        'enabled': continuous_enabled,
+                        'label': continuous_label,
+                        'tooltip': continuous_tooltip,
+                        'active': continuous_mode
                     },
                     'stop': {
                         'enabled': stop_enabled,
@@ -5094,6 +5486,9 @@ Generated: {generated_at}
             )
             self.control_stop_publisher = self.session.declare_publisher(
                 f"cognitive/{character_name}/control/stop"
+            )
+            self.control_continuous_publisher = self.session.declare_publisher(
+                f"cognitive/{character_name}/control/continuous"
             )
             # Subscribe to execution state updates
             self.execution_state_subscriber = self.session.declare_subscriber(

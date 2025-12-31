@@ -1,9 +1,11 @@
 ---
 name: mc-staircase
-description: Automates escaping a deep pit by digging and jumping to build a spiral staircase.
+description: Constructs a spiral staircase to ascend from any depth (small or deep pits). Handles digging and placing automatically to reach the surface safely.
 type: method
 resumable: yes
 invalidates: [position, orientation, visibility, groundedness, inventory]
+examples:
+  - '{"type":"mc-staircase","out":"$result"}'
 ---
 
 # Minecraft Staircase tool
@@ -19,6 +21,7 @@ as soon as that condition no longer holds.
 - Jumping in place without terrain modification does NOT increase Y.
 - Sky is NOT visible directly above within 2 blocks.
 - Terrain modification (digging) is permitted.
+- **A solid wall is within interaction range (forward distance < 1.0) in at least one cardinal direction.**
 
 If these preconditions do not hold, this skill should not be used.
 
@@ -33,9 +36,8 @@ If these preconditions do not hold, this skill should not be used.
 Violations of these constraints may cause failure and replanning.
 
 #LIMITATIONS:
-- Method tools cannot invoke other method tools (prevents recursion and complexity)
 - To loop within a method, use "Return to STEP X" (internal loop within this method execution), not recursive method calls
-- If a method needs another method's functionality, return control to the outer planner which can chain methods
+- If this method needs another method's functionality (e.g. mc-seek-boundary), it can be executed directly
 
 #RUNTIME STATE (LOCAL TO THIS SKILL)
 
@@ -46,46 +48,70 @@ Violations of these constraints may cause failure and replanning.
 
 Repeat until a termination condition is met.
 
----
-STEP 1 — ALIGN
----
-
-- Turn to the nearest cardinal direction:
-  yaw ∈ {0°, 90°, 180°, -90°}
-- Reset reposition_used_this_cycle := false
-
----
-STEP 2 — FIND WALL
----
-
+At start of each iteration, check termination conditions:
 - Call mc-observe-blocks.
+- If sky is visible above AND (jumping increases Y OR forward movement increases Y):
+      **TERMINATE (SUCCESS)**
+- If forward distance ≥ 1.0 in all four cardinal directions AND jumping increases Y:
+      **TERMINATE (INAPPLICABLE)**
+
+---
+STEP 1 — FIND WALL AND ALIGN
+---
+
+- Execute mc-seek-boundary.
+  This navigates to the nearest wall and ensures cardinal alignment (yaw ∈ {0°, 90°, 180°, -90°}) while maintaining wall proximity.
+
+---
+STEP 2 — VERIFY WALL PROXIMITY
+---
+
+- Call mc-observe-blocks to confirm forward distance < 1.0.
 - If forward distance < 1.0:
-      A wall occupies forward:1 → proceed to STEP 3
+      Wall confirmed → proceed to STEP 3
 - Else:
-      Rotate 90° clockwise and repeat STEP 2
-- If all four cardinal directions have been checked and none show
-  forward distance < 1.0:
-      Proceed to STEP 9 (SAFE REPOSITION)
+      Wall not found → return to STEP 1
 
 ---
-STEP 3 — VERIFY STEP EXISTS
+STEP 3 — VERIFY OR BUILD STEP
 ---
 
-- Interpret the blocking wall as the voxel at (forward:1, up:0).
-- If the block at (forward:1, up:0) is solid:
+- Call mc-observe-blocks to check block state at (forward:1, up:0).
+- If forward distance < 1.0 AND observation indicates solid block at (forward:1, up:0):
       Treat it as the step block and proceed to STEP 4
-- If the block is Air or missing:
-      Rotate 90° clockwise and return to STEP 2
+- If forward distance ≥ 1.0 OR observation indicates Air/Liquid at (forward:1, up:0):
+      **CONSTRUCT STEP**: 
+      1. Call mc-inventory to check for placeable blocks (dirt, cobblestone, stone, etc.).
+      2. If placeable blocks available:
+            a. Call mc-equip to equip a placeable block.
+            b. Call mc-place with item=<block_name>, forward=1, up=0, right=0, face="north" to build the step.
+      3. If placement succeeds, proceed to STEP 4.
+      4. If placement fails or no blocks available:
+            Call mc-status to get current yaw.
+            Calculate new yaw = current_yaw + 90° (convert to radians for mc-look).
+            Call mc-look with new yaw to rotate 90° clockwise, then return to STEP 2
 
 ---
 STEP 4 — CLEAR BODY AND HEAD SPACE
 ---
 
-Ensure a 2-block-high opening exists ABOVE the step block:
+Ensure clearance exists in two locations. Clear a 3-block-wide strip (left, center, right) at each Y level to handle slight misalignment:
 
-- Target blocks:
-    - (forward:1, up:1)  ← body space
-    - (forward:1, up:2)  ← head space
+1. Directly overhead (for jump initiation):
+   - (forward:0, right:-1, up:1)  ← left body space overhead
+   - (forward:0, up:1)  ← center body space overhead
+   - (forward:0, right:1, up:1)  ← right body space overhead
+   - (forward:0, right:-1, up:2)  ← left head space overhead
+   - (forward:0, up:2)  ← center head space overhead
+   - (forward:0, right:1, up:2)  ← right head space overhead
+
+2. At destination (for forward movement):
+   - (forward:1, right:-1, up:1)  ← left body space at step
+   - (forward:1, up:1)  ← center body space at step
+   - (forward:1, right:1, up:1)  ← right body space at step
+   - (forward:1, right:-1, up:2)  ← left head space at step
+   - (forward:1, up:2)  ← center head space at step
+   - (forward:1, right:1, up:2)  ← right head space at step
 
 For each target block:
 - If solid, issue mc-dig.
@@ -93,23 +119,40 @@ For each target block:
 - If dig fails but observation suggests clearance, proceed anyway.
 
 ---
+STEP 4.5 — VERIFY CLEARANCE
+---
+
+- Call mc-observe-blocks to verify critical path is clear.
+- Check that blocks at (forward:1, up:1) and (forward:1, up:2) are AIR.
+- If both are AIR:
+      Clearance confirmed → proceed to STEP 5
+- If either block is still solid:
+      Retry mc-dig on the remaining solid block(s) (max 2 retries per block).
+      After retries, call mc-observe-blocks again.
+      If still not clear:
+          **Abort climb**: Call mc-status to get current yaw, calculate new yaw = current_yaw + 90° (convert to radians), call mc-look to rotate 90° clockwise, then return to STEP 2
+      If now clear:
+          Proceed to STEP 5
+
+---
 STEP 5 — CLIMB
 ---
 
+- Call mc-status to record Y position before climb.
 - Execute mc-move with:
-      forward: true
-      jump: true
+      forward: true, jump: true, duration: 0.5
 
 ---
 STEP 6 — VERIFY ASCENT
 ---
 
-- Observe agent position (mc-status or mc-observe-blocks).
-- If Y increased by approximately one block:
+- Call mc-status to get current Y position.
+- Compare to Y position recorded at start of STEP 5.
+- If Y increased by ≥ 0.8 blocks:
       Ascent succeeded → proceed to STEP 7
-- If Y did NOT increase:
+- If Y did NOT increase by ≥ 0.8 blocks:
       Treat as climb failure.
-      Rotate 90° clockwise and return to STEP 2.
+      Call mc-status to get current yaw, calculate new yaw = current_yaw + 90° (convert to radians), call mc-look to rotate 90° clockwise, then return to STEP 2.
 
 ---
 STEP 7 — COLLECT / SETTLE
@@ -123,31 +166,6 @@ STEP 8 — LOOP
 
 - Loop back to STEP 1 (within this method execution).
 
----
-STEP 9 — SAFE REPOSITION (FALLBACK)
----
-
-This step is used only when no valid step is found in any direction.
-
-- If reposition_used_this_cycle is true:
-      Loop back to STEP 1 (within this method execution).
-
-- Verify (by observation) that:
-      - The block at (forward:0, up:-1) is solid.
-      - The block at (forward:1, up:-1) is solid.
-      - The block at (forward:1, up:0) is AIR.
-      - The block at (forward:1, up:1) is AIR.
-
-- If any appear unsafe:
-      Loop back to STEP 1 (within this method execution).
-
-- Otherwise:
-      - Execute mc-move with:
-            forward: true
-            jump: false
-      - Execute mc-wait for 0.5 seconds.
-      - Set reposition_used_this_cycle := true.
-      - Loop back to STEP 1 (within this method execution).
 
 #TERMINATION CONDITIONS
 
@@ -159,10 +177,11 @@ SUCCESS:
 
 INAPPLICABLE (EXIT SHALLOW PIT / OPEN TERRAIN):
 - Forward distance ≥ 1.0 in all four cardinal directions AND
-- Jumping without terrain modification increases Y.
+- Jumping without terrain modification maintains or increases Y.
 
 FAILURE:
 - STEP 4 detects a solid block at up:2 that cannot be dug (bedrock or protected region)
+- STEP 2 cannot find a wall within 1.0 distance in any cardinal direction.
 
 On termination, control should return to the caller for selection of
 a more appropriate skill.

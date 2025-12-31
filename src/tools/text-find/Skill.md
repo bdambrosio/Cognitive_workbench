@@ -2,6 +2,11 @@
 name: text-find
 description: Locate pattern or substring and return position with context. Use to search for specific substring or pattern in a text document
 type: prompt_augmentation
+schema_hint:
+  target: "$variable or Note ID (text to search)"
+  pattern: "string (substring or regex pattern, required)"
+  context_lines: "int (optional, default 1)"
+  out: "$variable"
 examples:
   - '{"type":"text-find","target":"$document","pattern":"conclusion","out":"$location"}'
 ---

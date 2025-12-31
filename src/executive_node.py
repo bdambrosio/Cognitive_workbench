@@ -629,6 +629,9 @@ class ZenohExecutiveNode:
         self.current_goal = None
         self.goal_source = None  # Track goal origin: 'ui', 'autonomous', or None
         self.awaiting_user_input = False  # Pause autonomous behavior after UI goal completion
+        self.continuous_mode = False  # Continuous mode: resubmit goal on completion
+        self.continuous_goal_text = None  # Original goal text for continuous resubmission
+        self.last_completed_goal_text = None  # Last completed goal text (for enabling continuous mode after completion)
         self.plan_just_generated = False  # Skip execution on same turn as plan generation
         self.observations = None
         self.text_input_queue = []
@@ -687,6 +690,22 @@ class ZenohExecutiveNode:
         self.control_interrupt_subscriber = self.session.declare_subscriber(
             f"cognitive/{character_name}/control/interrupt",
             self.handle_interrupt_command
+        )
+        self.control_continuous_subscriber = self.session.declare_subscriber(
+            f"cognitive/{character_name}/control/continuous",
+            self.handle_continuous_toggle
+        )
+        self.control_clear_epistemic_frame_subscriber = self.session.declare_subscriber(
+            f"cognitive/{character_name}/control/clear_epistemic_frame",
+            self.handle_clear_epistemic_frame
+        )
+        self.control_clear_map_subscriber = self.session.declare_subscriber(
+            f"cognitive/{character_name}/control/clear_map",
+            self.handle_clear_map
+        )
+        self.control_clear_transients_subscriber = self.session.declare_subscriber(
+            f"cognitive/{character_name}/control/clear_transients",
+            self.handle_clear_transients
         )
         
         # === ZENOH PUBLICATION ===
@@ -1479,6 +1498,8 @@ class ZenohExecutiveNode:
         # Build scenario content from character config
         character_desc = self.character_config.get('character', '').strip()
         backstory = self.character_config.get('backstory', '').strip()
+        capabilities = self.character_config.get('capabilities', '').strip()
+        setting = self.character_config.get('setting', '').strip()
         drives = self.character_config.get('drives', [])
         
         # Format drives
@@ -1490,12 +1511,16 @@ class ZenohExecutiveNode:
         # Build scenario content
         scenario_content = f"You are {self.character_name}\n\n"
         if character_desc:
-            scenario_content += f"{character_desc}\n\n"
+            scenario_content += f"## Character Description\n{character_desc}\n\n"
         if backstory:
-            scenario_content += f"{backstory}\n\n"
+            scenario_content += f"## Backstory\n{backstory}\n\n"
+        if capabilities:
+            scenario_content += f"## Capabilities\n{capabilities}\n\n"
+        if setting:
+            scenario_content += f"## Setting & World Rules\n{setting}\n\n"
         if drives_text:
-            scenario_content += f"{drives_text}\n\n"
-        scenario_content += "respond to User, who just said:\n\n"
+            scenario_content += f"## Drives\n{drives_text}\n\n"
+        scenario_content += "Respond to User, who just said:\n\n"
         
         # Create note with character_name as the note name
         create_action = {
@@ -1548,10 +1573,10 @@ class ZenohExecutiveNode:
                     self._add_to_conversation(f"User says: {clean_input}")
                     
                     # Prepend load instruction to user input using character_name
-                    template = """"goal: Context: the Collection named 'conversation' contains the history of this conversation.
+                    template = f""""goal: Context: the Collection named 'conversation' contains the history of this conversation.
 First load the note '{self.character_name}' to get additional context about your character and role.\n
 Then plan and act to address the following User-provided task: \n\n{clean_input}\n\n
-Finally, using 'say', respond in character to User"""
+Finally, using 'say', respond in character to User\n"""
                     
                     # Convert to goal format
                     logger.info(f'📥 {self.character_name} Received goal: "{goal}"')
@@ -1624,10 +1649,12 @@ Finally, using 'say', respond in character to User"""
         system_prompt = ''
         if self.character_config.get('character', None):
             system_prompt = self.character_config['character']
+        if self.character_config.get('character', None):
+            system_prompt += f"\n#Your capabilities are:\n\t{self.character_config['capabilities']}\n"
         if self.character_config.get('drives', None):
             system_prompt += f"\n#Your drives are:\n\t{'\n\t'.join(self.character_config['drives'])}\n"
         if self.character_config.get('setting', None):
-            system_prompt += f"\n#The overall setting is:\n{self.character_config['setting']}\n"
+            system_prompt += f"\n#The world you are operating in is:\n{self.character_config['setting']}\n"
         
         # Add dynamic updates
         if self.current_goal:
@@ -1831,7 +1858,7 @@ Finally, using 'say', respond in character to User"""
                     template=template,
                     goal=goal_text, 
                     context=context, 
-                    max_steps=24
+                    max_steps=16
                 )
             else:
                 logger.error("No planner available for infospace planning")
@@ -1856,7 +1883,30 @@ Finally, using 'say', respond in character to User"""
         if reason == 'manual goal override' or reason == 'manual plan override':
             return
         
+        # Store goal text before clearing (for potential continuous mode activation)
+        goal_text_to_store = None
+        if self.current_goal:
+            goal_text_to_store = self.current_goal.to_string()
+        
+        # Check if we should resubmit goal in continuous mode
+        if self.continuous_mode and self.continuous_goal_text:
+            logger.info(f'🔄 {self.character_name} plan completed, resubmitting goal in continuous mode')
+            # Resubmit the original goal text directly
+            goal_text = f"goal: {self.continuous_goal_text}"
+            self.parse_and_set_goal("", goal_text)
+            # Ensure execution continues (don't pause)
+            self.execution_paused = False
+            self.awaiting_user_input = False
+            self._publish_execution_state()
+            # Store goal text before clearing (for next cycle)
+            if goal_text_to_store:
+                self.last_completed_goal_text = goal_text_to_store
+            return  # Don't clear goal or pause - let resubmission proceed
+        
         # No activity - clear goal (existing behavior)
+        # Store goal text before clearing for potential continuous mode activation
+        if goal_text_to_store:
+            self.last_completed_goal_text = goal_text_to_store
         self.current_goal = None
         
         # If goal was from UI, pause autonomous behavior to await next user input
@@ -2131,7 +2181,7 @@ Finally, using 'say', respond in character to User"""
             traceback.print_exc()
     
     def handle_run_command(self, sample):
-        """Handle run command - enable continuous execution."""
+        """Handle run command - enable continuous execution (run mode only, not continuous mode)."""
         try:
             logger.debug(f'🏃 Run command received by {self.character_name}')
             self.execution_mode = 'run'
@@ -2141,12 +2191,187 @@ Finally, using 'say', respond in character to User"""
             logger.error(f'Error handling run command: {e}')
             traceback.print_exc()
     
+    def handle_continuous_toggle(self, sample):
+        """Handle continuous mode toggle - can be enabled/disabled at any time."""
+        try:
+            payload_bytes = sample.payload.to_bytes()
+            data = json.loads(payload_bytes.decode('utf-8'))
+            enable = data.get('enable', None)
+            
+            # If enable is None, toggle current state
+            if enable is None:
+                enable = not self.continuous_mode
+            
+            if enable:
+                # Enable continuous mode: store current goal text for resubmission
+                # Use current goal if available, otherwise use last completed goal
+                goal_text = None
+                if self.current_goal:
+                    goal_text = self.current_goal.to_string()
+                elif self.last_completed_goal_text:
+                    goal_text = self.last_completed_goal_text
+                    logger.info(f'🔄 {self.character_name} using last completed goal for continuous mode')
+                
+                if goal_text:
+                    self.continuous_mode = True
+                    self.continuous_goal_text = goal_text
+                    logger.info(f'🔄 {self.character_name} continuous mode enabled, goal: {self.continuous_goal_text[:80]}...')
+                    # If we're using last completed goal and execution is paused, resubmit immediately
+                    if not self.current_goal and self.execution_paused:
+                        logger.info(f'🔄 {self.character_name} resubmitting last completed goal immediately')
+                        goal_text_formatted = f"goal: {self.continuous_goal_text}"
+                        self.parse_and_set_goal("", goal_text_formatted)
+                else:
+                    logger.warning(f'⚠️ {self.character_name} continuous toggle ON but no current or last completed goal')
+            else:
+                # Disable continuous mode
+                self.continuous_mode = False
+                self.continuous_goal_text = None
+                logger.info(f'🔄 {self.character_name} continuous mode disabled')
+            
+            self._publish_execution_state()
+        except Exception as e:
+            logger.error(f'Error handling continuous toggle: {e}')
+            traceback.print_exc()
+    
+    def handle_clear_epistemic_frame(self, sample):
+        """Handle clear epistemic frame command - deletes the persistent epistemic frame Note."""
+        try:
+            if not self.resource_manager:
+                logger.error("Resource manager not available, cannot clear epistemic frame")
+                return
+            
+            agent_name = getattr(self, 'character_name', 'unknown')
+            frame_name = f"{agent_name}-epistemic_frame"
+            
+            # Resolve named Note
+            note_id = self.resource_manager._resolve_resource_id(frame_name)
+            if not note_id:
+                logger.info(f"Epistemic frame '{frame_name}' not found, nothing to clear")
+                return
+            
+            # Delete the Note
+            success, error_msg = self.resource_manager.delete_resource(note_id)
+            if success:
+                logger.info(f"🗑️ Cleared epistemic frame '{frame_name}' ({note_id})")
+            else:
+                logger.error(f"Failed to clear epistemic frame '{frame_name}': {error_msg}")
+        except Exception as e:
+            logger.error(f'Error clearing epistemic frame: {e}')
+            traceback.print_exc()
+    
+    def handle_clear_map(self, sample):
+        """Handle clear map command - deletes the persistent map Collection and all its Notes."""
+        try:
+            if not self.resource_manager:
+                logger.error("Resource manager not available, cannot clear map")
+                return
+            
+            agent_name = getattr(self, 'character_name', 'unknown')
+            map_name = f"{agent_name}-minecraft_map"
+            
+            # Resolve named Collection
+            collection_id = self.resource_manager.named_collections.get(map_name)
+            if not collection_id:
+                logger.info(f"Map '{map_name}' not found, nothing to clear")
+                return
+            
+            # Get Collection content (list of Note IDs)
+            collection_resource = self.resource_manager.get_resource(collection_id)
+            if not collection_resource:
+                logger.warning(f"Map Collection {collection_id} resolved but resource not found")
+                return
+            
+            note_ids = collection_resource.get('properties', {}).get('content', [])
+            if not isinstance(note_ids, list):
+                note_ids = []
+            
+            # Delete all Notes in the Collection
+            deleted_notes = 0
+            for note_id in note_ids:
+                if isinstance(note_id, str) and note_id.startswith('Note_'):
+                    success, _ = self.resource_manager.delete_resource(note_id)
+                    if success:
+                        deleted_notes += 1
+            
+            # Delete the Collection itself
+            success, error_msg = self.resource_manager.delete_resource(collection_id)
+            if success:
+                logger.info(f"🗑️ Cleared map '{map_name}' ({collection_id}) - deleted {deleted_notes} Notes")
+            else:
+                logger.error(f"Failed to clear map Collection '{map_name}': {error_msg}")
+        except Exception as e:
+            logger.error(f'Error clearing map: {e}')
+            traceback.print_exc()
+    
+    def handle_clear_transients(self, sample):
+        """Handle clear transients command - clears all non-persistent resources via query."""
+        try:
+            # Use existing clear_transient query mechanism
+            # Create a mock query object to call the handler
+            import zenoh
+            from zenoh import Query
+            
+            # We'll use the queryable directly instead
+            # Since we can't easily create a Query object, we'll duplicate the logic
+            if not self.resource_manager:
+                logger.error("Resource manager not available, cannot clear transients")
+                return
+            
+            PRESERVED_COLLECTIONS = {'conversation', 'conversation_history'}
+            
+            deleted_notes = 0
+            deleted_collections = 0
+            to_delete = []
+            for resource_id, resource_data in self.resource_manager.resource_registry.items():
+                props = resource_data.get('properties', {})
+                
+                # Skip persistent resources
+                if props.get('persistent', False):
+                    continue
+                
+                if resource_id.startswith('Note_') and resource_id != 'Note_null':
+                    to_delete.append(resource_id)
+                elif resource_id.startswith('Collection_'):
+                    collection_name = props.get('collection_name')
+                    is_preserved = False
+                    if collection_name and collection_name in PRESERVED_COLLECTIONS:
+                        is_preserved = True
+                    for preserved_name in PRESERVED_COLLECTIONS:
+                        if self.resource_manager.named_collections.get(preserved_name) == resource_id:
+                            is_preserved = True
+                            break
+                    if is_preserved:
+                        continue
+                    to_delete.append(resource_id)
+            
+            for resource_id in to_delete:
+                success, _ = self.resource_manager.delete_resource(resource_id)
+                if success:
+                    if resource_id.startswith('Note_'):
+                        deleted_notes += 1
+                    else:
+                        deleted_collections += 1
+            
+            # Also clear planner bindings
+            bindings_cleared = 0
+            if self.infospace_executor:
+                bindings_cleared = len(self.infospace_executor.plan_bindings_flat)
+                self.infospace_executor.clear_plan_state()
+            
+            logger.info(f"🗑️ Cleared transients - {deleted_notes} Notes, {deleted_collections} Collections, {bindings_cleared} bindings")
+        except Exception as e:
+            logger.error(f'Error clearing transients: {e}')
+            traceback.print_exc()
+    
     def handle_stop_command(self, sample):
-        """Handle stop command - pause execution."""
+        """Handle stop command - pause execution (but keep continuous mode)."""
         try:
             logger.info(f'⏹️ Stop command received by {self.character_name}')
             self.execution_mode = 'step'
             self.execution_paused = True
+            # Note: continuous_mode is NOT cleared here - user must toggle it off explicitly
+            self.awaiting_user_input = False  # Clear awaiting flag
             self._publish_execution_state()
         except Exception as e:
             logger.error(f'Error handling stop command: {e}')
@@ -2162,6 +2387,8 @@ Finally, using 'say', respond in character to User"""
             # Pause execution immediately; planner will notice interrupt at next step boundary
             self.execution_mode = 'step'
             self.execution_paused = True
+            # Note: continuous_mode is NOT cleared here - user must toggle it off explicitly
+            self.awaiting_user_input = False
             self._publish_execution_state()
         except Exception as e:
             logger.error(f'Error handling interrupt command: {e}')
@@ -2174,6 +2401,7 @@ Finally, using 'say', respond in character to User"""
                 'paused': self.execution_paused,
                 'mode': self.execution_mode,
                 'character': self.character_name,
+                'continuous_mode': self.continuous_mode,
                 'timestamp': time.time()
             }
             self.execution_state_publisher.put(json.dumps(state_data).encode('utf-8'))
@@ -2806,6 +3034,12 @@ Finally, using 'say', respond in character to User"""
             if not self.observations:
                 self._observe()
             self.current_goal = Goal(parsed_goal, [self.character_name], description='', termination='')
+            
+            # If continuous mode is active, update goal text for resubmission
+            if self.continuous_mode:
+                self.continuous_goal_text = self.current_goal.to_string()
+                self.last_completed_goal_text = self.current_goal.to_string()  # Also update last completed
+                logger.info(f'🔄 {self.character_name} continuous mode goal updated: {self.continuous_goal_text[:80]}...')
             
             # Skip goal rewriting and plan immediately (infospace mode)
             self._publish_goal(self.current_goal)

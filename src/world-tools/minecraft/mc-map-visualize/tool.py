@@ -154,7 +154,21 @@ def _generate_html_visualization(map_content: List[Dict], map_name: str) -> str:
             z = entry.get('z', 0)
             
             if isinstance(x, (int, float)) and isinstance(y, (int, float)) and isinstance(z, (int, float)):
-                locations.append({
+                # Extract observation metadata for hover details
+                observed = entry.get('observed', {})
+                observation_meta = {}
+                if isinstance(observed, dict):
+                    # Extract affordances, geometry, blocks for hover display
+                    observation_meta = {
+                        'aff': observed.get('aff', {}),
+                        'geom': observed.get('geom', {}),
+                        'blocks': observed.get('blocks', {}),
+                        'support': observed.get('support', {}),
+                        'clear': observed.get('clear', {})
+                    }
+                
+                # Create location dict with observation metadata
+                loc_dict = {
                     'x': x,
                     'y': y,
                     'z': z,
@@ -162,7 +176,11 @@ def _generate_html_visualization(map_content: List[Dict], map_name: str) -> str:
                     'waypoints': entry.get('waypoints', []),
                     'first_visit': entry.get('first_visit', ''),
                     'last_visit': entry.get('last_visit', '')
-                })
+                }
+                if observation_meta and any(observation_meta.values()):
+                    loc_dict['observation'] = observation_meta
+                
+                locations.append(loc_dict)
                 
                 min_x = min(min_x, x)
                 max_x = max(max_x, x)
@@ -175,44 +193,52 @@ def _generate_html_visualization(map_content: List[Dict], map_name: str) -> str:
                 visited_key = (_round_coordinate(x), _round_coordinate(y), _round_coordinate(z))
                 observed_set.add(visited_key)
                 
-                # Extract nearby_blocks from observation data
-                observed = entry.get('observed', {})
+                # Extract nearby_blocks from observation data (check both paths for backward compatibility)
+                nearby = None
                 if isinstance(observed, dict):
-                    metadata = observed.get('metadata', {})
-                    if isinstance(metadata, dict):
-                        perception = metadata.get('perception', {})
-                        if isinstance(perception, dict):
-                            nearby = perception.get('nearby_blocks', [])
-                            if isinstance(nearby, list):
-                                for block in nearby:
-                                    if isinstance(block, dict):
-                                        pos = block.get('position')
-                                        if isinstance(pos, dict):
-                                            bx = pos.get('x')
-                                            by = pos.get('y')
-                                            bz = pos.get('z')
-                                            if isinstance(bx, (int, float)) and isinstance(by, (int, float)) and isinstance(bz, (int, float)):
-                                                bx_round = _round_coordinate(bx)
-                                                by_round = _round_coordinate(by)
-                                                bz_round = _round_coordinate(bz)
-                                                block_key = (bx_round, by_round, bz_round)
-                                                
-                                                # Only add if not already visited
-                                                if block_key not in observed_set:
-                                                    observed_set.add(block_key)
-                                                    observed_blocks.append({
-                                                        'x': bx_round,
-                                                        'y': by_round,
-                                                        'z': bz_round,
-                                                        'name': block.get('name', 'unknown')
-                                                    })
-                                                    
-                                                    min_x = min(min_x, bx_round)
-                                                    max_x = max(max_x, bx_round)
-                                                    min_y = min(min_y, by_round)
-                                                    max_y = max(max_y, by_round)
-                                                    min_z = min(min_z, bz_round)
-                                                    max_z = max(max_z, bz_round)
+                    # New path: observed.nearby_blocks (top-level, filtered by map-update)
+                    nearby = observed.get('nearby_blocks')
+                    if not nearby:
+                        # Old path: observed.metadata.perception.nearby_blocks (nested)
+                        metadata = observed.get('metadata', {})
+                        if isinstance(metadata, dict):
+                            perception = metadata.get('perception', {})
+                            if isinstance(perception, dict):
+                                nearby = perception.get('nearby_blocks')
+                
+                if isinstance(nearby, list):
+                    for block in nearby:
+                        if isinstance(block, dict):
+                            pos = block.get('position')
+                            if isinstance(pos, dict):
+                                bx = pos.get('x')
+                                by = pos.get('y')
+                                bz = pos.get('z')
+                                if isinstance(bx, (int, float)) and isinstance(by, (int, float)) and isinstance(bz, (int, float)):
+                                    bx_round = _round_coordinate(bx)
+                                    by_round = _round_coordinate(by)
+                                    bz_round = _round_coordinate(bz)
+                                    block_key = (bx_round, by_round, bz_round)
+                                    
+                                    # Only add if not already visited
+                                    if block_key not in observed_set:
+                                        observed_set.add(block_key)
+                                        # Extract dy for layer indication
+                                        dy = block.get('dy', 0)
+                                        observed_blocks.append({
+                                            'x': bx_round,
+                                            'y': by_round,
+                                            'z': bz_round,
+                                            'name': block.get('name', 'unknown'),
+                                            'dy': int(dy) if isinstance(dy, (int, float)) else 0
+                                        })
+                                        
+                                        min_x = min(min_x, bx_round)
+                                        max_x = max(max_x, bx_round)
+                                        min_y = min(min_y, by_round)
+                                        max_y = max(max_y, by_round)
+                                        min_z = min(min_z, bz_round)
+                                        max_z = max(max_z, bz_round)
                 
                 # Collect waypoints
                 for wp in entry.get('waypoints', []):
@@ -562,15 +588,70 @@ def _generate_html_visualization(map_content: List[Dict], map_name: str) -> str:
                 );
                 if (nearby.length > 0) {{
                     const loc = nearby[0];
-                    infoPanel.innerHTML = `
-                        <strong>Location</strong><br>
-                        X: ${{loc.x}}, Y: ${{loc.y}}, Z: ${{loc.z}}<br>
-                        Visits: ${{loc.visit_count}}<br>
-                        ${{loc.waypoints.length > 0 ? 'Waypoints: ' + loc.waypoints.join(', ') : ''}}
-                    `;
+                    let infoHtml = `<strong>Location</strong><br>X: ${{loc.x}}, Y: ${{loc.y}}, Z: ${{loc.z}}<br>Visits: ${{loc.visit_count}}<br>`;
+                    
+                    if (loc.waypoints && loc.waypoints.length > 0) {{
+                        infoHtml += `Waypoints: ${{loc.waypoints.join(', ')}}<br>`;
+                    }}
+                    
+                    // Show observation details if available
+                    if (loc.observation) {{
+                        const obs = loc.observation;
+                        infoHtml += `<br><strong>Observation:</strong><br>`;
+                        
+                        // Affordances
+                        if (obs.aff) {{
+                            const affs = [];
+                            if (obs.aff.step) affs.push('Step');
+                            if (obs.aff.jump) affs.push('Jump');
+                            if (obs.aff.descend) affs.push('Descend');
+                            if (obs.aff.sky) affs.push('Sky');
+                            if (affs.length > 0) {{
+                                infoHtml += `Affordances: ${{affs.join(', ')}}<br>`;
+                            }}
+                        }}
+                        
+                        // Geometry
+                        if (obs.geom) {{
+                            const geoms = [];
+                            if (obs.geom.pit) geoms.push('Pit');
+                            if (obs.geom.stair) geoms.push('Stair');
+                            if (obs.geom.slope) geoms.push('Slope');
+                            if (geoms.length > 0) {{
+                                infoHtml += `Geometry: ${{geoms.join(', ')}}<br>`;
+                            }}
+                        }}
+                        
+                        // Block types
+                        if (obs.blocks && obs.blocks.seen && obs.blocks.seen.length > 0) {{
+                            const blockTypes = obs.blocks.seen.slice(0, 5);
+                            infoHtml += `Blocks: ${{blockTypes.join(', ')}}`;
+                            if (obs.blocks.seen.length > 5) {{
+                                infoHtml += ` (+${{obs.blocks.seen.length - 5}} more)`;
+                            }}
+                            infoHtml += `<br>`;
+                        }}
+                    }}
+                    
+                    infoPanel.innerHTML = infoHtml;
                     infoPanel.classList.add('visible');
                 }} else {{
-                    infoPanel.classList.remove('visible');
+                    // Check if hovering over observed block
+                    const nearbyBlocks = observedBlocks.filter(block => 
+                        Math.abs(block.x - worldPos.x) < 0.5 && Math.abs(block.z - worldPos.z) < 0.5
+                    );
+                    if (nearbyBlocks.length > 0) {{
+                        const block = nearbyBlocks[0];
+                        let infoHtml = `<strong>Block</strong><br>X: ${{block.x}}, Y: ${{block.y}}, Z: ${{block.z}}<br>Type: ${{block.name}}<br>`;
+                        if (block.dy !== undefined) {{
+                            const layerNames = {{'-1': 'Support (y-1)', '0': 'Body (y)', '1': 'Head (y+1)'}};
+                            infoHtml += `Layer: ${{layerNames[block.dy] || 'y+' + block.dy}}<br>`;
+                        }}
+                        infoPanel.innerHTML = infoHtml;
+                        infoPanel.classList.add('visible');
+                    }} else {{
+                        infoPanel.classList.remove('visible');
+                    }}
                 }}
             }}
         }});

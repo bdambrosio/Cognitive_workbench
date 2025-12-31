@@ -356,6 +356,7 @@ function statusPayload() {
     pitch: Number(pitch),
     health: typeof bot.health === 'number' ? bot.health : null,
     food: typeof bot.food === 'number' ? bot.food : null,
+    saturation: typeof bot.saturation === 'number' ? bot.saturation : null,
     onGround: bot.entity ? !!bot.entity.onGround : null,
     dimension: bot.game ? bot.game.dimension : null,
     time: {

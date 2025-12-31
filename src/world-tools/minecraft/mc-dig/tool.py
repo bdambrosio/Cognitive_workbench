@@ -69,13 +69,15 @@ def tool(input_value=None, **kwargs):
         return {"status": "failed", "reason": "position required (absolute x,y,z OR relative forward,right,up)"}
     
     try:
-        response = requests.post(
-            f"{minecraft_url}/act/dig",
-            json=dig_params,
-            timeout=30.0
-        )
+        url = f"{minecraft_url}/act/dig"
+        logger.info(f"🔍 mc-dig: POST {url} body={dig_params}")
+        # Increased timeout to 60s - digging blocks can take time, especially hard blocks
+        # Bridge returns immediately after initiating dig, but some blocks take 10-30+ seconds to break
+        response = requests.post(url, json=dig_params, timeout=60.0)
+        logger.info(f"📥 mc-dig: Response status={response.status_code}, headers={dict(response.headers)}")
         response.raise_for_status()
         data = response.json()
+        logger.debug(f"📥 mc-dig: Response body={data}")
         
         if not data.get("ok"):
             error = data.get("error", "unknown failure")

@@ -1,5 +1,11 @@
 # Cursor Rules for Cognitive Workbench
 
+## Question Handling
+
+- If the user asks a question (ends with "?" or is clearly a question), answer the question first
+- Do NOT make code changes when responding to questions unless explicitly requested
+- Only make code changes after answering the question if the user explicitly requests them
+
 ## Code Formatting
 
 - Format dictionaries and action objects as single lines when the total length is less than 120 characters

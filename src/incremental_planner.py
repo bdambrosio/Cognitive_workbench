@@ -151,6 +151,7 @@ except ImportError:
 EPISTEMIC_FRAME_SCHEMA = {
   "EpistemicFrame": {
     "version": "1.0",
+    "_size_limits": "hypotheses.active: 8 max (by importance/confidence), retired: 4 max (most recent). inferred_world_facts.*: 8 max each subfield (by confidence/recency). search_coverage.*: 6 max each. open_questions: 4 max (by priority). exploration_constraints.discouraged_assumptions: 4 max.",
 
     "goal_context": {
       "original_goal_text": "",
@@ -1613,19 +1614,23 @@ if HAS_SGLANG:
                 # Intercept the completion to force a self-audit
                 s += user(
                     "STOP. Before providing the final answer, perform a verification step:\n"
-                    "1. Generate a specific VERIFICATION_QUESTION to check if your logic is sound or if you missed any constraints.\n"
-                    "2. Provide a candid VERIFICATION_ANSWER."
+                    "    VERIFICATION_INSTRUCTIONS:\n"
+                    "        Inputs: GOAL, STATE_BEFORE, STATE_AFTER\n"
+                    "        - what are the observable facts in STATE_AFTER that directly satisfy GOAL.\n"
+                    "        - what are the required GOAL facts not observable in STATE_AFTER.\n"
+                    "        - based on the above, provide a candid VERIFICATION ANSWER: (SUCCESS, PARTIAL, INCONCLUSIVE):\n"
+                    "    OUTPUT FORMAT:\n"
+                    "        - VERIFICATION_ANSWER: <SUCCESS | PARTIAL | INCONCLUSIVE>\n"
+                    "    Respond using the OUTPUT FORMAT. Be concise.\n"
                 )
                 
                 s += assistant(
-                    "VERIFICATION_QUESTION: "
-                    + gen("verif_q", max_tokens=96, temperature=GEN_TEMPERATURE, stop="\n")
-                    + "\nVERIFICATION_ANSWER: "
-                    + gen("verif_a", max_tokens=256, temperature=GEN_TEMPERATURE, stop="\n")
+                    "VERIFICATION_ANSWER: "
+                    + gen("VERIFICATION_ANSWER", max_tokens=96, temperature=GEN_TEMPERATURE, stop="\n")
+
                 )
                 
-                logger.info(f"VERIFICATION Q: {s['verif_q']}")
-                logger.info(f"VERIFICATION A: {s['verif_a']}")
+                logger.info(f"VERIFICATION ANSWER: {s['VERIFICATION_ANSWER']}")
                 # --- [END NEW VERIFICATION LOGIC] ---                
                 # 
                 # Generate final answer using NEXT_TASK as prompt, or generic goal-focused prompt
@@ -1646,7 +1651,7 @@ if HAS_SGLANG:
                 current_task = next_task_raw
                 logger.info(f"Step {step}: Next task: {current_task}")
             else:
-                logger.warning(f"Step {step}: No NEXT_TASK provided, keeping current task")
+                logger.warning(f"Step {step}: No NEXT_TASK provided, stopping")
         
         
         # Write full conversation state to trace file (file-only, not console)
@@ -1739,28 +1744,64 @@ def _clear_interrupt(executor: "InfospaceExecutor") -> None:
         exec_node.interrupt_requested = False
 
 
+# Maximum call depth for recursive method calls
+MAX_METHOD_DEPTH = 3
+
 def run_method_protocol(s, executor: "InfospaceExecutor", method_name: str, max_steps: int, outer_step: int,
-                        loaded_skill_docs: set) -> str:
+                        loaded_skill_docs: set, call_depth: int = 0) -> str:
     """
     Execute a 'method' tool as an inner loop (bounded by max_steps).
     Returns a short summary string for the outer loop (so the method counts as 1 outer step).
     
     Pushes a new binding scope for the method (with copy of outer scope for read access),
     and pops it when the method completes.
+    
+    Args:
+        max_steps: Maximum steps for this method (reduced by 4 at each recursive level)
+        call_depth: Current recursion depth (0 = top level, incremented for nested calls)
     """
+    # Check depth limit
+    if call_depth >= MAX_METHOD_DEPTH:
+        return f"FAILED | Method {method_name} exceeded maximum call depth ({MAX_METHOD_DEPTH}). Nested method calls are limited to prevent unbounded recursion."
+    
+    # Ensure max_steps is at least 1 (minimum viable)
+    effective_max_steps = max(1, max_steps)
+    
+    # Publish method invocation to action log
+    if hasattr(executor, 'executive_node') and executor.executive_node:
+        from datetime import datetime
+        executive_node = executor.executive_node
+        now_ts = datetime.now()
+        
+        # Create action dict for method invocation
+        method_action = {
+            'type': method_name,
+            'action_type': method_name,
+            'action_id': f'{method_name}_{int(now_ts.timestamp() * 1000)}',
+            'timestamp': now_ts.isoformat(),
+            'character': executor.agent_name,
+            'status': 'running',
+            'method_depth': call_depth,
+            'max_steps': effective_max_steps
+        }
+        
+        # Publish method invocation start
+        if hasattr(executive_node, '_publish_action_result'):
+            executive_node._publish_action_result(method_action, {'status': 'running'}, method_name, now_ts)
+    
     # Push new binding scope for method (copy outer scope for read access)
     executor.push_binding_scope(copy_outer=True)
     
     method_task = "STEP 1"
     last_tool_result = ""
     try:
-        for mstep in range(max_steps):
+        for mstep in range(effective_max_steps):
             if _interrupt_requested(executor):
                 _clear_interrupt(executor)
                 return f"FAILED | Method {method_name} interrupted by user"
 
             s += user(
-            f"#METHOD EXECUTION MODE: {method_name} (internal step {mstep + 1}/{max_steps})\n"
+            f"#METHOD EXECUTION MODE: {method_name} (internal step {mstep + 1}/{effective_max_steps}, depth {call_depth})\n"
                 f"CURRENT METHOD STEP: {method_task}\n"
                 "Select the tool explicitly required by the current Method Step.\n"
                 "Choose tool and JSON args using Stage 2 FORMAT.\n"
@@ -1779,30 +1820,41 @@ def run_method_protocol(s, executor: "InfospaceExecutor", method_name: str, max_
             tool_name = s[tool_name_key].strip()
             tool_args_json = s[tool_args_key].strip()
 
-            # Prevent method recursion (KISS)
             tool_info = executor.available_tools.get(tool_name, {})
-            if tool_info.get('type') == 'method':
-                return f"FAILED | Method {method_name} cannot invoke method tool '{tool_name}'"
-
-            action = sgl_to_infospace_action(tool_name, tool_args_json, outer_step * 1000 + mstep, executor.available_tools)
             
-            # Add inner loop metadata for UI display
-            action['_inner_loop'] = {"method_name": method_name, "inner_step": mstep + 1, "max_steps": max_steps, "outer_step": outer_step}
+            # Handle method tool recursion with depth checking
+            if tool_info.get('type') == 'method':
+                # Recursive method call - reduce max_steps by 4 and increment depth
+                nested_max_steps = max(1, effective_max_steps - 4)
+                nested_result = run_method_protocol(
+                    s, executor, tool_name, nested_max_steps, outer_step, 
+                    loaded_skill_docs, call_depth=call_depth + 1
+                )
+                last_tool_result = nested_result
+                result_display = nested_result[:512]
+                if len(nested_result) > 512:
+                    result_display += f"\n... [TRUNCATED - showing 512 of {len(nested_result)} chars]"
+            else:
+                # Standard tool execution
+                action = sgl_to_infospace_action(tool_name, tool_args_json, outer_step * 1000 + mstep, executor.available_tools)
+            
+                # Add inner loop metadata for UI display
+                action['_inner_loop'] = {"method_name": method_name, "inner_step": mstep + 1, "max_steps": effective_max_steps, "outer_step": outer_step}
 
-            # Track resource bindings before execution (for commentary update)
-            out_var = action.get('out', '')
-            resource_id_before = None
-            if out_var:
-                resource_id_before = executor.plan_bindings_flat.get(out_var.lstrip('$'))
+                # Track resource bindings before execution (for commentary update)
+                out_var = action.get('out', '')
+                resource_id_before = None
+                if out_var:
+                    resource_id_before = executor.plan_bindings_flat.get(out_var.lstrip('$'))
 
-            last_tool_result = execute_infospace_action(action, executor, executor.agent_name)
-            result_display = last_tool_result[:512]
-            if len(last_tool_result) > 512:
-                result_display += f"\n... [TRUNCATED - showing 512 of {len(last_tool_result)} chars]"
+                last_tool_result = execute_infospace_action(action, executor, executor.agent_name)
+                result_display = last_tool_result[:512]
+                if len(last_tool_result) > 512:
+                    result_display += f"\n... [TRUNCATED - showing 512 of {len(last_tool_result)} chars]"
 
             s += user(
             f"=====\n"
-            f"METHOD STAGE 3 - TOOL EXECUTION COMPLETE (internal step {mstep + 1}/{max_steps})\n"
+            f"METHOD STAGE 3 - TOOL EXECUTION COMPLETE (internal step {mstep + 1}/{effective_max_steps})\n"
             f"=====\n\n"
             f"Tool executed: `{tool_name}`\n"
             f"Arguments: {tool_args_json}\n\n"
@@ -1872,13 +1924,57 @@ def run_method_protocol(s, executor: "InfospaceExecutor", method_name: str, max_
                 summary = thoughts_text.replace("\n", " ")
                 if len(summary) > 240:
                     summary = summary[:240] + "..."
-                return f"SUCCESS | Method {method_name} complete | {summary}"
+                final_result = f"SUCCESS | Method {method_name} complete | {summary}"
+                
+                # Publish method completion to action log
+                if hasattr(executor, 'executive_node') and executor.executive_node:
+                    from datetime import datetime
+                    executive_node = executor.executive_node
+                    now_ts = datetime.now()
+                    
+                    method_action = {
+                        'type': method_name,
+                        'action_type': method_name,
+                        'action_id': f'{method_name}_{int(now_ts.timestamp() * 1000)}',
+                        'timestamp': now_ts.isoformat(),
+                        'character': executor.agent_name,
+                        'status': 'success',
+                        'text': summary,
+                        'method_depth': call_depth
+                    }
+                    
+                    if hasattr(executive_node, '_publish_action_result'):
+                        executive_node._publish_action_result(method_action, {'status': 'success', 'value': summary}, method_name, now_ts)
+                
+                return final_result
 
             next_task_raw = s[next_task_key].strip()
             if next_task_raw and next_task_raw.lower() not in ["", "none", "null", "n/a"]:
                 method_task = next_task_raw
 
-        return f"FAILED | Method {method_name} exceeded max_steps ({max_steps}) | last_result={last_tool_result[:120]}"
+        final_result = f"FAILED | Method {method_name} exceeded max_steps ({effective_max_steps}) | last_result={last_tool_result[:120]}"
+        
+        # Publish method failure to action log
+        if hasattr(executor, 'executive_node') and executor.executive_node:
+            from datetime import datetime
+            executive_node = executor.executive_node
+            now_ts = datetime.now()
+            
+            method_action = {
+                'type': method_name,
+                'action_type': method_name,
+                'action_id': f'{method_name}_{int(now_ts.timestamp() * 1000)}',
+                'timestamp': now_ts.isoformat(),
+                'character': executor.agent_name,
+                'status': 'failed',
+                'error': f'exceeded max_steps ({effective_max_steps})',
+                'method_depth': call_depth
+            }
+            
+            if hasattr(executive_node, '_publish_action_result'):
+                executive_node._publish_action_result(method_action, {'status': 'failed', 'reason': final_result}, method_name, now_ts)
+        
+        return final_result
     finally:
         # Always pop the method scope when done
         executor.pop_binding_scope()
@@ -1929,6 +2025,110 @@ class IncrementalPlanner:
         # Initialize plan guidance system
         self.plan_guidance = PlanGuidance(resource_manager=executor.resource_manager)
     
+    def _load_epistemic_frame(self) -> Optional[Dict]:
+        """
+        Load persistent epistemic_frame from named Note if it exists.
+        
+        Returns:
+            Epistemic frame dict if found, None otherwise
+        """
+        if not self.executor.resource_manager:
+            logger.debug("Resource manager not available, cannot load epistemic_frame")
+            return None
+        
+        agent_name = getattr(self.executor, 'agent_name', 'unknown')
+        frame_name = f"{agent_name}-epistemic_frame"
+        
+        # Resolve named Note
+        note_id = self.executor.resource_manager._resolve_resource_id(frame_name)
+        if not note_id:
+            logger.debug(f"Epistemic frame Note '{frame_name}' not found")
+            return None
+        
+        # Load Note content
+        resource = self.executor.resource_manager.get_resource(note_id)
+        if not resource:
+            logger.warning(f"Epistemic frame Note {note_id} resolved but resource not found")
+            return None
+        
+        content = resource.get('properties', {}).get('content')
+        if content is None:
+            logger.warning(f"Epistemic frame Note {note_id} has no content")
+            return None
+        
+        # Parse JSON if needed
+        if isinstance(content, str):
+            try:
+                content = json.loads(content)
+            except json.JSONDecodeError as e:
+                logger.warning(f"Failed to parse epistemic_frame JSON: {e}")
+                return None
+        
+        logger.info(f"📂 Loaded persistent epistemic_frame from '{frame_name}' ({note_id})")
+        return content
+    
+    def _save_epistemic_frame(self, epistemic_frame: Dict) -> bool:
+        """
+        Save epistemic_frame to persistent named Note.
+        
+        Args:
+            epistemic_frame: Epistemic frame dict to save
+            
+        Returns:
+            True if saved successfully
+        """
+        if not self.executor.resource_manager:
+            logger.warning("Resource manager not available, cannot save epistemic_frame")
+            return False
+        
+        agent_name = getattr(self.executor, 'agent_name', 'unknown')
+        frame_name = f"{agent_name}-epistemic_frame"
+        
+        # Check if Note already exists
+        note_id = self.executor.resource_manager._resolve_resource_id(frame_name)
+        
+        if note_id:
+            # Update existing Note
+            resource = self.executor.resource_manager.get_resource(note_id)
+            if resource:
+                resource['properties']['content'] = epistemic_frame
+                # Update metadata
+                from datetime import datetime
+                resource['properties']['updated_at'] = datetime.now().isoformat()
+                resource['properties']['updated_by'] = agent_name.capitalize()
+                logger.info(f"💾 Updated epistemic_frame Note '{frame_name}' ({note_id})")
+                return True
+            else:
+                logger.warning(f"Epistemic frame Note {note_id} resolved but resource not found, creating new")
+                note_id = None
+        
+        if not note_id:
+            # Create new Note
+            success, new_note_id, error_msg, _ = self.executor.resource_manager.create_note(
+                character_name=agent_name,
+                content=epistemic_frame,
+                format_type='json',
+                source_skill='incremental_planner',
+                source_value='epistemic_frame',
+                note_name=frame_name,
+                extra_props={'exclude_from_index': True}  # Exclude from semantic search indexing
+            )
+            
+            if success:
+                # Mark as persistent
+                persist_success, persist_error = self.executor.resource_manager.mark_persistent(new_note_id, agent_name)
+                if persist_success:
+                    logger.info(f"💾 Created and persisted epistemic_frame Note '{frame_name}' ({new_note_id})")
+                    return True
+                else:
+                    logger.warning(f"Created epistemic_frame Note but failed to mark persistent: {persist_error}")
+                    return False
+            else:
+                logger.error(f"Failed to create epistemic_frame Note: {error_msg}")
+                return False
+        
+        return False
+    
     def __del__(self):
         """Cleanup: close trace file on instance destruction."""
         if hasattr(self, 'trace_file') and self.trace_file:
@@ -1965,25 +2165,38 @@ class IncrementalPlanner:
         """
         if not HAS_SGLANG:
             return {'error': 'SGLang not available'}
-        initial_epistemic_frame = EPISTEMIC_FRAME_SCHEMA.copy()
-        initial_epistemic_frame['EpistemicFrame']['goal_context']['original_goal_text'] = goal
-        initial_epistemic_frame['EpistemicFrame']['goal_context']['current_task_interpretation'] = ""
-        initial_epistemic_frame['EpistemicFrame']['goal_context']['supersedes_original_goal'] = False
-        initial_epistemic_frame['EpistemicFrame']['hypotheses']['active'] = []
-        initial_epistemic_frame['EpistemicFrame']['hypotheses']['retired'] = []
-        initial_epistemic_frame['EpistemicFrame']['inferred_world_facts']['positive'] = []
-        initial_epistemic_frame['EpistemicFrame']['inferred_world_facts']['negative'] = []
-        initial_epistemic_frame['EpistemicFrame']['inferred_world_facts']['invariants'] = []
-        initial_epistemic_frame['EpistemicFrame']['search_coverage']['exhausted_locations'] = []
-        initial_epistemic_frame['EpistemicFrame']['search_coverage']['exhausted_objects'] = []
-        initial_epistemic_frame['EpistemicFrame']['search_coverage']['unavailable_actions'] = []
-        initial_epistemic_frame['EpistemicFrame']['open_questions'] = []
-        initial_epistemic_frame['EpistemicFrame']['exploration_constraints']['max_steps'] = max_steps
-        initial_epistemic_frame['EpistemicFrame']['exploration_constraints']['allowed_probe_types'] = ["observation | navigation | manipulation | transformation"]
-        initial_epistemic_frame['EpistemicFrame']['exploration_constraints']['discouraged / unproven_assumptions'] = []
-        initial_epistemic_frame['EpistemicFrame']['reflection_notes']['failure_mode'] = ""
-        initial_epistemic_frame['EpistemicFrame']['reflection_notes']['model_mismatch_summary'] = ""
-        initial_epistemic_frame['EpistemicFrame']['reflection_notes']['confidence_in_frame'] = "low"
+        
+        # Load persistent epistemic_frame if it exists, otherwise initialize empty
+        loaded_frame = self._load_epistemic_frame()
+        if loaded_frame and isinstance(loaded_frame, dict) and 'EpistemicFrame' in loaded_frame:
+            initial_epistemic_frame = loaded_frame
+            # Update goal context for this planning session
+            initial_epistemic_frame['EpistemicFrame']['goal_context']['original_goal_text'] = goal
+            initial_epistemic_frame['EpistemicFrame']['goal_context']['current_task_interpretation'] = ""
+            initial_epistemic_frame['EpistemicFrame']['exploration_constraints']['max_steps'] = max_steps
+            logger.info("📂 Using loaded epistemic_frame as starting point")
+        else:
+            # Initialize empty epistemic_frame
+            initial_epistemic_frame = EPISTEMIC_FRAME_SCHEMA.copy()
+            initial_epistemic_frame['EpistemicFrame']['goal_context']['original_goal_text'] = goal
+            initial_epistemic_frame['EpistemicFrame']['goal_context']['current_task_interpretation'] = ""
+            initial_epistemic_frame['EpistemicFrame']['goal_context']['supersedes_original_goal'] = False
+            initial_epistemic_frame['EpistemicFrame']['hypotheses']['active'] = []
+            initial_epistemic_frame['EpistemicFrame']['hypotheses']['retired'] = []
+            initial_epistemic_frame['EpistemicFrame']['inferred_world_facts']['positive'] = []
+            initial_epistemic_frame['EpistemicFrame']['inferred_world_facts']['negative'] = []
+            initial_epistemic_frame['EpistemicFrame']['inferred_world_facts']['invariants'] = []
+            initial_epistemic_frame['EpistemicFrame']['search_coverage']['exhausted_locations'] = []
+            initial_epistemic_frame['EpistemicFrame']['search_coverage']['exhausted_objects'] = []
+            initial_epistemic_frame['EpistemicFrame']['search_coverage']['unavailable_actions'] = []
+            initial_epistemic_frame['EpistemicFrame']['open_questions'] = []
+            initial_epistemic_frame['EpistemicFrame']['exploration_constraints']['max_steps'] = max_steps
+            initial_epistemic_frame['EpistemicFrame']['exploration_constraints']['allowed_probe_types'] = ["observation | navigation | manipulation | transformation"]
+            initial_epistemic_frame['EpistemicFrame']['exploration_constraints']['discouraged / unproven_assumptions'] = []
+            initial_epistemic_frame['EpistemicFrame']['reflection_notes']['failure_mode'] = ""
+            initial_epistemic_frame['EpistemicFrame']['reflection_notes']['model_mismatch_summary'] = ""
+            initial_epistemic_frame['EpistemicFrame']['reflection_notes']['confidence_in_frame'] = "low"
+            logger.info("📝 Initialized new empty epistemic_frame")
 
         try:
             # Note: plan_bindings are NOT cleared here - they persist across plans unless explicitly cleared
@@ -2048,6 +2261,9 @@ class IncrementalPlanner:
             trace_str = str(state)
             compressed_trace = self._compress_trace(trace_str)
             epistemic_frame = self._reflect(goal, epistemic_frame, max_steps, compressed_trace)
+            
+            # Save updated epistemic_frame to persistent storage
+            self._save_epistemic_frame(epistemic_frame)
             if step < max_steps and state[f'done_{step}'] and state[f'done_{step}'].strip().upper().startswith("NO"):
                 #reflect and retry
                 logger.info(f"Step {step} failed, reflecting and retrying")
@@ -2181,8 +2397,9 @@ END_PLAN
         - Compress CALL: keep tool name, semantic args, truncate large values
         - Compress RESULT: keep status, bound var, always include result
         - Compress THOUGHT: extract intent, track hypothesis deltas
+        - Compress METHOD events: capture method tool inner loop execution (steps, calls, results, thoughts, hypotheses, audits)
         - Omit RAW_OTHER entirely
-        - Omit duplicate content for same key
+        - Omit duplicate content for same key (scoped by method context for inner loops)
         
         Args:
             trace_str: Full trace string from str(state)
@@ -2201,6 +2418,8 @@ END_PLAN
         first_goal = None
         current_goal_prefix = None
         seen_keys = {}  # Track duplicate content by key
+        current_method = None  # Track current method tool execution
+        method_step = None
         
         i = 0
         while i < len(sections):
@@ -2209,36 +2428,55 @@ END_PLAN
                 i += 1
                 continue
             
-            # STAGE 2 event
-            stage2_match = re.search(r'STAGE 2 \(step (\d+)/(\d+)\):', section)
-            if stage2_match:
-                step_num = stage2_match.group(1)
-                max_steps = stage2_match.group(2)
+            # METHOD EXECUTION MODE event (method tool inner loop start)
+            method_mode_match = re.search(r'#METHOD EXECUTION MODE:\s*([\w-]+)\s*\(internal step (\d+)/(\d+)\)', section)
+            if method_mode_match:
+                method_name = method_mode_match.group(1)
+                inner_step = method_mode_match.group(2)
+                max_inner_steps = method_mode_match.group(3)
+                current_method = method_name
+                method_step = inner_step
                 
-                # Extract GOAL and TASK
-                goal_match = re.search(r'#GOAL:\s*(.*?)#END GOAL', section, re.DOTALL)
-                task_match = re.search(r'CURRENT_TASK:\s*(.*?)(?:\n|$)', section)
+                # Extract method step instruction
+                method_step_match = re.search(r'CURRENT METHOD STEP:\s*(.*?)(?:\n|$)', section)
+                method_step_text = method_step_match.group(1).strip() if method_step_match else None
                 
-                goal_text = goal_match.group(1).strip() if goal_match else None
-                task_text = task_match.group(1).strip() if task_match else None
-                
-                # Handle goal: full first occurrence, prefix match later
-                if first_goal is None and goal_text:
-                    first_goal = goal_text
-                    current_goal_prefix = goal_text[:100]  # Use first 100 chars as prefix
-                    goal_display = goal_text
-                elif goal_text:
-                    if goal_text.startswith(current_goal_prefix):
-                        goal_display = "[unchanged from step 1]"
-                    else:
-                        # Changed - update prefix and show new goal
-                        current_goal_prefix = goal_text[:100]
+                if method_step_text:
+                    compressed_events.append(f"[METHOD {method_name} step={inner_step}/{max_inner_steps}]\nSTEP: {method_step_text}\n")
+            
+            # STAGE 2 event (outer loop)
+            elif re.search(r'STAGE 2 \(step (\d+)/(\d+)\):', section):
+                stage2_match = re.search(r'STAGE 2 \(step (\d+)/(\d+)\):', section)
+                current_method = None  # Reset method context for outer loop
+                method_step = None
+                if stage2_match:
+                    step_num = stage2_match.group(1)
+                    max_steps = stage2_match.group(2)
+                    
+                    # Extract GOAL and TASK
+                    goal_match = re.search(r'#GOAL:\s*(.*?)#END GOAL', section, re.DOTALL)
+                    task_match = re.search(r'CURRENT_TASK:\s*(.*?)(?:\n|$)', section)
+                    
+                    goal_text = goal_match.group(1).strip() if goal_match else None
+                    task_text = task_match.group(1).strip() if task_match else None
+                    
+                    # Handle goal: full first occurrence, prefix match later
+                    if first_goal is None and goal_text:
+                        first_goal = goal_text
+                        current_goal_prefix = goal_text[:100]  # Use first 100 chars as prefix
                         goal_display = goal_text
-                else:
-                    goal_display = None
-                
-                if goal_display and task_text:
-                    compressed_events.append(f"[STAGE2 step={step_num}/{max_steps}]\nGOAL: {goal_display}\nTASK: {task_text}\n")
+                    elif goal_text:
+                        if goal_text.startswith(current_goal_prefix):
+                            goal_display = "[unchanged from step 1]"
+                        else:
+                            # Changed - update prefix and show new goal
+                            current_goal_prefix = goal_text[:100]
+                            goal_display = goal_text
+                    else:
+                        goal_display = None
+                    
+                    if goal_display and task_text:
+                        compressed_events.append(f"[STAGE2 step={step_num}/{max_steps}]\nGOAL: {goal_display}\nTASK: {task_text}\n")
             
             # CALL event (TOOL_NAME + TOOL_ARGS_JSON)
             elif 'TOOL_NAME:' in section:
@@ -2265,10 +2503,44 @@ END_PLAN
                     else:
                         tool_args = "{}"
                     
-                    compressed_events.append(f"[CALL tool={tool_name}]\nARGS: {tool_args}\n")
+                    # Prefix with method context if in method execution
+                    if current_method:
+                        compressed_events.append(f"[METHOD {current_method} CALL tool={tool_name}]\nARGS: {tool_args}\n")
+                    else:
+                        compressed_events.append(f"[CALL tool={tool_name}]\nARGS: {tool_args}\n")
             
-            # RESULT event (STAGE 3 + ACTUAL RESULT)
-            elif 'STAGE 3 - TOOL EXECUTION COMPLETE' in section:
+            # METHOD RESULT event (METHOD STAGE 3 + ACTUAL RESULT)
+            elif 'METHOD STAGE 3 - TOOL EXECUTION COMPLETE' in section:
+                method_result_match = re.search(r'METHOD STAGE 3 - TOOL EXECUTION COMPLETE \(internal step (\d+)/(\d+)\)', section)
+                tool_match = re.search(r'Tool executed: `([\w-]+)`', section)
+                result_match = re.search(r'>> ACTUAL RESULT.*?<<\n(.*?)\n>> END RESULT', section, re.DOTALL)
+                bound_match = re.search(r'Bound: (\$\w+)', section)
+                status_match = re.search(r'(SUCCESS|FAILED)', section)
+                
+                if method_result_match and tool_match:
+                    inner_step = method_result_match.group(1)
+                    max_inner_steps = method_result_match.group(2)
+                    tool_name = tool_match.group(1)
+                    result_text = result_match.group(1).strip() if result_match else ""
+                    bound_var = bound_match.group(1) if bound_match else None
+                    status = 'OK' if status_match and 'SUCCESS' in status_match.group(0) else ('FAILED' if status_match else None)
+                    
+                    # Always include result, truncate if too long
+                    if len(result_text) > 300:  # Shorter for method inner loop
+                        result_text = result_text[:300] + f"\n... [truncated]"
+                    
+                    event_str = f"[METHOD {current_method or 'unknown'} RESULT step={inner_step}/{max_inner_steps} tool={tool_name}"
+                    if status:
+                        event_str += f" status={status}"
+                    if bound_var:
+                        event_str += f" -> {bound_var}"
+                    event_str += "]\n"
+                    if result_text:
+                        event_str += f"RESULT: {result_text}\n"
+                    compressed_events.append(event_str)
+            
+            # RESULT event (STAGE 3 + ACTUAL RESULT) - outer loop
+            elif 'STAGE 3 - TOOL EXECUTION COMPLETE' in section and 'METHOD STAGE 3' not in section:
                 tool_match = re.search(r'Tool executed: `([\w-]+)`', section)
                 result_match = re.search(r'>> ACTUAL RESULT.*?<<\n(.*?)\n>> END RESULT', section, re.DOTALL)
                 bound_match = re.search(r'Bound: (\$\w+)', section)
@@ -2294,11 +2566,14 @@ END_PLAN
                         event_str += f"RESULT: {result_text}\n"
                     compressed_events.append(event_str)
             
-            # THOUGHT event
+            # THOUGHT event (check for method context by looking for method-specific patterns)
             elif 'THOUGHTS' in section or 'HYPOTHESES:' in section or 'DONE:' in section:
+                # Check if this is a method inner loop thought (look for METHOD NEXT_TASK pattern)
+                is_method_thought = 'METHOD NEXT_TASK INSTRUCTIONS' in section or current_method is not None
+                
                 thoughts_match = re.search(r'THOUGHTS[^:]*:\s*(.*?)(?:\nHYPOTHESES|$)', section, re.DOTALL)
-                hyp_match = re.search(r'HYPOTHESES:\s*(.*?)(?:\nASSUMPTIONS|$)', section, re.DOTALL)
-                assump_match = re.search(r'ASSUMPTIONS:\s*(.*?)(?:\nDONE|$)', section, re.DOTALL)
+                hyp_match = re.search(r'HYPOTHESES:\s*(.*?)(?:\nAUDIT|$)', section, re.DOTALL)
+                assump_match = re.search(r'AUDIT:\s*(.*?)(?:\nDONE|$)', section, re.DOTALL)
                 done_match = re.search(r'DONE:\s*(.*?)(?:\nNEXT_TASK|$)', section)
                 next_match = re.search(r'NEXT_TASK:\s*(.*?)(?:\nREQUEST_TOOLS|$)', section)
                 request_tools_match = re.search(r'REQUEST_TOOLS:\s*(.*?)(?:\n|$)', section, re.DOTALL)
@@ -2310,8 +2585,15 @@ END_PLAN
                 next_task = next_match.group(1).strip() if next_match else None
                 request_tools = request_tools_match.group(1).strip() if request_tools_match else None
                 
-                # Build thought event
-                event_parts = ["[THOUGHT]"]
+                # Build thought event with method context if applicable
+                if is_method_thought and current_method:
+                    event_parts = [f"[METHOD {current_method} THOUGHT"]
+                    if method_step:
+                        event_parts[0] += f" step={method_step}"
+                    event_parts[0] += "]"
+                else:
+                    event_parts = ["[THOUGHT]"]
+                
                 if thoughts:
                     event_parts.append(f"THOUGHTS: {thoughts}")
                 
@@ -2320,29 +2602,35 @@ END_PLAN
                     event_parts.append(f"HYPOTHESES: {hypotheses}")
                 
                 if assumptions:
-                    # Include complete assumptions (no delta tracking)
-                    event_parts.append(f"ASSUMPTIONS: {assumptions}")
+                    # Include complete assumptions/audits (no delta tracking)
+                    event_parts.append(f"AUDIT: {assumptions}")
                 
-                # Check for duplicates
+                # Check for duplicates (use method-scoped keys if in method)
                 if done:
-                    done_key = f"DONE:{done}"
+                    done_key = f"{current_method or 'outer'}:DONE:{done}" if is_method_thought else f"DONE:{done}"
                     if done_key not in seen_keys:
                         event_parts.append(f"DONE: {done}")
                         seen_keys[done_key] = True
                 
                 if next_task:
-                    next_key = f"NEXT:{next_task}"
+                    next_key = f"{current_method or 'outer'}:NEXT:{next_task}" if is_method_thought else f"NEXT:{next_task}"
                     if next_key not in seen_keys:
                         event_parts.append(f"NEXT: {next_task}")
                         seen_keys[next_key] = True
                 
                 if request_tools:
-                    tools_key = f"REQUEST_TOOLS:{request_tools}"
+                    tools_key = f"{current_method or 'outer'}:REQUEST_TOOLS:{request_tools}" if is_method_thought else f"REQUEST_TOOLS:{request_tools}"
                     if tools_key not in seen_keys:
                         event_parts.append(f"REQUEST_TOOLS: {request_tools}")
                         seen_keys[tools_key] = True
                 
-                if len(event_parts) > 1:  # More than just [THOUGHT]
+                # Check for METHOD COMPLETE in thoughts
+                if is_method_thought and thoughts and 'METHOD COMPLETE' in thoughts.upper():
+                    event_parts.append("METHOD COMPLETE")
+                    current_method = None  # Reset method context
+                    method_step = None
+                
+                if len(event_parts) > 1:  # More than just [THOUGHT] or [METHOD ... THOUGHT]
                     compressed_events.append('\n'.join(event_parts) + '\n')
             
             # VERIFY event
@@ -2402,6 +2690,8 @@ Retired hypotheses MUST NOT be resurrected unless explicitly overturned by evide
 
 The trace is the complete problem-solving context.
 All observations, hypotheses, audits, and failures are authoritative.
+Note: The trace includes method tool inner loop execution (marked with [METHOD ...]).
+Hypotheses and audits from method tool inner loops should be considered alongside outer loop hypotheses.
 
 3) ORIGINAL GOAL TEXT
 ---------------------
@@ -2477,7 +2767,15 @@ OUTPUT REQUIREMENTS (STRICT)
 - Output MUST conform to the EpistemicFrame schema
 - Do NOT include explanations outside JSON
 - Do NOT include actions, tools, or plans
-- Be concise but explicit
+- Keep free text short and concise but explicit
+
+SIZE CONSTRAINTS (ENFORCE STRICTLY):
+- hypotheses.active: Maximum 8 items, prioritize by importance and confidence
+- hypotheses.retired: Maximum 4 items, do not repeat those in previous frame, keep most recent only
+- inferred_world_facts.positive/negative/invariants: Maximum 8 items each, prioritize by confidence and recency
+- search_coverage.*: Maximum 6 items per category
+- open_questions: Maximum 4 items, prioritize by priority
+- exploration_constraints.discouraged_assumptions: Maximum 4 items
 
 ============================================================
 OUTPUT (JSON ONLY)
@@ -2493,7 +2791,7 @@ OUTPUT (JSON ONLY)
         reflection_prompt = reflection_prompt.replace("{steps}", str(steps))
         reflection_prompt = reflection_prompt.replace("{EPISTEMIC_FRAME_SCHEMA}", json.dumps(EPISTEMIC_FRAME_SCHEMA, indent=2))
         reflection_prompt = reflection_prompt.replace("{trace}", trace)
-        reflection = self.executor.llm_generate(reflection_prompt, max_tokens=1024, is_json=True, temperature=GEN_TEMPERATURE)
+        reflection = self.executor.llm_generate(reflection_prompt, max_tokens=4096, is_json=True, temperature=GEN_TEMPERATURE)
         logger.info(f"Reflection: {json.dumps(reflection.text, indent=2)}")
 
 

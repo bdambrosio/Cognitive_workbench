@@ -201,11 +201,36 @@ def tool(input_value=None, **kwargs):
     # Prepare observation summary (extract structured data if available)
     observed_data = {}
     if isinstance(observation_data, dict):
-        # Extract structured fields from observation
-        for field in ['pose', 'dirs', 'support', 'clear', 'blocks', 'geom', 'aff', 'conf', 'note']:
-            if field in observation_data:
-                observed_data[field] = observation_data[field]
-        # If no structured fields, store full observation
+        # Check metadata first (where mc-observe-blocks puts structured fields)
+        metadata = observation_data.get('metadata', {})
+        if isinstance(metadata, dict):
+            # Extract structured fields from metadata
+            for field in ['pose', 'dirs', 'support', 'clear', 'blocks', 'geom', 'aff', 'conf', 'note']:
+                if field in metadata:
+                    observed_data[field] = metadata[field]
+            
+            # Extract nearby_blocks and filter to y-1, y, y+1 (walkable layers)
+            perception = metadata.get('perception', {})
+            if isinstance(perception, dict):
+                nearby_blocks_raw = perception.get('nearby_blocks', [])
+                if isinstance(nearby_blocks_raw, list):
+                    # Filter to blocks at dy = -1, 0, or +1 (relative to agent Y)
+                    nearby_blocks_filtered = []
+                    for block in nearby_blocks_raw:
+                        if isinstance(block, dict):
+                            dy = block.get('dy')
+                            if isinstance(dy, (int, float)) and abs(dy) <= 1:
+                                nearby_blocks_filtered.append(block)
+                    if nearby_blocks_filtered:
+                        observed_data['nearby_blocks'] = nearby_blocks_filtered
+        
+        # Also check top-level dict for structured fields (backward compatibility)
+        if not observed_data:
+            for field in ['pose', 'dirs', 'support', 'clear', 'blocks', 'geom', 'aff', 'conf', 'note']:
+                if field in observation_data:
+                    observed_data[field] = observation_data[field]
+        
+        # If no structured fields found, store full observation
         if not observed_data:
             observed_data = observation_data
     elif isinstance(observation_data, str):

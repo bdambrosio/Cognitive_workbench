@@ -63,34 +63,53 @@ def tool(input_value=None, **kwargs):
     try:
         # Increase timeout significantly as the server now blocks until movement completes (or collides)
         timeout_seconds = float(kwargs.get("duration", 0)) + 5.0
+        url = f"{minecraft_url}/act/move"
+        logger.info(f"🔍 mc-move: POST {url} body={move_params} timeout={max(10.0, timeout_seconds)}s")
         response = requests.post(
-            f"{minecraft_url}/act/move",
+            url,
             json=move_params,
             timeout=max(10.0, timeout_seconds)
         )
+        logger.info(f"📥 mc-move: Response status={response.status_code}, headers={dict(response.headers)}")
         response.raise_for_status()
         data = response.json()
+        logger.debug(f"📥 mc-move: Response body={data}")
         
         if not data.get("ok"):
             return {"status": "failed", "reason": data.get("error", "unknown error")}
         
-        # Parse result
-        status = data.get("status", "unknown")
-        actual_duration = data.get("actual_duration_ms", 0) / 1000.0
+        # Parse result - bridge returns final_position and status
+        status = data.get("status", "success")  # Bridge now returns status: "success", "collision", or "fell"
+        final_position = data.get("final_position", {})
+        
+        # Normalize final_position to dict format
+        if isinstance(final_position, (list, tuple)) and len(final_position) >= 3:
+            final_position = {"x": float(final_position[0]), "y": float(final_position[1]), "z": float(final_position[2])}
+        elif not isinstance(final_position, dict):
+            final_position = {}
         
         if status == "collision":
-            reason = data.get("reason", "unknown obstruction")
-            result_text = f"Movement stopped by collision after {actual_duration:.2f}s: {reason}"
+            result_text = f"Movement stopped by collision"
+            if final_position:
+                pos_str = f"({final_position.get('x', 0):.2f}, {final_position.get('y', 0):.2f}, {final_position.get('z', 0):.2f})"
+                result_text += f" at {pos_str}"
+        elif status == "fell":
+            result_text = f"Movement failed - fell unexpectedly"
+            if final_position:
+                pos_str = f"({final_position.get('x', 0):.2f}, {final_position.get('y', 0):.2f}, {final_position.get('z', 0):.2f})"
+                result_text += f" at {pos_str}"
         else:
-            result_text = f"Movement completed successfully ({actual_duration:.2f}s)"
+            result_text = f"Movement completed successfully"
+            if final_position:
+                pos_str = f"({final_position.get('x', 0):.2f}, {final_position.get('y', 0):.2f}, {final_position.get('z', 0):.2f})"
+                result_text += f" at {pos_str}"
         
         return {
             "text": result_text,
             "format": "text",
             "metadata": {
                 "status": status,
-                "duration_seconds": actual_duration,
-                "final_position": data.get("final_position"),
+                "final_position": final_position,
                 **data
             },
             "char_count": len(result_text)

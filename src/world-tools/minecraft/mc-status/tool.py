@@ -27,16 +27,23 @@ def tool(input_value=None, **kwargs):
         Executor will create Note from this content.
     """
     minecraft_url = kwargs.get("world_url") or kwargs.get("minecraft_url") or DEFAULT_MINECRAFT_URL
+    url = f"{minecraft_url}/status"
     
     try:
-        response = requests.get(f"{minecraft_url}/status", timeout=10.0)
+        logger.info(f"🔍 mc-status: GET {url}")
+        response = requests.get(url, timeout=10.0)
+        logger.info(f"📥 mc-status: Response status={response.status_code}, headers={dict(response.headers)}")
         response.raise_for_status()
         data = response.json()
+        logger.debug(f"📥 mc-status: Response body={data}")
+        
+        if not data.get('ok'):
+            return {"status": "failed", "reason": data.get('error', 'unknown error')}
         
         # Format status as readable text
         status_parts = []
         status_parts.append("Minecraft Bot Status:")
-        status_parts.append(f"Connected: {data.get('connected', False)}")
+        status_parts.append("Connected: True")
         
         position = data.get('position')
         if position:
@@ -45,12 +52,10 @@ def tool(input_value=None, **kwargs):
             elif isinstance(position, (list, tuple)) and len(position) >= 3:
                 status_parts.append(f"Position: ({position[0]:.2f}, {position[1]:.2f}, {position[2]:.2f})")
         
-        orientation = data.get('orientation')
-        if orientation:
-            if isinstance(orientation, dict):
-                status_parts.append(f"Yaw: {orientation.get('yaw', 0):.2f}, Pitch: {orientation.get('pitch', 0):.2f}")
-            elif isinstance(orientation, (list, tuple)) and len(orientation) >= 2:
-                status_parts.append(f"Yaw: {orientation[0]:.2f}, Pitch: {orientation[1]:.2f}")
+        yaw = data.get('yaw')
+        pitch = data.get('pitch')
+        if yaw is not None and pitch is not None:
+            status_parts.append(f"Yaw: {yaw:.2f}, Pitch: {pitch:.2f}")
         
         health = data.get('health')
         if health is not None and isinstance(health, (int, float)):
@@ -59,6 +64,14 @@ def tool(input_value=None, **kwargs):
         food = data.get('food')
         if food is not None and isinstance(food, (int, float)):
             status_parts.append(f"Food: {food}/20")
+        
+        on_ground = data.get('onGround')
+        if on_ground is not None:
+            status_parts.append(f"On Ground: {on_ground}")
+        
+        dimension = data.get('dimension')
+        if dimension:
+            status_parts.append(f"Dimension: {dimension}")
         
         action = data.get('action', {})
         if isinstance(action, dict) and action.get('type'):

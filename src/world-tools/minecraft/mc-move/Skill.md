@@ -33,12 +33,12 @@ examples:
 
 ## Output
 - Note ID (bound to `out` variable) containing:
-  - `text`: result summary (success or collision)
+  - `text`: result summary (success, collision, or fell)
   - `metadata`: raw response including:
-    - `status`: "success" or "collision"
+    - `status`: "success", "collision", or "fell"
     - `actual_duration_ms`: how long the move actually lasted
     - `final_position`: bot position after move
-    - `reason`: failure reason if collision occurred
+    - `reason`: failure reason if collision or fall occurred
 
 ## Configuration
 - Configured via `world_config.port` (defaults to `http://localhost:3003`)
