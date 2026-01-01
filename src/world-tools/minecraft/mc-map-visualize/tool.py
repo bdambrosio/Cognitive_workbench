@@ -809,9 +809,12 @@ def tool(input_value=None, **kwargs):
     
     output_path = Path(output_file)
     
-    # If relative path, save to current directory or temp
+    # If relative path, save to /tmp
     if not output_path.is_absolute():
-        output_path = Path.cwd() / output_path
+        # Ensure /tmp exists
+        tmp_dir = Path("/tmp")
+        tmp_dir.mkdir(parents=True, exist_ok=True)
+        output_path = tmp_dir / output_path
     
     # Write HTML file
     try:

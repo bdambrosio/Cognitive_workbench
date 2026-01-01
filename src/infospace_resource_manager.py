@@ -601,14 +601,8 @@ class InfospaceResourceManager:
         # Resource indexer for Stage 0 retrieval (pass base_dir for indexes)
         self.resource_indexer = ResourceIndexer(self, self.base_dir)
         
-        # Zenoh session for save_all subscriber
+        # Zenoh session (save_all handled by executive_node, not here to avoid duplicate saves)
         self.session = session
-        if self.session:
-            self.save_subscriber = self.session.declare_subscriber(
-                "cognitive/save_all",
-                self._handle_save_command
-            )
-            logger.info("InfospaceResourceManager: Subscribed to cognitive/save_all")
         
         # Create Note_null system resource (required global unique ID)
         self._create_note_null()
@@ -1677,14 +1671,6 @@ class InfospaceResourceManager:
         except Exception as e:
             logger.error(f"Error loading resources from file: {e}")
             return False
-    
-    def _handle_save_command(self, sample):
-        """Handle save command from cognitive/save_all topic."""
-        try:
-            logger.info('💾 InfospaceResourceManager received save command')
-            self.save_to_file()
-        except Exception as e:
-            logger.error(f'Error in save callback: {e}')
     
     # ==================== Public Query Methods ====================
     

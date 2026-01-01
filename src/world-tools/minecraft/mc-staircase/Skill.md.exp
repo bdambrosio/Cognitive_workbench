@@ -1,0 +1,122 @@
+---
+name: mc-staircase
+description: Constructs a spiral staircase to ascend from pits using a structured loops.
+type: method
+resumable: yes
+invalidates: [position, orientation, inventory]
+---
+# MAIN PROTOCOL
+# Design Pattern: State Machine implemented via Structured Control Flow
+
+# 1. INITIALIZATION & PRECONDITIONS
+# ---------------------------------
+# Ensure we are actually in a pit and can modify terrain.
+current_observation = mc_observe_blocks()
+
+if not (current_observation.forward_block.is_solid and current_observation.sky_obstructed):
+    # If we aren't facing a wall or sky is clear, this tool might not be needed.
+    # However, for safety, we do a quick check to see if we simply need to align.
+    mc_seek_boundary() # Primitive: snaps to nearest cardinal wall
+
+# Initialize safety counters to prevent infinite loops (Livelock protection)
+turns_without_ascent = 0
+max_consecutive_turns = 4 
+
+# 2. MAIN ASCENT LOOP
+# -------------------
+while True:
+    # A. CHECK TERMINATION (Success)
+    # Check if we have broken the surface or reached open terrain.
+    obs = mc_observe_blocks()
+    if obs.sky_visible and (obs.can_jump_up or obs.can_move_forward):
+        print("TERMINATE: SUCCESS - Surface reached.")
+        break
+
+    # B. CHECK TERMINATION (Failure/Stuck)
+    if turns_without_ascent >= max_consecutive_turns:
+        print("TERMINATE: FAILURE - Stuck. Rotated 360 degrees without vertical progress.")
+        break
+
+    # C. ATTEMPT CLIMB IN CURRENT DIRECTION
+    # We attempt to turn the current wall into a step.
+    wall_distance = obs.forward_distance
+    
+    # Condition: Is there a wall close enough to work with?
+    if wall_distance < 1.0:
+        
+        # --- SUB-ROUTINE: PREPARE STEP ---
+        # Look at the block that will become our 'step' (forward:1, up:0)
+        step_block = obs.block_at(forward=1, up=0)
+        
+        step_ready = False
+        
+        if step_block.is_solid:
+            step_ready = True
+        else:
+            # The spot is air/liquid. We must build the step.
+            inventory = mc_inventory()
+            # Select first available solid block (cobble, dirt, stone)
+            building_material = select_item(inventory, tags=['solid', 'placeable'])
+            
+            if building_material:
+                mc_equip(building_material)
+                # Place block against the ground or wall below target
+                success = mc_place(item=building_material, forward=1, up=-1, face="top")
+                if success:
+                    step_ready = True
+            else:
+                print("CRITICAL: No building materials available.")
+                # We cannot build. We must treat this as a "wall missing" and turn.
+                step_ready = False
+
+        # --- SUB-ROUTINE: CLEAR HEADROOM ---
+        # Only proceed if we have a valid step to stand on.
+        if step_ready:
+            # We need to ensure we don't hit our head.
+            # Critical path: (forward:0, up:2) -> Overhead start
+            #                (forward:1, up:1) -> Body destination
+            #                (forward:1, up:2) -> Head destination
+            
+            path_blocked = False
+            blocks_to_clear = [
+                {'f':0, 'u':2}, # Direct overhead
+                {'f':1, 'u':1}, # Destination body
+                {'f':1, 'u':2}  # Destination head
+            ]
+            
+            for coord in blocks_to_clear:
+                block = obs.block_at(forward=coord['f'], up=coord['u'])
+                if block.is_solid:
+                    # Attempt to dig
+                    dig_success = mc_dig(forward=coord['f'], up=coord['u'])
+                    if not dig_success:
+                        path_blocked = True # Bedrock or unbreakable
+                        break 
+            
+            # --- SUB-ROUTINE: EXECUTE MOVE ---
+            if not path_blocked:
+                # Record height to verify move
+                start_y = mc_status().y
+                
+                # Perform the jump-move
+                mc_move(forward=True, jump=True, duration=0.5)
+                
+                # Verify we actually went up
+                current_y = mc_status().y
+                if current_y >= start_y + 0.9:
+                    # ASCENT SUCCESSFUL
+                    turns_without_ascent = 0 # Reset safety counter
+                    mc_wait(0.5) # Stabilize
+                    continue # RESTART MAIN LOOP at new height
+    
+    # D. ROTATE AND RETRY
+    # If we reached here, we failed to climb in the current direction due to:
+    # 1. No wall (gap)
+    # 2. No materials to build step
+    # 3. Unbreakable block overhead
+    # 4. Movement failed
+    
+    mc_look(yaw_delta=90) # Rotate 90 degrees clockwise
+    turns_without_ascent += 1
+    
+    # Loop continues to next iteration, checking the new wall.

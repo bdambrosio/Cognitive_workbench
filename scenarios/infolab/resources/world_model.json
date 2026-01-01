@@ -1,0 +1,43 @@
+{
+  "version": "1.0",
+  "created_at": "2026-01-01T16:26:07.820783",
+  "updated_at": "2026-01-01T16:56:53.378689",
+  "facts": [],
+  "tool_contracts": [
+    {
+      "tool": "refine",
+      "insight": "The 'refine' tool returns a structured analysis of method syntax and semantics, but does not guarantee completeness or accuracy of the content; its output must be verified by loading and inspecting the resulting note.",
+      "status": "constrained",
+      "introduced_at": "2026-01-01T16:29:37.383311",
+      "last_confirmed_at": "2026-01-01T16:43:30.523252"
+    },
+    {
+      "tool": "load",
+      "insight": "The 'load' tool retrieves a note by name and binds it to a variable, but does not validate the content's completeness or correctness; it only confirms successful retrieval.",
+      "status": "constrained",
+      "introduced_at": "2026-01-01T16:29:37.383311",
+      "last_confirmed_at": "2026-01-01T16:56:53.378426"
+    },
+    {
+      "tool": "create-note",
+      "insight": "The 'create-note' tool creates a persistent note with a given value and name, but does not validate the content's accuracy, structure, or completeness; success only confirms storage.",
+      "status": "constrained",
+      "introduced_at": "2026-01-01T16:29:37.383311",
+      "last_confirmed_at": "2026-01-01T16:29:37.383311"
+    },
+    {
+      "tool": "say",
+      "insight": "The 'say' tool sends a message to a target, but does not confirm whether the message was understood or acted upon; it only confirms delivery.",
+      "status": "reliable",
+      "introduced_at": "2026-01-01T16:29:37.383311",
+      "last_confirmed_at": "2026-01-01T16:29:37.383311"
+    },
+    {
+      "tool": "generate-note",
+      "insight": "The 'generate-note' tool produces a new, independent output based on a prompt and style, even when the input is a static note, and is suitable for creating original evaluations when required.",
+      "status": "reliable",
+      "introduced_at": "2026-01-01T16:43:30.523252",
+      "last_confirmed_at": "2026-01-01T16:56:53.378426"
+    }
+  ]
+}

@@ -25,7 +25,7 @@ txtai>=6.1.0
 faiss-cpu>=1.7.0  # Vector search for infospace memory
 
 # GUI and visualization
-PyQt5>=5.15.0
+PyQt6>=6.0.0
 pygame>=2.6.0
 colorama>=0.4.6
 

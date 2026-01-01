@@ -36,7 +36,7 @@ If these preconditions do not hold, this skill should not be used.
 Violations of these constraints may cause failure and replanning.
 
 #LIMITATIONS:
-- To loop within a method, use "Return to STEP X" (internal loop within this method execution), not recursive method calls
+- To loop within a method, we use "Proceed to STEP X" (internal loop within this method execution), not recursive method calls
 - If this method needs another method's functionality (e.g. mc-seek-boundary), it can be executed directly
 
 #RUNTIME STATE (LOCAL TO THIS SKILL)
@@ -70,7 +70,7 @@ STEP 2 — VERIFY WALL PROXIMITY
 - If forward distance < 1.0:
       Wall confirmed → proceed to STEP 3
 - Else:
-      Wall not found → return to STEP 1
+      Wall not found → proceed to STEP 1
 
 ---
 STEP 3 — VERIFY OR BUILD STEP
@@ -84,12 +84,13 @@ STEP 3 — VERIFY OR BUILD STEP
       1. Call mc-inventory to check for placeable blocks (dirt, cobblestone, stone, etc.).
       2. If placeable blocks available:
             a. Call mc-equip to equip a placeable block.
-            b. Call mc-place with item=<block_name>, forward=1, up=0, right=0, face="north" to build the step.
+            b. Call mc-place targeting the ground below the step location:
+               item=<block_name>, forward=1, up=-1, right=0, face="top".
       3. If placement succeeds, proceed to STEP 4.
-      4. If placement fails or no blocks available:
+      4. If placement fails (e.g., no block below) or no items available:
             Call mc-status to get current yaw.
-            Calculate new yaw = current_yaw + 90° (convert to radians for mc-look).
-            Call mc-look with new yaw to rotate 90° clockwise, then return to STEP 2
+            Calculate new yaw = current_yaw + 90° (convert to radians).
+            Call mc-look with new yaw to rotate 90° clockwise, then proceed to STEP 2.
 
 ---
 STEP 4 — CLEAR BODY AND HEAD SPACE
@@ -130,7 +131,7 @@ STEP 4.5 — VERIFY CLEARANCE
       Retry mc-dig on the remaining solid block(s) (max 2 retries per block).
       After retries, call mc-observe-blocks again.
       If still not clear:
-          **Abort climb**: Call mc-status to get current yaw, calculate new yaw = current_yaw + 90° (convert to radians), call mc-look to rotate 90° clockwise, then return to STEP 2
+          **Abort climb**: Call mc-status to get current yaw, calculate new yaw = current_yaw + 90° (convert to radians), call mc-look to rotate 90° clockwise, then proceed to STEP 2 (ie, loop)
       If now clear:
           Proceed to STEP 5
 
@@ -152,7 +153,7 @@ STEP 6 — VERIFY ASCENT
       Ascent succeeded → proceed to STEP 7
 - If Y did NOT increase by ≥ 0.8 blocks:
       Treat as climb failure.
-      Call mc-status to get current yaw, calculate new yaw = current_yaw + 90° (convert to radians), call mc-look to rotate 90° clockwise, then return to STEP 2.
+      Call mc-status to get current yaw, calculate new yaw = current_yaw + 90° (convert to radians), call mc-look to rotate 90° clockwise, then proceed to STEP 2.
 
 ---
 STEP 7 — COLLECT / SETTLE

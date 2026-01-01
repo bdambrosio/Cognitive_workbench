@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Dict, List, Any, Optional
 from infospace_executor import InfospaceExecutor
 from plan_guidance import PlanGuidance
+from world_model import WORLD_MODEL_SCHEMA, empty_world_model
 
 # Global temperature setting for all gen() calls
 GEN_TEMPERATURE = 0.5
@@ -148,82 +149,80 @@ except ImportError:
     def function(f): return f
 
 
-EPISTEMIC_FRAME_SCHEMA = {
-  "EpistemicFrame": {
+
+REFLECTION_FRAME_SCHEMA = {
+  "ReflectionFrame": {
     "version": "1.0",
-    "_size_limits": "hypotheses.active: 8 max (by importance/confidence), retired: 4 max (most recent). inferred_world_facts.*: 8 max each subfield (by confidence/recency). search_coverage.*: 6 max each. open_questions: 4 max (by priority). exploration_constraints.discouraged_assumptions: 4 max.",
 
-    "goal_context": {
-      "original_goal_text": "",
-      "current_task_interpretation": "",
-      "supersedes_original_goal": True
+    "_size_limits": {
+      "task_state.active_hypotheses": 6,
+      "task_state.proven_safe_paths": 6,
+      "task_state.exhausted_search.locations": 6,
+      "task_state.exhausted_search.objects": 6,
+      "task_state.exhausted_search.actions": 6,
+      "world_model_updates": 10,
+      "tool_insights": 6,
+      "retired_beliefs": 4,
+      "context_forget": 8,
+      "open_questions": 4
     },
 
-    "hypotheses": {
-      "active": [
-        {
-          "id": "",
-          "statement": "",
-          "justification": "",
-          "confidence": "low | medium | high"
-        }
-      ],
-      "retired": [
-        {
-          "id": "",
-          "statement": "",
-          "retirement_reason": "contradicted | exhausted | reframed | invalid_assumption",
-          "evidence_summary": ""
-        }
-      ]
+    "failure_mode": "incorrect_task_interpretation | incorrect_world_assumption | missing_affordance | tool_limitation_or_misbehavior | exhausted_or_misdirected_search",
+
+    "failure_evidence": ["string"],
+
+    "task_state": {
+      "summary": "string",
+      "immediate_blockers": ["string"],
+      "active_hypotheses": ["string"],
+      "proven_safe_paths": ["string"],
+      "exhausted_search": {
+        "locations": ["string"],
+        "objects": ["string"],
+        "actions": ["string"]
+      }
     },
 
-    "inferred_world_facts": {
-      "positive": [
-        ""
-      ],
-      "negative": [
-        ""
-      ],
-      "invariants": [
-        ""
-      ]
-    },
-
-    "search_coverage": {
-      "exhausted_locations": [
-        ""
-      ],
-      "exhausted_objects": [
-        ""
-      ],
-      "unavailable_actions": [
-        ""
-      ]
-    },
-
-    "open_questions": [
+    "world_model_updates": [
       {
-        "id": "",
-        "question": "",
-        "priority": "high | medium | low",
-        "requires_environment_interaction": True
+        "fact": "string",
+        "confidence": "low | medium | high",
+        "source": "observation | tool_guarantee",
+        "stability": "invariant | regularity | anecdote"
       }
     ],
 
-    "exploration_constraints": {
-      "max_steps": 16,
-      "allowed_probe_types": ["observation | navigation | manipulation | transformation" ],
-      "discouraged / unproven_assumptions": [
-        ""
-      ]
-    },
+    "tool_insights": [
+      {
+        "tool": "string",
+        "insight": "string",
+        "status": "reliable | unreliable | constrained",
+        "evidence": "string"
+      }
+    ],
 
-    "reflection_notes": {
-      "failure_mode": "",
-      "model_mismatch_summary": "",
-      "confidence_in_frame": "low | medium | high"
-    }
+    "retired_beliefs": [
+      {
+        "belief": "string",
+        "reason": "contradicted | invalid_generalization",
+        "evidence": "string"
+      }
+    ],
+
+    "context_forget": [
+      {
+        "item": "string",
+        "reason": "obsolete | goal_specific | location_specific | superseded"
+      }
+    ],
+
+    "open_questions": [
+      {
+        "question": "string",
+        "priority": "low | medium | high",
+        "requires_environment_interaction": True
+      }
+    ]
   }
 }
 
@@ -1271,7 +1270,7 @@ if HAS_SGLANG:
         return goal
     
     @function
-    def tool_planner_infospace(s, template, goal: str, epistemic_frame: Dict, character_context: str, recent_context: str, 
+    def tool_planner_infospace(s, template, goal: str, world_model: Dict, character_context: str, recent_context: str, 
                               tools_catalog_text: str, executor, trace_file=None, max_steps: int = 16, similar_plan: Dict = None, preplan: str = None):
         """
         SGLang incremental planner for infospace goals.
@@ -1328,7 +1327,7 @@ if HAS_SGLANG:
             system_parts.append(f"\n{available_resources_text}\n")
         # Add current date and time
         import datetime
-        system_parts.append(f"EPISTEMIC_FRAME: {json.dumps(epistemic_frame, indent=2)}\n")
+        system_parts.append(f"WORLD_MODEL: {json.dumps(world_model, indent=2)}\n")
         system_parts.append(f"CURRENT_TIME: {datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}\n")
         s += system("".join(system_parts))
         
@@ -1392,6 +1391,48 @@ if HAS_SGLANG:
         
         # Stage 2/3 format instructions
         s += user(
+            "#Stage 2-PRE: AGENT-STATE HYPOTHESES\n"
+            "Before choosing TOOL_NAME/ARGS for this step, you MUST first produce AGENT_STATE_HYPOTHESES.\n"
+
+            "Purpose:\n"
+            "- Make 'context' explicit as TRANSIENT beliefs about the agent's current\n"
+            "  affordances, constraints, or limitations.\n"
+            "- These hypotheses exist ONLY for the current planning attempt.\n"
+            "- They are NOT persistent world facts and must NOT be promoted to memory.\n"
+            "- They should meaningfully influence tool choice when more than one tool\n"
+            "  could plausibly apply.\n"
+            "\n"    
+            "# STAGE 2-PRE FORMAT (STRICT):\n"
+            "AGENT_STATE_HYPOTHESES: [<h1>, <h2>, ...]\n"
+            "AGENT_STATE_SUPPORT:\n"
+            "  - <h1>: <evidence pointer: tool result field / note id / variable / or \"none\">\n"
+            "  - <h2>: <evidence pointer ...>\n"
+            "\n"
+            "# STAGE 2-PRE RULES (STRICT):\n"
+            "- Max 6 hypotheses.\n"
+            "- Each hypothesis MUST be falsifiable (something a tool call or note could\n"
+            "  contradict).\n"
+            "- Prefer CONSTRAINTS, LIMITATIONS, or MISSING AFFORDANCES over confirmations.\n"
+            "- Each hypothesis should plausibly matter: if it were false, a different tool\n"
+            "  choice might be reasonable.\n"
+            "- DO NOT describe future actions, plans, or tools.\n"
+            "- DO NOT restate the CURRENT_TASK or GOAL.\n"
+            "- DO NOT include generic truths about the system unless they constrain choice.\n"
+            "- These are NOT world-model facts.\n"
+            "\n"
+            "# OPTIONAL NULL CONTEXT:\n"
+            "- If the next step is logically forced (only one reasonable tool applies),\n"
+            "  you MAY output:\n"
+            "    AGENT_STATE_HYPOTHESES: []\n"
+            "    AGENT_STATE_SUPPORT: []\n"
+            "\n"
+            "Examples (do not include world annotations in your response):\n"       
+            "- 'Inventory contains at least one placeable solid block.' (minecraft)\n"
+            "- 'No placeable solid blocks are available in inventory.' (minecraft)\n"
+            "- 'Current position appears stable (on ground) rather than falling.' (minecraft)\n"
+            "- 'query-web returned no useful results.' (infospace)\n"
+            "- 'there is no more space in /data' (osworld)'\n"
+            ""
             "#Stage 2 FORMAT:\n"
             "  TOOL_NAME: <name>\n"
             "  TOOL_ARGS_JSON: <json object>\n\n"
@@ -1414,6 +1455,7 @@ if HAS_SGLANG:
             "      1. DATA: Claims about completeness or optimality (e.g., 'These are the only results').\n"
             "      2. SYSTEM: Beliefs about tool logic or failures (e.g., 'The tool failed because the query was too long').\n"
             "      3. WORLD: Causal theories about the goal (e.g., 'The user likely wants the cheapest option, not the fastest').\n"
+            "   - Do NOT generate any hypothesis that was explicitly CONTRADICTED in a prior step unless it is substantively revised (narrowed, conditioned, or inverted)."
             "  AUDIT Instructions:\n"
             "    - For each hypothesis, perform the following steps strictly and in order.\n"
             "    - Do not reinterpret, soften, or add qualifiers to hypotheses. Audit only what is explicitly claimed:\n"
@@ -1440,6 +1482,15 @@ if HAS_SGLANG:
             "        - <hypothesis text>\n"
             "        - scope: <observational | observed-set | global>\n"
             "        - verdict: <SUPPORTED | UNSUPPORTED | CONTRADICTED>\n"
+            "      5. CONTRADICTION PERSISTENCE RULE (MANDATORY)\n"
+            "        - Any hypothesis that receives verdict: CONTRADICTED at this step MUST NOT reappear verbatim in HYPOTHESES in any subsequent step.\n"
+            "        - If a contradicted hypothesis is still believed to be partially relevant, it may reappear ONLY if it is explicitly revised in one of the following ways:\n"
+            "          a) Narrowed in scope (e.g., from global → observed-set or observational)\n"
+            "          b) Conditioned (e.g., adding explicit qualifiers or boundary conditions)\n"
+            "          c) Inverted into a negated or alternative hypothesis\n"
+            "        - Repeating a contradicted hypothesis with identical wording or trivial rephrasing (synonyms only) is a protocol violation.\n"
+            "        - If a contradicted hypothesis is not revised, it MUST be omitted entirely from future HYPOTHESES lists.\n"
+            "\n"
             "  DONE Instructions:\n"
             "  - Only mark DONE: YES after ALL required actions are executed\n"
             "  - COMPLENESS CHECK: If the question asks for an attribute that can change over time (jobs, spouses, locations), you must verify if multiple values exist\n"
@@ -1474,6 +1525,34 @@ if HAS_SGLANG:
                 s["final_answer"] = "Interrupted by user."
                 break
 
+            # --- STAGE 2-PRE: Agent-State Hypotheses ---
+            s += user(
+                f"STAGE 2-PRE (step {step + 1}/{max_steps}):\n"
+                f"#GOAL: {goal_for_step}\n#END GOAL\n"
+                f"CURRENT_TASK: {current_task}\n\n"
+                "Before choosing any tool, infer AGENT-STATE HYPOTHESES.\n"
+                "These describe transient constraints or affordances of the agent\n"
+                "that may influence tool choice.\n\n"
+                "FORMAT (STRICT):\n"
+                "AGENT_STATE_HYPOTHESES: [<h1>, <h2>, ...]\n"
+                "AGENT_STATE_SUPPORT:\n"
+                "  - <h1>: <evidence pointer or 'none'>\n"
+                "  - <h2>: <evidence pointer or 'none'>\n\n"
+                "RULES:\n"
+                "- Max 6 hypotheses\n"
+                "- Each must be falsifiable\n"
+                "- Prefer constraints/affordances over narrative\n"
+                "- Do NOT mention tools or actions\n"
+                "- These are NOT world-model facts\n"
+            )
+
+            s += assistant(
+                gen(
+                    f"agent_state_hypotheses_{step}",
+                    max_tokens=512,
+                    temperature=GEN_TEMPERATURE,
+                )
+            )
             # Stage 2: Choose tool + args
             s += user(
                 f"STAGE 2 (step {step + 1}/{max_steps}):\n"
@@ -2025,109 +2104,19 @@ class IncrementalPlanner:
         # Initialize plan guidance system
         self.plan_guidance = PlanGuidance(resource_manager=executor.resource_manager)
     
-    def _load_epistemic_frame(self) -> Optional[Dict]:
+    def _find_last_step(self, state, max_steps: int) -> int:
         """
-        Load persistent epistemic_frame from named Note if it exists.
-        
-        Returns:
-            Epistemic frame dict if found, None otherwise
+        Find the last step that has a done_<step> value.
+        Iterates forward, returns the last valid step found.
         """
-        if not self.executor.resource_manager:
-            logger.debug("Resource manager not available, cannot load epistemic_frame")
-            return None
-        
-        agent_name = getattr(self.executor, 'agent_name', 'unknown')
-        frame_name = f"{agent_name}-epistemic_frame"
-        
-        # Resolve named Note
-        note_id = self.executor.resource_manager._resolve_resource_id(frame_name)
-        if not note_id:
-            logger.debug(f"Epistemic frame Note '{frame_name}' not found")
-            return None
-        
-        # Load Note content
-        resource = self.executor.resource_manager.get_resource(note_id)
-        if not resource:
-            logger.warning(f"Epistemic frame Note {note_id} resolved but resource not found")
-            return None
-        
-        content = resource.get('properties', {}).get('content')
-        if content is None:
-            logger.warning(f"Epistemic frame Note {note_id} has no content")
-            return None
-        
-        # Parse JSON if needed
-        if isinstance(content, str):
+        last_step = -1
+        for step in range(max_steps):
             try:
-                content = json.loads(content)
-            except json.JSONDecodeError as e:
-                logger.warning(f"Failed to parse epistemic_frame JSON: {e}")
-                return None
-        
-        logger.info(f"📂 Loaded persistent epistemic_frame from '{frame_name}' ({note_id})")
-        return content
-    
-    def _save_epistemic_frame(self, epistemic_frame: Dict) -> bool:
-        """
-        Save epistemic_frame to persistent named Note.
-        
-        Args:
-            epistemic_frame: Epistemic frame dict to save
-            
-        Returns:
-            True if saved successfully
-        """
-        if not self.executor.resource_manager:
-            logger.warning("Resource manager not available, cannot save epistemic_frame")
-            return False
-        
-        agent_name = getattr(self.executor, 'agent_name', 'unknown')
-        frame_name = f"{agent_name}-epistemic_frame"
-        
-        # Check if Note already exists
-        note_id = self.executor.resource_manager._resolve_resource_id(frame_name)
-        
-        if note_id:
-            # Update existing Note
-            resource = self.executor.resource_manager.get_resource(note_id)
-            if resource:
-                resource['properties']['content'] = epistemic_frame
-                # Update metadata
-                from datetime import datetime
-                resource['properties']['updated_at'] = datetime.now().isoformat()
-                resource['properties']['updated_by'] = agent_name.capitalize()
-                logger.info(f"💾 Updated epistemic_frame Note '{frame_name}' ({note_id})")
-                return True
-            else:
-                logger.warning(f"Epistemic frame Note {note_id} resolved but resource not found, creating new")
-                note_id = None
-        
-        if not note_id:
-            # Create new Note
-            success, new_note_id, error_msg, _ = self.executor.resource_manager.create_note(
-                character_name=agent_name,
-                content=epistemic_frame,
-                format_type='json',
-                source_skill='incremental_planner',
-                source_value='epistemic_frame',
-                note_name=frame_name,
-                extra_props={'exclude_from_index': True}  # Exclude from semantic search indexing
-            )
-            
-            if success:
-                # Mark as persistent
-                persist_success, persist_error = self.executor.resource_manager.mark_persistent(new_note_id, agent_name)
-                if persist_success:
-                    logger.info(f"💾 Created and persisted epistemic_frame Note '{frame_name}' ({new_note_id})")
-                    return True
-                else:
-                    logger.warning(f"Created epistemic_frame Note but failed to mark persistent: {persist_error}")
-                    return False
-            else:
-                logger.error(f"Failed to create epistemic_frame Note: {error_msg}")
-                return False
-        
-        return False
+                if f'done_{step}' in state and state[f'done_{step}']:
+                    last_step = step
+            except (KeyError, AttributeError, TypeError):
+                break
+        return last_step if last_step >= 0 else max_steps - 1
     
     def __del__(self):
         """Cleanup: close trace file on instance destruction."""
@@ -2166,37 +2155,13 @@ class IncrementalPlanner:
         if not HAS_SGLANG:
             return {'error': 'SGLang not available'}
         
-        # Load persistent epistemic_frame if it exists, otherwise initialize empty
-        loaded_frame = self._load_epistemic_frame()
-        if loaded_frame and isinstance(loaded_frame, dict) and 'EpistemicFrame' in loaded_frame:
-            initial_epistemic_frame = loaded_frame
-            # Update goal context for this planning session
-            initial_epistemic_frame['EpistemicFrame']['goal_context']['original_goal_text'] = goal
-            initial_epistemic_frame['EpistemicFrame']['goal_context']['current_task_interpretation'] = ""
-            initial_epistemic_frame['EpistemicFrame']['exploration_constraints']['max_steps'] = max_steps
-            logger.info("📂 Using loaded epistemic_frame as starting point")
+        # Get world_model from executor
+        if not hasattr(self.executor, 'world_model') or not self.executor.world_model:
+            logger.warning("WorldModel not available in executor, using empty model")
+            initial_world_model = empty_world_model()
         else:
-            # Initialize empty epistemic_frame
-            initial_epistemic_frame = EPISTEMIC_FRAME_SCHEMA.copy()
-            initial_epistemic_frame['EpistemicFrame']['goal_context']['original_goal_text'] = goal
-            initial_epistemic_frame['EpistemicFrame']['goal_context']['current_task_interpretation'] = ""
-            initial_epistemic_frame['EpistemicFrame']['goal_context']['supersedes_original_goal'] = False
-            initial_epistemic_frame['EpistemicFrame']['hypotheses']['active'] = []
-            initial_epistemic_frame['EpistemicFrame']['hypotheses']['retired'] = []
-            initial_epistemic_frame['EpistemicFrame']['inferred_world_facts']['positive'] = []
-            initial_epistemic_frame['EpistemicFrame']['inferred_world_facts']['negative'] = []
-            initial_epistemic_frame['EpistemicFrame']['inferred_world_facts']['invariants'] = []
-            initial_epistemic_frame['EpistemicFrame']['search_coverage']['exhausted_locations'] = []
-            initial_epistemic_frame['EpistemicFrame']['search_coverage']['exhausted_objects'] = []
-            initial_epistemic_frame['EpistemicFrame']['search_coverage']['unavailable_actions'] = []
-            initial_epistemic_frame['EpistemicFrame']['open_questions'] = []
-            initial_epistemic_frame['EpistemicFrame']['exploration_constraints']['max_steps'] = max_steps
-            initial_epistemic_frame['EpistemicFrame']['exploration_constraints']['allowed_probe_types'] = ["observation | navigation | manipulation | transformation"]
-            initial_epistemic_frame['EpistemicFrame']['exploration_constraints']['discouraged / unproven_assumptions'] = []
-            initial_epistemic_frame['EpistemicFrame']['reflection_notes']['failure_mode'] = ""
-            initial_epistemic_frame['EpistemicFrame']['reflection_notes']['model_mismatch_summary'] = ""
-            initial_epistemic_frame['EpistemicFrame']['reflection_notes']['confidence_in_frame'] = "low"
-            logger.info("📝 Initialized new empty epistemic_frame")
+            initial_world_model = self.executor.world_model.get()
+            logger.info("📂 Using world_model from executor")
 
         try:
             # Note: plan_bindings are NOT cleared here - they persist across plans unless explicitly cleared
@@ -2241,11 +2206,11 @@ class IncrementalPlanner:
                     logger.error(line.rstrip())
             
             # Run SGLang planner
-            epistemic_frame = initial_epistemic_frame
+            world_model = initial_world_model
             state = tool_planner_infospace.run(
                 template=template,
                 goal=goal,
-                epistemic_frame=epistemic_frame,
+                world_model=world_model,
                 character_context=character_context,
                 recent_context=recent_context,
                 tools_catalog_text=self.tools_catalog_text,
@@ -2260,17 +2225,27 @@ class IncrementalPlanner:
             logger.info(f"Last step: {step}, done_{step}: {state[f'done_{step}']}")
             trace_str = str(state)
             compressed_trace = self._compress_trace(trace_str)
-            epistemic_frame = self._reflect(goal, epistemic_frame, max_steps, compressed_trace)
+            reflection_frame = self._reflect(goal, world_model, max_steps, compressed_trace)
             
-            # Save updated epistemic_frame to persistent storage
-            self._save_epistemic_frame(epistemic_frame)
+            # Extract inner ReflectionFrame content (LLM returns wrapped in 'ReflectionFrame' key)
+            reflection_content = reflection_frame.get('ReflectionFrame', reflection_frame)
+            task_state = reflection_content.get('task_state', {})
+            
+            # Update world_model from reflection_frame
+            if hasattr(self.executor, 'world_model') and self.executor.world_model:
+                self.executor.world_model.update(reflection_content)
+                self.executor.world_model.save()
+                # Get updated world_model for retry if needed
+                world_model = self.executor.world_model.get()
+            else:
+                logger.warning("WorldModel not available, skipping update")
             if step < max_steps and state[f'done_{step}'] and state[f'done_{step}'].strip().upper().startswith("NO"):
                 #reflect and retry
                 logger.info(f"Step {step} failed, reflecting and retrying")
                 state = tool_planner_infospace.run(
                     template=template,
                     goal=goal,
-                    epistemic_frame=epistemic_frame,
+                    world_model=world_model,
                     character_context=character_context,
                     recent_context=recent_context,
                     tools_catalog_text=self.tools_catalog_text,
@@ -2294,8 +2269,9 @@ class IncrementalPlanner:
             error_count = getattr(self.executor, '_plan_error_count', 0)
             return {
                 'plan': plan_actions,
-                'reasoning': final_answer,
-                'success': True,
+                'response': final_answer,
+                'task_state': task_state,
+                'success': state[f'done_{step}'].strip().upper().startswith("YES"),
                 'error_count': error_count,
                 'skip_validation': True  # Plan already executed, no need to validate
             }
@@ -2653,51 +2629,63 @@ END_PLAN
         
         return '\n'.join(compressed_events)
 
-    def _reflect(self, goal_text, epistemic_frame, steps, trace) -> Dict:
+    def _reflect(self, goal_text, world_model, steps, trace) -> Dict:
         """
         Reflect on the plan execution outcome.
         Args:
             state: SGLang state
             goal_text: Original goal text
-            epistemic_frame: Epistemic frame from previous attempt
+            world_model: World model from previous attempt
             steps: Steps used
             trace: Trace (str(s) from tool_planner_infospace.run())
         Returns:
-            epistemic_frame: Revised epistemic frame
+            world_model: Revised world model
         """
+
         reflection_prompt = """ROLE
-You are a REFLECTIVE THEORIST operating inside the Cognitive Workbench.
-You do NOT act in the environment.
-You analyze a completed problem-solving attempt and revise the agent’s epistemic state.
+You are a REFLECTION ANALYST inside the Cognitive Workbench.
 
-You may reason step by step internally and may use reasoning primitives (e.g., think),
-but your FINAL OUTPUT MUST BE A SINGLE VALID JSON OBJECT matching the EpistemicFrame schema.
+You do NOT act.
+You do NOT plan.
+You do NOT invent knowledge.
+
+Your sole responsibility is to analyze ONE completed planner attempt and produce a
+ReflectionFrame that constrains future cognition correctly.
+
+You may reason internally, but your FINAL OUTPUT MUST BE A SINGLE VALID JSON OBJECT
+conforming EXACTLY to the ReflectionFrame schema provided by the runtime.
 
 ============================================================
-INPUTS (AUTHORITATIVE)
+AUTHORITATIVE INPUTS
 ============================================================
 
-1) PREVIOUS EPISTEMIC FRAME (JSON)
----------------------------------
-{epistemic_frame}
+1) PREVIOUS TASK STATE (JSON)
+----------------------------
+{task_state}
 
-This frame represents the agent’s prior epistemic state.
-Retired hypotheses MUST NOT be resurrected unless explicitly overturned by evidence.
+This is ephemeral, goal-scoped working memory from the prior attempt.
+It exists ONLY to support continuation of the SAME goal.
 
-2) FULL EXECUTION TRACE (COMPLETE, VERBATIM)
---------------------------------------------
+2) PREVIOUS WORLD MODEL (JSON)
+------------------------------
+{world_model}
+
+This is persistent, cross-goal knowledge.
+You must treat it as stable and conservative.
+You are NOT authorized to forget or overwrite it wholesale.
+
+3) FULL EXECUTION TRACE (VERBATIM)
+----------------------------------
 {trace}
 
-The trace is the complete problem-solving context.
-All observations, hypotheses, audits, and failures are authoritative.
-Note: The trace includes method tool inner loop execution (marked with [METHOD ...]).
-Hypotheses and audits from method tool inner loops should be considered alongside outer loop hypotheses.
+This is evidence, not memory.
+All claims must be grounded in this trace.
 
-3) ORIGINAL GOAL TEXT
+4) ORIGINAL GOAL TEXT
 ---------------------
 {goal_text}
 
-4) STEP BUDGET USED
+5) STEP BUDGET USED
 -------------------
 {steps}
 
@@ -2705,96 +2693,154 @@ Hypotheses and audits from method tool inner loops should be considered alongsid
 OBJECTIVE
 ============================================================
 
-Analyze WHY the attempt failed or stalled, and produce a REVISED EpistemicFrame
-that will be used to initialize the NEXT planning attempt.
+Produce a ReflectionFrame that:
 
-Your job is NOT to plan actions.
-Your job is to update the agent’s MODEL OF THE WORLD AND TASK.
+A) Updates TASK STATE for the NEXT attempt at THIS SAME goal (if any)
+B) Proposes WORLD MODEL updates ONLY if genuinely general and reusable
+C) Records TOOL INSIGHTS as contracts or constraints (not praise)
+D) Specifies CONTEXT-FORGET instructions to prune the NEXT prompt
+E) Retires false GENERAL beliefs only (not time-local facts)
 
-Failure is an acceptable and informative outcome.
+Your output must be minimal, conservative, and behavior-constraining.
+
+============================================================
+CRITICAL EPISTEMIC RULES (READ CAREFULLY)
+============================================================
+
+1) EPHEMERAL VS PERSISTENT
+- Task-specific, time-specific, or location-specific facts MUST NOT enter the world model.
+- World model facts must remain true under DIFFERENT goals and later time.
+
+2) PROMOTION THRESHOLD
+DO NOT promote world facts that describe:
+- current agent state (health, food, idle, inventory)
+- current location or coordinates
+- current absence of objects
+- single observations from a trivial task
+
+A trivial or already-completed goal should produce FEW or ZERO world model updates.
+
+3) TOOL INSIGHTS
+Tool insights must be stated as:
+- guarantees
+- limits
+- preconditions
+- failure modes
+
+NOT qualitative descriptions or praise.
+
+4) TASK COMPLETION COLLAPSE
+If the goal was COMPLETED:
+- task_state MUST collapse to a minimal summary
+- active hypotheses SHOULD be empty
+- exhausted_search SHOULD be empty
+- no new task continuations should be implied
+
+5) CONTEXT FORGETTING AUTHORITY
+You MAY request forgetting of:
+- coordinates
+- local observations
+- trace details
+- temporary hypotheses
+- report text
+- previous task_state
+
+You MUST NOT request forgetting of:
+- the world model as a whole
+- tool contracts
+- invariants
+- cross-goal knowledge
+
+6) FAILURE MODE HONESTY
+If the goal was completed successfully, use:
+- failure_mode = "none"
+
+Minor recoveries or clarifications do NOT count as failures.
 
 ============================================================
 REFLECTION PROCESS (FOLLOW IN ORDER)
 ============================================================
 
-STEP 1 — Failure Mode Identification
-- Determine the dominant failure mode:
-  - incorrect world model
-  - incorrect task interpretation
-  - missing or unavailable affordances
-  - inappropriate or exhausted search strategy
-- Cite concrete evidence from the trace.
+STEP 1 — Outcome Classification
+Determine whether the goal was:
+- completed successfully
+- incomplete
+- failed
 
-STEP 2 — Hypothesis Audit and Retirement
-- Examine all hypotheses encountered in the trace.
-- RETIRE a hypothesis if it is:
-  - CONTRADICTED by evidence, OR
-  - repeatedly UNSUPPORTED after exhaustive, reasonable search.
-- Do NOT weaken hypotheses; either RETAIN or RETIRE them.
+Select the appropriate failure_mode.
+Cite concrete trace evidence.
 
-STEP 3 — Infer Stable World Facts
-From repeated observations and absences, infer:
-- POSITIVE facts (what clearly exists or is true)
-- NEGATIVE facts (what does NOT exist, was NOT found, or is unavailable)
-- INVARIANTS (properties that appear stable across observations)
+STEP 2 — TASK STATE UPDATE (EPHEMERAL)
+Update ONLY what should bias the NEXT attempt at THIS SAME goal.
 
-Absence after exhaustive search counts as evidence.
+Include:
+- brief summary
+- immediate blockers (if any)
+- active hypotheses (max 6, omit if goal complete)
+- proven safe anchors or paths (if relevant)
+- exhausted search (only if it matters for continuation)
 
-STEP 4 — Diagnose Model / Task Mismatch
-Explicitly answer:
-- Which assumptions were imported from the task description rather than learned?
-- Which of those assumptions appear false or incomplete?
-- Where did the agent behave correctly but was misled by the task framing?
+If the goal is complete, keep this section minimal.
 
-STEP 5 — Task Reframing
-Propose one or more alternative interpretations of the task or goal.
-Examples:
-- reinterpretation of key nouns (e.g., “seed”, “grow”)
-- implicit transformations rather than object discovery
-- missing prerequisite steps not stated in the original goal
+STEP 3 — WORLD MODEL UPDATE CANDIDATES (CONSERVATIVE)
+Propose world facts ONLY if they:
+- generalize across goals
+- are not tied to current agent state
+- reflect stable properties of the world or tools
 
-Do NOT propose concrete actions.
+Each fact must be atomic, general, and reusable.
+If uncertain, do NOT promote.
 
-STEP 6 — Open Questions (Optional)
-If uncertainty remains, list precise, testable questions
-that a future attempt may need to resolve.
+It is acceptable — and often correct — to propose NO world updates.
+
+STEP 4 — TOOL INSIGHTS (META-COGNITION)
+Record any discovered tool properties that would constrain future planning:
+- guarantees
+- limits
+- misleading success signals
+- required preconditions
+
+Each insight must be stated as a contract or constraint.
+
+STEP 5 — RETIREMENT VS CONTEXT FORGETTING
+- RETIRE only false GENERAL beliefs (keep as warnings).
+- CONTEXT_FORGET only episode- or goal-specific material to omit from the NEXT prompt.
+
+Never request forgetting of the world model itself.
+
+STEP 6 — OPEN QUESTIONS (OPTIONAL)
+List up to 4 precise, testable questions that would reduce uncertainty.
+Omit if none are needed.
 
 ============================================================
 OUTPUT REQUIREMENTS (STRICT)
 ============================================================
 
 - Output MUST be a SINGLE VALID JSON OBJECT
-- Output MUST conform to the EpistemicFrame schema
-- Do NOT include explanations outside JSON
-- Do NOT include actions, tools, or plans
-- Keep free text short and concise but explicit
-
-SIZE CONSTRAINTS (ENFORCE STRICTLY):
-- hypotheses.active: Maximum 8 items, prioritize by importance and confidence
-- hypotheses.retired: Maximum 4 items, do not repeat those in previous frame, keep most recent only
-- inferred_world_facts.positive/negative/invariants: Maximum 8 items each, prioritize by confidence and recency
-- search_coverage.*: Maximum 6 items per category
-- open_questions: Maximum 4 items, prioritize by priority
-- exploration_constraints.discouraged_assumptions: Maximum 4 items
+- MUST conform EXACTLY to the ReflectionFrame schema
+- NO extra keys
+- NO explanations outside JSON
+- Prefer omission over verbosity
+- When in doubt, promote NOTHING
 
 ============================================================
 OUTPUT (JSON ONLY)
 ============================================================
 
-{EPISTEMIC_FRAME_SCHEMA}
-}
+REFLECTION_FRAME_SCHEMA:
+{REFLECTION_FRAME_SCHEMA}
 """
-        # Convert epistemic_frame to JSON string to avoid format() interpreting braces as placeholders
-        epistemic_frame_str = json.dumps(epistemic_frame, indent=2) if isinstance(epistemic_frame, dict) else str(epistemic_frame)
-        reflection_prompt = reflection_prompt.replace("{epistemic_frame}", epistemic_frame_str)
+        # Convert world_model to JSON string to avoid format() interpreting braces as placeholders
+        task_state = "{}"
+        world_model = json.dumps(world_model, indent=2) if isinstance(world_model, dict) else str(world_model)
+        task_state = json.dumps(task_state, indent=2) if isinstance(task_state, dict) else str(task_state)
+        reflection_prompt = reflection_prompt.replace("{task_state}", task_state)
+        reflection_prompt = reflection_prompt.replace("{world_model}", world_model)
         reflection_prompt = reflection_prompt.replace("{goal_text}", goal_text)
         reflection_prompt = reflection_prompt.replace("{steps}", str(steps))
-        reflection_prompt = reflection_prompt.replace("{EPISTEMIC_FRAME_SCHEMA}", json.dumps(EPISTEMIC_FRAME_SCHEMA, indent=2))
+        reflection_prompt = reflection_prompt.replace("{REFLECTION_FRAME_SCHEMA}", json.dumps(REFLECTION_FRAME_SCHEMA, indent=2))
         reflection_prompt = reflection_prompt.replace("{trace}", trace)
-        reflection = self.executor.llm_generate(reflection_prompt, max_tokens=4096, is_json=True, temperature=GEN_TEMPERATURE)
+        reflection = self.executor.llm_generate(reflection_prompt, max_tokens=4096, is_json=True, temperature=0.0)
         logger.info(f"Reflection: {json.dumps(reflection.text, indent=2)}")
 
-
-
-    
         return reflection.text
