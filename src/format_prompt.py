@@ -1,11 +1,11 @@
 from ast import literal_eval
-from PyQt5.QtWidgets import (QApplication, QTextEdit, QVBoxLayout, QWidget, 
+from PyQt6.QtWidgets import (QApplication, QTextEdit, QVBoxLayout, QWidget, 
                             QPushButton, QDialog, QProgressDialog, QMessageBox,
-                            QFileDialog, QComboBox, QLabel, QHBoxLayout, QLineEdit, QCheckBox, QShortcut)
-from PyQt5.QtCore import Qt, QThread, pyqtSignal, QUrl, QByteArray
-from PyQt5.QtNetwork import QNetworkAccessManager, QNetworkRequest, QNetworkReply
-from PyQt5.QtGui import QFont, QTextCursor, QKeySequence
-from PyQt5.QtGui import QTextDocument
+                            QFileDialog, QComboBox, QLabel, QHBoxLayout, QLineEdit, QCheckBox, QMenu)
+from PyQt6.QtCore import Qt, QThread, pyqtSignal, QUrl, QByteArray, QTimer
+from PyQt6.QtNetwork import QNetworkAccessManager, QNetworkRequest, QNetworkReply
+from PyQt6.QtGui import QFont, QTextCursor, QKeySequence, QClipboard, QShortcut
+from PyQt6.QtGui import QTextDocument
 from pathlib import Path
 import json
 import sys
@@ -225,7 +225,7 @@ def get_model_id(url: str = API_URL, callback=None):
     
     manager = get_network_manager()
     request = QNetworkRequest(QUrl(f"{url}/v1/models"))
-    request.setHeader(QNetworkRequest.ContentTypeHeader, "application/json")
+    request.setHeader(QNetworkRequest.KnownHeaders.ContentTypeHeader, "application/json")
     
     def handle_reply(reply):
         global _model_id_cache
@@ -275,7 +275,7 @@ def submit_text():
         
         manager = get_network_manager()
         request = QNetworkRequest(QUrl(f"{API_URL}/v1/chat/completions"))
-        request.setHeader(QNetworkRequest.ContentTypeHeader, "application/json")
+        request.setHeader(QNetworkRequest.KnownHeaders.ContentTypeHeader, "application/json")
         
         payload_bytes = QByteArray(json.dumps(payload).encode('utf-8'))
         
@@ -290,7 +290,7 @@ def submit_text():
                         assistant_message = data["choices"][0]["message"]["content"]
                         # Append response below the original text
                         cursor = text_edit.textCursor()
-                        cursor.movePosition(QTextCursor.End)
+                        cursor.movePosition(QTextCursor.MoveOperation.End)
                         cursor.insertText("\n\n--- Response ---\n\n")
                         cursor.insertText(assistant_message)
                         text_edit.setTextCursor(cursor)
@@ -374,6 +374,57 @@ text_edit.setTabStopDistance(40)  # Set tab stop distance (in pixels)
 textFont = QFont(); textFont.setPointSize(16)
 text_edit.setFont(textFont)  
 text_edit.setAcceptRichText(False)
+
+# Enable context menu with paste support
+def show_context_menu(pos):
+    cursor = text_edit.cursorForPosition(pos)
+    text_edit.setTextCursor(cursor)
+    menu = QMenu()
+    
+    # Add standard actions
+    undo_action = menu.addAction("Undo")
+    undo_action.setEnabled(text_edit.document().isUndoAvailable())
+    undo_action.triggered.connect(text_edit.undo)
+    
+    redo_action = menu.addAction("Redo")
+    redo_action.setEnabled(text_edit.document().isRedoAvailable())
+    redo_action.triggered.connect(text_edit.redo)
+    
+    menu.addSeparator()
+    
+    cut_action = menu.addAction("Cut")
+    cut_action.setEnabled(text_edit.textCursor().hasSelection())
+    cut_action.triggered.connect(text_edit.cut)
+    
+    copy_action = menu.addAction("Copy")
+    copy_action.setEnabled(text_edit.textCursor().hasSelection())
+    copy_action.triggered.connect(text_edit.copy)
+    
+    # Paste: explicitly use CLIPBOARD mode (not Selection/PRIMARY) to avoid clearing clipboard
+    paste_action = menu.addAction("Paste")
+    clipboard = QApplication.clipboard()
+    # Check CLIPBOARD mode explicitly (not Selection mode)
+    has_clipboard_text = clipboard.text(QClipboard.Mode.Clipboard)
+    paste_action.setEnabled(bool(has_clipboard_text))
+    
+    def handle_paste():
+        # Ensure we're using CLIPBOARD mode, not Selection mode
+        text_edit.setFocus()
+        # Use QTimer to ensure paste happens after menu closes and focus is restored
+        QTimer.singleShot(10, lambda: text_edit.paste())
+    
+    paste_action.triggered.connect(handle_paste)
+    
+    menu.addSeparator()
+    
+    select_all_action = menu.addAction("Select All")
+    select_all_action.triggered.connect(text_edit.selectAll)
+    
+    menu.exec(text_edit.mapToGlobal(pos))
+
+text_edit.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+text_edit.customContextMenuRequested.connect(show_context_menu)
+
 layout.addWidget(text_edit)
 
 # Create search bar
@@ -400,7 +451,7 @@ def find_next():
     
     flags = QTextDocument.FindFlag(0)
     if case_checkbox.isChecked():
-        flags |= QTextDocument.FindCaseSensitively
+        flags |= QTextDocument.FindFlag.FindCaseSensitively
     
     # Start search from current cursor position
     found = text_edit.find(search_term, flags)
@@ -408,7 +459,7 @@ def find_next():
     if not found:
         # Wrap around: move to start and try again
         cursor = text_edit.textCursor()
-        cursor.movePosition(QTextCursor.Start)
+        cursor.movePosition(QTextCursor.MoveOperation.Start)
         text_edit.setTextCursor(cursor)
         found = text_edit.find(search_term, flags)
         
@@ -450,7 +501,7 @@ def _zoom_all(delta: int):
     try:
         cur = text_edit.textCursor()
         sel = QTextCursor(cur)
-        sel.select(QTextCursor.Document)
+        sel.select(QTextCursor.SelectionType.Document)
         text_edit.setTextCursor(sel)
         if delta > 0:
             text_edit.zoomIn(delta)
@@ -503,7 +554,7 @@ def load_trace_section():
     ok_button.clicked.connect(dialog.accept)
     cancel_button.clicked.connect(dialog.reject)
     
-    if dialog.exec_() != QDialog.Accepted:
+    if dialog.exec() != QDialog.DialogCode.Accepted:
         return
     
     num_sections = int(combo.currentText())
@@ -549,7 +600,7 @@ def load_trace_section():
         text_edit.setFont(textFont)
     else:
         cursor = text_edit.textCursor()
-        cursor.movePosition(QTextCursor.End)
+        cursor.movePosition(QTextCursor.MoveOperation.End)
         cursor.insertText('\n\n' + section_text)
         text_edit.setTextCursor(cursor)
 
@@ -572,4 +623,4 @@ window.setWindowTitle("Text Formatter")
 window.show()
 
 # Run the app
-app.exec_()
+app.exec()

@@ -322,6 +322,10 @@ class ZenohExecutiveNode:
         config = zenoh.Config()
         self.session = zenoh.open(config)
         
+        # Autonomous mode state
+        self.previous_autonomous_goal_text = ''
+        self.autonomous_task_state = ''
+        
         # Subscriber for sense data (character-specific)
         self.sense_subscriber = self.session.declare_subscriber(
             f"cognitive/{character_name}/sense_data",
@@ -575,6 +579,15 @@ class ZenohExecutiveNode:
         world_config = self.character_config.get('world_config', {})
         world_name = world_config.get('world_name') or self.map_name
         
+        # Create WorldModel instance
+        from world_model import WorldModel
+        self.world_model = WorldModel(
+            world_name=world_name,
+            agent_name=character_name,
+            resource_manager=self.resource_manager
+        )
+        logger.info(f'🌍 WorldModel initialized for {character_name} in {world_name}')
+        
         self.infospace_executor = InfospaceExecutor(
             agent_name=character_name,
             session=self.session,
@@ -584,6 +597,10 @@ class ZenohExecutiveNode:
             executive_node=self,  # Pass actual executive node
             resource_manager=self.resource_manager
         )
+        # Attach world_model to executor for access by planner
+        self.infospace_executor.world_model = self.world_model
+        # Set executor on world_model so it can use LLM for generalization checks
+        self.world_model.executor = self.infospace_executor
         # Share runtime with executor
         if self.runtime:
             self.infospace_executor.runtime = self.runtime
@@ -671,17 +688,14 @@ class ZenohExecutiveNode:
         
         # Execution control (replaces turn management)
         self.execution_paused = True  # Start paused, wait for step/run command
-        self.execution_mode = 'step'  # 'step' or 'run'
+        self.execution_mode = 'step'  # 'step', 'run', or 'autonomous'
+        self.autonomous_mode = False  # Flag for autonomous execution mode
         self.interrupt_requested = False  # Global interrupt flag (checked once per planner step)
         
         # Subscribers for direct execution control from UI
-        self.control_step_subscriber = self.session.declare_subscriber(
-            f"cognitive/{character_name}/control/step",
-            self.handle_step_command
-        )
-        self.control_run_subscriber = self.session.declare_subscriber(
-            f"cognitive/{character_name}/control/run",
-            self.handle_run_command
+        self.control_autonomous_subscriber = self.session.declare_subscriber(
+            f"cognitive/{character_name}/control/autonomous",
+            self.handle_autonomous_command
         )
         self.control_stop_subscriber = self.session.declare_subscriber(
             f"cognitive/{character_name}/control/stop",
@@ -695,9 +709,9 @@ class ZenohExecutiveNode:
             f"cognitive/{character_name}/control/continuous",
             self.handle_continuous_toggle
         )
-        self.control_clear_epistemic_frame_subscriber = self.session.declare_subscriber(
-            f"cognitive/{character_name}/control/clear_epistemic_frame",
-            self.handle_clear_epistemic_frame
+        self.control_clear_world_model_subscriber = self.session.declare_subscriber(
+            f"cognitive/{character_name}/control/clear_world_model",
+            self.handle_clear_world_model
         )
         self.control_clear_map_subscriber = self.session.declare_subscriber(
             f"cognitive/{character_name}/control/clear_map",
@@ -723,12 +737,6 @@ class ZenohExecutiveNode:
         self.shutdown_subscriber = self.session.declare_subscriber(
             "cognitive/shutdown/executive",
             self.shutdown_callback
-        )
-        
-        # Subscriber for end dialog queries (character-specific)
-        self.end_dialog_subscriber = self.session.declare_subscriber(
-            f"cognitive/{character_name}/dialog_end",
-            self._dialog_end_callback
         )
         
         # Subscriber for enabling compliance tracking (evaluation mode)
@@ -801,8 +809,7 @@ class ZenohExecutiveNode:
 
         logger.info(f'🧠 Zenoh Executive Node initialized for character: {character_name}')
         logger.info(f'   - Subscribing to: cognitive/{character_name}/sense_data')
-        logger.info(f'   - Subscribing to: cognitive/{character_name}/control/step')
-        logger.info(f'   - Subscribing to: cognitive/{character_name}/control/run')
+        logger.info(f'   - Subscribing to: cognitive/{character_name}/control/autonomous')
         logger.info(f'   - Subscribing to: cognitive/{character_name}/control/stop')
         logger.info(f'   - Subscribing to: cognitive/map/time_advanced')
         logger.info(f'   - Subscribing to: cognitive/{character_name}/end_dialog')
@@ -920,8 +927,16 @@ class ZenohExecutiveNode:
                             self._process_text_input()
                         self._run_ooda_loop()
                         
+                        # Check autonomous mode completion conditions
+                        if self.execution_mode == 'autonomous':
+                            self.run_autonomous_mode()
+                            if not self.autonomous_mode:
+                                # Autonomous mode completed or stopped, pause and enable button
+                                self.execution_mode = 'step'
+                                self.execution_paused = True
+                                self._publish_execution_state()
                         # In step mode, pause after one OODA cycle
-                        if self.execution_mode == 'step':
+                        elif self.execution_mode == 'step':
                             self.execution_paused = True
                             self._publish_execution_state()
                     except Exception as e:
@@ -956,29 +971,6 @@ class ZenohExecutiveNode:
         except Exception as e:
             logger.error(f'Error announcing character: {e}')
     
-    def send_text_input(self, target_character: str, message: str):
-        """Send text input to another character."""
-        try:
-            # Create sense data format
-            sense_data = {
-                'timestamp': datetime.now().isoformat(),
-                'sequence_id': 0,
-                'mode': 'text',
-                'content': json.dumps({
-                    'source': self.character_name,
-                    'text': message
-                })
-            }
-            
-            # Publish directly to target character's sense_data topic
-            target_publisher = self.session.declare_publisher(f"cognitive/{target_character}/sense_data")
-            target_publisher.put(json.dumps(sense_data))
-            
-            logger.info(f'📤 {self.character_name} Sent text input to {target_character}: "{message}" (source: {self.character_name})')
-            
-        except Exception as e:
-            logger.error(f'Error sending text input to {target_character}: {e}')
-
     def _publish_goal(self, goal):
         """Publish current goal to the goal topic for UI display."""
         if not goal:
@@ -1151,8 +1143,8 @@ class ZenohExecutiveNode:
         if self.infospace_executor:
             bindings = self.infospace_executor.plan_bindings_flat
         
-        # Get final_thoughts from plan reasoning
-        final_thoughts = self.current_plan.get('reasoning', '')
+        # Get final_thoughts from plan response
+        final_thoughts = self.current_plan.get('response', '')
         
         # Get final_content: prefer last_say_text, else last_out_resource content
         final_content = getattr(self, 'last_say_text', '') or ''
@@ -1700,88 +1692,24 @@ Finally, using 'say', respond in character to User\n"""
             self.observations = {'static': system_prompt, 'dynamic': user_prompt}
             return self.observations
 
-    def _orient(self, observations: Dict[str, Any], step_rewrite: bool = False):
+    def _orient(self):
         """Orient: Assess current state and drives"""
 
-        # Create a new goal based on current situation
-        other_characters_str = ''
-        for other_character_name, other_character_desc in self.character_config.get('characters', {}).items():
-            if other_character_name != self.character_name:
-                other_characters_str += f"\n\t{other_character_name}: {other_character_desc}"
-        character_names = list(self.character_config.get("characters", {}).keys())
-
-        map_types_str = format_map_types(self.map_types)
-        if self.ontology:
-            ontology_nouns_str = f"#ABSTRACT NOUNS:\n{'\n'.join(self.ontology['nouns'])}\n"
-            ontology_verbs_str = f"#ABSTRACT VERBS:\n{'\n'.join(self.ontology['verbs'])}\n"
-        else:
-            ontology_nouns_str = ''
-            ontology_verbs_str = ''
-        character_drives = self.drives
-        character_drives_str = '\n'.join(character_drives)   
-
-        drives = character_drives.copy()
-        # Make LLM call
-        try:
-            # Use shorter timeout during shutdown
-            timeout = 100.0 if self.shutdown_requested else None
-            response = self.llm_generate(
-                messages=[GOAL_TEMPLATE if not step_rewrite else REWRITE_TEMPLATE],
-                bindings={
-                    "character_drives": character_drives_str,
-                    "primitive_nouns": map_types_str,
-                    "primitive_verbs": PLAN_VERBS,
-                    "abstract_nouns": ontology_nouns_str,
-                    "abstract_verbs": ontology_verbs_str,
-                    "character_names": '\n'.join(character_names),
-                    "other_characters": other_characters_str,
-                    "static_information": self.observations['static'],
-                    "current_information": self.observations['dynamic'],
-                    "current_percepts": self.percepts_at_plan,
-                    "step_to_rewrite": self.current_step if self.current_step else '',
-                },
-                max_tokens=400,
-                temperature=0.5,
+        prompt = f"""
+        You are a strict goal generator.
+        Given what you know about the world, your situation and your character, assess your current needs and pressing priorities.
+        Given these, generate 2-3 goal statements that you might work on next.
+        Finally, prioritize the goals by their importance, urgency, and feasibility, and return the highest priority goal.
+        Your response should be a single goal statement, with clear desired outcome and a clear termination condition, followed by </end>.
+        Respond with no other text, no markdown, no code fences, no reasoning, no explanation, no commentary.
+        """
+        response = self.llm_generate(
+                messages=[prompt],
+                max_tokens=200,
+                temperature=0.3,
                 stops=['</end>'],
-                timeout=timeout
-            )
-
-            if response.success:
-                logger.info(f'🤖 {self.character_name} New Goal: {response.text.strip()}')
-                goals = []
-                forms = hash_utils.findall_forms(response.text)
-                if len(forms) == 0:
-                    logger.error(f'No goal found in LLM response: {response.text}')
-                    self.current_goal = Goal('sleep', actors=[self.character_name])
-                    self._publish_goal(self.current_goal)
-                    return self.current_goal
-                for goal_hash in forms:
-                    goal = validate_and_create_goal(self.character_name, goal_hash)
-                    if goal:
-                        logger.info(f'{self.character_name} generated goal: {goal.to_string()}')
-                        self.current_goal = goal
-                        self.current_plan = None  # Clear plan so _plan creates new one for this goal
-                        # Note: plan_bindings are NOT cleared here - they persist across plans unless explicitly cleared
-                        self.plan_bindings_cache = {}
-                        self._publish_goal(goal)
-                        return self.current_goal
-                    else:
-                        logger.error(f'Warning: Invalid goal generation response for {goal_hash}')
-            else:
-                logger.error(f'LLM call failed: {response.error}')
-                self.current_plan = None
-                if self.infospace_executor:
-                    self.infospace_executor.clear_plan_state()
-                self.current_goal = Goal('sleep', actors=[self.character_name])
-                self._publish_goal(self.current_goal)
-
-            if not self.current_goal:
-                logger.error(f'No goal generated for {self.character_name}')
-        except Exception as e:
-            logger.error(f'Error in _orient: {e}')
-            traceback.print_exc()
-            self.current_goal = Goal('sleep', actors=[self.character_name])
-            self._publish_goal(self.current_goal)
+                )
+        self.current_goal = Goal(response.text.strip(), [self.character_name], description='', termination='')
         return self.current_goal
 
 
@@ -1865,265 +1793,6 @@ Finally, using 'say', respond in character to User\n"""
                 self.current_plan = {'error': 'No planner available for infospace planning'}
 
         return self.current_plan
-
-    def _plan_completed(self, reason='plan completed'):
-        """Handle successful plan completion."""
-        # Existing telemetry and cleanup
-        if reason == 'plan completed':
-            self._summarize_plan_execution()
-        completed_plan = self.current_plan
-        
-        # Publish plan_result BEFORE clearing current_plan (so _publish_plan_result can access it)
-        self._publish_current_plan()
-        
-        self.current_plan = None
-        # Note: plan_bindings are NOT cleared here - they persist across plans unless explicitly cleared
-        self.plan_bindings_cache = {}
-        self.action_history = []
-        if reason == 'manual goal override' or reason == 'manual plan override':
-            return
-        
-        # Store goal text before clearing (for potential continuous mode activation)
-        goal_text_to_store = None
-        if self.current_goal:
-            goal_text_to_store = self.current_goal.to_string()
-        
-        # Check if we should resubmit goal in continuous mode
-        if self.continuous_mode and self.continuous_goal_text:
-            logger.info(f'🔄 {self.character_name} plan completed, resubmitting goal in continuous mode')
-            # Resubmit the original goal text directly
-            goal_text = f"goal: {self.continuous_goal_text}"
-            self.parse_and_set_goal("", goal_text)
-            # Ensure execution continues (don't pause)
-            self.execution_paused = False
-            self.awaiting_user_input = False
-            self._publish_execution_state()
-            # Store goal text before clearing (for next cycle)
-            if goal_text_to_store:
-                self.last_completed_goal_text = goal_text_to_store
-            return  # Don't clear goal or pause - let resubmission proceed
-        
-        # No activity - clear goal (existing behavior)
-        # Store goal text before clearing for potential continuous mode activation
-        if goal_text_to_store:
-            self.last_completed_goal_text = goal_text_to_store
-        self.current_goal = None
-        
-        # If goal was from UI, pause autonomous behavior to await next user input
-        if self.goal_source == 'ui':
-            self.awaiting_user_input = True
-            logger.info(f'⏸️ {self.character_name} UI goal completed, awaiting user input')
-        self.goal_source = None
-        
-
-    def _summarize_plan_execution(self):
-        """Summarize the completed plan execution for memory storage."""
-        if self.plan_summary_completed:
-            logger.debug(f'📝 Plan summary already completed for {self.character_name}')
-            return
-            
-        if not self.action_history:
-            logger.debug(f'📝 No actions to summarize for {self.character_name}')
-            return
-            
-        logger.info(f'📝 Creating plan execution summary for {self.character_name}')
-        
-        # Convert action history to text structure
-        actions_text = []
-        for record in self.action_history:
-            action_type = record.action.get('type', 'unknown')
-            target = record.action.get('target', 'unknown')
-            result = record.result if record.result else 'no result recorded'
-            result_str = self._truncate_result(result)
-            timestamp = record.timestamp.strftime('%H:%M:%S')
-            actions_text.append(f"{timestamp} - {action_type}: {target} -> {result_str}")
-        
-        actions_summary = '\n'.join(actions_text)
-        
-        # Prepare context for LLM summary
-        goal_text = self.current_goal.to_string() if self.current_goal else "No specific goal"
-        plan_text = json.dumps(self.current_plan, indent=2) if self.current_plan else "No plan available"
-        
-        # Extract planner's own assessment if available (for incremental planner)
-        planner_assessment = ""
-        if self.current_plan and isinstance(self.current_plan, dict):
-            reasoning = self.current_plan.get('reasoning', '')
-            success = self.current_plan.get('success', None)
-            if reasoning:
-                planner_assessment = f"Planner's final assessment: {reasoning}"
-                if success is not None:
-                    planner_assessment += f" (success={success})"
-        
-        # Build compact structured telemetry for selected fields (bindings/evidence/features)
-        try:
-            telemetry_actions = []
-            for ar in self.action_history:
-                sel = {
-                    'step_id': ar.step_id,
-                    'type': (ar.action or {}).get('type', '')
-                }
-                if getattr(ar, 'bindings_after', None):
-                    sel['bindings_after'] = ar.bindings_after
-                if getattr(ar, 'binding_evidence', None):
-                    sel['binding_evidence'] = ar.binding_evidence
-                if getattr(ar, 'feature_snapshot', None):
-                    sel['feature_snapshot'] = ar.feature_snapshot
-                if len(sel.keys()) > 2:
-                    telemetry_actions.append(sel)
-        except Exception:
-            telemetry_actions = []
-
-        percepts_json = json.dumps(self.percepts_at_plan, indent=2) if self.percepts_at_plan else "[]"
-        telemetry_json = json.dumps({"actions": telemetry_actions}, indent=2)
-
-        summary_prompt = """
-        #Goal: 
-        {{$goal_text}}
-        
-        #Plan (JSON):
-        {{$plan_text}}
-        
-        #Actions Taken (text):
-        {{$actions_summary}}
-        
-        #Percepts at plan start (JSON):
-        {{$percepts_json}}
-        
-        #Structured telemetry (selected fields; JSON):
-        {{$telemetry_json}}
-        
-        {{$planner_assessment}}
-        
-        Please provide JSON object with:
-        1. 
-        2. a JSON formatted assessment of the plan's success or failure in meeting the goal, in the following format:
-            {
-                "Summary": str "a concise paragraph summarizing this plan execution, including the goal, actions taken, and observed results",
-                "How": str "concise (8-10 words) explanation how this plan intended to achieve the goal",
-                "outcome": str "concise (20-28 words) explanation of the outcome - did it achieve the goal? If not, where did it fail and why?",
-                "plan_score": int (0-100) "did the plan execute as expected? (lower if steps failed, even if goal was achieved)"
-                "goal_score": int (0-100) "how well the goal was met as measured by goal termination condition. If planner marked goal as DONE/achieved, use 80-100. If planner marked as incomplete, use 0-60."
-            }
-        
-        IMPORTANT: The goal_score should reflect whether the GOAL was achieved (not whether all steps succeeded). If the planner explicitly marked the goal as DONE/achieved, the goal_score should be high (80-100) even if some intermediate steps failed. The plan_score can be lower if steps failed, but goal_score reflects goal achievement.
-        
-        Do not include any other introductory, explanatory, discursive, or formatting text in your response.
-        
-        """
-        bindings = {
-            "goal_text": goal_text, 
-            "plan_text": plan_text, 
-            "actions_summary": actions_summary, 
-            "percepts_json": percepts_json, 
-            "telemetry_json": telemetry_json
-        }
-        if planner_assessment:
-            bindings["planner_assessment"] = planner_assessment
-        else:
-            bindings["planner_assessment"] = ""
-        
-        response = self.llm_generate([summary_prompt], 
-                                      bindings=bindings, 
-                                      max_tokens=500, is_json=True)
-        summary = response.text if isinstance(response.text, dict) else None
-        self.plan_summary = summary
-        if not summary:
-            logger.error(f'❌ No summary found in response: {response}')
-            summary = {}
-        logger.info(f'📝 Plan post-mortem prepared for {self.character_name}\n{self.plan_summary}\n')
-        
-        # Mark as completed to prevent redundant calls
-        self.plan_summary_completed = True
-        # Metrics aggregation (limited since physiology/time data removed)
-        try:
-            steps_total = len(self.action_history)
-            moves = sum(1 for ar in self.action_history if ar.action.get('type', '').lower() == 'move')
-            takes = sum(1 for ar in self.action_history if ar.action.get('type', '').lower() == 'take')
-            uses = sum(1 for ar in self.action_history if ar.action.get('type', '').lower() == 'use')
-            inspects = sum(1 for ar in self.action_history if ar.action.get('type', '').lower() == 'inspect')
-            failures = sum(1 for ar in self.action_history if getattr(ar, 'outcome_status', None) == 'failure')
-            items_taken = [ar.action.get('target', '') for ar in self.action_history if ar.action.get('type', '').lower() == 'take']
-            items_used = [ar.action.get('target', '') for ar in self.action_history if ar.action.get('type', '').lower() == 'use']
-
-            metrics = {
-                'steps': {
-                    'total': steps_total,
-                    'moves': moves,
-                    'takes': takes,
-                    'uses': uses,
-                    'inspects': inspects,
-                    'failures': failures
-                },
-                'inventory': {
-                    'taken': items_taken,
-                    'used': items_used
-                }
-            }
-        except Exception:
-            metrics = {}
-
-        # Assess drive fulfillment (stubbed LLM scaffolding)
-        try:
-            drive_fulfillment = self._assess_drive_fulfillment()
-            if isinstance(drive_fulfillment, dict):
-                metrics['drive_fulfillment'] = drive_fulfillment
-        except Exception:
-            pass
-
-        # Add goal satisfaction score to metrics for reflection scoring
-        if 'goal_score' in summary and summary['goal_score'] is not None:
-            metrics['goal_satisfaction'] = summary['goal_score']/100.0
-        else:
-            metrics['goal_satisfaction'] = 0.0
-
-        # Add goal satisfaction score to metrics for reflection scoring
-        if 'plan_score' in summary:
-            metrics['plan_score'] = summary['plan_score']/100.0
-        else:
-            metrics['plan_score'] = 0.0
-        
-        # Add infospace compliance metrics if evaluation mode is active
-        if hasattr(self.infospace_executor, '_compliance_tracker'):
-            tracker = self.infospace_executor._compliance_tracker
-            if tracker:
-                compliance_metrics = tracker.get_metrics()
-                metrics['infospace_compliance'] = compliance_metrics
-                
-                # Log eval statistics summary
-                violation_count = len(compliance_metrics.get('type_violations', []))
-                checks_count = compliance_metrics.get('compatibility_checks', 0)
-                
-                if violation_count > 0:
-                    logger.info(f'🧪 EVAL STATS [{self.character_name}]: {violation_count} type violations, {checks_count} compatibility checks')
-                    # Log violation details
-                    for v in compliance_metrics.get('type_violations', []):
-                        logger.info(f'  ❌ {v["operation"]} on {v["variable"]}: expected {v["expected_type"]}, got {v["actual_type"]}')
-                else:
-                    logger.info(f'🧪 EVAL STATS [{self.character_name}]: ✓ No violations, {checks_count} compatibility checks passed')
-
-        entry = {
-            'goal': self.current_goal.to_string() if self.current_goal else '',
-            'prompt': self.current_plan_prompt,
-            'plan': self.current_plan,
-            'summary': self.plan_summary,
-            'actions': [asdict(ar) for ar in self.action_history],
-            'percepts_at_plan': self.percepts_at_plan,
-            'metrics': metrics
-        }
-        self.plan_log.append(entry)
-        # Publish and persist JSONL
-        try:
-            self.plan_log_publisher.put(json.dumps(entry))
-        except Exception:
-            pass
-        try:
-            os.makedirs('data', exist_ok=True)
-            with open(f'data/{self.character_name}-plans.jsonl', 'a') as f:
-                f.write(json.dumps(entry, default=datetime_handler) + '\n')
-        except Exception as e:
-            logger.error(f'Error writing plan log to file: {e}')
-        #self.review_planning()
-        self.action_history = []
     
 
     def sense_data_callback(self, sample):
@@ -2169,27 +1838,61 @@ Finally, using 'say', respond in character to User\n"""
             traceback.print_exc()
             logger.error(f'Error processing sense data: {e}')
     
-    def handle_step_command(self, sample):
-        """Handle step command - advance one OODA cycle."""
+    def handle_autonomous_command(self, sample):
+        """Handle autonomous command - start autonomous execution mode."""
         try:
-            logger.debug(f'🎯 Step command received by {self.character_name}')
+            if not hasattr(self, 'character_name'):
+                logger.warning('🤖 Autonomous command received before initialization complete')
+                return
+            logger.info(f'🤖 Autonomous command received by {self.character_name}')
+            self.autonomous_mode = True
+            self.execution_mode = 'autonomous'
+            self.execution_paused = False
+            self._publish_execution_state()
+        except Exception as e:
+            logger.error(f'Error handling autonomous command: {e}')
+            traceback.print_exc()
+            # Ensure button is enabled (unshaded) on error
+            self.autonomous_mode = False
             self.execution_mode = 'step'
-            self.execution_paused = False
+            self.execution_paused = True
             self._publish_execution_state()
-        except Exception as e:
-            logger.error(f'Error handling step command: {e}')
-            traceback.print_exc()
     
-    def handle_run_command(self, sample):
-        """Handle run command - enable continuous execution (run mode only, not continuous mode)."""
-        try:
-            logger.debug(f'🏃 Run command received by {self.character_name}')
-            self.execution_mode = 'run'
-            self.execution_paused = False
-            self._publish_execution_state()
-        except Exception as e:
-            logger.error(f'Error handling run command: {e}')
-            traceback.print_exc()
+    def run_autonomous_mode(self):
+        """Check if autonomous mode should continue or complete."""
+        # Autonomous mode completes when:
+        # 1. Flag is False (stopped by user)
+        # 2. No current goal and no current plan (no work to do)
+        if not self.autonomous_mode:
+            return  # Already stopped, exit
+        #generate a new goal
+        prompt = f"""
+        You are a strict goal generator.
+        You are generating a goal for autonomous mode operation.
+        Your previous goal, if any, was: \n{self.previous_autonomous_goal_text}\n
+        The resulting autonomous task state, if any, was: \n{self.autonomous_task_state}\n
+        Given what you know about the world, your situation and your character, assess your current needs and pressing priorities.
+        Given these, generate 2-3 goal statements that you might work on next.
+        Finally, prioritize the goals by their importance, urgency, and feasibility, and return the highest priority goal.
+        Report to the user the highest priority goal, with clear desired outcome, followed by </end>.
+        Do NOT repeat the previous goal unless you are in an immediately life-threatening situation and it is the only way to save yourself.
+        Respond with no other text, no markdown, no code fences, no reasoning, no explanation, no commentary.
+        """
+
+        planner_response = self.incremental_planner.generate_plan(template='',goal=prompt, context=None, max_steps=16)
+        if not planner_response or not planner_response.get('success', False):
+            return False
+        goal_text = planner_response.get('response', '')
+        self.previous_autonomous_goal_text = goal_text
+        self.current_goal = Goal(goal_text, [self.character_name], description='', termination='')
+        self._publish_goal(self.current_goal)
+        planner_response = self.incremental_planner.generate_plan(template='',goal=goal_text, context=None, max_steps=16)
+        if not planner_response or not planner_response.get('success', False):
+            return False
+        self.autonomous_task_state = planner_response.get('task_state', '')
+        self.execution_paused = False
+        self._publish_execution_state()
+        return True
     
     def handle_continuous_toggle(self, sample):
         """Handle continuous mode toggle - can be enabled/disabled at any time."""
@@ -2234,30 +1937,30 @@ Finally, using 'say', respond in character to User\n"""
             logger.error(f'Error handling continuous toggle: {e}')
             traceback.print_exc()
     
-    def handle_clear_epistemic_frame(self, sample):
-        """Handle clear epistemic frame command - deletes the persistent epistemic frame Note."""
+    def handle_clear_world_model(self, sample):
+        """Handle clear world model command - deletes the persistent world model Note."""
         try:
             if not self.resource_manager:
-                logger.error("Resource manager not available, cannot clear epistemic frame")
+                logger.error("Resource manager not available, cannot clear world model")
                 return
             
             agent_name = getattr(self, 'character_name', 'unknown')
-            frame_name = f"{agent_name}-epistemic_frame"
+            frame_name = f"{agent_name}-world_model"
             
             # Resolve named Note
             note_id = self.resource_manager._resolve_resource_id(frame_name)
             if not note_id:
-                logger.info(f"Epistemic frame '{frame_name}' not found, nothing to clear")
+                logger.info(f"World model '{frame_name}' not found, nothing to clear")
                 return
             
             # Delete the Note
             success, error_msg = self.resource_manager.delete_resource(note_id)
             if success:
-                logger.info(f"🗑️ Cleared epistemic frame '{frame_name}' ({note_id})")
+                logger.info(f"🗑️ Cleared world model '{frame_name}' ({note_id})")
             else:
-                logger.error(f"Failed to clear epistemic frame '{frame_name}': {error_msg}")
+                logger.error(f"Failed to clear world model '{frame_name}': {error_msg}")
         except Exception as e:
-            logger.error(f'Error clearing epistemic frame: {e}')
+            logger.error(f'Error clearing world model: {e}')
             traceback.print_exc()
     
     def handle_clear_map(self, sample):
@@ -2365,9 +2068,10 @@ Finally, using 'say', respond in character to User\n"""
             traceback.print_exc()
     
     def handle_stop_command(self, sample):
-        """Handle stop command - pause execution (but keep continuous mode)."""
+        """Handle stop command - stop autonomous mode and pause execution."""
         try:
             logger.info(f'⏹️ Stop command received by {self.character_name}')
+            self.autonomous_mode = False
             self.execution_mode = 'step'
             self.execution_paused = True
             # Note: continuous_mode is NOT cleared here - user must toggle it off explicitly
@@ -2415,42 +2119,6 @@ Finally, using 'say', respond in character to User\n"""
             self.shutdown_requested = True
         except Exception as e:
             logger.error(f'Error in shutdown callback: {e}')
-    
-    def _dialog_end_callback(self, sample):
-        """Handle end dialog query from other characters."""
-        try:
-            # Extract the other character name from the JSON payload
-            data = json.loads(sample.payload.to_bytes().decode('utf-8'))
-            other_name = data.get('other_name', 'unknown')
-            if other_name == 'unknown':
-                logger.error(f'Error in end dialog callback: no other character name found in payload')
-                return
-                
-            logger.info(f'💬 {self.character_name} received end dialog from {other_name}')
-            
-            # Release conversation lock with this character
-            self._release_conversation_lock(other_name)
-            
-            entity_context = self.get_entity_context(other_name, 10)
-            # Build user prompt with context
-            dialog_history = '' 
-            if entity_context and isinstance(entity_context, dict):
-                conversation_history = entity_context.get('conversation_history', [])
-                if isinstance(conversation_history, list):
-                    dialog_history += f"Your recent conversation with {other_name} has been:\n"
-                    for i, memory in enumerate(conversation_history):
-                        if isinstance(memory, dict) and 'source' in memory and 'text' in memory:
-                            dialog_history += f"\t{memory['source']}: {memory['text']}\n"
-
-            reason = f'\nDialog end detected with {other_name}, dialog_history:\n{dialog_history}\n'
-            # In manual mode, do not replan due to dialog
-            if not self.manual and self.current_plan:
-                new_goal = self._replan(self.current_goal, reason)
-                if new_goal:
-                    self._plan(new_goal)
-            return
-        except Exception as e:
-            logger.error(f'Error in end dialog callback: {e}')
     
     def _enable_compliance_tracking_callback(self, sample):
         """Handle enabling compliance tracking for evaluation mode."""
@@ -2889,7 +2557,7 @@ Finally, using 'say', respond in character to User\n"""
         Handle query for synchronous plan execution.
         
         Accepts saved_plan format:
-            {"plan": {"plan": [...], "reasoning": "..."}, "goal": "optional"}
+            {"plan": {"plan": [...], "response": "..."}, "goal": "optional"}
         Or simple format:
             {"plan": [...], "max_steps": 1000}
         
@@ -2987,36 +2655,6 @@ Finally, using 'say', respond in character to User\n"""
             }
             query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
     
-    def publish_dialog_end(self, source: str):
-        """Publish dialog end notification to another character."""
-        # Only User can close dialogs - prevent other characters from closing
-        if self.character_name != 'User':
-            logger.info(f'🔒 {self.character_name} cannot close dialogs - only User can end conversations')
-            return
-        
-        try:
-            # === ZENOH PUBLICATION (ad-hoc) ===
-            # NAME: dialog_end
-            # TOPIC: cognitive/{character}/dialog_end
-            # DESCRIPTION: User ended conversation with character
-            # PAYLOAD: {"other_name": str}
-            # TRIGGERS: HandlePlanFailure (conversation interrupted), ResumePreviousActivity
-            # ========================
-            key = f"cognitive/{source}/dialog_end"
-            payload = json.dumps({'other_name': self.character_name})
-            self.session.put(key, payload)
-            
-            # Release conversation lock with this character
-            self._release_conversation_lock(source)
-            
-            # === ZENOH PUBLICATION (ad-hoc) ===
-            # NAME: memory_close_dialog
-            # Close dialog in memory module (direct call, no Zenoh)
-            self.memory.close_dialog(self.character_name)
-            
-        except Exception as e:
-            logger.error(f'Error publishing dialog end to {source}: {e}')
- 
 
     def parse_and_set_goal(self, template, goal_text):
         """Parse goal input from UI and set current goal."""
@@ -3055,15 +2693,6 @@ Finally, using 'say', respond in character to User\n"""
             traceback.print_exc()
             return
 
-    def _capture_percepts_at_plan(self) -> List[Dict[str, Any]]:
-        """Capture a compact, normalized snapshot of percepts at plan start.
-        
-        For infospace characters, returns empty list (no spatial percepts).
-        Legacy method kept for compatibility but always returns [].
-        """
-        return []
-
-    
     def _get_recent_chat_memories(self, num_entries: int) -> List[Dict[str, Any]]:
         """Get recent memory entries from memory module."""
         try:
@@ -3179,198 +2808,6 @@ Finally, using 'say', respond in character to User\n"""
             logger.error(f'Error getting entity context for {entity_name}: {e}')
             return None
     
-    def get_rag_context(self, query_text: str, entity_name: str = None, k: int = 5) -> Dict[str, Any]:
-        """
-        Query memory_node for RAG semantic search results.
-        
-        Args:
-            query_text: The text to search for semantically
-            entity_name: Optional entity to filter results (default: None for all entities)
-            k: Number of results to retrieve (default: 5)
-            
-        Returns:
-            Dictionary with retrieved_entries list and count, always returns even if empty
-        """
-        import urllib.parse
-        import time
-        
-        try:
-            # Build query parameters
-            params = [f"query={urllib.parse.quote(query_text)}", f"k={k}"]
-            if entity_name:
-                params.append(f"entity={urllib.parse.quote(entity_name.capitalize())}")
-            
-            key_expr = f"cognitive/{self.character_name}/memory/rag/search?{'&'.join(params)}"
-            start_ts = time.time()
-            logger.info(f'RAG: Sending query with key_expr={key_expr}')
-            for handler in logger.handlers: handler.flush()
-
-            for reply in self.session.get(key_expr, 
-                                        target=QueryTarget.BEST_MATCHING,          # ← don’t wait for all
-                                        consolidation=ConsolidationMode.NONE,
-                                        timeout=5.0 if not self.debug else 30.0):
-                logger.info(f'RAG: Received a reply, checking if ok...')
-                for handler in logger.handlers: handler.flush()
-                if reply.ok:
-                    data = json.loads(reply.ok.payload.to_bytes().decode('utf-8'))
-                    if data and isinstance(data, dict) and data.get('success') is True:
-                        latency_ms = int((time.time() - start_ts) * 1000)
-                        entries = data.get('retrieved_entries', [])
-                        count = data.get('count', len(entries) if isinstance(entries, list) else 0)
-                        return {
-                            'success': True,
-                            'retrieved_entries': entries if isinstance(entries, list) else [],
-                            'count': int(count) if isinstance(count, int) else 0,
-                            'query': data.get('query', query_text),
-                            'error': '',
-                            'latency_ms': latency_ms
-                        }
-                else:
-                    latency_ms = int((time.time() - start_ts) * 1000)
-                    logger.error(f'RAG query failed {reply.err.payload.to_bytes().decode('utf-8')}')
-                    for handler in logger.handlers: handler.flush()
-                    return {'success': False, 'retrieved_entries': [], 'count': 0, 'query': query_text, 'error': 'timeout_or_no_reply', 'latency_ms': latency_ms}
-
-            latency_ms = int((time.time() - start_ts) * 1000)
-            logger.warning(f'RAG query had no reply or failed for "{query_text[:50]}..."')
-            return {'success': False, 'retrieved_entries': [], 'count': 0, 'query': query_text, 'error': 'timeout_or_no_reply', 'latency_ms': latency_ms}
-            
-        except Exception as e:
-            logger.error(f'Error querying RAG context for "{query_text[:50]}...": {e}')
-            for handler in logger.handlers:
-                handler.flush()
-            # Provide a consistent failure schema
-            latency_ms = int((time.time() - start_ts) * 1000)
-            return {'success': False, 'retrieved_entries': [], 'count': 0, 'query': query_text, 'error': str(e), 'latency_ms': latency_ms}
-    
-    def expand_rag_context(self, rag_entry: Dict[str, Any], window_before: int = 3) -> str:
-        """
-        Expand a RAG retrieved entry with preceding context from the dialog.
-        
-        Args:
-            rag_entry: Dictionary with doc_id, entity, text from RAG retrieval
-            window_before: Number of preceding turns to include (default: 3)
-            
-        Returns:
-            String with context window or just the retrieved text if verification fails
-        """
-        try:
-            logger.info(f' Expanding RAG context for {rag_entry}')
-            for handler in logger.handlers: handler.flush()
-            doc_id = rag_entry.get('doc_id', '')
-            if not doc_id:
-                logger.warning(f'RAG expand: missing doc_id in RAG entry, returning text only')
-                for handler in logger.handlers: handler.flush()
-                return rag_entry.get('text', '')
-            
-            parts = doc_id.split(':')
-            if len(parts) < 4:
-                logger.warning(f'RAG expand: doc_id malformed ({doc_id}), returning text only')
-                for handler in logger.handlers: handler.flush()
-                return rag_entry.get('text', '')
-            
-            try:
-                entity_name = parts[1]
-                dialog_idx = int(parts[2])
-                entry_idx = int(parts[3])
-            except (ValueError, IndexError) as e:
-                logger.warning(f'RAG expand: failed to parse doc_id {doc_id}: {e}')
-                for handler in logger.handlers:  handler.flush()
-                return rag_entry.get('text', '')
-            
-            entity_context = self.get_entity_context(entity_name)
-            if not entity_context:
-                logger.warning(f'RAG expand: no entity_context retrieved for {entity_name}')
-                for handler in logger.handlers: handler.flush()
-                return rag_entry.get('text', '')
-            
-            # get_entity_data now includes 'dialogs' for RAG context expansion
-            dialogs = entity_context.get('dialogs')
-            if not dialogs:
-                logger.warning(f'RAG expand: no dialogs field in entity_context for {entity_name}')
-                for handler in logger.handlers:  handler.flush()
-                return rag_entry.get('text', '')
-            
-            if not isinstance(dialogs, list):
-                logger.warning(f'RAG expand: dialogs not a list for {entity_name}, type={type(dialogs)}')
-                for handler in logger.handlers: handler.flush()
-                return rag_entry.get('text', '')
-            
-            if dialog_idx >= len(dialogs):
-                logger.warning(f'RAG expand: dialog_idx {dialog_idx} >= len(dialogs) {len(dialogs)} for {entity_name} - data mismatch')
-                for handler in logger.handlers: handler.flush()
-                return rag_entry.get('text', '')
-            
-            dialog = dialogs[dialog_idx]
-            if not isinstance(dialog, list):
-                logger.warning(f'RAG expand: dialog {dialog_idx} not a list for {entity_name}, type={type(dialog)}')
-                for handler in logger.handlers: handler.flush()
-                return rag_entry.get('text', '')
-            
-            if entry_idx >= len(dialog):
-                logger.warning(f'RAG expand: entry_idx {entry_idx} >= len(dialog) {len(dialog)} for {entity_name} - data mismatch')
-                for handler in logger.handlers: handler.flush()
-                return rag_entry.get('text', '')
-            
-            # Verify the entry matches
-            entry = dialog[entry_idx]
-            if isinstance(entry, dict):
-                entry_text = f"{entry.get('source', '')}: {entry.get('text', '')}"
-            else:
-                entry_text = str(entry)
-            
-            rag_text = rag_entry.get('text', '')
-            if rag_text and rag_text not in entry_text:
-                logger.warning(f'RAG expand: entry mismatch for {entity_name} dialog {dialog_idx} entry {entry_idx}, RAG text not found in dialog entry')
-                for handler in logger.handlers: handler.flush()
-                return rag_text
-            
-            # Build context window
-            start_idx = max(0, entry_idx - window_before)
-            context_lines = []
-            for i in range(start_idx, entry_idx + 1):
-                if i < len(dialog):
-                    if isinstance(dialog[i], dict):
-                        context_lines.append(f"{dialog[i].get('source', '')}: {dialog[i].get('text', '')}")
-                    else:
-                        context_lines.append(str(dialog[i]))
-            
-            logger.info(f' Returning expanded RAG context: {context_lines}')
-            for handler in logger.handlers: handler.flush()
-            return '\n'.join(context_lines) if context_lines else rag_entry.get('text', '')
-            
-        except Exception as e:
-            logger.error(f'Error expanding RAG context for doc_id {rag_entry.get("doc_id", "")}: {e}')
-            for handler in logger.handlers:
-                handler.flush()
-            return rag_entry.get('text', '')
-    
-    def get_entity_discourse_tom_models(self, entity_name: str, limit: int = 20, scope='all') -> Dict[str, Any]:
-        """
-        Get entity discourse state and ToM model from memory module.
-        Args:
-            entity_name: Name of the entity to query (defaults to "User" if not provided)
-            limit: Number of recent conversation entries to include (default 20, unused but kept for compatibility)
-            scope: 'current' or 'all' (unused but kept for compatibility)
-        Returns:
-            Dictionary with discourse_state and tom_model
-        """
-        # safeguard - don't allow variables in query
-        entity_name = entity_name.replace('$', '')
-        if not entity_name:
-            entity_name = "User"
-        
-        logger.info(f' Getting entity discourse/tom for {entity_name}')
-        try:
-            result = self.memory.get_entity_discourse_tom(entity_name)
-            if result.get('success'):
-                logger.info(f'👥 Retrieved entity discourse/tom for {entity_name}')
-            return result
-        except Exception as e:
-            logger.error(f'Error getting entity discourse/tom for {entity_name}: {e}')
-            return {'success': False, 'discourse_state': '', 'tom_model': ''}
-
-    
     def shutdown(self):
         """Clean shutdown."""
         try:
@@ -3443,27 +2880,30 @@ Finally, using 'say', respond in character to User\n"""
         except Exception as e:
             logger.error(f'Error during shutdown: {e}')
 
+
 def main():
-    """Main entry point for the executive node."""
+    """Main entry point."""
     parser = argparse.ArgumentParser(description='Zenoh Executive Node')
-    parser.add_argument('-c', '--character-name', default='default', help='Character name for topic paths')
-    parser.add_argument('-config', default='{}', help='Character configuration as JSON string')
-    
+    parser.add_argument('-c', '--character', type=str, default='default', help='Character name')
+    parser.add_argument('-config', type=str, default='{}', help='Character configuration as JSON string')
     args = parser.parse_args()
     
-    # Parse character config
     try:
-        character_config = json.loads(args.config)
+        character_config = json.loads(args.config) if args.config else {}
     except json.JSONDecodeError as e:
-        print(f"Error parsing character config: {e}")
-        return
+        logger.error(f'Failed to parse character config JSON: {e}')
+        sys.exit(1)
     
-    executive_node = ZenohExecutiveNode(args.character_name, character_config)
     try:
+        executive_node = ZenohExecutiveNode(character_name=args.character, character_config=character_config)
         executive_node.run()
-    finally:
-        executive_node.shutdown()
+    except KeyboardInterrupt:
+        logger.info('Executive Node interrupted by user')
+    except Exception as e:
+        logger.error(f'Executive Node error: {e}')
+        traceback.print_exc()
+        sys.exit(1)
 
 
-if __name__ == '__main__':
-    main() 
+if __name__ == "__main__":
+    main()

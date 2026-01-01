@@ -297,6 +297,7 @@ class FastAPIActionDisplayNode:
         # Publishers for direct execution control (will be set when character is known)
         self.control_step_publisher = None
         self.control_run_publisher = None
+        self.control_autonomous_publisher = None
         self.control_stop_publisher = None
         self.control_continuous_publisher = None
         
@@ -483,12 +484,12 @@ class FastAPIActionDisplayNode:
                 # Give character a moment to receive the goal
                 await asyncio.sleep(0.3)
                 
-                # Automatically trigger a step to start plan execution
-                # This uses the same mechanism as the Step Turn button
-                if self.active_character_name and self.control_step_publisher:
+                # Automatically trigger autonomous mode to start plan execution
+                # This uses the same mechanism as the Autonomous button
+                if self.active_character_name and self.control_autonomous_publisher:
                     with self.turn_state_lock:
-                        self.turn_state['mode'] = 'step'
-                    self.control_step_publisher.put(json.dumps({"timestamp": datetime.now().isoformat()}).encode())
+                        self.turn_state['mode'] = 'autonomous'
+                    self.control_autonomous_publisher.put(json.dumps({"timestamp": datetime.now().isoformat()}).encode())
                 
                 await websocket.send_text(json.dumps({
                     'type': 'test_status',
@@ -823,42 +824,24 @@ class FastAPIActionDisplayNode:
             """Get User's conversation lock status (always unlocked with single character)."""
             return {"is_locked": False, "locked_with": []}
         
-        @self.app.post("/api/turn/step")
-        async def step_turn():
-            """Advance one OODA cycle."""
+        @self.app.post("/api/turn/autonomous")
+        async def autonomous_turns():
+            """Start autonomous execution."""
             try:
                 if self.active_character_name is None:
                     return {"success": False, "message": "No character available yet"}
                 
-                with self.turn_state_lock:
-                    self.turn_state['mode'] = 'step'
-                
-                self.control_step_publisher.put(json.dumps({"timestamp": datetime.now().isoformat()}).encode())
-                logger.info(f"🎯 Step command sent to {self.active_character_name}")
-                
-                return {"success": True, "message": "Step command sent"}
-            except Exception as e:
-                logger.error(f"Error in step_turn: {e}")
-                return {"success": False, "message": f"Error: {str(e)}"}
-        
-        @self.app.post("/api/turn/run")
-        async def run_turns():
-            """Start continuous execution."""
-            try:
-                if self.active_character_name is None:
-                    return {"success": False, "message": "No character available yet"}
-                
-                logger.info(f"🏃 Run command received in FastAPI")
+                logger.info(f"🤖 Autonomous command received in FastAPI")
                 
                 with self.turn_state_lock:
-                    self.turn_state['mode'] = 'run'
+                    self.turn_state['mode'] = 'autonomous'
                 
-                self.control_run_publisher.put(json.dumps({"timestamp": datetime.now().isoformat()}).encode())
-                logger.info(f"🏃 Run command sent to {self.active_character_name}")
+                self.control_autonomous_publisher.put(json.dumps({"timestamp": datetime.now().isoformat()}).encode())
+                logger.info(f"🤖 Autonomous command sent to {self.active_character_name}")
                 
-                return {"success": True, "message": "Run command sent"}
+                return {"success": True, "message": "Autonomous command sent"}
             except Exception as e:
-                logger.error(f"Error in run_turns: {e}")
+                logger.error(f"Error in autonomous_turns: {e}")
                 return {"success": False, "message": f"Error: {str(e)}"}
         
         @self.app.post("/api/turn/stop")
@@ -911,24 +894,24 @@ class FastAPIActionDisplayNode:
                 logger.error(f"Error in toggle_continuous: {e}")
                 return {"success": False, "message": f"Error: {str(e)}"}
         
-        @self.app.post("/api/control/clear_epistemic_frame")
-        async def clear_epistemic_frame():
-            """Clear epistemic frame."""
+        @self.app.post("/api/control/clear_world_model")
+        async def clear_world_model():
+            """Clear world model."""
             try:
                 if self.active_character_name is None:
                     return {"success": False, "message": "No character available yet"}
                 
-                logger.info(f"🗑️ Clear epistemic frame command received")
+                logger.info(f"🗑️ Clear world model command received")
                 
-                # Publish clear epistemic frame command
-                topic = f"cognitive/{self.active_character_name}/control/clear_epistemic_frame"
+                # Publish clear world model command
+                topic = f"cognitive/{self.active_character_name}/control/clear_world_model"
                 publisher = self.session.declare_publisher(topic)
                 publisher.put(json.dumps({"timestamp": datetime.now().isoformat()}).encode())
-                logger.info(f"🗑️ Clear epistemic frame command sent to {self.active_character_name}")
+                logger.info(f"🗑️ Clear world model command sent to {self.active_character_name}")
                 
-                return {"success": True, "message": "Epistemic frame clear command sent"}
+                return {"success": True, "message": "World model clear command sent"}
             except Exception as e:
-                logger.error(f"Error in clear_epistemic_frame: {e}")
+                logger.error(f"Error in clear_world_model: {e}")
                 return {"success": False, "message": f"Error: {str(e)}"}
         
         @self.app.post("/api/control/clear_map")
@@ -2274,8 +2257,7 @@ Generated: {generated_at}
                 <div class="input-section">
                     <h3>Turn Control</h3>
                     <div style="margin-bottom: 15px;">
-                        <button id="stepButton" onclick="stepTurn()" style="background: #555; margin-right: 10px;" disabled title="Advance execution by one step">Step Turn</button>
-                        <button id="runButton" onclick="runTurns()" style="background: #555; color: #888; margin-right: 10px;" disabled title="Run execution continuously until stopped">Run</button>
+                        <button id="autonomousButton" onclick="autonomousTurns()" style="background: #555; margin-right: 10px;" disabled title="Start autonomous execution">Autonomous</button>
                         <button onclick="stopTurns()" style="background: #ff6b6b; margin-right: 10px;" title="Pause execution">Stop</button>
                         <button onclick="openControlPanel()" style="background: #6c5ce7; color: white; margin-right: 10px;" title="Open control panel">⚙️ Control</button>
                         <button onclick="saveAll()" style="background: #95e1d3; color: #1a1a1a; margin-right: 10px;" title="Save all resources and memory to disk">Save</button>
@@ -2498,20 +2480,13 @@ Generated: {generated_at}
                                         selectCharacterTab(first);
                                     }
                                     // Enable controls if not in run mode
-                                    const stepButton = document.getElementById('stepButton');
-                                    const runButton = document.querySelector('button[onclick="runTurns()"]');
+                                    const autonomousButton = document.getElementById('autonomousButton');
                                     const testButton = document.getElementById('testButton');
-                                    if (currentTurnMode !== 'run') {
-                                        if (stepButton) {
-                                            stepButton.disabled = false;
-                                            stepButton.style.background = '#4ecdc4';
-                                            stepButton.title = 'Click to advance to next turn';
-                                        }
-                                        if (runButton) {
-                                            runButton.disabled = false;
-                                            runButton.style.background = '#ffe66d';
-                                            runButton.style.color = '#1a1a1a';
-                                            runButton.title = 'Click to run multiple turns';
+                                    if (currentTurnMode !== 'run' && currentTurnMode !== 'autonomous') {
+                                        if (autonomousButton) {
+                                            autonomousButton.disabled = false;
+                                            autonomousButton.style.background = '#4ecdc4';
+                                            autonomousButton.title = 'Click to start autonomous execution';
                                         }
                                         if (testButton) {
                                             testButton.disabled = false;
@@ -2620,21 +2595,13 @@ Generated: {generated_at}
             initCharacterDataTabs();
             
             // Initialize buttons as disabled until system is ready
-            const stepButton = document.getElementById('stepButton');
-            const runButton = document.getElementById('runButton');
+            const autonomousButton = document.getElementById('autonomousButton');
             const testButton = document.getElementById('testButton');
             
-            if (stepButton) {
-                stepButton.disabled = true;
-                stepButton.style.background = '#555';
-                stepButton.title = 'Waiting for system startup...';
-            }
-            
-            if (runButton) {
-                runButton.disabled = true;
-                runButton.style.background = '#555';
-                runButton.style.color = '#888';
-                runButton.title = 'Waiting for system startup...';
+            if (autonomousButton) {
+                autonomousButton.disabled = true;
+                autonomousButton.style.background = '#555';
+                autonomousButton.title = 'Waiting for system startup...';
             }
             
             const continuousButton = document.getElementById('continuousButton');
@@ -3137,7 +3104,7 @@ Generated: {generated_at}
              * Just apply what the backend tells us - no complex logic needed!
              */
             console.log(`🆕 Turn state update: turn=${stateData.turn.number}, mode=${stateData.turn.mode}, ` +
-                       `step_enabled=${stateData.buttons.step.enabled}, ` +
+                       `autonomous_enabled=${stateData.buttons.autonomous ? stateData.buttons.autonomous.enabled : 'N/A'}, ` +
                        `progress=${stateData.turn.completed_count}/${stateData.turn.active_count}`);
             
             // Store state for control panel access
@@ -3147,24 +3114,16 @@ Generated: {generated_at}
             commandInProgress = false;
             
             // Apply button states directly from backend computation
-            const stepButton = document.getElementById('stepButton');
-            const runButton = document.getElementById('runButton');
+            const autonomousButton = document.getElementById('autonomousButton');
             const continuousButton = document.getElementById('continuousButton');
             const stopButton = document.getElementById('stopButton');
             
-            if (stepButton) {
-                const shouldBeEnabled = stateData.buttons.step.enabled;
-                stepButton.disabled = !shouldBeEnabled;
-                stepButton.style.background = shouldBeEnabled ? '#4ecdc4' : '#555';
-                stepButton.title = stateData.buttons.step.tooltip;
-                console.log(`🔘 Step button: enabled=${shouldBeEnabled}, disabled=${stepButton.disabled}, background=${stepButton.style.background}, commandInProgress=${commandInProgress}`);
-            }
-            
-            if (runButton) {
-                runButton.disabled = !stateData.buttons.run.enabled;
-                runButton.style.background = stateData.buttons.run.enabled ? '#ffe66d' : '#555';
-                runButton.style.color = stateData.buttons.run.enabled ? '#1a1a1a' : '#888';
-                runButton.title = stateData.buttons.run.tooltip;
+            if (autonomousButton) {
+                const shouldBeEnabled = stateData.buttons.autonomous ? stateData.buttons.autonomous.enabled : true;
+                autonomousButton.disabled = !shouldBeEnabled;
+                autonomousButton.style.background = shouldBeEnabled ? '#4ecdc4' : '#555';
+                autonomousButton.title = stateData.buttons.autonomous ? stateData.buttons.autonomous.tooltip : 'Click to start autonomous execution';
+                console.log(`🔘 Autonomous button: enabled=${shouldBeEnabled}, disabled=${autonomousButton.disabled}, background=${autonomousButton.style.background}, commandInProgress=${commandInProgress}`);
             }
             
             if (continuousButton && stateData.buttons.continuous) {
@@ -3193,8 +3152,8 @@ Generated: {generated_at}
             // Update mode tracking
             currentTurnMode = stateData.turn.mode;
             
-            console.log(`✅ Applied button states: step=${stateData.buttons.step.enabled}, ` +
-                       `run=${stateData.buttons.run.enabled}, stop=${stateData.buttons.stop.enabled}`);
+            console.log(`✅ Applied button states: autonomous=${stateData.buttons.autonomous ? stateData.buttons.autonomous.enabled : 'N/A'}, ` +
+                       `stop=${stateData.buttons.stop.enabled}`);
         }
         
         function handleTurnStart(turnData) {
@@ -3386,59 +3345,6 @@ Generated: {generated_at}
         // Initial check
         setTimeout(updateConversationIndicator, 1000);
         
-        async function stepTurn() {
-            if (commandInProgress) return; // Prevent rapid clicks
-            commandInProgress = true;
-            
-            const resultDiv = document.getElementById('turnResult');
-            const stepButton = document.getElementById('stepButton');
-            
-            console.log('🔍 DEBUG: stepTurn() called - disabling Step button');
-            
-            // Immediately disable and shade the button for responsive UI
-            if (stepButton) {
-                stepButton.disabled = true;
-                stepButton.style.background = '#555';
-                stepButton.title = 'Waiting for all characters to complete their turns...';
-            }
-            
-            console.log('🔍 DEBUG: Step button disabled, commandInProgress =', commandInProgress);
-            
-            try {
-                const response = await fetch('/api/turn/step', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    }
-                });
-                
-                const result = await response.json();
-                
-                if (result.success) {
-                    if (resultDiv) resultDiv.innerHTML = `<span class="success">${result.message}</span>`;
-                    // Button state will be updated by backend via turn_state_update message
-                } else {
-                    if (resultDiv) resultDiv.innerHTML = `<span class="error">Error: ${result.message}</span>`;
-                    // Clear command lock on error so user can retry
-                    commandInProgress = false;
-                    if (stepButton) {
-                        stepButton.disabled = false;
-                        stepButton.style.background = '#4ecdc4';
-                        stepButton.title = 'Click to advance to next turn';
-                    }
-                }
-            } catch (error) {
-                if (resultDiv) resultDiv.innerHTML = `<span class="error">Error: ${error.message}</span>`;
-                // Clear command lock on error so user can retry
-                commandInProgress = false;
-                if (stepButton) {
-                    stepButton.disabled = false;
-                    stepButton.style.background = '#4ecdc4';
-                    stepButton.title = 'Click to advance to next turn';
-                }
-            }
-        }
-        
         async function toggleContinuous() {
             if (commandInProgress) return; // Prevent rapid clicks
             commandInProgress = true;
@@ -3554,17 +3460,17 @@ Generated: {generated_at}
             updateControlPanelContinuousButton();
         }
         
-        async function clearEpistemicFrame() {
-            if (!confirm('Are you sure you want to clear the Epistemic Frame? This cannot be undone.')) {
+        async function clearWorldModel() {
+            if (!confirm('Are you sure you want to clear the World Model? This cannot be undone.')) {
                 return;
             }
             
             const statusDiv = document.getElementById('controlPanelStatus');
             statusDiv.style.display = 'block';
-            statusDiv.innerHTML = '<span style="color: #888;">Clearing epistemic frame...</span>';
+            statusDiv.innerHTML = '<span style="color: #888;">Clearing world model...</span>';
             
             try {
-                const response = await fetch('/api/control/clear_epistemic_frame', {
+                const response = await fetch('/api/control/clear_world_model', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -3574,7 +3480,7 @@ Generated: {generated_at}
                 const result = await response.json();
                 
                 if (result.success) {
-                    statusDiv.innerHTML = '<span style="color: #4ecdc4;">✓ Epistemic frame cleared successfully</span>';
+                    statusDiv.innerHTML = '<span style="color: #4ecdc4;">✓ World model cleared successfully</span>';
                 } else {
                     statusDiv.innerHTML = `<span style="color: #ff6b6b;">✗ Error: ${result.message || 'Unknown error'}</span>`;
                 }
@@ -3644,13 +3550,22 @@ Generated: {generated_at}
             }
         }
         
-        async function runTurns() {
+        async function autonomousTurns() {
             if (commandInProgress) return; // Prevent rapid clicks
             commandInProgress = true;
             
             const resultDiv = document.getElementById('turnResult');
+            const autonomousButton = document.getElementById('autonomousButton');
+            
+            // Immediately disable and shade the button for responsive UI
+            if (autonomousButton) {
+                autonomousButton.disabled = true;
+                autonomousButton.style.background = '#555';
+                autonomousButton.title = 'Autonomous mode active...';
+            }
+            
             try {
-                const response = await fetch('/api/turn/run', {
+                const response = await fetch('/api/turn/autonomous', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -3660,17 +3575,27 @@ Generated: {generated_at}
                 const result = await response.json();
                 
                 if (result.success) {
-                    resultDiv.innerHTML = `<span class="success">${result.message}</span>`;
+                    if (resultDiv) resultDiv.innerHTML = `<span class="success">${result.message}</span>`;
                     // Button state will be updated by backend via turn_state_update message
                 } else {
-                    resultDiv.innerHTML = `<span class="error">Error: ${result.message}</span>`;
+                    if (resultDiv) resultDiv.innerHTML = `<span class="error">Error: ${result.message}</span>`;
                     // Clear command lock on error so user can retry
                     commandInProgress = false;
+                    if (autonomousButton) {
+                        autonomousButton.disabled = false;
+                        autonomousButton.style.background = '#4ecdc4';
+                        autonomousButton.title = 'Click to start autonomous execution';
+                    }
                 }
             } catch (error) {
-                resultDiv.innerHTML = `<span class="error">Error: ${error.message}</span>`;
+                if (resultDiv) resultDiv.innerHTML = `<span class="error">Error: ${error.message}</span>`;
                 // Clear command lock on error so user can retry
                 commandInProgress = false;
+                if (autonomousButton) {
+                    autonomousButton.disabled = false;
+                    autonomousButton.style.background = '#4ecdc4';
+                    autonomousButton.title = 'Click to start autonomous execution';
+                }
             }
         }
         
@@ -4667,7 +4592,7 @@ Generated: {generated_at}
                 <h3 style="color: #d4d4d4; font-size: 16px; margin-bottom: 10px;">Clear Data</h3>
                 <p style="color: #888; font-size: 12px; margin-bottom: 15px;">⚠️ These actions cannot be undone</p>
                 
-                <button onclick="clearEpistemicFrame()" style="width: 100%; padding: 12px; margin-bottom: 10px; background: #d32f2f; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">🗑️ Clear Epistemic Frame</button>
+                <button onclick="clearWorldModel()" style="width: 100%; padding: 12px; margin-bottom: 10px; background: #d32f2f; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">🗑️ Clear World Model</button>
                 <button onclick="clearMap()" style="width: 100%; padding: 12px; margin-bottom: 10px; background: #d32f2f; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">🗑️ Clear Map</button>
                 <button onclick="clearTransients()" style="width: 100%; padding: 12px; background: #ff9800; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">🗑️ Clear Transients</button>
             </div>
@@ -4879,15 +4804,10 @@ Generated: {generated_at}
                     'is_active': not paused
                 },
                 'buttons': {
-                    'step': {
-                        'enabled': step_enabled,
-                        'label': '🎯 Step',
-                        'tooltip': 'Ready - click to advance one OODA cycle' if step_enabled else 'Execution in progress'
-                    },
-                    'run': {
-                        'enabled': run_enabled,
-                        'label': '🏃 Run',
-                        'tooltip': 'Ready - click to run continuously' if run_enabled else 'Execution in progress'
+                    'autonomous': {
+                        'enabled': step_enabled or run_enabled,  # Enable if either step or run would be enabled
+                        'label': '🤖 Autonomous',
+                        'tooltip': 'Ready - click to start autonomous execution' if (step_enabled or run_enabled) else 'Execution in progress'
                     },
                     'continuous': {
                         'enabled': continuous_enabled,
@@ -4904,7 +4824,7 @@ Generated: {generated_at}
                 'timestamp': state_data.get('timestamp', time.time())
             }
             
-            logger.info(f"🆕 Received execution_state: paused={paused}, mode={mode}, step_enabled={step_enabled}, run_enabled={run_enabled}")
+            logger.info(f"🆕 Received execution_state: paused={paused}, mode={mode}, autonomous_enabled={step_enabled or run_enabled}")
             
             # Forward formatted state to websockets for UI rendering
             with self.websocket_lock:
@@ -5483,6 +5403,9 @@ Generated: {generated_at}
             )
             self.control_run_publisher = self.session.declare_publisher(
                 f"cognitive/{character_name}/control/run"
+            )
+            self.control_autonomous_publisher = self.session.declare_publisher(
+                f"cognitive/{character_name}/control/autonomous"
             )
             self.control_stop_publisher = self.session.declare_publisher(
                 f"cognitive/{character_name}/control/stop"
