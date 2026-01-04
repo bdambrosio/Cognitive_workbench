@@ -48,8 +48,12 @@ def tool(input_value=None, **kwargs):
         agent_name: Agent name (for creating resources)
         
     Returns:
-        Dict with status and result information.
+        Dict with result using uniform return format.
     """
+    executor = kwargs.get("executor")
+    if not executor:
+        return {"status": "failed", "reason": "executor not available", "value": None, "resource_id": None}
+    
     resource_manager = kwargs.get('resource_manager')
     agent_name = kwargs.get('agent_name', 'system')
     # Default to agent-specific map name
@@ -58,22 +62,10 @@ def tool(input_value=None, **kwargs):
     waypoint_name = kwargs.get('name')
     
     if not resource_manager:
-        return {
-            "status": "failed",
-            "reason": "Resource manager not available",
-            "text": "Failed to create waypoint: Resource manager not available",
-            "format": "text",
-            "char_count": 0
-        }
+        return executor._create_uniform_return('failed', reason="Resource manager not available")
     
     if not waypoint_name:
-        return {
-            "status": "failed",
-            "reason": "Waypoint name required",
-            "text": "Failed to create waypoint: Name parameter required",
-            "format": "text",
-            "char_count": 0
-        }
+        return executor._create_uniform_return('failed', reason="Waypoint name required")
     
     # Get coordinates
     x = kwargs.get('x')
@@ -83,13 +75,7 @@ def tool(input_value=None, **kwargs):
     # If coordinates not provided, try to get from status (would need status Note ID)
     # For now, require explicit coordinates
     if x is None or y is None or z is None:
-        return {
-            "status": "failed",
-            "reason": "Coordinates required (x, y, z)",
-            "text": "Failed to create waypoint: Coordinates (x, y, z) required",
-            "format": "text",
-            "char_count": 0
-        }
+        return executor._create_uniform_return('failed', reason="Coordinates required (x, y, z)")
     
     # Round coordinates to block positions
     x_block = _round_coordinate(x)
@@ -110,13 +96,7 @@ def tool(input_value=None, **kwargs):
             resource_manager.mark_persistent(collection_id, agent_name)
             logger.info(f"Created new map Collection: {map_name} = {collection_id}")
         else:
-            return {
-                "status": "failed",
-                "reason": f"Failed to create map Collection: {error_msg}",
-                "text": f"Failed to create map Collection: {error_msg}",
-                "format": "text",
-                "char_count": 0
-            }
+            return executor._create_uniform_return('failed', reason=f"Failed to create map Collection: {error_msg}")
     
     # Create entry with waypoint label
     from datetime import datetime
@@ -135,13 +115,7 @@ def tool(input_value=None, **kwargs):
     )
     
     if not success:
-        return {
-            "status": "failed",
-            "reason": f"Failed to create waypoint Note: {error_msg}",
-            "text": f"Failed to create waypoint Note: {error_msg}",
-            "format": "text",
-            "char_count": 0
-        }
+        return executor._create_uniform_return('failed', reason=f"Failed to create waypoint Note: {error_msg}")
     
     # Add Note to Collection
     success, item_count, error_msg = resource_manager.add_to_collection(
@@ -149,33 +123,23 @@ def tool(input_value=None, **kwargs):
     )
     
     if not success:
-        return {
-            "status": "failed",
-            "reason": f"Failed to add Note to Collection: {error_msg}",
-            "text": f"Failed to add Note to Collection: {error_msg}",
-            "format": "text",
-            "char_count": 0
-        }
+        return executor._create_uniform_return('failed', reason=f"Failed to add Note to Collection: {error_msg}")
     
     # Mark Collection as persistent
     resource_manager.mark_persistent(map_collection_id, agent_name)
     
     result_text = f"Waypoint '{waypoint_name}' created at ({x_block}, {y_block}, {z_block})"
     
-    return {
-        "status": "success",
-        "value": result_text,
-        "text": result_text,  # Keep for backward compatibility
-        "format": "text",
-        "metadata": {
-            "map_name": map_name,
-            "map_id": map_collection_id,
-            "note_id": note_id,
-            "waypoint": waypoint_name,
-            "location": {"x": x_block, "y": y_block, "z": z_block}
-        },
-        "char_count": len(result_text)
+    # Build structured data dict
+    structured_data = {
+        "map_name": map_name,
+        "map_id": map_collection_id,
+        "note_id": note_id,
+        "waypoint": waypoint_name,
+        "location": {"x": x_block, "y": y_block, "z": z_block}
     }
+    
+    return executor._create_uniform_return('success', value=result_text, data=structured_data)
 
 
 if __name__ == "__main__":

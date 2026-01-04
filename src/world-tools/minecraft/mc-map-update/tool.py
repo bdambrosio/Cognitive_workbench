@@ -51,8 +51,12 @@ def tool(input_value=None, **kwargs):
         agent_name: Agent name (for creating resources)
         
     Returns:
-        Dict with status and result information.
+        Dict with result using uniform return format.
     """
+    executor = kwargs.get("executor")
+    if not executor:
+        return {"status": "failed", "reason": "executor not available", "value": None, "resource_id": None}
+    
     resource_manager = kwargs.get('resource_manager')
     agent_name = kwargs.get('agent_name', 'system')
     # Default to agent-specific map name
@@ -70,13 +74,7 @@ def tool(input_value=None, **kwargs):
         map_name = provided_map_name
     
     if not resource_manager:
-        return {
-            "status": "failed",
-            "reason": "Resource manager not available",
-            "text": "Failed to update map: Resource manager not available",
-            "format": "text",
-            "char_count": 0
-        }
+        return executor._create_uniform_return('failed', reason="Resource manager not available")
     
     # Get observation data
     observation_data = kwargs.get('observation') or input_value
@@ -91,13 +89,7 @@ def tool(input_value=None, **kwargs):
             observation_data = _get_content(observation_data, resource_manager)
     
     if not observation_data:
-        return {
-            "status": "failed",
-            "reason": "No observation data provided",
-            "text": "Failed to update map: No observation data provided",
-            "format": "text",
-            "char_count": 0
-        }
+        return executor._create_uniform_return('failed', reason="No observation data provided")
     
     # Parse observation data
     if isinstance(observation_data, str):
@@ -112,13 +104,7 @@ def tool(input_value=None, **kwargs):
             if pose_match:
                 x, y, z = float(pose_match.group(1)), float(pose_match.group(2)), float(pose_match.group(3))
             else:
-                return {
-                    "status": "failed",
-                    "reason": "Could not parse observation data",
-                    "text": "Failed to update map: Could not parse observation data",
-                    "format": "text",
-                    "char_count": 0
-                }
+                return executor._create_uniform_return('failed', reason="Could not parse observation data")
     
     # Extract coordinates
     x = kwargs.get('x')
@@ -163,13 +149,7 @@ def tool(input_value=None, **kwargs):
                             x, y, z = pos[0], pos[1], pos[2]
     
     if x is None or y is None or z is None:
-        return {
-            "status": "failed",
-            "reason": "Could not determine coordinates from observation",
-            "text": "Failed to update map: Could not determine coordinates (x, y, z) from observation data",
-            "format": "text",
-            "char_count": 0
-        }
+        return executor._create_uniform_return('failed', reason="Could not determine coordinates from observation")
     
     # Round coordinates to block positions
     x_block = _round_coordinate(x)
@@ -190,13 +170,7 @@ def tool(input_value=None, **kwargs):
             resource_manager.mark_persistent(collection_id, agent_name)
             logger.info(f"Created new map Collection: {map_name} = {collection_id}")
         else:
-            return {
-                "status": "failed",
-                "reason": f"Failed to create map Collection: {error_msg}",
-                "text": f"Failed to create map Collection: {error_msg}",
-                "format": "text",
-                "char_count": 0
-            }
+            return executor._create_uniform_return('failed', reason=f"Failed to create map Collection: {error_msg}")
     
     # Prepare observation summary (extract structured data if available)
     observed_data = {}
@@ -253,13 +227,7 @@ def tool(input_value=None, **kwargs):
     )
     
     if not success:
-        return {
-            "status": "failed",
-            "reason": f"Failed to create map Note: {error_msg}",
-            "text": f"Failed to create map Note: {error_msg}",
-            "format": "text",
-            "char_count": 0
-        }
+        return executor._create_uniform_return('failed', reason=f"Failed to create map Note: {error_msg}")
     
     # Add Note to Collection
     success, item_count, error_msg = resource_manager.add_to_collection(
@@ -267,33 +235,23 @@ def tool(input_value=None, **kwargs):
     )
     
     if not success:
-        return {
-            "status": "failed",
-            "reason": f"Failed to add Note to Collection: {error_msg}",
-            "text": f"Failed to add Note to Collection: {error_msg}",
-            "format": "text",
-            "char_count": 0
-        }
+        return executor._create_uniform_return('failed', reason=f"Failed to add Note to Collection: {error_msg}")
     
     # Mark Collection as persistent
     resource_manager.mark_persistent(map_collection_id, agent_name)
     
     result_text = f"Map updated: ({x_block}, {y_block}, {z_block}) - {item_count} observations total"
     
-    return {
-        "status": "success",
-        "value": result_text,
-        "text": result_text,  # Keep for backward compatibility
-        "format": "text",
-        "metadata": {
-            "map_name": map_name,
-            "map_id": map_collection_id,
-            "note_id": note_id,
-            "location": {"x": x_block, "y": y_block, "z": z_block},
-            "total_observations": item_count
-        },
-        "char_count": len(result_text)
+    # Build structured data dict
+    structured_data = {
+        "map_name": map_name,
+        "map_id": map_collection_id,
+        "note_id": note_id,
+        "location": {"x": x_block, "y": y_block, "z": z_block},
+        "total_observations": item_count
     }
+    
+    return executor._create_uniform_return('success', value=result_text, data=structured_data)
 
 
 if __name__ == "__main__":

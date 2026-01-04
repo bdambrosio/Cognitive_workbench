@@ -31,9 +31,12 @@ def tool(input_value=None, **kwargs):
         minecraft_url: Optional URL override for Minecraft bot server (default: http://localhost:3003)
         
     Returns:
-        Dict with result (text, format, metadata, char_count).
-        Executor will create Note from this content.
+        Dict with result using uniform return format.
     """
+    executor = kwargs.get("executor")
+    if not executor:
+        return {"status": "failed", "reason": "executor not available", "value": None, "resource_id": None}
+    
     minecraft_url = kwargs.get("world_url") or kwargs.get("minecraft_url") or DEFAULT_MINECRAFT_URL
     
     use_params = {}
@@ -62,14 +65,13 @@ def tool(input_value=None, **kwargs):
 
         use_params["rel"] = rel_params
     else:
-        return {"status": "failed", "reason": "position required (absolute x,y,z OR relative forward,right,up)"}
+        return executor._create_uniform_return('failed', reason="position required (absolute x,y,z OR relative forward,right,up)")
     
     try:
-        response = requests.post(
-            f"{minecraft_url}/act/use",
-            json=use_params,
-            timeout=10.0
-        )
+        url = f"{minecraft_url}/act/use"
+        logger.debug(f"🔍 mc-use: POST {url} body={use_params}")
+        response = requests.post(url, json=use_params, timeout=10.0)
+        logger.debug(f"📥 mc-use: Response status={response.status_code}")
         response.raise_for_status()
         data = response.json()
         
@@ -77,31 +79,21 @@ def tool(input_value=None, **kwargs):
             error = data.get("error", "unknown failure")
             error_code = data.get("error_code", "unknown_error")
             result_text = f"Use failed: {error}"
-            return {
-                "text": result_text,
-                "format": "text",
-                "metadata": {
-                    "success": False,
-                    "error_code": error_code,
-                    **data
-                },
-                "char_count": len(result_text)
-            }
+            return executor._create_uniform_return('failed', reason=result_text, data={
+                "error": error,
+                "error_code": error_code,
+                **data
+            })
         
         result_text = "Use interaction successful"
         
-        return {
-            "text": result_text,
-            "format": "text",
-            "metadata": {
-                "success": True,
-                **data
-            },
-            "char_count": len(result_text)
-        }
+        # Build structured data dict
+        structured_data = dict(data)
+        
+        return executor._create_uniform_return('success', value=result_text, data=structured_data)
     except requests.exceptions.RequestException as e:
         logger.error(f"Minecraft use request failed: {e}")
-        return {"status": "failed", "reason": f"API request failed: {e}"}
+        return executor._create_uniform_return('failed', reason=f"API request failed: {e}")
 
 
 if __name__ == "__main__":

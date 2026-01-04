@@ -20,21 +20,25 @@ def tool(input_value=None, **kwargs):
     
     Args:
         input_value: ignored
-        yaw: float - yaw angle in radians (required)
-        pitch: float - pitch angle in radians (required)
+        yaw: float - yaw angle in degrees (required)
+        pitch: float - pitch angle in degrees (required)
         minecraft_url: Optional URL override for Minecraft bot server (default: http://localhost:3003)
         
     Returns:
-        Dict with acknowledgement (text, format, metadata, char_count).
+        Dict with acknowledgement using uniform return format.
         Executor will create Note from this content.
     """
+    executor = kwargs.get("executor")
+    if not executor:
+        return {"status": "failed", "reason": "executor not available", "value": None, "resource_id": None}
+    
     minecraft_url = kwargs.get("world_url") or kwargs.get("minecraft_url") or DEFAULT_MINECRAFT_URL
     
     yaw = kwargs.get("yaw")
     pitch = kwargs.get("pitch")
     
     if yaw is None or pitch is None:
-        return {"status": "failed", "reason": "yaw and pitch required (radians)"}
+        return executor._create_uniform_return('failed', reason="yaw and pitch required (degrees)")
     
     url = f"{minecraft_url}/act/look"
     body = {"yaw": float(yaw), "pitch": float(pitch)}
@@ -47,22 +51,22 @@ def tool(input_value=None, **kwargs):
         data = response.json()
         logger.debug(f"📥 mc-look: Response body={data}")
         
-        # Format acknowledgement
-        ack_text = f"Look command accepted (yaw: {yaw:.2f}, pitch: {pitch:.2f})"
+        # Format acknowledgement (yaw and pitch are in degrees)
+        ack_text = f"Look command accepted (yaw: {yaw:.2f}°, pitch: {pitch:.2f}°)"
         
-        return {
-            "text": ack_text,
-            "format": "text",
-            "metadata": data,
-            "char_count": len(ack_text)
-        }
+        # Build structured data dict
+        structured_data = dict(data)
+        structured_data["yaw"] = yaw
+        structured_data["pitch"] = pitch
+        
+        return executor._create_uniform_return('success', value=ack_text, data=structured_data)
     except requests.exceptions.RequestException as e:
         logger.error(f"Minecraft look request failed: {e}")
-        return {"status": "failed", "reason": f"API request failed: {e}"}
+        return executor._create_uniform_return('failed', reason=f"API request failed: {e}")
 
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
-    result = tool(yaw=1.57, pitch=0.0)
+    result = tool(yaw=90.0, pitch=0.0)  # 90 degrees = east
     print(result)
 

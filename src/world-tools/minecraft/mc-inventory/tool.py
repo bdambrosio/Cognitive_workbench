@@ -22,19 +22,25 @@ def tool(input_value=None, **kwargs):
         minecraft_url: Optional URL override for Minecraft bot server (default: http://localhost:3003)
         
     Returns:
-        Dict with inventory information (text, format, metadata, char_count).
-        Executor will create Note from this content.
+        Dict with result using uniform return format.
     """
+    executor = kwargs.get("executor")
+    if not executor:
+        return {"status": "failed", "reason": "executor not available", "value": None, "resource_id": None}
+    
     minecraft_url = kwargs.get("world_url") or kwargs.get("minecraft_url") or DEFAULT_MINECRAFT_URL
     
     try:
-        response = requests.get(f"{minecraft_url}/inventory", timeout=10.0)
+        url = f"{minecraft_url}/inventory"
+        logger.debug(f"🔍 mc-inventory: GET {url}")
+        response = requests.get(url, timeout=10.0)
+        logger.debug(f"📥 mc-inventory: Response status={response.status_code}")
         response.raise_for_status()
         data = response.json()
         
         if not data.get("ok"):
             error = data.get("error", "unknown failure")
-            return {"status": "failed", "reason": f"Inventory request failed: {error}"}
+            return executor._create_uniform_return('failed', reason=f"Inventory request failed: {error}")
         
         slots = data.get("slots", [])
         equipped = data.get("equipped", {})
@@ -61,19 +67,17 @@ def tool(input_value=None, **kwargs):
         
         inv_text = "\n".join(inv_parts)
         
-        return {
-            "text": inv_text,
-            "format": "text",
-            "metadata": {
-                "slots": slots,
-                "equipped": equipped,
-                **data
-            },
-            "char_count": len(inv_text)
+        # Build structured data dict
+        structured_data = {
+            "slots": slots,
+            "equipped": equipped,
+            **data
         }
+        
+        return executor._create_uniform_return('success', value=inv_text, data=structured_data)
     except requests.exceptions.RequestException as e:
         logger.error(f"Minecraft inventory request failed: {e}")
-        return {"status": "failed", "reason": f"API request failed: {e}"}
+        return executor._create_uniform_return('failed', reason=f"API request failed: {e}")
 
 
 if __name__ == "__main__":

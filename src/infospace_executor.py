@@ -79,6 +79,12 @@ class InfospaceExecutor:
         # Global interrupt flag (can be set by UI via executive_node control channel)
         self.interrupt_requested: bool = False
         
+        # Caches for Python tool execution (performance optimization)
+        self._tool_path_cache: Dict[str, Path] = {}  # python_file -> Path object
+        self._tool_spec_cache: Dict[str, Any] = {}  # (tool_name, python_file) -> importlib spec
+        self._tool_base_args_cache: Optional[Dict[str, Any]] = None  # Base resolved_args template
+        self._tool_base_args_cache_key: Optional[tuple] = None  # Cache key for invalidation
+        
         logger.info(f"InfospaceExecutor initialized for {agent_name} with {len(available_tools)} tools")
         
         # Load world-specific documentation if configured
@@ -181,7 +187,12 @@ class InfospaceExecutor:
     
     def call_subplanner(self, goal: str, context: Optional[str] = None, max_steps: int = 8, trace: Optional[str] = None) -> str:
         """
-        Run a nested IncrementalPlanner using a fresh InfospaceExecutor instance.
+        Run a nested IncrementalPlanner using binding scope isolation (same executor, isolated scope).
+        
+        Uses the same isolation model as run_method_protocol:
+        - Same executor instance (shared resource manager, tools, runtime)
+        - Push binding scope with copy_outer=True (read access to outer bindings)
+        - Pop binding scope when done (cleanup)
         
         Args:
             goal: Delegated goal for the sub-planner
@@ -193,7 +204,6 @@ class InfospaceExecutor:
             String summary/report from the nested planner (or error message).
         """
         try:
-            from templates import INFOSPACE_PRIMITIVES_REFERENCE
             from incremental_planner import IncrementalPlanner, HAS_SGLANG
         except ImportError as e:
             logger.error(f"Subplanner unavailable: {e}")
@@ -204,71 +214,58 @@ class InfospaceExecutor:
             logger.warning(msg)
             return msg
         
-        # Create isolated resource manager for subplanner (in-memory only, no persistence)
-        from infospace_resource_manager import InfospaceResourceManager
-        subspace_world_name = f"{self.world_name}_subspace"
-        isolated_resource_manager = InfospaceResourceManager(
-            world_name=subspace_world_name,
-            session=None  # No Zenoh subscriber needed for in-memory only workspace
-        )
-        logger.info(f"Created isolated resource manager '{subspace_world_name}' for subplanner")
+        # Push new binding scope for subplanner (copy outer scope for read access)
+        logger.info(f"Pushing binding scope for subplanner, goal: {goal}")
+        self.push_binding_scope(copy_outer=True)
         
-        # Create fresh executor with isolated plan state and isolated resource manager
-        logger.info(f"Creating child executor for subplanner, goal: {goal}")
-        child_executor = InfospaceExecutor(
-            agent_name=self.agent_name,
-            session=self.session,
-            world_name=self.world_name,
-            llm_client=self.llm_client,
-            available_tools=self.available_tools,
-            executive_node=self.executive_node,
-            resource_manager=isolated_resource_manager
-        )
-        child_executor.runtime = self.runtime
-        child_executor.tokenizer = self.tokenizer
-        child_executor.clear_plan_state()
-        
-        planner = IncrementalPlanner(
-            executor=child_executor,
-            available_tools=self.available_tools,
-            logger_instance=logger
-        )
-               
         try:
-            result = planner.generate_plan(goal=goal, context=None, max_steps=max_steps)
-        except Exception as exc:
-            logger.error(f"Subplanner execution error: {exc}")
-            return f"Subplanner execution error: {exc}"
-        
-        if result.get('success'):
-            reasoning = result.get('reasoning', 'Subplanner completed successfully')
+            # Create planner using same executor instance (shared resource manager, tools, runtime)
+            planner = IncrementalPlanner(
+                executor=self,
+                available_tools=self.available_tools,
+                logger_instance=logger
+            )
+                   
+            try:
+                result = planner.generate_subplan(template='', goal=goal, context=None, max_steps=max_steps)
+            except Exception as exc:
+                logger.error(f"Subplanner execution error: {exc}")
+                return f"Subplanner execution error: {exc}"
             
-            # Substitute bindings in reasoning
-            for var_name, res_id in child_executor.plan_bindings.items():
-                if res_id:
-                    # Replace variable ($note) with resource ID (Note_123)
-                    # Handle both with and without $ prefix in case of different usage
-                    reasoning = reasoning.replace(f"${var_name}", res_id)
-                    reasoning = reasoning.replace(var_name, res_id)
-            
-            # Retrieve executed plan actions
-            plan_actions = getattr(child_executor, '_plan_actions', [])
-            
-            # Format and substitute bindings in plan
-            formatted_plan = []
-            for action in plan_actions:
-                action_str = json.dumps(action)
-                for var_name, res_id in child_executor.plan_bindings.items():
+            if result.get('success'):
+                # Fix: use 'response' not 'reasoning' (generate_subplan returns 'response')
+                reasoning = result.get('response', 'Subplanner completed successfully')
+                
+                # Substitute bindings in reasoning (use current scope bindings)
+                current_bindings = self.plan_bindings[-1] if self.plan_bindings else {}
+                for var_name, res_id in current_bindings.items():
                     if res_id:
-                        action_str = action_str.replace(f"${var_name}", res_id)
-                        action_str = action_str.replace(var_name, res_id)
-                formatted_plan.append(action_str)
+                        # Replace variable ($note) with resource ID (Note_123)
+                        # Handle both with and without $ prefix in case of different usage
+                        reasoning = reasoning.replace(f"${var_name}", res_id)
+                        reasoning = reasoning.replace(var_name, res_id)
+                
+                # Retrieve executed plan actions
+                plan_actions = getattr(self, '_plan_actions', [])
+                
+                # Format and substitute bindings in plan
+                formatted_plan = []
+                for action in plan_actions:
+                    action_str = json.dumps(action)
+                    for var_name, res_id in current_bindings.items():
+                        if res_id:
+                            action_str = action_str.replace(f"${var_name}", res_id)
+                            action_str = action_str.replace(var_name, res_id)
+                    formatted_plan.append(action_str)
+                
+                plan_text = "\n".join([f"- {a}" for a in formatted_plan])
+                logger.info(f"Executed sub-plan: \n{reasoning}\n\nEXECUTED SUB-PLAN:\n{plan_text}")
+                return f"{reasoning}\n\nEXECUTED SUB-PLAN:\n{plan_text}"
             
-            plan_text = "\n".join([f"- {a}" for a in formatted_plan])
-            logger.info(f"Executed sub-plan: \n{reasoning}\n\nEXECUTED SUB-PLAN:\n{plan_text}")
-            return f"{reasoning}\n\nEXECUTED SUB-PLAN:\n{plan_text}"
-        
-        return f"Subplanner failed: {result.get('error', 'unknown error')}"
+            return f"Subplanner failed: {result.get('error', 'unknown error')}"
+        finally:
+            # Always pop the subplanner scope when done
+            self.pop_binding_scope()
     
     def _create_collection(self, note_ids: list, source_context: str, collection_name: str = '', properties: Optional[Dict] = None) -> Optional[str]:
         """
@@ -456,7 +453,7 @@ class InfospaceExecutor:
         
         return f"{item_count} items [{note_list_str}]"
     
-    def _create_uniform_return(self, status: str, value: Any = None, resource_id: Optional[str] = None, reason: Optional[str] = None) -> Dict:
+    def _create_uniform_return(self, status: str, value: Any = None, resource_id: Optional[str] = None, reason: Optional[str] = None, data: Optional[Any] = None) -> Dict:
         """
         Create uniform return format for all actions.
         
@@ -465,20 +462,26 @@ class InfospaceExecutor:
             value: Content value (will be truncated if string/too long)
             resource_id: Resource ID if resource was created/referenced
             reason: Error reason if failed
+            data: Optional data field (defaults to value if not provided)
             
         Returns:
-            Uniform return dict with status, value, resource_id, reason
+            Uniform return dict with type='uniform_return', status, value, data (full original value), resource_id, reason
         """
         result = {
+            'type': 'uniform_return',
             'status': status
         }
         
         if status == 'failed':
             result['reason'] = reason or 'Unknown error'
             result['value'] = None
+            result['data'] = None
             result['resource_id'] = None
         else:
-            # Format value (truncate if needed)
+            # Store data field (use provided data, or default to value)
+            result['data'] = data if data is not None else value
+            
+            # Format value (truncate if needed) for 'value' field
             if value is None:
                 result['value'] = None
             elif isinstance(value, str) and len(value) > 1024:
@@ -487,6 +490,32 @@ class InfospaceExecutor:
                 result['value'] = self._format_return_value(value, max_chars=1024)
             
             result['resource_id'] = resource_id
+        
+        return result
+    
+    def execute_action_with_log(self, action: Dict, method_name: str) -> Dict:
+        """
+        Execute an action and publish it to the action log with method name prefix.
+        
+        This is a convenience wrapper for Python tools that want their internal
+        tool calls to appear in the UI action log with a method name prefix.
+        
+        Args:
+            action: Action dict with 'type' field
+            method_name: Name of the calling method (e.g., 'mc-seek-boundary')
+            
+        Returns:
+            Result dict with 'status' field ('success', 'failed', 'retry')
+        """
+        # Execute the action
+        result = self.execute_action(action)
+        
+        # Publish to action log with method name prefix
+        if self.executive_node:
+            action_type = action.get('type', 'unknown')
+            prefixed_type = f"{method_name}:{action_type}"
+            timestamp = datetime.now()
+            self.executive_node._publish_action_result(action, result, prefixed_type, timestamp)
         
         return result
     
@@ -691,8 +720,13 @@ class InfospaceExecutor:
             # Failed result - convert to uniform format for API/planner
             return self._create_uniform_return('failed', reason=result.get('reason', 'Unknown error'))
         
-        # Extract result components (original_value is untruncated)
-        original_value = result.get('original_value')
+        # Extract result components
+        # If result is already a uniform return dict, use 'data' field (full value)
+        # Otherwise, use 'original_value' (legacy format)
+        if result.get('type') == 'uniform_return':
+            original_value = result.get('data')  # Full untruncated value
+        else:
+            original_value = result.get('original_value')  # Legacy format
         result_resource_id = result.get('resource_id')
         
         # Bind result if output variable specified
@@ -718,7 +752,9 @@ class InfospaceExecutor:
                 logger.error(f"Failed to persist result from '{target}'")
                 return self._create_uniform_return('failed', reason='Failed to persist result')
         
-        # No out_var - convert to uniform format for API/planner (truncated)
+        # No out_var - if result is already uniform, return as-is; otherwise convert to uniform format
+        if result.get('type') == 'uniform_return':
+            return result
         return self._create_uniform_return('success', value=original_value, resource_id=result_resource_id)
 
     def _get_tool_info(self, tool_name: str) -> Optional[Dict]:
@@ -1095,17 +1131,26 @@ Make sure the string is in a format that can be parsed by the json.loads functio
                    'reason': f'No Python file found for tool: {tool_name}',
                    'original_value': None, 'resource_id': None}
         
-        python_path = Path(python_file)
+        # Cache Path object (avoid repeated Path() construction)
+        if python_file not in self._tool_path_cache:
+            self._tool_path_cache[python_file] = Path(python_file)
+        python_path = self._tool_path_cache[python_file]
+        
         if not python_path.exists():
             return {'status': 'failed', 
                    'reason': f'Python file not found: {python_path}',
                    'original_value': None, 'resource_id': None}
         
-        # Import module dynamically
-        spec = importlib.util.spec_from_file_location(
-            f"tool_{tool_name.replace('-', '_')}", 
-            python_path
-        )
+        # Cache spec object (avoid repeated spec creation)
+        spec_cache_key = (tool_name, python_file)
+        if spec_cache_key not in self._tool_spec_cache:
+            self._tool_spec_cache[spec_cache_key] = importlib.util.spec_from_file_location(
+                f"tool_{tool_name.replace('-', '_')}", 
+                python_path
+            )
+        spec = self._tool_spec_cache[spec_cache_key]
+        
+        # Create fresh module from spec and execute (MUST be done each call)
         tool_module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(tool_module)
         
@@ -1117,7 +1162,7 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         
         tool_func = tool_module.tool
         
-        # Resolve any variables in additional args
+        # Resolve any variables in additional args (per-call, cannot be cached)
         resolved_args = {}
         if additional_args:
             for key, val in additional_args.items():
@@ -1135,39 +1180,51 @@ Make sure the string is in a format that can be parsed by the json.loads functio
                         # For other parameters, re-raise the error
                         raise
         
-        # Add world_name and other kwargs for tools (don't override if tool already set it)
-        if 'world_name' not in resolved_args:
-            resolved_args['world_name'] = self.world_name
-        resolved_args['agent_name'] = self.agent_name
-        resolved_args['resource_manager'] = self.resource_manager
-        resolved_args['executive_node'] = self.executive_node  # For ScienceWorld state access
-        
-        # Add unified LLM generation callback (SGLang only)
-        resolved_args['llm_generate'] = self.llm_generate
-        
-        # Extract grobid URL from config if available (for PDF processing tools)
-        if self.executive_node:
-            llm_config = self.executive_node.character_config.get('llm_config', {})
-            grobid_url = llm_config.get('grobid')
-            if grobid_url:
-                resolved_args['grobid_url'] = grobid_url
+        # Cache base resolved_args template (lines 1168-1201) - only rebuild if config changes
+        cache_key = (self.agent_name, self.world_name, id(self.executive_node) if self.executive_node else None)
+        if self._tool_base_args_cache is None or self._tool_base_args_cache_key != cache_key:
+            # Build base template
+            base_args = {}
+            base_args['world_name'] = self.world_name
+            base_args['agent_name'] = self.agent_name
+            base_args['resource_manager'] = self.resource_manager
+            base_args['executive_node'] = self.executive_node
+            base_args['executor'] = self
+            base_args['llm_generate'] = self.llm_generate
             
-            # Extract world_config if available (generalized for any external world API)
-            world_config = self.executive_node.character_config.get('world_config', {})
-            if world_config:
-                world_name = world_config.get('world_name')
-                port = world_config.get('port')
+            # Extract grobid URL from config if available (for PDF processing tools)
+            if self.executive_node:
+                llm_config = self.executive_node.character_config.get('llm_config', {})
+                grobid_url = llm_config.get('grobid')
+                if grobid_url:
+                    base_args['grobid_url'] = grobid_url
                 
-                # Construct URL from world_name and port if url not explicitly provided
-                if world_config.get('url'):
-                    resolved_args['world_url'] = world_config.get('url')
-                elif world_name and port:
-                    resolved_args['world_url'] = f"http://localhost:{port}"
-                
-                # Pass all other config fields as-is (arbitrary args for world-specific tools)
-                for key, value in world_config.items():
-                    if key not in ('world_name', 'port', 'url'):  # Skip URL construction fields
-                        resolved_args[key] = value
+                # Extract world_config if available (generalized for any external world API)
+                world_config = self.executive_node.character_config.get('world_config', {})
+                if world_config:
+                    world_name = world_config.get('world_name')
+                    port = world_config.get('port')
+                    
+                    # Construct URL from world_name and port if url not explicitly provided
+                    if world_config.get('url'):
+                        base_args['world_url'] = world_config.get('url')
+                    elif world_name and port:
+                        base_args['world_url'] = f"http://localhost:{port}"
+                    
+                    # Pass all other config fields as-is (arbitrary args for world-specific tools)
+                    for key, value in world_config.items():
+                        if key not in ('world_name', 'port', 'url'):  # Skip URL construction fields
+                            base_args[key] = value
+            
+            # Cache the template
+            self._tool_base_args_cache = base_args
+            self._tool_base_args_cache_key = cache_key
+        
+        # Merge cached base args with per-call resolved args (per-call args override base)
+        # Don't override if tool already set it in resolved_args
+        for key, value in self._tool_base_args_cache.items():
+            if key not in resolved_args:
+                resolved_args[key] = value
         
         # Execute tool
         try:
@@ -1180,7 +1237,12 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         # Handle result format - return original value (not truncated) for Note creation
         # Truncation happens later in _execute_apply when creating uniform return for API/planner
         if isinstance(result, dict) and 'status' in result:
-            # Tool returned structured response
+            # Check if tool already returned a uniform return dict (has type='uniform_return')
+            if result.get('type') == 'uniform_return':
+                # Tool already used _create_uniform_return - pass through as-is
+                return result
+            
+            # Tool returned structured response (legacy format)
             status = result.get('status')
             if status == 'failed':
                 return {'status': 'failed', 'reason': result.get('reason', 'Unknown error'), 'original_value': None, 'resource_id': None}
@@ -1636,8 +1698,19 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         display_var = self._normalize_var_for_log(out_var)
         logger.info(f"Loaded {target_arg} → {display_var} = {resource_id} ({resource_type})")
         
+        # Prefix content to clarify it's Note/Collection content (prevents planner confusion with domain-specific content)
+        if content is not None:
+            if resource_id.startswith('Note_'):
+                prefixed_content = f"Note Content: {content}"
+            elif resource_id.startswith('Collection_'):
+                prefixed_content = f"Collection Content: {content}"
+            else:
+                prefixed_content = f"Resource Content: {content}"
+        else:
+            prefixed_content = None
+        
         # Return truncated content (1024 chars), resource_id is the loaded resource
-        return self._create_uniform_return('success', value=content, resource_id=resource_id)
+        return self._create_uniform_return('success', value=prefixed_content, resource_id=resource_id)
     
     def _execute_index(self, action: Dict) -> Dict:
         """
@@ -4212,6 +4285,35 @@ Make sure the string is in a format that can be parsed by the json.loads functio
             'content': content,
             'content_type': content_type
         }
+    
+    def get_last_plan_action(self, action_type: Optional[str] = None) -> Optional[Dict]:
+        """
+        Get the last executed action from the current plan's action list.
+        
+        This is more reliable than parsing JSON from subplanner text responses,
+        as it returns the actual action dict that was executed.
+        
+        Args:
+            action_type: Optional filter to return only actions of this type.
+                        If None, returns the last action regardless of type.
+        
+        Returns:
+            Last action dict from _plan_actions (optionally filtered by type),
+            or None if no matching actions executed.
+        """
+        plan_actions = getattr(self, '_plan_actions', [])
+        if not plan_actions:
+            return None
+        
+        if action_type:
+            # Return last action of specified type
+            for action in reversed(plan_actions):
+                if isinstance(action, dict) and action.get('type') == action_type:
+                    return action
+            return None
+        else:
+            # Return last action regardless of type
+            return plan_actions[-1]
     
     def _extract_json_from_text(self, text: str) -> Optional[Any]:
         """

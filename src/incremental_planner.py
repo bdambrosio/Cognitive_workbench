@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Dict, List, Any, Optional
 from infospace_executor import InfospaceExecutor
 from plan_guidance import PlanGuidance
+from tool_model import ToolModel
 from world_model import WORLD_MODEL_SCHEMA, empty_world_model
 
 # Global temperature setting for all gen() calls
@@ -293,7 +294,7 @@ All search primitives return structured Notes matching search-web/semantic-schol
 Use project to extract metadata fields (uri, source_id, score, etc.). For extracting information FROM text content, use refine (LLM-based).
 
 Persistence Operations:
-- load: Retrieve persistent Note or Collection by ID or name. Returns Note content (384 chars) or Collection Note IDs list (first 5). Use to get content into planner context.
+- load: Retrieve persistent Note or Collection by ID or name. Returns prefixed content ("Note Content: <text>" or "Collection Content: <ids>") truncated to 1024 chars. The prefix clarifies that the returned text is Note/Collection content, not domain-specific output. Use to get content into planner context.
 - persist: Mark Note or Collection as persistent (saved to filesystem). Use after creating resources you want to keep.
 
 Collection Mutation Operations (require Collection):
@@ -445,7 +446,7 @@ def build_tool_catalog(available_tools: Dict[str, Dict]) -> Dict[str, Dict]:
             "schema_hint": PRIMITIVE_DOCS["create-collection"]["schema_hint"]
         },
         "load": {
-            "description": "Load persistent Note or Collection by ID or name. Can load named Notes/Collections by name (e.g., 'my-note') or by ID (e.g., 'Note_123').",
+            "description": "Load persistent Note or Collection by ID or name. Can load named Notes/Collections by name (e.g., 'my-note') or by ID (e.g., 'Note_123'). Returns prefixed content ('Note Content: <text>' or 'Collection Content: <ids>') to clarify that the result is Note/Collection content, not domain-specific output.",
             "schema_hint": {"target": "string (ID or name) or $variable", "out": "$variable", "expect": "string"}
         },
         "persist": {
@@ -964,13 +965,23 @@ def sgl_to_infospace_action(tool_name: str, args_json: str, step: int, available
         Infospace action dict
     """
     try:
-        args = json.loads(args_json) if args_json else {}
+        parsed = json.loads(args_json) if args_json else {}
+        # Ensure args is always a dict (handle case where JSON parses to int/str/etc)
+        # Tool arguments must be JSON objects, not primitives
+        if isinstance(parsed, dict):
+            args = parsed
+        else:
+            logger.warning(f"Tool {tool_name} args JSON parsed to non-dict type {type(parsed).__name__}: {parsed} (raw: {args_json[:100]}), using empty dict")
+            args = {}
     except json.JSONDecodeError as e:
         # Try robust JSON repair
         repaired = repair_json_string(args_json)
         if repaired is not None:
-            args = repaired
-            logger.info(f"Repaired malformed JSON for {tool_name}")
+            args = repaired if isinstance(repaired, dict) else {}
+            if not isinstance(repaired, dict):
+                logger.warning(f"Repaired JSON is non-dict type {type(repaired).__name__}: {repaired}, using empty dict")
+            else:
+                logger.info(f"Repaired malformed JSON for {tool_name}")
         else:
             logger.warning(f"Failed to parse/repair args_json: {args_json}")
             logger.debug(f"JSON error: {e}")
@@ -1391,9 +1402,8 @@ if HAS_SGLANG:
         
         # Stage 2/3 format instructions
         s += user(
-            "#Stage 2-PRE: AGENT-STATE HYPOTHESES\n"
+            "#Stage 2-PRE: Instructions\n"
             "Before choosing TOOL_NAME/ARGS for this step, you MUST first produce AGENT_STATE_HYPOTHESES.\n"
-
             "Purpose:\n"
             "- Make 'context' explicit as TRANSIENT beliefs about the agent's current\n"
             "  affordances, constraints, or limitations.\n"
@@ -1410,11 +1420,11 @@ if HAS_SGLANG:
             "\n"
             "# STAGE 2-PRE RULES (STRICT):\n"
             "- Max 6 hypotheses.\n"
-            "- Each hypothesis MUST be falsifiable (something a tool call or note could\n"
-            "  contradict).\n"
+            "- Each hypothesis MUST be falsifiable (something a tool call or note could contradict).\n"
             "- Prefer CONSTRAINTS, LIMITATIONS, or MISSING AFFORDANCES over confirmations.\n"
-            "- Each hypothesis should plausibly matter: if it were false, a different tool\n"
-            "  choice might be reasonable.\n"
+            "- Each hypothesis should plausibly matter: if it were false, a different tool  choice might be reasonable.\n"
+            "- Hypotheses may reference ONLY information already observed before this step; they MUST NOT depend on the outcome of the tool about to be chosen.\n"
+            "- Hypotheses MUST describe epistemic or physical state of the agent (e.g., known/unknown, stable/unstable, blocked/unblocked); NOT communicative, procedural, or planning affordances.\n"
             "- DO NOT describe future actions, plans, or tools.\n"
             "- DO NOT restate the CURRENT_TASK or GOAL.\n"
             "- DO NOT include generic truths about the system unless they constrain choice.\n"
@@ -1433,6 +1443,10 @@ if HAS_SGLANG:
             "- 'query-web returned no useful results.' (infospace)\n"
             "- 'there is no more space in /data' (osworld)'\n"
             ""
+            "#Stage 2 Instructions:\n"
+            "- Review the ABSTRACT_PLAN and determine progress on it towards the goal.\n"
+            "- Review the current AGENT_STATE_HYPOTHESES and AGENT_STATE_SUPPORT.\n"
+            "- Choose the next tool and JSON args, based on the current task, suggested ABSTRACT_PLAN, and the AGENT_STATE_HYPOTHESES and AGENT_STATE_SUPPORT.\n"
             "#Stage 2 FORMAT:\n"
             "  TOOL_NAME: <name>\n"
             "  TOOL_ARGS_JSON: <json object>\n\n"
@@ -1530,27 +1544,23 @@ if HAS_SGLANG:
                 f"STAGE 2-PRE (step {step + 1}/{max_steps}):\n"
                 f"#GOAL: {goal_for_step}\n#END GOAL\n"
                 f"CURRENT_TASK: {current_task}\n\n"
-                "Before choosing any tool, infer AGENT-STATE HYPOTHESES.\n"
-                "These describe transient constraints or affordances of the agent\n"
-                "that may influence tool choice.\n\n"
-                "FORMAT (STRICT):\n"
-                "AGENT_STATE_HYPOTHESES: [<h1>, <h2>, ...]\n"
-                "AGENT_STATE_SUPPORT:\n"
-                "  - <h1>: <evidence pointer or 'none'>\n"
-                "  - <h2>: <evidence pointer or 'none'>\n\n"
-                "RULES:\n"
-                "- Max 6 hypotheses\n"
-                "- Each must be falsifiable\n"
-                "- Prefer constraints/affordances over narrative\n"
-                "- Do NOT mention tools or actions\n"
-                "- These are NOT world-model facts\n"
+                "Before choosing any tool, infer AGENT-STATE HYPOTHESES and AGENT-STATE-SUPPORT. Refer to STAGE 2-PRE Instructions.\n"
             )
 
             s += assistant(
-                gen(
+                "AGENT_STATE_HYPOTHESES:\n"
+                + gen(
                     f"agent_state_hypotheses_{step}",
-                    max_tokens=512,
+                    max_tokens=256,
                     temperature=GEN_TEMPERATURE,
+                    stop="\nAGENT_STATE_SUPPORT:"
+                )
+                + "\nAGENT_STATE_SUPPORT:\n"
+                + gen(
+                    f"agent_state_support_{step}",
+                    max_tokens=256,
+                    temperature=GEN_TEMPERATURE,
+                    stop="\n"
                 )
             )
             # Stage 2: Choose tool + args
@@ -1586,7 +1596,7 @@ if HAS_SGLANG:
             tool_info = executor.available_tools.get(tool_name, {})
             if tool_info.get('type') == 'method':
                 logger.info(f"Step {step}: Running method tool {tool_name} (inner loop, max_steps={max_steps})")
-                tool_result = run_method_protocol(s, executor, tool_name, max_steps, step, _loaded_skill_docs)
+                tool_result = run_method_protocol(s, executor, tool_name, max_steps, step, _loaded_skill_docs, outer_action=action)
             else:
                 tool_result = execute_infospace_action(action, executor, executor.agent_name)
             
@@ -1827,7 +1837,7 @@ def _clear_interrupt(executor: "InfospaceExecutor") -> None:
 MAX_METHOD_DEPTH = 3
 
 def run_method_protocol(s, executor: "InfospaceExecutor", method_name: str, max_steps: int, outer_step: int,
-                        loaded_skill_docs: set, call_depth: int = 0) -> str:
+                        loaded_skill_docs: set, call_depth: int = 0, outer_action: Dict = None) -> str:
     """
     Execute a 'method' tool as an inner loop (bounded by max_steps).
     Returns a short summary string for the outer loop (so the method counts as 1 outer step).
@@ -1841,7 +1851,11 @@ def run_method_protocol(s, executor: "InfospaceExecutor", method_name: str, max_
     """
     # Check depth limit
     if call_depth >= MAX_METHOD_DEPTH:
-        return f"FAILED | Method {method_name} exceeded maximum call depth ({MAX_METHOD_DEPTH}). Nested method calls are limited to prevent unbounded recursion."
+        error_msg = f"Method {method_name} exceeded maximum call depth ({MAX_METHOD_DEPTH}). Nested method calls are limited to prevent unbounded recursion."
+        bound_var = outer_action.get('out', '') if outer_action else ''
+        if bound_var:
+            return f"ERROR | {error_msg} | Bound: {bound_var}"
+        return f"ERROR | {error_msg}"
     
     # Ensure max_steps is at least 1 (minimum viable)
     effective_max_steps = max(1, max_steps)
@@ -1877,7 +1891,11 @@ def run_method_protocol(s, executor: "InfospaceExecutor", method_name: str, max_
         for mstep in range(effective_max_steps):
             if _interrupt_requested(executor):
                 _clear_interrupt(executor)
-                return f"FAILED | Method {method_name} interrupted by user"
+                error_msg = f"Method {method_name} interrupted by user"
+                bound_var = outer_action.get('out', '') if outer_action else ''
+                if bound_var:
+                    return f"ERROR | {error_msg} | Bound: {bound_var}"
+                return f"ERROR | {error_msg}"
 
             s += user(
             f"#METHOD EXECUTION MODE: {method_name} (internal step {mstep + 1}/{effective_max_steps}, depth {call_depth})\n"
@@ -1901,13 +1919,22 @@ def run_method_protocol(s, executor: "InfospaceExecutor", method_name: str, max_
 
             tool_info = executor.available_tools.get(tool_name, {})
             
+            # Initialize action and resource_id_before for potential use later
+            action = None
+            resource_id_before = None
+            
             # Handle method tool recursion with depth checking
             if tool_info.get('type') == 'method':
                 # Recursive method call - reduce max_steps by 4 and increment depth
+                # Create a nested action dict for the recursive call
+                nested_action = {
+                    'type': tool_name,
+                    'out': ''  # Nested methods don't bind variables directly
+                }
                 nested_max_steps = max(1, effective_max_steps - 4)
                 nested_result = run_method_protocol(
                     s, executor, tool_name, nested_max_steps, outer_step, 
-                    loaded_skill_docs, call_depth=call_depth + 1
+                    loaded_skill_docs, call_depth=call_depth + 1, outer_action=nested_action
                 )
                 last_tool_result = nested_result
                 result_display = nested_result[:512]
@@ -1922,7 +1949,6 @@ def run_method_protocol(s, executor: "InfospaceExecutor", method_name: str, max_
 
                 # Track resource bindings before execution (for commentary update)
                 out_var = action.get('out', '')
-                resource_id_before = None
                 if out_var:
                     resource_id_before = executor.plan_bindings_flat.get(out_var.lstrip('$'))
 
@@ -1944,7 +1970,7 @@ def run_method_protocol(s, executor: "InfospaceExecutor", method_name: str, max_
             f"Identify the Exact Step defined in the {method_name} manual that matches the ACTUAL RESULT above.\n"
             f"NEXT_TASK must be written as: [METHOD: STEP X] <Instruction from manual>.\n"
             f"Do not invent new steps.\n"
-            f"TERMINATION: When the Method says terminate (SUCCESS/FAILED/INAPPLICABLE), write 'METHOD COMPLETE' in THOUGHTS.\n\n"
+            f"TERMINATION: When the Method instructs TERMINATE (SUCCESS/FAILED/INAPPLICABLE), write 'METHOD COMPLETE' in THOUGHTS.\n\n"
             f"Respond using Stage 3 FORMAT. Be concise.\n"
                 f"Ensure the REQUEST_TOOLS list is a valid JSON list of tool names.\n"
             )
@@ -1975,7 +2001,8 @@ def run_method_protocol(s, executor: "InfospaceExecutor", method_name: str, max_
             thoughts_text = s[thoughts_key].strip()
 
             # Stage 3.1: Update resource indexes with commentary (same behavior as outer loop)
-            if thoughts_text:
+            # Only update if we have an action (not a recursive method call)
+            if thoughts_text and action is not None:
                 out_var = action.get('out', '')
                 resource_id = None
                 if out_var:
@@ -2003,7 +2030,13 @@ def run_method_protocol(s, executor: "InfospaceExecutor", method_name: str, max_
                 summary = thoughts_text.replace("\n", " ")
                 if len(summary) > 240:
                     summary = summary[:240] + "..."
-                final_result = f"SUCCESS | Method {method_name} complete | {summary}"
+                
+                # Format result to match execute_infospace_action format
+                bound_var = outer_action.get('out', '') if outer_action else ''
+                if bound_var:
+                    final_result = f"SUCCESS | Method {method_name} complete | {summary} | Bound: {bound_var}"
+                else:
+                    final_result = f"SUCCESS | Method {method_name} complete | {summary}"
                 
                 # Publish method completion to action log
                 if hasattr(executor, 'executive_node') and executor.executive_node:
@@ -2031,7 +2064,12 @@ def run_method_protocol(s, executor: "InfospaceExecutor", method_name: str, max_
             if next_task_raw and next_task_raw.lower() not in ["", "none", "null", "n/a"]:
                 method_task = next_task_raw
 
-        final_result = f"FAILED | Method {method_name} exceeded max_steps ({effective_max_steps}) | last_result={last_tool_result[:120]}"
+        error_reason = f"Method {method_name} exceeded max_steps ({effective_max_steps}) | last_result={last_tool_result[:120]}"
+        bound_var = outer_action.get('out', '') if outer_action else ''
+        if bound_var:
+            final_result = f"ERROR | {error_reason} | Bound: {bound_var}"
+        else:
+            final_result = f"ERROR | {error_reason}"
         
         # Publish method failure to action log
         if hasattr(executor, 'executive_node') and executor.executive_node:
@@ -2051,7 +2089,7 @@ def run_method_protocol(s, executor: "InfospaceExecutor", method_name: str, max_
             }
             
             if hasattr(executive_node, '_publish_action_result'):
-                executive_node._publish_action_result(method_action, {'status': 'failed', 'reason': final_result}, method_name, now_ts)
+                executive_node._publish_action_result(method_action, {'status': 'failed', 'reason': error_reason}, method_name, now_ts)
         
         return final_result
     finally:
@@ -2140,6 +2178,90 @@ class IncrementalPlanner:
                 break
         return last_step if last_step >= 0 else max_steps - 1
 
+    def generate_subplan(self, template, goal: str, context: Dict = None, max_steps: int = 16) -> Dict:
+        """
+        Generate plan incrementally using SGLang.
+        
+        Args:
+            goal: Goal text
+            context: Optional dict with character_context, recent_context
+            max_steps: Maximum planning steps
+            
+        Returns:
+            Plan dict with 'plan' key containing actions
+        """
+        if not HAS_SGLANG:
+            return {'error': 'SGLang not available'}
+        
+        # Get world_model from executor
+        if not hasattr(self.executor, 'world_model') or not self.executor.world_model:
+            logger.warning("WorldModel not available in executor, using empty model")
+            initial_world_model = empty_world_model()
+        else:
+            initial_world_model = self.executor.world_model.get()
+            logger.info("📂 Using world_model from executor")
+
+        try:
+            # Note: plan_bindings are NOT cleared here - they persist across plans unless explicitly cleared
+            # Only clear other plan state if needed, but preserve bindings
+            
+            # Attach plan_actions list to executor for tracking
+            self.executor._plan_actions = []
+            self.executor._plan_error_count = 0  # Initialize error counter for this plan
+            self.goal = goal
+
+            preplan = goal
+            # Extract context components
+            character_context = ""
+            recent_context = ""
+            if context:
+                character_context = context.get('character_context', '')
+                recent_context = context.get('recent_context', '')
+                
+            #
+           
+            # Run SGLang planner
+            world_model = initial_world_model
+            state = tool_planner_infospace.run(
+                template=template,
+                goal=goal,
+                world_model=world_model,
+                character_context=character_context,
+                recent_context=recent_context,
+                tools_catalog_text=self.tools_catalog_text,
+                executor=self.executor,
+                trace_file=self.trace_file,
+                max_steps=max_steps,
+                preplan=preplan,
+                similar_plan=None
+            )
+
+            step = self._find_last_step(state, max_steps)
+            logger.info(f"Last step: {step}, done_{step}: {state[f'done_{step}']}")
+            trace_str = str(state)
+            tool_model: ToolModel = self.executor.tool_model
+             
+            # Extract final_answer from ProgramState (use bracket notation)
+            try:
+                final_answer = state['final_answer']
+            except (KeyError, TypeError):
+                final_answer = 'Planning completed'
+            
+            error_count = getattr(self.executor, '_plan_error_count', 0)
+            return {
+                'plan': None,
+                'response': final_answer,
+                'task_state': None,
+                'success': state[f'done_{step}'].strip().upper().startswith("YES"),
+                'error_count': error_count,
+                'skip_validation': True  # Plan already executed, no need to validate
+            }
+        except Exception as e:
+            self.logger.error(f"Incremental planning failed: {e}")
+            traceback.print_exc()
+            return {'error': str(e)}
+
+
     def generate_plan(self, template, goal: str, context: Dict = None, max_steps: int = 16) -> Dict:
         """
         Generate plan incrementally using SGLang.
@@ -2224,6 +2346,8 @@ class IncrementalPlanner:
             step = self._find_last_step(state, max_steps)
             logger.info(f"Last step: {step}, done_{step}: {state[f'done_{step}']}")
             trace_str = str(state)
+            tool_model: ToolModel = self.executor.tool_model
+            tool_model.update_from_trace(trace_str=trace_str)
             compressed_trace = self._compress_trace(trace_str)
             reflection_frame = self._reflect(goal, world_model, max_steps, compressed_trace)
             
@@ -2296,28 +2420,25 @@ AVAILABLE_TOOLS:
 GOAL:
 {goal_text}
 
-When creating the strategy:
+Instructions:
 
-1. Identify what *types of operations* the goal requires  
+1. If this is a simple, direct goal, return the original goal. DO NOTHING ELSE.
+2. Otherwise:
+   - Identify what *types of operations* the goal requires  
    (e.g., retrieval, extraction from existing text, transformation, comparison, generation).
-
-2. Match these operation types to the available tools.  
-   - Do not assume tools that are absent.  
-   - If multiple tools could serve a role, state how to choose between them.
-
-3. Describe a minimal, ordered sequence of conceptual steps  
-   that a tool-using planner would follow to solve the goal.  
-   - Describe *what must be achieved*, not how to call tools.
-
-4. Include fallback logic **only if the goal plausibly needs it**  
-   (e.g., multi-source lookup, ambiguous values, missing information).
-
-5. Do not include JSON, tool calls, URLs, or domain-specific knowledge.  
+   - Match these operation types to the available tools.  
+     - Do not assume tools that are absent.  
+     - If multiple tools could serve a role, state how to choose between them.
+   - Describe a minimal, ordered sequence of conceptual steps  
+     - that a tool-using planner would follow to solve the goal.  
+     - Describe *what must be achieved*, not how to call tools.
+   - Include fallback logic **only if the goal plausibly needs it**  
+     (e.g., multi-source lookup, ambiguous values, missing information).
+   - Do not include JSON, tool calls, URLs, or domain-specific knowledge.  
    The output must be a brief strategic outline, not an answer to the goal.
 
 Format:
 ABSTRACT_PLAN:
-- <step>
 - <step>
 - ...
 END_PLAN
@@ -2369,6 +2490,7 @@ END_PLAN
         
         Rules:
         - Preserve all events in order
+        - Compress STAGE2-PRE: keep AGENT_STATE_HYPOTHESES and AGENT_STATE_SUPPORT (important for reflection and ToolModel)
         - Compress STAGE2: keep GOAL (full first, prefix match later), CURRENT_TASK
         - Compress CALL: keep tool name, semantic args, truncate large values
         - Compress RESULT: keep status, bound var, always include result
@@ -2419,6 +2541,38 @@ END_PLAN
                 
                 if method_step_text:
                     compressed_events.append(f"[METHOD {method_name} step={inner_step}/{max_inner_steps}]\nSTEP: {method_step_text}\n")
+            
+            # STAGE 2-PRE event (Agent-State Hypotheses - outer loop only, not in method protocol)
+            elif re.search(r'STAGE 2-PRE \(step (\d+)/(\d+)\):', section):
+                stage2_pre_match = re.search(r'STAGE 2-PRE \(step (\d+)/(\d+)\):', section)
+                if stage2_pre_match:
+                    step_num = stage2_pre_match.group(1)
+                    max_steps = stage2_pre_match.group(2)
+                    
+                    # Extract AGENT_STATE_HYPOTHESES
+                    hyp_match = re.search(r'AGENT_STATE_HYPOTHESES:\s*\[(.*?)\]', section, re.DOTALL)
+                    hyp_text = hyp_match.group(1).strip() if hyp_match else None
+                    
+                    # Extract AGENT_STATE_SUPPORT
+                    support_match = re.search(r'AGENT_STATE_SUPPORT:\s*(.*?)(?:\n\n|\nSTAGE|$)', section, re.DOTALL)
+                    support_text = support_match.group(1).strip() if support_match else None
+                    
+                    if hyp_text or support_text:
+                        event_parts = [f"[STAGE2-PRE step={step_num}/{max_steps}]"]
+                        if hyp_text:
+                            # Try to parse as JSON list, fallback to raw text
+                            try:
+                                hyp_list = json.loads(f"[{hyp_text}]")
+                                event_parts.append(f"AGENT_STATE_HYPOTHESES: {json.dumps(hyp_list, ensure_ascii=False)}")
+                            except:
+                                event_parts.append(f"AGENT_STATE_HYPOTHESES: [{hyp_text}]")
+                        if support_text:
+                            # Keep support text (may be multi-line with evidence pointers)
+                            # Truncate if very long
+                            if len(support_text) > 500:
+                                support_text = support_text[:500] + "\n... [truncated]"
+                            event_parts.append(f"AGENT_STATE_SUPPORT:\n{support_text}")
+                        compressed_events.append('\n'.join(event_parts) + '\n')
             
             # STAGE 2 event (outer loop)
             elif re.search(r'STAGE 2 \(step (\d+)/(\d+)\):', section):

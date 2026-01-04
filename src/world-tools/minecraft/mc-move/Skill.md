@@ -32,13 +32,19 @@ examples:
 - `check_collision`: bool - whether to stop early if blocked (default: true)
 
 ## Output
-- Note ID (bound to `out` variable) containing:
-  - `text`: result summary (success, collision, or fell)
-  - `metadata`: raw response including:
-    - `status`: "success", "collision", or "fell"
-    - `actual_duration_ms`: how long the move actually lasted
-    - `final_position`: bot position after move
-    - `reason`: failure reason if collision or fall occurred
+- Uniform return format dict (bound to `out` variable if specified):
+  - `status`: 'success' or 'failed' (execution status - whether API call succeeded)
+  - `value`: truncated text summary (e.g., "Movement completed successfully at (x, y, z)")
+  - `data`: structured data dict containing:
+    - `status`: "success", "collision", or "fell" (movement status from API)
+    - `final_position`: dict with `x`, `y`, `z` coordinates after movement
+    - All other API response fields (may include `actual_duration_ms`, `reason`, etc.)
+  - `resource_id`: None (no resource created)
+  
+Movement status values in `data.status`:
+- `"success"`: Movement completed successfully
+- `"collision"`: Movement stopped by collision with a block
+- `"fell"`: Movement failed - bot fell unexpectedly
 
 ## Configuration
 - Configured via `world_config.port` (defaults to `http://localhost:3003`)

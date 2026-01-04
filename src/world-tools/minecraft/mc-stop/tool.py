@@ -23,9 +23,13 @@ def tool(input_value=None, **kwargs):
         minecraft_url: Optional URL override for Minecraft bot server (default: http://localhost:3003)
         
     Returns:
-        Dict with acknowledgement (text, format, metadata, char_count).
+        Dict with acknowledgement using uniform return format.
         Executor will create Note from this content.
     """
+    executor = kwargs.get("executor")
+    if not executor:
+        return {"status": "failed", "reason": "executor not available", "value": None, "resource_id": None}
+    
     minecraft_url = kwargs.get("world_url") or kwargs.get("minecraft_url") or DEFAULT_MINECRAFT_URL
     
     try:
@@ -40,15 +44,13 @@ def tool(input_value=None, **kwargs):
         # Format acknowledgement
         ack_text = "Stop command accepted - all movement cancelled"
         
-        return {
-            "text": ack_text,
-            "format": "text",
-            "metadata": data,
-            "char_count": len(ack_text)
-        }
+        # Build structured data dict
+        structured_data = dict(data)
+        
+        return executor._create_uniform_return('success', value=ack_text, data=structured_data)
     except requests.exceptions.RequestException as e:
         logger.error(f"Minecraft stop request failed: {e}")
-        return {"status": "failed", "reason": f"API request failed: {e}"}
+        return executor._create_uniform_return('failed', reason=f"API request failed: {e}")
 
 
 if __name__ == "__main__":
