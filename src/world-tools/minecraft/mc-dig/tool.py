@@ -32,9 +32,14 @@ def tool(input_value=None, **kwargs):
         minecraft_url: Optional URL override for Minecraft bot server (default: http://localhost:3003)
         
     Returns:
-        Dict with result (text, format, metadata, char_count).
-        Executor will create Note from this content.
+        Dict with result using uniform return format.
+        Note: Digging is asynchronous - the request may be accepted but digging may fail
+        due to Minecraft physics (e.g., block too hard, cannot reach, already air).
     """
+    executor = kwargs.get("executor")
+    if not executor:
+        return {"status": "failed", "reason": "executor not available", "value": None, "resource_id": None}
+    
     minecraft_url = kwargs.get("world_url") or kwargs.get("minecraft_url") or DEFAULT_MINECRAFT_URL
     
     # Build position parameters - bot expects pos or rel
@@ -66,7 +71,7 @@ def tool(input_value=None, **kwargs):
         
         dig_params["rel"] = rel_params
     else:
-        return {"status": "failed", "reason": "position required (absolute x,y,z OR relative forward,right,up)"}
+        return executor._create_uniform_return('failed', reason="position required (absolute x,y,z OR relative forward,right,up)")
     
     try:
         url = f"{minecraft_url}/act/dig"
@@ -82,24 +87,34 @@ def tool(input_value=None, **kwargs):
         if not data.get("ok"):
             error = data.get("error", "unknown failure")
             result_text = f"Dig failed: {error}"
-        else:
-            dug = data.get("dug", {})
-            block_name = dug.get("name", "unknown")
-            result_text = f"Block dug successfully: {block_name}"
-        
-        return {
-            "text": result_text,
-            "format": "text",
-            "metadata": {
-                "success": data.get("ok", False),
-                "block_type": data.get("dug", {}).get("name"),
+            return executor._create_uniform_return('failed', reason=result_text, data={
+                "error": error,
                 **data
-            },
-            "char_count": len(result_text)
-        }
+            })
+        
+        # Dig request accepted - note that actual digging is asynchronous
+        # and may fail due to Minecraft physics (block too hard, cannot reach, etc.)
+        dug = data.get("dug", {})
+        block_name = dug.get("name", "unknown")
+        dug_pos = dug.get("position", {})
+        
+        if block_name == "air":
+            result_text = f"Dig request accepted: target block is already air"
+        elif dug_pos:
+            pos_str = f"({dug_pos.get('x', 0)}, {dug_pos.get('y', 0)}, {dug_pos.get('z', 0)})"
+            result_text = f"Dig request accepted: {block_name} at {pos_str}"
+        else:
+            result_text = f"Dig request accepted: {block_name}"
+        
+        # Build structured data dict
+        structured_data = dict(data)
+        structured_data["status"] = "accepted"  # Request accepted, but digging may still fail asynchronously
+        structured_data["dug"] = dug
+        
+        return executor._create_uniform_return('success', value=result_text, data=structured_data)
     except requests.exceptions.RequestException as e:
         logger.error(f"Minecraft dig request failed: {e}")
-        return {"status": "failed", "reason": f"API request failed: {e}"}
+        return executor._create_uniform_return('failed', reason=f"API request failed: {e}")
 
 
 if __name__ == "__main__":

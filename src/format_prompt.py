@@ -377,8 +377,16 @@ text_edit.setAcceptRichText(False)
 
 # Enable context menu with paste support
 def show_context_menu(pos):
-    cursor = text_edit.cursorForPosition(pos)
-    text_edit.setTextCursor(cursor)
+    # Preserve existing selection: only move cursor if no selection exists
+    current_cursor = text_edit.textCursor()
+    has_selection = current_cursor.hasSelection()
+    
+    if not has_selection:
+        # No selection: move cursor to click position (normal behavior)
+        cursor = text_edit.cursorForPosition(pos)
+        text_edit.setTextCursor(cursor)
+    # else: preserve existing selection (don't move cursor)
+    
     menu = QMenu()
     
     # Add standard actions
@@ -392,12 +400,15 @@ def show_context_menu(pos):
     
     menu.addSeparator()
     
+    # Check selection again (may have changed if cursor was moved above)
+    has_selection_now = text_edit.textCursor().hasSelection()
+    
     cut_action = menu.addAction("Cut")
-    cut_action.setEnabled(text_edit.textCursor().hasSelection())
+    cut_action.setEnabled(has_selection_now)
     cut_action.triggered.connect(text_edit.cut)
     
     copy_action = menu.addAction("Copy")
-    copy_action.setEnabled(text_edit.textCursor().hasSelection())
+    copy_action.setEnabled(has_selection_now)
     copy_action.triggered.connect(text_edit.copy)
     
     # Paste: explicitly use CLIPBOARD mode (not Selection/PRIMARY) to avoid clearing clipboard

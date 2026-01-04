@@ -31,9 +31,13 @@ def tool(input_value=None, **kwargs):
         minecraft_url: Optional URL override for Minecraft bot server (default: http://localhost:3003)
         
     Returns:
-        Dict with result (text, format, metadata, char_count).
+        Dict with result using uniform return format.
         Executor will create Note from this content.
     """
+    executor = kwargs.get("executor")
+    if not executor:
+        return {"status": "failed", "reason": "executor not available", "value": None, "resource_id": None}
+    
     minecraft_url = kwargs.get("world_url") or kwargs.get("minecraft_url") or DEFAULT_MINECRAFT_URL
     
     # Build movement parameters
@@ -58,7 +62,7 @@ def tool(input_value=None, **kwargs):
         move_params["duration_ms"] = int(float(kwargs.get("duration")) * 1000)
     
     if not move_params:
-        return {"status": "failed", "reason": "at least one direction flag required"}
+        return executor._create_uniform_return('failed', reason="at least one direction flag required")
     
     try:
         # Increase timeout significantly as the server now blocks until movement completes (or collides)
@@ -76,7 +80,7 @@ def tool(input_value=None, **kwargs):
         logger.debug(f"📥 mc-move: Response body={data}")
         
         if not data.get("ok"):
-            return {"status": "failed", "reason": data.get("error", "unknown error")}
+            return executor._create_uniform_return('failed', reason=data.get("error", "unknown error"))
         
         # Parse result - bridge returns final_position and status
         status = data.get("status", "success")  # Bridge now returns status: "success", "collision", or "fell"
@@ -104,19 +108,15 @@ def tool(input_value=None, **kwargs):
                 pos_str = f"({final_position.get('x', 0):.2f}, {final_position.get('y', 0):.2f}, {final_position.get('z', 0):.2f})"
                 result_text += f" at {pos_str}"
         
-        return {
-            "text": result_text,
-            "format": "text",
-            "metadata": {
-                "status": status,
-                "final_position": final_position,
-                **data
-            },
-            "char_count": len(result_text)
-        }
+        # Build structured data dict
+        structured_data = dict(data)
+        structured_data["status"] = status
+        structured_data["final_position"] = final_position
+        
+        return executor._create_uniform_return('success', value=result_text, data=structured_data)
     except requests.exceptions.RequestException as e:
         logger.error(f"Minecraft move request failed: {e}")
-        return {"status": "failed", "reason": f"API request failed: {e}"}
+        return executor._create_uniform_return('failed', reason=f"API request failed: {e}")
 
 
 if __name__ == "__main__":

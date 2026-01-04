@@ -1,23 +1,23 @@
 ---
 name: mc-look
 type: python
-description: "Reorient bot's view - adjust yaw and pitch in radians."
+description: "Reorient bot's view - adjust yaw and pitch in degrees."
 schema_hint:
   value: "ignored"
-  yaw: "yaw angle in radians (float, required)"
-  pitch: "pitch angle in radians (float, required)"
+  yaw: "yaw angle in degrees (float, required)"
+  pitch: "pitch angle in degrees (float, required)"
   out: "$variable"
 examples:
-  - '{"type":"mc-look","yaw":1.57,"pitch":0.0,"out":"$look"}'
-  - '{"type":"mc-look","yaw":0.0,"pitch":-0.5,"out":"$look_down"}'
+  - '{"type":"mc-look","yaw":90.0,"pitch":0.0,"out":"$look"}'
+  - '{"type":"mc-look","yaw":0.0,"pitch":-30.0,"out":"$look_down"}'
 ---
 
 # Minecraft Look Tool
 
 ## Input
 - `value`: ignored
-- `yaw`: float - yaw angle in radians (required)
-- `pitch`: float - pitch angle in radians (required)
+- `yaw`: float - yaw angle in degrees (required)
+- `pitch`: float - pitch angle in degrees (required)
 
 ## Output
 - Note ID (bound to `out` variable) containing:
@@ -30,7 +30,7 @@ examples:
 
 ## Common Workflow
 ```json
-{"type":"mc-look","yaw":1.57,"pitch":0.0,"out":"$look"}
+{"type":"mc-look","yaw":90.0,"pitch":0.0,"out":"$look"}
 {"type":"mc-observe-blocks","out":"$obs"}
 ```
 

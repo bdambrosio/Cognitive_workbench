@@ -31,9 +31,12 @@ def tool(input_value=None, **kwargs):
         minecraft_url: Optional URL override for Minecraft bot server (default: http://localhost:3003)
         
     Returns:
-        Dict with result (text, format, metadata, char_count).
-        Executor will create Note from this content.
+        Dict with result using uniform return format.
     """
+    executor = kwargs.get("executor")
+    if not executor:
+        return {"status": "failed", "reason": "executor not available", "value": None, "resource_id": None}
+    
     minecraft_url = kwargs.get("world_url") or kwargs.get("minecraft_url") or DEFAULT_MINECRAFT_URL
     
     open_params = {}
@@ -63,37 +66,37 @@ def tool(input_value=None, **kwargs):
         
         open_params["rel"] = rel_params
     else:
-        return {"status": "failed", "reason": "position required (absolute x,y,z OR relative forward,right,up)"}
+        return executor._create_uniform_return('failed', reason="position required (absolute x,y,z OR relative forward,right,up)")
     
     try:
-        response = requests.post(
-            f"{minecraft_url}/act/open",
-            json=open_params,
-            timeout=10.0
-        )
+        url = f"{minecraft_url}/act/open"
+        logger.debug(f"🔍 mc-open: POST {url} body={open_params}")
+        response = requests.post(url, json=open_params, timeout=10.0)
+        logger.debug(f"📥 mc-open: Response status={response.status_code}")
         response.raise_for_status()
         data = response.json()
         
         if not data.get("ok"):
             error = data.get("error", "unknown failure")
             result_text = f"Open failed: {error}"
-        else:
-            ui_type = data.get("ui_type", "unknown")
-            result_text = f"Opened {ui_type}"
-        
-        return {
-            "text": result_text,
-            "format": "text",
-            "metadata": {
-                "success": data.get("ok", False),
-                "ui_type": data.get("ui_type"),
+            return executor._create_uniform_return('failed', reason=result_text, data={
+                "error": error,
                 **data
-            },
-            "char_count": len(result_text)
+            })
+        
+        ui_type = data.get("ui_type", "unknown")
+        result_text = f"Opened {ui_type}"
+        
+        # Build structured data dict
+        structured_data = {
+            "ui_type": data.get("ui_type"),
+            **data
         }
+        
+        return executor._create_uniform_return('success', value=result_text, data=structured_data)
     except requests.exceptions.RequestException as e:
         logger.error(f"Minecraft open request failed: {e}")
-        return {"status": "failed", "reason": f"API request failed: {e}"}
+        return executor._create_uniform_return('failed', reason=f"API request failed: {e}")
 
 
 if __name__ == "__main__":

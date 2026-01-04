@@ -1,7 +1,7 @@
 ---
 name: mc-place
 type: python
-description: "Build / modify world - place blocks. Returns ok/error."
+description: "Build / modify world - place blocks. ASYNCHRONOUS. Returns request acceptance status."
 schema_hint:
   value: "item/block name"
   item: "item/block name (alternative to value)"
@@ -30,11 +30,16 @@ examples:
 - `face`: string - face of reference block to place against (top, bottom, north, south, east, west) - REQUIRED
 
 ## Output
-- Note ID (bound to `out` variable) containing:
-  - `text`: success/failure message
-  - `metadata`: raw response including:
-    - `success`: boolean - whether place succeeded
-    - `error_code`: string - failure reason code if unsuccessful (e.g., "no_reference_block", "no_reference_face", "item_not_equipped", "item_not_in_inventory", "out_of_range")
+- Uniform return format dict (bound to `out` variable if specified):
+  - `status`: 'success' or 'failed' (execution status - whether API call succeeded)
+  - `value`: truncated text summary (e.g., "Place request accepted: dirt at (x, y, z) (face=north)")
+  - `data`: structured data dict containing:
+    - `status`: "accepted" (request accepted, but placement may still fail asynchronously)
+    - `placed`: dict with `name`, `position` (x, y, z), and `face`
+    - All other API response fields
+  - `resource_id`: None (no resource created)
+  
+**Note**: Placement is asynchronous - the request may be accepted but actual placement may fail due to Minecraft physics (e.g., block already exists at target location, insufficient space, item not in inventory, cannot reach target location).
 
 ## Configuration
 - Configured via `world_config.port` (defaults to `http://localhost:3003`)
@@ -46,13 +51,15 @@ examples:
 {"type":"mc-equip","item":"stone","slot":"hand","out":"$equip"}
 {"type":"mc-observe-blocks","out":"$obs"}
 {"type":"mc-place","value":"stone","forward":1,"up":0,"right":0,"face":"top","out":"$place"}
-{"type":"mc-observe","out":"$obs_after"}
+{"type":"mc-observe-blocks","out":"$obs_after"}
 ```
 
 ## Cognitive Contract
-- Builds/modifies world - places blocks
+- ASYNCHRONOUS: Placement request is accepted immediately, but actual placement happens asynchronously.
+- RETURNS REQUEST STATUS: The output tells you if the request was accepted, not whether placement actually succeeded.
+- Placement may fail due to Minecraft physics even if request is accepted (e.g., block already exists, insufficient space, item not in inventory).
+- Use `mc-observe-blocks` after placement to verify the block was actually placed.
 - REQUIRES: item must be equipped (use mc-equip first)
 - REQUIRES: reference block position and face must be specified
-- Returns ok/error - success or failure indication
 - Used for construction, modification, building
 

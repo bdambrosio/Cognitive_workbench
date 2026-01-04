@@ -53,10 +53,14 @@ def tool(input_value=None, **kwargs):
         minecraft_url: Optional URL override for Minecraft bot server (default: http://localhost:3003)
         
     Returns:
-        Dict with status information (text, format, metadata, char_count).
+        Dict with status information using uniform return format.
         Executor will create Note from this content.
         Includes vertical_state: STABLE | FALLING | UNKNOWN (derived from Y position changes).
     """
+    executor = kwargs.get("executor")
+    if not executor:
+        return {"status": "failed", "reason": "executor not available", "value": None, "resource_id": None}
+    
     minecraft_url = kwargs.get("world_url") or kwargs.get("minecraft_url") or DEFAULT_MINECRAFT_URL
     url = f"{minecraft_url}/status"
     # Check input_value for "double_sample" mode (value parameter from action)
@@ -66,9 +70,9 @@ def tool(input_value=None, **kwargs):
     
     try:
         def fetch_status() -> Dict[str, Any]:
-            logger.info(f"🔍 mc-status: GET {url}")
+            #logger.info(f"🔍 mc-status: GET {url}")
             response = requests.get(url, timeout=10.0)
-            logger.info(f"📥 mc-status: Response status={response.status_code}, headers={dict(response.headers)}")
+            #logger.info(f"📥 mc-status: Response status={response.status_code}, headers={dict(response.headers)}")
             response.raise_for_status()
             d = response.json()
             logger.debug(f"📥 mc-status: Response body={d}")
@@ -78,7 +82,7 @@ def tool(input_value=None, **kwargs):
         data = fetch_status()
         
         if not data.get('ok'):
-            return {"status": "failed", "reason": data.get('error', 'unknown error')}
+            return executor._create_uniform_return('failed', reason=data.get('error', 'unknown error'))
 
         y_prev = None
         y_now = _extract_y_from_status(data)
@@ -161,26 +165,22 @@ def tool(input_value=None, **kwargs):
             status_parts.append("Current Action: idle")
         
         status_text = "\n".join(status_parts)
-
-        metadata = dict(data)
-        metadata["vertical_state"] = vertical_state
-        metadata["vertical_state_explanation"] = vertical_explanation
-        metadata["vertical_state_mode"] = mode
-        metadata["vertical_state_y_prev"] = y_prev
-        metadata["vertical_state_y_now"] = y_now
-        metadata["vertical_state_dt_s"] = dt_s
-        metadata["vertical_state_y_epsilon"] = y_epsilon
-        metadata["vertical_state_sample_delay_s"] = sample_delay_s if double_sample else None
         
-        return {
-            "text": status_text,
-            "format": "text",
-            "metadata": metadata,
-            "char_count": len(status_text)
-        }
+        # Build structured data dict
+        structured_data = dict(data)
+        structured_data["vertical_state"] = vertical_state
+        structured_data["vertical_state_explanation"] = vertical_explanation
+        structured_data["vertical_state_mode"] = mode
+        structured_data["vertical_state_y_prev"] = y_prev
+        structured_data["vertical_state_y_now"] = y_now
+        structured_data["vertical_state_dt_s"] = dt_s
+        structured_data["vertical_state_y_epsilon"] = y_epsilon
+        structured_data["vertical_state_sample_delay_s"] = sample_delay_s if double_sample else None
+        
+        return executor._create_uniform_return('success', value=status_text, data=structured_data)
     except requests.exceptions.RequestException as e:
         logger.error(f"Minecraft status request failed: {e}")
-        return {"status": "failed", "reason": f"API request failed: {e}"}
+        return executor._create_uniform_return('failed', reason=f"API request failed: {e}")
 
 
 if __name__ == "__main__":

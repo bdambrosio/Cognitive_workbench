@@ -1289,7 +1289,7 @@ class InfospaceResourceManager:
         if not isinstance(text, str):
             text = str(text)
         
-        embedding = self.embedder.encode(text, convert_to_tensor=False)
+        embedding = self.embedder.encode(text, convert_to_tensor=False, show_progress_bar=False)
         return embedding.tolist()
     
     def _extract_content_for_embedding(self, item: Any, fields: Dict) -> str:

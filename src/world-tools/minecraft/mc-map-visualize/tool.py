@@ -740,21 +740,19 @@ def tool(input_value=None, **kwargs):
         agent_name: Agent name (for logging)
         
     Returns:
-        Dict with status and result information.
+        Dict with result using uniform return format.
     """
+    executor = kwargs.get("executor")
+    if not executor:
+        return {"status": "failed", "reason": "executor not available", "value": None, "resource_id": None}
+    
     resource_manager = kwargs.get('resource_manager')
     agent_name = kwargs.get('agent_name', 'system')
     target = kwargs.get('target') or kwargs.get('map_name')
     output_file = kwargs.get('output_file')
     
     if not resource_manager:
-        return {
-            "status": "failed",
-            "reason": "Resource manager not available",
-            "text": "Failed to visualize map: Resource manager not available",
-            "format": "text",
-            "char_count": 0
-        }
+        return executor._create_uniform_return('failed', reason="Resource manager not available")
     
     # Resolve target (could be variable or literal name)
     # Default to agent-specific map name if not provided
@@ -776,13 +774,9 @@ def tool(input_value=None, **kwargs):
     map_collection_id = resource_manager.named_collections.get(map_name)
     
     if not map_collection_id:
-        return {
-            "status": "failed",
-            "reason": f"Map Collection '{map_name}' not found",
-            "text": f"Failed to visualize map: Collection '{map_name}' not found. Use mc-map-update to create it first.",
-            "format": "text",
-            "char_count": 0
-        }
+        reason = f"Map Collection '{map_name}' not found"
+        result_text = f"Failed to visualize map: Collection '{map_name}' not found. Use mc-map-update to create it first."
+        return executor._create_uniform_return('failed', reason=reason, value=result_text)
     
     # Compile forward: Load all Notes, deduplicate by (x,y,z), keep latest
     map_content = _compile_map_forward(map_collection_id, resource_manager)
@@ -792,13 +786,9 @@ def tool(input_value=None, **kwargs):
         html_content = _generate_html_visualization(map_content, map_name)
     except Exception as e:
         logger.error(f"Failed to generate HTML visualization: {e}", exc_info=True)
-        return {
-            "status": "failed",
-            "reason": f"HTML generation failed: {str(e)}",
-            "text": f"Failed to generate visualization: {str(e)}",
-            "format": "text",
-            "char_count": 0
-        }
+        reason = f"HTML generation failed: {str(e)}"
+        result_text = f"Failed to generate visualization: {str(e)}"
+        return executor._create_uniform_return('failed', reason=reason, value=result_text)
     
     # Determine output file path
     if not output_file:
@@ -822,13 +812,9 @@ def tool(input_value=None, **kwargs):
         logger.info(f"Generated map visualization: {output_path}")
     except Exception as e:
         logger.error(f"Failed to write HTML file: {e}", exc_info=True)
-        return {
-            "status": "failed",
-            "reason": f"File write failed: {str(e)}",
-            "text": f"Failed to save visualization file: {str(e)}",
-            "format": "text",
-            "char_count": 0
-        }
+        reason = f"File write failed: {str(e)}"
+        result_text = f"Failed to save visualization file: {str(e)}"
+        return executor._create_uniform_return('failed', reason=reason, value=result_text)
     
     # Open in browser
     try:
@@ -840,20 +826,17 @@ def tool(input_value=None, **kwargs):
     
     result_text = f"Map visualization generated: {output_path.absolute()}\n{len(map_content)} locations visualized"
     
-    return {
-        "status": "success",
-        "value": result_text,
-        "text": result_text,  # Keep for backward compatibility
-        "format": "text",
-        "metadata": {
-            "map_name": map_name,
-            "map_id": map_collection_id,
-            "file_path": str(output_path.absolute()),
-            "locations_count": len(map_content),
-            "waypoints_count": len([loc for loc in map_content if isinstance(loc, dict) and loc.get('waypoints')])
-        },
-        "char_count": len(result_text)
+    # Build structured data dict
+    structured_data = {
+        "map_name": map_name,
+        "map_id": map_collection_id,
+        "file_path": str(output_path.absolute()),
+        "output_file": str(output_path.absolute()),
+        "locations_count": len(map_content),
+        "waypoints_count": len([loc for loc in map_content if isinstance(loc, dict) and loc.get('waypoints')])
     }
+    
+    return executor._create_uniform_return('success', value=result_text, data=structured_data)
 
 
 if __name__ == "__main__":

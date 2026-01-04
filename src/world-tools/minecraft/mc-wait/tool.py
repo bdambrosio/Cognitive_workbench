@@ -19,23 +19,24 @@ def tool(input_value=None, **kwargs):
         out: variable name to store result (handled by executor)
         
     Returns:
-        Dict with wait completion information (text, format, metadata, char_count).
-        Executor will create Note from this content.
+        Dict with result using uniform return format.
     """
+    executor = kwargs.get("executor")
+    if not executor:
+        return {"status": "failed", "reason": "executor not available", "value": None, "resource_id": None}
+    
     # Synchronous wait for 1 second
     time.sleep(1)
     
     status_text = "Wait completed: 1 second elapsed"
     
-    return {
-        "text": status_text,
-        "format": "text",
-        "metadata": {
-            "wait_duration_seconds": 1,
-            "status": "completed"
-        },
-        "char_count": len(status_text)
+    # Build structured data dict
+    structured_data = {
+        "wait_duration_seconds": 1,
+        "status": "completed"
     }
+    
+    return executor._create_uniform_return('success', value=status_text, data=structured_data)
 
 
 if __name__ == "__main__":

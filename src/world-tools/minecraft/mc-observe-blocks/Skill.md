@@ -6,7 +6,6 @@ schema_hint:
   value: "ignored"
   radius: "optional observation radius (default: 4, max: 6)"
   blocks_radius: "optional blocks observation radius (default: 4, max: 6)"
-  entities_radius: "optional entities observation radius (default: 4, max: 12)"
   out: "$variable"
 examples:
   - '{"type":"mc-observe-blocks","out":"$obs"}'

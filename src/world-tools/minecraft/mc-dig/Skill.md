@@ -1,7 +1,7 @@
 ---
 name: mc-dig
 type: python
-description: "removes a block from the Minecraft world at a specified location.  May cause an item entity to spawn, but item spawning, item type, and item location are not guaranteed and are not directly reported by this tool**."
+description: "Removes a block from the Minecraft world at a specified location. ASYNCHRONOUS. Returns request acceptance status. May cause an item entity to spawn, but item spawning, item type, and item location are not guaranteed and are not directly reported by this tool."
 schema_hint:
   value: "ignored"
   forward: "blocks forward (float, egocentric, + is front, - is back)"
@@ -26,12 +26,16 @@ examples:
 - Relative Cartesian (Legacy): `rel_x`, `rel_y`, `rel_z`
 
 ## Output
-- Note ID (bound to `out` variable) containing:
-  - `text`: success/failure message with block type
-  - `metadata`: raw response including:
-    - `success`: boolean - whether dig succeeded
-    - `block_type`: string - type of block that was dug (or null if failed)
-    - `reason`: string - failure reason if unsuccessful
+- Uniform return format dict (bound to `out` variable if specified):
+  - `status`: 'success' or 'failed' (execution status - whether API call succeeded)
+  - `value`: truncated text summary (e.g., "Dig request accepted: stone at (x, y, z)" or "Dig request accepted: target block is already air")
+  - `data`: structured data dict containing:
+    - `status`: "accepted" (request accepted, but digging may still fail asynchronously)
+    - `dug`: dict with `name` (block type) and `position` (x, y, z)
+    - All other API response fields
+  - `resource_id`: None (no resource created)
+  
+**Note**: Digging is asynchronous - the request may be accepted but actual digging may fail due to Minecraft physics (e.g., block too hard, cannot reach target, already air, insufficient time to break block).
 
 ## Configuration
 - Configured via `world_config.port` (defaults to `http://localhost:3003`)
@@ -41,11 +45,14 @@ examples:
 ```json
 {"type":"mc-observe-blocks","out":"$obs"}
 {"type":"mc-dig","forward":1,"up":0,"right":0,"out":"$dig"}
-{"type":"mc-observe","out":"$obs_after"}
+{"type":"mc-observe-blocks","out":"$obs_after"}
 ```
 
 ## Cognitive Contract
-- Atomic at human timescale - dig completes before returning
+- ASYNCHRONOUS: Dig request is accepted immediately, but actual digging happens asynchronously.
+- RETURNS REQUEST STATUS: The output tells you if the request was accepted, not whether digging actually succeeded.
+- Digging may fail due to Minecraft physics even if request is accepted (e.g., block too hard, cannot reach, already air).
+- Use `mc-observe-blocks` after digging to verify the block was actually removed.
 - Failure is informative, not fatal - Jill learns from failures
-- Returns what was dug - useful for planning and verification
+- Returns what was targeted for digging - useful for planning and verification
 

@@ -16,16 +16,37 @@ logger = logging.getLogger(__name__)
 # Default Minecraft bot server URL (can be overridden via environment variable or config)
 DEFAULT_MINECRAFT_URL = os.getenv("MINECRAFT_URL", "http://localhost:3003")
 
-# Solid blocks that provide safe footing
-SOLID_BLOCKS = {
-    'stone', 'grass', 'dirt', 'cobblestone', 'planks', 'bedrock', 'sand', 'gravel',
-    'wood', 'log', 'leaves', 'glass', 'wool', 'brick', 'clay', 'concrete', 'terracotta',
-    'ice', 'packed_ice', 'snow', 'snow_block', 'mycelium', 'podzol', 'grass_path',
-    'farmland', 'mossy_cobblestone', 'stone_brick', 'netherrack', 'soul_sand', 'end_stone'
+# Non-solid blocks that do NOT provide safe footing (primary list)
+NON_SOLID_BLOCKS = {
+    # Air and fluids
+    'air', 'cave_air', 'void_air', 'water', 'lava', 'flowing_water', 'flowing_lava',
+    # Plants and vegetation
+    'grass', 'tall_grass', 'fern', 'large_fern', 'dead_bush', 'seagrass', 'tall_seagrass',
+    'kelp', 'kelp_plant', 'vine', 'lily_pad', 'sugar_cane', 'bamboo', 'bamboo_sapling',
+    # Flowers
+    'dandelion', 'poppy', 'blue_orchid', 'allium', 'azure_bluet', 'red_tulip', 'orange_tulip',
+    'white_tulip', 'pink_tulip', 'oxeye_daisy', 'cornflower', 'lily_of_the_valley', 'wither_rose',
+    'sunflower', 'lilac', 'rose_bush', 'peony', 'torchflower', 'pitcher_plant',
+    # Crops
+    'wheat', 'carrots', 'potatoes', 'beetroots', 'melon_stem', 'pumpkin_stem',
+    'nether_wart', 'sweet_berry_bush', 'cocoa',
+    # Redstone and mechanisms
+    'torch', 'wall_torch', 'redstone_torch', 'redstone_wall_torch', 'soul_torch', 'soul_wall_torch',
+    'redstone_wire', 'lever', 'button', 'stone_button', 'oak_button', 'pressure_plate',
+    'stone_pressure_plate', 'oak_pressure_plate', 'tripwire', 'tripwire_hook',
+    # Rails
+    'rail', 'powered_rail', 'detector_rail', 'activator_rail',
+    # Signs and banners
+    'sign', 'wall_sign', 'oak_sign', 'oak_wall_sign', 'hanging_sign',
+    'banner', 'wall_banner',
+    # Misc non-solid
+    'ladder', 'snow', 'carpet', 'fire', 'soul_fire', 'cobweb',
+    'mushroom', 'red_mushroom', 'brown_mushroom',
+    'sapling', 'oak_sapling', 'spruce_sapling', 'birch_sapling',
 }
 
 # Hazardous blocks
-HAZARD_BLOCKS = {'lava', 'fire', 'cactus', 'magma_block', 'soul_fire'}
+HAZARD_BLOCKS = {'lava', 'fire', 'cactus', 'magma_block', 'soul_fire', 'wither_rose', 'sweet_berry_bush'}
 
 # Fluid blocks
 FLUID_BLOCKS = {'water', 'lava', 'flowing_water', 'flowing_lava'}
@@ -37,7 +58,7 @@ def rel_to_abs(position: Dict[str, float], yaw: float, forward: int, right: int,
     
     Args:
         position: Bot position dict with x, y, z
-        yaw: Bot yaw in radians
+        yaw: Bot yaw in degrees
         forward: Forward offset (positive = forward)
         right: Right offset (positive = right)
         up: Up offset (positive = up)
@@ -57,8 +78,8 @@ def rel_to_abs(position: Dict[str, float], yaw: float, forward: int, right: int,
     # Calculate egocentric offsets
     # forward vector = (-sin(yaw), 0, -cos(yaw))
     # right vector   = (-cos(yaw), 0, sin(yaw))
-    dx = -math.sin(yaw) * forward - math.cos(yaw) * right
-    dz = -math.cos(yaw) * forward + math.sin(yaw) * right
+    dx = -math.sin(math.radians(yaw)) * forward - math.cos(math.radians(yaw)) * right
+    dz = -math.cos(math.radians(yaw)) * forward + math.sin(math.radians(yaw)) * right
     dy = up
     
     # Round to nearest block
@@ -99,9 +120,17 @@ def find_block_at(nearby_blocks: List[Dict], target_x: int, target_y: int, targe
 
 def is_solid(block_name: Optional[str]) -> bool:
     """Check if block is solid (provides safe footing)."""
-    if not block_name or block_name == 'air':
+    if not block_name:
         return False
-    return block_name in SOLID_BLOCKS or not block_name.startswith(('air', 'water', 'lava'))
+    # Strip minecraft: prefix if present
+    name = block_name.split(':')[-1] if ':' in block_name else block_name
+    # Check against explicit non-solid list
+    if name in NON_SOLID_BLOCKS:
+        return False
+    # Check common non-solid suffixes/patterns
+    if any(name.endswith(suffix) for suffix in ('_torch', '_sign', '_button', '_pressure_plate', '_sapling', '_carpet')):
+        return False
+    return True
 
 
 def compute_geometry(nearby_blocks: List[Dict], position: Dict[str, float], yaw: float) -> Dict[str, bool]:
@@ -228,18 +257,22 @@ def tool(input_value=None, **kwargs):
     
     Returns structured observation summary following enhanced schema.
     """
+    executor = kwargs.get("executor")
+    if not executor:
+        return {"status": "failed", "reason": "executor not available", "value": None, "resource_id": None}
+    
     minecraft_url = kwargs.get("world_url") or kwargs.get("minecraft_url") or DEFAULT_MINECRAFT_URL
     
     try:
         # New minescript API uses simple radius parameter
-        radius = kwargs.get("blocks_radius") or kwargs.get("radius") or 5
+        radius = kwargs.get("blocks_radius") or kwargs.get("radius") or 4
         radius = max(1, min(6, int(radius)))  # Clamp to valid range
         
         params = {"radius": radius}
         url = f"{minecraft_url}/observe"
-        logger.info(f"🔍 mc-observe-blocks: GET {url} params={params}")
+        #logger.info(f"🔍 mc-observe-blocks: GET {url} params={params}")
         response = requests.get(url, params=params, timeout=10.0)
-        logger.info(f"📥 mc-observe-blocks: Response status={response.status_code}, headers={dict(response.headers)}")
+        #logger.info(f"📥 mc-observe-blocks: Response status={response.status_code}, headers={dict(response.headers)}")
         response.raise_for_status()
         data = response.json()
         logger.debug(f"📥 mc-observe-blocks: Response body keys={list(data.keys())}, blocks_count={len(data.get('perception', {}).get('nearby_blocks', []))}")
@@ -259,7 +292,6 @@ def tool(input_value=None, **kwargs):
         nearby_blocks = perception.get('nearby_blocks', [])
         blocks_complete = perception.get('blocks_complete', True)
         blocks_elapsed_ms = perception.get('blocks_elapsed_ms', 0)
-        radius = kwargs.get("blocks_radius") or kwargs.get("radius") or 4
         
         # Build structured summary
         summary_parts = []
@@ -317,30 +349,83 @@ def tool(input_value=None, **kwargs):
         # support: footing information
         summary_parts.append("support:")
         support_info = {}
-        
-        # Current position footing (forward:0, up:-1)
-        pos_here = rel_to_abs(position, yaw, 0, 0, -1)
-        block_here = find_block_at(nearby_blocks, *pos_here)
-        if block_here and is_solid(block_here):
-            summary_parts.append(f"  here: solid({block_here})")
-            support_info['here'] = {'type': 'solid', 'block': block_here}
+
+        # Blocks that occupy space but do NOT provide vertical support
+        NON_SUPPORTING_BLOCKS = (
+            'minecraft:snow',        # snow layers (any layers=N)
+            'minecraft:carpet',
+            'minecraft:pressure_plate',
+            'minecraft:farmland',
+            'minecraft:rail',
+            'minecraft:trapdoor',
+        )
+
+        MAX_SUPPORT_PROBE = 2  # how far down we are willing to look for real support
+
+        def classify_support_at(forward_offset: int) -> Dict[str, Any]:
+            """
+            Determine vertical support by probing downward past non-supporting blocks.
+            forward_offset = 0 (here) or 1 (forward)
+            """
+            for dy in range(1, MAX_SUPPORT_PROBE + 1):
+                pos = rel_to_abs(position, yaw, forward_offset, 0, -dy)
+                block = find_block_at(nearby_blocks, *pos)
+
+                if not block:
+                    continue  # air, keep probing
+
+                # Normalize block name for prefix checks
+                block_name = block if isinstance(block, str) else str(block)
+
+                # Explicit non-supporting blocks → keep probing
+                if any(block_name.startswith(ns) for ns in NON_SUPPORTING_BLOCKS):
+                    continue
+
+                # Solid block found → real support
+                if is_solid(block_name):
+                    return {
+                        'type': 'solid',
+                        'block': block_name,
+                        'depth': dy
+                    }
+
+                # Unknown / weird block → treat conservatively
+                return {
+                    'type': 'unsafe',
+                    'block': block_name,
+                    'depth': dy
+                }
+
+            # Nothing supporting found within probe depth
+            return {
+                'type': 'unsafe',
+                'block': None,
+                'depth': None
+            }
+
+        # --- HERE support ---
+        here_support = classify_support_at(forward_offset=0)
+        if here_support['type'] == 'solid':
+            summary_parts.append(f"  here: solid({here_support['block']})")
         else:
-            summary_parts.append(f"  here: unsafe")
-            support_info['here'] = {'type': 'unsafe', 'block': block_here}
-        
-        # Forward position footing (forward:1, up:-1)
-        pos_fwd = rel_to_abs(position, yaw, 1, 0, -1)
-        block_fwd_footing = find_block_at(nearby_blocks, *pos_fwd)
-        # Also get block at (forward:1, up:0) for explicit block type
+            summary_parts.append("  here: unsafe")
+        support_info['here'] = here_support
+
+        # --- FORWARD support ---
+        fwd_support = classify_support_at(forward_offset=1)
+
+        # Also record the block directly in front at foot level (for context)
         pos_fwd_block = rel_to_abs(position, yaw, 1, 0, 0)
         block_fwd_block = find_block_at(nearby_blocks, *pos_fwd_block)
-        if block_fwd_footing and is_solid(block_fwd_footing):
-            summary_parts.append(f"  fwd:  solid({block_fwd_footing})")
-            support_info['fwd'] = {'type': 'solid', 'block': block_fwd_footing, 'forward_block': block_fwd_block}
+
+        if fwd_support['type'] == 'solid':
+            summary_parts.append(f"  fwd:  solid({fwd_support['block']})")
         else:
-            summary_parts.append(f"  fwd:  unsafe")
-            support_info['fwd'] = {'type': 'unsafe', 'block': block_fwd_footing, 'forward_block': block_fwd_block}
-        
+            summary_parts.append("  fwd:  unsafe")
+
+        fwd_support['forward_block'] = block_fwd_block
+        support_info['fwd'] = fwd_support
+
         summary_parts.append("")
         
         # clear: clearance information
@@ -461,7 +546,8 @@ def tool(input_value=None, **kwargs):
             "blocks": {
                 "seen": sorted(list(seen_blocks)),
                 "fluid": sorted(list(fluid_blocks)),
-                "hazard": sorted(list(hazard_blocks))
+                "hazard": sorted(list(hazard_blocks)),
+                "nearby": nearby_blocks
             },
             "geom": geom,
             "aff": aff,
@@ -469,18 +555,11 @@ def tool(input_value=None, **kwargs):
             "note": note
         }
         
-        return {
-            "text": summary_text,  # Planner sees this
-            "format": "text",
-            "metadata": {
-                **data,  # Include raw API response
-                **structured_data  # Include structured fields for mc-map-update
-            },
-            "char_count": len(summary_text)
-        }
+        
+        return executor._create_uniform_return('success', value=summary_text, data=structured_data)
     except requests.exceptions.RequestException as e:
         logger.error(f"Minecraft observe request failed: {e}")
-        return {"status": "failed", "reason": f"API request failed: {e}"}
+        return executor._create_uniform_return('failed', reason=f"API request failed: {e}")
 
 
 if __name__ == "__main__":

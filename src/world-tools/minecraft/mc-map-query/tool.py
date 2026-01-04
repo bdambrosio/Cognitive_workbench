@@ -136,8 +136,12 @@ def tool(input_value=None, **kwargs):
         agent_name: Agent name (for creating resources)
         
     Returns:
-        Dict with query results.
+        Dict with result using uniform return format.
     """
+    executor = kwargs.get("executor")
+    if not executor:
+        return {"status": "failed", "reason": "executor not available", "value": None, "resource_id": None}
+    
     resource_manager = kwargs.get('resource_manager')
     agent_name = kwargs.get('agent_name', 'system')
     # Default to agent-specific map name
@@ -146,30 +150,19 @@ def tool(input_value=None, **kwargs):
     query_type = kwargs.get('query', 'location')
     
     if not resource_manager:
-        return {
-            "status": "failed",
-            "reason": "Resource manager not available",
-            "text": "Failed to query map: Resource manager not available",
-            "format": "text",
-            "char_count": 0
-        }
+        return executor._create_uniform_return('failed', reason="Resource manager not available")
     
     # Load map Collection
     map_collection_id = resource_manager.named_collections.get(map_name)
     
     if not map_collection_id:
-        return {
-            "status": "success",
-            "value": "Map not found - no locations explored yet",
-            "text": "Map not found - no locations explored yet",  # Keep for backward compatibility
-            "format": "text",
-            "metadata": {
-                "map_name": map_name,
-                "found": False,
-                "results": []
-            },
-            "char_count": 0
+        result_text = "Map not found - no locations explored yet"
+        structured_data = {
+            "map_name": map_name,
+            "found": False,
+            "results": []
         }
+        return executor._create_uniform_return('success', value=result_text, data=structured_data)
     
     # Compile forward: Load all Notes, deduplicate by (x,y,z), keep latest
     map_content = _compile_map_forward(map_collection_id, resource_manager)
@@ -185,13 +178,7 @@ def tool(input_value=None, **kwargs):
         z = kwargs.get('z')
         
         if x is None or y is None or z is None:
-            return {
-                "status": "failed",
-                "reason": "Location query requires x, y, z coordinates",
-                "text": "Failed to query map: Location query requires x, y, z coordinates",
-                "format": "text",
-                "char_count": 0
-            }
+            return executor._create_uniform_return('failed', reason="Location query requires x, y, z coordinates")
         
         x_block = _round_coordinate(x)
         y_block = _round_coordinate(y)
@@ -216,13 +203,7 @@ def tool(input_value=None, **kwargs):
         property_value = kwargs.get('value')
         
         if not property_path:
-            return {
-                "status": "failed",
-                "reason": "Property query requires property path",
-                "text": "Failed to query map: Property query requires property path",
-                "format": "text",
-                "char_count": 0
-            }
+            return executor._create_uniform_return('failed', reason="Property query requires property path")
         
         # Navigate property path (e.g., "geom.stair" -> entry['observed']['geom']['stair'])
         for entry in map_content:
@@ -258,13 +239,7 @@ def tool(input_value=None, **kwargs):
         waypoint_name = kwargs.get('waypoint')
         
         if not waypoint_name:
-            return {
-                "status": "failed",
-                "reason": "Waypoint query requires waypoint name",
-                "text": "Failed to query map: Waypoint query requires waypoint name",
-                "format": "text",
-                "char_count": 0
-            }
+            return executor._create_uniform_return('failed', reason="Waypoint query requires waypoint name")
         
         for entry in map_content:
             if isinstance(entry, dict):
@@ -284,13 +259,7 @@ def tool(input_value=None, **kwargs):
         from_z = kwargs.get('from_z')
         
         if from_x is None or from_y is None or from_z is None:
-            return {
-                "status": "failed",
-                "reason": "Unexplored query requires from_x, from_y, from_z coordinates",
-                "text": "Failed to query map: Unexplored query requires from_x, from_y, from_z coordinates",
-                "format": "text",
-                "char_count": 0
-            }
+            return executor._create_uniform_return('failed', reason="Unexplored query requires from_x, from_y, from_z coordinates")
         
         # Find locations with low visit_count or missing observations
         candidates = []
@@ -326,13 +295,7 @@ def tool(input_value=None, **kwargs):
         property_value = kwargs.get('value')
         
         if from_x is None or from_y is None or from_z is None:
-            return {
-                "status": "failed",
-                "reason": "Nearest query requires from_x, from_y, from_z coordinates",
-                "text": "Failed to query map: Nearest query requires from_x, from_y, from_z coordinates",
-                "format": "text",
-                "char_count": 0
-            }
+            return executor._create_uniform_return('failed', reason="Nearest query requires from_x, from_y, from_z coordinates")
         
         # Filter by property if specified
         candidates = []
@@ -370,31 +333,21 @@ def tool(input_value=None, **kwargs):
             result_text_parts.append("No matching locations found")
     
     else:
-        return {
-            "status": "failed",
-            "reason": f"Unknown query type: {query_type}",
-            "text": f"Failed to query map: Unknown query type '{query_type}'",
-            "format": "text",
-            "char_count": 0
-        }
+        return executor._create_uniform_return('failed', reason=f"Unknown query type: {query_type}")
     
     # Format results
     result_text = "\n".join(result_text_parts) if result_text_parts else "Query completed"
     
-    return {
-        "status": "success",
-        "value": result_text,
-        "text": result_text,  # Keep for backward compatibility
-        "format": "text",
-        "metadata": {
-            "map_name": map_name,
-            "query_type": query_type,
-            "found": len(results) > 0,
-            "result_count": len(results),
-            "results": results[:10]  # Limit to first 10 for metadata
-        },
-        "char_count": len(result_text)
+    # Build structured data dict
+    structured_data = {
+        "map_name": map_name,
+        "query_type": query_type,
+        "found": len(results) > 0,
+        "result_count": len(results),
+        "results": results[:10]  # Limit to first 10 for metadata
     }
+    
+    return executor._create_uniform_return('success', value=result_text, data=structured_data)
 
 
 if __name__ == "__main__":

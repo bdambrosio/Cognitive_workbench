@@ -579,15 +579,7 @@ class ZenohExecutiveNode:
         world_config = self.character_config.get('world_config', {})
         world_name = world_config.get('world_name') or self.map_name
         
-        # Create WorldModel instance
-        from world_model import WorldModel
-        self.world_model = WorldModel(
-            world_name=world_name,
-            agent_name=character_name,
-            resource_manager=self.resource_manager
-        )
-        logger.info(f'🌍 WorldModel initialized for {character_name} in {world_name}')
-        
+        # Initialize InfospaceExecutor first (needed for WorldModel and ToolModel)
         self.infospace_executor = InfospaceExecutor(
             agent_name=character_name,
             session=self.session,
@@ -597,15 +589,36 @@ class ZenohExecutiveNode:
             executive_node=self,  # Pass actual executive node
             resource_manager=self.resource_manager
         )
-        # Attach world_model to executor for access by planner
-        self.infospace_executor.world_model = self.world_model
-        # Set executor on world_model so it can use LLM for generalization checks
-        self.world_model.executor = self.infospace_executor
         # Share runtime with executor
         if self.runtime:
             self.infospace_executor.runtime = self.runtime
             self.infospace_executor.tokenizer = self.tokenizer
         logger.info(f'🧩 Infospace executor initialized for {character_name}')
+        
+        # Create WorldModel instance (with executor)
+        from world_model import WorldModel
+        self.world_model = WorldModel(
+            world_name=world_name,
+            agent_name=character_name,
+            resource_manager=self.resource_manager,
+            executor=self.infospace_executor
+        )
+        logger.info(f'🌍 WorldModel initialized for {character_name} in {world_name}')
+        
+        # Create ToolModel instance (with executor)
+        from tool_model import ToolModel
+        self.tool_model = ToolModel(
+            world_name=world_name,
+            agent_name=character_name,
+            resource_manager=self.resource_manager,
+            executor=self.infospace_executor
+        )
+        self.tool_model.build_task_tool_index()
+        logger.info(f'🔧 ToolModel initialized for {character_name} in {world_name}')
+        
+        # Attach models to executor for access by planner
+        self.infospace_executor.world_model = self.world_model
+        self.infospace_executor.tool_model = self.tool_model
         
         # World initialization removed - worlds are assumed to run as separate servers
         
@@ -994,6 +1007,13 @@ class ZenohExecutiveNode:
         try:
             # Normalize action_type - handle both 'create-note' and 'createnote' formats
             normalized_type = action_type.replace('_', '-').lower()
+            
+            # Prefix with method_name if within a method protocol
+            if '_inner_loop' in action:
+                inner_loop = action['_inner_loop']
+                method_name = inner_loop.get('method_name')
+                if method_name:
+                    normalized_type = f"{method_name}:{normalized_type}"
             
             # Format action data for UI display
             action_data = {
@@ -1547,6 +1567,29 @@ class ZenohExecutiveNode:
             
             # If awaiting ask response, the ask primitive is polling text_input_queue directly
             # So we should not process text inputs here - they'll be consumed by the polling loop
+            
+            # Check for direct JSON action execution (before other special commands)
+            if source == 'User' and clean_input.strip().startswith('{'):
+                try:
+                    action_dict = json.loads(clean_input)
+                    if isinstance(action_dict, dict) and 'type' in action_dict:
+                        # Valid action JSON - execute directly
+                        logger.info(f'🔧 Direct action execution: {action_dict.get("type")}')
+                        result = self.infospace_executor.execute_action(action_dict)
+                        timestamp = datetime.now()
+                        self._publish_action_result(action_dict, result, action_dict.get('type'), timestamp)
+                        return  # Don't process as normal input
+                except json.JSONDecodeError:
+                    # Not valid JSON, fall through to normal processing
+                    pass
+                except Exception as e:
+                    # Execution error - log and publish error result
+                    logger.error(f'❌ Direct action execution failed: {e}')
+                    error_result = {"status": "failed", "reason": str(e)}
+                    timestamp = datetime.now()
+                    action_type = action_dict.get('type', 'unknown') if 'action_dict' in locals() else 'unknown'
+                    self._publish_action_result(action_dict if 'action_dict' in locals() else {}, error_result, action_type, timestamp)
+                    return
             
             # Handle special commands from User BEFORE processing as dialog
             if source == 'User':

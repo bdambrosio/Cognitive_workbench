@@ -43,6 +43,10 @@ def tool(input_value=None, **kwargs):
     
     Returns structured observation summary following simplified schema.
     """
+    executor = kwargs.get("executor")
+    if not executor:
+        return {"status": "failed", "reason": "executor not available", "value": None, "resource_id": None}
+    
     minecraft_url = kwargs.get("world_url") or kwargs.get("minecraft_url") or DEFAULT_MINECRAFT_URL
     
     try:
@@ -54,9 +58,13 @@ def tool(input_value=None, **kwargs):
         
         params["entity_filter"] = "items"
         
-        response = requests.get(f"{minecraft_url}/observe", params=params, timeout=10.0)
+        url = f"{minecraft_url}/observe"
+        logger.debug(f"🔍 mc-observe-items: GET {url} params={params}")
+        response = requests.get(url, params=params, timeout=10.0)
+        logger.debug(f"📥 mc-observe-items: Response status={response.status_code}, headers={dict(response.headers)}")
         response.raise_for_status()
         data = response.json()
+        logger.debug(f"📥 mc-observe-items: Response body keys={list(data.keys())}, items_count={len(data.get('perception', {}).get('nearby_entities', []))}")
         
         status = data.get('status', {})
         perception = data.get('perception', {})
@@ -91,6 +99,11 @@ def tool(input_value=None, **kwargs):
         # items: summary and details
         summary_parts.append("items:")
         
+        # Initialize variables for structured data
+        items_by_type = defaultdict(int)
+        items_with_distance = []
+        nearest_by_type = {}
+        
         if not nearby_items:
             summary_parts.append("  total: 0")
             summary_parts.append("  types: {}")
@@ -98,8 +111,6 @@ def tool(input_value=None, **kwargs):
             summary_parts.append("  by_distance: []")
         else:
             # Group items by type and compute distances
-            items_by_type = defaultdict(int)
-            items_with_distance = []
             
             for item in nearby_items:
                 if not isinstance(item, dict):
@@ -137,7 +148,6 @@ def tool(input_value=None, **kwargs):
             summary_parts.append(f"  types: {types_str}")
             
             # Nearest items (one per type, closest)
-            nearest_by_type = {}
             for item in items_with_distance:
                 item_name = item['name']
                 if item_name not in nearest_by_type:
@@ -161,14 +171,16 @@ def tool(input_value=None, **kwargs):
         # pickup: feasibility categorization
         summary_parts.append("pickup:")
         
+        # Initialize pickup sets
+        in_range: Set[str] = set()
+        nearby: Set[str] = set()
+        far: Set[str] = set()
+        
         if not nearby_items:
             summary_parts.append("  in_range: []")
             summary_parts.append("  nearby: []")
             summary_parts.append("  far: []")
         else:
-            in_range: Set[str] = set()
-            nearby: Set[str] = set()
-            far: Set[str] = set()
             
             for item in nearby_items:
                 if not isinstance(item, dict):
@@ -221,15 +233,35 @@ def tool(input_value=None, **kwargs):
         
         summary_text = "\n".join(summary_parts)
         
-        return {
-            "text": summary_text,
-            "format": "text",
-            "metadata": data,
-            "char_count": len(summary_text)
+        # Build structured data dict (similar to mc-observe-blocks)
+        structured_data = {
+            "pose": {
+                "x": px,
+                "y": py,
+                "z": pz,
+                "yaw": yaw,
+                "pitch": pitch
+            },
+            "items": {
+                "total": len(nearby_items),
+                "types": dict(items_by_type) if nearby_items else {},
+                "nearest": nearest_by_type if nearby_items else {},
+                "by_distance": items_with_distance if nearby_items else [],
+                "nearby": nearby_items  # Full list of item entities
+            },
+            "pickup": {
+                "in_range": sorted(list(in_range)) if nearby_items else [],
+                "nearby": sorted(list(nearby)) if nearby_items else [],
+                "far": sorted(list(far)) if nearby_items else []
+            },
+            "conf": conf,
+            "note": note
         }
+        
+        return executor._create_uniform_return('success', value=summary_text, data=structured_data)
     except requests.exceptions.RequestException as e:
         logger.error(f"Minecraft observe-items request failed: {e}")
-        return {"status": "failed", "reason": f"API request failed: {e}"}
+        return executor._create_uniform_return('failed', reason=f"API request failed: {e}")
 
 
 if __name__ == "__main__":

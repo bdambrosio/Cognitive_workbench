@@ -523,16 +523,15 @@ def handle_look(body: Dict[str, Any]) -> Dict[str, Any]:
     - Parameters are in DEGREES (not radians)
     - yaw: degrees rotation around y-axis
     - pitch: degrees rotation from x-z plane
+    
+    Tool now sends degrees directly (standardized API).
     """
     try:
-        # Tool sends radians, convert to degrees (minescript API expects degrees)
-        yaw_rad = float(body.get("yaw", 0))
-        pitch_rad = float(body.get("pitch", 0))
-        pitch_rad = max(-math.pi/2, min(math.pi/2, pitch_rad))  # Clamp pitch to [-90°, 90°]
-        
-        # Convert to degrees
-        yaw_deg = math.degrees(yaw_rad)
-        pitch_deg = math.degrees(pitch_rad)
+        # Tool sends degrees directly (standardized API)
+        yaw_deg = float(body.get("yaw", 0))
+        pitch_deg = float(body.get("pitch", 0))
+        # Clamp pitch to [-90°, 90°]
+        pitch_deg = max(-90.0, min(90.0, pitch_deg))
         
         # Use authoritative API: player_set_orientation(yaw: float, pitch: float) -> bool
         try:
@@ -1130,6 +1129,7 @@ class BridgeHandler(BaseHTTPRequestHandler):
             status_start = time.time()
             status = get_status()
             status_elapsed = (time.time() - status_start) * 1000
+            
             
             payload_start = time.time()
             payload = {
