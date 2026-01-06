@@ -1,46 +1,54 @@
 ---
 name: mc-attack
 type: python
-description: "Left-click style interaction (entities or blocks). Returns success/failure."
-schema_hint:
-  value: "ignored"
-  target: "dict with entity_id (string) OR forward/right/up (floats) OR rel_x/rel_y/rel_z (floats)"
-  forward: "blocks forward (float, egocentric - alternative top-level arg)"
-  right: "blocks right (float, egocentric - alternative top-level arg)"
-  up: "blocks up (float, egocentric - alternative top-level arg)"
-  out: "$variable"
-examples:
-  - '{"type":"mc-attack","target":{"forward":1,"right":0,"up":0},"out":"$attack"}'
-  - '{"type":"mc-attack","target":{"entity_id":"zombie_123"},"out":"$attack"}'
+description: "Left-click style interaction (entities or blocks). Returns success/failure"
 ---
 
 # Minecraft Attack Tool
 
+Left-click style interaction for attacking entities or breaking blocks. Returns success/failure status.
+
+## Purpose
+
+Combat and block breaking. Can target entities (mobs, players) or blocks depending on target specification.
+
 ## Input
-- `target`: dict with either:
-  - `entity_id`: string (for entity attack)
-  - `forward`, `right`, `up`: floats (for block attack, egocentric)
-  - `rel_x`, `rel_y`, `rel_z`: floats (for block attack, legacy)
+
+- `target`: Dict with either:
+  - `entity_id`: String (for entity attack)
+  - `forward`, `right`, `up`: Floats (for block attack, egocentric)
+  - `rel_x`, `rel_y`, `rel_z`: Floats (for block attack, legacy)
 - Exactly one targeting mode must be specified
+- `value`: Ignored
 
 ## Output
-- Note ID (bound to `out` variable) containing:
-  - `text`: success/failure message
-  - `metadata`: raw response including:
-    - `success`: boolean - whether attack succeeded
 
-## Configuration
-- Configured via `world_config.port` (defaults to `http://localhost:3003`)
-- Can be overridden with `world_config.url` or `MINECRAFT_URL` environment variable
+Returns uniform_return format with:
+- `value`: Text summary (success/failure message)
+- `data`: Structured data dict (machine-readable). Key fields:
+  - `success`: Boolean
 
-## Common Workflow
+## Behavior & Performance
+
+- Entity attack: Targets specific entity by ID
+- Block attack: Targets block at specified position
+- Requires appropriate tool for efficient block breaking
+
+## Guidelines
+
+- Use entity_id for attacking mobs or players
+- Use egocentric coordinates (forward, right, up) for block attacks
+- Tool efficiency matters for block breaking (use appropriate tool)
+- Multiple attacks may be needed to break blocks or defeat entities
+
+## Usage Examples
+
+Attack block forward:
 ```json
 {"type":"mc-attack","target":{"forward":1,"right":0,"up":0},"out":"$attack"}
-{"type":"mc-attack","target":{"entity_id":"zombie_123"},"out":"$attack_entity"}
 ```
 
-## Cognitive Contract
-- Left-click style interaction
-- Can target entities (by entity_id) or blocks (by position)
-- Mutually exclusive targeting modes (entity OR block, not both)
-
+Attack entity:
+```json
+{"type":"mc-attack","target":{"entity_id":"zombie_123"},"out":"$attack"}
+```

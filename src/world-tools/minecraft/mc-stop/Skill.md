@@ -1,39 +1,44 @@
 ---
 name: mc-stop
 type: python
-description: "Stop all movement - cancel embodied motion. Critical for safety, interrupts, reflection pauses."
-schema_hint:
-  value: "ignored"
-  out: "$variable"
-examples:
-  - '{"type":"mc-stop","out":"$stop"}'
+description: "Stop all movement - cancel embodied motion. Critical for safety, interrupts, reflection pauses"
 ---
 
 # Minecraft Stop Tool
 
+Stops all movement and cancels embodied motion. Critical safety tool for interrupts and reflection pauses.
+
+## Purpose
+
+Movement cancellation for safety, emergency stops, interrupt handling, and reflection pauses. Immediately halts all ongoing movement operations.
+
 ## Input
-- No parameters required
-- `value` parameter is ignored
+
+- `value`: Ignored
 
 ## Output
-- Note ID (bound to `out` variable) containing:
-  - `text`: acknowledgement message
-  - `metadata`: raw response data
 
-## Configuration
-- Configured via `world_config.port` (defaults to `http://localhost:3003`)
-- Can be overridden with `world_config.url` or `MINECRAFT_URL` environment variable
+Returns uniform_return format with:
+- `value`: Text summary (acknowledgement message)
+- `data`: Structured data dict (machine-readable). Key fields:
+  - `success`: Boolean
 
-## Common Workflow
+## Behavior & Performance
+
+- Immediately stops all movement
+- Cancels ongoing movement operations
+- Critical for safety and emergency stops
+
+## Guidelines
+
+- Use for emergency stops and safety interrupts
+- Use before reflection pauses and replanning
+- Use to cancel unintended movement
+- Critical safety tool - use liberally when uncertain
+
+## Usage Examples
+
+Stop all movement:
 ```json
-{"type":"mc-move","forward":true,"duration":10.0,"out":"$move"}
-{"type":"mc-observe-blocks","out":"$obs"}
 {"type":"mc-stop","out":"$stop"}
 ```
-
-## Cognitive Contract
-- Critical for safety - stops all movement immediately
-- Used for interrupts - when Jill needs to change plans
-- Used for reflection pauses - when Jill needs to think
-- Returns ok - immediate acknowledgement
-

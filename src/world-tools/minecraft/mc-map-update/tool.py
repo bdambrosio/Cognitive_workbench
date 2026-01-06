@@ -74,7 +74,11 @@ def tool(input_value=None, **kwargs):
         map_name = provided_map_name
     
     if not resource_manager:
-        return executor._create_uniform_return('failed', reason="Resource manager not available")
+        return executor._create_uniform_return(
+            'failed',
+            value="Resource manager not available",
+            data={"success": False, "failure_reason": "no_resource_manager"}
+        )
     
     # Get observation data
     observation_data = kwargs.get('observation') or input_value
@@ -89,7 +93,11 @@ def tool(input_value=None, **kwargs):
             observation_data = _get_content(observation_data, resource_manager)
     
     if not observation_data:
-        return executor._create_uniform_return('failed', reason="No observation data provided")
+        return executor._create_uniform_return(
+            'failed',
+            value="No observation data provided",
+            data={"success": False, "failure_reason": "missing_observation"}
+        )
     
     # Parse observation data
     if isinstance(observation_data, str):
@@ -104,7 +112,11 @@ def tool(input_value=None, **kwargs):
             if pose_match:
                 x, y, z = float(pose_match.group(1)), float(pose_match.group(2)), float(pose_match.group(3))
             else:
-                return executor._create_uniform_return('failed', reason="Could not parse observation data")
+                return executor._create_uniform_return(
+                    'failed',
+                    value="Could not parse observation data",
+                    data={"success": False, "failure_reason": "parse_error"}
+                )
     
     # Extract coordinates
     x = kwargs.get('x')
@@ -149,7 +161,11 @@ def tool(input_value=None, **kwargs):
                             x, y, z = pos[0], pos[1], pos[2]
     
     if x is None or y is None or z is None:
-        return executor._create_uniform_return('failed', reason="Could not determine coordinates from observation")
+        return executor._create_uniform_return(
+            'failed',
+            value="Could not determine coordinates from observation",
+            data={"success": False, "failure_reason": "missing_coordinates"}
+        )
     
     # Round coordinates to block positions
     x_block = _round_coordinate(x)
@@ -170,7 +186,11 @@ def tool(input_value=None, **kwargs):
             resource_manager.mark_persistent(collection_id, agent_name)
             logger.info(f"Created new map Collection: {map_name} = {collection_id}")
         else:
-            return executor._create_uniform_return('failed', reason=f"Failed to create map Collection: {error_msg}")
+            return executor._create_uniform_return(
+                'failed',
+                value=f"Failed to create map Collection: {error_msg}",
+                data={"success": False, "failure_reason": "collection_creation_failed"}
+            )
     
     # Prepare observation summary (extract structured data if available)
     observed_data = {}
@@ -227,7 +247,11 @@ def tool(input_value=None, **kwargs):
     )
     
     if not success:
-        return executor._create_uniform_return('failed', reason=f"Failed to create map Note: {error_msg}")
+        return executor._create_uniform_return(
+            'failed',
+            value=f"Failed to create map Note: {error_msg}",
+            data={"success": False, "failure_reason": "note_creation_failed"}
+        )
     
     # Add Note to Collection
     success, item_count, error_msg = resource_manager.add_to_collection(
@@ -235,7 +259,11 @@ def tool(input_value=None, **kwargs):
     )
     
     if not success:
-        return executor._create_uniform_return('failed', reason=f"Failed to add Note to Collection: {error_msg}")
+        return executor._create_uniform_return(
+            'failed',
+            value=f"Failed to add Note to Collection: {error_msg}",
+            data={"success": False, "failure_reason": "add_to_collection_failed"}
+        )
     
     # Mark Collection as persistent
     resource_manager.mark_persistent(map_collection_id, agent_name)

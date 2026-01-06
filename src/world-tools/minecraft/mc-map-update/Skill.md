@@ -1,91 +1,59 @@
 ---
 name: mc-map-update
 type: python
-description: "Converts ephemeral observation data into persistent spatial memory. Stores observation data in a persistent Collection named 'minecraft_map'."
-schema_hint:
-  value: "observation data from mc-observe-blocks (Note ID or dict)"
-  observation: "observation data from mc-observe-blocks (Note ID or dict, alternative to value)"
-  x: "optional x coordinate (defaults to extracting from observation)"
-  y: "optional y coordinate (defaults to extracting from observation)"
-  z: "optional z coordinate (defaults to extracting from observation)"
-  map_name: "optional map Collection name (default: '<agent_name>-minecraft_map', computed automatically)"
-  out: "$variable"
-examples:
-  - '{"type":"mc-observe-blocks","out":"$obs"}'
-  - '{"type":"mc-map-update","observation":"$obs","out":"$result"}'
-  - '{"type":"mc-map-update","observation":"$obs","x":-112,"y":71,"z":-123,"out":"$result"}'
+description: "Converts ephemeral observation data into persistent spatial memory. Stores observation data in a persistent Collection named 'minecraft_map'"
 ---
 
-# Minecraft Map-Update Tool
+# Minecraft Map Update Tool
+
+Converts ephemeral observation data into persistent spatial memory. Stores observation data in a persistent Collection for later querying.
+
+## Purpose
+
+Spatial memory persistence for learning and navigation. Converts observation data from `mc-observe-blocks` into persistent map entries that can be queried later.
 
 ## Input
-- `value` or `observation`: Observation data from `mc-observe-blocks` (Note ID or dict)
+
+- `value`: Observation data from `mc-observe-blocks` (preferred)
+- `observation`: Observation data from `mc-observe-blocks` (alternative to value)
 - `x`, `y`, `z`: Optional explicit coordinates (defaults to extracting from observation)
-- `map_name`: Optional map Collection name (default: `<agent_name>-minecraft_map`, computed automatically)
+- `map_name`: Optional map Collection name (default: `<agent_name>-minecraft_map`)
 
 ## Output
-- Note ID (bound to `out` variable) containing:
-  - `text`: Success message with location and total locations count
-  - `metadata`: Map information including map_name, map_id, location, total_locations, visit_count
 
-## How It Works
+Returns uniform_return format with:
+- `value`: Text summary (success message with location and total locations count)
+- `data`: Structured data dict (machine-readable). Key fields:
+  - `success`: Boolean
+  - `map_name`: String
+  - `location`: `{x: int, y: int, z: int}`
+  - `total_locations`: Integer
+  - `visit_count`: Integer
 
-1. **Loads or creates map Collection**: Looks for named Collection `"minecraft_map"` (or specified `map_name`)
-2. **Extracts coordinates**: From observation data (structured SUMMARY format or metadata)
-3. **Rounds to block coordinates**: Converts float coordinates to integer block positions
-4. **Updates or creates entry**: 
-   - If location exists: Updates observation data, increments visit_count
-   - If new location: Creates new entry with observation data
-5. **Marks as persistent**: Ensures map Collection persists across plans
+## Behavior & Performance
 
-## Map Entry Structure
+- Extracts location from observation data
+- Stores observation in persistent Collection
+- Tracks visit counts for locations
+- Map name defaults to agent-specific name
 
-Each location entry in the map Collection:
-```json
-{
-  "x": -112,
-  "y": 71,
-  "z": -123,
-  "observed": {
-    "pose": {...},
-    "dirs": {...},
-    "support": {...},
-    "clear": {...},
-    "blocks": {...},
-    "geom": {...},
-    "aff": {...},
-    "conf": "high",
-    "note": "..."
-  },
-  "first_visit": "2025-12-28T09:37:50",
-  "last_visit": "2025-12-28T09:37:50",
-  "visit_count": 1,
-  "waypoints": []
-}
-```
+## Guidelines
 
-## Common Workflow
+- Use after `mc-observe-blocks` to store observations
+- Observation data should come from `mc-observe-blocks` tool
+- Coordinates extracted from observation if not explicitly provided
+- Stored data enables later queries with `mc-map-query`
+- Visit counts track how many times location was observed
 
+## Usage Examples
+
+Update map with observation:
 ```json
 {"type":"mc-observe-blocks","out":"$obs"}
-{"type":"mc-status","out":"$status"}
 {"type":"mc-map-update","observation":"$obs","out":"$result"}
-{"type":"persist","target":"minecraft_map"}
 ```
 
-## Cognitive Contract
-
-- **Converts sight to memory**: Ephemeral observations become persistent spatial knowledge
-- **Automatic coordinate extraction**: Parses coordinates from structured observation format
-- **Visit tracking**: Increments visit_count for repeated locations
-- **Persistent storage**: Map Collection persists across `generate_plan` invocations
-- **Block-level precision**: Rounds coordinates to integer block positions for consistency
-
-## Important Notes
-
-- **First use creates map**: If `minecraft_map` doesn't exist, it's created automatically
-- **Coordinates rounded**: Float coordinates are rounded to nearest block (integer)
-- **Observation data preserved**: Stores structured observation summary from `mc-observe-blocks`
-- **Waypoints preserved**: Existing waypoint labels are preserved when updating entries
-- **Must persist**: After updating, use `persist` primitive to ensure map survives plan completion
-
+Update map with explicit coordinates:
+```json
+{"type":"mc-map-update","observation":"$obs","x":-112,"y":71,"z":-123,"out":"$result"}
+```

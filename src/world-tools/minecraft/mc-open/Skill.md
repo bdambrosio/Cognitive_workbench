@@ -1,50 +1,48 @@
 ---
 name: mc-open
 type: python
-description: "Open block-based UI (crafting table, chest, furnace). Returns success/failure."
-schema_hint:
-  value: "ignored"
-  forward: "blocks forward (float, egocentric)"
-  right: "blocks right (float, egocentric)"
-  up: "blocks up (float, egocentric)"
-  x: "absolute x coordinate (float, if using absolute)"
-  y: "absolute y coordinate (float, if using absolute)"
-  z: "absolute z coordinate (float, if using absolute)"
-  rel_x: "relative x offset (float, if using relative)"
-  rel_y: "relative y offset (float, if using relative)"
-  rel_z: "relative z offset (float, if using relative)"
-  out: "$variable"
-examples:
-  - '{"type":"mc-open","forward":1,"up":0,"right":0,"out":"$open"}'
+description: "Open block-based UI (crafting table, chest, furnace). Returns success/failure"
 ---
 
 # Minecraft Open Tool
 
+Opens block-based UI interfaces like crafting tables, chests, and furnaces. Returns success/failure status.
+
+## Purpose
+
+UI interaction for crafting, storage access, and furnace operations. Opens interactive interfaces from specific block types.
+
 ## Input
-- Egocentric position: `forward`, `right`, `up` (preferred)
-- Absolute position: `x`, `y`, `z` (all required if using absolute)
-- Relative position: `rel_x`, `rel_y`, `rel_z` (all required if using relative)
+
+- Egocentric position (preferred): `forward`, `right`, `up` (floats)
+- Absolute position: `x`, `y`, `z` (floats, all required if using absolute)
+- Relative position: `rel_x`, `rel_y`, `rel_z` (floats, all required if using relative)
+- `value`: Ignored
 
 ## Output
-- Note ID (bound to `out` variable) containing:
-  - `text`: success/failure message
-  - `metadata`: raw response including:
-    - `success`: boolean - whether open succeeded
-    - `ui_type`: string - type of UI opened (e.g., "crafting_table", "chest", "furnace")
 
-## Configuration
-- Configured via `world_config.port` (defaults to `http://localhost:3003`)
-- Can be overridden with `world_config.url` or `MINECRAFT_URL` environment variable
+Returns uniform_return format with:
+- `value`: Text summary (success/failure message)
+- `data`: Structured data dict (machine-readable). Key fields:
+  - `success`: Boolean
+  - `ui_type`: String (e.g., `"crafting_table"`, `"chest"`, `"furnace"`)
 
-## Common Workflow
+## Behavior & Performance
+
+- Opens UI interface from block at specified position
+- Fails if block does not have openable UI
+- UI remains open until closed with `mc-close`
+
+## Guidelines
+
+- Use `mc-observe-blocks` to identify openable blocks
+- Common openable blocks: crafting_table, chest, furnace, dispenser
+- Must be within reach of block
+- Use `mc-close` to close opened UI
+
+## Usage Examples
+
+Open block forward:
 ```json
 {"type":"mc-open","forward":1,"up":0,"right":0,"out":"$open"}
-{"type":"mc-craft","recipe":"minecraft:stick","count":4,"out":"$craft"}
-{"type":"mc-close","out":"$close"}
 ```
-
-## Cognitive Contract
-- Opens block-based UI (crafting table, chest, furnace)
-- Required before mc-craft (if crafting table needed)
-- UI state should be checked via mc-inventory or mc-status
-

@@ -62,10 +62,18 @@ def tool(input_value=None, **kwargs):
     waypoint_name = kwargs.get('name')
     
     if not resource_manager:
-        return executor._create_uniform_return('failed', reason="Resource manager not available")
+        return executor._create_uniform_return(
+            'failed',
+            value="Resource manager not available",
+            data={"success": False, "failure_reason": "no_resource_manager"}
+        )
     
     if not waypoint_name:
-        return executor._create_uniform_return('failed', reason="Waypoint name required")
+        return executor._create_uniform_return(
+            'failed',
+            value="Waypoint name required",
+            data={"success": False, "failure_reason": "missing_name"}
+        )
     
     # Get coordinates
     x = kwargs.get('x')
@@ -75,7 +83,11 @@ def tool(input_value=None, **kwargs):
     # If coordinates not provided, try to get from status (would need status Note ID)
     # For now, require explicit coordinates
     if x is None or y is None or z is None:
-        return executor._create_uniform_return('failed', reason="Coordinates required (x, y, z)")
+        return executor._create_uniform_return(
+            'failed',
+            value="Coordinates required (x, y, z)",
+            data={"success": False, "failure_reason": "missing_coordinates"}
+        )
     
     # Round coordinates to block positions
     x_block = _round_coordinate(x)
@@ -96,7 +108,11 @@ def tool(input_value=None, **kwargs):
             resource_manager.mark_persistent(collection_id, agent_name)
             logger.info(f"Created new map Collection: {map_name} = {collection_id}")
         else:
-            return executor._create_uniform_return('failed', reason=f"Failed to create map Collection: {error_msg}")
+            return executor._create_uniform_return(
+                'failed',
+                value=f"Failed to create map Collection: {error_msg}",
+                data={"success": False, "failure_reason": "collection_creation_failed"}
+            )
     
     # Create entry with waypoint label
     from datetime import datetime
@@ -115,7 +131,11 @@ def tool(input_value=None, **kwargs):
     )
     
     if not success:
-        return executor._create_uniform_return('failed', reason=f"Failed to create waypoint Note: {error_msg}")
+        return executor._create_uniform_return(
+            'failed',
+            value=f"Failed to create waypoint Note: {error_msg}",
+            data={"success": False, "failure_reason": "note_creation_failed"}
+        )
     
     # Add Note to Collection
     success, item_count, error_msg = resource_manager.add_to_collection(
@@ -123,7 +143,11 @@ def tool(input_value=None, **kwargs):
     )
     
     if not success:
-        return executor._create_uniform_return('failed', reason=f"Failed to add Note to Collection: {error_msg}")
+        return executor._create_uniform_return(
+            'failed',
+            value=f"Failed to add Note to Collection: {error_msg}",
+            data={"success": False, "failure_reason": "add_to_collection_failed"}
+        )
     
     # Mark Collection as persistent
     resource_manager.mark_persistent(map_collection_id, agent_name)

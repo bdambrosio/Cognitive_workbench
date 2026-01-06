@@ -258,10 +258,15 @@ def tool(input_value=None, **kwargs):
             "note": note
         }
         
+        structured_data["success"] = True
         return executor._create_uniform_return('success', value=summary_text, data=structured_data)
     except requests.exceptions.RequestException as e:
         logger.error(f"Minecraft observe-items request failed: {e}")
-        return executor._create_uniform_return('failed', reason=f"API request failed: {e}")
+        return executor._create_uniform_return(
+            'failed',
+            value=f"API request failed: {e}",
+            data={"success": False, "failure_reason": "api_failed"}
+        )
 
 
 if __name__ == "__main__":

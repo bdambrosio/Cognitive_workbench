@@ -10,111 +10,14 @@ llm_config:
 world_config:
   world_name: "minecraft"
   port: 3003
-
+  state: '{"nav": [{"pose": {"x":0,"y":0,"z":0,"yaw":0}, "support_here": "unknown", "fell": false, "was_fall": false}]}'
 setting: |
   
   ==================================================
   Minecraft (EXTERNAL EMBODIED WORLD)
   ==================================================
 
-  Minecraft is a persistent 3D block-based world where you control a bot (Lodestone-lite) through a REST API.
-  You interact with Minecraft through the following tools:
-
-  World Awareness Tools:
-  - mc-status: Fast heartbeat + sanity check (connection, position, orientation, health/food, current action)
-  - mc-observe-blocks: Snapshot of nearby blocks and non-item entities (bot pose, blocks, mobs) - epistemic, not exhaustive
-  - mc-observe-items: Snapshot of nearby dropped items (items only) - epistemic, not exhaustive
-
-  Communication Tool:
-  - mc-say: Send chat messages (social/debugging/alignment) - returns acknowledgement only
-
-  Action Tools (Non-blocking):
-  - mc-move: Initiate locomotion with direction flags and duration (Synchronous - returns upon completion or collision). IMPORTANT: mc-move is body-relative (forward/right/up).
-  - mc-look: Reorient perception (yaw, pitch in radians)
-  - mc-stop: Cancel all movement (critical for safety, interrupts, reflection pauses)
-
-  World-Manipulation Tools:
-  - mc-dig: Remove a block (egocentric forward/right/up or absolute position)
-  - mc-place: Build/modify world (item, egocentric or absolute reference block, face)
-
-  Lifecycle/Recovery Tools:
-  - mc-respawn: Reset embodiment after death
-
-  Cognitive Contract:
-  - The world continues when you're not looking - actions have duration, not just effects
-  - Certainty comes from re-observation, not promises - always verify via mc-status, mc-observe-blocks, or mc-observe-items
-  - mc-move is Synchronous - it waits until movement finishes or hits a wall
-  - mc-observe-blocks and mc-observe-items are epistemic, not exhaustive - treat them as "what I know right now". 
-  - Observations are incomplete snapshots. Absence of evidence is not evidence of absence.
-  - Use mc-stop for safety, interrupts, and reflection pauses
-  - Failure is informative, not fatal - learn from failed actions
-  - Inventory state is the ground truth for possession; item observations are informational only.
-
-  Action Model:
-  - Observe the world using mc-status, mc-observe-blocks, or mc-observe-items
-  - Plan actions based on what you see
-  - Execute actions (movement, digging, placing)
-  - Re-observe to verify results and detect changes
-  - Record important findings in Notes for future reference
-  - The world persists across requests - state changes are cumulative
-  - Invariant: The Minecraft world does not provide symbolic state. All durable beliefs about the world must be explicitly recorded by the agent.
-
-  Motion Semantics:
-  - During mc-move, Jill’s position may temporarily change due to jumping, falling, or collision.
-  - Vertical motion alone does not create new standing positions.
-  - Only the position reported by mc-status after motion completes represents the stable world state.
-  - Intermediate positions during motion are not evidence of success.
-  - In Minecraft, progress in space happens through horizontal movement; vertical motion alone does not create new standing positions.
-
-  Embodied Coordinate Frame:
-  - Jill acts as an embodied agent with a body, position, and orientation in the world.
-  - All tool arguments that refer to positions, directions, or targets are interpreted in Jill’s local, body-centered coordinate frame (Egocentric), unless absolute coordinates are explicitly used.
-  - In particular:
-    - Egocentric offsets (forward, right, up) are relative to Jill's current orientation (Yaw).
-    - `forward: 1` means "1 block in the direction I am facing".
-    - `right: 1` means "1 block 90 degrees to my right".
-    - `up: 1` means "1 block vertically up (global Y)".
-    - Legacy relative positions (rel_x, rel_y, rel_z) are deprecated but supported as Cartesian offsets.
-    - Directional actions (move, look, use, place, attack) are relative to Jill’s current orientation.
-  - Absolute world coordinates (x, y, z) may only be used by tools that explicitly document support for absolute positioning.
-
-  ## Ontological Model (Important)
-    Minecraft distinguishes between three related but distinct concepts:
-
-    ### 1. Block
-    - Occupies a fixed world cell at integer `(x, y, z)`
-    - Examples: `stone`, `grass_block`, `dirt`
-    - Has collision, hardness, light, and drop rules
-    - **Not movable**
-    - Ceases to exist when dug
-
-    ### 2. Item (Item Type / Item Stack)
-    - Represents a holdable object
-    - Lives in inventories or item entities
-    - Often (but not always) has the same name as a block
-    - Examples:
-      - `stone` block → drops `cobblestone` item
-      - `grass_block` → drops `dirt` item
-      - `snow` → may drop nothing
-
-    ### 3. Item Entity
-    - A physical object spawned in the world
-    - Has floating-point position, gravity, and collision
-    - May spawn offset from the dug block
-    - Must be collected via movement to enter inventory
-
-    Relationship:
-    - Block ──(dig)──▶ Item Entity ──(pickup)──▶ Inventory Item
-
-    In Minecraft, an agent adopts three new beliefs:
-      - The world continues when I'm not looking
-      - Actions have duration, not just effects
-      - Certainty comes from re-observation, not promises
-      
-      She does not need real-time clocks, tick counters, background threads, callbacks, or promises of completion.
-      Everything is still: observe → decide → act → observe, just with persistence.
-
-
+  Minecraft is a persistent 3D block-based world where you control a bot
   Documentation:
   - Documentation for the Minecraft is available and indexed in the collection named "minecraft".
   - The collection named "minecraft" is indexed, and can be searched using the search-within-collections tool. 
@@ -139,9 +42,7 @@ characters:
       Characters operate in information spaces (semantic operations over notes, collections, and web content).
 
       Key capabilities
-      - Autonomous planning - Jill can generate multi-step plans with control flow (conditionals, loops) to achieve goals
-      - Information space operations - Create, search, index, and manipulate structured information (notes, collections)
-      - Extensible tool system - Web search, content summarization, entity extraction, and custom tools
+      - Autonomous planning - Jill can plan incrementally to achieve goals
 
       Primitives (built-in operations, available in all worlds)
       - Storage: create-note, create-collection, load, persist, index/organize
@@ -150,7 +51,6 @@ characters:
       - Data operations: map, flatten, add, remove, split, coerce
       - Set operations: size, union, intersection, difference
       - Structured data: project, pluck, head, filter-structured, sort, join
-      - Control flow: if/then/else, while (in plan structure)
 
       Tool System
       - Tools are world-specific and defined as SKILL.md files with YAML frontmatter

@@ -35,7 +35,11 @@ def tool(input_value=None, **kwargs):
     
     item = kwargs.get("item") or input_value or ""
     if not isinstance(item, str) or not item.strip():
-        return executor._create_uniform_return('failed', reason="item name required (string)")
+        return executor._create_uniform_return(
+            'failed',
+            value="item name required (string)",
+            data={"success": False, "failure_reason": "missing_item"}
+        )
     
     count = kwargs.get("count")
     if count is not None:
@@ -66,11 +70,17 @@ def tool(input_value=None, **kwargs):
             error = data.get("error", "unknown failure")
             error_code = data.get("error_code", "unknown_error")
             result_text = f"Drop failed: {error}"
-            return executor._create_uniform_return('failed', reason=result_text, data={
-                "error": error,
-                "error_code": error_code,
-                **data
-            })
+            return executor._create_uniform_return(
+                'failed',
+                value=result_text,
+                data={
+                    "success": False,
+                    "failure_reason": "drop_failed",
+                    "error": error,
+                    "error_code": error_code,
+                    **data
+                }
+            )
         
         dropped = data.get("dropped", [])
         
@@ -86,6 +96,7 @@ def tool(input_value=None, **kwargs):
         
         # Build structured data dict
         structured_data = {
+            "success": True,
             "dropped": dropped,
             **data
         }
@@ -93,7 +104,11 @@ def tool(input_value=None, **kwargs):
         return executor._create_uniform_return('success', value=result_text, data=structured_data)
     except requests.exceptions.RequestException as e:
         logger.error(f"Minecraft drop request failed: {e}")
-        return executor._create_uniform_return('failed', reason=f"API request failed: {e}")
+        return executor._create_uniform_return(
+            'failed',
+            value=f"API request failed: {e}",
+            data={"success": False, "failure_reason": "api_failed"}
+        )
 
 
 if __name__ == "__main__":

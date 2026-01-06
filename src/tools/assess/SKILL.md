@@ -1,63 +1,42 @@
 ---
 name: assess
-description: Test Note content against natural language predicate using LLM (returns boolean). Use to determine if a text Note meets criteria.
+description: Boolean test of text content against a natural language predicate. Features auto-chunking for long texts (returns "true" if ANY chunk matches).
 type: python
 flattens_collections: true
-schema_hint:
-  target: "$variable or Note ID or Collection ID"
-  predicate: "string (natural language question)"
-  out: "$variable (optional)"
-examples:
-  - '{"type":"if","condition":{"type":"tool_condition","tool":"assess","target":"$content","predicate":"contains citations?"},"then":[...]}'
-  - '{"type":"assess","target":"$document","predicate":"discusses AI safety?","out":"$is_relevant"}'
 ---
 
 # Test Note
 
-Universal boolean test tool that evaluates natural language predicates against Note content using LLM.
+Evaluates natural language predicates against text content using an LLM.
 
 ## Purpose
-
-Provides flexible conditionals for plan control flow. Use when:
-- No specialized condition exists
-- Complex reasoning over content required
-- Ad-hoc validation needed
+Semantic boolean testing. Handles large documents automatically via chunking.
+Returns "true" if any part of the content meets the criteria.
 
 ## Input
-
-- `predicate`: Natural language question (e.g., "contains citations?", "is valid JSON?", "mentions neural networks?")
-- `target`: Note content to test
+- `predicate`: Natural language question (e.g., "mentions specific dates?", "is critical of the author?").
+- `target`: The string content to test. *Empty inputs return "false".*
 
 ## Output
+Returns string `"true"` or `"false"`.
+Note: Output is a lowercase string, not a JSON boolean.
 
-Returns "true" or "false" as string (for use in tool_condition).
+## Behavior & Performance
+1. Auto-Chunking: Texts >16k characters are split into boundary-aware chunks.
+2. Aggregation (OR Logic): Evaluates chunks sequentially. Returns `"true"` immediately upon the **first** chunk that satisfies the predicate (short-circuit). Returns `"false"` only if *all* chunks fail.
+3. Latency: Fast for short texts. Increases linearly with length for long texts until a match is found.
+
+## Guidelines
+- Predicate Phrasing: Since the tool checks chunks in isolation, phrase predicates to detect *presence* rather than *global summary*.
+    - Good: "Contains mention of inflation?"
+    - Risky: "Is the main topic inflation?" (Might be a topic in one smaller chunk of input).
+- Cost: Every chunk requires an LLM call.
+- Fallbacks: Returns `"false"` on ambiguous LLM responses.
 
 ## Usage Examples
 
-Test for citations:
+Example:
 ```json
-{"type":"if","condition":{"type":"tool_condition","tool":"assess","target":"$paper","predicate":"contains academic citations?"},"then":[...]}
+// Because flattens_collections=true, passing a list to target returns a list of "true"/"false" strings
+{"type":"assess","target":"$my_note","predicate":"is urgent?","out":"$urgency_flags"}
 ```
-
-Check data validity:
-```json
-{"type":"if","condition":{"type":"tool_condition","tool":"assess","target":"$data","predicate":"is valid JSON with 'results' field?"},"then":[...]}
-```
-
-Content filtering:
-```json
-{"type":"if","condition":{"type":"tool_condition","tool":"assess","target":"$text","predicate":"discusses machine learning or AI?"},"then":[...]}
-```
-
-## Guidelines
-
-- **Be specific:** Clear predicates yield accurate results. "Contains author and year metadata?" > "has metadata?"
-- **Binary questions:** Phrase as yes/no questions for clearest results.
-- **Prefer specialized conditions:** Use built-in conditions (contains, equals) when possible - they're faster.
-- **Cost aware:** Every call hits LLM. Use judiciously in loops.
-
-## Performance
-
-- Fast execution: ~1-2 seconds per test
-- Logged for usage analysis
-

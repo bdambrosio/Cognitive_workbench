@@ -1,0 +1,22 @@
+{
+  "version": "1.0",
+  "created_at": "2026-01-06T00:10:09.890660",
+  "updated_at": "2026-01-06T02:29:44.107131",
+  "facts": [],
+  "tool_contracts": [
+    {
+      "tool": "mc-stop",
+      "insight": "Terminates movement operations",
+      "status": "reliable",
+      "introduced_at": "2026-01-06T02:18:28.153224",
+      "last_confirmed_at": "2026-01-06T02:29:44.106804"
+    },
+    {
+      "tool": "nav-moveone",
+      "insight": "Moves the agent one block forward in the z-direction when clear, with success and position tracking",
+      "status": "reliable",
+      "introduced_at": "2026-01-06T02:29:44.106804",
+      "last_confirmed_at": "2026-01-06T02:29:44.106804"
+    }
+  ]
+}

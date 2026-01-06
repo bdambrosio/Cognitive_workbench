@@ -752,7 +752,11 @@ def tool(input_value=None, **kwargs):
     output_file = kwargs.get('output_file')
     
     if not resource_manager:
-        return executor._create_uniform_return('failed', reason="Resource manager not available")
+        return executor._create_uniform_return(
+            'failed',
+            value="Resource manager not available",
+            data={"success": False, "failure_reason": "no_resource_manager"}
+        )
     
     # Resolve target (could be variable or literal name)
     # Default to agent-specific map name if not provided
@@ -776,7 +780,11 @@ def tool(input_value=None, **kwargs):
     if not map_collection_id:
         reason = f"Map Collection '{map_name}' not found"
         result_text = f"Failed to visualize map: Collection '{map_name}' not found. Use mc-map-update to create it first."
-        return executor._create_uniform_return('failed', reason=reason, value=result_text)
+        return executor._create_uniform_return(
+            'failed',
+            value=result_text,
+            data={"success": False, "failure_reason": reason}
+        )
     
     # Compile forward: Load all Notes, deduplicate by (x,y,z), keep latest
     map_content = _compile_map_forward(map_collection_id, resource_manager)
@@ -788,7 +796,11 @@ def tool(input_value=None, **kwargs):
         logger.error(f"Failed to generate HTML visualization: {e}", exc_info=True)
         reason = f"HTML generation failed: {str(e)}"
         result_text = f"Failed to generate visualization: {str(e)}"
-        return executor._create_uniform_return('failed', reason=reason, value=result_text)
+        return executor._create_uniform_return(
+            'failed',
+            value=result_text,
+            data={"success": False, "failure_reason": reason}
+        )
     
     # Determine output file path
     if not output_file:
@@ -814,7 +826,11 @@ def tool(input_value=None, **kwargs):
         logger.error(f"Failed to write HTML file: {e}", exc_info=True)
         reason = f"File write failed: {str(e)}"
         result_text = f"Failed to save visualization file: {str(e)}"
-        return executor._create_uniform_return('failed', reason=reason, value=result_text)
+        return executor._create_uniform_return(
+            'failed',
+            value=result_text,
+            data={"success": False, "failure_reason": reason}
+        )
     
     # Open in browser
     try:

@@ -1,40 +1,45 @@
 ---
 name: mc-inventory
 type: python
-description: "Observe inventory contents and equipped items - epistemic, read-only. Returns inventory slots and equipped items."
-schema_hint:
-  value: "ignored"
-  out: "$variable"
-examples:
-  - '{"type":"mc-inventory","out":"$inv"}'
+description: "Observe inventory contents and equipped items - epistemic, read-only. Returns inventory slots and equipped items"
 ---
 
 # Minecraft Inventory Tool
 
+Observes inventory contents and equipped items. Read-only epistemic tool for checking current inventory state.
+
+## Purpose
+
+Inventory inspection for planning and decision-making. Returns both human-readable inventory text and machine-readable structured data including all slots and equipped items.
+
 ## Input
-- No parameters required
-- `value` parameter is ignored
+
+- `value`: Ignored
 
 ## Output
-- Note ID (bound to `out` variable) containing:
-  - `text`: formatted inventory information
-  - `metadata`: raw inventory data including:
-    - `slots`: array of slot objects with `slot`, `item`, `count`
-    - `equipped`: object with `hand` and `offhand` items
 
-## Configuration
-- Configured via `world_config.port` (defaults to `http://localhost:3003`)
-- Can be overridden with `world_config.url` or `MINECRAFT_URL` environment variable
+Returns uniform_return format with:
+- `value`: Multi-line inventory text (human-readable)
+- `data`: Structured inventory dict (machine-readable). Key fields:
+  - `success`: Boolean
+  - `slots`: Array of `{slot: int, item: string, count: int}`
+  - `equipped`: `{hand: string, offhand: string}`
 
-## Common Workflow
+## Behavior & Performance
+
+- Read-only: Does not modify inventory
+- Fast status check
+- Returns complete inventory state including empty slots
+
+## Guidelines
+
+- Use before planning item operations (equip, drop, craft)
+- Check `equipped.hand` and `equipped.offhand` for currently held items
+- Empty slots have `item: null` or empty string
+
+## Usage Examples
+
+Check inventory:
 ```json
 {"type":"mc-inventory","out":"$inv"}
-{"type":"mc-equip","item":"stone","slot":"hand","out":"$equip"}
-{"type":"mc-place","item":"stone","rel_x":0,"rel_y":-1,"rel_z":0,"face":"top","out":"$place"}
 ```
-
-## Cognitive Contract
-- Epistemic observation - read-only, does not modify state
-- Required before any action that consumes or uses items
-- Inventory state must be observed or cached before item-dependent actions
-

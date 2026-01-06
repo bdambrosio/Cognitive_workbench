@@ -150,7 +150,11 @@ def tool(input_value=None, **kwargs):
     query_type = kwargs.get('query', 'location')
     
     if not resource_manager:
-        return executor._create_uniform_return('failed', reason="Resource manager not available")
+        return executor._create_uniform_return(
+            'failed',
+            value="Resource manager not available",
+            data={"success": False, "failure_reason": "no_resource_manager"}
+        )
     
     # Load map Collection
     map_collection_id = resource_manager.named_collections.get(map_name)
@@ -178,7 +182,11 @@ def tool(input_value=None, **kwargs):
         z = kwargs.get('z')
         
         if x is None or y is None or z is None:
-            return executor._create_uniform_return('failed', reason="Location query requires x, y, z coordinates")
+            return executor._create_uniform_return(
+                'failed',
+                value="Location query requires x, y, z coordinates",
+                data={"success": False, "failure_reason": "missing_coordinates"}
+            )
         
         x_block = _round_coordinate(x)
         y_block = _round_coordinate(y)
@@ -203,7 +211,11 @@ def tool(input_value=None, **kwargs):
         property_value = kwargs.get('value')
         
         if not property_path:
-            return executor._create_uniform_return('failed', reason="Property query requires property path")
+            return executor._create_uniform_return(
+                'failed',
+                value="Property query requires property path",
+                data={"success": False, "failure_reason": "missing_property"}
+            )
         
         # Navigate property path (e.g., "geom.stair" -> entry['observed']['geom']['stair'])
         for entry in map_content:
@@ -239,7 +251,11 @@ def tool(input_value=None, **kwargs):
         waypoint_name = kwargs.get('waypoint')
         
         if not waypoint_name:
-            return executor._create_uniform_return('failed', reason="Waypoint query requires waypoint name")
+            return executor._create_uniform_return(
+                'failed',
+                value="Waypoint query requires waypoint name",
+                data={"success": False, "failure_reason": "missing_waypoint"}
+            )
         
         for entry in map_content:
             if isinstance(entry, dict):
@@ -259,7 +275,11 @@ def tool(input_value=None, **kwargs):
         from_z = kwargs.get('from_z')
         
         if from_x is None or from_y is None or from_z is None:
-            return executor._create_uniform_return('failed', reason="Unexplored query requires from_x, from_y, from_z coordinates")
+            return executor._create_uniform_return(
+                'failed',
+                value="Unexplored query requires from_x, from_y, from_z coordinates",
+                data={"success": False, "failure_reason": "missing_coordinates"}
+            )
         
         # Find locations with low visit_count or missing observations
         candidates = []
@@ -295,7 +315,11 @@ def tool(input_value=None, **kwargs):
         property_value = kwargs.get('value')
         
         if from_x is None or from_y is None or from_z is None:
-            return executor._create_uniform_return('failed', reason="Nearest query requires from_x, from_y, from_z coordinates")
+            return executor._create_uniform_return(
+                'failed',
+                value="Nearest query requires from_x, from_y, from_z coordinates",
+                data={"success": False, "failure_reason": "missing_coordinates"}
+            )
         
         # Filter by property if specified
         candidates = []
@@ -333,7 +357,11 @@ def tool(input_value=None, **kwargs):
             result_text_parts.append("No matching locations found")
     
     else:
-        return executor._create_uniform_return('failed', reason=f"Unknown query type: {query_type}")
+        return executor._create_uniform_return(
+            'failed',
+            value=f"Unknown query type: {query_type}",
+            data={"success": False, "failure_reason": "invalid_query_type"}
+        )
     
     # Format results
     result_text = "\n".join(result_text_parts) if result_text_parts else "Query completed"

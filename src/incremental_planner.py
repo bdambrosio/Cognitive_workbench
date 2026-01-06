@@ -14,6 +14,7 @@ import time
 import re
 import os
 import sys
+import datetime
 from pathlib import Path
 from typing import Dict, List, Any, Optional
 from infospace_executor import InfospaceExecutor
@@ -337,39 +338,7 @@ Common Patterns:
 
 #TOOLS
 Tool System
-  - Tools are defined as SKILL.md files with YAML frontmatter
-  - available tools are loaded from the tools directory and will be listed below
-  - prompt_augmentation - LLM-based tools (e.g. as-json, as-markdown, matches, text-find, extract-struct)
-  - python - Code execution tools (e.g. search-web, semantic-scholar, filter-collection, calculate, summarize, refine, assess, relate, generate-note)
-
-#Tool Selection (only if tool is in the tool catalog):
-General Tools:
-- Academic papers: semantic-scholar (provides abstracts, citations, PDFs)
-- General web: search-web (broad coverage, recent content)
-- Single URL fetch: fetch-text (NOT for search-web/semantic-scholar results)
-- Generate new content: generate-note (creates text/code from scratch, no target needed)
-- Extract info from unstructured text: refine (LLM-based, use for text content)
-- Extract metadata/structured fields: project (field accessor, use for metadata.* fields)
-- as-markdown: EXTRACT existing markdown from mixed text (NOT for converting TO markdown)
-- as-json: EXTRACT existing JSON from mixed text (NOT for converting TO JSON)
-
-Boolean Tools (return true/false):
-- is-empty: Check if text is null/empty/whitespace
-- is-positive: Check if number is > 0
-- is-question: Check if text contains a question
-Result shows as Note with boolean content (True/False) - inspect actual value when needed
-
-Condition Tools:
-- bound: {"type": "bound", "target": "$var"} - true if $var exists
-- notbound: {"type": "notbound", "target": "$var"} - true if $var doesn't exist
-- has_value: {"type": "has_value", "target": "$var"} - true if $var is truthy
-- empty: {"type": "empty", "target": "$var"} - true if Note is falsy/empty or Collection has 0 items
-- equals: {"type": "equals", "target": "$var", "value": "expected"}
-- not_equals: {"type": "not_equals", "target": "$var", "value": "unwanted"}
-- greater_than, less_than, gte, lte: Numeric comparisons
-- contains: {"type": "contains", "target": "$var", "value": "keyword"} - substring for Note, Note ID membership for Collection
-- not_contains: {"type": "not_contains", "target": "$var", "value": "unwanted"}
-- matches_pattern: {"type": "matches_pattern", "target": "$var", "pattern": "regex"}
+  - Tools include primitive tools, discussed above, and external tools, loaded at runtime from the tools directory.
 """
 
 
@@ -666,9 +635,9 @@ def tool_catalog_text(tools: Dict[str, Dict]) -> str:
         description = meta.get('full_description') or meta.get('description', 'No description')
         tool_type = meta.get('type', 'code_execution')
         lines.append(f"- {name}: {description}")
-        lines.append(f"  type: {tool_type}")
-        schema = json.dumps(meta['schema_hint'])
-        lines.append(f"  expected_args_schema: {schema}")
+        #lines.append(f"  type: {tool_type}")
+        #schema = json.dumps(meta['schema_hint'])
+        #lines.append(f"  expected_args_schema: {schema}")
         
         # Add examples for primitives with expanded docs
         if 'examples' in meta and meta['examples']:
@@ -1011,8 +980,6 @@ def sgl_to_infospace_action(tool_name: str, args_json: str, step: int, available
     literal_value_primitives = [
         'create-note', 'create-collection', 'add', 'remove', 'say', 'display', 'think', 'ask',
         'search-web', 'semantic-scholar', 'search-notes', 'search-collections',
-        # World tools that need literal values (block names, commands, etc.)
-        'mc-place', 'mc-say', 'osworld-execute', 'osworld-reset', 'scienceworld-act'
     ]
     if tool_name not in literal_value_primitives:
         variable_fields.extend(['target', 'value'])
@@ -1317,14 +1284,7 @@ if HAS_SGLANG:
         system_parts.append("and iteratively execute-step / reflect / refine your plan until the goal is satisfied.")
         system_parts.append(f"\n{INCREMENTAL_PLAN_SPECIFICATIONS}\n")
         system_parts.append(f"Complete primitive and tool catalog:\n{tools_catalog_text}\n#### END OF INFOSPACE TYPE SYSTEM, SPECIFICATIONS, AND TOOL CATALOG\n\n")
-        system_parts.append("""Follow this process to achieve the goal:
-    Stage 1 (once): Analyze goal, select relevant tools, decompose into FIRST_TASK.
-    Stage 1.5 (once): Load and inject detailed docs for selected tools.
-    Then you will work in repeated cycles to achieve the goal:
-    - Stage 2: Pick a single tool and JSON args for CURRENT_TASK. Be concise in text value arguments.
-    - Stage 3: Reflect on result, decide if goal done, set NEXT_TASK.
-    ALWAYS follow all formatting instructions exactly.
-""")
+
         system_parts.append(f"Setting:\n{character_context}\n\n")
         system_parts.append(f"Goal:\n\n{template}\n{goal}\n\n")
         if preplan:
@@ -1337,9 +1297,18 @@ if HAS_SGLANG:
         if available_resources_text:
             system_parts.append(f"\n{available_resources_text}\n")
         # Add current date and time
-        import datetime
+
         system_parts.append(f"WORLD_MODEL: {json.dumps(world_model, indent=2)}\n")
         system_parts.append(f"CURRENT_TIME: {datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}\n")
+        system_parts.append("""Follow this process to achieve the goal:
+ - Stage 1 (once): Analyze goal, select relevant tools, decompose into FIRST_TASK.
+ - Stage 1.5 (once): Load and inject detailed docs for selected tools.
+Then you will work in repeated cycles to achieve the goal:
+ - Stage 2: Pick a single tool and JSON args for CURRENT_TASK. Be concise in text value arguments.
+ - Stage 3: Reflect on result, decide if goal done, set NEXT_TASK.
+ALWAYS follow all formatting instructions exactly.
+
+""")        
         s += system("".join(system_parts))
         
         s += user(

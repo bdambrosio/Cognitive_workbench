@@ -579,6 +579,9 @@ class ZenohExecutiveNode:
         world_config = self.character_config.get('world_config', {})
         world_name = world_config.get('world_name') or self.map_name
         
+        # Initialize action_counter before creating executor (executor init may trigger init tool which publishes actions)
+        self.action_counter = 0
+        
         # Initialize InfospaceExecutor first (needed for WorldModel and ToolModel)
         self.infospace_executor = InfospaceExecutor(
             agent_name=character_name,
@@ -601,7 +604,8 @@ class ZenohExecutiveNode:
             world_name=world_name,
             agent_name=character_name,
             resource_manager=self.resource_manager,
-            executor=self.infospace_executor
+            executor=self.infospace_executor,
+            available_tools=self.available_tools
         )
         logger.info(f'🌍 WorldModel initialized for {character_name} in {world_name}')
         
@@ -611,7 +615,8 @@ class ZenohExecutiveNode:
             world_name=world_name,
             agent_name=character_name,
             resource_manager=self.resource_manager,
-            executor=self.infospace_executor
+            executor=self.infospace_executor,
+            available_tools=self.available_tools
         )
         self.tool_model.build_task_tool_index()
         logger.info(f'🔧 ToolModel initialized for {character_name} in {world_name}')
@@ -651,8 +656,7 @@ class ZenohExecutiveNode:
             import traceback
             traceback.print_exc()
         
-        # Internal state
-        self.action_counter = 0
+        # Internal state (action_counter already initialized above, before executor creation)
         self.last_sense_data = None
         
         # OODA loop state
@@ -802,6 +806,11 @@ class ZenohExecutiveNode:
         self.plan_bindings_queryable = self.session.declare_queryable(
             f"cognitive/{character_name}/plan_bindings",
             self._plan_bindings_query_handler
+        )
+        
+        self.world_state_queryable = self.session.declare_queryable(
+            f"cognitive/{character_name}/world_state",
+            self._world_state_query_handler
         )
         
         # Queryable for explicit planner bindings clearing (character-specific)
@@ -2509,6 +2518,20 @@ Finally, using 'say', respond in character to User\n"""
             query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
         except Exception as e:
             logger.error(f'Error in plan_bindings query handler: {e}')
+            response = {'success': False, 'error': str(e)}
+            query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
+    
+    def _world_state_query_handler(self, query):
+        """Handle query for current world state."""
+        try:
+            world_state = {}
+            if self.infospace_executor and hasattr(self.infospace_executor, 'world_state'):
+                world_state = self.infospace_executor.world_state
+            
+            response = {'success': True, 'world_state': world_state}
+            query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
+        except Exception as e:
+            logger.error(f'Error in world_state query handler: {e}')
             response = {'success': False, 'error': str(e)}
             query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
     

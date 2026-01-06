@@ -40,7 +40,11 @@ def tool(input_value=None, **kwargs):
         
         if not data.get("ok"):
             error = data.get("error", "unknown failure")
-            return executor._create_uniform_return('failed', reason=f"Inventory request failed: {error}")
+            return executor._create_uniform_return(
+                'failed',
+                value=f"Inventory request failed: {error}",
+                data={"success": False, "failure_reason": "inventory_failed"}
+            )
         
         slots = data.get("slots", [])
         equipped = data.get("equipped", {})
@@ -69,6 +73,7 @@ def tool(input_value=None, **kwargs):
         
         # Build structured data dict
         structured_data = {
+            "success": True,
             "slots": slots,
             "equipped": equipped,
             **data
@@ -77,7 +82,11 @@ def tool(input_value=None, **kwargs):
         return executor._create_uniform_return('success', value=inv_text, data=structured_data)
     except requests.exceptions.RequestException as e:
         logger.error(f"Minecraft inventory request failed: {e}")
-        return executor._create_uniform_return('failed', reason=f"API request failed: {e}")
+        return executor._create_uniform_return(
+            'failed',
+            value=f"API request failed: {e}",
+            data={"success": False, "failure_reason": "api_failed"}
+        )
 
 
 if __name__ == "__main__":

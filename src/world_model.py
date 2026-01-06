@@ -85,12 +85,12 @@ def empty_world_model() -> WorldModel:
 
 
 class WorldModel:
-    def __init__(self, world_name: str, agent_name: str, resource_manager, executor=None):
+    def __init__(self, world_name: str, agent_name: str, resource_manager, executor=None, available_tools: Dict[str, Dict] = None):
         self.world_name = world_name
         self.agent_name = agent_name
         self.resource_manager = resource_manager
         self.executor = executor
-        
+        self.available_tools = available_tools
         # Store prior creation date to avoid re-reading file at save time
         self.prior_create_date = None
         
@@ -128,6 +128,47 @@ class WorldModel:
             if not self.prior_create_date:
                 # Fallback to updated_at if created_at missing (legacy files)
                 self.prior_create_date = world_model.get('updated_at')
+            
+            # Validate tool_contracts against available_tools
+            removed_tools = []
+            if self.available_tools is not None:
+                available_tool_names = set(self.available_tools.keys())
+                tool_contracts = world_model.get('tool_contracts', [])
+                original_count = len(tool_contracts)
+                
+                # Filter out contracts for unavailable tools
+                world_model['tool_contracts'] = [
+                    contract for contract in tool_contracts
+                    if contract.get('tool') in available_tool_names
+                ]
+                
+                # Log warnings for removed contracts and track removed tool names
+                removed_count = original_count - len(world_model['tool_contracts'])
+                if removed_count > 0:
+                    removed_tools = [
+                        contract.get('tool') for contract in tool_contracts
+                        if contract.get('tool') not in available_tool_names
+                    ]
+                    for tool_name in removed_tools:
+                        logger.warning(f"Removed tool_contract for unavailable tool '{tool_name}' from world_model")
+                
+                # Remove facts that mention any removed tool names
+                if removed_tools:
+                    facts = world_model.get('facts', [])
+                    original_facts_count = len(facts)
+                    
+                    world_model['facts'] = [
+                        fact for fact in facts
+                        if not any(tool_name in fact.get('fact', '') for tool_name in removed_tools)
+                    ]
+                    
+                    # Log warnings for removed facts
+                    removed_facts_count = original_facts_count - len(world_model['facts'])
+                    if removed_facts_count > 0:
+                        for fact in facts:
+                            fact_text = fact.get('fact', '')
+                            if any(tool_name in fact_text for tool_name in removed_tools):
+                                logger.warning(f"Removed fact mentioning unavailable tool(s) from world_model: '{fact_text[:100]}...'")
             
             logger.info(f"📂 Loaded world_model from {self.world_model_file}")
             return world_model

@@ -1,78 +1,56 @@
 ---
 name: search-obsidian
 type: python
-description: "Search Obsidian notes using Obsidian Local REST API. Returns Collection of JSON Notes with fields text, metadata.uri (alias: source_url), metadata.domain, format, char_count). Use to find information in Obsidian vault."
-schema_hint:
-  value: "string (query - literal search text, not a variable)"
-  out: "$variable"
-examples:
-  - '{"type":"search-obsidian","value":"transformer architecture","out":"$notes"}'
-  - '{"type":"project","target":"$notes","fields":["metadata.uri","metadata.domain"],"out":"$urls"}'
-  - '{"type":"filter-structured","target":"$notes","where":"char_count > 1000","out":"$long_notes"}'
+description: "Search Obsidian notes using Obsidian Local REST API. Returns Collection of JSON Notes with fields text, metadata.uri (alias: source_url), metadata.domain, format, char_count"
 ---
 
-# Obsidian Search Tool (Level 4)
+# Obsidian Search Tool
+
+Search Obsidian notes using Obsidian Local REST API. Returns Collection of structured Notes.
+
+## Purpose
+
+Find information in Obsidian vault. Searches by filename first, then fetches note content and filters by content match. Only searches markdown files (`.md`).
+
 ## Input
-- Query string (e.g., "machine learning notes")
+
+- `value`: Query string (literal search text, not a variable)
+
 ## Output
-- Collection ID containing one structured Note per search result
-- Each Note contains JSON with uniform structure:
 
-```json
-{
-  "text": "# Machine Learning\n\nThis note discusses...",
-  "format": "markdown",
-  "metadata": {
-    "source_url": "obsidian://vault/notes/machine-learning.md",
-    "uri": "obsidian://vault/notes/machine-learning.md",
-    "domain": "obsidian",
-    "elapsed_ms": 45
-  },
-  "char_count": 1123
-}
-```
+Returns Collection ID containing one structured Note per search result. Each Note contains JSON with uniform structure:
+- `text`: Note content
+- `format`: "markdown"
+- `metadata.source_url`: Obsidian URI (e.g., "obsidian://vault/notes/machine-learning.md")
+- `metadata.uri`: Alias for source_url (standardized URI field)
+- `metadata.domain`: "obsidian"
+- `char_count`: Character count
+- `metadata.elapsed_ms`: Search time
 
-## Configuration
-Requires Obsidian Local REST API plugin to be installed and enabled in Obsidian.
+## Behavior & Performance
 
-- `OBSIDIAN_MCP_URL` environment variable (defaults to `http://127.0.0.1:27123` for HTTP, or `https://127.0.0.1:27124` for HTTPS)
-- `OBSIDIAN_MCP_API_KEY` environment variable (required) - Get your API key from Obsidian Local REST API plugin settings
+- Searches by filename first, then content match
+- Only searches markdown files
+- Returns structured Notes matching search-web/semantic-scholar format for consistency
 
-## Search Behavior
-Searches by filename first, then fetches note content and filters by content match. Only searches markdown files (`.md`).
+## Guidelines
 
-## Example Note Structure
+- Requires Obsidian Local REST API plugin installed and enabled
+- Requires `OBSIDIAN_MCP_URL` environment variable (defaults to `http://127.0.0.1:27123` for HTTP, or `https://127.0.0.1:27124` for HTTPS)
+- Requires `OBSIDIAN_MCP_API_KEY` environment variable (get from Obsidian Local REST API plugin settings)
+- The `value` parameter must be a literal string (e.g., `"grobid"`), not a variable reference (e.g., `"$grobid"`)
+- Use `metadata.uri` in `project` operations for consistent access across all tools
 
-Each Note in the returned Collection contains:
-```json
-{
-  "text": "# Note Title\n\nNote content here...",
-  "format": "markdown",
-  "metadata": {
-    "source_url": "obsidian://vault/path/to/note.md",
-    "uri": "obsidian://vault/path/to/note.md",
-    "domain": "obsidian",
-    "elapsed_ms": 50
-  },
-  "char_count": 523
-}
-```
+## Usage Examples
 
-**Note**: The `uri` field is a standardized URI field (alias for `source_url`) for consistency with `search-web` and search primitives. Use `metadata.uri` in `project` operations for consistent access across all tools.
-
-**Important**: The `value` parameter must be a literal string (e.g., `"grobid"`), not a variable reference (e.g., `"$grobid"`).
-
-## Common Workflows
-
-**Search and summarize:**
+Search and summarize:
 ```json
 {"type":"search-obsidian","value":"neural networks","out":"$notes"}
 {"type":"summarize","target":"$notes","focus":"what are neural networks","out":"$summary"}
 ```
 
-**Filter results:**
+Filter results:
 ```json
 {"type":"search-obsidian","value":"python scripts","out":"$notes"}
 {"type":"filter-collection","target":"$notes","predicate":"contains code","out":"$code_notes"}
 ```
-

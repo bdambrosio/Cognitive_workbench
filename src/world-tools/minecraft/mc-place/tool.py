@@ -46,7 +46,11 @@ def tool(input_value=None, **kwargs):
     
     item = kwargs.get("item") or input_value or ""
     if not isinstance(item, str) or not item.strip():
-        return executor._create_uniform_return('failed', reason="item/block name required (string)")
+        return executor._create_uniform_return(
+            'failed',
+            value="item/block name required (string)",
+            data={"success": False, "failure_reason": "missing_item"}
+        )
     
     # Build position parameters - bot expects ref.pos or ref.rel
     place_params = {"item": item}
@@ -79,14 +83,22 @@ def tool(input_value=None, **kwargs):
         ref["rel"] = rel_params
     
     if not ref:
-        return executor._create_uniform_return('failed', reason="reference block position required (absolute x,y,z OR relative forward,right,up)")
+        return executor._create_uniform_return(
+            'failed',
+            value="reference block position required (absolute x,y,z OR relative forward,right,up)",
+            data={"success": False, "failure_reason": "missing_position"}
+        )
     
     place_params["ref"] = ref
     
     # Face is required (convert "top"/"bottom" to "up"/"down" if needed)
     face = kwargs.get("face")
     if not face:
-        return executor._create_uniform_return('failed', reason="face required (top, bottom, north, south, east, west)")
+        return executor._create_uniform_return(
+            'failed',
+            value="face required (top, bottom, north, south, east, west)",
+            data={"success": False, "failure_reason": "missing_face"}
+        )
     if face == "top":
         face = "up"
     elif face == "bottom":
@@ -106,11 +118,17 @@ def tool(input_value=None, **kwargs):
             error = data.get("error", "unknown failure")
             error_code = data.get("error_code", "unknown_error")
             result_text = f"Place failed: {error}"
-            return executor._create_uniform_return('failed', reason=result_text, data={
-                "error": error,
-                "error_code": error_code,
-                **data
-            })
+            return executor._create_uniform_return(
+                'failed',
+                value=result_text,
+                data={
+                    "success": False,
+                    "failure_reason": "placement_failed",
+                    "error": error,
+                    "error_code": error_code,
+                    **data
+                }
+            )
         
         # Placement request accepted - note that actual placement is asynchronous
         # and may fail due to Minecraft physics (block already exists, insufficient space, etc.)
@@ -125,13 +143,18 @@ def tool(input_value=None, **kwargs):
         
         # Build structured data dict
         structured_data = dict(data)
+        structured_data["success"] = True
         structured_data["status"] = "accepted"  # Request accepted, but placement may still fail asynchronously
         structured_data["placed"] = placed_info
         
         return executor._create_uniform_return('success', value=result_text, data=structured_data)
     except requests.exceptions.RequestException as e:
         logger.error(f"Minecraft place request failed: {e}")
-        return executor._create_uniform_return('failed', reason=f"API request failed: {e}")
+        return executor._create_uniform_return(
+            'failed',
+            value=f"API request failed: {e}",
+            data={"success": False, "failure_reason": "api_failed"}
+        )
 
 
 if __name__ == "__main__":

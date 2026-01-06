@@ -65,7 +65,11 @@ def tool(input_value=None, **kwargs):
 
         use_params["rel"] = rel_params
     else:
-        return executor._create_uniform_return('failed', reason="position required (absolute x,y,z OR relative forward,right,up)")
+        return executor._create_uniform_return(
+            'failed',
+            value="position required (absolute x,y,z OR relative forward,right,up)",
+            data={"success": False, "failure_reason": "missing_position"}
+        )
     
     try:
         url = f"{minecraft_url}/act/use"
@@ -79,21 +83,32 @@ def tool(input_value=None, **kwargs):
             error = data.get("error", "unknown failure")
             error_code = data.get("error_code", "unknown_error")
             result_text = f"Use failed: {error}"
-            return executor._create_uniform_return('failed', reason=result_text, data={
-                "error": error,
-                "error_code": error_code,
-                **data
-            })
+            return executor._create_uniform_return(
+                'failed',
+                value=result_text,
+                data={
+                    "success": False,
+                    "failure_reason": "use_failed",
+                    "error": error,
+                    "error_code": error_code,
+                    **data
+                }
+            )
         
         result_text = "Use interaction successful"
         
         # Build structured data dict
         structured_data = dict(data)
+        structured_data["success"] = True
         
         return executor._create_uniform_return('success', value=result_text, data=structured_data)
     except requests.exceptions.RequestException as e:
         logger.error(f"Minecraft use request failed: {e}")
-        return executor._create_uniform_return('failed', reason=f"API request failed: {e}")
+        return executor._create_uniform_return(
+            'failed',
+            value=f"API request failed: {e}",
+            data={"success": False, "failure_reason": "api_failed"}
+        )
 
 
 if __name__ == "__main__":
