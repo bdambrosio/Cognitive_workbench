@@ -66,7 +66,11 @@ def tool(input_value=None, **kwargs):
         
         open_params["rel"] = rel_params
     else:
-        return executor._create_uniform_return('failed', reason="position required (absolute x,y,z OR relative forward,right,up)")
+        return executor._create_uniform_return(
+            'failed',
+            value="position required (absolute x,y,z OR relative forward,right,up)",
+            data={"success": False, "failure_reason": "missing_position"}
+        )
     
     try:
         url = f"{minecraft_url}/act/open"
@@ -79,16 +83,23 @@ def tool(input_value=None, **kwargs):
         if not data.get("ok"):
             error = data.get("error", "unknown failure")
             result_text = f"Open failed: {error}"
-            return executor._create_uniform_return('failed', reason=result_text, data={
-                "error": error,
-                **data
-            })
+            return executor._create_uniform_return(
+                'failed',
+                value=result_text,
+                data={
+                    "success": False,
+                    "failure_reason": "open_failed",
+                    "error": error,
+                    **data
+                }
+            )
         
         ui_type = data.get("ui_type", "unknown")
         result_text = f"Opened {ui_type}"
         
         # Build structured data dict
         structured_data = {
+            "success": True,
             "ui_type": data.get("ui_type"),
             **data
         }
@@ -96,7 +107,11 @@ def tool(input_value=None, **kwargs):
         return executor._create_uniform_return('success', value=result_text, data=structured_data)
     except requests.exceptions.RequestException as e:
         logger.error(f"Minecraft open request failed: {e}")
-        return executor._create_uniform_return('failed', reason=f"API request failed: {e}")
+        return executor._create_uniform_return(
+            'failed',
+            value=f"API request failed: {e}",
+            data={"success": False, "failure_reason": "api_failed"}
+        )
 
 
 if __name__ == "__main__":

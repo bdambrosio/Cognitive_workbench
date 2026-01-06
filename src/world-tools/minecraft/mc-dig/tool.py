@@ -71,7 +71,11 @@ def tool(input_value=None, **kwargs):
         
         dig_params["rel"] = rel_params
     else:
-        return executor._create_uniform_return('failed', reason="position required (absolute x,y,z OR relative forward,right,up)")
+        return executor._create_uniform_return(
+            'failed',
+            value="position required (absolute x,y,z OR relative forward,right,up)",
+            data={"success": False, "failure_reason": "missing_position"}
+        )
     
     try:
         url = f"{minecraft_url}/act/dig"
@@ -87,10 +91,16 @@ def tool(input_value=None, **kwargs):
         if not data.get("ok"):
             error = data.get("error", "unknown failure")
             result_text = f"Dig failed: {error}"
-            return executor._create_uniform_return('failed', reason=result_text, data={
-                "error": error,
-                **data
-            })
+            return executor._create_uniform_return(
+                'failed',
+                value=result_text,
+                data={
+                    "success": False,
+                    "failure_reason": "dig_failed",
+                    "error": error,
+                    **data
+                }
+            )
         
         # Dig request accepted - note that actual digging is asynchronous
         # and may fail due to Minecraft physics (block too hard, cannot reach, etc.)
@@ -108,13 +118,18 @@ def tool(input_value=None, **kwargs):
         
         # Build structured data dict
         structured_data = dict(data)
+        structured_data["success"] = True
         structured_data["status"] = "accepted"  # Request accepted, but digging may still fail asynchronously
         structured_data["dug"] = dug
         
         return executor._create_uniform_return('success', value=result_text, data=structured_data)
     except requests.exceptions.RequestException as e:
         logger.error(f"Minecraft dig request failed: {e}")
-        return executor._create_uniform_return('failed', reason=f"API request failed: {e}")
+        return executor._create_uniform_return(
+            'failed',
+            value=f"API request failed: {e}",
+            data={"success": False, "failure_reason": "api_failed"}
+        )
 
 
 if __name__ == "__main__":

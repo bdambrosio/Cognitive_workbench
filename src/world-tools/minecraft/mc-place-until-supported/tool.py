@@ -129,11 +129,19 @@ def tool(input_value=None, **kwargs):
     if not isinstance(item, str) or not item.strip():
         item = _find_best_block_from_inventory(executor)
         if not item:
-            return executor._create_uniform_return('failed', reason="item/block name required and no solid blocks found in inventory")
+            return executor._create_uniform_return(
+                'failed',
+                value="item/block name required and no solid blocks found in inventory",
+                data={"success": False, "failure_reason": "no_item_available"}
+            )
     
     placement_policy = kwargs.get("placement_policy", "underfoot").lower()
     if placement_policy not in ["underfoot", "forward-underfoot", "lateral"]:
-        return executor._create_uniform_return('failed', reason=f"Invalid placement_policy: {placement_policy}. Must be one of: underfoot, forward-underfoot, lateral")
+        return executor._create_uniform_return(
+            'failed',
+            value=f"Invalid placement_policy: {placement_policy}. Must be one of: underfoot, forward-underfoot, lateral",
+            data={"success": False, "failure_reason": "invalid_policy"}
+        )
     
     max_attempts = int(kwargs.get("max_attempts", 3))
     verify_delay = float(kwargs.get("verify_delay", 0.0))
@@ -245,8 +253,12 @@ def tool(input_value=None, **kwargs):
     if log_messages:
         result_text += "\n" + "\n".join(log_messages)
     
+    # Determine success based on outcome
+    is_success = (outcome == "SUPPORTED")
+    
     # Build structured data dict
     structured_data = {
+        "success": is_success,
         "outcome": outcome,
         "attempts_made": attempt_count,
         "max_attempts": max_attempts,
@@ -256,7 +268,8 @@ def tool(input_value=None, **kwargs):
         "log": log_messages
     }
     
-    return executor._create_uniform_return('success', value=result_text, data=structured_data)
+    status = 'success' if is_success else 'failed'
+    return executor._create_uniform_return(status, value=result_text, data=structured_data)
 
 
 if __name__ == "__main__":

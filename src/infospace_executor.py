@@ -70,6 +70,10 @@ class InfospaceExecutor:
         # Agent state (persistent across plans)
         self.agent_position = None
         
+        # World state (initialized from world_config.state JSON string)
+        self.world_state = {}
+        self._initialize_world_state()
+        
         # Suspension state for sync execution
         self._sync_suspension_state = None
         
@@ -89,6 +93,80 @@ class InfospaceExecutor:
         
         # Load world-specific documentation if configured
         self._load_world_documentation()
+        
+        # Run init tool if available (after full tool catalog is loaded)
+        self._run_init_tool()
+    
+    def _initialize_world_state(self):
+        """
+        Initialize world_state from world_config.state JSON string.
+        
+        Parses world_config.state (if present) and stores as self.world_state dict.
+        If state is missing or invalid JSON, initializes to empty dict.
+        """
+        if not self.executive_node:
+            return
+        
+        world_config = self.executive_node.character_config.get('world_config', {})
+        state_json = world_config.get('state')
+        
+        if not state_json:
+            logger.debug("No world_config.state found, initializing empty world_state")
+            self.world_state = {}
+            return
+        
+        if isinstance(state_json, str):
+            try:
+                self.world_state = json.loads(state_json)
+                logger.info(f"Initialized world_state from world_config.state: {list(self.world_state.keys())}")
+            except json.JSONDecodeError as e:
+                logger.warning(f"Failed to parse world_config.state JSON: {e}, initializing empty world_state")
+                self.world_state = {}
+        elif isinstance(state_json, dict):
+            # Already a dict (some configs might provide it parsed)
+            self.world_state = state_json.copy()
+            logger.info(f"Initialized world_state from world_config.state dict: {list(self.world_state.keys())}")
+        else:
+            logger.warning(f"world_config.state has unexpected type {type(state_json).__name__}, initializing empty world_state")
+            self.world_state = {}
+    
+    def get_world_state(self, field_name: str) -> Any:
+        """
+        Get a top-level field from world_state.
+        
+        Args:
+            field_name: Name of the top-level field to retrieve (e.g., 'nav')
+            
+        Returns:
+            Value of the field, or None if field doesn't exist
+        """
+        return self.world_state.get(field_name)
+    
+    def set_world_state(self, field_name: str, value: Any) -> None:
+        """
+        Set a top-level field in world_state.
+        
+        Args:
+            field_name: Name of the top-level field to set (e.g., 'nav')
+            value: Value to set (can be any JSON-serializable type)
+        """
+        self.world_state[field_name] = value
+        logger.debug(f"Set world_state.{field_name} = {value}")
+        
+        # Publish world_state update to Zenoh for UI updates
+        if self.session:
+            try:
+                world_state_data = {
+                    'world_state': self.world_state,
+                    'updated_field': field_name,
+                    'timestamp': datetime.now().isoformat()
+                }
+                self.session.put(
+                    f"cognitive/{self.agent_name}/world_state",
+                    json.dumps(world_state_data)
+                )
+            except Exception as e:
+                logger.warning(f"Failed to publish world_state update: {e}")
     
     def _load_world_documentation(self):
         """
@@ -177,6 +255,47 @@ class InfospaceExecutor:
                     logger.warning(f"Failed to index world documentation Collection '{world_name}': {error_msg}")
         else:
             logger.error(f"Failed to create world documentation Collection '{world_name}'")
+    
+    def _run_init_tool(self):
+        """
+        Run init tool if available from world-tools/<world_name>/init.
+        
+        Checks for a tool named 'init' or '<world_name>-init' in available_tools
+        and executes it using execute_action_with_log.
+        """
+        if not self.available_tools:
+            return
+        
+        # Try to find init tool - check both 'init' and '<world_name>-init'
+        init_tool_name = None
+        
+        # First try exact 'init' name
+        if 'init' in self.available_tools:
+            init_tool_name = 'init'
+        # Then try world-specific name (e.g., 'minecraft-init')
+        elif f'{self.world_name}-init' in self.available_tools:
+            init_tool_name = f'{self.world_name}-init'
+        
+        if not init_tool_name:
+            logger.debug(f"No init tool found (checked 'init' and '{self.world_name}-init')")
+            return
+        
+        logger.info(f"Running init tool: {init_tool_name}")
+        
+        try:
+            # Execute init tool with no input value
+            result = self.execute_action_with_log(
+                {"type": init_tool_name},
+                "init-tool"
+            )
+            
+            if result.get("status") == "success":
+                logger.info(f"Init tool '{init_tool_name}' completed successfully")
+            else:
+                reason = result.get("reason", "unknown error")
+                logger.warning(f"Init tool '{init_tool_name}' failed: {reason}")
+        except Exception as e:
+            logger.error(f"Error running init tool '{init_tool_name}': {e}", exc_info=True)
     
     def clear_plan_state(self):
         """Clear ephemeral plan state (call at start of new plan)"""
@@ -717,8 +836,11 @@ class InfospaceExecutor:
             return self._create_uniform_return('failed', reason=f'Unknown tool type: {tool_type}')
         
         if result.get('status') != 'success':
-            # Failed result - convert to uniform format for API/planner
-            return self._create_uniform_return('failed', reason=result.get('reason', 'Unknown error'))
+            if result.get('type') == 'uniform_return':# Failed result - convert to uniform format for API/planner
+                return result
+            else:
+                # Failed result - convert to uniform format for API/planner
+                return self._create_uniform_return('failed', reason=result.get('reason', 'Unknown error'))
         
         # Extract result components
         # If result is already a uniform return dict, use 'data' field (full value)

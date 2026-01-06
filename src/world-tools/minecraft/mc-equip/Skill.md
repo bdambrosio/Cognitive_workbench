@@ -1,45 +1,53 @@
 ---
 name: mc-equip
 type: python
-description: "Equip an item from inventory into hand or offhand. Returns success/failure."
-schema_hint:
-  value: "item name (preferred)"
-  item: "item name (alternative to value)"
-  slot: "hand or offhand (default: hand)"
-  out: "$variable"
-examples:
-  - '{"type":"mc-equip","item":"stone","slot":"hand","out":"$equip"}'
-  - '{"type":"mc-equip","value":"wooden_pickaxe","slot":"hand","out":"$tool"}'
+description: "Equip an item from inventory into hand or offhand. Returns success/failure"
 ---
 
 # Minecraft Equip Tool
 
+Equips an item from inventory into hand or offhand slot. Returns success/failure status.
+
+## Purpose
+
+Item equipping for tool use, combat, and interaction. Moves items from inventory slots to hand or offhand for use.
+
 ## Input
-- `value` or `item`: Item name to equip (required)
-- `slot`: "hand" or "offhand" (optional, default: "hand")
+
+- `value`: Item name to equip (preferred)
+- `item`: Item name to equip (alternative to value)
+- `slot`: `"hand"` | `"offhand"` (default: `"hand"`)
 
 ## Output
-- Note ID (bound to `out` variable) containing:
-  - `text`: success/failure message
-  - `metadata`: raw response including:
-    - `success`: boolean - whether equip succeeded
-    - `equipped`: string - item that was equipped
-    - `error_code`: string - failure reason code if unsuccessful (e.g., "item_not_in_inventory", "invalid_slot", "already_equipped")
 
-## Configuration
-- Configured via `world_config.port` (defaults to `http://localhost:3003`)
-- Can be overridden with `world_config.url` or `MINECRAFT_URL` environment variable
+Returns uniform_return format with:
+- `value`: Text summary (e.g., "Equipped stone in hand")
+- `data`: Structured data dict (machine-readable). Key fields:
+  - `success`: Boolean
+  - `equipped`: String (item that was equipped)
+  - `slot`: String (`"hand"` | `"offhand"`)
 
-## Common Workflow
+## Behavior & Performance
+
+- Requires item to be in inventory
+- Fails if item not found in inventory
+- Hand slot is default if slot not specified
+
+## Guidelines
+
+- Use `mc-inventory` first to check available items
+- Item name must match exactly (e.g., "stone", "wooden_pickaxe")
+- Hand slot is primary interaction slot
+- Offhand slot is secondary slot (e.g., shield, torch)
+
+## Usage Examples
+
+Equip item in hand:
 ```json
-{"type":"mc-inventory","out":"$inv"}
 {"type":"mc-equip","item":"stone","slot":"hand","out":"$equip"}
-{"type":"mc-place","item":"stone","rel_x":0,"rel_y":-1,"rel_z":0,"face":"top","out":"$place"}
 ```
 
-## Cognitive Contract
-- Embodied state change - modifies equipped item
-- Required before mc-place (item must be equipped)
-- May be required before mc-dig (tool-dependent)
-- Fails loudly if item not in inventory
-
+Equip tool:
+```json
+{"type":"mc-equip","value":"wooden_pickaxe","slot":"hand","out":"$tool"}
+```

@@ -1,49 +1,45 @@
 ---
 name: extract-struct
-description: Extract structured metadata (title, authors, year) from paper text using LLM. Use to convert online search results metadata to JSON
 type: prompt_augmentation
-schema_hint:
-  target: "$variable or Note ID (paper text)"
-  out: "$variable"
-parameters:
-  - name: paper_text
-    type: string
-    description: Full text or first pages of academic paper
-examples:
-  - '{"type":"extract-struct","target":"$paper_text","out":"$metadata"}'
+description: "Extract structured metadata (title, authors, year) from paper text using LLM. Use to convert online search results metadata to JSON"
 ---
 
-# Extract Metadata
+# Extract Metadata Tool
 
 Extracts structured metadata from academic paper text using LLM analysis.
 
+## Purpose
+
+Convert unstructured paper text into structured JSON format with title, authors, year, venue, and abstract fields. Useful for converting online search results to standardized metadata format.
+
 ## Input
-- `paper_text`: Full text or first few pages of paper (from fetch-text, or text field from fetch-text JSON output)
+
+- `target`: Note ID or variable containing full text or first pages of academic paper
 
 ## Output
-Returns JSON with:
-- title: Paper title
-- authors: List of author names
-- year: Publication year
-- venue: Conference/journal if identifiable
-- abstract: Paper abstract if present
 
-## Prompt
+Returns JSON Note with:
+- `title`: Paper title
+- `authors`: List of author names
+- `year`: Publication year
+- `venue`: Conference/journal if identifiable
+- `abstract`: Paper abstract if present
 
-You are analyzing academic paper text. Extract the following metadata and return as JSON:
+## Behavior & Performance
 
+- Uses LLM to analyze paper text and extract structured fields
+- Handles various paper formats and layouts
+- Returns only JSON, no explanation text
+
+## Guidelines
+
+- Provide full text or first few pages for best results
+- Works best with academic papers that have clear title/author sections
+- Use with `fetch-text` to get paper content first
+
+## Usage Examples
+
+Extract metadata from paper:
 ```json
-{
-  "title": "paper title",
-  "authors": ["author1", "author2"],
-  "year": "YYYY",
-  "venue": "conference or journal name",
-  "abstract": "paper abstract"
-}
+{"type":"extract-struct","target":"$paper_text","out":"$metadata"}
 ```
-
-Paper text:
-{{paper_text}}
-
-Return only the JSON, no explanation.
-

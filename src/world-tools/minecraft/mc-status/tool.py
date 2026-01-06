@@ -28,6 +28,22 @@ def _extract_y_from_status(data: Dict[str, Any]) -> Optional[float]:
     return None
 
 
+def _normalize_yaw(yaw: float) -> float:
+    """
+    Normalize yaw to 0-360 range.
+    
+    Args:
+        yaw: Yaw in degrees (can be negative or > 360)
+    
+    Returns:
+        Normalized yaw in 0-360 range
+    """
+    normalized = yaw % 360
+    if normalized < 0:
+        normalized += 360
+    return normalized
+
+
 def _derive_vertical_state(y_prev: Optional[float], y_now: Optional[float], dt_s: Optional[float], y_epsilon: float) -> Tuple[str, str]:
     if y_now is None:
         return "UNKNOWN", "Missing current Y position"
@@ -82,7 +98,11 @@ def tool(input_value=None, **kwargs):
         data = fetch_status()
         
         if not data.get('ok'):
-            return executor._create_uniform_return('failed', reason=data.get('error', 'unknown error'))
+            return executor._create_uniform_return(
+                'failed',
+                value=data.get('error', 'unknown error'),
+                data={"success": False, "failure_reason": "status_failed"}
+            )
 
         y_prev = None
         y_now = _extract_y_from_status(data)
@@ -131,6 +151,9 @@ def tool(input_value=None, **kwargs):
         
         yaw = data.get('yaw')
         pitch = data.get('pitch')
+        # Normalize yaw to 0-360 range before returning
+        if yaw is not None:
+            yaw = _normalize_yaw(yaw)
         if yaw is not None and pitch is not None:
             status_parts.append(f"Yaw: {yaw:.2f}, Pitch: {pitch:.2f}")
         
@@ -168,6 +191,9 @@ def tool(input_value=None, **kwargs):
         
         # Build structured data dict
         structured_data = dict(data)
+        # Ensure yaw is normalized in structured_data
+        if 'yaw' in structured_data and structured_data['yaw'] is not None:
+            structured_data['yaw'] = _normalize_yaw(structured_data['yaw'])
         structured_data["vertical_state"] = vertical_state
         structured_data["vertical_state_explanation"] = vertical_explanation
         structured_data["vertical_state_mode"] = mode
@@ -176,11 +202,16 @@ def tool(input_value=None, **kwargs):
         structured_data["vertical_state_dt_s"] = dt_s
         structured_data["vertical_state_y_epsilon"] = y_epsilon
         structured_data["vertical_state_sample_delay_s"] = sample_delay_s if double_sample else None
+        structured_data["success"] = True
         
         return executor._create_uniform_return('success', value=status_text, data=structured_data)
     except requests.exceptions.RequestException as e:
         logger.error(f"Minecraft status request failed: {e}")
-        return executor._create_uniform_return('failed', reason=f"API request failed: {e}")
+        return executor._create_uniform_return(
+            'failed',
+            value=f"API request failed: {e}",
+            data={"success": False, "failure_reason": "api_failed"}
+        )
 
 
 if __name__ == "__main__":

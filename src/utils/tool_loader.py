@@ -200,8 +200,8 @@ def load_tools(tools_dir_path: str) -> Dict[str, Dict]:
         
         # Extract examples from frontmatter for planner
         examples = metadata.get('examples', [])
-        if not examples:
-            logger.warning(f"Tool {tool_name} missing examples in SKILL.md frontmatter")
+        #if not examples:
+        #    logger.warning(f"Tool {tool_name} missing examples in SKILL.md frontmatter")
         
         # For instruction tools, extract body text (everything after frontmatter)
         body_text = None

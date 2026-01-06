@@ -1,41 +1,45 @@
 ---
 name: mc-wait
 type: python
-description: "Synchronous wait for 1 second using time.sleep. Useful for timing delays or pacing actions."
-schema_hint:
-  value: "ignored"
-  out: "$variable"
-examples:
-  - '{"type":"mc-wait","out":"$wait"}'
+description: "Synchronous wait for 1 second using time.sleep. Useful for timing delays or pacing actions"
 ---
 
 # Minecraft Wait Tool
 
+Synchronous wait for 1 second using time.sleep. Useful for timing delays or pacing actions.
+
+## Purpose
+
+Timing control for pacing actions, waiting for asynchronous operations, and coordinating multi-step sequences.
+
 ## Input
-- `value`: ignored
-- `out`: variable name to store result
+
+- `value`: Ignored
 
 ## Output
-- Note ID (bound to `out` variable) containing:
-  - `text`: wait completion message
-  - `metadata`: raw wait data including:
-    - `wait_duration_seconds`: duration waited (currently fixed at 1 second)
-    - `status`: completion status ("completed")
 
-## Configuration
-- No external configuration required
-- Uses Python `time.sleep()` for synchronous blocking wait
+Returns uniform_return format with:
+- `value`: Text summary (wait completion message)
+- `data`: Structured data dict (machine-readable). Key fields:
+  - `success`: Boolean
+  - `wait_duration_seconds`: Float (currently fixed at `1.0`)
 
-## Common Workflow
+## Behavior & Performance
+
+- Synchronous wait - blocks execution for 1 second
+- Fixed duration of 1.0 seconds
+- Useful for pacing rapid actions
+
+## Guidelines
+
+- Use to pace rapid action sequences
+- Use after asynchronous operations to allow time for completion
+- Fixed 1-second duration - cannot be customized
+- Blocks execution during wait
+
+## Usage Examples
+
+Wait one second:
 ```json
-{"type":"mc-move","forward":true,"duration":2.0,"out":"$move"}
 {"type":"mc-wait","out":"$wait"}
-{"type":"mc-observe-blocks","out":"$obs"}
 ```
-
-## Cognitive Contract
-- **SYNCHRONOUS**: This tool blocks for exactly 1 second before returning
-- **TIMING**: Useful for pacing actions, allowing world state to settle, or creating deliberate delays
-- **NO MINECRAFT API**: Does not interact with Minecraft server, purely Python timing
-- **CONSTANT DURATION**: Currently fixed at 1 second (no parameters)
-

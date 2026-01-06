@@ -28,7 +28,7 @@ def empty_tool_model() -> Dict[str, Any]:
     }
 
 class ToolModel:
-    def __init__(self, world_name: str, agent_name: str, resource_manager, executor=None):
+    def __init__(self, world_name: str, agent_name: str, resource_manager, executor=None, available_tools: Dict[str, Dict] = None):
         """
         Initialize ToolModel.
         
@@ -37,11 +37,13 @@ class ToolModel:
             agent_name: Agent name (required)
             resource_manager: Resource manager instance (required)
             executor: InfospaceExecutor instance (optional)
+            available_tools: Dictionary of available tools for filtering (optional)
         """
         self.world_name = world_name
         self.agent_name = agent_name
         self.resource_manager = resource_manager
         self.executor = executor
+        self.available_tools = available_tools
         
         # Store prior creation date to avoid re-reading file at save time
         self.prior_create_date = None
@@ -86,12 +88,47 @@ class ToolModel:
                 # Fallback to updated_at if created_at missing (legacy files)
                 self.prior_create_date = tool_model.get('updated_at')
             
-            # Reconstruct existing_hashes from loaded records (not stored, computed at load time)
-            self.existing_hashes = set()
-            for rec in tool_model.get("training_records", []):
-                h = rec.get("_record_hash")
-                if h:
-                    self.existing_hashes.add(h)
+            # Validate training_records against available_tools
+            if self.available_tools is not None:
+                available_tool_names = set(self.available_tools.keys())
+                training_records = tool_model.get('training_records', [])
+                original_count = len(training_records)
+                
+                # Filter out records for unavailable tools and clean legal_tools lists
+                filtered_records = []
+                for rec in training_records:
+                    chosen_tool = rec.get('chosen_tool')
+                    # Remove record if chosen_tool is not available
+                    if chosen_tool and chosen_tool not in available_tool_names:
+                        logger.warning(f"Removed training_record for unavailable tool '{chosen_tool}' from tool_model")
+                        continue
+                    
+                    # Clean legal_tools list to only include available tools
+                    legal_tools = rec.get('legal_tools', [])
+                    if legal_tools:
+                        cleaned_legal_tools = [tool for tool in legal_tools if tool in available_tool_names]
+                        removed_legal = set(legal_tools) - set(cleaned_legal_tools)
+                        if removed_legal:
+                            logger.warning(f"Removed unavailable tools from legal_tools in training_record: {removed_legal}")
+                        rec['legal_tools'] = cleaned_legal_tools
+                    
+                    filtered_records.append(rec)
+                
+                tool_model['training_records'] = filtered_records
+                
+                # Reconstruct existing_hashes from filtered records
+                self.existing_hashes = set()
+                for rec in filtered_records:
+                    h = rec.get("_record_hash")
+                    if h:
+                        self.existing_hashes.add(h)
+            else:
+                # Reconstruct existing_hashes from loaded records (not stored, computed at load time)
+                self.existing_hashes = set()
+                for rec in tool_model.get("training_records", []):
+                    h = rec.get("_record_hash")
+                    if h:
+                        self.existing_hashes.add(h)
             
             logger.info(f"📂 Loaded tool_model from {self.tool_model_file}")
             return tool_model

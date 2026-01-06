@@ -1,37 +1,44 @@
 ---
 name: mc-unequip
 type: python
-description: "Clear or swap equipped item. Returns success/failure."
-schema_hint:
-  value: "ignored"
-  slot: "hand or offhand (default: hand)"
-  out: "$variable"
-examples:
-  - '{"type":"mc-unequip","slot":"hand","out":"$unequip"}'
+description: "Clear or swap equipped item. Returns success/failure"
 ---
 
 # Minecraft Unequip Tool
 
+Clears or swaps equipped item from hand or offhand slot. Returns success/failure status.
+
+## Purpose
+
+Item unequipping for inventory management and tool switching. Moves items from hand/offhand back to inventory.
+
 ## Input
-- `slot`: "hand" or "offhand" (optional, default: "hand")
+
+- `slot`: `"hand"` | `"offhand"` (default: `"hand"`)
+- `value`: Ignored
 
 ## Output
-- Note ID (bound to `out` variable) containing:
-  - `text`: success/failure message
-  - `metadata`: raw response including:
-    - `success`: boolean - whether unequip succeeded
 
-## Configuration
-- Configured via `world_config.port` (defaults to `http://localhost:3003`)
-- Can be overridden with `world_config.url` or `MINECRAFT_URL` environment variable
+Returns uniform_return format with:
+- `value`: Text summary (success/failure message)
+- `data`: Structured data dict (machine-readable). Key fields:
+  - `success`: Boolean
 
-## Common Workflow
+## Behavior & Performance
+
+- Clears specified slot
+- Item returns to inventory
+- Fails if slot already empty
+
+## Guidelines
+
+- Use before equipping different items
+- Hand slot is default if slot not specified
+- Empty slots cannot be unequipped
+
+## Usage Examples
+
+Unequip hand slot:
 ```json
 {"type":"mc-unequip","slot":"hand","out":"$unequip"}
-{"type":"mc-equip","item":"wooden_pickaxe","slot":"hand","out":"$equip"}'
 ```
-
-## Cognitive Contract
-- Embodied state change - clears equipped item
-- Item returns to inventory (does not drop)
-

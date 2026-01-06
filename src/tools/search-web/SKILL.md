@@ -1,70 +1,54 @@
 ---
 name: search-web
 type: python
-description: "Search web using Google CSE. Returns Collection of JSON Notes with fields text, metadata.uri (alias: source_url), metadata.domain, format, char_count). Use to find information on the web."
-schema_hint:
-  value: "string (query)"
-  out: "$variable"
-examples:
-  - '{"type":"search-web","value":"transformer architecture papers","out":"$results"}'
-  - '{"type":"project","target":"$results","fields":["metadata.uri","metadata.domain"],"out":"$urls"}'
-  - '{"type":"filter-structured","target":"$results","where":"char_count > 1000","out":"$long_articles"}'
+description: "Search web using Google CSE. Returns Collection of JSON Notes with fields text, metadata.uri (alias: source_url), metadata.domain, format, char_count"
 ---
 
-# Web Search Tool (Level 4)
+# Web Search Tool
+
+Search web using Google Custom Search Engine. Returns Collection of structured Notes with filtered excerpts from multiple URLs.
+
+## Purpose
+
+Find information on the web. Returns query-relevant snippets from multiple URLs (filtered excerpts, not full content). Use `fetch-text` when you have a specific URL and want complete content.
+
 ## Input
-- Query string (e.g., "weather forecast Berkeley CA October 2025")
+
+- `value`: Query string (e.g., "weather forecast Berkeley CA October 2025")
+
 ## Output
-- Collection ID containing one structured Note per search result
-- Each Note contains JSON with uniform structure:
 
-```json
-{
-  "text": "Station List\nNational Weather Service Marine Forecast ...",
-  "format": "html",
-  "metadata": {
-    "source_url": "https://www.ndbc.noaa.gov/data/Forecasts/FZUS56.KMTR.html",
-    "uri": "https://www.ndbc.noaa.gov/data/Forecasts/FZUS56.KMTR.html",
-    "domain": "www.ndbc.noaa.gov",
-    "elapsed_ms": 1206
-  },
-  "char_count": 112
-}
-```
+Returns Collection ID containing one structured Note per search result. Each Note contains JSON with uniform structure:
+- `text`: Filtered excerpt (query-relevant snippet)
+- `format`: "html"
+- `metadata.source_url`: Full URL
+- `metadata.uri`: Alias for source_url (standardized URI field)
+- `metadata.domain`: Domain name
+- `char_count`: Character count
+- `metadata.elapsed_ms`: Search time
 
-## Configuration
-Requires `GOOGLE_API_KEY` and `GOOGLE_CX` environment variables.
+## Behavior & Performance
 
-## Example Note Structure
+- Returns filtered excerpts from multiple URLs (not full content)
+- Format matches semantic-scholar and search-obsidian for consistency
+- Requires `GOOGLE_API_KEY` and `GOOGLE_CX` environment variables
 
-Each Note in the returned Collection contains:
-```json
-{
-  "text": "The dominant sequence transduction models are based on...",
-  "format": "html",
-  "metadata": {
-    "source_url": "https://arxiv.org/abs/1706.03762",
-    "uri": "https://arxiv.org/abs/1706.03762",
-    "domain": "arxiv.org",
-    "elapsed_ms": 1234
-  },
-  "char_count": 523
-}
-```
+## Guidelines
 
-**Note**: The `uri` field is a standardized URI field (alias for `source_url`) for consistency with `semantic-scholar` and search primitives. Use `metadata.uri` in `project` operations for consistent access across all tools.
+- Use `metadata.uri` in `project` operations for consistent access across all tools
+- For complete content from a specific URL, use `fetch-text` instead
+- Results are filtered excerpts, not full page content
 
-## Common Workflows
+## Usage Examples
 
-**Search and summarize:**
+Search and summarize:
 ```json
 {"type":"search-web","value":"what are transformers in AI","out":"$results"}
 {"type":"summarize","target":"$results","focus":"what are transformers","out":"$summary"}
 ```
 
-**Filter results:**
+Filter results:
 ```json
 {"type":"search-web","value":"transformer papers","out":"$results"}
 {"type":"filter-collection","target":"$results","predicate":"contains arxiv.org","out":"$arxiv_only"}
 ```
-

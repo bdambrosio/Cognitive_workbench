@@ -551,6 +551,75 @@ def handle_look(body: Dict[str, Any]) -> Dict[str, Any]:
     except Exception as e:
         return {"ok": False, "error": f"Failed to set rotation: {e}"}
 
+def handle_snapto(body: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Snap player to exact position and orientation.
+    
+    Body: {"x": float, "y": float, "z": float, "yaw": float (optional), "pitch": float (optional)}
+    All parameters are in degrees (for yaw/pitch) and world coordinates (for x/y/z).
+    If yaw or pitch are not provided, current player orientation is preserved.
+    """
+    try:
+        x = float(body.get("x", 0))
+        y = float(body.get("y", 0))
+        z = float(body.get("z", 0))
+        
+        # Preserve current orientation if not provided
+        if "yaw" in body:
+            yaw = float(body["yaw"])
+        else:
+            current_yaw, _ = get_player_rot()
+            yaw = current_yaw
+        
+        if "pitch" in body:
+            pitch = float(body["pitch"])
+        else:
+            _, current_pitch = get_player_rot()
+            pitch = current_pitch
+        
+        # Clamp pitch to [-90°, 90°]
+        pitch = max(-90.0, min(90.0, pitch))
+        
+        # Try Minescript 4.0 APIs first
+        try:
+            # Try player_set_position or player_teleport
+            if hasattr(m, 'player_set_position'):
+                result = m.player_set_position(x, y, z)
+                if result is False:
+                    return {"ok": False, "error": "player_set_position returned False"}
+            elif hasattr(m, 'player_teleport'):
+                result = m.player_teleport(x, y, z)
+                if result is False:
+                    return {"ok": False, "error": "player_teleport returned False"}
+            else:
+                # Fallback: use execute command
+                m.execute(f"tp @s {x} {y} {z} {yaw} {pitch}")
+            
+            # Set orientation
+            result = m.player_set_orientation(yaw, pitch)
+            if result is False:
+                return {"ok": False, "error": "player_set_orientation returned False"}
+            
+            # Flush to ensure commands are applied
+            try:
+                m.flush()
+            except:
+                pass
+        except AttributeError as e:
+            # Fallback: use execute command if APIs not available
+            try:
+                m.execute(f"tp @s {x} {y} {z} {yaw} {pitch}")
+                m.flush()
+            except Exception as e2:
+                return {"ok": False, "error": f"Minescript APIs not available and execute failed: {e2}"}
+        except Exception as e:
+            return {"ok": False, "error": f"Failed to snap: {e}"}
+        
+        log_action("snapto", f"pos=({x:.2f},{y:.2f},{z:.2f}) yaw={yaw:.1f}° pitch={pitch:.1f}°")
+        return {"ok": True}
+    except Exception as e:
+        return {"ok": False, "error": f"Failed to snap: {e}"}
+
 def handle_move(body: Dict[str, Any]) -> Dict[str, Any]:
     """Handle movement command using minescript v4.0 player_press_* APIs."""
     try:
@@ -1071,6 +1140,7 @@ class BridgeHandler(BaseHTTPRequestHandler):
         "/act/drop": handle_drop,
         "/act/stop": handle_stop,
         "/act/respawn": handle_respawn,
+        "/act/snapto": handle_snapto,
         "/say": handle_say,
     }
 

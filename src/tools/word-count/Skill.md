@@ -1,34 +1,40 @@
 ---
 name: word-count
-description: Count words in text. Use to determine length of a document, e.g. to determine if it needs to be summarized before further use.
 type: python
-schema_hint:
-  target: "$variable or Note ID"
-  out: "$variable"
-parameters: none
-examples:
-  - '{"type":"word-count","target":"$text","out":"$count"}'
+description: "Count words in text. Use to determine length of a document, e.g. to determine if it needs to be summarized before further use"
 ---
 
-# Word Count
+# Word Count Tool
 
 Counts the number of words in input text.
 
 ## Purpose
 
-Simple deterministic word counting for text analysis.
+Simple deterministic word counting for text analysis. Use to determine document length, e.g., to determine if it needs to be summarized before further use.
 
-## Input Format
+## Input
 
-Accepts:
-- Plain text string
+- `target`: Note ID or variable containing text to count
 
-## Output Format
+## Output
 
-Returns string with word count.
+Returns string with word count (e.g., "Word count: 6").
 
-## Example
+## Behavior & Performance
 
-Input: "Hello world this is a test"
-Output: "Word count: 6"
+- Simple deterministic counting
+- Fast and reliable
+- Works on any text content
 
+## Guidelines
+
+- Use to check document length before processing
+- Useful for determining if summarization is needed
+- Returns formatted string, not numeric value
+
+## Usage Examples
+
+Count words in text:
+```json
+{"type":"word-count","target":"$text","out":"$count"}
+```

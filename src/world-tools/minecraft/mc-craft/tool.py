@@ -34,7 +34,11 @@ def tool(input_value=None, **kwargs):
     
     recipe = kwargs.get("recipe") or input_value or ""
     if not isinstance(recipe, str) or not recipe.strip():
-        return executor._create_uniform_return('failed', reason="recipe/item name required (string)")
+        return executor._create_uniform_return(
+            'failed',
+            value="recipe/item name required (string)",
+            data={"success": False, "failure_reason": "missing_recipe"}
+        )
     
     count = kwargs.get("count", 1)
     try:
@@ -56,11 +60,17 @@ def tool(input_value=None, **kwargs):
             error = data.get("error", "unknown failure")
             error_code = data.get("error_code", "unknown_error")
             result_text = f"Craft failed: {error}"
-            return executor._create_uniform_return('failed', reason=result_text, data={
-                "error": error,
-                "error_code": error_code,
-                **data
-            })
+            return executor._create_uniform_return(
+                'failed',
+                value=result_text,
+                data={
+                    "success": False,
+                    "failure_reason": "craft_failed",
+                    "error": error,
+                    "error_code": error_code,
+                    **data
+                }
+            )
         
         crafted_item = data.get("item", recipe)
         crafted_count = data.get("count", count)
@@ -68,6 +78,7 @@ def tool(input_value=None, **kwargs):
         
         # Build structured data dict
         structured_data = {
+            "success": True,
             "item": crafted_item,
             "count": crafted_count,
             **data
@@ -76,7 +87,11 @@ def tool(input_value=None, **kwargs):
         return executor._create_uniform_return('success', value=result_text, data=structured_data)
     except requests.exceptions.RequestException as e:
         logger.error(f"Minecraft craft request failed: {e}")
-        return executor._create_uniform_return('failed', reason=f"API request failed: {e}")
+        return executor._create_uniform_return(
+            'failed',
+            value=f"API request failed: {e}",
+            data={"success": False, "failure_reason": "api_failed"}
+        )
 
 
 if __name__ == "__main__":

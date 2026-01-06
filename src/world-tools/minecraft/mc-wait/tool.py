@@ -32,6 +32,7 @@ def tool(input_value=None, **kwargs):
     
     # Build structured data dict
     structured_data = {
+        "success": True,
         "wait_duration_seconds": 1,
         "status": "completed"
     }

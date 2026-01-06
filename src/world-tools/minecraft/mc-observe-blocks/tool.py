@@ -533,6 +533,7 @@ def tool(input_value=None, **kwargs):
         
         # Build structured data dict for mc-map-update (planner still sees text SUMMARY)
         structured_data = {
+            "success": True,
             "pose": {
                 "x": px,
                 "y": py,
@@ -559,7 +560,11 @@ def tool(input_value=None, **kwargs):
         return executor._create_uniform_return('success', value=summary_text, data=structured_data)
     except requests.exceptions.RequestException as e:
         logger.error(f"Minecraft observe request failed: {e}")
-        return executor._create_uniform_return('failed', reason=f"API request failed: {e}")
+        return executor._create_uniform_return(
+            'failed',
+            value=f"API request failed: {e}",
+            data={"success": False, "failure_reason": "api_failed"}
+        )
 
 
 if __name__ == "__main__":

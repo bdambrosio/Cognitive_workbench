@@ -281,6 +281,12 @@ class FastAPIActionDisplayNode:
             self.current_plan_callback
         )
         
+        # Subscriber for character world state updates
+        self.world_state_subscriber = self.session.declare_subscriber(
+            "cognitive/*/world_state",
+            self.world_state_callback
+        )
+        
         # Subscriber for character current state
         # Subscriber for launcher ready signal
         self.ready_subscriber = self.session.declare_subscriber(
@@ -1292,6 +1298,25 @@ Generated: {generated_at}
                 logger.error(f"Error getting plan bindings: {e}")
                 return {"success": False, "message": f"Error: {str(e)}"}
         
+        @self.app.get("/api/world_state/{character}")
+        async def get_world_state(character: str):
+            """Get current world state for a character."""
+            try:
+                selector = f"cognitive/{character}/world_state"
+                replies = self.session.get(selector, timeout=2.0)
+                
+                for reply in replies:
+                    if hasattr(reply, 'ok') and reply.ok is not None:
+                        payload_bytes = reply.ok.payload.to_bytes()
+                        response = json.loads(payload_bytes.decode('utf-8'))
+                        if response.get('success'):
+                            return {"success": True, "world_state": response.get('world_state', {})}
+                
+                return {"success": True, "world_state": {}}
+            except Exception as e:
+                logger.error(f"Error getting world state: {e}")
+                return {"success": False, "message": f"Error: {str(e)}"}
+        
         @self.app.post("/api/export_to_obsidian")
         async def export_to_obsidian():
             """Export current trace file to Obsidian vault."""
@@ -2185,6 +2210,7 @@ Generated: {generated_at}
                     <div class="character-data-tab" data-tab="bindings">Bindings</div>
                     <div class="character-data-tab" data-tab="goals">Goals</div>
                     <div class="character-data-tab" data-tab="plans">Plans</div>
+                    <div class="character-data-tab" data-tab="state">State</div>
                 </div>
                 
                 <!-- Character data content -->
@@ -2221,6 +2247,15 @@ Generated: {generated_at}
                         <div id="savedPlansList">
                             <div style="color: #888; font-style: italic; text-align: center; padding: 20px;">
                                 Loading saved plans...
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- State tab content -->
+                    <div class="character-data-panel" id="statePanel">
+                        <div id="worldStateDisplay">
+                            <div style="color: #888; font-style: italic; text-align: center; padding: 20px;">
+                                Select a character to view world state
                             </div>
                         </div>
                     </div>
@@ -2520,6 +2555,9 @@ Generated: {generated_at}
                 } else if (data.type === 'turn_state_update') {
                     // Handle unified turn state update (replaces step_complete)
                     handleTurnStateUpdate(data);
+                } else if (data.type === 'world_state_update') {
+                    // Handle world state update
+                    updateWorldStateDisplay(data);
                 } else if (data.type === 'test_files_list') {
                     updateTestFileList(data.files);
                 } else if (data.type === 'test_details') {
@@ -2666,6 +2704,11 @@ Generated: {generated_at}
                 document.getElementById('plansPanel').classList.add('active');
                 // Load saved plans list
                 loadSavedPlansList();
+            } else if (tabName === 'state') {
+                document.getElementById('statePanel').classList.add('active');
+                // Load world state
+                const character = activeCharacter || 'Jill';
+                loadWorldState(character);
             }
         }
         
@@ -4102,6 +4145,76 @@ Generated: {generated_at}
             }
         }
         
+        function updateWorldStateDisplay(data) {
+            // Only update if state tab is active and matches current character
+            const activeTab = document.querySelector('.character-data-tab.active');
+            if (!activeTab || activeTab.getAttribute('data-tab') !== 'state') {
+                return;
+            }
+            
+            // Check if this update is for the currently selected character
+            if (data.character !== activeCharacter) {
+                return;
+            }
+            
+            const stateDiv = document.getElementById('worldStateDisplay');
+            if (!stateDiv) {
+                return;
+            }
+            
+            const worldState = data.world_state || {};
+            
+            if (Object.keys(worldState).length === 0) {
+                stateDiv.innerHTML = '<div style="color: #888; font-style: italic; text-align: center; padding: 20px;">No world state data available.</div>';
+                return;
+            }
+            
+            // Use formatted_json if provided, otherwise format it
+            const formattedJson = data.formatted_json || JSON.stringify(worldState, null, 2);
+            
+            stateDiv.innerHTML = `
+                <div style="background: #1e1e1e; border: 1px solid #3e3e42; border-radius: 4px; padding: 15px; font-family: 'Courier New', monospace; font-size: 12px; line-height: 1.6; white-space: pre-wrap; word-wrap: break-word; color: #d4d4d4; max-height: 600px; overflow-y: auto;">
+                    ${escapeHtml(formattedJson)}
+                </div>
+            `;
+        }
+        
+        async function loadWorldState(character) {
+            const stateDiv = document.getElementById('worldStateDisplay');
+            if (!stateDiv) {
+                return;
+            }
+            stateDiv.innerHTML = '<div style="color: #f39c12; text-align: center; padding: 20px;">⏳ Loading...</div>';
+            
+            try {
+                const response = await fetch(`/api/world_state/${character}`);
+                const result = await response.json();
+                
+                if (!result.success) {
+                    stateDiv.innerHTML = `<div style="color: #ff4757; text-align: center; padding: 20px;">❌ Error: ${result.message}</div>`;
+                    return;
+                }
+                
+                const worldState = result.world_state || {};
+                
+                if (Object.keys(worldState).length === 0) {
+                    stateDiv.innerHTML = '<div style="color: #888; font-style: italic; text-align: center; padding: 20px;">No world state data available.</div>';
+                    return;
+                }
+                
+                // Format world_state as JSON with indentation
+                const formattedJson = JSON.stringify(worldState, null, 2);
+                
+                stateDiv.innerHTML = `
+                    <div style="background: #1e1e1e; border: 1px solid #3e3e42; border-radius: 4px; padding: 15px; font-family: 'Courier New', monospace; font-size: 12px; line-height: 1.6; white-space: pre-wrap; word-wrap: break-word; color: #d4d4d4; max-height: 600px; overflow-y: auto;">
+                        ${escapeHtml(formattedJson)}
+                    </div>
+                `;
+            } catch (error) {
+                stateDiv.innerHTML = `<div style="color: #ff4757; text-align: center; padding: 20px;">❌ Error: ${error.message}</div>`;
+            }
+        }
+        
         async function executeGoal(goalName) {
             const character = activeCharacter || 'Jill';
             
@@ -4838,6 +4951,65 @@ Generated: {generated_at}
             logger.error(f"Error in execution_state_callback: {e}")
             import traceback
             traceback.print_exc()
+    
+    def world_state_callback(self, sample):
+        """Handle incoming world state updates."""
+        try:
+            world_state_data = json.loads(sample.payload.to_bytes().decode('utf-8'))
+            
+            # Extract character name from topic path
+            topic_path = str(sample.key_expr)
+            character_name = topic_path.split('/')[1]  # cognitive/{character}/world_state
+            
+            # Send world state update to web clients via WebSocket
+            self._send_world_state_to_websockets(world_state_data, character_name)
+            
+        except Exception as e:
+            logger.error(f"Error in world_state_callback: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    def _send_world_state_to_websockets(self, world_state_data: Dict[str, Any], character_name: str):
+        """Send world state update to all connected WebSocket clients."""
+        with self.websocket_lock:
+            if not self.websocket_connections:
+                return
+        
+        world_state = world_state_data.get('world_state', {})
+        
+        # Format as JSON
+        formatted_json = json.dumps(world_state, indent=2)
+        
+        web_data = {
+            'type': 'world_state_update',
+            'character': character_name,
+            'world_state': world_state,
+            'formatted_json': formatted_json,
+            'timestamp': datetime.now().isoformat()
+        }
+        
+        # Send to all WebSocket connections
+        with self.websocket_lock:
+            disconnected = []
+            for ws in self.websocket_connections:
+                try:
+                    import asyncio
+                    if hasattr(self, '_event_loop') and self._event_loop:
+                        asyncio.run_coroutine_threadsafe(
+                            ws.send_text(json.dumps(web_data)),
+                            self._event_loop
+                        )
+                    else:
+                        # Fallback: try direct send (may not work if event loop not set)
+                        pass
+                except Exception as e:
+                    logger.warning(f"Error sending world_state to WebSocket: {e}")
+                    disconnected.append(ws)
+            
+            # Remove disconnected clients
+            for ws in disconnected:
+                if ws in self.websocket_connections:
+                    self.websocket_connections.remove(ws)
     
     def ready_callback(self, sample):
         """Handle launcher ready signal."""

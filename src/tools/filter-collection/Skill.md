@@ -1,145 +1,53 @@
---- 
+---
 name: filter-collection
-description: Evaluate complex text criteria on each item in a Collection and return a new Collection of matching items. Use to identify relevant items in a Collection.
 type: python
-schema_hint:
-  target: "$variable (Collection)"
-  predicate: "string (filter criteria)"
-  mode: "string (optional, 'include' or 'exclude', default 'include')"
-  out: "$variable"
-examples:
-  - '{"type":"filter-collection","target":"$collection","predicate":"contains technical content","out":"$filtered"}'
+description: "Evaluate complex text criteria on each item in a Collection and return a new Collection of matching items. Use to identify relevant items in a Collection"
 ---
 
-# Filter Collection By Predicate
+# Filter Collection Tool
 
 Apply flexible, natural-language filtering criteria to Collections. Evaluates each item against specified conditions and returns a new Collection containing only matching items.
 
 ## Purpose
 
-Enable complex filtering that goes beyond simple field comparisons:
-- Content-based filtering (semantic, not just keyword)
-- Multi-condition logic
-- Contextual evaluation
-- Subjective/qualitative criteria
+Enable complex filtering that goes beyond simple field comparisons: content-based filtering (semantic, not just keyword), multi-condition logic, contextual evaluation, and subjective/qualitative criteria.
 
-## Input Format
+## Input
 
-Expects a Collection (list of note_ids or sub-collections). Each item is evaluated individually.
+- `target`: Collection ID or variable (required)
+- `predicate`: String describing filter criteria (required)
+- `mode`: "include" (return matches) or "exclude" (return non-matches) (optional, default: "include")
 
+## Output
+
+Returns ID of new Collection containing only items matching the predicate. Empty result returns new empty Collection.
+
+## Behavior & Performance
+
+- Evaluates each item individually using LLM
+- Supports simple predicates ("contains practical examples"), complex predicates ("discusses either reinforcement learning OR supervised learning"), semantic predicates ("has a positive tone"), and comparative predicates ("more detailed than typical overview")
+- Handles numeric predicates (parse and compare numerically), date predicates (handle relative dates), negation ("NOT X"), and boolean logic (AND/OR with standard precedence)
+
+## Guidelines
+
+- Interpretation: Apply reasonable semantic interpretation, use content context not just keywords, consider implicit meaning when clear
+- Edge cases: Ambiguous items excluded unless predicate clearly matches, partial matches included if substantial match (>70% of criteria), missing fields treated as non-match unless predicate allows null
+- Consistency: Apply same standard across all items, similar items should receive similar treatment
+- Quality: No false positives/negatives on clear cases, evaluate entire item content not just opening
+
+## Usage Examples
+
+Content filtering:
 ```json
-["Note_1", "Note_2", "Collection_3"]
+{"type":"filter-collection","target":"$collection","predicate":"contains code or implementation details","out":"$filtered"}
 ```
 
-## Output Format
-
-Returns ID of new Collection containing only items matching the predicate:
-
+Complex logic:
 ```json
-"Collection_5"
+{"type":"filter-collection","target":"$collection","predicate":"mentions safety AND published after 2024","out":"$filtered"}
 ```
 
-The new Collection will have `item_count` reflecting the number of matches.
-
-Empty result: New empty Collection (`[]`).
-
-## Parameters
-
-Required:
-- `predicate`: String describing filter criteria
-
-Optional:
-- `mode`: 'include' (return matches) or 'exclude' (return non-matches), default: 'include'
-
-## Predicate Language
-
-Write predicates as natural language conditions. The tool evaluates each item's content against the criteria.
-
-### Simple Predicates
-- "contains practical examples"
-- "discusses security concerns"
-- "mentions specific companies"
-- "written in technical language"
-- "expresses uncertainty"
-
-### Complex Predicates
-- "discusses either reinforcement learning OR supervised learning"
-- "mentions AI safety AND includes specific proposals"
-- "published after 2024 AND cites empirical results"
-- "NOT just theoretical discussion"
-
-### Semantic Predicates
-- "has a positive tone"
-- "is relevant to healthcare applications"
-- "contains actionable recommendations"
-- "discusses limitations or risks"
-- "suitable for non-technical audience"
-
-### Comparative Predicates
-- "more detailed than typical overview"
-- "focuses on recent developments (last 2 years)"
-- "higher quality than blog post level"
-
-## Evaluation Guidelines
-
-### Interpretation
-- Apply reasonable semantic interpretation
-- Use content context, not just keywords
-- Consider implicit meaning when clear
-
-### Edge Cases
-- **Ambiguous items**: Exclude unless predicate clearly matches
-- **Partial matches**: Include if substantial match (>70% of criteria)
-- **Missing fields**: Treat as non-match unless predicate allows null
-
-### Consistency
-- Apply same standard across all items
-- Similar items should receive similar treatment
-
-## Quality Standards
-
-- **Accuracy**: No false positives/negatives on clear cases
-- **Consistency**: Same criteria applied uniformly
-- **Completeness**: Evaluate entire item content, not just opening
-
-## Special Handling
-
-**Numeric predicates**: Parse and compare numerically when possible
-**Date predicates**: Handle relative dates ("recent", "last month")
-**Negation**: "NOT X" excludes items matching X
-**Boolean logic**: AND/OR handled with standard precedence (AND before OR)
-**Empty/null items**: Skip or treat as non-match based on predicate context
-
-## Examples
-
-**Content filtering:**
-predicate: "contains code or implementation details"  
-Input: Collection with 3 items  
-Output: Collection with 2 matching items
-
-**Complex logic:**
-predicate: "mentions safety AND published after 2024"  
-Input: Collection with 4 items  
-Output: Collection with 2 matching items
-
-**Exclusion mode:**
-predicate: "purely theoretical without practical applications", mode: "exclude"  
-Input: Collection with 3 items  
-Output: Collection with 1 non-matching item
-
-## Error Handling
-
-- **Empty collection**: Return `[]`
-- **Malformed predicate**: Return empty list and log error
-- **Unparseable items**: Skip and continue processing remaining items
-- **No predicate in args**: Return original collection unchanged (no filtering)
-
-## Implementation Notes
-
-Tool should:
-1. Fetch full content for each note_id/sub-collection in input
-2. Evaluate each item against predicate using LLM
-3. Collect matching note_ids
-4. Create new Collection with filtered list
-5. Return the new Collection ID
-6. Preserve original item structure and metadata
+Exclusion mode:
+```json
+{"type":"filter-collection","target":"$collection","predicate":"purely theoretical without practical applications","mode":"exclude","out":"$filtered"}
+```
