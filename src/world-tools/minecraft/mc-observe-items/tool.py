@@ -233,7 +233,7 @@ def tool(input_value=None, **kwargs):
         
         summary_text = "\n".join(summary_parts)
         
-        # Build structured data dict (similar to mc-observe-blocks)
+        # Build structured data dict
         structured_data = {
             "pose": {
                 "x": px,
@@ -258,14 +258,14 @@ def tool(input_value=None, **kwargs):
             "note": note
         }
         
-        structured_data["success"] = True
-        return executor._create_uniform_return('success', value=summary_text, data=structured_data)
+        # Pass structured dict as value (stored in Note), summary_text will be formatted for LLM context
+        return executor._create_uniform_return('success', value=structured_data, extra={"summary": summary_text})
     except requests.exceptions.RequestException as e:
         logger.error(f"Minecraft observe-items request failed: {e}")
         return executor._create_uniform_return(
             'failed',
             value=f"API request failed: {e}",
-            data={"success": False, "failure_reason": "api_failed"}
+            reason="api_failed"
         )
 
 

@@ -69,7 +69,7 @@ def tool(input_value=None, **kwargs):
         return executor._create_uniform_return(
             'failed',
             value="position required (absolute x,y,z OR relative forward,right,up)",
-            data={"success": False, "failure_reason": "missing_position"}
+            reason="missing_position"
         )
     
     try:
@@ -86,31 +86,21 @@ def tool(input_value=None, **kwargs):
             return executor._create_uniform_return(
                 'failed',
                 value=result_text,
-                data={
-                    "success": False,
-                    "failure_reason": "open_failed",
-                    "error": error,
-                    **data
-                }
+                reason="open_failed"
             )
         
         ui_type = data.get("ui_type", "unknown")
         result_text = f"Opened {ui_type}"
         
         # Build structured data dict
-        structured_data = {
-            "success": True,
-            "ui_type": data.get("ui_type"),
-            **data
-        }
-        
-        return executor._create_uniform_return('success', value=result_text, data=structured_data)
+        # Pass API response data as value (stored in Note)
+        return executor._create_uniform_return('success', value=data)
     except requests.exceptions.RequestException as e:
         logger.error(f"Minecraft open request failed: {e}")
         return executor._create_uniform_return(
             'failed',
             value=f"API request failed: {e}",
-            data={"success": False, "failure_reason": "api_failed"}
+            reason="api_failed"
         )
 
 

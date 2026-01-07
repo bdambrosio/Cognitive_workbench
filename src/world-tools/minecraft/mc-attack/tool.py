@@ -42,7 +42,7 @@ def tool(input_value=None, **kwargs):
         return executor._create_uniform_return(
             'failed',
             value="target required (dict with entity_id or rel_x/rel_y/rel_z)",
-            data={"success": False, "failure_reason": "missing_target"}
+            reason="missing_target"
         )
     
     attack_params = {}
@@ -75,7 +75,7 @@ def tool(input_value=None, **kwargs):
         return executor._create_uniform_return(
             'failed',
             value="target must have either entity_id, absolute pos, or relative (forward,right,up)",
-            data={"success": False, "failure_reason": "invalid_target"}
+            reason="invalid_target"
         )
     
     try:
@@ -92,27 +92,20 @@ def tool(input_value=None, **kwargs):
             return executor._create_uniform_return(
                 'failed',
                 value=result_text,
-                data={
-                    "success": False,
-                    "failure_reason": "attack_failed",
-                    "error": error,
-                    **data
-                }
+                reason="attack_failed",
+                extra={"error": error, **data}
             )
         
         result_text = "Attack successful"
         
-        # Build structured data dict
-        structured_data = dict(data)
-        structured_data["success"] = True
-        
-        return executor._create_uniform_return('success', value=result_text, data=structured_data)
+        # Pass API response data as value (stored in Note)
+        return executor._create_uniform_return('success', value=data)
     except requests.exceptions.RequestException as e:
         logger.error(f"Minecraft attack request failed: {e}")
         return executor._create_uniform_return(
             'failed',
             value=f"API request failed: {e}",
-            data={"success": False, "failure_reason": "api_failed"}
+            reason="api_failed"
         )
 
 

@@ -670,7 +670,7 @@ def tool_catalog_text(tools: Dict[str, Dict]) -> str:
 
 def load_skill_docs(tool_names: List[str], available_tools: Dict[str, Dict]) -> str:
     """
-    Load full SKILL.md documentation for selected tools.
+    Load full SKILL.md documentation for selected tools and primitives.
     
     Args:
         tool_names: List of tool names to load docs for
@@ -683,38 +683,47 @@ def load_skill_docs(tool_names: List[str], available_tools: Dict[str, Dict]) -> 
     lines.append("# DETAILED TOOL DOCUMENTATION")
     lines.append("Full documentation for selected tools with examples, patterns, and output schemas:\n")
     
+    # Get primitives directory path
+    primitives_dir = Path(__file__).parent / 'primitives'
+    
     for tool_name in tool_names:
         logger.debug(f"Stage 1.5: Processing {tool_name}")
         
-        # Skip primitives (no SKILL.md files)
-        if tool_name not in available_tools:
-            logger.debug(f"Stage 1.5: {tool_name} not in available_tools (primitive, skipping)")
-            continue
-            
-        tool_meta = available_tools[tool_name]
-        # Use 'path' field which is the tool directory (not 'python_file' which is tool.py)
-        tool_dir_path = tool_meta.get('path')
-        logger.debug(f"Stage 1.5: {tool_name} path = {tool_dir_path}")
-        
-        if not tool_dir_path:
-            logger.debug(f"Stage 1.5: {tool_name} has no path field, skipping")
-            continue
-        
-        # Resolve to absolute path
-        tool_dir = Path(tool_dir_path).resolve()
-        logger.debug(f"Stage 1.5: {tool_name} tool_dir = {tool_dir}")
-        
-        # Look for SKILL.md or Skill.md in tool directory
         skill_file = None
-        for variant in ['SKILL.md', 'Skill.md', 'skill.md']:
-            candidate = tool_dir / variant
-            if candidate.exists():
-                skill_file = candidate
-                logger.debug(f"Stage 1.5: {tool_name} found {variant} at {skill_file}")
-                break
+        
+        # Check if it's a regular tool
+        if tool_name in available_tools:
+            tool_meta = available_tools[tool_name]
+            # Use 'path' field which is the tool directory (not 'python_file' which is tool.py)
+            tool_dir_path = tool_meta.get('path')
+            logger.debug(f"Stage 1.5: {tool_name} path = {tool_dir_path}")
+            
+            if tool_dir_path:
+                # Resolve to absolute path
+                tool_dir = Path(tool_dir_path).resolve()
+                logger.debug(f"Stage 1.5: {tool_name} tool_dir = {tool_dir}")
+                
+                # Look for SKILL.md or Skill.md in tool directory
+                for variant in ['SKILL.md', 'Skill.md', 'skill.md']:
+                    candidate = tool_dir / variant
+                    if candidate.exists():
+                        skill_file = candidate
+                        logger.debug(f"Stage 1.5: {tool_name} found {variant} at {skill_file}")
+                        break
+        else:
+            # Check if it's a primitive with Skill.md
+            logger.debug(f"Stage 1.5: {tool_name} not in available_tools, checking primitives")
+            primitive_dir = primitives_dir / tool_name
+            if primitive_dir.exists():
+                for variant in ['SKILL.md', 'Skill.md', 'skill.md']:
+                    candidate = primitive_dir / variant
+                    if candidate.exists():
+                        skill_file = candidate
+                        logger.debug(f"Stage 1.5: {tool_name} found primitive {variant} at {skill_file}")
+                        break
         
         if not skill_file:
-            logger.debug(f"Stage 1.5: No SKILL.md found for {tool_name} in {tool_dir}")
+            logger.debug(f"Stage 1.5: No SKILL.md found for {tool_name}")
             continue
         
         try:
@@ -1312,7 +1321,7 @@ ALWAYS follow all formatting instructions exactly.
         s += system("".join(system_parts))
         
         s += user(
-            "#Stage 1: Analyze goal and identify relevant tools.\n"
+            "#Stage 1: Analyze goal and identify relevant tools from the Complete primitive and tool catalog.\n"
             "Include tools you might need AND related/supporting tools.\n"
             "Then, decompose the goal into a FIRST high-level task/subgoal to focus on.\n"
             "In doing so, consider the tools you have selected, the goal you are trying to achieve, and the downstream tasks that will be required to achieve the goal.\n"
@@ -1415,9 +1424,9 @@ ALWAYS follow all formatting instructions exactly.
             "#Stage 2 Instructions:\n"
             "- Review the ABSTRACT_PLAN and determine progress on it towards the goal.\n"
             "- Review the current AGENT_STATE_HYPOTHESES and AGENT_STATE_SUPPORT.\n"
-            "- Choose the next tool and JSON args, based on the current task, suggested ABSTRACT_PLAN, and the AGENT_STATE_HYPOTHESES and AGENT_STATE_SUPPORT.\n"
+            "- Choose the next tool and its JSON args, from the Complete primitive and tool catalog, based on the current task, suggested ABSTRACT_PLAN, and the AGENT_STATE_HYPOTHESES and AGENT_STATE_SUPPORT.\n"
             "#Stage 2 FORMAT:\n"
-            "  TOOL_NAME: <name>\n"
+            "  TOOL_NAME: <name from the Complete primitive and tool catalog>\n"
             "  TOOL_ARGS_JSON: <json object>\n\n"
             "#Stage 2 NUMERIC ARGUMENTS:\n"
             "  IMPORTANT: All numeric tool arguments (integers, floats) must be simple literals.\n"
@@ -1492,10 +1501,6 @@ ALWAYS follow all formatting instructions exactly.
             "  - Example: [\"project\", \"filter-structured\"]\n\n"
             "  - If you realize you need a tool not initially selected, add it to REQUEST_TOOLS.\n"
             "  - You'll receive its full documentation before the next step.\n\n"
-            "  METHOD TOOL Instructions:\n"
-            "  - A 'Method' is a text-based protocol YOU must execute step-by-step.\n"
-            "  - It is NOT an automated background process.\n"
-            "  - When you select a Method, you load its manual and must strictly follow its instructions yourself.\n\n"
             "Follow these formats exactly."
         )
         s += assistant("Understood.\n")

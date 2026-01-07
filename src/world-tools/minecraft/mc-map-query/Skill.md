@@ -1,79 +1,91 @@
 ---
 name: mc-map-query
 type: python
-description: "Queries persistent spatial memory for strategic decision-making. Enables 'Have I been here before?', 'Where is the nearest unexplored edge?', 'Where was that staircase?'"
+description: "Queries persistent spatial map for strategic decision-making. Supports coverage, reachability, safety, and resource queries."
 ---
 
 # Minecraft Map Query Tool
 
-Queries persistent spatial memory for strategic decision-making. Enables location queries, property searches, waypoint lookups, and nearest neighbor searches.
+Queries cell-based SpatialMap for spatial planning. Supports multiple query types for coverage analysis, movement planning, safety assessment, and resource discovery.
 
 ## Purpose
 
-Spatial memory queries for navigation, exploration planning, and location recall. Supports multiple query types for different spatial reasoning needs.
+Query spatial memory for strategic information. Returns cells matching criteria for movement planning, hazard avoidance, exploration targeting, and resource gathering.
 
 ## Input
 
-- `query`: Query type - one of `{"location", "property", "unexplored", "waypoint", "nearest"}` (required)
-- `x`, `y`, `z`: Coordinates (for location queries)
-- `property`: Property path string (e.g., `"geom.stair"`) (for property/nearest queries)
-- `value`: Property value to match (for property/nearest queries)
-- `waypoint`: Waypoint name string (for waypoint queries)
-- `from_x`, `from_y`, `from_z`: Starting coordinates (for nearest/unexplored queries)
-- `map_name`: Optional map Collection name (default: `<agent_name>-minecraft_map`)
-- `value`: Ignored
+Common parameters:
+- `query`: Query type (see list below)
+- `x`, `z`: Center coordinates for radius-based queries
+- `radius`: Search radius (default: 10)
+
+Query-specific parameters:
+- `threshold`: Confidence threshold for `cells-low-confidence` (default: 0.5)
+- `max_age`: Maximum age in seconds for `cells-stale` (default: 300)
+- `max_delta_y`: Max Y change for `cells-reachable` (default: 1)
+- `min_dist`: Minimum distance for `cells-observed-from-distance`
+- `resource_type`: Resource type for `cells-with-resource`
+- `predicate`: Filter for `cells-nearest` (walkable, safe, hazard, resource)
+
+## Query Types
+
+Coverage / Observability:
+- `stats`: Map statistics (no coords required)
+- `cells-unobserved`: Unmapped cells within radius
+- `cells-low-confidence`: Cells with confidence below threshold
+- `frontier-cells`: Observed cells adjacent to unobserved
+- `cells-observed-from-distance`: Cells observed from far away
+- `cells-stale`: Cells with old observations
+
+Reachability / Locomotion:
+- `cells-reachable`: Walkable cells within delta_y constraint
+- `cells-blocked`: All blocked/unwalkable cells
+- `cells-requiring-climb`: Cells needing upward movement
+- `cells-with-drop-risk`: Cells involving unsafe descent
+
+Safety / Survival:
+- `cells-safe-to-stand`: Low hazard, walkable cells
+- `cells-high-hazard`: Cells with hazards (lava, fire, etc.)
+- `cells-escape-nodes`: Good retreat positions
+
+Resources:
+- `cells-with-resource`: Cells with specified resource type
+- `cells-water-source`: Cells with water
+
+Multi-Objective:
+- `cells-candidate-waypoints`: Safe, reachable waypoint candidates
+- `cells-nearest`: Nearest cells matching predicate
+- `cells-worth-revisit`: Low confidence or inferred cells
 
 ## Output
 
 Returns uniform_return format with:
-- `value`: Text summary (human-readable query results)
-- `data`: Structured data dict (machine-readable). Key fields:
-  - `success`: Boolean
-  - `query_type`: String
-  - `found`: Boolean
-  - `result_count`: Integer
-  - `results`: Array of location entries (up to 10)
-
-## Behavior & Performance
-
-- Location query: Check if location exists in map
-- Property query: Find locations matching property value
-- Unexplored query: Find nearest unexplored edge from starting point
-- Waypoint query: Lookup waypoint by name
-- Nearest query: Find nearest location matching property from starting point
-
-## Guidelines
-
-- Use location query to check if visited before
-- Use property query to find locations with specific features (e.g., stairs, pits)
-- Use unexplored query for exploration planning
-- Use waypoint query to recall named locations
-- Use nearest query to find closest matching location
-- Results limited to 10 entries for performance
+- `value`: Human-readable summary
+- `data`: `{success, query_type, result_count, results: [cell...]}`
 
 ## Usage Examples
 
-Check location:
+Map statistics:
 ```json
-{"type":"mc-map-query","query":"location","x":-112,"y":71,"z":-123,"out":"$loc"}
+{"type":"mc-map-query","query":"stats"}
 ```
 
-Find stairs:
+Unobserved cells:
 ```json
-{"type":"mc-map-query","query":"property","property":"geom.stair","value":true,"out":"$stairs"}
+{"type":"mc-map-query","query":"cells-unobserved","x":-112,"z":-123,"radius":15}
 ```
 
-Find unexplored edge:
+Safe cells nearby:
 ```json
-{"type":"mc-map-query","query":"unexplored","from_x":-112,"from_y":71,"from_z":-123,"out":"$next"}
+{"type":"mc-map-query","query":"cells-safe-to-stand","x":-112,"z":-123,"radius":10}
 ```
 
-Lookup waypoint:
+Find water:
 ```json
-{"type":"mc-map-query","query":"waypoint","waypoint":"Base_Camp","out":"$base"}
+{"type":"mc-map-query","query":"cells-water-source"}
 ```
 
-Find nearest stair:
+Nearest walkable:
 ```json
-{"type":"mc-map-query","query":"nearest","from_x":-112,"from_y":71,"from_z":-123,"property":"geom.stair","value":true,"out":"$nearest_stair"}
+{"type":"mc-map-query","query":"cells-nearest","x":-112,"z":-123,"predicate":"walkable"}
 ```

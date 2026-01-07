@@ -11,8 +11,23 @@ import uuid
 import traceback
 from zenoh import QueryTarget, ConsolidationMode
 from utils.text_chunking import segment_text_boundary_aware
+from infospace_executor import InfospaceExecutor
 
 logger = logging.getLogger(__name__)
+
+
+def _fail(executor: InfospaceExecutor, reason: str, value: str | None = None, extra: dict | None = None):
+    return executor._create_uniform_return(
+        "failed",
+        value=value or reason,
+        reason=reason,
+        extra=extra,
+    )
+
+
+def _success(executor: InfospaceExecutor, result: str, extra: dict | None = None):
+    return executor._create_uniform_return("success", value=result, extra=extra)
+
 
 # Resource manager will be passed via kwargs
 
@@ -281,8 +296,12 @@ def tool(input_value, runtime=None, **kwargs):
     Returns:
         Summary as string
     """
+    executor: InfospaceExecutor = kwargs.get("executor")
+    if not executor:
+        return {"status": "failed", "reason": "executor not available", "value": None, "resource_id": None}
+
     if not input_value:
-        return "No content to summarize"
+        return _fail(executor, "No content to summarize")
     
     # Extract parameters
     focus = kwargs.get('focus', '')
@@ -354,6 +373,8 @@ def tool(input_value, runtime=None, **kwargs):
                f"after_filter={filtered_chars} chars ({effective_tokens}t), "
                f"target={target_tokens}t")
     
+    final_text: str | None = None
+
     if chunk_count == 1:
         # Single chunk - direct summarization
         chunk_text = chunks[0][0]
@@ -375,7 +396,7 @@ End your response with:
         # Use unified llm_generate callback (required)
         llm_generate = kwargs.get('llm_generate')
         if not llm_generate:
-            raise ValueError("llm_generate callback is required")
+            return _fail(executor, "llm_generate callback is required")
         response = llm_generate(
             messages=[prompt],
             max_tokens=3000,
@@ -389,13 +410,14 @@ End your response with:
         
         if not response.success:
             logger.error(f"summarize failed: {response.error}")
-            return f"Error: {response.error}"
+            return _fail(
+                executor,
+                "llm_generate_failed",
+                value=f"Error: {response.error}",
+                extra={"llm_error": response.error},
+            )
         
-        output_chars = len(response.text)
-        output_tokens = _estimate_tokens(response.text)
-        logger.info(f"summarize: output={output_chars} chars ({output_tokens}t)")
-        
-        return response.text
+        final_text = response.text
     
     # Multiple chunks - hierarchical summarization
     logger.info(f"summarize: hierarchical summarization ({chunk_count} chunks)")
@@ -425,7 +447,7 @@ End your response with:
         # Use unified llm_generate callback (required)
         llm_generate = kwargs.get('llm_generate')
         if not llm_generate:
-            raise ValueError("llm_generate callback is required")
+            return _fail(executor, "llm_generate callback is required")
         response = llm_generate(
             messages=[prompt],
             max_tokens=max_chunk_tokens,
@@ -439,7 +461,12 @@ End your response with:
         
         if not response.success:
             logger.error(f"summarize chunk {i+1}/{chunk_count} failed: {response.error}")
-            return f"Error: {response.error}"
+            return _fail(
+                executor,
+                "llm_generate_failed",
+                value=f"Error: {response.error}",
+                extra={"llm_error": response.error, "chunk_index": i + 1},
+            )
         
         chunk_summaries.append(response.text)
     
@@ -463,7 +490,7 @@ End your response with:
     # Use unified llm_generate callback (required)
     llm_generate = kwargs.get('llm_generate')
     if not llm_generate:
-        raise ValueError("llm_generate callback is required")
+        return _fail(executor, "llm_generate callback is required")
     response = llm_generate(
         messages=[synthesis_prompt],
         max_tokens=3000,
@@ -477,11 +504,32 @@ End your response with:
     
     if not response.success:
         logger.error(f"summarize synthesis failed: {response.error}")
-        return f"Error: {response.error}"
+        return _fail(
+            executor,
+            "llm_generate_failed",
+            value=f"Error: {response.error}",
+            extra={"llm_error": response.error, "stage": "synthesis"},
+        )
     
-    output_chars = len(response.text)
-    output_tokens = _estimate_tokens(response.text)
+    final_text = response.text
+
+    if final_text is None:
+        return _fail(executor, "summarization_failed")
+    
+    output_chars = len(final_text)
+    output_tokens = _estimate_tokens(final_text)
     logger.info(f"summarize: output={output_chars} chars ({output_tokens}t)")
     
-    return response.text
+    return _success(
+        executor,
+        final_text,
+        {
+            "style": style,
+            "focus": focus,
+            "chunk_count": chunk_count,
+            "input_chars": input_chars,
+            "output_chars": output_chars,
+            "inclusion_pct": inclusion_pct,
+        },
+    )
 

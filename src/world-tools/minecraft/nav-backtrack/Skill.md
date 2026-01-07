@@ -31,7 +31,7 @@ Returns uniform_return format with:
 ## Behavior & Performance
 
 - Reads `world_state("nav")` and chooses up to `max_targets` safe entries.
-- Uses `nav-turn` + one of: `nav-moveone`, `nav-climb`, `nav-descend`.
+- Uses `nav-turn` + one of: `nav-move`, `nav-climb`, `nav-descend`.
 - Verifies cell match via `mc-status`.
 
 ## Guidelines

@@ -41,7 +41,7 @@ def tool(input_value=None, **kwargs):
         return executor._create_uniform_return(
             "failed",
             value="Failed to get initial status",
-            data={"success": False, "failure_reason": "status_failed"}
+            reason="status_failed"
         )
     
     status_data = status_result.get("data", {})
@@ -62,7 +62,7 @@ def tool(input_value=None, **kwargs):
         return executor._create_uniform_return(
             "failed",
             value="Failed to normalize pose with nav-turn",
-            data={"success": False, "failure_reason": "turn_failed"}
+            reason="turn_failed"
         )
     
     turn_data = turn_result.get("data", {})
@@ -71,7 +71,7 @@ def tool(input_value=None, **kwargs):
         return executor._create_uniform_return(
             "failed",
             value=f"nav-turn failed: {failure_reason}",
-            data={"success": False, "failure_reason": f"turn_failed_{failure_reason}"}
+            reason=f"turn_failed_{failure_reason}"
         )
     
     # Step 3: Get normalized status
@@ -80,7 +80,7 @@ def tool(input_value=None, **kwargs):
         return executor._create_uniform_return(
             "failed",
             value="Failed to get normalized status",
-            data={"success": False, "failure_reason": "normalized_status_failed"}
+            reason="normalized_status_failed"
         )
     
     normalized_data = normalized_status.get("data", {})
@@ -125,8 +125,7 @@ def tool(input_value=None, **kwargs):
     return executor._create_uniform_return(
         "success",
         value=f"Initialized nav state at ({pose['x']:.2f}, {pose['y']:.2f}, {pose['z']:.2f}), yaw={pose['yaw']:.1f}°",
-        data={
-            "success": True,
+        extra={
             "pose": pose,
             "normalized_from": {
                 "x": initial_pos.get("x", 0.0),

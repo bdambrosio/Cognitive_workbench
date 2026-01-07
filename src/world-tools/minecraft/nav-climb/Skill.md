@@ -112,7 +112,7 @@ This ensures consistent, block-centered positioning for all navigation operation
 - Falls are detected immediately by the bridge `/act/move` endpoint and reported as failures.
 - Collisions prevent movement and are reported as failures.
 - The tool tries walk-up first (no jump), then jump-up if walk-up doesn't achieve sufficient elevation.
-- The default `step_duration` (0.6s) is longer than `nav-moveone` (0.2s) to allow time for step-up mechanics.
+- The default `step_duration` (0.6s) is longer than `nav-move` (0.2s) to allow time for step-up mechanics.
 - Higher-level skills can compose multiple `nav-climb` calls for multi-block vertical traversal.
 - Orientation changes require `nav-turn` (separate tool, not yet implemented).
 - The tool always moves forward relative to the agent's current facing direction.

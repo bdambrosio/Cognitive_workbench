@@ -1056,6 +1056,12 @@ class ZenohExecutiveNode:
                         if binding:
                             display_target = binding
                 
+                # Always include full action JSON for UI display
+                if isinstance(action, dict):
+                    action_data['action'] = json.dumps(action)
+                else:
+                    action_data['action'] = json.dumps(action) if not isinstance(action, str) else action
+                
                 # Show what was created/processed (using uniform format)
                 if result.get('status') == 'success':
                     result_value = result.get('value', '')
@@ -2016,7 +2022,7 @@ Finally, using 'say', respond in character to User\n"""
             traceback.print_exc()
     
     def handle_clear_map(self, sample):
-        """Handle clear map command - deletes the persistent map Collection and all its Notes."""
+        """Handle clear map command - deletes the persistent map Collection, all its Notes, and the SpatialMap file."""
         try:
             if not self.resource_manager:
                 logger.error("Resource manager not available, cannot clear map")
@@ -2025,36 +2031,78 @@ Finally, using 'say', respond in character to User\n"""
             agent_name = getattr(self, 'character_name', 'unknown')
             map_name = f"{agent_name}-minecraft_map"
             
+            # === Clear Collection-based map ===
+            
             # Resolve named Collection
             collection_id = self.resource_manager.named_collections.get(map_name)
             if not collection_id:
                 logger.info(f"Map '{map_name}' not found, nothing to clear")
-                return
-            
-            # Get Collection content (list of Note IDs)
-            collection_resource = self.resource_manager.get_resource(collection_id)
-            if not collection_resource:
-                logger.warning(f"Map Collection {collection_id} resolved but resource not found")
-                return
-            
-            note_ids = collection_resource.get('properties', {}).get('content', [])
-            if not isinstance(note_ids, list):
-                note_ids = []
-            
-            # Delete all Notes in the Collection
-            deleted_notes = 0
-            for note_id in note_ids:
-                if isinstance(note_id, str) and note_id.startswith('Note_'):
-                    success, _ = self.resource_manager.delete_resource(note_id)
-                    if success:
-                        deleted_notes += 1
-            
-            # Delete the Collection itself
-            success, error_msg = self.resource_manager.delete_resource(collection_id)
-            if success:
-                logger.info(f"🗑️ Cleared map '{map_name}' ({collection_id}) - deleted {deleted_notes} Notes")
             else:
-                logger.error(f"Failed to clear map Collection '{map_name}': {error_msg}")
+                # Get Collection content (list of Note IDs)
+                collection_resource = self.resource_manager.get_resource(collection_id)
+                if not collection_resource:
+                    logger.warning(f"Map Collection {collection_id} resolved but resource not found")
+                else:
+                    note_ids = collection_resource.get('properties', {}).get('content', [])
+                    if not isinstance(note_ids, list):
+                        note_ids = []
+                    
+                    # Delete all Notes in the Collection
+                    deleted_notes = 0
+                    for note_id in note_ids:
+                        if isinstance(note_id, str) and note_id.startswith('Note_'):
+                            success, _ = self.resource_manager.delete_resource(note_id)
+                            if success:
+                                deleted_notes += 1
+                    
+                    # Delete the Collection itself
+                    success, error_msg = self.resource_manager.delete_resource(collection_id)
+                    if success:
+                        logger.info(f"🗑️ Cleared map '{map_name}' ({collection_id}) - deleted {deleted_notes} Notes")
+                    else:
+                        logger.error(f"Failed to clear map Collection '{map_name}': {error_msg}")
+            
+            # === Clear SpatialMap file ===
+            
+            # Import SpatialMap and clear it
+            try:
+                from pathlib import Path
+                
+                # Determine base directory
+                if hasattr(self.resource_manager, 'base_dir'):
+                    base_dir = self.resource_manager.base_dir
+                else:
+                    # Fallback to scenarios/<world_name>/resources/
+                    current_dir = Path(__file__).parent
+                    project_root = current_dir.parent
+                    world_name = getattr(self, 'world_name', 'minecraft')
+                    base_dir = project_root / "scenarios" / world_name / "resources"
+                
+                # Delete spatial map file directly
+                spatial_map_file = base_dir / f"{agent_name}_spatial_map.json"
+                if spatial_map_file.exists():
+                    spatial_map_file.unlink()
+                    logger.info(f"🗑️ Deleted spatial map file: {spatial_map_file}")
+                else:
+                    logger.info(f"Spatial map file not found: {spatial_map_file}")
+                
+                # Also clear from mc-map-update cache if it exists
+                try:
+                    import sys
+                    mc_map_update = sys.modules.get('src.world-tools.minecraft.mc-map-update.tool')
+                    if mc_map_update and hasattr(mc_map_update, '_spatial_map_cache'):
+                        world_name = getattr(self, 'world_name', 'minecraft')
+                        cache_key = f"{agent_name}:{world_name}"
+                        if cache_key in mc_map_update._spatial_map_cache:
+                            mc_map_update._spatial_map_cache[cache_key].clear()
+                            del mc_map_update._spatial_map_cache[cache_key]
+                            logger.info(f"🗑️ Cleared spatial map cache for {cache_key}")
+                except Exception as e:
+                    logger.debug(f"Could not clear spatial map cache: {e}")
+                    
+            except Exception as e:
+                logger.warning(f"Failed to clear spatial map file: {e}")
+                
         except Exception as e:
             logger.error(f'Error clearing map: {e}')
             traceback.print_exc()

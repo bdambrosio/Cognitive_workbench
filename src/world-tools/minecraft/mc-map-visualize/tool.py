@@ -1,6 +1,7 @@
 """
 Minecraft map visualization tool.
 Generates an HTML file with 2D visualization of the spatial map and opens it in browser.
+Displays cell-based SpatialMap data with zoomable, pannable interface.
 """
 
 import logging
@@ -13,6 +14,15 @@ from datetime import datetime
 logger = logging.getLogger(__name__)
 
 DEFAULT_MAP_NAME = "minecraft_map"
+
+# Import SpatialMap
+try:
+    from ..spatial_map import SpatialMap
+except ImportError:
+    # Fallback for direct execution
+    import sys
+    sys.path.insert(0, str(Path(__file__).parent.parent))
+    from spatial_map import SpatialMap
 
 
 def _get_content(resource_id: str, resource_manager) -> Any:
@@ -36,241 +46,98 @@ def _round_coordinate(coord: float) -> int:
     return int(round(coord))
 
 
-def _compile_map_forward(map_collection_id: str, resource_manager) -> List[Dict]:
-    """
-    Compile forward: Load all Notes from Collection, deduplicate by (x,y,z), keep latest.
-    
-    Args:
-        map_collection_id: Collection ID containing map Notes
-        resource_manager: Resource manager instance
-        
-    Returns:
-        List of compiled map entries (one per unique location, latest observation)
-    """
-    if not resource_manager:
-        return []
-    
-    # Load Collection
-    map_resource = resource_manager.get_resource(map_collection_id)
-    if not map_resource:
-        return []
-    
-    # Get Note IDs from Collection content
-    note_ids = map_resource.get('properties', {}).get('content', [])
-    if not isinstance(note_ids, list):
-        return []
-    
-    # Load all Notes and compile
-    location_map = {}  # (x,y,z) -> entry with latest timestamp
-    waypoint_map = {}  # (x,y,z) -> set of waypoint names
-    
-    for note_id in note_ids:
-        if not isinstance(note_id, str) or not note_id.startswith('Note_'):
-            continue
-        
-        note_resource = resource_manager.get_resource(note_id)
-        if not note_resource:
-            continue
-        
-        entry = note_resource.get('properties', {}).get('content')
-        if not isinstance(entry, dict):
-            continue
-        
-        # Extract coordinates
-        x = _round_coordinate(entry.get('x', 0))
-        y = _round_coordinate(entry.get('y', 0))
-        z = _round_coordinate(entry.get('z', 0))
-        key = (x, y, z)
-        
-        # Collect waypoints
-        waypoints = entry.get('waypoints', [])
-        if isinstance(waypoints, list) and waypoints:
-            if key not in waypoint_map:
-                waypoint_map[key] = set()
-            waypoint_map[key].update(waypoints)
-        
-        # Get timestamp
-        timestamp = entry.get('timestamp', '')
-        
-        # Keep latest entry for each location
-        if key not in location_map:
-            location_map[key] = entry
-        else:
-            existing_timestamp = location_map[key].get('timestamp', '')
-            if timestamp > existing_timestamp:
-                location_map[key] = entry
-    
-    # Merge waypoints into compiled entries
-    compiled = []
-    for key, entry in location_map.items():
-        compiled_entry = entry.copy()
-        if key in waypoint_map:
-            compiled_entry['waypoints'] = sorted(list(waypoint_map[key]))
-        compiled.append(compiled_entry)
-    
-    return compiled
+# Cache for SpatialMap instances (one per agent)
+_spatial_map_cache: Dict[str, SpatialMap] = {}
 
 
-def _generate_html_visualization(map_content: List[Dict], map_name: str) -> str:
+def _get_spatial_map(agent_name: str, world_name: str, base_dir: Optional[Path] = None) -> SpatialMap:
+    """Get or create SpatialMap for agent."""
+    cache_key = f"{agent_name}:{world_name}"
+    if cache_key not in _spatial_map_cache:
+        _spatial_map_cache[cache_key] = SpatialMap(agent_name, world_name, base_dir)
+    return _spatial_map_cache[cache_key]
+
+
+def _generate_html_visualization(cells: List[Dict], map_name: str, stats: Dict) -> str:
     """
-    Generate HTML visualization of the map.
+    Generate HTML visualization of the spatial map.
     
     Args:
-        map_content: List of location entries from map Collection
-        map_name: Name of the map Collection
+        cells: List of cell entries from SpatialMap
+        map_name: Name of the map
+        stats: Map statistics
         
     Returns:
         HTML string
     """
-    if not map_content:
+    if not cells:
         return """
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Map Visualization - Empty</title>
+    <title>Spatial Map Visualization - Empty</title>
     <style>
-        body { font-family: sans-serif; padding: 40px; text-align: center; }
-        .empty { color: #666; font-size: 18px; }
+        body { font-family: sans-serif; padding: 40px; text-align: center; background: #1e1e1e; color: #d4d4d4; }
+        .empty { color: #888; font-size: 18px; }
     </style>
 </head>
 <body>
-    <div class="empty">Map is empty - no locations explored yet</div>
+    <div class="empty">Spatial map is empty - no cells mapped yet</div>
 </body>
 </html>
 """
     
-    # Extract coordinates and metadata
-    locations = []
-    observed_blocks = []  # Blocks observed but not visited
-    observed_set = set()  # Track (x,y,z) to avoid duplicates
+    # Process cells into visualization data
+    cell_data = []
     waypoints = []
-    min_x = min_y = min_z = float('inf')
-    max_x = max_y = max_z = float('-inf')
     
-    for entry in map_content:
-        if isinstance(entry, dict):
-            x = entry.get('x', 0)
-            y = entry.get('y', 0)
-            z = entry.get('z', 0)
-            
-            if isinstance(x, (int, float)) and isinstance(y, (int, float)) and isinstance(z, (int, float)):
-                # Extract observation metadata for hover details
-                observed = entry.get('observed', {})
-                observation_meta = {}
-                if isinstance(observed, dict):
-                    # Extract affordances, geometry, blocks for hover display
-                    observation_meta = {
-                        'aff': observed.get('aff', {}),
-                        'geom': observed.get('geom', {}),
-                        'blocks': observed.get('blocks', {}),
-                        'support': observed.get('support', {}),
-                        'clear': observed.get('clear', {})
-                    }
-                
-                # Create location dict with observation metadata
-                loc_dict = {
-                    'x': x,
-                    'y': y,
-                    'z': z,
-                    'visit_count': entry.get('visit_count', 0),
-                    'waypoints': entry.get('waypoints', []),
-                    'first_visit': entry.get('first_visit', ''),
-                    'last_visit': entry.get('last_visit', '')
-                }
-                if observation_meta and any(observation_meta.values()):
-                    loc_dict['observation'] = observation_meta
-                
-                locations.append(loc_dict)
-                
-                min_x = min(min_x, x)
-                max_x = max(max_x, x)
-                min_y = min(min_y, y)
-                max_y = max(max_y, y)
-                min_z = min(min_z, z)
-                max_z = max(max_z, z)
-                
-                # Track visited location to avoid showing as observed
-                visited_key = (_round_coordinate(x), _round_coordinate(y), _round_coordinate(z))
-                observed_set.add(visited_key)
-                
-                # Extract nearby_blocks from observation data (check both paths for backward compatibility)
-                nearby = None
-                if isinstance(observed, dict):
-                    # New path: observed.nearby_blocks (top-level, filtered by map-update)
-                    nearby = observed.get('nearby_blocks')
-                    if not nearby:
-                        # Old path: observed.metadata.perception.nearby_blocks (nested)
-                        metadata = observed.get('metadata', {})
-                        if isinstance(metadata, dict):
-                            perception = metadata.get('perception', {})
-                            if isinstance(perception, dict):
-                                nearby = perception.get('nearby_blocks')
-                
-                if isinstance(nearby, list):
-                    for block in nearby:
-                        if isinstance(block, dict):
-                            pos = block.get('position')
-                            if isinstance(pos, dict):
-                                bx = pos.get('x')
-                                by = pos.get('y')
-                                bz = pos.get('z')
-                                if isinstance(bx, (int, float)) and isinstance(by, (int, float)) and isinstance(bz, (int, float)):
-                                    bx_round = _round_coordinate(bx)
-                                    by_round = _round_coordinate(by)
-                                    bz_round = _round_coordinate(bz)
-                                    block_key = (bx_round, by_round, bz_round)
-                                    
-                                    # Only add if not already visited
-                                    if block_key not in observed_set:
-                                        observed_set.add(block_key)
-                                        # Extract dy for layer indication
-                                        dy = block.get('dy', 0)
-                                        observed_blocks.append({
-                                            'x': bx_round,
-                                            'y': by_round,
-                                            'z': bz_round,
-                                            'name': block.get('name', 'unknown'),
-                                            'dy': int(dy) if isinstance(dy, (int, float)) else 0
-                                        })
-                                        
-                                        min_x = min(min_x, bx_round)
-                                        max_x = max(max_x, bx_round)
-                                        min_y = min(min_y, by_round)
-                                        max_y = max(max_y, by_round)
-                                        min_z = min(min_z, bz_round)
-                                        max_z = max(max_z, bz_round)
-                
-                # Collect waypoints
-                for wp in entry.get('waypoints', []):
-                    if wp not in [w['name'] for w in waypoints]:
-                        waypoints.append({'name': wp, 'x': x, 'y': y, 'z': z})
+    bounds = stats.get('bounds', {})
+    min_x = bounds.get('min_x', 0)
+    max_x = bounds.get('max_x', 0)
+    min_z = bounds.get('min_z', 0)
+    max_z = bounds.get('max_z', 0)
+    range_x = max(1, max_x - min_x)
+    range_z = max(1, max_z - min_z)
     
-    if not locations:
-        return """
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Map Visualization - Invalid Data</title>
-    <style>
-        body { font-family: sans-serif; padding: 40px; text-align: center; }
-        .error { color: #d32f2f; font-size: 18px; }
-    </style>
-</head>
-<body>
-    <div class="error">Map contains no valid location data</div>
-</body>
-</html>
-"""
+    for cell in cells:
+        cell_id = cell.get('cell_id', {})
+        x = cell_id.get('x', 0)
+        z = cell_id.get('z', 0)
+        
+        support = cell.get('support', {})
+        surface = cell.get('surface', {})
+        hazards = cell.get('hazards', {})
+        resources = cell.get('resources', {})
+        observability = cell.get('observability', {})
+        environment = cell.get('environment', {})
+        
+        cell_entry = {
+            'x': x,
+            'z': z,
+            'support_y': support.get('support_y'),
+            'delta_y_from_agent': support.get('delta_y_from_agent'),
+            'walkable': support.get('walkable', False),
+            'movement_class': support.get('movement_class', 'unknown'),
+            'surface_class': surface.get('surface_block_class', 'unknown'),
+            'support_block': surface.get('support_block'),
+            'is_fluid': surface.get('is_fluid', False),
+            'hazard_flags': hazards.get('flags', []),
+            'exposure_risk': hazards.get('exposure_risk', 'unknown'),
+            'escape_difficulty': hazards.get('escape_difficulty', 'unknown'),
+            'resources': resources.get('resources_visible', []),
+            'confidence': observability.get('confidence', 0),
+            'observation_mode': observability.get('observation_mode', 'unknown'),
+            'last_observed': observability.get('last_observed_at'),
+            'light_level': environment.get('light_level', 'unknown')
+        }
+        
+        cell_data.append(cell_entry)
     
-    # Calculate bounds and scale
-    range_x = max_x - min_x if max_x != min_x else 1
-    range_z = max_z - min_z if max_z != min_z else 1
-    
-    # Generate HTML with canvas visualization
+    # Generate HTML
     html = f"""<!DOCTYPE html>
 <html>
 <head>
-    <title>Map Visualization - {map_name}</title>
+    <title>Spatial Map Visualization - {map_name}</title>
     <meta charset="UTF-8">
     <style>
         * {{ margin: 0; padding: 0; box-sizing: border-box; }}
@@ -306,6 +173,7 @@ def _generate_html_visualization(map_content: List[Dict], map_name: str) -> str:
             display: flex;
             gap: 10px;
             flex-wrap: wrap;
+            align-items: center;
         }}
         button {{
             background: #0e639c;
@@ -318,6 +186,24 @@ def _generate_html_visualization(map_content: List[Dict], map_name: str) -> str:
         }}
         button:hover {{ background: #1177bb; }}
         button:active {{ background: #0d5585; }}
+        button.active {{ background: #388a34; }}
+        .legend {{
+            display: flex;
+            gap: 15px;
+            margin-left: 20px;
+            font-size: 12px;
+        }}
+        .legend-item {{
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }}
+        .legend-color {{
+            width: 16px;
+            height: 16px;
+            border-radius: 2px;
+            border: 1px solid #444;
+        }}
         .container {{
             display: flex;
             gap: 20px;
@@ -336,7 +222,7 @@ def _generate_html_visualization(map_content: List[Dict], map_name: str) -> str:
             cursor: crosshair;
         }}
         .sidebar {{
-            width: 300px;
+            width: 320px;
             background: #252526;
             border-radius: 4px;
             padding: 15px;
@@ -354,38 +240,58 @@ def _generate_html_visualization(map_content: List[Dict], map_name: str) -> str:
             margin-bottom: 10px;
             letter-spacing: 0.5px;
         }}
-        .waypoint-item {{
+        .stat-item {{
             padding: 6px 10px;
             margin: 4px 0;
             background: #2a2d2e;
             border-radius: 3px;
             font-size: 13px;
-            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
         }}
-        .waypoint-item:hover {{
-            background: #3a3d3e;
-        }}
-        .location-item {{
-            padding: 6px 10px;
-            margin: 4px 0;
-            background: #2a2d2e;
-            border-radius: 3px;
-            font-size: 12px;
-            font-family: 'Consolas', monospace;
+        .stat-value {{
+            color: #4ec9b0;
+            font-weight: 500;
         }}
         .info-panel {{
             position: absolute;
             top: 10px;
             right: 10px;
-            background: rgba(30, 30, 30, 0.9);
-            padding: 10px;
+            background: rgba(30, 30, 30, 0.95);
+            padding: 12px;
             border-radius: 4px;
             font-size: 12px;
             display: none;
             border: 1px solid #3e3e42;
+            min-width: 200px;
+            max-width: 280px;
         }}
         .info-panel.visible {{
             display: block;
+        }}
+        .info-row {{
+            display: flex;
+            justify-content: space-between;
+            padding: 3px 0;
+            border-bottom: 1px solid #333;
+        }}
+        .info-row:last-child {{
+            border-bottom: none;
+        }}
+        .info-label {{
+            color: #888;
+        }}
+        .info-value {{
+            color: #4ec9b0;
+        }}
+        .info-value.hazard {{
+            color: #f14c4c;
+        }}
+        .info-value.safe {{
+            color: #89d185;
+        }}
+        .info-value.warning {{
+            color: #cca700;
         }}
         ::-webkit-scrollbar {{ width: 8px; }}
         ::-webkit-scrollbar-track {{ background: #1e1e1e; }}
@@ -395,65 +301,99 @@ def _generate_html_visualization(map_content: List[Dict], map_name: str) -> str:
 </head>
 <body>
     <div class="header">
-        <h1>🗺️ Map Visualization: {map_name}</h1>
+        <h1>🗺️ Spatial Map: {map_name}</h1>
         <div class="stats">
-            {len(locations)} visited • {len(observed_blocks)} observed • {len(waypoints)} waypoints
+            {stats.get('cell_count', 0)} cells • 
+            {stats.get('walkable_count', 0)} walkable • 
+            {stats.get('hazard_count', 0)} hazards • 
+            {stats.get('resource_count', 0)} resources
         </div>
     </div>
     
     <div class="controls">
         <button onclick="resetView()">Reset View</button>
         <button onclick="fitToBounds()">Fit All</button>
-        <button onclick="toggleWaypoints()">Toggle Waypoints</button>
+        <button id="btnWalkable" class="active" onclick="toggleLayer('walkable')">Walkable</button>
+        <button id="btnHazards" class="active" onclick="toggleLayer('hazards')">Hazards</button>
+        <button id="btnResources" class="active" onclick="toggleLayer('resources')">Resources</button>
+        <button id="btnConfidence" onclick="toggleLayer('confidence')">Confidence</button>
         <button onclick="exportData()">Export JSON</button>
+        
+        <div class="legend">
+            <div class="legend-item">
+                <div class="legend-color" style="background: #4ec9b0;"></div>
+                <span>Walkable</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: #666;"></div>
+                <span>Blocked</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: #f14c4c;"></div>
+                <span>Hazard</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: #ffd700;"></div>
+                <span>Resource</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: #3794ff;"></div>
+                <span>Water</span>
+            </div>
+        </div>
     </div>
     
     <div class="container">
         <div class="map-area">
-            <canvas id="mapCanvas" width="800" height="600"></canvas>
+            <canvas id="mapCanvas" width="900" height="700"></canvas>
             <div id="infoPanel" class="info-panel"></div>
         </div>
         
         <div class="sidebar">
             <div class="section">
-                <div class="section-title">Waypoints ({len(waypoints)})</div>
-                <div id="waypointsList">
-"""
-    
-    # Add waypoints to sidebar
-    for wp in waypoints:
-        html += f"""
-                    <div class="waypoint-item" onclick="focusLocation({wp['x']}, {wp['z']})">
-                        📍 {wp['name']}<br>
-                        <span style="color: #888; font-size: 11px;">({wp['x']}, {wp['y']}, {wp['z']})</span>
-                    </div>
-"""
-    
-    html += """
+                <div class="section-title">Map Statistics</div>
+                <div class="stat-item">
+                    <span>Total Cells</span>
+                    <span class="stat-value">{stats.get('cell_count', 0)}</span>
+                </div>
+                <div class="stat-item">
+                    <span>Walkable</span>
+                    <span class="stat-value">{stats.get('walkable_count', 0)}</span>
+                </div>
+                <div class="stat-item">
+                    <span>Hazards</span>
+                    <span class="stat-value">{stats.get('hazard_count', 0)}</span>
+                </div>
+                <div class="stat-item">
+                    <span>Resources</span>
+                    <span class="stat-value">{stats.get('resource_count', 0)}</span>
                 </div>
             </div>
             
             <div class="section">
-                <div class="section-title">Recent Locations</div>
-                <div id="locationsList">
-"""
-    
-    # Add recent locations (sorted by last_visit)
-    sorted_locations = sorted(locations, key=lambda l: l.get('last_visit', ''), reverse=True)[:20]
-    for loc in sorted_locations:
-        wp_str = ', '.join(loc['waypoints']) if loc['waypoints'] else ''
-        html += f"""
-                    <div class="location-item" onclick="focusLocation({loc['x']}, {loc['z']})">
-                        ({loc['x']}, {loc['y']}, {loc['z']})<br>
-                        <span style="color: #888; font-size: 11px;">
-                            Visits: {loc['visit_count']}
-                            {(' • ' + wp_str) if wp_str else ''}
-                        </span>
-                    </div>
-"""
-    
-    html += f"""
+                <div class="section-title">Bounds</div>
+                <div class="stat-item">
+                    <span>X Range</span>
+                    <span class="stat-value">{bounds.get('min_x', 0)} to {bounds.get('max_x', 0)}</span>
                 </div>
+                <div class="stat-item">
+                    <span>Z Range</span>
+                    <span class="stat-value">{bounds.get('min_z', 0)} to {bounds.get('max_z', 0)}</span>
+                </div>
+                <div class="stat-item">
+                    <span>Size</span>
+                    <span class="stat-value">{bounds.get('range_x', 0)} x {bounds.get('range_z', 0)}</span>
+                </div>
+            </div>
+            
+            <div class="section">
+                <div class="section-title">Movement Classes</div>
+                <div id="movementStats"></div>
+            </div>
+            
+            <div class="section">
+                <div class="section-title">Surface Types</div>
+                <div id="surfaceStats"></div>
             </div>
         </div>
     </div>
@@ -464,9 +404,7 @@ def _generate_html_visualization(map_content: List[Dict], map_name: str) -> str:
         const infoPanel = document.getElementById('infoPanel');
         
         // Map data
-        const locations = {json.dumps(locations)};
-        const observedBlocks = {json.dumps(observed_blocks)};
-        const waypoints = {json.dumps(waypoints)};
+        const cells = {json.dumps(cell_data)};
         const bounds = {{
             minX: {min_x},
             maxX: {max_x},
@@ -480,90 +418,207 @@ def _generate_html_visualization(map_content: List[Dict], map_name: str) -> str:
         let scale = 1;
         let offsetX = 0;
         let offsetZ = 0;
-        let showWaypoints = true;
         let isDragging = false;
         let dragStart = {{x: 0, z: 0}};
         
+        // Layer visibility
+        let showWalkable = true;
+        let showHazards = true;
+        let showResources = true;
+        let showConfidence = false;
+        
+        // Color schemes
+        const surfaceColors = {{
+            'stone': '#808080',
+            'dirt': '#8B4513',
+            'sand': '#C2B280',
+            'wood': '#A0522D',
+            'foliage': '#228B22',
+            'water': '#3794ff',
+            'lava': '#FF4500',
+            'ore': '#FFD700',
+            'unknown': '#555555'
+        }};
+        
         // Convert world coordinates to canvas coordinates
         function worldToCanvas(x, z) {{
-            const canvasX = ((x - bounds.minX) / bounds.rangeX) * canvas.width * scale + offsetX;
-            const canvasZ = ((z - bounds.minZ) / bounds.rangeZ) * canvas.height * scale + offsetZ;
+            const padding = 40;
+            const canvasX = padding + ((x - bounds.minX) / bounds.rangeX) * (canvas.width - padding * 2) * scale + offsetX;
+            const canvasZ = padding + ((z - bounds.minZ) / bounds.rangeZ) * (canvas.height - padding * 2) * scale + offsetZ;
             return {{x: canvasX, z: canvasZ}};
         }}
         
         // Convert canvas coordinates to world coordinates
         function canvasToWorld(canvasX, canvasZ) {{
-            const worldX = ((canvasX - offsetX) / scale) * bounds.rangeX / canvas.width + bounds.minX;
-            const worldZ = ((canvasZ - offsetZ) / scale) * bounds.rangeZ / canvas.height + bounds.minZ;
+            const padding = 40;
+            const worldX = ((canvasX - offsetX - padding) / scale) * bounds.rangeX / (canvas.width - padding * 2) + bounds.minX;
+            const worldZ = ((canvasZ - offsetZ - padding) / scale) * bounds.rangeZ / (canvas.height - padding * 2) + bounds.minZ;
             return {{x: worldX, z: worldZ}};
+        }}
+        
+        // Create lookup map for mapped cells
+        const mappedCells = new Map();
+        cells.forEach(cell => {{
+            const key = `${{cell.x}},${{cell.z}}`;
+            mappedCells.set(key, cell);
+        }});
+        
+        // Helper function to lighten a color
+        function lightenColor(color, amount = 0.3) {{
+            // Handle hex colors
+            if (color.startsWith('#')) {{
+                const num = parseInt(color.slice(1), 16);
+                const r = Math.min(255, ((num >> 16) & 0xff) + Math.floor(255 * amount));
+                const g = Math.min(255, ((num >> 8) & 0xff) + Math.floor(255 * amount));
+                const b = Math.min(255, (num & 0xff) + Math.floor(255 * amount));
+                return `#${{r.toString(16).padStart(2, '0')}}${{g.toString(16).padStart(2, '0')}}${{b.toString(16).padStart(2, '0')}}`;
+            }}
+            // Handle rgb colors
+            if (color.startsWith('rgb')) {{
+                const matches = color.match(/\\d+/g);
+                if (matches && matches.length >= 3) {{
+                    const r = Math.min(255, parseInt(matches[0]) + Math.floor(255 * amount));
+                    const g = Math.min(255, parseInt(matches[1]) + Math.floor(255 * amount));
+                    const b = Math.min(255, parseInt(matches[2]) + Math.floor(255 * amount));
+                    return `rgb(${{r}}, ${{g}}, ${{b}})`;
+                }}
+            }}
+            return color;
+        }}
+        
+        // Get cell color based on properties and active layers
+        function getCellColor(cell, isMapped = true) {{
+            // Unmapped cells use darker color (slightly lighter than background for visibility)
+            if (!isMapped) {{
+                return '#2a2d2e';  // Dark gray, slightly lighter than background #1e1e1e
+            }}
+            
+            // Mapped cells use lighter shades
+            // Priority: hazards > resources > walkability > surface
+            if (showHazards && cell.hazard_flags && cell.hazard_flags.length > 0) {{
+                return lightenColor('#f14c4c', 0.2);
+            }}
+            
+            if (cell.is_fluid) {{
+                return cell.surface_class === 'lava' ? lightenColor('#FF4500', 0.2) : lightenColor('#3794ff', 0.2);
+            }}
+            
+            if (showResources && cell.resources && cell.resources.length > 0) {{
+                return lightenColor('#ffd700', 0.2);
+            }}
+            
+            if (showWalkable) {{
+                if (cell.walkable) {{
+                    // Color by surface type - lighten all surface colors
+                    const baseColor = surfaceColors[cell.surface_class] || '#4ec9b0';
+                    return lightenColor(baseColor, 0.3);
+                }} else {{
+                    return lightenColor('#444444', 0.3);
+                }}
+            }}
+            
+            if (showConfidence) {{
+                const conf = cell.confidence || 0;
+                const r = Math.min(255, Math.floor(255 * (1 - conf)) + Math.floor(255 * 0.3));
+                const g = Math.min(255, Math.floor(255 * conf) + Math.floor(255 * 0.3));
+                const b = Math.min(255, 100 + Math.floor(255 * 0.3));
+                return `rgb(${{r}}, ${{g}}, ${{b}})`;
+            }}
+            
+            const baseColor = surfaceColors[cell.surface_class] || '#555555';
+            return lightenColor(baseColor, 0.3);
         }}
         
         // Draw map
         function drawMap() {{
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             
-            // Draw grid
+            // Draw background grid aligned to 1x1 block boundaries (integer coordinates)
             ctx.strokeStyle = '#2a2d2e';
-            ctx.lineWidth = 1;
-            const gridSpacing = 50 * scale;
-            for (let x = -offsetX % gridSpacing; x < canvas.width; x += gridSpacing) {{
-                ctx.beginPath();
-                ctx.moveTo(x, 0);
-                ctx.lineTo(x, canvas.height);
-                ctx.stroke();
-            }}
-            for (let z = -offsetZ % gridSpacing; z < canvas.height; z += gridSpacing) {{
-                ctx.beginPath();
-                ctx.moveTo(0, z);
-                ctx.lineTo(canvas.width, z);
-                ctx.stroke();
-            }}
+            ctx.lineWidth = 0.5;
             
-            // Draw observed blocks (smaller, lighter)
-            observedBlocks.forEach(block => {{
-                const pos = worldToCanvas(block.x, block.z);
-                ctx.fillStyle = 'rgba(150, 150, 150, 0.4)';
-                ctx.beginPath();
-                ctx.arc(pos.x, pos.z, 1.5, 0, Math.PI * 2);
-                ctx.fill();
-            }});
-            
-            // Draw visited locations (larger, colored)
-            locations.forEach(loc => {{
-                const pos = worldToCanvas(loc.x, loc.z);
-                const radius = Math.max(3, Math.min(8, 3 + loc.visit_count * 0.5));
-                
-                // Color based on visit count
-                const intensity = Math.min(255, 100 + loc.visit_count * 30);
-                ctx.fillStyle = `rgb(${{intensity}}, 150, 100)`;
-                ctx.beginPath();
-                ctx.arc(pos.x, pos.z, radius, 0, Math.PI * 2);
-                ctx.fill();
-                
-                // Border
-                ctx.strokeStyle = '#4ec9b0';
-                ctx.lineWidth = 1;
-                ctx.stroke();
-            }});
-            
-            // Draw waypoints
-            if (showWaypoints) {{
-                waypoints.forEach(wp => {{
-                    const pos = worldToCanvas(wp.x, wp.z);
-                    ctx.fillStyle = '#ffd700';
+            // Draw vertical grid lines at integer x coordinates
+            const minXInt = Math.floor(bounds.minX);
+            const maxXInt = Math.ceil(bounds.maxX);
+            for (let xInt = minXInt; xInt <= maxXInt; xInt++) {{
+                const canvasPos = worldToCanvas(xInt, 0);
+                // Only draw if within visible area
+                if (canvasPos.x >= -10 && canvasPos.x <= canvas.width + 10) {{
                     ctx.beginPath();
-                    ctx.arc(pos.x, pos.z, 6, 0, Math.PI * 2);
-                    ctx.fill();
-                    ctx.strokeStyle = '#ffaa00';
-                    ctx.lineWidth = 2;
+                    ctx.moveTo(canvasPos.x, 0);
+                    ctx.lineTo(canvasPos.x, canvas.height);
                     ctx.stroke();
-                    
-                    // Label
-                    ctx.fillStyle = '#ffd700';
-                    ctx.font = '12px sans-serif';
-                    ctx.fillText(wp.name, pos.x + 8, pos.z - 8);
-                }});
+                }}
             }}
+            
+            // Draw horizontal grid lines at integer z coordinates
+            const minZInt = Math.floor(bounds.minZ);
+            const maxZInt = Math.ceil(bounds.maxZ);
+            for (let zInt = minZInt; zInt <= maxZInt; zInt++) {{
+                const canvasPos = worldToCanvas(0, zInt);
+                // Only draw if within visible area
+                if (canvasPos.z >= -10 && canvasPos.z <= canvas.height + 10) {{
+                    ctx.beginPath();
+                    ctx.moveTo(0, canvasPos.z);
+                    ctx.lineTo(canvas.width, canvasPos.z);
+                    ctx.stroke();
+                }}
+            }}
+            
+            // Calculate cell size based on scale and map size
+            const cellSize = Math.max(4, Math.min(30, 15 * scale));
+            
+            // Draw all cells in bounds (both mapped and unmapped)
+            const minXInt = Math.floor(bounds.minX);
+            const maxXInt = Math.ceil(bounds.maxX);
+            const minZInt = Math.floor(bounds.minZ);
+            const maxZInt = Math.ceil(bounds.maxZ);
+            
+            for (let xInt = minXInt; xInt <= maxXInt; xInt++) {{
+                for (let zInt = minZInt; zInt <= maxZInt; zInt++) {{
+                    const key = `${{xInt}},${{zInt}}`;
+                    const cell = mappedCells.get(key);
+                    const pos = worldToCanvas(xInt, zInt);
+                    
+                    // Skip if outside visible area
+                    if (pos.x < -cellSize || pos.x > canvas.width + cellSize ||
+                        pos.z < -cellSize || pos.z > canvas.height + cellSize) {{
+                        continue;
+                    }}
+                    
+                    const isMapped = cell !== undefined;
+                    const color = getCellColor(cell || {{x: xInt, z: zInt}}, isMapped);
+                    
+                    // Draw cell
+                    ctx.fillStyle = color;
+                    ctx.fillRect(pos.x - cellSize/2, pos.z - cellSize/2, cellSize, cellSize);
+                    
+                    // Draw border based on movement class (only for mapped cells)
+                    if (isMapped) {{
+                        if (cell.movement_class === 'step_up') {{
+                            ctx.strokeStyle = '#89d185';
+                            ctx.lineWidth = 2;
+                            ctx.strokeRect(pos.x - cellSize/2, pos.z - cellSize/2, cellSize, cellSize);
+                        }} else if (cell.movement_class === 'drop') {{
+                            ctx.strokeStyle = '#cca700';
+                            ctx.lineWidth = 2;
+                            ctx.strokeRect(pos.x - cellSize/2, pos.z - cellSize/2, cellSize, cellSize);
+                        }} else if (cell.observation_mode === 'inferred') {{
+                            ctx.strokeStyle = '#666';
+                            ctx.lineWidth = 1;
+                            ctx.setLineDash([2, 2]);
+                            ctx.strokeRect(pos.x - cellSize/2, pos.z - cellSize/2, cellSize, cellSize);
+                            ctx.setLineDash([]);
+                        }}
+                    }}
+                }}
+            }}
+            
+            // Draw axis labels
+            ctx.fillStyle = '#888';
+            ctx.font = '11px sans-serif';
+            ctx.fillText(`X: ${{bounds.minX}} to ${{bounds.maxX}}`, 10, canvas.height - 10);
+            ctx.fillText(`Z: ${{bounds.minZ}} to ${{bounds.maxZ}}`, canvas.width - 120, 20);
         }}
         
         // Mouse events
@@ -581,77 +636,87 @@ def _generate_html_visualization(map_content: List[Dict], map_name: str) -> str:
                 dragStart.z = e.offsetY;
                 drawMap();
             }} else {{
-                // Show info panel
+                // Show info panel for hovered cell
                 const worldPos = canvasToWorld(e.offsetX, e.offsetY);
-                const nearby = locations.filter(loc => 
-                    Math.abs(loc.x - worldPos.x) < 1 && Math.abs(loc.z - worldPos.z) < 1
+                const nearby = cells.filter(cell => 
+                    Math.abs(cell.x - worldPos.x) < 0.8 && Math.abs(cell.z - worldPos.z) < 0.8
                 );
+                
                 if (nearby.length > 0) {{
-                    const loc = nearby[0];
-                    let infoHtml = `<strong>Location</strong><br>X: ${{loc.x}}, Y: ${{loc.y}}, Z: ${{loc.z}}<br>Visits: ${{loc.visit_count}}<br>`;
+                    const cell = nearby[0];
+                    let infoHtml = `
+                        <div class="info-row">
+                            <span class="info-label">Position</span>
+                            <span class="info-value">(${{cell.x}}, ${{cell.z}})</span>
+                        </div>
+                        ${{cell.support_y !== null && cell.support_y !== undefined ? `
+                        <div class="info-row">
+                            <span class="info-label">Surface Height</span>
+                            <span class="info-value">Y = ${{cell.support_y.toFixed(1)}}</span>
+                        </div>
+                        ` : ''}}
+                        ${{cell.delta_y_from_agent !== null && cell.delta_y_from_agent !== undefined ? `
+                        <div class="info-row">
+                            <span class="info-label">Height Delta</span>
+                            <span class="info-value">${{cell.delta_y_from_agent > 0 ? '+' : ''}}${{cell.delta_y_from_agent.toFixed(1)}}</span>
+                        </div>
+                        ` : ''}}
+                        <div class="info-row">
+                            <span class="info-label">Walkable</span>
+                            <span class="info-value ${{cell.walkable ? 'safe' : 'warning'}}">${{cell.walkable ? 'Yes' : 'No'}}</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">Movement</span>
+                            <span class="info-value">${{cell.movement_class}}</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">Surface</span>
+                            <span class="info-value">${{cell.surface_class}}</span>
+                        </div>
+                    `;
                     
-                    if (loc.waypoints && loc.waypoints.length > 0) {{
-                        infoHtml += `Waypoints: ${{loc.waypoints.join(', ')}}<br>`;
+                    if (cell.support_block) {{
+                        infoHtml += `
+                            <div class="info-row">
+                                <span class="info-label">Block</span>
+                                <span class="info-value">${{cell.support_block}}</span>
+                            </div>
+                        `;
                     }}
                     
-                    // Show observation details if available
-                    if (loc.observation) {{
-                        const obs = loc.observation;
-                        infoHtml += `<br><strong>Observation:</strong><br>`;
-                        
-                        // Affordances
-                        if (obs.aff) {{
-                            const affs = [];
-                            if (obs.aff.step) affs.push('Step');
-                            if (obs.aff.jump) affs.push('Jump');
-                            if (obs.aff.descend) affs.push('Descend');
-                            if (obs.aff.sky) affs.push('Sky');
-                            if (affs.length > 0) {{
-                                infoHtml += `Affordances: ${{affs.join(', ')}}<br>`;
-                            }}
-                        }}
-                        
-                        // Geometry
-                        if (obs.geom) {{
-                            const geoms = [];
-                            if (obs.geom.pit) geoms.push('Pit');
-                            if (obs.geom.stair) geoms.push('Stair');
-                            if (obs.geom.slope) geoms.push('Slope');
-                            if (geoms.length > 0) {{
-                                infoHtml += `Geometry: ${{geoms.join(', ')}}<br>`;
-                            }}
-                        }}
-                        
-                        // Block types
-                        if (obs.blocks && obs.blocks.seen && obs.blocks.seen.length > 0) {{
-                            const blockTypes = obs.blocks.seen.slice(0, 5);
-                            infoHtml += `Blocks: ${{blockTypes.join(', ')}}`;
-                            if (obs.blocks.seen.length > 5) {{
-                                infoHtml += ` (+${{obs.blocks.seen.length - 5}} more)`;
-                            }}
-                            infoHtml += `<br>`;
-                        }}
+                    if (cell.hazard_flags && cell.hazard_flags.length > 0) {{
+                        infoHtml += `
+                            <div class="info-row">
+                                <span class="info-label">Hazards</span>
+                                <span class="info-value hazard">${{cell.hazard_flags.join(', ')}}</span>
+                            </div>
+                        `;
                     }}
+                    
+                    if (cell.resources && cell.resources.length > 0) {{
+                        infoHtml += `
+                            <div class="info-row">
+                                <span class="info-label">Resources</span>
+                                <span class="info-value">${{cell.resources.join(', ')}}</span>
+                            </div>
+                        `;
+                    }}
+                    
+                    infoHtml += `
+                        <div class="info-row">
+                            <span class="info-label">Confidence</span>
+                            <span class="info-value">${{(cell.confidence * 100).toFixed(0)}}%</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">Observation</span>
+                            <span class="info-value">${{cell.observation_mode}}</span>
+                        </div>
+                    `;
                     
                     infoPanel.innerHTML = infoHtml;
                     infoPanel.classList.add('visible');
                 }} else {{
-                    // Check if hovering over observed block
-                    const nearbyBlocks = observedBlocks.filter(block => 
-                        Math.abs(block.x - worldPos.x) < 0.5 && Math.abs(block.z - worldPos.z) < 0.5
-                    );
-                    if (nearbyBlocks.length > 0) {{
-                        const block = nearbyBlocks[0];
-                        let infoHtml = `<strong>Block</strong><br>X: ${{block.x}}, Y: ${{block.y}}, Z: ${{block.z}}<br>Type: ${{block.name}}<br>`;
-                        if (block.dy !== undefined) {{
-                            const layerNames = {{'-1': 'Support (y-1)', '0': 'Body (y)', '1': 'Head (y+1)'}};
-                            infoHtml += `Layer: ${{layerNames[block.dy] || 'y+' + block.dy}}<br>`;
-                        }}
-                        infoPanel.innerHTML = infoHtml;
-                        infoPanel.classList.add('visible');
-                    }} else {{
-                        infoPanel.classList.remove('visible');
-                    }}
+                    infoPanel.classList.remove('visible');
                 }}
             }}
         }});
@@ -664,7 +729,7 @@ def _generate_html_visualization(map_content: List[Dict], map_name: str) -> str:
             e.preventDefault();
             const delta = e.deltaY > 0 ? 0.9 : 1.1;
             scale *= delta;
-            scale = Math.max(0.1, Math.min(5, scale));
+            scale = Math.max(0.2, Math.min(10, scale));
             drawMap();
         }});
         
@@ -677,48 +742,98 @@ def _generate_html_visualization(map_content: List[Dict], map_name: str) -> str:
         }}
         
         function fitToBounds() {{
-            const padding = 20;
-            const scaleX = (canvas.width - padding * 2) / canvas.width;
-            const scaleZ = (canvas.height - padding * 2) / canvas.height;
-            scale = Math.min(scaleX, scaleZ);
-            offsetX = padding;
-            offsetZ = padding;
+            const padding = 60;
+            const scaleX = (canvas.width - padding * 2) / (canvas.width - 80);
+            const scaleZ = (canvas.height - padding * 2) / (canvas.height - 80);
+            scale = Math.min(scaleX, scaleZ, 1);
+            offsetX = 0;
+            offsetZ = 0;
             drawMap();
         }}
         
-        function toggleWaypoints() {{
-            showWaypoints = !showWaypoints;
-            drawMap();
-        }}
-        
-        function focusLocation(x, z) {{
-            const pos = worldToCanvas(x, z);
-            offsetX = canvas.width / 2 - pos.x;
-            offsetZ = canvas.height / 2 - pos.z;
-            scale = 2;
+        function toggleLayer(layer) {{
+            const btn = document.getElementById('btn' + layer.charAt(0).toUpperCase() + layer.slice(1));
+            
+            switch(layer) {{
+                case 'walkable':
+                    showWalkable = !showWalkable;
+                    break;
+                case 'hazards':
+                    showHazards = !showHazards;
+                    break;
+                case 'resources':
+                    showResources = !showResources;
+                    break;
+                case 'confidence':
+                    showConfidence = !showConfidence;
+                    break;
+            }}
+            
+            if (btn) {{
+                btn.classList.toggle('active');
+            }}
+            
             drawMap();
         }}
         
         function exportData() {{
             const data = {{
                 map_name: '{map_name}',
-                locations: locations,
-                observed_blocks: observedBlocks,
-                waypoints: waypoints,
+                cells: cells,
                 bounds: bounds,
+                stats: {json.dumps(stats)},
                 exported_at: new Date().toISOString()
             }};
             const blob = new Blob([JSON.stringify(data, null, 2)], {{type: 'application/json'}});
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = '{map_name}_export.json';
+            a.download = '{map_name}_spatial_export.json';
             a.click();
             URL.revokeObjectURL(url);
         }}
         
+        // Compute and display statistics
+        function computeStats() {{
+            // Movement class distribution
+            const movementCounts = {{}};
+            const surfaceCounts = {{}};
+            
+            cells.forEach(cell => {{
+                const mc = cell.movement_class || 'unknown';
+                movementCounts[mc] = (movementCounts[mc] || 0) + 1;
+                
+                const sc = cell.surface_class || 'unknown';
+                surfaceCounts[sc] = (surfaceCounts[sc] || 0) + 1;
+            }});
+            
+            // Display movement stats
+            const movementDiv = document.getElementById('movementStats');
+            movementDiv.innerHTML = Object.entries(movementCounts)
+                .sort((a, b) => b[1] - a[1])
+                .map(([key, value]) => `
+                    <div class="stat-item">
+                        <span>${{key}}</span>
+                        <span class="stat-value">${{value}}</span>
+                    </div>
+                `).join('');
+            
+            // Display surface stats
+            const surfaceDiv = document.getElementById('surfaceStats');
+            surfaceDiv.innerHTML = Object.entries(surfaceCounts)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 8)
+                .map(([key, value]) => `
+                    <div class="stat-item">
+                        <span>${{key}}</span>
+                        <span class="stat-value">${{value}}</span>
+                    </div>
+                `).join('');
+        }}
+        
         // Initial draw
         fitToBounds();
+        computeStats();
     </script>
 </body>
 </html>
@@ -730,6 +845,9 @@ def _generate_html_visualization(map_content: List[Dict], map_name: str) -> str:
 def tool(input_value=None, **kwargs):
     """
     Generate HTML visualization of the spatial map and open in browser.
+    
+    Displays cell-based SpatialMap data with zoomable, pannable interface.
+    Shows walkability, hazards, resources, and observation confidence.
     
     Args:
         input_value: Ignored
@@ -748,6 +866,7 @@ def tool(input_value=None, **kwargs):
     
     resource_manager = kwargs.get('resource_manager')
     agent_name = kwargs.get('agent_name', 'system')
+    world_name = kwargs.get('world_name', 'minecraft')
     target = kwargs.get('target') or kwargs.get('map_name')
     output_file = kwargs.get('output_file')
     
@@ -755,65 +874,60 @@ def tool(input_value=None, **kwargs):
         return executor._create_uniform_return(
             'failed',
             value="Resource manager not available",
-            data={"success": False, "failure_reason": "no_resource_manager"}
+            reason="no_resource_manager"
         )
     
-    # Resolve target (could be variable or literal name)
-    # Default to agent-specific map name if not provided
+    # Resolve map name
     default_map_name = f"{agent_name}-minecraft_map"
-    map_collection_id = None
-    map_name = None
     
     if not target:
-        # Default to agent-specific map name
         map_name = default_map_name
     elif isinstance(target, str) and target.startswith('$'):
-        # Variable reference - strip $ and use as literal name
-        # (executor should have resolved it, but if not, treat as literal)
         map_name = target.lstrip('$')
     else:
         map_name = str(target)
     
-    # Try to get Collection by name
-    map_collection_id = resource_manager.named_collections.get(map_name)
+    # Get base_dir from resource_manager if available
+    base_dir = None
+    if resource_manager and hasattr(resource_manager, 'base_dir'):
+        base_dir = resource_manager.base_dir
     
-    if not map_collection_id:
-        reason = f"Map Collection '{map_name}' not found"
-        result_text = f"Failed to visualize map: Collection '{map_name}' not found. Use mc-map-update to create it first."
+    # Get SpatialMap instance
+    spatial_map = _get_spatial_map(agent_name, world_name, base_dir)
+    
+    # Get all cells and stats
+    cells = spatial_map.get_all_cells()
+    stats = spatial_map.get_stats()
+    
+    if not cells:
+        result_text = f"Spatial map '{map_name}' is empty - no cells mapped yet. Use mc-map-update to add observations."
         return executor._create_uniform_return(
-            'failed',
+            'success',
             value=result_text,
-            data={"success": False, "failure_reason": reason}
+            extra={"map_name": map_name, "cell_count": 0, "message": "empty_map"}
         )
-    
-    # Compile forward: Load all Notes, deduplicate by (x,y,z), keep latest
-    map_content = _compile_map_forward(map_collection_id, resource_manager)
     
     # Generate HTML
     try:
-        html_content = _generate_html_visualization(map_content, map_name)
+        html_content = _generate_html_visualization(cells, map_name, stats)
     except Exception as e:
         logger.error(f"Failed to generate HTML visualization: {e}", exc_info=True)
-        reason = f"HTML generation failed: {str(e)}"
-        result_text = f"Failed to generate visualization: {str(e)}"
         return executor._create_uniform_return(
             'failed',
-            value=result_text,
-            data={"success": False, "failure_reason": reason}
+            value=f"Failed to generate visualization: {str(e)}",
+            reason="html_generation_failed"
         )
     
     # Determine output file path
     if not output_file:
-        # Generate filename based on map name and timestamp
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         safe_map_name = map_name.replace('/', '_').replace('\\', '_')
-        output_file = f"map_visualization_{safe_map_name}_{timestamp}.html"
+        output_file = f"spatial_map_{safe_map_name}_{timestamp}.html"
     
     output_path = Path(output_file)
     
     # If relative path, save to /tmp
     if not output_path.is_absolute():
-        # Ensure /tmp exists
         tmp_dir = Path("/tmp")
         tmp_dir.mkdir(parents=True, exist_ok=True)
         output_path = tmp_dir / output_path
@@ -821,38 +935,35 @@ def tool(input_value=None, **kwargs):
     # Write HTML file
     try:
         output_path.write_text(html_content, encoding='utf-8')
-        logger.info(f"Generated map visualization: {output_path}")
+        logger.info(f"Generated spatial map visualization: {output_path}")
     except Exception as e:
         logger.error(f"Failed to write HTML file: {e}", exc_info=True)
-        reason = f"File write failed: {str(e)}"
-        result_text = f"Failed to save visualization file: {str(e)}"
         return executor._create_uniform_return(
             'failed',
-            value=result_text,
-            data={"success": False, "failure_reason": reason}
+            value=f"Failed to save visualization file: {str(e)}",
+            reason="file_write_failed"
         )
     
     # Open in browser
     try:
         file_url = f"file://{output_path.absolute()}"
         webbrowser.open(file_url)
-        logger.info(f"Opened map visualization in browser: {file_url}")
+        logger.info(f"Opened spatial map visualization in browser: {file_url}")
     except Exception as e:
         logger.warning(f"Failed to open browser automatically: {e}. File saved at: {output_path}")
     
-    result_text = f"Map visualization generated: {output_path.absolute()}\n{len(map_content)} locations visualized"
+    result_text = f"Spatial map visualization generated: {output_path.absolute()}\n{stats['cell_count']} cells visualized"
     
-    # Build structured data dict
-    structured_data = {
+    # Extract metadata fields for extra
+    extra_metadata = {
         "map_name": map_name,
-        "map_id": map_collection_id,
         "file_path": str(output_path.absolute()),
         "output_file": str(output_path.absolute()),
-        "locations_count": len(map_content),
-        "waypoints_count": len([loc for loc in map_content if isinstance(loc, dict) and loc.get('waypoints')])
+        "cell_count": stats['cell_count'],
+        "stats": stats
     }
     
-    return executor._create_uniform_return('success', value=result_text, data=structured_data)
+    return executor._create_uniform_return('success', value=result_text, extra=extra_metadata)
 
 
 if __name__ == "__main__":
@@ -864,4 +975,3 @@ if __name__ == "__main__":
         agent_name="test"
     )
     print(result)
-

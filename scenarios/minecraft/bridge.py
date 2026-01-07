@@ -1187,12 +1187,15 @@ class BridgeHandler(BaseHTTPRequestHandler):
             blocks_elapsed = (time.time() - blocks_start) * 1000
             print(f"[Bridge] /observe: scan_blocks took {blocks_elapsed:.1f}ms, found {len(nearby_blocks)} blocks")
             
-            # Only scan entities if entity_filter is specified (optimization)
+            # Scan entities if entity_filter is specified (optimization: skip if not needed)
+            # entity_filter can be "items" (filter items only), "" (all entities), or None (skip)
             nearby_entities = []
             entities_elapsed = 0
-            if entity_filter:
+            if entity_filter is not None:  # Scan if explicitly requested (including empty string for "all")
                 entities_start = time.time()
-                nearby_entities = scan_entities(radius, entity_filter)
+                # Pass None to scan_entities if empty string (means "all entities")
+                filter_value = None if entity_filter == "" else entity_filter
+                nearby_entities = scan_entities(radius, filter_value)
                 entities_elapsed = (time.time() - entities_start) * 1000
                 print(f"[Bridge] /observe: scan_entities took {entities_elapsed:.1f}ms, found {len(nearby_entities)} entities")
             

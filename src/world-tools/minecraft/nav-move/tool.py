@@ -1,5 +1,5 @@
 """
-Navigation moveone primitive.
+Navigation move primitive.
 
 Attempt exactly ONE forward adjacent move with verification, snap-to-grid, and nav history update.
 """
@@ -44,13 +44,12 @@ def tool(input_value=None, **kwargs):
     minecraft_url = kwargs.get("world_url") or kwargs.get("minecraft_url") or DEFAULT_MINECRAFT_URL
 
     # --- Initial status ---
-    status_before = executor.execute_action_with_log({"type": "mc-status"}, "nav-moveone")
+    status_before = executor.execute_action_with_log({"type": "mc-status"}, "nav-move")
     if status_before.get("status") != "success":
         return executor._create_uniform_return(
             "failed",
             value="Failed to obtain initial status",
-            reason="Failed to obtain initial status",
-            data={"success": False, "failure_reason": "status_failed"},
+            reason="status_failed",
         )
 
     start_pos = status_before["data"]["position"]
@@ -63,33 +62,31 @@ def tool(input_value=None, **kwargs):
         return executor._create_uniform_return(
             "failed",
             value="Move request failed",
-            reason="Move request failed",
-            data={"success": False, "failure_reason": "move_failed", "from": start_pos, "to": None},
+            reason="move_failed",
+            extra={"from": start_pos, "to": None}
         )
 
     move_status = move_data.get("status", "success")
 
     if move_status == "collision":
         # Observe anyway to expose clearance facts
-        obs = executor.execute_action_with_log({"type": "mc-observe-blocks"}, "nav-moveone")
+        obs = executor.execute_action_with_log({"type": "mc-observe-blocks"}, "nav-move")
         clear = obs.get("data", {}).get("clear", {}) if obs.get("status") == "success" else {}
 
         return executor._create_uniform_return(
             "failed",
             value="Movement blocked by collision",
-            reason="Movement blocked by collision",
-            data={
-                "success": False,
-                "failure_reason": "collision",
+            reason="collision",
+            extra={
                 "from": start_pos,
                 "to": start_pos,
                 "clear_fwd_body": clear.get("fwd", {}).get("body"),
                 "clear_fwd_head": clear.get("fwd", {}).get("head"),
-            },
+            }
         )
 
     if move_status == "fell":
-        status_after = executor.execute_action_with_log({"type": "mc-status"}, "nav-moveone")
+        status_after = executor.execute_action_with_log({"type": "mc-status"}, "nav-move")
         end_pos = status_after.get("data", {}).get("position")
 
         if end_pos:
@@ -107,18 +104,18 @@ def tool(input_value=None, **kwargs):
         return executor._create_uniform_return(
             "failed",
             value="Fall detected during movement",
-            reason="Fall detected during movement",
-            data={"success": False, "fell": True, "failure_reason": "fell", "from": start_pos, "to": end_pos},
+            reason="fell",
+            extra={"fell": True, "from": start_pos, "to": end_pos}
         )
 
     # --- Observe landing ---
-    obs = executor.execute_action_with_log({"type": "mc-observe-blocks"}, "nav-moveone")
+    obs = executor.execute_action_with_log({"type": "mc-observe-blocks"}, "nav-move")
     if obs.get("status") != "success":
         return executor._create_uniform_return(
             "failed",
             value="Failed to observe blocks at destination",
-            reason="Failed to observe blocks at destination",
-            data={"success": False, "failure_reason": "observation_failed", "from": start_pos, "to": start_pos},
+            reason="observation_failed",
+            extra={"from": start_pos, "to": start_pos}
         )
 
     support_here = obs.get("data", {}).get("support", {}).get("here", {})
@@ -126,13 +123,13 @@ def tool(input_value=None, **kwargs):
     clear = obs.get("data", {}).get("clear", {})
 
     # --- Final status ---
-    status_after = executor.execute_action_with_log({"type": "mc-status"}, "nav-moveone")
+    status_after = executor.execute_action_with_log({"type": "mc-status"}, "nav-move")
     if status_after.get("status") != "success":
         return executor._create_uniform_return(
             "failed",
             value="Failed to obtain final status",
-            reason="Failed to obtain final status",
-            data={"success": False, "failure_reason": "observation_failed", "from": start_pos, "to": start_pos},
+            reason="observation_failed",
+            extra={"from": start_pos, "to": start_pos}
         )
 
     end_pos = status_after["data"]["position"]
@@ -155,10 +152,8 @@ def tool(input_value=None, **kwargs):
         return executor._create_uniform_return(
             "failed",
             value=reason_text,
-            reason=reason_text,
-            data={
-                "success": False,
-                "failure_reason": "unexpected_vertical_change",
+            reason="unexpected_vertical_change",
+            extra={
                 "from": start_pos,
                 "to": end_pos,
                 "delta_y": delta_y,
@@ -179,10 +174,8 @@ def tool(input_value=None, **kwargs):
         return executor._create_uniform_return(
             "failed",
             value=reason_text,
-            reason=reason_text,
-            data={
-                "success": False,
-                "failure_reason": "support_ambiguous",
+            reason="support_ambiguous",
+            extra={
                 "from": start_pos,
                 "to": end_pos,
                 "support_here": support_type,
@@ -199,10 +192,8 @@ def tool(input_value=None, **kwargs):
 
     return executor._create_uniform_return(
         "success",
-        value="Moveone completed successfully",
-        data={
-            "success": True,
-            "fell": False,
+        value="Move completed successfully",
+        extra={
             "from": start_pos,
             "to": end_pos,
             "delta_y": delta_y,
@@ -215,4 +206,4 @@ def tool(input_value=None, **kwargs):
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
-    print("nav-moveone module loaded")
+    print("nav-move module loaded")

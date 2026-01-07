@@ -531,9 +531,8 @@ def tool(input_value=None, **kwargs):
         
         summary_text = "\n".join(summary_parts)
         
-        # Build structured data dict for mc-map-update (planner still sees text SUMMARY)
+        # Build structured observation data dict (will be stored in Note)
         structured_data = {
-            "success": True,
             "pose": {
                 "x": px,
                 "y": py,
@@ -556,14 +555,14 @@ def tool(input_value=None, **kwargs):
             "note": note
         }
         
-        
-        return executor._create_uniform_return('success', value=summary_text, data=structured_data)
+        # Pass structured dict as value (stored in Note), summary_text will be formatted for LLM context
+        return executor._create_uniform_return('success', value=structured_data, extra={"summary": summary_text})
     except requests.exceptions.RequestException as e:
         logger.error(f"Minecraft observe request failed: {e}")
         return executor._create_uniform_return(
             'failed',
             value=f"API request failed: {e}",
-            data={"success": False, "failure_reason": "api_failed"}
+            reason="api_failed"
         )
 
 

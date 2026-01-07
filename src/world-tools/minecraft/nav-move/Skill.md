@@ -1,10 +1,10 @@
 ---
-name: nav-moveone
+name: nav-move
 type: python
 description: "Attempt exactly ONE adjacent navigation move forward and report the outcome. Atomic navigation operation suitable for composition."
 ---
 
-# Navigation Moveone Tool
+# Navigation Move Tool
 
 Attempt exactly one adjacent forward move (relative to current facing direction) and report the outcome.
 
@@ -48,10 +48,10 @@ Returns uniform_return format with:
 
 Move forward one cell:
 ```json
-{"type":"nav-moveone","out":"$m1"}
+{"type":"nav-move","out":"$m1"}
 ```
 
 Use a slower move:
 ```json
-{"type":"nav-moveone","step_duration":0.25,"out":"$m1"}
+{"type":"nav-move","step_duration":0.25,"out":"$m1"}
 ```

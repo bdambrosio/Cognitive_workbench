@@ -37,7 +37,7 @@ def tool(input_value=None, **kwargs):
         return executor._create_uniform_return(
             'failed',
             value="recipe/item name required (string)",
-            data={"success": False, "failure_reason": "missing_recipe"}
+            reason="missing_recipe"
         )
     
     count = kwargs.get("count", 1)
@@ -58,18 +58,11 @@ def tool(input_value=None, **kwargs):
         
         if not data.get("ok"):
             error = data.get("error", "unknown failure")
-            error_code = data.get("error_code", "unknown_error")
             result_text = f"Craft failed: {error}"
             return executor._create_uniform_return(
                 'failed',
                 value=result_text,
-                data={
-                    "success": False,
-                    "failure_reason": "craft_failed",
-                    "error": error,
-                    "error_code": error_code,
-                    **data
-                }
+                reason="craft_failed"
             )
         
         crafted_item = data.get("item", recipe)
@@ -77,20 +70,21 @@ def tool(input_value=None, **kwargs):
         result_text = f"Crafted {crafted_count}x {crafted_item}"
         
         # Build structured data dict
-        structured_data = {
-            "success": True,
+        # Extract metadata fields for extra
+        extra_metadata = {
             "item": crafted_item,
-            "count": crafted_count,
-            **data
+            "count": crafted_count
         }
+        # Merge API response data into extra
+        extra_metadata.update(data)
         
-        return executor._create_uniform_return('success', value=result_text, data=structured_data)
+        return executor._create_uniform_return('success', value=result_text, extra=extra_metadata)
     except requests.exceptions.RequestException as e:
         logger.error(f"Minecraft craft request failed: {e}")
         return executor._create_uniform_return(
             'failed',
             value=f"API request failed: {e}",
-            data={"success": False, "failure_reason": "api_failed"}
+            reason="api_failed"
         )
 
 

@@ -3,9 +3,24 @@
 Boolean predicate testing with automatic chunking for long documents.
 """
 import logging
+from typing import Any, Dict
+from infospace_executor import InfospaceExecutor
 from utils.text_chunking import segment_text_boundary_aware
 
 logger = logging.getLogger(__name__)
+
+
+def _fail(executor: InfospaceExecutor, reason: str, value: str | None = None, extra: Dict[str, Any] | None = None):
+    return executor._create_uniform_return(
+        "failed",
+        value=value or reason,
+        reason=reason,
+        extra=extra,
+    )
+
+
+def _succeed(executor: InfospaceExecutor, result: str, extra: Dict[str, Any] | None = None):
+    return executor._create_uniform_return("success", value=result, extra=extra)
 
 
 def tool(input_value, runtime=None, **kwargs):
@@ -20,16 +35,20 @@ def tool(input_value, runtime=None, **kwargs):
     Returns:
         "true" or "false" as string
     """
+    executor: InfospaceExecutor = kwargs.get("executor")
+    if not executor:
+        return {"status": "failed", "reason": "executor not available", "value": None, "resource_id": None}
+
     predicate = kwargs.get('predicate')
     # If no predicate but value is in kwargs (planner mistake: used 'value' instead of 'predicate'), use value as predicate
     if not predicate and 'value' in kwargs:
         predicate = kwargs.get('value')
     
     if not predicate:
-        return "false"
+        return _fail(executor, "missing_predicate")
     
     if not input_value:
-        return "false"
+        return _fail(executor, "missing_input")
     
     # Check if segmentation needed
     chunks = segment_text_boundary_aware(input_value, max_chunk_size=16000)
@@ -45,9 +64,9 @@ def tool(input_value, runtime=None, **kwargs):
         result = _test_chunk(chunk_text, predicate, kwargs)
         if result == "true":
             logger.info(f"assess: predicate matched in chunk {i+1}/{len(chunks)}")
-            return "true"
+            return _succeed(executor, "true", {"matched_chunk": i + 1, "total_chunks": len(chunks)})
     
-    return "false"
+    return _succeed(executor, "false", {"matched_chunk": None, "total_chunks": len(chunks)})
 
 
 def _test_chunk(text, predicate, kwargs=None):

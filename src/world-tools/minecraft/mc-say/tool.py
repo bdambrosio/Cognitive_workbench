@@ -36,7 +36,7 @@ def tool(input_value=None, **kwargs):
         return executor._create_uniform_return(
             'failed',
             value="message text required (string)",
-            data={"success": False, "failure_reason": "missing_message"}
+            reason="missing_message"
         )
     
     minecraft_url = kwargs.get("world_url") or kwargs.get("minecraft_url") or DEFAULT_MINECRAFT_URL
@@ -53,19 +53,20 @@ def tool(input_value=None, **kwargs):
         ack_text = f"Message sent: {message}"
         
         # Build structured data dict
-        structured_data = {
-            "success": True,
-            "message": message,
-            **data
+        # Extract metadata fields for extra
+        extra_metadata = {
+            "message": message
         }
+        # Merge API response data into extra
+        extra_metadata.update(data)
         
-        return executor._create_uniform_return('success', value=ack_text, data=structured_data)
+        return executor._create_uniform_return('success', value=ack_text, extra=extra_metadata)
     except requests.exceptions.RequestException as e:
         logger.error(f"Minecraft say request failed: {e}")
         return executor._create_uniform_return(
             'failed',
             value=f"API request failed: {e}",
-            data={"success": False, "failure_reason": "api_failed"}
+            reason="api_failed"
         )
 
 

@@ -49,7 +49,7 @@ def tool(input_value=None, **kwargs):
         return executor._create_uniform_return(
             'failed',
             value="item/block name required (string)",
-            data={"success": False, "failure_reason": "missing_item"}
+            reason="missing_item"
         )
     
     # Build position parameters - bot expects ref.pos or ref.rel
@@ -86,7 +86,7 @@ def tool(input_value=None, **kwargs):
         return executor._create_uniform_return(
             'failed',
             value="reference block position required (absolute x,y,z OR relative forward,right,up)",
-            data={"success": False, "failure_reason": "missing_position"}
+            reason="missing_position"
         )
     
     place_params["ref"] = ref
@@ -97,7 +97,7 @@ def tool(input_value=None, **kwargs):
         return executor._create_uniform_return(
             'failed',
             value="face required (top, bottom, north, south, east, west)",
-            data={"success": False, "failure_reason": "missing_face"}
+            reason="missing_face"
         )
     if face == "top":
         face = "up"
@@ -116,18 +116,11 @@ def tool(input_value=None, **kwargs):
         
         if not data.get("ok"):
             error = data.get("error", "unknown failure")
-            error_code = data.get("error_code", "unknown_error")
             result_text = f"Place failed: {error}"
             return executor._create_uniform_return(
                 'failed',
                 value=result_text,
-                data={
-                    "success": False,
-                    "failure_reason": "placement_failed",
-                    "error": error,
-                    "error_code": error_code,
-                    **data
-                }
+                reason="placement_failed"
             )
         
         # Placement request accepted - note that actual placement is asynchronous
@@ -141,19 +134,21 @@ def tool(input_value=None, **kwargs):
         else:
             result_text = f"Place request accepted: {item} (face={face})"
         
-        # Build structured data dict
-        structured_data = dict(data)
-        structured_data["success"] = True
-        structured_data["status"] = "accepted"  # Request accepted, but placement may still fail asynchronously
-        structured_data["placed"] = placed_info
+        # Extract metadata fields for extra
+        extra_metadata = {
+            "status": "accepted",  # Request accepted, but placement may still fail asynchronously
+            "placed": placed_info
+        }
+        # Merge API response data into extra
+        extra_metadata.update(data)
         
-        return executor._create_uniform_return('success', value=result_text, data=structured_data)
+        return executor._create_uniform_return('success', value=result_text, extra=extra_metadata)
     except requests.exceptions.RequestException as e:
         logger.error(f"Minecraft place request failed: {e}")
         return executor._create_uniform_return(
             'failed',
             value=f"API request failed: {e}",
-            data={"success": False, "failure_reason": "api_failed"}
+            reason="api_failed"
         )
 
 

@@ -1,0 +1,43 @@
+{
+  "version": "1.0",
+  "created_at": "2026-01-01T16:26:07.820783",
+  "updated_at": "2026-01-07T17:40:32.462068",
+  "facts": [],
+  "tool_contracts": [
+    {
+      "tool": "refine",
+      "insight": "The 'refine' tool returns a structured analysis of method syntax and semantics, but does not guarantee completeness or accuracy of the content; its output must be verified by loading and inspecting the resulting note.",
+      "status": "constrained",
+      "introduced_at": "2026-01-01T16:29:37.383311",
+      "last_confirmed_at": "2026-01-07T17:40:32.461733"
+    },
+    {
+      "tool": "generate-note",
+      "insight": "The 'generate-note' tool produces a new, independent output based on a prompt and style, even when the input is a static note, and is suitable for creating original evaluations when required.",
+      "status": "reliable",
+      "introduced_at": "2026-01-01T16:43:30.523252",
+      "last_confirmed_at": "2026-01-07T02:28:16.444011"
+    },
+    {
+      "tool": "search-web",
+      "insight": "The tool returns a collection of results, but the relevance of individual results must be verified by loading and inspecting content; not all results contain structured forecast data, even when the query is specific.",
+      "status": "constrained",
+      "introduced_at": "2026-01-06T17:34:08.224712",
+      "last_confirmed_at": "2026-01-07T17:40:32.461733"
+    },
+    {
+      "tool": "load",
+      "insight": "The 'load' tool cannot be applied to Notes that are already materialized (i.e., their content is part of the result collection); attempting to load such Notes results in an empty output.",
+      "status": "constrained",
+      "introduced_at": "2026-01-07T17:40:32.461733",
+      "last_confirmed_at": "2026-01-07T17:40:32.461733"
+    },
+    {
+      "tool": "map",
+      "insight": "The 'map' tool fails when applied to materialized Notes, returning an empty collection; it is only effective on non-materialized or dynamically accessible objects.",
+      "status": "constrained",
+      "introduced_at": "2026-01-07T17:40:32.461733",
+      "last_confirmed_at": "2026-01-07T17:40:32.461733"
+    }
+  ]
+}

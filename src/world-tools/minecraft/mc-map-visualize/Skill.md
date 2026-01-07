@@ -1,63 +1,84 @@
 ---
 name: mc-map-visualize
 type: python
-description: "Generates an HTML file with 2D visualization of the spatial map and opens it in browser. Developer tool for viewing explored locations, waypoints, and visit patterns"
+description: "Generates zoomable HTML visualization of the spatial map showing walkability, hazards, resources, and observation confidence."
 ---
 
 # Minecraft Map Visualize Tool
 
-Generates an HTML file with 2D visualization of the spatial map and opens it in browser. Developer tool for viewing explored locations, waypoints, and visit patterns.
+Generates an interactive HTML visualization of the cell-based SpatialMap. Displays mapped cells with color-coded walkability, hazards, resources, and observation confidence.
 
 ## Purpose
 
-Map visualization for debugging and analysis. Creates interactive HTML visualization showing explored locations, waypoints, and visit patterns from persistent spatial memory.
+Visualize spatial map for debugging, analysis, and planning review. Interactive HTML allows panning, zooming, and layer toggling. Shows cell details on hover.
 
 ## Input
 
-- `target`: Map Collection name or variable (default: `<agent_name>-minecraft_map`)
-- `map_name`: Map Collection name (alternative to target)
-- `output_file`: Optional output file path (default: auto-generated)
-- `value`: Ignored
+- `target` or `map_name`: Map name (default: agent-specific)
+- `output_file`: Optional output file path (default: auto-generated in /tmp)
 
 ## Output
 
 Returns uniform_return format with:
-- `value`: Text summary (success message with file path and location count)
-- `data`: Structured data dict (machine-readable). Key fields:
-  - `success`: Boolean
-  - `file_path`: String
-  - `locations_count`: Integer
-  - `waypoints_count`: Integer
+- `value`: Summary text with file path
+- `data`: `{success, map_name, file_path, cell_count, stats}`
+
+Also opens generated HTML file in default browser.
+
+## Visualization Features
+
+Interactive canvas:
+- Pan: Click and drag
+- Zoom: Mouse wheel
+- Hover: Shows cell details
+
+Layer toggles:
+- Walkable: Show walkability coloring
+- Hazards: Highlight hazard cells (red)
+- Resources: Highlight resource cells (gold)
+- Confidence: Color by observation confidence
+
+Color scheme:
+- Green/surface colors: Walkable cells
+- Gray: Blocked cells
+- Red: Hazard cells
+- Gold: Resource cells
+- Blue: Water
+- Orange: Lava
+
+Cell borders:
+- Green border: Step-up movement
+- Yellow border: Drop risk
+- Dashed border: Inferred (not directly observed)
+
+Sidebar:
+- Map statistics
+- Bounds information
+- Movement class distribution
+- Surface type distribution
 
 ## Behavior & Performance
 
-- Generates HTML file with 2D map visualization
-- Opens file in default browser
-- Shows explored locations, waypoints, and visit patterns
-- File path can be customized or auto-generated
+- Generates self-contained HTML file
+- Auto-opens in default browser
+- Exports JSON data for external analysis
+- Works with maps of any size (canvas scales)
 
 ## Guidelines
 
-- Developer tool for debugging and analysis
-- Use `load` to load map Collection first if needed
-- Visualization shows spatial exploration patterns
-- Waypoints are highlighted in visualization
-- Visit counts shown as intensity
+- Use after mc-map-update to visualize mapped area
+- Toggle layers to focus on specific aspects
+- Hover over cells for detailed properties
+- Export JSON for programmatic analysis
 
 ## Usage Examples
 
-Visualize map:
+Visualize current map:
 ```json
-{"type":"load","target":"minecraft_map","out":"$map"}
-{"type":"mc-map-visualize","target":"$map","out":"$result"}
+{"type":"mc-map-visualize"}
 ```
 
-Visualize with Collection name:
+With specific output file:
 ```json
-{"type":"mc-map-visualize","target":"minecraft_map","out":"$result"}
-```
-
-Custom output file:
-```json
-{"type":"mc-map-visualize","target":"minecraft_map","output_file":"my_map.html","out":"$result"}
+{"type":"mc-map-visualize","output_file":"/tmp/my_map.html"}
 ```

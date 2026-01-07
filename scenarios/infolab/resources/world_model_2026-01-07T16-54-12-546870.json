@@ -1,0 +1,50 @@
+{
+  "version": "1.0",
+  "created_at": "2026-01-01T16:26:07.820783",
+  "updated_at": "2026-01-07T16:54:12.546870",
+  "facts": [],
+  "tool_contracts": [
+    {
+      "tool": "refine",
+      "insight": "The 'refine' tool returns a structured analysis of method syntax and semantics, but does not guarantee completeness or accuracy of the content; its output must be verified by loading and inspecting the resulting note.",
+      "status": "constrained",
+      "introduced_at": "2026-01-01T16:29:37.383311",
+      "last_confirmed_at": "2026-01-07T16:54:12.546543"
+    },
+    {
+      "tool": "generate-note",
+      "insight": "The 'generate-note' tool produces a new, independent output based on a prompt and style, even when the input is a static note, and is suitable for creating original evaluations when required.",
+      "status": "reliable",
+      "introduced_at": "2026-01-01T16:43:30.523252",
+      "last_confirmed_at": "2026-01-07T02:28:16.444011"
+    },
+    {
+      "tool": "search-web",
+      "insight": "The tool returns a collection of results, but the relevance of individual results must be verified by loading and inspecting content; not all results contain structured forecast data, even when the query is specific.",
+      "status": "constrained",
+      "introduced_at": "2026-01-06T17:34:08.224712",
+      "last_confirmed_at": "2026-01-07T02:28:16.444011"
+    },
+    {
+      "tool": "filter-structured",
+      "insight": "The tool fails to process date filtering on JSON arrays when the data is parsed via 'coerce' or 'refine', even when dates are in valid ISO format (YYYY-MM-DD).",
+      "status": "unreliable",
+      "introduced_at": "2026-01-07T16:54:12.546543",
+      "last_confirmed_at": "2026-01-07T16:54:12.546543"
+    },
+    {
+      "tool": "pluck",
+      "insight": "The tool cannot extract fields from a Note containing a JSON array, even when the array is valid and parsed via 'coerce'.",
+      "status": "unreliable",
+      "introduced_at": "2026-01-07T16:54:12.546543",
+      "last_confirmed_at": "2026-01-07T16:54:12.546543"
+    },
+    {
+      "tool": "coerce",
+      "insight": "The tool successfully parses a JSON string into a structured array, but the resulting object may not be recognized as a Collection by other tools.",
+      "status": "constrained",
+      "introduced_at": "2026-01-07T16:54:12.546543",
+      "last_confirmed_at": "2026-01-07T16:54:12.546543"
+    }
+  ]
+}

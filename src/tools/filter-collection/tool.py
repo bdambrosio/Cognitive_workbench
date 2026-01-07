@@ -4,7 +4,8 @@ Filter items in a Collection based on natural-language predicate, returning a ne
 """
 import logging
 import json
-from typing import List, Any
+from typing import Any, Dict, List, Optional
+from infospace_executor import InfospaceExecutor
 
 logger = logging.getLogger(__name__)
 
@@ -48,6 +49,19 @@ def _create_collection(note_ids: List[str], agent_name: str, resource_manager, s
         return None
 
 
+def _fail(executor: InfospaceExecutor, reason: str, extra: Optional[Dict[str, Any]] = None):
+    return executor._create_uniform_return("failed", value=reason, reason=reason, extra=extra)
+
+
+def _success(
+    executor: InfospaceExecutor,
+    value: str,
+    resource_id: Optional[str],
+    extra: Optional[Dict[str, Any]] = None,
+):
+    return executor._create_uniform_return("success", value=value, resource_id=resource_id, extra=extra)
+
+
 def tool(input_value: Any, runtime=None, **kwargs) -> str:
     """
     Filter Collection items by predicate, return new Collection ID.
@@ -64,6 +78,10 @@ def tool(input_value: Any, runtime=None, **kwargs) -> str:
     Returns:
         New Collection ID (str) or None on error
     """
+    executor: InfospaceExecutor = kwargs.get("executor")
+    if not executor:
+        return {"status": "failed", "reason": "executor not available", "value": None, "resource_id": None}
+
     resource_manager = kwargs.get('resource_manager')
     predicate = kwargs.get('predicate')
     # If no predicate but value is in kwargs (planner mistake: used 'value' instead of 'predicate'), use value as predicate
@@ -75,21 +93,31 @@ def tool(input_value: Any, runtime=None, **kwargs) -> str:
         agent_name = kwargs.get('agent_name', 'system')
         empty_coll_id = _create_collection([], agent_name, resource_manager)
         if not empty_coll_id:
-            return {'status': 'failed', 'reason': 'Failed to create empty Collection', 'value': None, 'resource_id': None}
-        return {'status': 'success', 'value': '0 items []', 'resource_id': empty_coll_id}
+            return _fail(executor, 'Failed to create empty Collection')
+        return _success(
+            executor,
+            '0 items []',
+            empty_coll_id,
+            {"item_count": 0, "predicate": predicate, "mode": "include"},
+        )
     
     mode = kwargs.get('mode', 'include')
     agent_name = kwargs.get('agent_name', 'system')
     llm_generate = kwargs.get('llm_generate')
     if not llm_generate:
-        return {'status': 'failed', 'reason': 'llm_generate callback is required', 'value': None, 'resource_id': None}
+        return _fail(executor, 'llm_generate callback is required')
     
     if not isinstance(input_value, list):
         logger.warning("Input not a list; treating as empty Collection")
         empty_coll_id = _create_collection([], agent_name, resource_manager)
         if not empty_coll_id:
-            return {'status': 'failed', 'reason': 'Failed to create empty Collection', 'value': None, 'resource_id': None}
-        return {'status': 'success', 'value': '0 items []', 'resource_id': empty_coll_id}
+            return _fail(executor, 'Failed to create empty Collection')
+        return _success(
+            executor,
+            '0 items []',
+            empty_coll_id,
+            {"item_count": 0, "predicate": predicate, "mode": mode},
+        )
     
     filtered_ids = []
     for note_id in input_value:
@@ -126,7 +154,7 @@ def tool(input_value: Any, runtime=None, **kwargs) -> str:
     new_coll_id = _create_collection(filtered_ids, agent_name, resource_manager)
     if not new_coll_id:
         logger.error("Failed to create filtered Collection")
-        return {'status': 'failed', 'reason': 'Failed to create filtered Collection', 'value': None, 'resource_id': None}
+        return _fail(executor, 'Failed to create filtered Collection')
     
     # Format collection value as "X items [Note_1, ...]"
     item_count = len(filtered_ids)
@@ -136,4 +164,14 @@ def tool(input_value: Any, runtime=None, **kwargs) -> str:
         note_list_str += ', ...'
     collection_value = f"{item_count} items [{note_list_str}]"
     
-    return {'status': 'success', 'value': collection_value, 'resource_id': new_coll_id}
+    return _success(
+        executor,
+        collection_value,
+        new_coll_id,
+        {
+            "item_count": item_count,
+            "predicate": predicate,
+            "mode": mode,
+            "filtered_ids": filtered_ids,
+        },
+    )

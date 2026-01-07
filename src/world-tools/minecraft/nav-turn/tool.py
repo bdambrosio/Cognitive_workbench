@@ -136,7 +136,7 @@ def tool(input_value=None, **kwargs):
         return executor._create_uniform_return(
             "failed",
             value=f"Invalid direction: {direction}. Must be one of: right, left, back, forward",
-            data={"success": False, "failure_reason": "invalid_direction"}
+            reason="invalid_direction"
         )
 
     minecraft_url = kwargs.get("world_url") or kwargs.get("minecraft_url") or DEFAULT_MINECRAFT_URL
@@ -147,7 +147,7 @@ def tool(input_value=None, **kwargs):
         return executor._create_uniform_return(
             "failed",
             value="Failed to obtain current status",
-            data={"success": False, "failure_reason": "status_failed"}
+            reason="status_failed"
         )
 
     current_pos = status["data"]["position"]
@@ -191,11 +191,7 @@ def tool(input_value=None, **kwargs):
         return executor._create_uniform_return(
             "failed",
             value="Failed to snap to position and orientation",
-            data={
-                "success": False,
-                "failure_reason": "snapto_failed",
-                "yaw": cardinal_yaw,
-            },
+            reason="snapto_failed",
         )
 
     # Update nav state (pose change - yaw changed)
@@ -211,8 +207,7 @@ def tool(input_value=None, **kwargs):
     return executor._create_uniform_return(
         "success",
         value=f"Turned to {direction}, yaw={cardinal_yaw}°",
-        data={
-            "success": True,
+        extra={
             "yaw": cardinal_yaw,
             "direction": direction,
         },

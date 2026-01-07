@@ -5,6 +5,8 @@ Generates new text or code from scratch using natural language prompts.
 """
 import logging
 import json
+from typing import Any, Dict, Optional
+from infospace_executor import InfospaceExecutor
 
 logger = logging.getLogger(__name__)
 
@@ -87,6 +89,19 @@ def _resolve_context(context_arg: str, resource_manager) -> str:
     return context_str
 
 
+def _fail(executor: InfospaceExecutor, reason: str, value: Optional[str] = None, extra: Optional[Dict[str, Any]] = None):
+    return executor._create_uniform_return(
+        "failed",
+        value=value or reason,
+        reason=reason,
+        extra=extra,
+    )
+
+
+def _success(executor: InfospaceExecutor, result: str, extra: Optional[Dict[str, Any]] = None):
+    return executor._create_uniform_return("success", value=result, extra=extra)
+
+
 def tool(input_value=None, runtime=None, **kwargs):
     """
     Generate new content using natural language prompt.
@@ -101,13 +116,17 @@ def tool(input_value=None, runtime=None, **kwargs):
     Returns:
         Generated content as string
     """
+    executor: InfospaceExecutor = kwargs.get("executor")
+    if not executor:
+        return {"status": "failed", "reason": "executor not available", "value": None, "resource_id": None}
+
     prompt = kwargs.get('prompt', '')
     # If no prompt but value is in kwargs (planner mistake: used 'value' instead of 'prompt'), use value as prompt
     if not prompt and 'value' in kwargs:
         prompt = kwargs.get('value')
     
     if not prompt:
-        return "Error: prompt parameter required"
+        return _fail(executor, "prompt parameter required")
     
     style = kwargs.get('style', 'text').lower()
     context_arg = kwargs.get('context', '')
@@ -205,7 +224,7 @@ End your response with:
     # Use unified llm_generate callback (required)
     llm_generate = kwargs.get('llm_generate')
     if not llm_generate:
-        raise ValueError("llm_generate callback is required")
+        return _fail(executor, "llm_generate callback is required")
     response = llm_generate(
         messages=[generation_prompt],
         max_tokens=max_tokens,
@@ -221,10 +240,18 @@ End your response with:
     
     if not response.success:
         logger.error(f"generate-note failed: {response.error}")
-        return f"Error: {response.error}"
+        return _fail(executor, "llm_generate_failed", value=f"Error: {response.error}", extra={"llm_error": response.error})
     
     result = response.text.strip()
     logger.info(f"generate-note complete: output_len={len(result)}")
     
-    return result
+    return _success(
+        executor,
+        result,
+        {
+            "style": style,
+            "context_length": len(context),
+            "prompt_length": len(prompt),
+        },
+    )
 
