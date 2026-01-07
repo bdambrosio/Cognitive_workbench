@@ -38,7 +38,7 @@ def tool(input_value=None, **kwargs):
         return executor._create_uniform_return(
             'failed',
             value="item name required (string)",
-            data={"success": False, "failure_reason": "missing_item"}
+            reason="missing_item"
         )
     
     count = kwargs.get("count")
@@ -68,18 +68,11 @@ def tool(input_value=None, **kwargs):
         
         if not data.get("ok"):
             error = data.get("error", "unknown failure")
-            error_code = data.get("error_code", "unknown_error")
             result_text = f"Drop failed: {error}"
             return executor._create_uniform_return(
                 'failed',
                 value=result_text,
-                data={
-                    "success": False,
-                    "failure_reason": "drop_failed",
-                    "error": error,
-                    "error_code": error_code,
-                    **data
-                }
+                reason="drop_failed"
             )
         
         dropped = data.get("dropped", [])
@@ -95,19 +88,20 @@ def tool(input_value=None, **kwargs):
         result_text = "\n".join(result_parts)
         
         # Build structured data dict
-        structured_data = {
-            "success": True,
-            "dropped": dropped,
-            **data
+        # Extract metadata fields for extra
+        extra_metadata = {
+            "dropped": dropped
         }
+        # Merge API response data into extra
+        extra_metadata.update(data)
         
-        return executor._create_uniform_return('success', value=result_text, data=structured_data)
+        return executor._create_uniform_return('success', value=result_text, extra=extra_metadata)
     except requests.exceptions.RequestException as e:
         logger.error(f"Minecraft drop request failed: {e}")
         return executor._create_uniform_return(
             'failed',
             value=f"API request failed: {e}",
-            data={"success": False, "failure_reason": "api_failed"}
+            reason="api_failed"
         )
 
 

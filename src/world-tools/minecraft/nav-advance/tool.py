@@ -47,7 +47,8 @@ def tool(input_value=None, **kwargs):
         return executor._create_uniform_return(
             "failed",
             value="nav-advance requires target (positive integer blocks)",
-            data={"success": False, "stop_reason": "INVALID_TARGET"},
+            reason="INVALID_TARGET",
+            extra={"stop_reason": "INVALID_TARGET"}
         )
 
     step_duration = float(kwargs.get("step_duration", 0.2))
@@ -59,7 +60,8 @@ def tool(input_value=None, **kwargs):
         return executor._create_uniform_return(
             "failed",
             value="Failed to obtain initial status",
-            data={"success": False, "stop_reason": "STATUS_FAILED"},
+            reason="STATUS_FAILED",
+            extra={"stop_reason": "STATUS_FAILED"}
         )
 
     start_pos = status_before["data"]["position"]
@@ -75,12 +77,7 @@ def tool(input_value=None, **kwargs):
             return executor._create_uniform_return(
                 "failed",
                 value=f"Advance stopped: MOVE_FAILED after {steps_completed}/{target}",
-                data={
-                    "success": False,
-                    "steps_completed": steps_completed,
-                    "target": target,
-                    "stop_reason": "MOVE_FAILED",
-                },
+                reason="MOVE_FAILED",
             )
 
         move_status = move_data.get("status", "success")
@@ -89,34 +86,23 @@ def tool(input_value=None, **kwargs):
             return executor._create_uniform_return(
                 "failed",
                 value=f"Advance stopped: COLLISION after {steps_completed}/{target}",
-                data={
-                    "success": False,
-                    "steps_completed": steps_completed,
-                    "target": target,
-                    "stop_reason": "COLLISION",
-                },
+                reason="COLLISION",
             )
 
         if move_status == "fell":
             status_after = executor.execute_action_with_log({"type": "mc-status"}, "nav-advance")
             end_pos = status_after.get("data", {}).get("position")
             if end_pos:
-                snap_pos, yaw, pitch = calculate_snap_position_and_yaw(last_pos, end_pos, current_yaw)
-                snap_to_position(minecraft_url, x=snap_pos["x"], y=snap_pos["y"], z=snap_pos["z"], yaw=yaw, pitch=pitch)
+                snap_pos, _, _ = calculate_snap_position_and_yaw(last_pos, end_pos, current_yaw)
+                snap_to_position(minecraft_url, x=snap_pos["x"], y=snap_pos["y"], z=snap_pos["z"])
                 end_pos = snap_pos
-                pose = {"x": end_pos["x"], "y": end_pos["y"], "z": end_pos["z"], "yaw": yaw}
+                pose = {"x": end_pos["x"], "y": end_pos["y"], "z": end_pos["z"], "yaw": current_yaw}
                 update_nav_state(executor, pose=pose, support_here="unknown", fell=True, was_fall=True)
 
             return executor._create_uniform_return(
                 "failed",
                 value=f"Advance stopped: FELL after {steps_completed}/{target}",
-                data={
-                    "success": False,
-                    "steps_completed": steps_completed,
-                    "target": target,
-                    "stop_reason": "FELL",
-                    "to": end_pos,
-                },
+                reason="FELL",
             )
 
         # Observe for support
@@ -125,7 +111,7 @@ def tool(input_value=None, **kwargs):
             return executor._create_uniform_return(
                 "failed",
                 value=f"Advance stopped: OBSERVATION_FAILED after {steps_completed}/{target}",
-                data={"success": False, "steps_completed": steps_completed, "target": target, "stop_reason": "OBSERVATION_FAILED"},
+                reason="OBSERVATION_FAILED",
             )
 
         support_here = obs.get("data", {}).get("support", {}).get("here", {})
@@ -136,7 +122,7 @@ def tool(input_value=None, **kwargs):
             return executor._create_uniform_return(
                 "failed",
                 value=f"Advance stopped: STATUS_FAILED after {steps_completed}/{target}",
-                data={"success": False, "steps_completed": steps_completed, "target": target, "stop_reason": "STATUS_FAILED"},
+                reason="STATUS_FAILED",
             )
 
         end_pos = status_after["data"]["position"]
@@ -147,59 +133,46 @@ def tool(input_value=None, **kwargs):
             delta_y = end_y - last_y
 
         if delta_y is not None and abs(delta_y) > max_abs_delta_y:
-            snap_pos, yaw, pitch = calculate_snap_position_and_yaw(last_pos, end_pos, current_yaw)
-            snap_to_position(minecraft_url, x=snap_pos["x"], y=snap_pos["y"], z=snap_pos["z"], yaw=yaw, pitch=pitch)
+            snap_pos, _, _ = calculate_snap_position_and_yaw(last_pos, end_pos, current_yaw)
+            snap_to_position(minecraft_url, x=snap_pos["x"], y=snap_pos["y"], z=snap_pos["z"])
             end_pos = snap_pos
-            pose = {"x": end_pos["x"], "y": end_pos["y"], "z": end_pos["z"], "yaw": yaw}
+            pose = {"x": end_pos["x"], "y": end_pos["y"], "z": end_pos["z"], "yaw": current_yaw}
             update_nav_state(executor, pose=pose, support_here=support_type, fell=False, was_fall=False)
 
             return executor._create_uniform_return(
                 "failed",
                 value=f"Advance stopped: UNEXPECTED_VERTICAL_CHANGE after {steps_completed}/{target}",
-                data={
-                    "success": False,
-                    "steps_completed": steps_completed,
-                    "target": target,
-                    "stop_reason": "UNEXPECTED_VERTICAL_CHANGE",
-                    "delta_y": delta_y,
-                },
+                reason="UNEXPECTED_VERTICAL_CHANGE",
             )
 
         if support_type not in {"solid", "unsafe"}:
-            snap_pos, yaw, pitch = calculate_snap_position_and_yaw(last_pos, end_pos, current_yaw)
-            snap_to_position(minecraft_url, x=snap_pos["x"], y=snap_pos["y"], z=snap_pos["z"], yaw=yaw, pitch=pitch)
+            snap_pos, _, _ = calculate_snap_position_and_yaw(last_pos, end_pos, current_yaw)
+            snap_to_position(minecraft_url, x=snap_pos["x"], y=snap_pos["y"], z=snap_pos["z"])
             end_pos = snap_pos
-            pose = {"x": end_pos["x"], "y": end_pos["y"], "z": end_pos["z"], "yaw": yaw}
+            pose = {"x": end_pos["x"], "y": end_pos["y"], "z": end_pos["z"], "yaw": current_yaw}
             update_nav_state(executor, pose=pose, support_here=support_type, fell=False, was_fall=False)
 
             return executor._create_uniform_return(
                 "failed",
                 value=f"Advance stopped: SUPPORT_AMBIGUOUS after {steps_completed}/{target}",
-                data={
-                    "success": False,
-                    "steps_completed": steps_completed,
-                    "target": target,
-                    "stop_reason": "SUPPORT_AMBIGUOUS",
-                    "support_here": support_type,
-                },
+                reason="SUPPORT_AMBIGUOUS",
             )
 
         # Success for this block: snap and record nav state
-        snap_pos, yaw, pitch = calculate_snap_position_and_yaw(last_pos, end_pos, current_yaw)
-        snap_to_position(minecraft_url, x=snap_pos["x"], y=snap_pos["y"], z=snap_pos["z"], yaw=yaw, pitch=pitch)
+        snap_pos, _, _ = calculate_snap_position_and_yaw(last_pos, end_pos, current_yaw)
+        snap_to_position(minecraft_url, x=snap_pos["x"], y=snap_pos["y"], z=snap_pos["z"])
         end_pos = snap_pos
-        pose = {"x": end_pos["x"], "y": end_pos["y"], "z": end_pos["z"], "yaw": yaw}
+        pose = {"x": end_pos["x"], "y": end_pos["y"], "z": end_pos["z"], "yaw": current_yaw}
         update_nav_state(executor, pose=pose, support_here=support_type, fell=False, was_fall=False)
 
         steps_completed += 1
         last_pos = end_pos
         last_y = end_pos.get("y")
-        current_yaw = yaw
+        # current_yaw remains unchanged (preserved from initial status)
 
     return executor._create_uniform_return(
         "success",
         value=f"Advance completed: TARGET_REACHED ({steps_completed}/{target})",
-        data={"success": True, "steps_completed": steps_completed, "target": target, "stop_reason": "TARGET_REACHED"},
     )
 
 

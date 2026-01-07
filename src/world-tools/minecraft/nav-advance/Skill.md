@@ -37,7 +37,7 @@ Returns uniform_return format with:
 
 ## Guidelines
 
-- Use instead of planner loops over `nav-moveone`.
+- Use instead of planner loops over `nav-move`.
 - If `stop_reason` is `FELL`, treat as safety event and consider `nav-backtrack`.
 
 ## Usage Examples

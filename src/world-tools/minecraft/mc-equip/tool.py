@@ -37,7 +37,7 @@ def tool(input_value=None, **kwargs):
         return executor._create_uniform_return(
             'failed',
             value="item name required (string)",
-            data={"success": False, "failure_reason": "missing_item"}
+            reason="missing_item"
         )
     
     slot = kwargs.get("slot", "hand")
@@ -45,7 +45,7 @@ def tool(input_value=None, **kwargs):
         return executor._create_uniform_return(
             'failed',
             value="slot must be 'hand' or 'offhand'",
-            data={"success": False, "failure_reason": "invalid_slot"}
+            reason="invalid_slot"
         )
     
     equip_params = {"item": item, "slot": slot}
@@ -60,38 +60,32 @@ def tool(input_value=None, **kwargs):
         
         if not data.get("ok"):
             error = data.get("error", "unknown failure")
-            error_code = data.get("error_code", "unknown_error")
             result_text = f"Equip failed: {error}"
             return executor._create_uniform_return(
                 'failed',
                 value=result_text,
-                data={
-                    "success": False,
-                    "failure_reason": "equip_failed",
-                    "error": error,
-                    "error_code": error_code,
-                    **data
-                }
+                reason="equip_failed"
             )
         
         equipped_item = data.get("equipped", item)
         result_text = f"Equipped {equipped_item} in {slot}"
         
         # Build structured data dict
-        structured_data = {
-            "success": True,
+        # Extract metadata fields for extra
+        extra_metadata = {
             "equipped": equipped_item,
-            "slot": slot,
-            **data
+            "slot": slot
         }
+        # Merge API response data into extra
+        extra_metadata.update(data)
         
-        return executor._create_uniform_return('success', value=result_text, data=structured_data)
+        return executor._create_uniform_return('success', value=result_text, extra=extra_metadata)
     except requests.exceptions.RequestException as e:
         logger.error(f"Minecraft equip request failed: {e}")
         return executor._create_uniform_return(
             'failed',
             value=f"API request failed: {e}",
-            data={"success": False, "failure_reason": "api_failed"}
+            reason="api_failed"
         )
 
 

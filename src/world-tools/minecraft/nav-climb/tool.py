@@ -98,9 +98,9 @@ def _call_move_endpoint(minecraft_url: str, forward: bool = True, duration: floa
         return None
 
 
-def _snap_to_position(executor: InfospaceExecutor, snap_pos: Dict, yaw: float, pitch: float, minecraft_url: str) -> bool:
+def _snap_to_position(executor: InfospaceExecutor, snap_pos: Dict, minecraft_url: str) -> bool:
     """
-    Snap player to exact position and orientation via bridge endpoint.
+    Snap player to exact position via bridge endpoint (preserves current orientation).
     
     Returns:
         True if successful, False otherwise
@@ -198,7 +198,7 @@ def tool(input_value=None, **kwargs):
         return executor._create_uniform_return(
             "failed",
             value="Failed to obtain initial status",
-            data={"success": False, "failure_reason": "status_failed"}
+            reason="status_failed"
         )
 
     start_pos = status_before["data"]["position"]
@@ -250,22 +250,20 @@ def tool(input_value=None, **kwargs):
         if dy is not None and dy >= min_delta_y:
             if allow_walkable_landing or res.get("support_here") == "solid":
                 end_pos = res.get("end_pos")
-                # Snap to block center and set yaw
+                # Snap to block center (preserves current yaw)
                 if end_pos:
-                    snap_pos, yaw, pitch = _calculate_snap_position_and_yaw(start_pos, end_pos, current_yaw)
-                    _snap_to_position(executor, snap_pos, yaw, pitch, minecraft_url)
+                    snap_pos, _, _ = _calculate_snap_position_and_yaw(start_pos, end_pos, current_yaw)
+                    _snap_to_position(executor, snap_pos, minecraft_url)
                     end_pos = snap_pos
                     
-                    # Update nav state (successful climb)
-                    pose = {"x": end_pos["x"], "y": end_pos["y"], "z": end_pos["z"], "yaw": yaw}
+                    # Update nav state (successful climb) - preserve current_yaw
+                    pose = {"x": end_pos["x"], "y": end_pos["y"], "z": end_pos["z"], "yaw": current_yaw}
                     _update_nav_state(executor, pose, res.get("support_here", "unknown"), fell=False, was_fall=False)
                 
                 return executor._create_uniform_return(
                     "success",
                     value=f"Climbed successfully via walk (delta_y={dy:.2f})",
-                    data={
-                        "success": True,
-                        "climbed": True,
+                    extra={
                         "from": start_pos,
                         "to": end_pos,
                         "delta_y": dy,
@@ -281,22 +279,20 @@ def tool(input_value=None, **kwargs):
         if dy is not None and dy >= min_delta_y:
             if allow_walkable_landing or res.get("support_here") == "solid":
                 end_pos = res.get("end_pos")
-                # Snap to block center and set yaw
+                # Snap to block center (preserves current yaw)
                 if end_pos:
-                    snap_pos, yaw, pitch = _calculate_snap_position_and_yaw(start_pos, end_pos, current_yaw)
-                    _snap_to_position(executor, snap_pos, yaw, pitch, minecraft_url)
+                    snap_pos, _, _ = _calculate_snap_position_and_yaw(start_pos, end_pos, current_yaw)
+                    _snap_to_position(executor, snap_pos, minecraft_url)
                     end_pos = snap_pos
                     
-                    # Update nav state (successful climb)
-                    pose = {"x": end_pos["x"], "y": end_pos["y"], "z": end_pos["z"], "yaw": yaw}
+                    # Update nav state (successful climb) - preserve current_yaw
+                    pose = {"x": end_pos["x"], "y": end_pos["y"], "z": end_pos["z"], "yaw": current_yaw}
                     _update_nav_state(executor, pose, res.get("support_here", "unknown"), fell=False, was_fall=False)
                 
                 return executor._create_uniform_return(
                     "success",
                     value=f"Climbed successfully via jump (delta_y={dy:.2f})",
-                    data={
-                        "success": True,
-                        "climbed": True,
+                    extra={
                         "from": start_pos,
                         "to": end_pos,
                         "delta_y": dy,
@@ -309,28 +305,21 @@ def tool(input_value=None, **kwargs):
     reason = res.get("reason", "not_elevated")
     end_pos = res.get("end_pos") if isinstance(res, dict) else None
     
-    # Snap to block center even on failure if we have a position
+    # Snap to block center even on failure if we have a position (preserves current yaw)
     if end_pos:
-        snap_pos, yaw, pitch = _calculate_snap_position_and_yaw(start_pos, end_pos, current_yaw)
-        _snap_to_position(executor, snap_pos, yaw, pitch, minecraft_url)
+        snap_pos, _, _ = _calculate_snap_position_and_yaw(start_pos, end_pos, current_yaw)
+        _snap_to_position(executor, snap_pos, minecraft_url)
         end_pos = snap_pos
         
-        # Update nav state (climb failure)
-        pose = {"x": end_pos["x"], "y": end_pos["y"], "z": end_pos["z"], "yaw": yaw}
+        # Update nav state (climb failure) - preserve current_yaw
+        pose = {"x": end_pos["x"], "y": end_pos["y"], "z": end_pos["z"], "yaw": current_yaw}
         support_here = res.get("support_here", "unknown") if isinstance(res, dict) else "unknown"
         _update_nav_state(executor, pose, support_here, fell=False, was_fall=False)
     
     return executor._create_uniform_return(
         "failed",
         value=f"Climb failed: {reason}",
-        data={
-            "success": False,
-            "climbed": False,
-            "failure_reason": reason,
-            "from": start_pos,
-            "to": end_pos,
-            "delta_y": res.get("delta_y") if isinstance(res, dict) else None,
-        },
+        reason=reason,
     )
 
 

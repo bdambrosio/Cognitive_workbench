@@ -4,6 +4,8 @@ Relate tool - Compare two Notes or Collections to find similarities, differences
 """
 import logging
 import json
+from typing import Any, Dict, Optional
+from infospace_executor import InfospaceExecutor
 
 logger = logging.getLogger(__name__)
 
@@ -200,6 +202,19 @@ def _preprocess_element(element: any, resource_manager, focus: str = '', heartbe
     return content
 
 
+def _fail(executor: InfospaceExecutor, reason: str, extra: Optional[Dict[str, Any]] = None, value: Optional[str] = None):
+    return executor._create_uniform_return(
+        "failed",
+        value=value or reason,
+        reason=reason,
+        extra=extra,
+    )
+
+
+def _success(executor: InfospaceExecutor, result: str, extra: Optional[Dict[str, Any]] = None):
+    return executor._create_uniform_return("success", value=result, extra=extra)
+
+
 def tool(input_value, runtime=None, **kwargs):
     """
     Relate exactly two Notes/Collections to find similarities, differences, and relationships.
@@ -213,9 +228,13 @@ def tool(input_value, runtime=None, **kwargs):
     Returns:
         Comparison analysis as JSON string
     """
+    executor: InfospaceExecutor = kwargs.get("executor")
+    if not executor:
+        return {"status": "failed", "reason": "executor not available", "value": None, "resource_id": None}
+
     other = kwargs.get('other')
     if not input_value or not other:
-        return json.dumps({"error": "relate requires both target and other parameters"})
+        return _fail(executor, "missing_parameters", value=json.dumps({"error": "relate requires both target and other parameters"}))
     
     instruction = kwargs.get('instruction', '')
     heartbeat = kwargs.get('heartbeat')
@@ -258,7 +277,7 @@ Do not include any introductory, reasoning, or explanatory text in your response
     # Use unified llm_generate callback (required)
     llm_generate = kwargs.get('llm_generate')
     if not llm_generate:
-        raise ValueError("llm_generate callback is required")
+        return _fail(executor, "llm_generate callback is required")
     response = llm_generate(
         messages=[prompt],
         max_tokens=1000,
@@ -273,7 +292,23 @@ Do not include any introductory, reasoning, or explanatory text in your response
     
     if not response.success:
         logger.error(f"relate failed: {response.error}")
-        return json.dumps({"error": response.error})
+        return _fail(
+            executor,
+            "llm_generate_failed",
+            value=json.dumps({"error": response.error}),
+            extra={"llm_error": response.error},
+        )
     
-    return response.text
+    return _success(
+        executor,
+        response.text,
+        {
+            "instruction": instruction,
+            "focus": focus,
+            "comparison_lengths": {
+                "item_a": len(element_a),
+                "item_b": len(element_b),
+            },
+        },
+    )
 

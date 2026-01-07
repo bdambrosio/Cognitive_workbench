@@ -101,7 +101,7 @@ def tool(input_value=None, **kwargs):
             return executor._create_uniform_return(
                 'failed',
                 value=data.get('error', 'unknown error'),
-                data={"success": False, "failure_reason": "status_failed"}
+                reason="status_failed"
             )
 
         y_prev = None
@@ -189,28 +189,32 @@ def tool(input_value=None, **kwargs):
         
         status_text = "\n".join(status_parts)
         
-        # Build structured data dict
+        # Build structured data dict (copy API response data)
         structured_data = dict(data)
-        # Ensure yaw is normalized in structured_data
+        # Ensure yaw is normalized
         if 'yaw' in structured_data and structured_data['yaw'] is not None:
             structured_data['yaw'] = _normalize_yaw(structured_data['yaw'])
-        structured_data["vertical_state"] = vertical_state
-        structured_data["vertical_state_explanation"] = vertical_explanation
-        structured_data["vertical_state_mode"] = mode
-        structured_data["vertical_state_y_prev"] = y_prev
-        structured_data["vertical_state_y_now"] = y_now
-        structured_data["vertical_state_dt_s"] = dt_s
-        structured_data["vertical_state_y_epsilon"] = y_epsilon
-        structured_data["vertical_state_sample_delay_s"] = sample_delay_s if double_sample else None
-        structured_data["success"] = True
         
-        return executor._create_uniform_return('success', value=status_text, data=structured_data)
+        # Extract metadata fields for extra (excluding redundant success field)
+        extra_metadata = {
+            "vertical_state": vertical_state,
+            "vertical_state_explanation": vertical_explanation,
+            "vertical_state_mode": mode,
+            "vertical_state_y_prev": y_prev,
+            "vertical_state_y_now": y_now,
+            "vertical_state_dt_s": dt_s,
+            "vertical_state_y_epsilon": y_epsilon,
+            "vertical_state_sample_delay_s": sample_delay_s if double_sample else None
+        }
+        
+        # Pass structured_data as value (stored in Note), metadata in extra
+        return executor._create_uniform_return('success', value=structured_data, extra=extra_metadata)
     except requests.exceptions.RequestException as e:
         logger.error(f"Minecraft status request failed: {e}")
         return executor._create_uniform_return(
             'failed',
             value=f"API request failed: {e}",
-            data={"success": False, "failure_reason": "api_failed"}
+            reason="api_failed"
         )
 
 

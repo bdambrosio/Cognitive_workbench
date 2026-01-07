@@ -196,7 +196,7 @@ def tool(input_value=None, **kwargs):
             "failed",
             value="Failed to obtain initial status",
             reason="Failed to obtain initial status",
-            data={"success": False, "failure_reason": "status_failed"}
+            reason="status_failed"
         )
 
     start_pos = status_before["data"]["position"]
@@ -210,13 +210,7 @@ def tool(input_value=None, **kwargs):
         return executor._create_uniform_return(
             "failed",
             value="Move request failed",
-            reason="Move request failed",
-            data={
-                "success": False,
-                "failure_reason": "move_failed",
-                "from": start_pos,
-                "to": None,
-            },
+            reason="move_failed",
         )
 
     move_status = move_data.get("status", "success")
@@ -225,13 +219,7 @@ def tool(input_value=None, **kwargs):
         return executor._create_uniform_return(
             "failed",
             value="Movement blocked by collision",
-            reason="Movement blocked by collision",
-            data={
-                "success": False,
-                "failure_reason": "collision",
-                "from": start_pos,
-                "to": start_pos,
-            },
+            reason="collision",
         )
 
     if move_status == "fell":
@@ -242,13 +230,7 @@ def tool(input_value=None, **kwargs):
             return executor._create_uniform_return(
                 "failed",
                 value="Failed to obtain position after fall",
-                reason="Failed to obtain position after fall",
-                data={
-                    "success": False,
-                    "failure_reason": "observation_failed",
-                    "from": start_pos,
-                    "to": None,
-                },
+                reason="observation_failed",
             )
         
         end_pos = status_after.get("data", {}).get("position")
@@ -274,14 +256,7 @@ def tool(input_value=None, **kwargs):
             return executor._create_uniform_return(
                 "failed",
                 value="Failed to observe blocks after fall",
-                reason="Failed to observe blocks after fall",
-                data={
-                    "success": False,
-                    "failure_reason": "observation_failed",
-                    "from": start_pos,
-                    "to": end_pos,
-                    "delta_y": delta_y,
-                },
+                reason="observation_failed",
             )
         
         support_here = obs.get("data", {}).get("support", {}).get("here", {})
@@ -303,14 +278,7 @@ def tool(input_value=None, **kwargs):
             return executor._create_uniform_return(
                 "failed",
                 value=reason_text,
-                reason=reason_text,
-                data={
-                    "success": False,
-                    "failure_reason": "no_descent",
-                    "from": start_pos,
-                    "to": end_pos,
-                    "delta_y": delta_y,
-                },
+                reason="no_descent",
             )
         
         if abs(delta_y) > max_drop:
@@ -322,14 +290,7 @@ def tool(input_value=None, **kwargs):
             return executor._create_uniform_return(
                 "failed",
                 value=reason_text,
-                reason=reason_text,
-                data={
-                    "success": False,
-                    "failure_reason": "excessive_drop",
-                    "from": start_pos,
-                    "to": end_pos,
-                    "delta_y": delta_y,
-                },
+                reason="excessive_drop",
             )
         
         # Validate landing support
@@ -342,15 +303,7 @@ def tool(input_value=None, **kwargs):
             return executor._create_uniform_return(
                 "failed",
                 value=reason_text,
-                reason=reason_text,
-                data={
-                    "success": False,
-                    "failure_reason": "support_ambiguous",
-                    "from": start_pos,
-                    "to": end_pos,
-                    "delta_y": delta_y,
-                    "support_here": support_type,
-                },
+                reason="support_ambiguous",
             )
         
         # Success: Fall was a controlled descent within bounds with walkable landing
@@ -360,9 +313,7 @@ def tool(input_value=None, **kwargs):
         return executor._create_uniform_return(
             "success",
             value=f"Controlled descent completed via fall (delta_y={delta_y:.2f})",
-            data={
-                "success": True,
-                "descended": True,
+            extra={
                 "from": start_pos,
                 "to": end_pos,
                 "delta_y": delta_y,
@@ -376,13 +327,7 @@ def tool(input_value=None, **kwargs):
         return executor._create_uniform_return(
             "failed",
             value="Failed to observe blocks at destination",
-            reason="Failed to observe blocks at destination",
-            data={
-                "success": False,
-                "failure_reason": "observation_failed",
-                "from": start_pos,
-                "to": start_pos,
-            },
+            reason="observation_failed",
         )
 
     support_here = obs.get("data", {}).get("support", {}).get("here", {})
@@ -394,13 +339,7 @@ def tool(input_value=None, **kwargs):
         return executor._create_uniform_return(
             "failed",
             value="Failed to obtain final status",
-            reason="Failed to obtain final status",
-            data={
-                "success": False,
-                "failure_reason": "observation_failed",
-                "from": start_pos,
-                "to": start_pos,
-            },
+            reason="observation_failed",
         )
 
     end_pos = status_after["data"]["position"]
@@ -426,14 +365,7 @@ def tool(input_value=None, **kwargs):
         return executor._create_uniform_return(
             "failed",
             value=reason_text,
-            reason=reason_text,
-            data={
-                "success": False,
-                "failure_reason": "no_descent",
-                "from": start_pos,
-                "to": end_pos,
-                "delta_y": delta_y,
-            },
+            reason="no_descent",
         )
 
     if abs(delta_y) > max_drop:
@@ -450,14 +382,7 @@ def tool(input_value=None, **kwargs):
         return executor._create_uniform_return(
             "failed",
             value=reason_text,
-            reason=reason_text,
-            data={
-                "success": False,
-                "failure_reason": "excessive_drop",
-                "from": start_pos,
-                "to": end_pos,
-                "delta_y": delta_y,
-            },
+            reason="excessive_drop",
         )
 
     # --- Support check ---
@@ -476,15 +401,7 @@ def tool(input_value=None, **kwargs):
         return executor._create_uniform_return(
             "failed",
             value=reason_text,
-            reason=reason_text,
-            data={
-                "success": False,
-                "failure_reason": "support_ambiguous",
-                "from": start_pos,
-                "to": end_pos,
-                "delta_y": delta_y,
-                "support_here": support_type,
-            },
+            reason="support_ambiguous",
         )
 
     # --- Success: Snap to destination block center and set yaw ---
@@ -499,9 +416,7 @@ def tool(input_value=None, **kwargs):
     return executor._create_uniform_return(
         "success",
         value=f"Descent completed successfully (delta_y={delta_y:.2f})",
-        data={
-            "success": True,
-            "descended": True,
+        extra={
             "from": start_pos,
             "to": end_pos,
             "delta_y": delta_y,

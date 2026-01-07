@@ -21,7 +21,7 @@ examples:
 Level 1 — Atomic orientation primitive
 
 ### Purpose
-Turn to a cardinal direction (0°, 90°, 180°, or 270°) and snap to block center. This is an atomic orientation operation suitable for composition into higher-level navigation skills. This is the only navigation tool that changes orientation; all movement tools (`nav-moveone`, `nav-climb`, `nav-descend`) move forward relative to current facing direction.
+Turn to a cardinal direction (0°, 90°, 180°, or 270°) and snap to block center. This is an atomic orientation operation suitable for composition into higher-level navigation skills. This is the only navigation tool that changes orientation; all movement tools (`nav-move`, `nav-climb`, `nav-descend`) move forward relative to current facing direction.
 
 ### Primitives Used
 - `mc-status`: Capture current pose and orientation
@@ -89,7 +89,7 @@ Failure Reasons:
 ### Notes
 
 - This is the only navigation tool that changes orientation.
-- All movement tools (`nav-moveone`, `nav-climb`, `nav-descend`) move forward relative to current facing direction.
+- All movement tools (`nav-move`, `nav-climb`, `nav-descend`) move forward relative to current facing direction.
 - Use `nav-turn` before movement to change direction, or after movement to align to cardinal directions.
 - The `forward` direction is useful for aligning to a cardinal direction without changing orientation.
 - All turns result in cardinal directions, ensuring predictable orientation for navigation planning.
@@ -99,10 +99,10 @@ Failure Reasons:
 ```json
 {"type":"mc-status","out":"$status_before"}
 {"type":"nav-turn","direction":"right","out":"$turn"}
-{"type":"nav-moveone","out":"$m1"}
-{"type":"nav-moveone","out":"$m2"}
+{"type":"nav-move","out":"$m1"}
+{"type":"nav-move","out":"$m2"}
 {"type":"nav-turn","direction":"left","out":"$turn2"}
-{"type":"nav-moveone","out":"$m3"}
+{"type":"nav-move","out":"$m3"}
 {"type":"mc-status","out":"$status_after"}
 ```
 

@@ -2,52 +2,98 @@
 name: refine
 type: python
 flattens_collections: true
-description: "Extract or transform information from unstructured text content using LLM. Use for extracting facts, entities, or specific information from text. Does not add new content"
+description: "Extract or transform information from unstructured or semi-structured text using an LLM. Edits existing content only; does not add new information."
 ---
 
 # Refine Tool
 
-Universal LLM-based transformation tool. Edits existing Note content according to natural language instructions.
+Universal LLM-based transformation tool for **editing or extracting information from existing text**.
 
-## Purpose
+`refine` operates on a **single Note** and produces a **new Note** whose content is derived solely from the input. It does **not** create new facts or synthesize information.
 
-Transform the content of an existing Note based on instruction. Does NOT add new content - only edits/transforms what's already present. For creating new content, use `generate-note` instead.
+---
 
-## Input
+## INPUT CONTRACT
 
-- `target`: Note to transform (required - must exist and contain content)
-- `instruction`: Transformation instruction (required, e.g., "extract schema", "convert to bullet list", "rewrite in formal tone")
+- `target`: **Note** (variable or ID)  
+  - MUST be a single Note (not a Collection)
+- `instruction`: **String** describing extraction or transformation
+- `out`: Variable name for resulting Note
 
-## Output
+### REQUIREMENTS
+- Target content SHOULD be unstructured or semi-structured text
+- Instruction MUST specify *what to extract* or *how to transform*
 
-Returns Note containing the edited/transformed content based on the instruction.
+### NOT SUPPORTED
+- ❌ `refine(Collection)`
+  - Use `map(refine)` if each Note is independent
+  - Or `flatten` → `refine` if structure is distributed
+- ❌ Notes containing multiple independent documents  
+  - Use `split` first
 
-## Behavior & Performance
+---
 
-- Only edits existing text - does not add information that isn't already present
-- Does not create content - for creating new content, use `generate-note`
-- Prefer specialized tools (as-json, extract-entities) when available - they're faster and cheaper
+## OUTPUT
 
-## Guidelines
+- Returns a **Note** containing transformed or extracted content
+- Output content is derived **only from existing input text**
+- No new information is introduced
 
-- Use for extracting facts, entities, or transforming existing content
-- Examples that work: "Extract the schema from this JSON", "Convert this to a bullet list", "Rewrite in formal tone"
-- Examples that don't work: "Add a summary paragraph" (will NOT add new content), "Create a response to the user" (will NOT create new content)
-- For creating new content, use `generate-note` instead
+---
 
-## Usage Examples
+## FAILURE SEMANTICS
+
+An **empty result** may indicate:
+- No extractable structure matching the instruction
+- Incorrect input shape (Collection instead of Note)
+- Instruction too specific or incompatible with content
+
+**Empty result does NOT imply information is absent globally.**  
+It often indicates a contract or instruction mismatch.
+
+Actual failures include:
+- Invalid target type
+- Missing instruction
+- LLM execution error
+
+---
+
+## USAGE GUIDANCE
+
+### Use `refine` when:
+- Extracting facts or fields from a single document
+- Transforming text format (e.g., bullets, JSON)
+- Normalizing or rewriting existing content
+
+### Do NOT use `refine` when:
+- Target is a Collection → use `map(refine)` or `flatten` → `refine`
+- Combining multiple documents → use `flatten` → `refine`
+- Selecting or filtering items → use `filter-collection` / `filter-structured`
+- Extracting structured fields → use `project` / `pluck`
+- Creating new content → use `generate-note`
+
+---
+
+## REPRESENTATION INVARIANTS
+
+- Collection ≠ Note
+- Use `map(refine)` when each Note is independently meaningful
+- Use `flatten` → `refine` when structure is distributed across text
+- Prefer specialized tools (`as-json`, `extract-entities`) when available
+
+---
+
+## ANTI-PATTERNS
+
+- ❌ `refine(target=$collection)`
+- ❌ `refine(target=$note, instruction="add summary")`
+- ❌ Treating empty result as “data missing”
+- ❌ Using `refine` for relational or field-based selection
+
+---
+
+## EXAMPLES
 
 Extract schema:
 ```json
 {"type":"refine","target":"$data","instruction":"extract schema as JSON","out":"$schema"}
-```
-
-Transform format:
-```json
-{"type":"refine","target":"$text","instruction":"convert to bullet list","out":"$bullets"}
-```
-
-Extract information:
-```json
-{"type":"refine","target":"$bio","instruction":"extract the nationality","out":"$nationality"}
-```

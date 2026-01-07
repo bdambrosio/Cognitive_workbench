@@ -65,14 +65,14 @@ def tool(input_value=None, **kwargs):
         return executor._create_uniform_return(
             'failed',
             value="Resource manager not available",
-            data={"success": False, "failure_reason": "no_resource_manager"}
+            reason="no_resource_manager"
         )
     
     if not waypoint_name:
         return executor._create_uniform_return(
             'failed',
             value="Waypoint name required",
-            data={"success": False, "failure_reason": "missing_name"}
+            reason="missing_name"
         )
     
     # Get coordinates
@@ -86,7 +86,7 @@ def tool(input_value=None, **kwargs):
         return executor._create_uniform_return(
             'failed',
             value="Coordinates required (x, y, z)",
-            data={"success": False, "failure_reason": "missing_coordinates"}
+            reason="missing_coordinates"
         )
     
     # Round coordinates to block positions
@@ -111,7 +111,7 @@ def tool(input_value=None, **kwargs):
             return executor._create_uniform_return(
                 'failed',
                 value=f"Failed to create map Collection: {error_msg}",
-                data={"success": False, "failure_reason": "collection_creation_failed"}
+                reason="collection_creation_failed"
             )
     
     # Create entry with waypoint label
@@ -134,7 +134,7 @@ def tool(input_value=None, **kwargs):
         return executor._create_uniform_return(
             'failed',
             value=f"Failed to create waypoint Note: {error_msg}",
-            data={"success": False, "failure_reason": "note_creation_failed"}
+            reason="note_creation_failed"
         )
     
     # Add Note to Collection
@@ -146,7 +146,7 @@ def tool(input_value=None, **kwargs):
         return executor._create_uniform_return(
             'failed',
             value=f"Failed to add Note to Collection: {error_msg}",
-            data={"success": False, "failure_reason": "add_to_collection_failed"}
+            reason="add_to_collection_failed"
         )
     
     # Mark Collection as persistent
@@ -163,7 +163,7 @@ def tool(input_value=None, **kwargs):
         "location": {"x": x_block, "y": y_block, "z": z_block}
     }
     
-    return executor._create_uniform_return('success', value=result_text, data=structured_data)
+    return executor._create_uniform_return('success', value=result_text, extra=structured_data)
 
 
 if __name__ == "__main__":

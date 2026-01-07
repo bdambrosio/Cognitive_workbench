@@ -74,7 +74,7 @@ def tool(input_value=None, **kwargs):
         return executor._create_uniform_return(
             'failed',
             value="position required (absolute x,y,z OR relative forward,right,up)",
-            data={"success": False, "failure_reason": "missing_position"}
+            reason="missing_position"
         )
     
     try:
@@ -94,12 +94,7 @@ def tool(input_value=None, **kwargs):
             return executor._create_uniform_return(
                 'failed',
                 value=result_text,
-                data={
-                    "success": False,
-                    "failure_reason": "dig_failed",
-                    "error": error,
-                    **data
-                }
+                reason="dig_failed"
             )
         
         # Dig request accepted - note that actual digging is asynchronous
@@ -117,18 +112,21 @@ def tool(input_value=None, **kwargs):
             result_text = f"Dig request accepted: {block_name}"
         
         # Build structured data dict
-        structured_data = dict(data)
-        structured_data["success"] = True
-        structured_data["status"] = "accepted"  # Request accepted, but digging may still fail asynchronously
-        structured_data["dug"] = dug
+        # Extract metadata fields for extra
+        extra_metadata = {
+            "status": "accepted",  # Request accepted, but digging may still fail asynchronously
+            "dug": dug
+        }
+        # Merge API response data into extra
+        extra_metadata.update(data)
         
-        return executor._create_uniform_return('success', value=result_text, data=structured_data)
+        return executor._create_uniform_return('success', value=result_text, extra=extra_metadata)
     except requests.exceptions.RequestException as e:
         logger.error(f"Minecraft dig request failed: {e}")
         return executor._create_uniform_return(
             'failed',
             value=f"API request failed: {e}",
-            data={"success": False, "failure_reason": "api_failed"}
+            reason="api_failed"
         )
 
 

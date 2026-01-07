@@ -80,7 +80,7 @@ After successful initialization:
 - The tool name must be `init` or `<world_name>-init` (e.g., `minecraft-init`) to be auto-executed
 - Normalization ensures consistent starting state for navigation operations
 - Support assessment (`support_here`) is left as `"unknown"` and should be updated by first navigation operation
-- Navigation history starts empty and is populated by `nav-moveone`, `nav-climb`, and `nav-descend` tools
+- Navigation history starts empty and is populated by `nav-move`, `nav-climb`, and `nav-descend` tools
 
 ### Common Workflow
 

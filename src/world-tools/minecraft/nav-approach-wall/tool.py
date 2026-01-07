@@ -36,7 +36,8 @@ def tool(input_value=None, **kwargs):
         return executor._create_uniform_return(
             "failed",
             value="Failed to get initial status",
-            data={"success": False, "outcome": "NO_WALL_REACHABLE", "failure_reason": "status_failed"},
+            reason="status_failed",
+            extra={"outcome": "NO_WALL_REACHABLE"}
         )
 
     initial_yaw = status_result.get("data", {}).get("yaw", 0.0)
@@ -118,16 +119,17 @@ def tool(input_value=None, **kwargs):
     if log_messages:
         result_text += "\n" + "\n".join(log_messages)
 
-    structured_data = {
-        "success": outcome == "SUCCESS",
+    # Extract metadata fields for extra (excluding redundant success field)
+    extra_metadata = {
         "outcome": outcome,
         "target": target,
         "step_duration": step_duration,
         "placement_item": placement_item,
         "log": log_messages,
     }
-    status = "success" if structured_data["success"] else "failed"
-    return executor._create_uniform_return(status, value=result_text, data=structured_data)
+    
+    status = "success" if outcome == "SUCCESS" else "failed"
+    return executor._create_uniform_return(status, value=result_text, extra=extra_metadata)
 
 
 if __name__ == "__main__":

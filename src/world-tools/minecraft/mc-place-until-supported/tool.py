@@ -132,7 +132,7 @@ def tool(input_value=None, **kwargs):
             return executor._create_uniform_return(
                 'failed',
                 value="item/block name required and no solid blocks found in inventory",
-                data={"success": False, "failure_reason": "no_item_available"}
+                reason="no_item_available"
             )
     
     placement_policy = kwargs.get("placement_policy", "underfoot").lower()
@@ -140,7 +140,7 @@ def tool(input_value=None, **kwargs):
         return executor._create_uniform_return(
             'failed',
             value=f"Invalid placement_policy: {placement_policy}. Must be one of: underfoot, forward-underfoot, lateral",
-            data={"success": False, "failure_reason": "invalid_policy"}
+            reason="invalid_policy"
         )
     
     max_attempts = int(kwargs.get("max_attempts", 3))
@@ -256,9 +256,8 @@ def tool(input_value=None, **kwargs):
     # Determine success based on outcome
     is_success = (outcome == "SUPPORTED")
     
-    # Build structured data dict
-    structured_data = {
-        "success": is_success,
+    # Extract metadata fields for extra (excluding redundant success field)
+    extra_metadata = {
         "outcome": outcome,
         "attempts_made": attempt_count,
         "max_attempts": max_attempts,
@@ -269,7 +268,7 @@ def tool(input_value=None, **kwargs):
     }
     
     status = 'success' if is_success else 'failed'
-    return executor._create_uniform_return(status, value=result_text, data=structured_data)
+    return executor._create_uniform_return(status, value=result_text, extra=extra_metadata)
 
 
 if __name__ == "__main__":

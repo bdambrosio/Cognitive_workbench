@@ -2,6 +2,7 @@
 Calculate tool - numerically evaluate mathematical expressions using SymPy.
 """
 
+from typing import Any, Dict, Optional
 from sympy import (
     sympify, N, pi, E,
     sin, cos, tan, asin, acos, atan,
@@ -9,6 +10,15 @@ from sympy import (
     solve, Eq
 )
 from sympy.core.sympify import SympifyError
+from infospace_executor import InfospaceExecutor
+
+
+def _fail(executor: InfospaceExecutor, reason: str, extra: Optional[Dict[str, Any]] = None):
+    return executor._create_uniform_return("failed", value=reason, reason=reason, extra=extra)
+
+
+def _success(executor: InfospaceExecutor, result: str, extra: Optional[Dict[str, Any]] = None):
+    return executor._create_uniform_return("success", value=result, extra=extra)
 
 
 def tool(input_value, runtime=None, **kwargs):
@@ -28,20 +38,18 @@ def tool(input_value, runtime=None, **kwargs):
     # ----------------------------
     # Validate input
     # ----------------------------
+    executor: InfospaceExecutor = kwargs.get("executor")
+    if not executor:
+        return {"status": "failed", "reason": "executor not available", "value": None, "resource_id": None}
+
     if not isinstance(input_value, str):
-        return {
-            "status": "failed",
-            "reason": "input_value must be a string expression"
-        }
+        return _fail(executor, "input_value must be a string expression")
 
     variables = kwargs.get("variables", {}) or {}
     precision = kwargs.get("precision", 10)
 
     if not isinstance(variables, dict):
-        return {
-            "status": "failed",
-            "reason": "variables must be a dictionary"
-        }
+        return _fail(executor, "variables must be a dictionary")
 
     # ----------------------------
     # Local namespace for SymPy
@@ -79,10 +87,7 @@ def tool(input_value, runtime=None, **kwargs):
     try:
         expr = sympify(input_value, locals=local_dict)
     except SympifyError as e:
-        return {
-            "status": "failed",
-            "reason": f"Invalid mathematical expression: {e}"
-        }
+        return _fail(executor, f"Invalid mathematical expression: {e}")
 
     # ----------------------------
     # Substitute variables
@@ -90,10 +95,7 @@ def tool(input_value, runtime=None, **kwargs):
     try:
         expr = expr.subs(variables)
     except Exception as e:
-        return {
-            "status": "failed",
-            "reason": f"Variable substitution failed: {e}"
-        }
+        return _fail(executor, f"Variable substitution failed: {e}")
 
     # ----------------------------
     # Handle solve(...)
@@ -106,34 +108,27 @@ def tool(input_value, runtime=None, **kwargs):
                 solutions = solve(expr.args[0])
 
             if not solutions:
-                return ""
+                return _success(executor, "")
 
-            return ", ".join(str(N(sol, precision)) for sol in solutions)
+            result = ", ".join(str(N(sol, precision)) for sol in solutions)
+            return _success(executor, result)
 
         except Exception as e:
-            return {
-                "status": "failed",
-                "reason": f"Equation solving failed: {e}"
-            }
+            return _fail(executor, f"Equation solving failed: {e}")
 
     # ----------------------------
     # Reject unresolved symbols
     # ----------------------------
     free_symbols = getattr(expr, "free_symbols", set())
     if free_symbols:
-        return {
-            "status": "failed",
-            "reason": f"Unresolved symbols in expression: {', '.join(map(str, free_symbols))}"
-        }
+        symbols = ', '.join(map(str, free_symbols))
+        return _fail(executor, f"Unresolved symbols in expression: {symbols}")
 
     # ----------------------------
     # Numeric evaluation
     # ----------------------------
     try:
-        result = N(expr, precision)
-        return str(result)
+        result = str(N(expr, precision))
+        return _success(executor, result)
     except Exception as e:
-        return {
-            "status": "failed",
-            "reason": f"Numeric evaluation failed: {e}"
-        }
+        return _fail(executor, f"Numeric evaluation failed: {e}")

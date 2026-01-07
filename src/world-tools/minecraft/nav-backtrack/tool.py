@@ -115,8 +115,9 @@ def tool(input_value=None, **kwargs):
 
     if not history:
         return executor._create_uniform_return(
-            "success",
-            data={"success": False, "failure_reason": "NO_HISTORY"}
+            "failed",
+            value="No navigation history available",
+            reason="NO_HISTORY"
         )
 
     # ----------------------------
@@ -125,8 +126,9 @@ def tool(input_value=None, **kwargs):
     status = executor.execute_action_with_log({"type": "mc-status"}, "nav-backtrack")
     if status.get("status") != "success":
         return executor._create_uniform_return(
-            "success",
-            data={"success": False, "failure_reason": "STATUS_FAILED"}
+            "failed",
+            value="Failed to obtain status",
+            reason="STATUS_FAILED"
         )
 
     cur = status["result"]["position"]
@@ -151,8 +153,9 @@ def tool(input_value=None, **kwargs):
 
     if not safe_targets:
         return executor._create_uniform_return(
-            "success",
-            data={"success": False, "failure_reason": "NO_SAFE_TARGET"}
+            "failed",
+            value="No safe targets found in navigation history",
+            reason="NO_SAFE_TARGET"
         )
 
     # ----------------------------
@@ -176,7 +179,7 @@ def tool(input_value=None, **kwargs):
 
             # Move
             if move_kind == "step":
-                move = {"type": "nav-moveone"}
+                move = {"type": "nav-move"}
             elif move_kind == "climb":
                 move = {"type": "nav-climb"}
             elif move_kind == "descend":
@@ -220,8 +223,8 @@ def tool(input_value=None, **kwargs):
 
                 return executor._create_uniform_return(
                     "success",
-                    data={
-                        "success": True,
+                    value=f"Recovered to target via {move_kind}",
+                    extra={
                         "recovered_to": target_pose,
                         "method": move_kind,
                         "yaw": desired_yaw,
@@ -232,6 +235,7 @@ def tool(input_value=None, **kwargs):
     # Failure
     # ----------------------------
     return executor._create_uniform_return(
-        "success",
-        data={"success": False, "failure_reason": "UNREACHABLE"}
+        "failed",
+        value="Could not reach any safe target",
+        reason="UNREACHABLE"
     )

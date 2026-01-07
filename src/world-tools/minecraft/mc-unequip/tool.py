@@ -36,7 +36,7 @@ def tool(input_value=None, **kwargs):
         return executor._create_uniform_return(
             'failed',
             value="slot must be 'hand' or 'offhand'",
-            data={"success": False, "failure_reason": "invalid_slot"}
+            reason="invalid_slot"
         )
     
     unequip_params = {"slot": slot}
@@ -55,30 +55,26 @@ def tool(input_value=None, **kwargs):
             return executor._create_uniform_return(
                 'failed',
                 value=result_text,
-                data={
-                    "success": False,
-                    "failure_reason": "unequip_failed",
-                    "error": error,
-                    **data
-                }
+                reason="unequip_failed"
             )
         
         result_text = f"Unequipped {slot}"
         
         # Build structured data dict
-        structured_data = {
-            "success": True,
-            "slot": slot,
-            **data
+        # Extract metadata fields for extra
+        extra_metadata = {
+            "slot": slot
         }
+        # Merge API response data into extra
+        extra_metadata.update(data)
         
-        return executor._create_uniform_return('success', value=result_text, data=structured_data)
+        return executor._create_uniform_return('success', value=result_text, extra=extra_metadata)
     except requests.exceptions.RequestException as e:
         logger.error(f"Minecraft unequip request failed: {e}")
         return executor._create_uniform_return(
             'failed',
             value=f"API request failed: {e}",
-            data={"success": False, "failure_reason": "api_failed"}
+            reason="api_failed"
         )
 
 

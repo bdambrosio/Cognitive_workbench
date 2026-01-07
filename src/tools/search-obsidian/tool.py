@@ -9,8 +9,27 @@ import os
 import time
 import requests
 from typing import List, Dict, Any, Optional
+from infospace_executor import InfospaceExecutor
 
 logger = logging.getLogger(__name__)
+
+
+def _fail(executor: InfospaceExecutor, reason: str, value: Optional[str] = None, extra: Optional[Dict[str, Any]] = None):
+    return executor._create_uniform_return(
+        "failed",
+        value=value or reason,
+        reason=reason,
+        extra=extra,
+    )
+
+
+def _success(
+    executor: InfospaceExecutor,
+    value: str,
+    resource_id: Optional[str],
+    extra: Optional[Dict[str, Any]] = None,
+):
+    return executor._create_uniform_return("success", value=value, resource_id=resource_id, extra=extra)
 
 # ------------------------------
 # Configuration
@@ -357,28 +376,23 @@ def tool(input_value, **kwargs):
     Returns:
         Collection ID containing structured Note for each search result
     """
+    executor: InfospaceExecutor = kwargs.get("executor")
+    if not executor:
+        return {"status": "failed", "reason": "executor not available", "value": None, "resource_id": None}
+
     query = input_value or kwargs.get('value') or kwargs.get('query', '')
     if not isinstance(query, str):
         query = ''
     if not query:
-        return {
-            'status': 'failed',
-            'reason': 'input_value parameter required (search query)'
-        }
+        return _fail(executor, 'input_value parameter required (search query)')
     
     agent_name = kwargs.get('agent_name')
     if not agent_name:
-        return {
-            'status': 'failed',
-            'reason': 'agent_name required in kwargs'
-        }
+        return _fail(executor, 'agent_name required in kwargs')
     
     resource_manager = kwargs.get('resource_manager')
     if not resource_manager:
-        return {
-            'status': 'failed',
-            'reason': 'resource_manager required in kwargs'
-        }
+        return _fail(executor, 'resource_manager required in kwargs')
     
     max_results = kwargs.get('max_results', 10)
     
@@ -396,17 +410,19 @@ def tool(input_value, **kwargs):
         logger.error(f"Obsidian MCP search failed: {e}")
         import traceback
         traceback.print_exc()
-        return {
-            'status': 'failed',
-            'reason': f'Search failed: {e}'
-        }
+        return _fail(executor, 'search_failed', extra={"exception": str(e)})
     
     if not results:
         # Return empty Collection for no results
         empty_coll_id = _create_collection([], agent_name, resource_manager)
         if not empty_coll_id:
-            return {'status': 'failed', 'reason': 'Failed to create empty Collection', 'value': None, 'resource_id': None}
-        return {'status': 'success', 'value': '0 items []', 'resource_id': empty_coll_id}
+            return _fail(executor, 'Failed to create empty Collection')
+        return _success(
+            executor,
+            '0 items []',
+            empty_coll_id,
+            {"item_count": 0, "query": query},
+        )
     
     # Create a Note for each result (each is structured JSON)
     note_ids = []
@@ -418,12 +434,12 @@ def tool(input_value, **kwargs):
             logger.warning(f"Failed to create Note for result: {result.get('metadata', {}).get('uri', 'unknown')}")
     
     if not note_ids:
-        return {'status': 'failed', 'reason': 'Failed to create any Notes from search results', 'value': None, 'resource_id': None}
+        return _fail(executor, 'Failed to create any Notes from search results')
     
     # Create Collection containing all result Notes
     collection_id = _create_collection(note_ids, agent_name, resource_manager)
     if not collection_id:
-        return {'status': 'failed', 'reason': 'Failed to create Collection', 'value': None, 'resource_id': None}
+        return _fail(executor, 'Failed to create Collection')
     
     # Format collection value as "X items [Note_1, ...]"
     item_count = len(note_ids)
@@ -434,7 +450,12 @@ def tool(input_value, **kwargs):
     collection_value = f"{item_count} items [{note_list_str}]"
     
     logger.info(f"search-obsidian created Collection {collection_id} with {len(note_ids)} results for query: {query}")
-    return {'status': 'success', 'value': collection_value, 'resource_id': collection_id}
+    return _success(
+        executor,
+        collection_value,
+        collection_id,
+        {"item_count": item_count, "query": query, "note_ids": note_ids},
+    )
 
 if __name__ == "__main__":
     # Test

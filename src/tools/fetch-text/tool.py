@@ -14,6 +14,7 @@ from urllib.parse import urljoin, urlparse
 from html.parser import HTMLParser
 import pymupdf
 import warnings
+from infospace_executor import InfospaceExecutor
 
 from utils.grobid import parse_pdf_grobid
 
@@ -39,6 +40,19 @@ logger = logging.getLogger(__name__)
 warnings.filterwarnings('ignore', category=UserWarning, module='unstructured')
 
 
+def _fail(executor: InfospaceExecutor, reason: str, value: str | None = None, extra: dict | None = None):
+    return executor._create_uniform_return(
+        "failed",
+        value=value or reason,
+        reason=reason,
+        extra=extra,
+    )
+
+
+def _success(executor: InfospaceExecutor, result: str, extra: dict | None = None):
+    return executor._create_uniform_return("success", value=result, extra=extra)
+
+
 def tool(url_or_content: str, runtime=None, **kwargs) -> str:
     """
     Fetch text from URL, base64 PDF, Note ID, or Collection ID. Auto-detects format and extracts all text.
@@ -52,11 +66,15 @@ def tool(url_or_content: str, runtime=None, **kwargs) -> str:
     Returns:
         JSON string with text, format, metadata, page_count (if PDF), char_count
     """
+    executor: InfospaceExecutor = kwargs.get("executor")
+    if not executor:
+        return {"status": "failed", "reason": "executor not available", "value": None, "resource_id": None}
+
     # Extract grobid_url from kwargs if available (from YAML config)
     grobid_url = kwargs.get('grobid_url')
     
     if not url_or_content or not isinstance(url_or_content, str):
-        return json.dumps({"error": "url_or_content parameter required"})
+        return _fail(executor, "url_or_content parameter required")
     
     # Check if input is Note ID - retrieve Note content directly
     if url_or_content.startswith('Note_'):
@@ -69,35 +87,37 @@ def tool(url_or_content: str, runtime=None, **kwargs) -> str:
                 if note_content:
                     content = note_content.get('properties', {}).get('content', '')
                 else:
-                    return json.dumps({"error": f"Note {url_or_content} not found"})
+                    return _fail(executor, f"Note {url_or_content} not found")
             else:
-                return json.dumps({"error": f"resource_manager not available"})
+                return _fail(executor, "resource_manager not available")
             
             # If content is structured JSON (from search-web/semantic-scholar), extract text field
             if isinstance(content, dict):
                 # Check if it's a structured Note with 'text' field
                 if 'text' in content:
                     # Return the structured content as-is (already has text, format, metadata, char_count)
-                    return json.dumps(content)
+                    return _success(executor, json.dumps(content))
                 else:
                     # Other structured content - return as JSON
-                    return json.dumps({
+                    payload = {
                         "text": json.dumps(content),
                         "format": "json",
                         "metadata": {"source_id": url_or_content},
                         "char_count": len(json.dumps(content))
-                    })
+                    }
+                    return _success(executor, json.dumps(payload), payload)
             else:
                 # Plain text content - return as text
-                return json.dumps({
+                payload = {
                     "text": str(content),
                     "format": "text",
                     "metadata": {"source_id": url_or_content},
                     "char_count": len(str(content))
-                })
+                }
+                return _success(executor, json.dumps(payload), payload)
         except Exception as e:
             logger.error(f"Failed to retrieve Note {url_or_content}: {e}")
-            return json.dumps({"error": f"Failed to retrieve Note: {e}"})
+            return _fail(executor, "Failed to retrieve Note", extra={"exception": str(e)})
     
     # Check if input is Collection ID - extract first item
     if url_or_content.startswith('Collection_'):
@@ -111,13 +131,13 @@ def tool(url_or_content: str, runtime=None, **kwargs) -> str:
                 if collection_resource:
                     note_ids = collection_resource.get('properties', {}).get('content', [])
             else:
-                return json.dumps({"error": f"resource_manager not available"})
+                return _fail(executor, "resource_manager not available")
             
             if not note_ids:
-                return json.dumps({"error": f"Collection {url_or_content} not found or empty"})
+                return _fail(executor, f"Collection {url_or_content} not found or empty")
             
             if len(note_ids) == 0:
-                return json.dumps({"error": "Collection is empty"})
+                return _fail(executor, "Collection is empty")
             
             if len(note_ids) > 1:
                 logger.warning(f"fetch-text: Collection {url_or_content} has {len(note_ids)} items, using first")
@@ -127,7 +147,7 @@ def tool(url_or_content: str, runtime=None, **kwargs) -> str:
             return tool(first_note_id, **kwargs)
         except Exception as e:
             logger.error(f"Failed to resolve Collection: {e}")
-            return json.dumps({"error": f"Failed to resolve Collection: {e}"})
+            return _fail(executor, "Failed to resolve Collection", extra={"exception": str(e)})
     
     # Check if input is local absolute file path
     if url_or_content.startswith('/') and os.path.isfile(url_or_content):
@@ -138,35 +158,48 @@ def tool(url_or_content: str, runtime=None, **kwargs) -> str:
             final_url = url_or_content
         except OSError as e:
             logger.error(f"File read failed: {str(e)}")
-            return json.dumps({"error": f"Failed to read file {url_or_content}: {str(e)}"})
+            return _fail(executor, f"Failed to read file {url_or_content}: {str(e)}")
     else:
         # Check if input is base64 PDF (backward compatibility)
         if _is_base64_pdf(url_or_content):
-            return _process_base64_pdf(url_or_content)
+            payload = _process_base64_pdf(url_or_content)
+            return _success(executor, payload)
         
         # Otherwise treat as URL
         url = _extract_url(url_or_content)
         if not url:
-            return json.dumps({"error": f"Invalid URL or content: {url_or_content[:100]}"})
+            return _fail(executor, f"Invalid URL or content: {url_or_content[:100]}")
         
         # Download and detect format
         content, content_type, final_url = _download_from_url(url)
         if not content:
-            return json.dumps({"error": f"Failed to download from {url}"})
+            return _fail(executor, f"Failed to download from {url}")
     
     # Now detect format and extract (common for both file and URL)
     file_format = _detect_format(content, content_type, final_url)
     
     if file_format == "pdf":
-        return _extract_pdf_text(content, final_url, grobid_url=grobid_url)
+        result = _extract_pdf_text(content, final_url, grobid_url=grobid_url)
     elif file_format == "html":
-        return _extract_html_text(content, final_url)
+        result = _extract_html_text(content, final_url)
     elif file_format == "docx":
-        return _extract_docx_text(content, final_url)
+        result = _extract_docx_text(content, final_url)
     elif file_format == "markdown":
-        return _extract_text_plain(content, final_url, "markdown")
+        result = _extract_text_plain(content, final_url, "markdown")
     else:
-        return _extract_text_plain(content, final_url, "text")
+        result = _extract_text_plain(content, final_url, "text")
+
+    # Attempt to include parsed JSON as data for convenience
+    extra_data = None
+    try:
+        extra_data = json.loads(result)
+    except Exception:
+        extra_data = {"raw_result": result}
+    
+    if isinstance(extra_data, dict) and "error" in extra_data:
+        return _fail(executor, extra_data["error"], value=result, extra=extra_data)
+    
+    return _success(executor, result, extra_data)
 
 
 def _is_base64_pdf(content: str) -> bool:

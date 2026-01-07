@@ -30,14 +30,13 @@ def tool(input_value=None, **kwargs):
     
     status_text = "Wait completed: 1 second elapsed"
     
-    # Build structured data dict
-    structured_data = {
-        "success": True,
+    # Extract metadata fields for extra
+    extra_metadata = {
         "wait_duration_seconds": 1,
         "status": "completed"
     }
     
-    return executor._create_uniform_return('success', value=status_text, data=structured_data)
+    return executor._create_uniform_return('success', value=status_text, extra=extra_metadata)
 
 
 if __name__ == "__main__":
