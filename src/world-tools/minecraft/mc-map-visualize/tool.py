@@ -400,11 +400,21 @@ def _generate_html_visualization(cells: List[Dict], map_name: str, stats: Dict) 
     
     <script>
         const canvas = document.getElementById('mapCanvas');
-        const ctx = canvas.getContext('2d');
+        if (!canvas) {{
+            console.error('Canvas element not found!');
+        }}
+        const ctx = canvas ? canvas.getContext('2d') : null;
         const infoPanel = document.getElementById('infoPanel');
+        
+        if (!ctx) {{
+            console.error('Could not get 2D context from canvas!');
+        }}
         
         // Map data
         const cells = {json.dumps(cell_data)};
+        console.log('Loaded cells:', cells.length, 'cells');
+        console.log('Cell data sample:', cells.length > 0 ? cells[0] : 'none');
+        
         const bounds = {{
             minX: {min_x},
             maxX: {max_x},
@@ -413,6 +423,7 @@ def _generate_html_visualization(cells: List[Dict], map_name: str, stats: Dict) 
             rangeX: {range_x},
             rangeZ: {range_z}
         }};
+        console.log('Bounds:', bounds);
         
         // View state
         let scale = 1;
@@ -447,6 +458,16 @@ def _generate_html_visualization(cells: List[Dict], map_name: str, stats: Dict) 
             const canvasZ = padding + ((z - bounds.minZ) / bounds.rangeZ) * (canvas.height - padding * 2) * scale + offsetZ;
             return {{x: canvasX, z: canvasZ}};
         }}
+
+        function getCellRect(x, z) {{
+            const topLeft = worldToCanvas(x, z);
+            const bottomRight = worldToCanvas(x + 1, z + 1);
+            const left = Math.min(topLeft.x, bottomRight.x);
+            const right = Math.max(topLeft.x, bottomRight.x);
+            const top = Math.min(topLeft.z, bottomRight.z);
+            const bottom = Math.max(topLeft.z, bottomRight.z);
+            return {{left, top, width: right - left, height: bottom - top}};
+        }}
         
         // Convert canvas coordinates to world coordinates
         function canvasToWorld(canvasX, canvasZ) {{
@@ -466,15 +487,21 @@ def _generate_html_visualization(cells: List[Dict], map_name: str, stats: Dict) 
         // Helper function to lighten a color
         function lightenColor(color, amount = 0.3) {{
             // Handle hex colors
-            if (color.startsWith('#')) {{
+            if (color && color.startsWith('#')) {{
                 const num = parseInt(color.slice(1), 16);
+                if (isNaN(num)) return '#4ec9b0';  // Fallback to cyan if invalid
                 const r = Math.min(255, ((num >> 16) & 0xff) + Math.floor(255 * amount));
                 const g = Math.min(255, ((num >> 8) & 0xff) + Math.floor(255 * amount));
                 const b = Math.min(255, (num & 0xff) + Math.floor(255 * amount));
-                return `#${{r.toString(16).padStart(2, '0')}}${{g.toString(16).padStart(2, '0')}}${{b.toString(16).padStart(2, '0')}}`;
+                const result = `#${{r.toString(16).padStart(2, '0')}}${{g.toString(16).padStart(2, '0')}}${{b.toString(16).padStart(2, '0')}}`;
+                // Ensure result is visible (not too dark)
+                if (r < 50 && g < 50 && b < 50) {{
+                    return '#4ec9b0';  // Force cyan if still too dark
+                }}
+                return result;
             }}
             // Handle rgb colors
-            if (color.startsWith('rgb')) {{
+            if (color && color.startsWith('rgb')) {{
                 const matches = color.match(/\\d+/g);
                 if (matches && matches.length >= 3) {{
                     const r = Math.min(255, parseInt(matches[0]) + Math.floor(255 * amount));
@@ -483,7 +510,8 @@ def _generate_html_visualization(cells: List[Dict], map_name: str, stats: Dict) 
                     return `rgb(${{r}}, ${{g}}, ${{b}})`;
                 }}
             }}
-            return color;
+            // Fallback to visible color
+            return '#4ec9b0';
         }}
         
         // Get cell color based on properties and active layers
@@ -525,13 +553,27 @@ def _generate_html_visualization(cells: List[Dict], map_name: str, stats: Dict) 
                 return `rgb(${{r}}, ${{g}}, ${{b}})`;
             }}
             
-            const baseColor = surfaceColors[cell.surface_class] || '#555555';
+            // Fallback: ensure all mapped cells get a visible color
+            // Default to a light cyan/teal that's clearly visible
+            const baseColor = surfaceColors[cell.surface_class] || '#4ec9b0';
             return lightenColor(baseColor, 0.3);
         }}
         
         // Draw map
         function drawMap() {{
+            if (!ctx || !canvas) {{
+                console.error('Canvas or context not available!');
+                return;
+            }}
+            
             ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            if (cells.length === 0) {{
+                console.warn('No cells to draw!');
+                return;
+            }}
+            
+            console.log('Drawing map with', cells.length, 'cells, scale:', scale, 'bounds:', bounds);
             
             // Draw background grid aligned to 1x1 block boundaries (integer coordinates)
             ctx.strokeStyle = '#2a2d2e';
@@ -565,52 +607,71 @@ def _generate_html_visualization(cells: List[Dict], map_name: str, stats: Dict) 
                 }}
             }}
             
-            // Calculate cell size based on scale and map size
-            const cellSize = Math.max(4, Math.min(30, 15 * scale));
+            // Draw mapped cells first (always draw these, regardless of bounds or visibility)
+            let cellsDrawn = 0;
+            cells.forEach(cell => {{
+                // Validate cell has coordinates
+                if (cell.x === undefined || cell.z === undefined || cell.x === null || cell.z === null) {{
+                    console.warn('Cell missing coordinates:', cell);
+                    return;
+                }}
+                
+                const rect = getCellRect(cell.x, cell.z);
+                
+                // Validate rectangle is valid
+                if (isNaN(rect.left) || isNaN(rect.top) || isNaN(rect.width) || isNaN(rect.height)) {{
+                    console.warn('Invalid rectangle for cell:', cell, 'rect:', rect);
+                    return;
+                }}
+                
+                const color = getCellColor(cell, true);
+                
+                ctx.fillStyle = color;
+                ctx.fillRect(rect.left, rect.top, rect.width, rect.height);
+                cellsDrawn++;
+                
+                // Draw border based on movement class
+                if (cell.movement_class === 'step_up') {{
+                    ctx.strokeStyle = '#89d185';
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(rect.left, rect.top, rect.width, rect.height);
+                }} else if (cell.movement_class === 'drop') {{
+                    ctx.strokeStyle = '#cca700';
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(rect.left, rect.top, rect.width, rect.height);
+                }} else if (cell.observation_mode === 'inferred') {{
+                    ctx.strokeStyle = '#666';
+                    ctx.lineWidth = 1;
+                    ctx.setLineDash([2, 2]);
+                    ctx.strokeRect(rect.left, rect.top, rect.width, rect.height);
+                    ctx.setLineDash([]);
+                }}
+            }});
             
-            // Draw all cells in bounds (both mapped and unmapped)
-            const minXInt = Math.floor(bounds.minX);
-            const maxXInt = Math.ceil(bounds.maxX);
-            const minZInt = Math.floor(bounds.minZ);
-            const maxZInt = Math.ceil(bounds.maxZ);
+            console.log('Drew', cellsDrawn, 'mapped cells');
             
+            // Draw unmapped cells in bounds (for visual contrast)
             for (let xInt = minXInt; xInt <= maxXInt; xInt++) {{
                 for (let zInt = minZInt; zInt <= maxZInt; zInt++) {{
                     const key = `${{xInt}},${{zInt}}`;
                     const cell = mappedCells.get(key);
-                    const pos = worldToCanvas(xInt, zInt);
                     
-                    // Skip if outside visible area
-                    if (pos.x < -cellSize || pos.x > canvas.width + cellSize ||
-                        pos.z < -cellSize || pos.z > canvas.height + cellSize) {{
+                    // Skip if already drawn as mapped cell
+                    if (cell !== undefined) {{
                         continue;
                     }}
                     
-                    const isMapped = cell !== undefined;
-                    const color = getCellColor(cell || {{x: xInt, z: zInt}}, isMapped);
+                    const rect = getCellRect(xInt, zInt);
                     
-                    // Draw cell
-                    ctx.fillStyle = color;
-                    ctx.fillRect(pos.x - cellSize/2, pos.z - cellSize/2, cellSize, cellSize);
-                    
-                    // Draw border based on movement class (only for mapped cells)
-                    if (isMapped) {{
-                        if (cell.movement_class === 'step_up') {{
-                            ctx.strokeStyle = '#89d185';
-                            ctx.lineWidth = 2;
-                            ctx.strokeRect(pos.x - cellSize/2, pos.z - cellSize/2, cellSize, cellSize);
-                        }} else if (cell.movement_class === 'drop') {{
-                            ctx.strokeStyle = '#cca700';
-                            ctx.lineWidth = 2;
-                            ctx.strokeRect(pos.x - cellSize/2, pos.z - cellSize/2, cellSize, cellSize);
-                        }} else if (cell.observation_mode === 'inferred') {{
-                            ctx.strokeStyle = '#666';
-                            ctx.lineWidth = 1;
-                            ctx.setLineDash([2, 2]);
-                            ctx.strokeRect(pos.x - cellSize/2, pos.z - cellSize/2, cellSize, cellSize);
-                            ctx.setLineDash([]);
-                        }}
+                    // Skip if outside visible area
+                    if (rect.left + rect.width < -10 || rect.left > canvas.width + 10 ||
+                        rect.top + rect.height < -10 || rect.top > canvas.height + 10) {{
+                        continue;
                     }}
+                    
+                    // Draw unmapped cell with darker color
+                    ctx.fillStyle = '#2a2d2e';
+                    ctx.fillRect(rect.left, rect.top, rect.width, rect.height);
                 }}
             }}
             
@@ -742,10 +803,10 @@ def _generate_html_visualization(cells: List[Dict], map_name: str, stats: Dict) 
         }}
         
         function fitToBounds() {{
-            const padding = 60;
-            const scaleX = (canvas.width - padding * 2) / (canvas.width - 80);
-            const scaleZ = (canvas.height - padding * 2) / (canvas.height - 80);
-            scale = Math.min(scaleX, scaleZ, 1);
+            // worldToCanvas: padding + ((x - minX) / rangeX) * availableSpace * scale
+            // With scale=1: minX maps to padding, maxX maps to padding + availableSpace (fits exactly)
+            // Use scale slightly less than 1 for padding around the map
+            scale = 0.9;  // 10% padding on all sides
             offsetX = 0;
             offsetZ = 0;
             drawMap();
@@ -831,9 +892,18 @@ def _generate_html_visualization(cells: List[Dict], map_name: str, stats: Dict) 
                 `).join('');
         }}
         
-        // Initial draw
-        fitToBounds();
-        computeStats();
+        // Initial draw - ensure canvas is ready
+        // Use requestAnimationFrame to ensure DOM is fully loaded
+        if (document.readyState === 'loading') {{
+            document.addEventListener('DOMContentLoaded', () => {{
+                fitToBounds();
+                computeStats();
+            }});
+        }} else {{
+            // DOM already loaded
+            fitToBounds();
+            computeStats();
+        }}
     </script>
 </body>
 </html>

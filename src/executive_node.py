@@ -1147,6 +1147,8 @@ class ZenohExecutiveNode:
 
     def _publish_current_plan(self):
         """Publish current plan to the current_plan topic for UI display."""
+        if not isinstance(self.current_plan, dict):
+            self.current_plan = {}
         try:
             current_plan_data = {
                 'current_plan': json.dumps(self.current_plan, indent=2) if self.current_plan else '',
@@ -1623,10 +1625,7 @@ class ZenohExecutiveNode:
                     self._add_to_conversation(f"User says: {clean_input}")
                     
                     # Prepend load instruction to user input using character_name
-                    template = f""""goal: Context: the Collection named 'conversation' contains the history of this conversation.
-First load the note '{self.character_name}' to get additional context about your character and role.\n
-Then plan and act to address the following User-provided task: \n\n{clean_input}\n\n
-Finally, using 'say', respond in character to User\n"""
+                    template = f"""{clean_input}"""
                     
                     # Convert to goal format
                     logger.info(f'📥 {self.character_name} Received goal: "{goal}"')
@@ -1804,7 +1803,9 @@ Finally, using 'say', respond in character to User\n"""
             
             # Note: plan_bindings are NOT cleared here to preserve bindings from execute_plan_sync
             # Use clear_planner_bindings API to explicitly clear if needed
-            goal_text = goal.name + (': ' + goal.description if goal.description != goal.name else '')
+            goal_text = goal.name
+            if goal.description != goal.name and goal.description != '':
+                goal_text += ':' + goal.description
             character_context = system_prompt  # Character description + drives
             self_entity_context = self.get_entity_context(self.character_name, 10)
             recent_context = ""
@@ -1838,19 +1839,15 @@ Finally, using 'say', respond in character to User\n"""
             self.current_plan_id = f"p_{self.plan_counter}"
             self.step_counter = 0
             
-            # Use IncrementalPlanner if available, otherwise error
-            if self.incremental_planner:
-                self.current_plan = self.incremental_planner.generate_plan(
-                    template=template,
-                    goal=goal_text, 
-                    context=context, 
-                    max_steps=16
-                )
-            else:
-                logger.error("No planner available for infospace planning")
-                self.current_plan = {'error': 'No planner available for infospace planning'}
+            result = self.incremental_planner.generate_plan(
+                template=template,
+                goal=goal_text, 
+                context=context, 
+                max_steps=16
+            )
+            self.current_plan = result.get('plan', {})
 
-        return self.current_plan
+        return result
     
 
     def sense_data_callback(self, sample):
@@ -2796,7 +2793,16 @@ Finally, using 'say', respond in character to User\n"""
             # Skip goal rewriting and plan immediately (infospace mode)
             self._publish_goal(self.current_goal)
             logger.info(f'🧩 {self.character_name} infospace planning for goal: {parsed_goal}')
-            self._plan(template, self.current_goal)
+            result = self._plan(template, self.current_goal)
+            if result.get('success', False):
+                self.current_plan = result.get('plan', {})
+                self._publish_current_plan()
+                self.plan_just_generated = True
+                if result.get('response', None):
+                    self.infospace_executor.execute_action({"type": "say", "target": "user", "value": result.get('response')})
+            else:
+                logger.error(f"Error in _plan: {result.get('error', 'Unknown error')}")
+                return
             if self.current_plan:
                 self._publish_current_plan()
                 self.plan_just_generated = True
