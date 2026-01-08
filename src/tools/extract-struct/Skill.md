@@ -4,13 +4,9 @@ type: prompt_augmentation
 description: "Extract structured metadata (title, authors, year) from paper text using LLM. Use to convert online search results metadata to JSON"
 ---
 
-# Extract Metadata Tool
+# extract-struct
 
-Extracts structured metadata from academic paper text using LLM analysis.
-
-## Purpose
-
-Convert unstructured paper text into structured JSON format with title, authors, year, venue, and abstract fields. Useful for converting online search results to standardized metadata format.
+Extract structured metadata from academic paper text using LLM analysis.
 
 ## Input
 
@@ -25,21 +21,20 @@ Returns JSON Note with:
 - `venue`: Conference/journal if identifiable
 - `abstract`: Paper abstract if present
 
-## Behavior & Performance
+## Behavior
 
 - Uses LLM to analyze paper text and extract structured fields
 - Handles various paper formats and layouts
 - Returns only JSON, no explanation text
 
-## Guidelines
+## Planning Notes
 
 - Provide full text or first few pages for best results
 - Works best with academic papers that have clear title/author sections
 - Use with `fetch-text` to get paper content first
 
-## Usage Examples
+## Example
 
-Extract metadata from paper:
 ```json
 {"type":"extract-struct","target":"$paper_text","out":"$metadata"}
 ```

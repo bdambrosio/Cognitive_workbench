@@ -252,7 +252,8 @@ Action Syntax:
 - Literal numbers: Use directly without $ (e.g., "value": 123)
 - Literal booleans: Use directly without $ (e.g., "value": true)
 
-Primitive Action / Type Compatibility:
+InfospacePrimitive Action / Type Compatibility:
+This table applies only to native infospace primitives. World/skill tools are governed by their own contracts.
 Operation_name: applicable to: <Note | Collection | Note, Collection>;   Purpose
  - split: Note;  Note structure → Collection
  - flatten: Collection;  Collection → single Note
@@ -273,7 +274,7 @@ Operation_name: applicable to: <Note | Collection | Note, Collection>;   Purpose
 Key distinctions:
 - split (Note→Coll): Transforms internal structure (array/lines) into separate items
 - flatten (Coll→Note): Opposite of split, merges Collection into single Note
-- load: Use to GET content into planner context (returns Note content or Collection Note IDs)
+- load: Use to GET content *into planner context* (returns Note content or Collection Note IDs)
 - display: Use to SHOW content to user (UI popup, does NOT return content for planning)
 - persist: Mark resource as persistent (saved to filesystem)
 
@@ -306,7 +307,7 @@ Collection Mutation Operations (require Collection):
 - intersection: Items in both Collections (A ∩ B)
 - difference: Items in A but not B (A - B)
 
-SQL-like Collection Operations (require dict/JSON Notes):
+Structured-data Collection Operations (require Notes of type dict/JSON):
 - project: Extract metadata/structured fields (SELECT columns) → new Collection with subset of fields
 - pluck: Extract single field as simple values → Collection of values  
 - filter-structured: Filter by field conditions (WHERE clauses) → filtered Collection
@@ -325,7 +326,7 @@ Use cases:
 - head: Get top 5 after sorting, take first result from search
 - join: Merge papers with citation data, combine user info with profiles
 
-Efficiency Rules:
+Efficiency Heuristics:
 - Use tools directly on Notes for single items
 - Create Collections only for 2+ Notes together
 - split, refine, as-json work on Notes ONLY, not Collections
@@ -348,7 +349,31 @@ def build_tool_catalog(available_tools: Dict[str, Dict]) -> Dict[str, Dict]:
     
     Returns dict mapping tool_name -> {fn, description, schema_hint}
     """
+    def _infer_tool_source(tool_meta: Dict[str, Dict]) -> str:
+        """
+        Infer tool source as 'core' or <world_name>.
+        
+        - src/tools/<tool>/...            -> core
+        - src/world-tools/<world>/<tool>/ -> <world>
+        """
+        path = tool_meta.get('path') or tool_meta.get('python_file') or ''
+        if not isinstance(path, str) or not path:
+            return 'core'
+        
+        # Normalize separators for robust matching
+        p = path.replace('\\', '/')
+        
+        marker = '/src/world-tools/'
+        if marker in p:
+            after = p.split(marker, 1)[1]
+            world_name = after.split('/', 1)[0].strip()
+            return world_name or 'core'
+        
+        return 'core'
+    
     tools = {}
+    core_tools = {}
+    world_tools = {}
     
     # Add infospace primitives (from reference doc)
     # Key primitives that need to be in catalog
@@ -571,16 +596,17 @@ def build_tool_catalog(available_tools: Dict[str, Dict]) -> Dict[str, Dict]:
     }
     
     for name, meta in primitive_tools.items():
-        tools[name] = {
+        core_tools[name] = {
             "fn": None,  # Placeholder - execution via infospace_executor
             "description": meta["description"],
-            "schema_hint": meta["schema_hint"]
+            "schema_hint": meta["schema_hint"],
+            "source": "core"
         }
         # Include full_description and examples if available
         if "full_description" in meta:
-            tools[name]["full_description"] = meta["full_description"]
+            core_tools[name]["full_description"] = meta["full_description"]
         if "examples" in meta:
-            tools[name]["examples"] = meta["examples"]
+            core_tools[name]["examples"] = meta["examples"]
     
     # Enhanced descriptions to prevent common confusions
     TOOL_DISAMBIGUATION = {
@@ -617,31 +643,51 @@ def build_tool_catalog(available_tools: Dict[str, Dict]) -> Dict[str, Dict]:
         # Extract type from tool metadata (important for method tools)
         tool_type = tool_meta.get('type', 'code_execution')
         
-        tools[tool_name] = {
+        entry = {
             "fn": None,  # Placeholder
             "description": description,
             "schema_hint": schema_hint,
-            "type": tool_type
+            "type": tool_type,
+            "source": _infer_tool_source(tool_meta)
         }
+        
+        if entry["source"] == "core":
+            core_tools[tool_name] = entry
+        else:
+            world_tools[tool_name] = entry
     
+    # Merge: core first, then world-specific
+    tools.update(core_tools)
+    tools.update(world_tools)
     return tools
 
 
 def tool_catalog_text(tools: Dict[str, Dict]) -> str:
-    """Format tool catalog for LLM prompt."""
+    """Format tool catalog for LLM prompt, grouped by source."""
     lines = []
-    for name, meta in sorted(tools.items()):
-        # Use expanded description if available (from PRIMITIVE_DOCS)
+    
+    # Group tools by source
+    world_tools = {}  # world_name -> [(tool_name, meta), ...]
+    core_tools = []   # [(tool_name, meta), ...]
+    
+    for name, meta in tools.items():
+        source = meta.get('source', 'core')
+        if source == 'core':
+            core_tools.append((name, meta))
+        else:
+            if source not in world_tools:
+                world_tools[source] = []
+            world_tools[source].append((name, meta))
+    
+    # Helper function to format a tool entry
+    def format_tool(name: str, meta: Dict) -> List[str]:
+        tool_lines = []
         description = meta.get('full_description') or meta.get('description', 'No description')
-        tool_type = meta.get('type', 'code_execution')
-        lines.append(f"- {name}: {description}")
-        #lines.append(f"  type: {tool_type}")
-        #schema = json.dumps(meta['schema_hint'])
-        #lines.append(f"  expected_args_schema: {schema}")
+        tool_lines.append(f"- {name}: {description}")
         
         # Add examples for primitives with expanded docs
         if 'examples' in meta and meta['examples']:
-            lines.append(f"  examples:")
+            tool_lines.append(f"  examples:")
             for ex in meta['examples']:
                 # Format example as single-line JSON if it's a dict or string
                 if isinstance(ex, dict):
@@ -655,10 +701,26 @@ def tool_catalog_text(tools: Dict[str, Dict]) -> str:
                         ex_str = ex
                 else:
                     ex_str = str(ex)
-                lines.append(f"    {ex_str}")
+                tool_lines.append(f"    {ex_str}")
+        return tool_lines
     
+    # List world tools first, grouped by world name
+    for world_name in sorted(world_tools.keys()):
+        lines.append(f"#{world_name.upper()}")
+        for name, meta in sorted(world_tools[world_name]):
+            lines.extend(format_tool(name, meta))
+        lines.append("")  # Blank line between sections
+    
+    # List core tools under INFOSPACE CORE
+    if core_tools:
+        lines.append("#INFOSPACE CORE")
+        for name, meta in sorted(core_tools):
+            lines.extend(format_tool(name, meta))
+        lines.append("")  # Blank line before workflows
+    
+    lines.append("Preferred tool order: World tools first when they apply, then Infospace Core")
     # Add critical workflows to prevent common mistakes
-    lines.append("\n# CRITICAL WORKFLOWS:")
+    lines.append("# CRITICAL WORKFLOWS:")
     lines.append("- search-web → summarize / refine / filter-collection")
     lines.append("- search-web already returns full text in 'text' field of each Note")
     lines.append("- semantic-scholar → summarize / refine / filter-collection")
@@ -1288,14 +1350,14 @@ if HAS_SGLANG:
                 logger.warning(f"Stage 0: Failed to retrieve resources: {e}")
         
         # Stage 1: Analysis + tool selection
-        system_parts = ["Your task is to achieve a stated goal in information space."]
-        system_parts.append("You choose tools/primitives (aka actions, if and as needed), call them via JSON arguments,")
-        system_parts.append("and iteratively execute-step / reflect / refine your plan until the goal is satisfied.")
+        system_parts = [f"Your task is to achieve\n#GOAL:\n{goal}\n\n"]
+        system_parts.append("You can choose tools/primitives (aka actions), if and as needed, callling them with JSON arguments,")
+        system_parts.append("and loop over execute-step / reflect / refine until the goal is satisfied.")
         system_parts.append(f"\n{INCREMENTAL_PLAN_SPECIFICATIONS}\n")
         system_parts.append(f"Complete primitive and tool catalog:\n{tools_catalog_text}\n#### END OF INFOSPACE TYPE SYSTEM, SPECIFICATIONS, AND TOOL CATALOG\n\n")
 
         system_parts.append(f"Setting:\n{character_context}\n\n")
-        system_parts.append(f"Goal:\n\n{template}\n{goal}\n\n")
+        #system_parts.append(f"Again, \n#GOAL:\n\n{template}\n{goal}\n\n")
         if preplan:
             system_parts.append(f"\n## {preplan}\n")
             system_parts.append(f"\n## End ABSTRACT_PLAN\n")
@@ -1595,7 +1657,7 @@ ALWAYS follow all formatting instructions exactly.
                 f"1. The result above is GROUND TRUTH. Use it exactly as shown.\n"
                 f"2. If reporting to user, use ONLY the values from the result above.\n"
                 f"3. Do NOT approximate, summarize, or invent values.\n"
-                f"4. Evaluate: Is the goal complete, including actual execution of all planned actions? If yes, respond DONE: YES.\n"
+                f"4. Evaluate: Is the GOAL complete, including actual execution of all required actions, and achievement of all required information determinations, and outcomes? If yes, respond DONE: YES.\n"
                 f"   If no, determine the next action needed.\n\n"
                 f"Respond using Stage 3 FORMAT. Be concise.\n"
                 f"Ensure the REQUEST_TOOLS list is a valid JSON list of tool names.\n"
@@ -1676,15 +1738,16 @@ ALWAYS follow all formatting instructions exactly.
                 # --- [START NEW VERIFICATION LOGIC] ---
                 # Intercept the completion to force a self-audit
                 s += user(
-                    "STOP. Before providing the final answer, perform a verification step:\n"
-                    "    VERIFICATION_INSTRUCTIONS:\n"
-                    "        Inputs: GOAL, STATE_BEFORE, STATE_AFTER\n"
+                    "STOP. Before providing the final answer, perform a verification step. \n"
+                    "Verify that the GOAL has been achieved, including actual execution of all required actions, and achievement of all required information determinations, and outcomes:\n"
+                    "#VERIFICATION_INSTRUCTIONS:\n"
+                    "        Inputs: GOAL, prior state, and current state\n"
                     "        - what are the observable facts in STATE_AFTER that directly satisfy GOAL.\n"
-                    "        - what are the required GOAL facts not observable in STATE_AFTER.\n"
+                    "        - what are the required GOAL actions and facts not observable in STATE_AFTER.\n"
                     "        - based on the above, provide a candid VERIFICATION ANSWER: (SUCCESS, PARTIAL, INCONCLUSIVE):\n"
-                    "    OUTPUT FORMAT:\n"
+                    "#OUTPUT FORMAT:\n"
                     "        - VERIFICATION_ANSWER: <SUCCESS | PARTIAL | INCONCLUSIVE>\n"
-                    "    Respond using the OUTPUT FORMAT. Be concise.\n"
+                    "#Respond using the OUTPUT FORMAT. Be concise.\n"
                 )
                 
                 s += assistant(
@@ -2376,7 +2439,7 @@ class IncrementalPlanner:
         except Exception as e:
             self.logger.error(f"Incremental planning failed: {e}")
             traceback.print_exc()
-            return {'error': str(e)}
+            return {"success": False, 'error': str(e)}
 
 
     def _preplan(self, goal_text: str) -> str:

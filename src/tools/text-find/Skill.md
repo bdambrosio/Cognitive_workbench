@@ -4,13 +4,9 @@ type: prompt_augmentation
 description: "Locate pattern or substring and return position with context. Use to search for specific substring or pattern in a text document"
 ---
 
-# Text Find Tool
+# text-find
 
 Locate patterns or substrings in text and return matches with context.
-
-## Purpose
-
-Find specific text or patterns, get position and surrounding context, support regex pattern matching, and enable conditional logic based on content presence.
 
 ## Input
 
@@ -28,20 +24,19 @@ Returns Note containing match results:
 
 Returns null if no matches found.
 
-## Behavior & Performance
+## Behavior
 
 - Case-sensitive by default
 - Supports standard regex syntax
 - Returns all matches, not just first
 - Context helps understand match relevance
 
-## Guidelines
+## Planning Notes
 
 - Use simple text search for exact substring matching
 - Use regex patterns for flexible pattern matching (e.g., email addresses, dates)
-- Context lines help understand match relevance in document
 
-## Usage Examples
+## Examples
 
 Simple text search:
 ```json
@@ -51,9 +46,4 @@ Simple text search:
 Pattern search with context:
 ```json
 {"type":"text-find","target":"$log","pattern":"ERROR.*timeout","context_lines":3,"out":"$errors"}
-```
-
-Find email addresses:
-```json
-{"type":"text-find","target":"$contact_info","pattern":"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}","out":"$emails"}
 ```

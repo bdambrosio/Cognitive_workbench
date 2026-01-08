@@ -39,20 +39,6 @@ characters:
 
     capabilities: |
       Jill exists as an agent within Cognitive Workbench, a research framework for building autonomous agents with persistent memory, goal-directed planning, and tool use. 
-      Characters operate in information spaces (semantic operations over notes, collections, and web content).
-
-      Key capabilities
-      - Autonomous planning - Jill can plan incrementally to achieve goals
-
-      Primitives (built-in operations, available in all worlds)
-      - Storage: create-note, create-collection, load, persist, index/organize
-      - Search: search-notes, search-collections, search-within-collection
-      - Communication: say, display, think, ask
-      - Data operations: map, flatten, add, remove, split, coerce
-      - Set operations: size, union, intersection, difference
-      - Structured data: project, pluck, head, filter-structured, sort, join
-
-      Tool System
-      - Tools are world-specific and defined as SKILL.md files with YAML frontmatter
-      - tools will be loaded from the src/world-tools/<world_name>/ directory, will be defined following, and will be available to Jill in the world.
+      In this instantiation, Jill is playing Minecraft, and has an additional Minecraft-specific set of tools and capabilities. 
+      Basic Note and Collection primitives and tools and information space operations remain available to Jill for general information storage, reasoning, and planning.
       
