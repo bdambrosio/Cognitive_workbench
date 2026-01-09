@@ -1,776 +1,130 @@
 # Cognitive Workbench
 
-**Code as Laboratory for LLM Cognitive Architecture Research**
+Code as Laboratory for LLM cognitive architecture research.
 
 [![Status: Research Laboratory](https://img.shields.io/badge/status-research_laboratory-purple.svg)]()
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
----
+## What this is
 
-## 🧪 Code as Laboratory
+This repo is experimental research software. It prioritizes **inspectable agent behavior** and fast iteration over stability.
 
-**Cognitive Workbench is not a finished product.** It is a research framework—a laboratory—for exploring the frontiers of LLM-based cognitive architecture.
+Core ideas:
+- **Incremental planning**: the planner interleaves reasoning and tool execution.
+- **Infospace memory**: Notes + Collections are treated as working memory.
+- **World integrations** (optional): scenario-specific “world tools” (e.g., Minecraft) can be loaded per character.
 
-The code here is constantly evolving. It prioritizes **experimental capability** over stability. We view the codebase itself as a "workbench" where we test hypotheses about agency, memory, planning, and theory of mind.
+## Wiki (recommended entry points)
 
-If you are looking for a production-ready agent framework, this is likely not it. If you are looking to experiment with novel cognitive architectures, welcome to the lab.
+The GitHub wiki is intended to be the primary long-form documentation surface.
 
----
+- [Architecture overview](https://github.com/bdambrosio/Cognitive_workbench/wiki/Architecture)
+- [Incremental planner](https://github.com/bdambrosio/Cognitive_workbench/wiki/Incremental-Planner)
+- [Infospace memory (Notes & Collections)](https://github.com/bdambrosio/Cognitive_workbench/wiki/Infospace)
+- [Tools & primitives (uniform return, tool catalog)](https://github.com/bdambrosio/Cognitive_workbench/wiki/Tools)
+- [World integrations (world_config, world_state)](https://github.com/bdambrosio/Cognitive_workbench/wiki/Worlds)
+- [Minecraft guide](https://github.com/bdambrosio/Cognitive_workbench/wiki/Minecraft)
+- [UI guide (FastAPI + WebSockets)](https://github.com/bdambrosio/Cognitive_workbench/wiki/UI)
+- [Troubleshooting](https://github.com/bdambrosio/Cognitive_workbench/wiki/Troubleshooting)
 
-## 🔄 Recent Updates (Dec 2025)
+If you rename these pages later, update the links here.
 
-- **Abstract pre-planning layer** – `IncrementalPlanner` now calls a lightweight `_preplan()` helper that asks the LLM to emit a goal-specific strategy sketch (no tool calls) before the step-by-step planning loop begins. The abstract plan is injected into the planner prompt, giving the LLM a bird's-eye view of the task without constraining downstream execution.
-- **Plan guidance memory** – A new `PlanGuidance` module loads historical plan feedback from `src/data/planner_feedback/plan_guidance.jsonl`, embeds the goals, and surfaces high-similarity successes back to the planner. This lets new goals borrow structure from proven strategies while still remaining adaptive.
-- **Tracked feedback corpus** – The `plan_guidance.jsonl` file is now committed to the repo so collaborators can reproduce guidance behavior without rebuilding a feedback dataset from scratch. Add your own feedback records (one JSON object per line) to grow the shared memory.
-
----
-
-## 💡 Design Philosophy
-
-**Cognitive Workbench takes a fundamentally different approach to 'reasoning'.**
-
-Traditional (RL) approaches treat agent behavior as a black box: train a policy network end-to-end with reinforcement learning, hope it generalizes, and debug by staring at reward curves. When the agent fails, you adjust hyperparameters and retrain.
-
-**We believe problem-solving strategy should be explicit and inspectable.**
-
-The core reasoning/planning logic lives in `src/incremental_planner.py`—not as learned weights, but as structured prompts and execution rules that you can read, understand, and modify directly. When the agent makes a poor decision, you can:
-
-1. **Read the planner trace** (`logs/planner_trace_{character}.txt`) to see exactly what the LLM saw and generated
-2. **Identify the failure mode** (bad tool selection? incorrect reasoning? missing information?)
-3. **Edit the planning specifications** (`INCREMENTAL_PLAN_SPECIFICATIONS`, `PRIMITIVE_DOCS`, `tool_planner_infospace`) to address the issue
-4. **Test immediately** without retraining
-
-This is **symbolic AI meets LLM capabilities**: the LLM provides language understanding and generation, while the structured planning framework provides guardrails, tool orchestration, and interpretable decision-making.
-
-**Enabled by SGLang's `@function` decorator:** The incremental planning approach is made practical by SGLang's ability to extend context and continue inference at minimal cost. Each planning step appends tool results to the conversation state and resumes generation—no prompt reconstruction or KV cache rebuilding required. This makes tight plan-execute-observe loops efficient enough for real-time interaction.
-
-**Benefits over RL-based agents:**
-- **Interpretability**: Every decision has a readable rationale
-- **Rapid iteration**: Fix bugs in minutes, not training runs
-- **Composability**: Add new tools without retraining the entire system
-- **Predictability**: Same input → same plan (with temperature=0)
-
-**Trade-offs:**
-- Requires manual prompt engineering for new capabilities
-- May not discover novel strategies that RL could find
-- Depends on LLM instruction-following quality
-
-The benchmarks in `tests/` (MMLU, HotpotQA) serve both as evaluation harnesses and as examples of how to integrate external tasks with the Cognitive Workbench API.
-
----
-
-## 🔬 Key Research Frontiers
-
-This workbench currently focuses on three main areas of cognitive agent research:
-
-### 1. Incremental Planning with SGLang
-The **Incremental Planner** implements **interleaved reasoning** within a single SGLang evolving state:
-- **Plans** incrementally, a few steps at a time
-- **Executes** tools **during planning** to progress on goal
-- **Adapts** the plan based on execution results  
-- **Requests** additional tools dynamically as needs emerge
-- All within SGLang's `@function` context for efficient synchronous execution
-
-```mermaid
-sequenceDiagram
-    participant LLM as SGLang Stream
-    participant Exec as Executor
-    participant Mem as Infospace (Memory)
-    
-    LLM->>LLM: Generate Thought
-    LLM->>LLM: Select Tool (JSON)
-    LLM->>Exec: Call Tool
-    Exec->>Mem: Read/Write (Note/Collection)
-    Mem-->>Exec: Return Result
-    Exec-->>LLM: Inject Result (Text)
-    LLM->>LLM: Reflect & Next Step
-```
-
-**Key Innovation:** Tool execution happens **inside** the planning loop, for any instruct LLM SGLang can run locally. LLM need not be natively capable or reasoning or tool use, in fact better if it is just a plan *instruct* model.  The planner sees actual results (e.g., "Word count: 306") and adapts immediately.
-
-**Result Format:** Tools now return status, resource (Note or Collection) ids created, and output (truncated for injection into SGLang state, full for return to caller. Screen output (and in the context):
-```
-[SUCCESS] Word count: 306 | word-count completed | Bound: $count to Note_529
-```
-
-This tight integration between thought and action enables complex research tasks requiring iterative information gathering and synthesis.
-
-*See: `src/incremental_planner.py`*
-
-[▶️ Incremental planning demo](https://github.com/bdambrosio/Cognitive_workbench/raw/main/docs/incremental_planning.mp4)
-
-### Information Space ("Infospace")
-Cognitive Workbench supports a working memory that acts like an **Operating System for Thoughts**:
-
-- **Notes (Files):** Persistent data units (text, JSON, code).
-- **Collections (Folders):** Ordered lists of Notes.
-- **Operations (Syscalls):** SQL-like manipulation of memory (split, map, filter, join, sort).
-
-This allows the agent to treat memory not as a fuzzy context window, but as a structured file system:
-*"I will save search results to a Collection, filter for 'relevance > 0.8', and summarize the remaining Notes."*
-
-*See: `src/infospace_executor.py`, `src/infospace_resource_manager.py`*
-
-### New Interactive Primitives
-
-**`ask` Primitive:**
-- Agent can request information from the user mid-plan
-- Synchronous execution: planning suspends until user responds
-- UI shows pending question indicator in input area
-- Example: `{"type": "ask", "target": "user", "value": "Which paper should I focus on?", "out": "$user_choice"}`
-
-**`think` Primitive:**
-- Internal reasoning appended to SGLang conversation state
-- Not displayed externally, but logged for debugging
-- Does NOT create Notes (use `generate-note` or `create-note` to persist content)
-- Example: `{"type": "think", "value": "Should I verify these claims before proceeding?"}`
-
-*See: `src/infospace_executor.py`*
-
-### 3. Schema-First Tool Definitions
-Tools are not just Python functions. They are defined by a **Natural Language Schema (`SKILL.md`)** and a **Python Implementation (`tool.py`)**.
-
-**SKILL.md (The Interface):**
-```markdown
-name: search-web
-description: "Search web using Google CSE. Returns Collection of JSON Notes..."
-examples:
-  - '{"type":"search-web","value":"transformer architecture papers","out":"$results"}'
-```
-
-**tool.py (The Logic):**
-```python
-def query_web(query: str, count: int = 10, **kwargs):
-    # Execute search, return structured data
-    return [...]
-```
-
-The planner uses the schema to understand *how* to use the tool, and the executor maps the JSON action to the Python logic.
-
-*See: `src/tools/`*
-
-### 4. Entity Modeling & Theory of Mind (ToM) (still there from older multi-agent version, not fully functional right now)
-Agents build mental models of their interlocutors:
-- Tracks every interaction indexed by other character (default: "User")
-- Maintains distinct **discourse states** for each relationship
-- Models **Theory of Mind (ToM)** — what they know, want, and intend
-- Consolidates conversation history to maintain long-term coherence
-
-*See: `src/memory.py`, `src/entity_model.py`, `src/discourse.py`*
-
----
-
-## 🏗️ Architecture (Current - Nov 2025)
-
-The system is 100% **Infospace-only** (physical world support removed). It uses **Zenoh** for inter-process communication and **SGLang** for LLM inference.
-
-### Core Components
-
-| Component | Responsibility |
-|-----------|----------------|
-| **Executive Node** | OODA loop, planning coordination, goal management, memory integration |
-| **Incremental Planner** | SGLang-based synchronous planning with in-loop tool execution |
-| **Infospace Executor** | Executes primitives (create, load, search, ask, think) and tools |
-| **Resource Manager** | Manages Notes/Collections, vector indexing, semantic search |
-| **Memory Module** | Entity models, discourse tracking, conversation history |
-| **FastAPI UI** | Web interface for monitoring and interaction |
-
-### Recent Removals (Nov 2025)
-- ~~Memory Node~~ → Integrated into Executive Node as `memory.py` module
-- ~~Map Node~~ → Functionality moved to `InfospaceResourceManager` (direct method calls)
-- ~~Perception Node~~ → Refactored to `action_post_processing.py` utility
-- ~~Semantic Validator~~ → Validation now handled by Incremental Planner
-- ~~Physical World~~ → System is 100% infospace-only
-- ~~CharacterRAGStore~~ → Removed (unused)
-- ~~UnifiedPlanner~~ → Removed (redundant abstraction layer)
-- ~~Activity System~~ → Removed (activity_manager, activity UI tabs, activity.py)
-- ~~Turn-based Execution~~ → Continuous OODA loop with direct planning
-- ~~Simulation Time~~ → Now uses real `datetime.datetime`
-
-### Technology Stack
-- **Communication**: [Eclipse Zenoh](https://zenoh.io/) (Python) - for inter-process pub/sub
-- **LLM Backend**: [SGLang](https://github.com/sgl-project/sglang) (required for planning)
-- **Planning**: SGLang `@function` with constrained generation, synchronous execution
-- **Vector Store**: `txtai` with `sentence-transformers` embeddings
-- **Tools**: 32+ dynamically loaded skills in `src/tools/`
-- **UI**: FastAPI + WebSockets for real-time monitoring
-
----
-
-## 🎯 Example: Complex Research Task
-
-**Goal:** "I need to understand the debate around emergent capabilities in large models. Find arguments on both sides, assess their evidence quality, and tell me what questions remain unresolved."
-
-**System Response:** 16-step incremental plan with adaptive reasoning:
-
-```
-📥 Jill queued goal → Incremental planner activated
-
-FIRST_TASK: Conduct initial web and academic literature search
-
-Step 0: search-web → [SUCCESS] Bound $web_results to Collection_95 (6 items)
-  THOUGHTS: Should summarize to understand key arguments, then proceed to academic papers
-  DONE: NO
-  NEXT_TASK: Summarize web search results
-  REQUEST_TOOLS: ["summarize", "create-collection"]
-
-Step 1: summarize → [SUCCESS] Bound $web_summary to Note_334
-  THOUGHTS: Web results summarized. Now need academic papers for detailed arguments
-  DONE: NO
-  NEXT_TASK: Conduct academic literature search
-  REQUEST_TOOLS: ["semantic-scholar"]
-
-Step 2: semantic-scholar → [SUCCESS] Bound $papers to Collection_96 (9 papers)
-  THOUGHTS: 9 academic papers found. Should summarize to understand core arguments
-  DONE: NO
-  NEXT_TASK: Summarize academic papers for key arguments and evidence
-  REQUEST_TOOLS: ["summarize"]
-
-Step 3: summarize → [SUCCESS] Bound $paper_summary to Note_344
-  THOUGHTS: Papers summarized. Need to examine arguments closely, look for contrasts
-  DONE: NO
-  NEXT_TASK: Identify key papers representing both sides, focus on evidence quality
-  REQUEST_TOOLS: ["create-collection", "relate", "extract-entities"]
-
-Step 4: extract-entities → [SUCCESS] Bound $entities to Note_345
-  THOUGHTS: Entities extracted. Create focused collection for core debate papers
-  DONE: NO
-  NEXT_TASK: Create focused collection, examine contrasting arguments
-  REQUEST_TOOLS: ["create-collection", "filter-collection"]
-
-Step 5: create-collection → [SUCCESS] Bound $focused_papers to Collection_97
-  THOUGHTS: Collection wrapped in another collection. Need to filter for key papers
-  DONE: NO
-  NEXT_TASK: Refine to papers explicitly addressing emergence debate
-  REQUEST_TOOLS: ["map", "filter-collection", "flatten"]
-
-Step 6: flatten → [SUCCESS] Bound $flattened_papers to Note_346
-  THOUGHTS: Need to see actual titles/years. Use map to extract metadata
-  DONE: NO
-  NEXT_TASK: Extract metadata (titles, years) for targeted filtering
-  REQUEST_TOOLS: ["map"]
-
-Step 7: map → [SUCCESS] Bound $paper_metadata to Collection_98 (9 items)
-  THOUGHTS: Metadata extracted. Filter for papers with strong emergence claims
-  DONE: NO
-  NEXT_TASK: Filter for key papers addressing core debate
-  REQUEST_TOOLS: ["filter-collection"]
-
-Step 8: filter-collection → [SUCCESS] Bound $debate_papers to Collection_99 (9 items)
-  THOUGHTS: All 9 papers discuss emergence. Need different approach for contrasts
-  DONE: NO
-  NEXT_TASK: Focus on papers with arguments for vs. against emergence
-  REQUEST_TOOLS: ["display"]
-
-Step 9: display → [SUCCESS] display completed
-  THOUGHTS: Display didn't show full papers. Analyze structure, extract arguments
-  DONE: NO
-  NEXT_TASK: Analyze key paper to understand debate structure
-  REQUEST_TOOLS: ["load", "summarize", "relate", "create-note"]
-
-Step 10: load → [ERROR] load failed: No response for Collection_96
-  THOUGHTS: Can't load collection directly. Return to web results for details
-  DONE: NO
-  NEXT_TASK: Use web results for papers addressing for/against arguments
-  REQUEST_TOOLS: ["display", "create-collection"]
-
-Step 11: display → [SUCCESS] display completed
-  THOUGHTS: Need systematic approach. Synthesize current understanding now
-  DONE: NO
-  NEXT_TASK: Synthesize understanding focusing on arguments and evidence quality
-  REQUEST_TOOLS: ["create-note", "summarize"]
-
-Step 12: create-note → [SUCCESS] Bound $synthesis to Note_356
-  THOUGHTS: Synthesized key arguments. Should examine strong pro/con paper
-  DONE: NO
-  NEXT_TASK: Select paper representing emergence or non-emergence perspective
-  REQUEST_TOOLS: ["load", "search-web"]
-
-Step 13: search-web → [SUCCESS] Bound $emergence_papers to Collection_100 (6 items)
-  THOUGHTS: Found pro-emergence papers. Now search anti-emergence for comparison
-  DONE: NO
-  NEXT_TASK: Search papers arguing against emergence
-  REQUEST_TOOLS: ["search-web"]
-
-Step 14: search-web → [SUCCESS] Bound $anti_emergence_papers to Collection_101 (4 items)
-  THOUGHTS: Have both sides. Summarize understanding of debate and evidence quality
-  DONE: NO
-  NEXT_TASK: Create comprehensive summary with arguments, evidence, open questions
-  REQUEST_TOOLS: ["summarize", "create-note"]
-
-Step 15: create-note → [SUCCESS] Bound $final_analysis to Note_367
-  THOUGHTS: Completed analysis of debate from both sides with evidence assessment
-  DONE: YES ✓
-  NEXT_TASK: Present final analysis to user
-  REQUEST_TOOLS: ["display"]
-```
-
-**Final Output (Note_367):**
-```markdown
-## Analysis of the Emergent Capabilities Debate in Large Language Models
-
-### Arguments for Emergence:
-1. Capabilities appear suddenly at scale rather than building linearly
-2. Some abilities only manifest in very large models (like reasoning)
-3. These capabilities aren't simply extrapolations from smaller models
-4. Complex emergent behaviors are often surprising to developers
-5. Qualitative differences in performance across model sizes
-
-### Arguments Against Emergence:
-1. All capabilities can be attributed to scaling laws and training
-2. No true 'new' abilities - just better extrapolation of existing patterns
-3. Emergent behavior might be explained by improved training methods
-4. Claims of emergence may reflect imagination rather than genuine new capabilities
-5. The phenomenon can be fully understood through current theoretical frameworks
-
-### Evidence Quality:
-- **Strong evidence** for scaling relationships and performance improvements
-- **Mixed evidence** for genuine emergence vs. extrapolation
-- **Methodological differences** between empirical and theoretical approaches
-- **Peer review varies** significantly in quality and depth of analysis
-- **Replication concerns** in some empirical studies
-
-### Remaining Questions:
-1. How do we distinguish genuine emergence from improved scaling?
-2. What constitutes "emergence" in ML context?
-3. How should we evaluate evidence quality for emergence claims?
-4. Are our theoretical frameworks adequate for studying underlying mechanisms?
-5. What are the implications for general intelligence research?
-
-### Conclusion:
-The debate remains unresolved due to methodological disagreements and unclear 
-definitions. The core issue is whether observed capabilities represent a 
-qualitative leap beyond scaling or just the amplification of existing patterns.
-```
-
-**Key Capabilities Demonstrated:**
-- Multi-source information gathering (web + academic)
-- Iterative refinement based on results
-- Tool composition (summarize → extract-entities → filter)
-- Evidence quality assessment
-- Synthesis of conflicting viewpoints
-
----
-
-## 🚀 Setting Up the Lab
+## Quick start
 
 ### Prerequisites
+
 - Python 3.10+
-- GPU recommended for SGLang (CPU fallback available)
+- An LLM backend configured for your environment (SGLang is commonly used for planning)
 
-### Installation
+### Install
+
 ```bash
-# Clone the laboratory
-git clone https://github.com/bdambrosio/Cognitive_workbench.git
-cd Cognitive_workbench
-
-# Initialize environment
 python3 -m venv zenoh_venv
 source zenoh_venv/bin/activate
-
-# Install dependencies
 pip install -r requirements.txt
 ```
 
-### Configuration
-Create src/logs/ (needed dir, autocreate on todo)
-Edit `scenarios/jill.yaml`:
+### Run (UI)
 
-**Minimal Configuration:**
-```yaml
-llm_config:
-  sgl_model_path: "/path/to/model"  # Required - path to your SGLang model
+From `src/`, run the launcher with UI enabled.
 
-characters:
-  Jill:
-    character: |
-      Character description...
-    drives:
-      - Goal 1
-      - Goal 2
-```
-
-**SGLang Model Path:** This is the only required LLM configuration. Point it to a local model compatible with SGLang (e.g., Qwen, Llama, etc.).
-
-**Removed Configurations:**
-- `server_name`, `model_name` - No longer used (SGLang only)
-- Activity ontology files (`*-activity-ontology.json`)
-- Activities list files (`*-activities.json`)
-- Simulation time configuration
-
-### External World Integration
-
-Cognitive Workbench supports interaction with external simulated worlds (e.g., OSWorld, ScienceWorld) via API-based tools. World-specific tools are located in `src/world-tools/<world-name>/` and are automatically loaded when a character's `world_config.world_name` is set.
-
-**OSWorld Integration:**
-To use OSWorld with Cognitive Workbench, you need a separate OSWorld wrapper service (separate repository to be created). The wrapper provides a REST API that exposes OSWorld's `DesktopEnv` functionality, allowing Jill to interact with the desktop environment through dedicated tools (`osworld-status`, `osworld-observe`, `osworld-execute`, `osworld-reset`, `osworld-version`).
-
-Configure OSWorld in your character YAML:
-```yaml
-world_config:
-  world_name: "osworld"
-  port: 3002  # Port where OSWorld wrapper service runs
-```
-
-**ScienceWorld Integration:**
-ScienceWorld tools (`scienceworld-act`, `scienceworld-reset`) are available in `src/world-tools/scienceworld/`. Configure ScienceWorld similarly:
-```yaml
-world_config:
-  world_name: "scienceworld"
-  port: 3001  # Port where ScienceWorld service runs
-```
-
-### Running an Experiment
 ```bash
 cd src
-python3 launcher.py jill.yaml --ui --resource-browser --map-file infolab.py
-Startup can take a while, it loads llm, be patient...
+python3 launcher.py <your-characters-yaml> --ui --resource-browser
+```
 
-Access the UI at `http://localhost:3000`.
-See also benchmarks below (tests/hotpotqa_eval.py, tests/mmlu_eval.py, tests/gaia_eval.py, tests/chat_cli.py), for examples of use of the zenoh api provided by launcher.py
+Open the UI at `http://localhost:3000`.
 
----
+## How tools work (important)
 
-## 📂 Repository Structure
+### Schema + implementation
 
-<pre>
+Tools are defined by:
+- `Skill.md`: tool interface / contract (inputs, outputs, behavior)
+- `tool.py`: implementation
+
+Core tools live in `src/tools/`. World-specific tools live in `src/world-tools/<world_name>/`.
+
+### Uniform return format
+
+All tools return a uniform dictionary via `InfospaceExecutor._create_uniform_return()`:
+- `result["status"]`: `"success"` or `"failed"`
+- `result["data"]`: **raw value** (dict/list/etc.) on success (or reason/value on failure)
+- `result["value"]`: formatted/truncated string for display/logging
+- `result["reason"]`: failure reason (only on failure)
+
+When consuming tool outputs programmatically, **use `data`**, not `value`.
+
+### Tool catalog ordering and sources
+
+The planner sees tools grouped by **source**:
+- World tools first (e.g., `#MINECRAFT`)
+- Then core infospace tools (`#INFOSPACE CORE`)
+
+Each tool entry includes a `source` field: `"core"` or `"<world_name>"`.
+
+## Worlds: loading, state, and UI
+
+World integrations are enabled per character via `world_config.world_name` in your scenario config.
+
+Key mechanics:
+- World tools are loaded from `src/world-tools/<world_name>/`.
+- `InfospaceExecutor` maintains a persistent `world_state` dict for the active world.
+- The UI has a **State** tab that displays `world_state` (updates on `set_world_state`).
+
+## Minecraft (current state)
+
+Minecraft support lives under `src/world-tools/minecraft/`.
+
+Highlights:
+- Navigation history is tracked in `world_state.nav` as a **list** (most recent first, bounded).
+- Yaw is normalized to **0–360**.
+- `minecraft/init` is auto-run on executor initialization (if present) to normalize pose and seed nav state.
+- Mapping uses a **SpatialMap** compiled representation (`mc-map-update`, `mc-map-query`, `mc-map-visualize`).
+  - Legacy map-Collection queries are deprecated; SpatialMap is the source of truth.
+
+## Repository structure (high level)
+
+```
 src/
-├── executive_node.py           # Main OODA loop, SGLang runtime, planning coordination
-├── incremental_planner.py      # SGLang-based synchronous planning with tool execution
-├── infospace_executor.py       # Primitive & tool execution engine
-├── infospace_resource_manager.py  # Note/Collection persistence, vector search
-├── memory.py                   # Entity model & discourse integration
-├── entity_model.py            # Theory of Mind tracking per entity
-├── discourse.py               # Conversation state analysis
-├── fastapi_action_display.py  # Web UI server (FastAPI + WebSockets)
-├── launcher.py                # Process orchestration
-├── templates.py               # LLM prompt templates
-├── utils/
-│   ├── action_post_processing.py  # Result validation utilities
-│   └── llm_api.py             # LLM client wrapper (legacy)
-├── tools/                     # General tools (always loaded)
-│   ├── search-web/             # Web search & extraction
-│   ├── semantic-scholar/      # Academic paper search
-│   ├── summarize/             # Text summarization
-│   ├── filter-collection/     # Semantic filtering
-│   ├── relate/                # Relationship analysis
-│   ├── word-count/            # Text metrics
-│   └── ...
-└── world-tools/               # World-specific tools (loaded conditionally)
-    ├── osworld/                # OSWorld tools (status, observe, execute, reset, version)
-    └── scienceworld/           # ScienceWorld tools (act, reset)
-
+  executive_node.py
+  infospace_executor.py
+  incremental_planner.py
+  fastapi_action_display.py
+  tools/
+  world-tools/
+    minecraft/
+scenarios/
 tests/
-├── mmlu_eval.py               # MMLU benchmark harness (see Benchmarks section)
-└── hotpotqa_eval.py           # HotpotQA benchmark harness
-
-scenarios/                     # Agent configuration YAML files
-data/                         # Persistent storage (Notes, Collections, memory)
-logs/                         # Execution logs and planner traces
-Docs/                         # Design documents (may lag code)
-</pre>
-
----
-
-## 🛠️ Available Tools & Primitives
-
-**Information Gathering (tools):**
-- `search-web` - Web search with LLM-based extraction
-- `semantic-scholar` - Academic paper search
-- `fetch-text` - Fetch full text from URL or paper ID
-- `search-notes` - Semantic search over existing Notes
-- `search-collections` - Search Collections
-- `search-within-collection` - Search within a specific Collection
-
-**Transformation (tools & primitives):**
-- `summarize` - Hierarchical text summarization
-- `filter-collection` - Semantic filtering with LLM predicates
-- `map` - Apply operation to each item in Collection (supports additional args like `focus`, `max_length`)
-- `expand` - Split Note into Collection (lines/JSON/etc.)
-- `flatten` - Merge Collection items into single Note
-- `relate` - Compare/relate multiple items
-- `coerce` - Convert between formats
-
-**Structured Data Operations (primitives):**
-- `project` - Extract metadata fields from Notes or fields from structured Notes (not text content—use `refine` for that)
-- `pluck` - Extract single field values from Notes
-- `filter-structured` - Filter by field conditions (SQL WHERE)
-- `sort` - Order Collection by field (SQL ORDER BY)
-- `join` - Combine Collections on matching field (SQL JOIN)
-- `head` - Take first N items from Collection (SQL LIMIT)
-
-**Set Operations (primitives):**
-- `size` - Count items in Collection
-- `union` - Combine two Collections
-- `intersection` - Items in both Collections
-- `difference` - Items in first but not second Collection
-- `add` - Add item to Collection
-- `remove` - Remove item from Collection
-
-**Analysis (tools):**
-- `extract-entities` - Named entity extraction
-- `extract-struct` - Structured data extraction
-- `assess` - Quality/relevance assessment
-- `as-json` - Parse/validate JSON content
-- `as-markdown` - Convert to markdown format
-- `word-count` - Text metrics
-- `is-empty` - Check if content is empty
-- `is-positive` - Sentiment check
-- `is-question` - Check if text is a question
-- `matches` - Pattern matching
-- `text-find` - Find text within content
-
-**Generation (tools & primitives):**
-- `generate-note` - LLM-generated content (new text, code, analysis)
-- `refine` - Extract/transform information from unstructured text (does not add new content)
-- `create-note` - Create Note with literal content
-- `create-collection` - Create Collection from items
-
-**Core Primitives (built-in):**
-- `load` - Load Note or Collection by ID or name
-- `persist` - Save Note or Collection to disk
-- `display` - Show content in UI popup
-- `say` - Output text to user (appears in action log)
-- `think` - Internal reasoning (appended to planner context)
-- `ask` - Interactive user input (synchronous wait for response)
-- `index` - Build vector index for Collection search
-- `apply` - Execute a tool on a target
-
----
-
-## 📊 Benchmarks
-
-Cognitive Workbench includes evaluation harnesses for standard QA benchmarks. These serve dual purposes:
-1. **Benchmark evaluation**: Measure agent performance on established datasets
-2. **Integration examples**: Demonstrate how to connect external systems to the Cognitive Workbench API
-
-### MMLU Evaluation (`tests/mmlu_eval.py`)
-
-Evaluates on the [MMLU](https://huggingface.co/datasets/cais/mmlu) multiple-choice benchmark.
-
-**Modes:**
-- **Direct mode** (default): Uses Zenoh LLM API for raw generation—tests the underlying model
-- **Executive mode** (`--use-executive`): Sends goals through the full planner/executor pipeline—tests the agent
-
-```bash
-# Direct LLM evaluation (requires running Jill session)
-cd src
-python ../tests/mmlu_eval.py --subjects "high_school_physics" --k-shot 5 --max-test-per-subject 20
-
-# Full agent evaluation
-python ../tests/mmlu_eval.py --subjects "high_school_physics" --use-executive --max-test-per-subject 10
 ```
 
-**Key features:**
-- Canonical 5-shot (or 0-shot) prompting per subject
-- Clears transient Notes between questions
-- Extracts "ANSWER: X" format from model output
+Note: runtime-generated scenario resources live under `scenarios/*/resources/` and are ignored by git.
 
-### HotpotQA Evaluation (`tests/hotpotqa_eval.py`)
+## Contributing
 
-Evaluates on [HotpotQA](https://huggingface.co/datasets/hotpot_qa), a multi-hop reasoning benchmark with supporting context paragraphs.
+See `src/AGENTS.md` for repository guidelines and contributor expectations.
 
-**Context modes:**
-- **inline**: Context paragraphs included directly in the goal text
-- **preload**: Context stored as Notes via Zenoh API before the question—tests the agent's memory retrieval
+## License
 
-```bash
-# Inline context (simpler, faster)
-python ../tests/hotpotqa_eval.py --character Jill --max-questions 20 --context-mode inline
-
-# Preload context (tests search-notes capability)
-python ../tests/hotpotqa_eval.py --character Jill --max-questions 10 --context-mode preload
-```
-
-**Evaluation metrics:**
-- **Exact Match (EM)**: Normalized prediction equals gold answer
-- **Contains Match (CM)**: Gold answer appears in prediction
-- **LLM Judge (LJ)**: LLM evaluates semantic correctness
-- **F1 Score**: Token-level overlap
-
-### Zenoh APIs for External Integration
-
-Both benchmarks demonstrate the Zenoh APIs added for external tool integration:
-
-| API Endpoint | Purpose |
-|--------------|---------|
-| `cognitive/{character}/llm/generate` | Direct LLM generation (bypasses planner) |
-| `cognitive/{character}/resource/create_note` | Create Notes programmatically |
-| `cognitive/{character}/resource/clear_transient` | Clear non-persistent Notes/Collections |
-
-These APIs enable building custom evaluation harnesses or integrating Cognitive Workbench with external systems.
-
----
-
-## ⚠️ Current Limitations
-
-1. **SGLang Required** - No longer optional; needed for planning
-2. **No physical world simulation** (removed Nov 2025)
-3. **Single-agent focus** (multi-agent capabilities reduced)
-4. **Memory persistence** is simple JSON (no graph DB)
-5. **UI is minimal** (research tool, not production-ready)
-6. **Documentation lags code** by design (code = truth)
-7. **LLM arithmetic unreliable** - Physics/math problems may get wrong numerical answers; consider adding a calculator tool for precise computation
-
----
-
-## 🚨 Breaking Changes (Nov 2025)
-
-If migrating from an earlier version:
-
-**Removed:**
-- Activity system (activity_manager, activity ontology, activity.json files)
-- UnifiedPlanner (use IncrementalPlanner directly)
-- Simulation time (use real datetime)
-- Map node queryables (use resource_manager direct calls)
-- Physical world support
-- `server_name` and `model_name` in llm_config (use `sgl_model_path` only)
-- `parameter_source` mechanism in tool definitions (all parameters now flat)
-- Nested `args` structure in action JSON
-
-**Changed:**
-- Tool result format (now includes actual values)
-- `think` primitive now creates Notes (not just logs)
-- `ask` primitive works synchronously (polls for response)
-- Tools receive `resource_manager` as kwarg
-- Startup is faster (planners initialized once)
-- **Action format simplified**: All tool parameters are now top-level fields
-  - Old: `{"type": "search-web", "args": {"query": "..."}}`
-  - New: `{"type": "search-web", "query": "..."}`
-- `search-notes` now returns full indexed text content (not 200-char preview)
-
-**Migration Guide:**
-1. Update `llm_config` in YAML - only `sgl_model_path` needed
-2. Remove activity-related files (`*-activity-ontology.json`, `*-activities.json`)
-3. SGLang is now required (install if not present)
-4. Tool implementations may need `resource_manager` parameter
-5. UI will only show "Plan" tab (Activity tabs removed)
-
----
-
-## 🔬 Research Notes
-
-### Recent Architectural Changes (Nov 2025)
-
-**Major Simplifications:**
-
-1. **Removed UnifiedPlanner abstraction** (redundant layer)
-   - `IncrementalPlanner` and `InfospacePlanner` now initialized directly in `executive_node`
-   - Eliminated startup delay from repeated planner instantiation
-   - Cleaner architecture with fewer indirection layers
-
-2. **Eliminated Activity System** (activity_manager, activity.py, activity UI tabs)
-   - System is now purely goal/plan-based
-   - Removed activity ontology, activity selection, activity tracking
-   - Simplified UI: only "Plan" tab remains in character panel
-   - Removed ~500 lines of dead code
-
-3. **Resource Access Refactoring**
-   - Replaced Zenoh queries with direct method calls to `resource_manager`
-   - Tools now receive `resource_manager` as kwarg parameter
-   - Fixed broken `load`, `generate-note`, `relate`, `fetch-text` tools
-   - Eliminated map_node queryables (no longer needed)
-
-4. **Removed Simulation Time**
-   - Now uses real `datetime.datetime` throughout
-   - Simplified time handling (no time advancement coordination)
-   - Removed time subscribers and publishers
-
-5. **Improved Tool Result Reporting**
-   - Results now show actual values, not just status
-   - Format: `[SUCCESS] <actual_result> | <action> | Bound: <var> to <resource>`
-   - 128-char truncation for long results
-   - Planner sees both execution status and actual data
-
-6. **Simplified Action Format**
-   - Removed nested `args` structure from action JSON
-   - All tool parameters are now top-level fields
-   - Removed `parameter_source` mechanism from tool loader
-   - Reduces LLM confusion and parsing complexity
-
-7. **Added External Zenoh APIs**
-   - `cognitive/{character}/llm/generate`: Direct LLM access for external tools
-   - `cognitive/{character}/resource/create_note`: Programmatic Note creation
-   - `cognitive/{character}/resource/clear_transient`: Clear non-persistent Notes/Collections
-   - Enables benchmark harnesses and external system integration
-
-8. **Fixed Note/Collection ID Numbering**
-   - Counters now correctly reset on startup based on highest existing IDs
-   - Prevents ID collisions after loading saved state
-
-**Benefits:**
-- 40% reduction in inter-process communication
-- Simpler debugging (fewer nodes, direct calls)
-- Faster startup (single planner initialization)
-- Better planner feedback (sees actual tool results)
-- Cleaner codebase (~700 lines of dead code removed)
-- External tools can access LLM and memory system
-
-**Trade-offs:**
-- Less modularity (acceptable for research)
-- Executive node is larger (~2600 lines)
-- SGLang is now required (not optional)
-
----
-
-## 📊 Performance Characteristics
-
-**Typical Complex Task (16 steps):**
-- Total time: ~45-60 seconds (improved with direct method calls)
-- Web searches: 2-4 seconds each
-- Semantic Scholar: 1 second
-- Summarization: 1-8 seconds (depends on input size)
-- Vector indexing: 300-500 embeddings/sec (txtai + sentence-transformers)
-- SGLang inference: Context-dependent (batch size 1, GPU)
-- Startup: ~15-20 seconds (improved with single planner init)
-
-**Resource Usage:**
-- Memory: ~2-4GB (without SGLang)
-- SGLang: +8-96GB GPU memory (model-dependent)
-  - Recommended: Qwen2.5-32B or Qwen3-Coder-30B (16-bit, ~60GB VRAM)
-  - Configure in `jill.yaml`: `sgl_model_path: "/path/to/model"`
-- Disk: ~50MB per agent (Note/Collection persistence)
-- Logs: Planner traces in `logs/planner_trace_{character}.txt` (full conversation state)
-
-**Recent Improvements:**
-- 40% reduction in Zenoh query overhead (direct method calls)
-- Faster startup (single planner initialization vs repeated instantiation)
-- Better planner feedback (actual tool results visible)
-- Reduced shutdown time (5s vs 10s)
-
----
-
-## 📝 Citation
-
-If you use this workbench for your research, please cite:
-
-```bibtex
-@software{cognitive_workbench,
-  author = {Bruce D'Ambrosio},
-  title = {Cognitive Workbench: A Framework for LLM-Powered Cognitive Agents},
-  year = {2024-2025},
-  url = {https://github.com/bdambrosio/Cognitive_workbench}
-}
-```
-
----
-
-## 🤝 Contributing
-
-This is a research laboratory. Contributions are welcome, but expect frequent breaking changes. The best way to contribute:
-
-1. **Experiment** with the code
-2. **Document** your findings (even if informal)
-3. **Share** interesting results or failure modes
-4. **Propose** architectural changes with rationale
-
-Code quality standards are intentionally relaxed to prioritize research velocity.
-
----
-
-## 📄 License
-
-MIT License - See LICENSE file for details.
-
-**Disclaimer:** This is experimental research software. It may break, change direction, or be completely rewritten. Use at your own risk.
+MIT License - see `LICENSE`.
