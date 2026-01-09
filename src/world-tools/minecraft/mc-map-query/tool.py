@@ -192,13 +192,10 @@ QUERY_TYPES = [
     "cells-candidate-waypoints",
     "cells-nearest",
     "cells-worth-revisit",
-    # Legacy queries
-    "location",
-    "property",
-    "waypoint",
-    "unexplored",
-    "nearest",
+    # Statistics
     "stats"
+    # Legacy queries (DEPRECATED - removed from valid types):
+    # "location", "property", "waypoint", "unexplored", "nearest"
 ]
 
 
@@ -241,17 +238,12 @@ def tool(input_value=None, **kwargs):
     resource_manager = kwargs.get('resource_manager')
     agent_name = kwargs.get('agent_name', 'system')
     world_name = kwargs.get('world_name', 'minecraft')
-    
-    # Default to agent-specific map name
-    default_map_name = f"{agent_name}-minecraft_map"
-    map_name = kwargs.get('map_name') or default_map_name
     query_type = kwargs.get('query', 'stats')
     
     if not resource_manager:
         return executor._create_uniform_return(
             'failed',
             value="Resource manager not available",
-            reason="no_resource_manager"
             reason="no_resource_manager"
         )
     
@@ -595,169 +587,40 @@ def tool(input_value=None, **kwargs):
         )
     
     # ========================================================================
-    # Legacy Collection-based Queries
+    # Legacy Collection-based Queries (DEPRECATED - use SpatialMap queries instead)
     # ========================================================================
     
-    # Load map Collection for legacy queries
-    map_collection_id = resource_manager.named_collections.get(map_name)
+    # Legacy queries are deprecated. Use SpatialMap queries instead:
+    # - 'location' -> use get_cell() or cells-nearest
+    # - 'property' -> use cells-with-resource or other SpatialMap queries
+    # - 'waypoint' -> use SpatialMap waypoints field (via get_waypoints())
+    # - 'unexplored' -> use cells-unobserved or frontier-cells
+    # - 'nearest' (legacy) -> use cells-nearest
     
-    if not map_collection_id and query_type in ['location', 'property', 'waypoint', 'unexplored', 'nearest']:
-        result_text = "Map not found - no locations explored yet"
-        extra_metadata = {"map_name": map_name, "found": False, "results": []}
-        return executor._create_uniform_return('success', value=result_text, extra=extra_metadata)
-    
-    # Compile forward: Load all Notes, deduplicate by (x,y,z), keep latest
-    if map_collection_id:
-        map_content = _compile_map_forward(map_collection_id, resource_manager)
-    else:
-        map_content = []
-    
-    if query_type == 'location':
-        # Query specific location
-        if x is None or y is None or z is None:
-            return executor._create_uniform_return(
-                'failed',
-                value="Location query requires x, y, z coordinates",
-                reason="missing_coordinates"
-            )
+    if query_type in ['location', 'property', 'waypoint', 'unexplored', 'nearest']:
+        # Try to provide helpful alternatives
+        alternatives = {
+            'location': 'Use SpatialMap.get_cell() or cells-nearest query',
+            'property': 'Use cells-with-resource or other SpatialMap queries',
+            'waypoint': 'Use SpatialMap waypoints field (cells with waypoints can be queried)',
+            'unexplored': 'Use cells-unobserved or frontier-cells queries',
+            'nearest': 'Use cells-nearest query (already implemented)'
+        }
         
-        for entry in map_content:
-            if isinstance(entry, dict):
-                entry_x = _round_coordinate(entry.get('x', 0))
-                entry_y = _round_coordinate(entry.get('y', 0))
-                entry_z = _round_coordinate(entry.get('z', 0))
-                if entry_x == x and entry_y == y and entry_z == z:
-                    results.append(entry)
-                    result_text_parts.append(f"Location ({x}, {y}, {z}) found: visited {entry.get('visit_count', 0)} times")
-                    break
-        
-        if not results:
-            result_text_parts.append(f"Location ({x}, {y}, {z}) not found in map")
-    
-    elif query_type == 'property':
-        # Query by property value
-        property_path = kwargs.get('property')
-        property_value = kwargs.get('value')
-        
-        if not property_path:
-            return executor._create_uniform_return(
-                'failed',
-                value="Property query requires property path",
-                reason="missing_property"
-                reason="missing_property"
-            )
-        
-        # Navigate property path (e.g., "geom.stair" -> entry['observed']['geom']['stair'])
-        for entry in map_content:
-            if isinstance(entry, dict) and 'observed' in entry:
-                observed = entry['observed']
-                if isinstance(observed, dict):
-                    # Navigate nested path
-                    parts = property_path.split('.')
-                    value = observed
-                    for part in parts:
-                        if isinstance(value, dict):
-                            value = value.get(part)
-                        else:
-                            value = None
-                            break
-                    
-                    # Check if value matches
-                    if property_value is not None:
-                        if value == property_value:
-                            results.append(entry)
-                    else:
-                        # Return all entries with this property set
-                        if value is not None:
-                            results.append(entry)
-        
-        if results:
-            result_text_parts.append(f"Found {len(results)} locations with {property_path}={property_value}")
-        else:
-            result_text_parts.append(f"No locations found with {property_path}={property_value}")
-    
-    elif query_type == 'waypoint':
-        # Query by waypoint name
-        waypoint_name = kwargs.get('waypoint')
-        
-        if not waypoint_name:
-            return executor._create_uniform_return(
-                'failed',
-                value="Waypoint query requires waypoint name",
-                reason="missing_waypoint"
-                reason="missing_waypoint"
-            )
-        
-        for entry in map_content:
-            if isinstance(entry, dict):
-                waypoints = entry.get('waypoints', [])
-                if isinstance(waypoints, list) and waypoint_name in waypoints:
-                    results.append(entry)
-        
-        if results:
-            result_text_parts.append(f"Found waypoint '{waypoint_name}' at {len(results)} location(s)")
-        else:
-            result_text_parts.append(f"Waypoint '{waypoint_name}' not found")
-    
-    elif query_type == 'unexplored':
-        # Find nearest unexplored edge (low visit_count or missing observations)
-        from_x = x
-        from_y = y
-        from_z = z
-        
-        if from_x is None or from_y is None or from_z is None:
-            return executor._create_uniform_return(
-                'failed',
-                value="Unexplored query requires from_x, from_y, from_z coordinates",
-                reason="missing_coordinates"
-            )
-        
-        # Find locations with low visit_count or missing observations
-        candidates = []
-        for entry in map_content:
-            if isinstance(entry, dict):
-                visit_count = entry.get('visit_count', 0)
-                observed = entry.get('observed', {})
-                # Consider unexplored if visit_count <= 1 or missing key observation data
-                if visit_count <= 1 or not observed or not isinstance(observed, dict) or not observed.get('dirs'):
-                    ex = entry.get('x', 0)
-                    ey = entry.get('y', 0)
-                    ez = entry.get('z', 0)
-                    dist = _distance(from_x, from_y, from_z, ex, ey, ez)
-                    candidates.append((dist, entry))
-        
-        # Sort by distance
-        candidates.sort(key=lambda x: x[0])
-        
-        # Return nearest few
-        results = [entry for dist, entry in candidates[:5]]
-        
-        if results:
-            result_text_parts.append(f"Found {len(results)} unexplored locations nearby")
-        else:
-            result_text_parts.append("No unexplored locations found")
-    
-    else:
         return executor._create_uniform_return(
             'failed',
-            value=f"Unknown query type: {query_type}. Valid types: {', '.join(QUERY_TYPES)}",
-            reason="invalid_query_type"
-            reason="invalid_query_type"
+            value=f"Legacy query type '{query_type}' is deprecated. {alternatives.get(query_type, 'Use SpatialMap queries instead')}.",
+            reason="legacy_query_deprecated",
+            extra={"deprecated_query": query_type, "alternative": alternatives.get(query_type)}
         )
     
-    # Format results
-    result_text = "\n".join(result_text_parts) if result_text_parts else "Query completed"
-    
-    # Extract metadata fields for extra
-    extra_metadata = {
-        "map_name": map_name,
-        "query_type": query_type,
-        "found": len(results) > 0,
-        "result_count": len(results),
-        "results": results[:10]  # Limit to first 10 for metadata
-    }
-    
-    return executor._create_uniform_return('success', value=result_text, extra=extra_metadata)
+    # All valid queries should have been handled above
+    # If we reach here, it's an unknown query type
+    return executor._create_uniform_return(
+        'failed',
+        value=f"Unknown query type: {query_type}. Valid types: {', '.join(QUERY_TYPES)}",
+        reason="invalid_query_type"
+    )
 
 
 if __name__ == "__main__":

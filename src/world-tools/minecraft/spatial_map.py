@@ -58,7 +58,8 @@ def empty_cell(x: int, z: int) -> Dict[str, Any]:
         "provenance": {
             "updated_by": "unknown",
             "update_reason": "unknown"
-        }
+        },
+        "waypoints": []  # List of waypoint names at this location
     }
 
 
@@ -295,6 +296,46 @@ class SpatialMap:
         """Set cell at coordinates."""
         key = self._cell_key(x, z)
         self.cells[key] = cell
+    
+    def add_waypoint(self, x: int, z: int, waypoint_name: str) -> bool:
+        """
+        Add a waypoint name to a cell.
+        
+        Args:
+            x, z: Cell coordinates
+            waypoint_name: Name of the waypoint to add
+            
+        Returns:
+            True if waypoint was added, False if cell doesn't exist
+        """
+        key = self._cell_key(x, z)
+        cell = self.cells.get(key)
+        if not cell:
+            return False
+        
+        if 'waypoints' not in cell:
+            cell['waypoints'] = []
+        
+        if waypoint_name not in cell['waypoints']:
+            cell['waypoints'].append(waypoint_name)
+        
+        return True
+    
+    def get_waypoints(self, x: int, z: int) -> List[str]:
+        """
+        Get waypoint names at a cell.
+        
+        Args:
+            x, z: Cell coordinates
+            
+        Returns:
+            List of waypoint names, empty list if cell doesn't exist or has no waypoints
+        """
+        key = self._cell_key(x, z)
+        cell = self.cells.get(key)
+        if not cell:
+            return []
+        return cell.get('waypoints', [])
     
     def update_cell_from_observation(
         self,

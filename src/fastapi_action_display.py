@@ -1298,6 +1298,11 @@ Generated: {generated_at}
                 logger.error(f"Error getting plan bindings: {e}")
                 return {"success": False, "message": f"Error: {str(e)}"}
         
+        @self.app.get("/api/characters")
+        async def get_characters():
+            """Get list of active characters that have announced themselves."""
+            return {"characters": list(self.active_characters)}
+        
         @self.app.get("/api/world_state/{character}")
         async def get_world_state(character: str):
             """Get current world state for a character."""
@@ -2443,8 +2448,8 @@ Generated: {generated_at}
                     }
                 }, 30000); // Send ping every 30 seconds
                 
-                // Request initial system state
-                // Note: The server will send ready_state when available
+                // Query backend for any characters that may have been announced while tab was inactive
+                syncCharactersFromBackend();
             };
             
             ws.onerror = function(error) {
@@ -2711,6 +2716,36 @@ Generated: {generated_at}
                 loadWorldState(character);
             }
         }
+        
+        // Sync characters from backend (handles missed announcements when tab was inactive)
+        async function syncCharactersFromBackend() {
+            try {
+                const response = await fetch('/api/characters');
+                if (!response.ok) return;
+                const data = await response.json();
+                if (data.characters && Array.isArray(data.characters)) {
+                    data.characters.forEach(function(character) {
+                        if (!characterTabs.has(character)) {
+                            createCharacterTab(character);
+                            announcedCharacters.add(character);
+                        }
+                    });
+                    // Auto-select first character if none selected
+                    if (!activeCharacter && data.characters.length > 0) {
+                        selectCharacterTab(data.characters[0]);
+                    }
+                }
+            } catch (e) {
+                console.log('Failed to sync characters from backend:', e);
+            }
+        }
+        
+        // Listen for page visibility changes (tab becomes active)
+        document.addEventListener('visibilitychange', function() {
+            if (!document.hidden) {
+                syncCharactersFromBackend();
+            }
+        });
         
         // Character Tab Management Functions
         function createCharacterTab(characterName) {
@@ -3221,16 +3256,22 @@ Generated: {generated_at}
                 systemStatusText.textContent = `Ready - ${readyData.character_count} characters launching`;
                 systemStatusText.style.color = '#4ecdc4'; // Green color for ready
 
+                // Sync characters from readyData.characters_active if available
+                if (Array.isArray(readyData.characters_active) && readyData.characters_active.length > 0) {
+                    readyData.characters_active.forEach(function(character) {
+                        if (!characterTabs.has(character)) {
+                            createCharacterTab(character);
+                            announcedCharacters.add(character);
+                        }
+                    });
+                }
+
                 // Auto-select first character if none selected yet
                 try {
                     const expected = Array.isArray(readyData.characters_active) ? readyData.characters_active.length : (readyData.character_count || 0);
                     const allAnnounced = (expected > 0) && (announcedCharacters.size >= expected);
                     if (!activeCharacter && allAnnounced && Array.isArray(readyData.characters_active) && readyData.characters_active.length > 0) {
-                        const firstCharacter = readyData.characters_active[0];
-                        if (!characterTabs.has(firstCharacter)) {
-                            createCharacterTab(firstCharacter);
-                        }
-                        selectCharacterTab(firstCharacter);
+                        selectCharacterTab(readyData.characters_active[0]);
                     }
                 } catch (e) { /* no-op */ }
                 

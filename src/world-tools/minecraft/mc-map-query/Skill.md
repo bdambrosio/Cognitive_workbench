@@ -57,6 +57,8 @@ Multi-Objective:
 - `cells-nearest`: Nearest cells matching predicate
 - `cells-worth-revisit`: Low confidence or inferred cells
 
+Note: Legacy Collection-based queries (`location`, `property`, `waypoint`, `unexplored`, `nearest`) are deprecated. Use SpatialMap queries instead.
+
 ## Output
 
 Returns uniform_return format with:

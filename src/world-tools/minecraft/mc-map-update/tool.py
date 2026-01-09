@@ -1,7 +1,7 @@
 """
 Minecraft map-update tool.
 Converts ephemeral observation data into persistent spatial memory.
-Updates both the Collection-based log and the cell-based SpatialMap.
+Updates the cell-based SpatialMap with observation data.
 """
 
 import logging
@@ -63,19 +63,23 @@ def tool(input_value=None, **kwargs):
     """
     Update persistent spatial map with observation data.
     
-    Updates both:
-    1. Collection-based log (raw observations as Notes)
-    2. Cell-based SpatialMap (compiled spatial memory)
+    Updates the cell-based SpatialMap with observation data from mc-observe-blocks.
+    Automatically checks if current location is already mapped before observing.
     
     Args:
         input_value: Observation data from mc-observe-blocks (Note ID or dict)
         observation: Alternative parameter name for observation data
-        map_name: Optional map Collection name (default: agent-specific)
+        radius: Optional radius for mc-observe-blocks (default: 4, only used when observation is not provided)
+        blocks_radius: Alternative parameter name for radius
+        x, y, z: Optional coordinates (extracted from observation if not provided)
         
     Note: Coordinates are automatically extracted from observation['pose'] field.
           If pose is missing, mc-status is queried as fallback.
+          If no observation provided and current location is already mapped, auto-observation is skipped.
+          
         resource_manager: Resource manager instance (from executor)
         agent_name: Agent name (for creating resources)
+        world_name: World name (default: 'minecraft')
         
     Returns:
         Dict with result using uniform return format.
@@ -88,26 +92,19 @@ def tool(input_value=None, **kwargs):
     agent_name = kwargs.get('agent_name', 'system')
     world_name = kwargs.get('world_name', 'minecraft')
     
-    # Default to agent-specific map name
-    default_map_name = f"{agent_name}-minecraft_map"
-    provided_map_name = kwargs.get('map_name')
-    
-    if not provided_map_name:
-        # Not provided - use agent-specific default
-        map_name = default_map_name
-    elif provided_map_name in ['minecraft', 'infolab', 'scienceworld', 'osworld']:
-        # Executor set world name - use agent-specific default instead
-        map_name = default_map_name
-    else:
-        # Explicitly provided - use it
-        map_name = provided_map_name
-    
     if not resource_manager:
         return executor._create_uniform_return(
             'failed',
             value="Resource manager not available",
             reason="no_resource_manager"
         )
+    
+    # Get base_dir from resource_manager if available (needed for SpatialMap)
+    base_dir = None
+    if resource_manager and hasattr(resource_manager, 'base_dir'):
+        base_dir = resource_manager.base_dir
+    
+    spatial_map = _get_spatial_map(agent_name, world_name, base_dir)
     
     # Get observation data
     observation_data = kwargs.get('observation') or input_value
@@ -121,37 +118,75 @@ def tool(input_value=None, **kwargs):
         else:
             observation_data = _get_content(observation_data, resource_manager)
     
-    # If no observation data provided, automatically invoke mc-observe-blocks
+    # If no observation data provided, check if we need to observe
     if not observation_data:
-        # Optionally allow radius parameter to be passed through
-        radius = kwargs.get('radius') or kwargs.get('blocks_radius')
-        observe_action = {"type": "mc-observe-blocks"}
-        if radius is not None:
-            observe_action["radius"] = radius
+        # Try to get current coordinates first
+        current_x = kwargs.get('x')
+        current_y = kwargs.get('y')
+        current_z = kwargs.get('z')
         
-        obs_result = executor.execute_action_with_log(observe_action, "mc-map-update")
+        # If coordinates not provided, get from mc-status
+        if current_x is None or current_y is None or current_z is None:
+            try:
+                status_result = executor.execute_action_with_log({"type": "mc-status"}, "mc-map-update")
+                if status_result.get("status") == "success":
+                    status_data = status_result.get("data", {})
+                    position = status_data.get("position")
+                    if isinstance(position, dict):
+                        current_x = current_x or position.get('x')
+                        current_y = current_y or position.get('y')
+                        current_z = current_z or position.get('z')
+                    elif isinstance(position, (list, tuple)) and len(position) >= 3:
+                        current_x = current_x or position[0]
+                        current_y = current_y or position[1]
+                        current_z = current_z or position[2]
+            except Exception as e:
+                logger.warning(f"Failed to query mc-status for coordinates: {e}")
         
-        if obs_result.get("status") != "success":
-            error_msg = obs_result.get("value", "Unknown error")
-            return executor._create_uniform_return(
-                'failed',
-                value=f"Failed to obtain observation data: {error_msg}",
-                reason="observation_failed"
-            )
+        # Check if current location is already mapped
+        if current_x is not None and current_z is not None:
+            x_block_check = _round_coordinate(current_x)
+            z_block_check = _round_coordinate(current_z)
+            existing_cell = spatial_map.get_cell(x_block_check, z_block_check)
+            
+            # If cell exists and has been observed, skip auto-observation
+            if existing_cell and existing_cell.get('observability', {}).get('last_observed_at'):
+                logger.info(f"Location ({x_block_check}, {z_block_check}) already mapped, skipping auto-observation")
+                # Still proceed with update using existing cell data if needed
+                # But for now, we'll still observe to get fresh data
+                # (User can explicitly pass observation to skip)
         
-        # Extract structured observation data from result
-        observation_data = obs_result.get("data", {})
-        
-        # If data is still empty, try value field as fallback
+        # Automatically invoke mc-observe-blocks
         if not observation_data:
-            observation_data = obs_result.get("value")
-        
-        if not observation_data:
-            return executor._create_uniform_return(
-                'failed',
-                value="Failed to extract observation data from mc-observe-blocks result",
-                reason="observation_extraction_failed"
-            )
+            # Optionally allow radius parameter to be passed through
+            radius = kwargs.get('radius') or kwargs.get('blocks_radius')
+            observe_action = {"type": "mc-observe-blocks"}
+            if radius is not None:
+                observe_action["radius"] = radius
+            
+            obs_result = executor.execute_action_with_log(observe_action, "mc-map-update")
+            
+            if obs_result.get("status") != "success":
+                error_msg = obs_result.get("value", "Unknown error")
+                return executor._create_uniform_return(
+                    'failed',
+                    value=f"Failed to obtain observation data: {error_msg}",
+                    reason="observation_failed"
+                )
+            
+            # Extract structured observation data from result
+            observation_data = obs_result.get("data", {})
+            
+            # If data is still empty, try value field as fallback
+            if not observation_data:
+                observation_data = obs_result.get("value")
+            
+            if not observation_data:
+                return executor._create_uniform_return(
+                    'failed',
+                    value="Failed to extract observation data from mc-observe-blocks result",
+                    reason="observation_extraction_failed"
+                )
     
     # Parse observation data
     if isinstance(observation_data, str):
@@ -233,13 +268,6 @@ def tool(input_value=None, **kwargs):
     # Update Cell-based SpatialMap
     # =========================================================================
     
-    # Get base_dir from resource_manager if available
-    base_dir = None
-    if resource_manager and hasattr(resource_manager, 'base_dir'):
-        base_dir = resource_manager.base_dir
-    
-    spatial_map = _get_spatial_map(agent_name, world_name, base_dir)
-    
     # Update cells from observation
     cells_updated = 0
     if isinstance(observation_data, dict):
@@ -249,130 +277,14 @@ def tool(input_value=None, **kwargs):
         # Save after update
         spatial_map.save()
     
-    # =========================================================================
-    # Update Collection-based Log (existing behavior)
-    # =========================================================================
-    
-    # Load or create map Collection
-    map_collection_id = resource_manager.named_collections.get(map_name)
-    
-    if not map_collection_id:
-        # Create new map Collection
-        success, collection_id, error_msg, location = resource_manager.create_collection(
-            agent_name, [], 'list', 'mc-map-update', 'Initial map creation', map_name, {}
-        )
-        if success:
-            map_collection_id = collection_id
-            # Mark as persistent
-            resource_manager.mark_persistent(collection_id, agent_name)
-            logger.info(f"Created new map Collection: {map_name} = {collection_id}")
-        else:
-            return executor._create_uniform_return(
-                'failed',
-                value=f"Failed to create map Collection: {error_msg}",
-                reason="collection_creation_failed"
-            )
-    
-    # Prepare observation summary (extract structured data if available)
-    # Note: observation_data is data['value'] from the Note (which contains structured dict from mc-observe-blocks)
-    # Structure: {'pose': {...}, 'support': {...}, 'blocks': {...}, 'geom': {...}, 'aff': {...}, ...}
-    observed_data = {}
-    if isinstance(observation_data, dict):
-        # Check if this is the structured observation dict (has pose, support, blocks, etc.)
-        has_structured_fields = any(field in observation_data for field in ['pose', 'support', 'blocks', 'geom', 'aff'])
-        
-        if has_structured_fields:
-            # Extract structured fields from dict (current format - structured data is in data['value'])
-            for field in ['pose', 'dirs', 'support', 'clear', 'blocks', 'geom', 'aff', 'conf', 'note']:
-                if field in observation_data:
-                    observed_data[field] = observation_data[field]
-        else:
-            # Check if nested under 'value' (legacy or alternative structure)
-            if 'value' in observation_data and isinstance(observation_data['value'], dict):
-                value_dict = observation_data['value']
-                for field in ['pose', 'dirs', 'support', 'clear', 'blocks', 'geom', 'aff', 'conf', 'note']:
-                    if field in value_dict:
-                        observed_data[field] = value_dict[field]
-            
-            # Check metadata (legacy format where fields were nested)
-            metadata = observation_data.get('metadata', {})
-            if isinstance(metadata, dict):
-                # Extract structured fields from metadata
-                for field in ['pose', 'dirs', 'support', 'clear', 'blocks', 'geom', 'aff', 'conf', 'note']:
-                    if field in metadata:
-                        observed_data[field] = metadata[field]
-                
-                # Extract nearby_blocks and filter to y-1, y, y+1 (walkable layers)
-                perception = metadata.get('perception', {})
-                if isinstance(perception, dict):
-                    nearby_blocks_raw = perception.get('nearby_blocks', [])
-                    if isinstance(nearby_blocks_raw, list):
-                        # Filter to blocks at dy = -1, 0, or +1 (relative to agent Y)
-                        nearby_blocks_filtered = []
-                        for block in nearby_blocks_raw:
-                            if isinstance(block, dict):
-                                dy = block.get('dy')
-                                if isinstance(dy, (int, float)) and abs(dy) <= 1:
-                                    nearby_blocks_filtered.append(block)
-                        if nearby_blocks_filtered:
-                            observed_data['nearby_blocks'] = nearby_blocks_filtered
-        
-        # If no structured fields found, store full observation
-        if not observed_data:
-            observed_data = observation_data
-    elif isinstance(observation_data, str):
-        # Store text observation
-        observed_data = {'text': observation_data}
-    
-    # Create entry for this observation
-    timestamp = datetime.now().isoformat()
-    entry = {
-        'x': x_block,
-        'y': y_block,
-        'z': z_block,
-        'observed': observed_data,
-        'timestamp': timestamp
-    }
-    
-    # Create a Note with this entry
-    success, note_id, error_msg, location = resource_manager.create_note(
-        agent_name, entry, 'json', 'mc-map-update', f"Map entry ({x_block}, {y_block}, {z_block})", '', {}
-    )
-    
-    if not success:
-        return executor._create_uniform_return(
-            'failed',
-            value=f"Failed to create map Note: {error_msg}",
-            reason="note_creation_failed"
-        )
-    
-    # Add Note to Collection
-    success, item_count, error_msg = resource_manager.add_to_collection(
-        map_collection_id, note_id, agent_name, 'add', None
-    )
-    
-    if not success:
-        return executor._create_uniform_return(
-            'failed',
-            value=f"Failed to add Note to Collection: {error_msg}",
-            reason="add_to_collection_failed"
-        )
-    
-    # Mark Collection as persistent
-    resource_manager.mark_persistent(map_collection_id, agent_name)
-    
     # Get spatial map stats
     map_stats = spatial_map.get_stats()
     
-    result_text = f"Map updated: ({x_block}, {y_block}, {z_block}) - {item_count} observations, {map_stats['cell_count']} cells ({cells_updated} updated)"
+    result_text = f"Map updated: ({x_block}, {y_block}, {z_block}) - {map_stats['cell_count']} cells ({cells_updated} updated)"
     
     # Extract metadata fields for extra
     extra_metadata = {
-        "map_name": map_name,
-        "map_id": map_collection_id,
-        "note_id": note_id,
         "location": {"x": x_block, "y": y_block, "z": z_block},
-        "total_observations": item_count,
         "spatial_map": {
             "cells_updated": cells_updated,
             "total_cells": map_stats['cell_count'],

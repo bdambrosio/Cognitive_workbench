@@ -1678,12 +1678,20 @@ ALWAYS follow all formatting instructions exactly.
                 + gen(f"request_tools_{step}", max_tokens=96, temperature=GEN_TEMPERATURE, stop=["\n\n"])
                 + "\n"
             )
-            logger.info(f"THOUGHTS: {s[f'thoughts_{step}']}")
-            logger.info(f"HYPOTHESES: {s[f'hypotheses_{step}']}")
-            logger.info(f"ASSUMPTIONS: {s[f'assumption_audit_{step}']}")
-            logger.info(f"DONE: {s[f'done_{step}']}")
-            logger.info(f"NEXT_TASK: {s[f'next_task_{step}']}")
-            logger.info(f"REQUEST_TOOLS: {s[f'request_tools_{step}']}")
+            # Safely log step fields (may not exist if step was interrupted or incomplete)
+            # ProgramState uses bracket notation and raises KeyError if key doesn't exist
+            def safe_get(state, key, default='N/A'):
+                try:
+                    return state[key]
+                except (KeyError, TypeError, AttributeError):
+                    return default
+            
+            logger.info(f"THOUGHTS: {safe_get(s, f'thoughts_{step}')}")
+            logger.info(f"HYPOTHESES: {safe_get(s, f'hypotheses_{step}')}")
+            logger.info(f"ASSUMPTIONS: {safe_get(s, f'assumption_audit_{step}')}")
+            logger.info(f"DONE: {safe_get(s, f'done_{step}')}")
+            logger.info(f"NEXT_TASK: {safe_get(s, f'next_task_{step}')}")
+            logger.info(f"REQUEST_TOOLS: {safe_get(s, f'request_tools_{step}')}")
             
             # Stage 3.1: Update resource indexes with commentary
             # Track ANY resource created in this step (not just explicit create-note/create-collection)
@@ -2274,7 +2282,16 @@ class IncrementalPlanner:
             )
 
             step = self._find_last_step(state, max_steps)
-            logger.info(f"Last step: {step}, done_{step}: {state[f'done_{step}']}")
+            # Safely check if done_<step> exists (may not exist if interrupted)
+            done_value = None
+            if f'done_{step}' in state:
+                try:
+                    done_value = state[f'done_{step}']
+                    logger.info(f"Last step: {step}, done_{step}: {done_value}")
+                except (KeyError, TypeError, AttributeError):
+                    done_value = None
+            else:
+                logger.info(f"Last step: {step}, done_{step}: (not found - may be interrupted)")
             trace_str = str(state)
             tool_model: ToolModel = self.executor.tool_model
              
@@ -2285,11 +2302,24 @@ class IncrementalPlanner:
                 final_answer = 'Planning completed'
             
             error_count = getattr(self.executor, '_plan_error_count', 0)
+            # Safely determine success status (handle interrupt case)
+            success = False
+            if f'done_{step}' in state:
+                try:
+                    done_str = state[f'done_{step}']
+                    if done_str and isinstance(done_str, str):
+                        success = done_str.strip().upper().startswith("YES")
+                except (KeyError, TypeError, AttributeError):
+                    pass
+            # If interrupted, final_answer will be "Interrupted by user."
+            elif final_answer == "Interrupted by user.":
+                success = False
+            
             return {
                 'plan': None,
                 'response': final_answer,
                 'task_state': None,
-                'success': state[f'done_{step}'].strip().upper().startswith("YES"),
+                'success': success,
                 'error_count': error_count,
                 'skip_validation': True  # Plan already executed, no need to validate
             }
@@ -2381,7 +2411,16 @@ class IncrementalPlanner:
             )
 
             step = self._find_last_step(state, max_steps)
-            logger.info(f"Last step: {step}, done_{step}: {state[f'done_{step}']}")
+            # Safely check if done_<step> exists (may not exist if interrupted)
+            done_value = None
+            if f'done_{step}' in state:
+                try:
+                    done_value = state[f'done_{step}']
+                    logger.info(f"Last step: {step}, done_{step}: {done_value}")
+                except (KeyError, TypeError, AttributeError):
+                    done_value = None
+            else:
+                logger.info(f"Last step: {step}, done_{step}: (not found - may be interrupted)")
             trace_str = str(state)
             tool_model: ToolModel = self.executor.tool_model
             tool_model.update_from_trace(trace_str=trace_str)
@@ -2400,7 +2439,16 @@ class IncrementalPlanner:
                 world_model = self.executor.world_model.get()
             else:
                 logger.warning("WorldModel not available, skipping update")
-            if step < max_steps and state[f'done_{step}'] and state[f'done_{step}'].strip().upper().startswith("NO"):
+            # Safely check done_<step> before retry logic
+            should_retry = False
+            if step < max_steps and f'done_{step}' in state:
+                try:
+                    done_str = state[f'done_{step}']
+                    if done_str and isinstance(done_str, str) and done_str.strip().upper().startswith("NO"):
+                        should_retry = True
+                except (KeyError, TypeError, AttributeError):
+                    pass
+            if should_retry:
                 #reflect and retry
                 logger.info(f"Step {step} failed, reflecting and retrying")
                 state = tool_planner_infospace.run(
@@ -2428,11 +2476,24 @@ class IncrementalPlanner:
                 final_answer = 'Planning completed'
             
             error_count = getattr(self.executor, '_plan_error_count', 0)
+            # Safely determine success status (handle interrupt case)
+            success = False
+            if f'done_{step}' in state:
+                try:
+                    done_str = state[f'done_{step}']
+                    if done_str and isinstance(done_str, str):
+                        success = done_str.strip().upper().startswith("YES")
+                except (KeyError, TypeError, AttributeError):
+                    pass
+            # If interrupted, final_answer will be "Interrupted by user."
+            elif final_answer == "Interrupted by user.":
+                success = False
+            
             return {
                 'plan': plan_actions,
                 'response': final_answer,
                 'task_state': task_state,
-                'success': state[f'done_{step}'].strip().upper().startswith("YES"),
+                'success': success,
                 'error_count': error_count,
                 'skip_validation': True  # Plan already executed, no need to validate
             }
