@@ -161,22 +161,22 @@ def send_goal_and_wait(
     goal_text: str,
     timeout: float = 600.0
 ) -> dict:
-    """Send goal to executive_node and wait for plan_result."""
-    response = {'received': False, 'final_thoughts': '', 'final_content': ''}
+    """Send goal to executive_node and wait for goal_result."""
+    response = {'received': False, 'answer': ''}
     response_lock = threading.Lock()
     
-    def plan_result_callback(sample):
+    def goal_result_callback(sample):
         payload = sample.payload.to_bytes().decode('utf-8')
         result = json.loads(payload)
         with response_lock:
             if not response['received']:
                 response['received'] = True
-                response['final_thoughts'] = result.get('final_thoughts', '')
-                response['final_content'] = result.get('final_content', '')
+                # goal_result contains 'response' field (final answer from planner)
+                response['answer'] = result.get('response', '')
     
     subscriber = session.declare_subscriber(
-        f"cognitive/{character}/plan_result",
-        plan_result_callback
+        f"cognitive/{character}/goal_result",
+        goal_result_callback
     )
     
     sense_data = {
@@ -202,8 +202,8 @@ def send_goal_and_wait(
     if not response['received']:
         return {'error': 'timeout', 'answer': ''}
     
-    combined = response['final_thoughts'] + '\n' + response['final_content']
-    return {'reasoning': response['final_thoughts'], 'answer': combined}
+    answer = response.get('answer', '')
+    return {'reasoning': answer, 'answer': answer}
 
 
 def extract_answer(text: str) -> str:

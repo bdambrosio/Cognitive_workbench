@@ -389,6 +389,14 @@ class ZenohExecutiveNode:
         self.plan_result_publisher = self.session.declare_publisher(f"cognitive/{character_name}/plan_result")
         
         # === ZENOH PUBLICATION ===
+        # NAME: goal_result
+        # TOPIC: cognitive/{character}/goal_result
+        # DESCRIPTION: Published when goal planning completes - contains complete result from _plan()
+        # PAYLOAD: Complete result dict from incremental_planner.generate_plan() with plan, response, task_state, success, error_count
+        # ========================
+        self.goal_result_publisher = self.session.declare_publisher(f"cognitive/{character_name}/goal_result")
+        
+        # === ZENOH PUBLICATION ===
         # NAME: bindings_update
         # TOPIC: cognitive/{character}/bindings
         # DESCRIPTION: Published when plan bindings change
@@ -1170,6 +1178,23 @@ class ZenohExecutiveNode:
         except Exception as e:
             logger.error(f'Error publishing current plan: {e}')
 
+    def _publish_goal_result(self, result: Dict[str, Any]):
+        """Publish complete goal result from _plan() for external consumers (e.g., eval scripts)."""
+        try:
+            # Add metadata to the result
+            goal_result = result.copy()
+            goal_result['timestamp'] = datetime.now().isoformat()
+            goal_result['character'] = self.character_name
+            
+            # Add bindings if available
+            if self.infospace_executor:
+                goal_result['bindings'] = self.infospace_executor.plan_bindings_flat
+            
+            self.goal_result_publisher.put(json.dumps(goal_result))
+            logger.info(f'📤 Published goal_result for {self.character_name}')
+        except Exception as e:
+            logger.error(f'Error publishing goal_result: {e}')
+    
     def _publish_plan_result(self):
         """Publish plan result for external consumers (e.g., MMLU eval)."""
         if not self.current_plan:
@@ -1614,7 +1639,7 @@ class ZenohExecutiveNode:
                     # Explicit goal command - process as before
                     goal_preview = clean_input[:80] + ('...' if len(clean_input) > 80 else '')
                     logger.info(f'📥 {self.character_name} Received goal: "{goal_preview}"')
-                    self.parse_and_set_goal("", clean_input)
+                    self.parse_and_set_goal("", clean_input[5:].strip())
                     return  # Don't process as speech
                 else:
                     # Regular user input - ensure character note exists and load it
@@ -2794,6 +2819,8 @@ class ZenohExecutiveNode:
             self._publish_goal(self.current_goal)
             logger.info(f'🧩 {self.character_name} infospace planning for goal: {parsed_goal}')
             result = self._plan(template, self.current_goal)
+            # Publish complete goal result for external consumers (e.g., eval scripts)
+            self._publish_goal_result(result)
             if result.get('success', False):
                 self.current_plan = result.get('plan', {})
                 self._publish_current_plan()

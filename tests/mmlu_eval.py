@@ -96,7 +96,7 @@ def mmlu_query_via_executive(
     session: zenoh.Session,
     character: str,
     prompt: str,
-    timeout: float = 640.0
+    timeout: float = 64.0
 ) -> dict:
     """
     Send MMLU question to executive_node via Zenoh and wait for response.
@@ -110,26 +110,22 @@ def mmlu_query_via_executive(
     Returns:
         {'reasoning': str, 'answer': str} or {'error': str}
     """
-    response = {'received': False, 'final_thoughts': '', 'final_content': '', 'last_action_result': None}
+    response = {'received': False, 'answer': ''}
     response_lock = threading.Lock()
     
-    def plan_result_callback(sample):
+    def goal_result_callback(sample):
         payload = sample.payload.to_bytes().decode('utf-8')
         result = json.loads(payload)
         with response_lock:
             if not response['received']:
                 response['received'] = True
-                response['final_thoughts'] = result.get('final_thoughts', '')
-                response['final_content'] = result.get('final_content', '')
-                response['last_action_result'] = result.get('last_action_result')
-                #print(f"Final thoughts: {response['final_thoughts']}")
-                #print(f"Final content: {response['final_content']}")
-                #print(f"Last action result: {response['last_action_result']}")
+                # goal_result contains 'response' field (final answer from planner)
+                response['answer'] = result.get('response', '')
     
-    # Subscribe to plan_result before sending
+    # Subscribe to goal_result before sending
     subscriber = session.declare_subscriber(
-        f"cognitive/{character}/plan_result",
-        plan_result_callback
+        f"cognitive/{character}/goal_result",
+        goal_result_callback
     )
     
     # Publish to sense_data with goal: prefix (same as FastAPI submit)
@@ -158,19 +154,13 @@ def mmlu_query_via_executive(
         return {'error': 'timeout', 'reasoning': '', 'answer': ''}
     
     # Try to use last_action_result if available and action is 'say' (most reliable)
-    last_action_result = response.get('last_action_result')
-    if last_action_result and isinstance(last_action_result, dict):
-        action_type = last_action_result.get('action')
-        if action_type == 'say' and last_action_result.get('status') == 'success':
-            # Direct access to say output - most reliable
-            say_value = last_action_result.get('value', '')
-            if say_value:
-                return {'reasoning': response['final_thoughts'], 'answer': say_value}
+    answer = response.get('answer')
+    if answer and isinstance(answer, str):
+        return {'answer': answer}
     
     # Fallback: Try to extract answer from both fields - final_thoughts often has "choice B" format
     # Prioritize final_thoughts as it usually contains the answer determination
-    combined = response['final_thoughts'] + '\n' + response['final_content']
-    return {'reasoning': response['final_thoughts'], 'answer': combined}
+    return {'answer': answer}
 
 def build_prompt(
     subject: str,
@@ -190,7 +180,6 @@ def build_prompt(
     # Goal block
     lines = []
     lines.append(f"goal:")
-    lines.append(f"  subject: {subject}")
     lines.append(f"  question: {question.strip()}") 
     #lines.append(f"  do not use display, search-web, or semantic-scholar in your reasoning. Only use generate to find information.")
     lines.append(f"  do not use search-web or semantic-scholar in your reasoning. use generate or think to surface knowledge, or refine to extract information from text.")
@@ -227,9 +216,6 @@ def build_prompt(
     lines.append("output your answer in this format:")
     lines.append("ANSWER: X")
     lines.append("where X is A, B, C, or D.")
-    if use_executive:
-        lines.append("Finally, say the answer to User")
-
 
     return "\n".join(lines)
 
@@ -340,7 +326,6 @@ def evaluate_subject(
 
         # Access outputs to force completion before measuring time
         answer_text = out["answer"]
-        _ = out["reasoning"]  # Force reasoning generation to complete
         dt = time.time() - t0
         pred = extract_choice(answer_text)
 
@@ -348,12 +333,6 @@ def evaluate_subject(
         num_total += 1
         if correct:
             num_correct += 1
-
-        # Send feedback to planner if using executive mode
-        if use_executive:
-            feedback_sent = send_planner_feedback(zenoh_session, character, correct)
-            if not feedback_sent:
-                print(f"[{subject}] idx={idx:4d} WARNING: Failed to send planner feedback")
 
         print(
             f"[{subject}] idx={idx:4d} gold={gold} pred={pred or '?'} "
