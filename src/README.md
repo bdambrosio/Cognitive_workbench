@@ -1,4 +1,11 @@
-# Zenoh Cognitive Framework
+# Zenoh Cognitive Framework (legacy doc)
+
+This file describes an older architecture and may not match the current system.
+
+For the current overview and entry points, use:
+- Top-level `README.md`
+- `src/AGENTS.md`
+- GitHub wiki (linked from the top-level README)
 
 A simplified cognitive framework using Zenoh for communication, replacing ROS2 complexity with clean Python applications that can run on separate cores. For contributor responsibilities and workflows, see the [Repository Guidelines](AGENTS.md).
 
