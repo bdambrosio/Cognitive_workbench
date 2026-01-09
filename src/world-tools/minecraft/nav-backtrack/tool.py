@@ -191,10 +191,6 @@ def tool(input_value=None, **kwargs):
             if result.get("status") != "success":
                 continue
 
-            data = result.get("data", {})
-            if not data.get("success", False):
-                continue
-
             # Verify position
             status2 = executor.execute_action_with_log(
                 {"type": "mc-status"},

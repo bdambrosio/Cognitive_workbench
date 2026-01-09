@@ -1,7 +1,7 @@
 
 # Cognitive Workbench Configuration
 llm_config:
-  sgl_model_path: "Qwen/Qwen3-Coder-30B-A3B-Instruct" #Qwen/Qwen3-VL-2B-Instruct" #Qwen/Qwen3-8B" # Qwen/Qwen3-VL-8B-Instruct" #Qwen/Qwen3-4B-Instruct-2507" #/home/bruce/vllm/models/Qwen3-Coder-30B-A3B-Instruct" 
+  sgl_model_path: "Qwen/Qwen3-Next-80B-A3B-Instruct-FP8" #"Qwen/Qwen3-Coder-30B-A3B-Instruct"  #Qwen/Qwen3-Next-80B-A3B-FP8-Instruct" #/home/bruce/vllm/models/Qwen3-Coder-30B-A3B-Instruct" 
   grobid: "http://localhost:8070/"
 
 # ================================

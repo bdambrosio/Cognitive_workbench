@@ -59,18 +59,10 @@ def tool(input_value=None, **kwargs):
     )
     
     if turn_result.get("status") != "success":
+        failure_reason = turn_result.get("reason", "unknown")
         return executor._create_uniform_return(
             "failed",
-            value="Failed to normalize pose with nav-turn",
-            reason="turn_failed"
-        )
-    
-    turn_data = turn_result.get("data", {})
-    if not turn_data.get("success", False):
-        failure_reason = turn_data.get("failure_reason", "unknown")
-        return executor._create_uniform_return(
-            "failed",
-            value=f"nav-turn failed: {failure_reason}",
+            value=f"Failed to normalize pose with nav-turn: {failure_reason}",
             reason=f"turn_failed_{failure_reason}"
         )
     
