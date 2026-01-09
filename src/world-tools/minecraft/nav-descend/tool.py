@@ -195,7 +195,6 @@ def tool(input_value=None, **kwargs):
         return executor._create_uniform_return(
             "failed",
             value="Failed to obtain initial status",
-            reason="Failed to obtain initial status",
             reason="status_failed"
         )
 
