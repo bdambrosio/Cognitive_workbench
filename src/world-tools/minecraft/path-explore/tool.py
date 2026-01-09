@@ -81,7 +81,7 @@ def tool(input_value=None, **kwargs):
         return executor._create_uniform_return(
             "success",
             value={
-                "outcome": "no_frontier"
+            "outcome": "no_frontier"
             },
         )
 
@@ -150,11 +150,11 @@ def tool(input_value=None, **kwargs):
     return executor._create_uniform_return(
         "success",
         value={
-            "outcome": execution_result,
-            "target": {
-                "x": target["x"],
-                "z": target["z"]
-            }
+        "outcome": execution_result,
+        "target": {
+            "x": target["x"],
+            "z": target["z"]
+        }
         },
     )
 
