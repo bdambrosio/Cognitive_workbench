@@ -4,7 +4,7 @@ import math
 import threading
 import itertools
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
-from typing import Dict, Any, Tuple, List, Optional
+from typing import Dict, Any, Tuple, List, Optional, Set
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 import minescript as m  # pyright: ignore[reportMissingImports]
@@ -15,7 +15,7 @@ import minescript as m  # pyright: ignore[reportMissingImports]
 
 HOST = "127.0.0.1"
 PORT = 3003
-MAX_RADIUS = 12
+MAX_RADIUS = 10
 
 # ------------------------------------------------------------------------------
 # Math & Coordinate Helpers
@@ -284,42 +284,38 @@ def is_position_visible(eye_x: float, eye_y: float, eye_z: float, target_x: int,
 
 def scan_blocks(radius: int) -> List[Dict[str, Any]]:
     """
-    Candidate scan (cheap), then filter:
-    - Only blocks within a view cone (yaw ±60°, pitch: up 60° / down 90° relative to pitch=0)
-    - Only visible blocks (line-of-sight, via raycast)
+    Navigation-first scan (Option B): enumerate candidate (x,z) cells in a forward cone,
+    probe for *support* (walkable surface) via a small downward search, and synthesize a
+    lightweight block list from those samples.
+    
+    This is intentionally NOT "visual rendering visibility". It is tuned for navigation:
+    thin layers/cover that do not change support_y should not prevent us from learning
+    standable surfaces.
     """
     radius = max(1, min(MAX_RADIUS, radius))
     px, py, pz = get_player_pos()
-    eye_y = py + 1.6  # Eye position
+    eye_y = py + 1.6  # Eye position (used only for legacy angle calculations)
     cx, cy, cz = map(int, (px, py, pz))
-    blocks = []
 
     yaw_deg, _ = get_player_rot()
     yaw_rad = math.radians(yaw_deg)
     fwd_dx = -math.sin(yaw_rad)
     fwd_dz = math.cos(yaw_rad)
 
-    def in_view_cone(bx: int, by: int, bz: int) -> bool:
-        dx = (bx + 0.5) - px
-        dy = (by + 0.5) - eye_y
-        dz = (bz + 0.5) - pz
-
-        dist_h = math.sqrt(dx * dx + dz * dz)
-        if dist_h > 0.001:
-            vx_h = dx / dist_h
-            vz_h = dz / dist_h
-            if (vx_h * fwd_dx + vz_h * fwd_dz) < 0.5:  # cos(60°)
-                return False
-
-        pitch_deg = math.degrees(math.atan2(-dy, dist_h))
-        return (-60.0 <= pitch_deg <= 90.0)
-
-    max_blocks = 200
-    visited = set()
+    # Cache for m.getblock calls for this scan
     block_cache: Dict[Tuple[int, int, int], Optional[str]] = {}
 
-    transparent_blocks = {'air', 'glass', 'water', 'ice', 'leaves', 'slab', 'stairs',
-                          'fence', 'fence_gate', 'wall', 'ladder', 'vine', 'cobweb'}
+    # Non-supporting blocks: occupy space but do not provide vertical support
+    NON_SUPPORTING_PREFIXES = (
+        'minecraft:snow',  # snow layers (any layers=N)
+        'minecraft:carpet',
+        'minecraft:pressure_plate',
+        'minecraft:farmland',
+        'minecraft:rail',
+        'minecraft:trapdoor',
+        'minecraft:short_grass',
+        'minecraft:tall_grass',
+    )
 
     def get_block_name(bx: int, by: int, bz: int) -> Optional[str]:
         """Return block name at coords, or None if air/unknown. Cached to reduce getblock calls."""
@@ -349,96 +345,126 @@ def scan_blocks(radius: int) -> List[Dict[str, Any]]:
             block_cache[key] = None
             return None
 
-        block_name_lower = block_name.lower()
-        if block_name_lower in ('air', 'minecraft:air', '') or 'air' in block_name_lower:
+        lower = block_name.lower()
+        if lower in ('air', 'minecraft:air', '') or 'air' in lower:
             block_cache[key] = None
             return None
 
         block_cache[key] = block_name
         return block_name
 
-    def is_position_visible_cached(target_x: int, target_y: int, target_z: int) -> bool:
-        """Line-of-sight check using cached block reads."""
-        dx = target_x + 0.5 - px  # Block center
-        dy = target_y + 0.5 - eye_y
-        dz = target_z + 0.5 - pz
-        dist = math.sqrt(dx*dx + dy*dy + dz*dz)
-        if dist < 0.1:
+    def in_view_cone_2d(bx: int, bz: int) -> bool:
+        """Horizontal cone only (yaw ±60°)."""
+        dx = (bx + 0.5) - px
+        dz = (bz + 0.5) - pz
+        dist_h = math.sqrt(dx * dx + dz * dz)
+        if dist_h <= 0.001:
             return True
+        vx_h = dx / dist_h
+        vz_h = dz / dist_h
+        return (vx_h * fwd_dx + vz_h * fwd_dz) >= 0.5  # cos(60°)
 
-        dx /= dist
-        dy /= dist
-        dz /= dist
+    def is_non_supporting(block_name: str) -> bool:
+        bl = block_name.lower()
+        return any(bl.startswith(p) for p in NON_SUPPORTING_PREFIXES)
 
-        step = 0.5
-        steps = int(dist / step)
-
-        for i in range(1, steps):
-            check_dist = i * step
-            cx_i = int(px + dx * check_dist)
-            cy_i = int(eye_y + dy * check_dist)
-            cz_i = int(pz + dz * check_dist)
-
-            if cx_i == target_x and cy_i == target_y and cz_i == target_z:
-                return True
-
-            bname = get_block_name(cx_i, cy_i, cz_i)
-            if not bname:
-                continue
-
-            b_lower = bname.lower()
-            is_transparent = False
-            for t in transparent_blocks:
-                if t in b_lower:
-                    is_transparent = True
-                    break
-            if not is_transparent:
-                return False
-
+    def is_walkable_support(block_name: str) -> bool:
+        bl = block_name.lower()
+        # KISS: treat obvious fluids/hazards as non-walkable
+        if 'water' in bl or 'lava' in bl:
+            return False
         return True
 
-    for shell_dist in range(1, radius + 1):
-        if len(blocks) >= max_blocks:
-            break
+    # --- nav_surface scan (cached/capped) ---
+    nav_surface: List[Dict[str, Any]] = []
+    max_nav_cells = 120  # cap work; radius=7 diamond is 113 total cells pre-cone
+    max_up = 2
+    max_down = 6
 
+    visited_xz: Set[Tuple[int, int]] = set()
+    for shell_dist in range(0, radius + 1):
+        if len(nav_surface) >= max_nav_cells:
+            break
         shell_positions = []
         for dx in range(-shell_dist, shell_dist + 1):
-            for dy in range(-shell_dist, shell_dist + 1):
-                for dz in range(-shell_dist, shell_dist + 1):
-                    if abs(dx) + abs(dy) + abs(dz) == shell_dist:
-                        shell_positions.append((dx, dy, dz))
+            for dz in range(-shell_dist, shell_dist + 1):
+                if abs(dx) + abs(dz) == shell_dist:
+                    shell_positions.append((dx, dz))
+        for dx, dz in shell_positions:
+            if len(nav_surface) >= max_nav_cells:
+                break
+            bx, bz = cx + dx, cz + dz
+            if (bx, bz) in visited_xz:
+                continue
+            visited_xz.add((bx, bz))
 
-        shell_positions.sort(key=lambda p: (abs(p[1]), p[1]))
+            if not in_view_cone_2d(bx, bz):
+                continue
 
-        for dx, dy, dz in shell_positions:
-            if len(blocks) >= max_blocks:
+            support_y = None
+            support_block = None
+
+            # Probe down for supporting block near the agent's current Y.
+            for by in range(cy + max_up, cy - max_down - 1, -1):
+                bname = get_block_name(bx, by, bz)
+                if not bname:
+                    continue
+                if is_non_supporting(bname):
+                    continue
+                support_y = by
+                support_block = bname
                 break
 
-            bx, by, bz = cx + dx, cy + dy, cz + dz
-            if (bx, by, bz) in visited:
-                continue
-            visited.add((bx, by, bz))
-
-            if not in_view_cone(bx, by, bz):
+            if support_y is None or support_block is None:
                 continue
 
-            block_name = get_block_name(bx, by, bz)
-            if not block_name:
-                continue
+            surface_y = support_y + 1
+            cover_block = get_block_name(bx, surface_y, bz)  # may be snow/grass/None
 
-            if not is_position_visible_cached(bx, by, bz):
-                continue
-
-            blocks.append({
-                "name": block_name,
-                "position": {"x": bx, "y": by, "z": bz},
+            nav_surface.append({
+                "x": bx,
+                "z": bz,
                 "dx": dx,
-                "dy": dy,
                 "dz": dz,
+                "support_y": support_y,
+                "support_block": support_block,
+                "walkable": bool(is_walkable_support(support_block)),
+                "cover_block": cover_block,
             })
 
-    # Tri-state surface tagging: True/False/"unknown", derived from already-retrieved blocks.
-    # Surface=True if block above is known-air, False if known-non-air, unknown otherwise.
+    # --- synthesize blocks list from nav_surface ---
+    blocks: List[Dict[str, Any]] = []
+    max_blocks = 200
+
+    def append_block(name: Optional[str], bx: int, by: int, bz: int, dx: int, dy: int, dz: int):
+        if not name:
+            return
+        if len(blocks) >= max_blocks:
+            return
+        blocks.append({
+            "name": name,
+            "position": {"x": bx, "y": by, "z": bz},
+            "dx": dx,
+            "dy": dy,
+            "dz": dz,
+        })
+
+    for ns in nav_surface:
+        if len(blocks) >= max_blocks:
+            break
+        bx = int(ns["x"])
+        bz = int(ns["z"])
+        dx = int(ns.get("dx", bx - cx))
+        dz = int(ns.get("dz", bz - cz))
+        support_y = int(ns["support_y"])
+        surface_y = support_y + 1
+
+        # cover block at surface level (e.g., snow layer / tall grass)
+        append_block(ns.get("cover_block"), bx, surface_y, bz, dx, surface_y - cy, dz)
+        # supporting block (useful for nav/map update)
+        append_block(ns.get("support_block"), bx, support_y, bz, dx, support_y - cy, dz)
+
+    # Tri-state surface tagging: True/False/"unknown", derived from cached block reads.
     for b in blocks:
         pos = b.get("position") or {}
         bx = int(pos.get("x", 0))
@@ -449,6 +475,10 @@ def scan_blocks(radius: int) -> List[Dict[str, Any]]:
             b["surface"] = block_cache[above_key] is None
         else:
             b["surface"] = "unknown"
+
+    # Attach nav_surface for /observe payload via a side-channel attribute on the function
+    # (keeps signature stable for callers).
+    scan_blocks._last_nav_surface = nav_surface  # type: ignore[attr-defined]
 
     return blocks
 
@@ -1291,6 +1321,9 @@ class BridgeHandler(BaseHTTPRequestHandler):
             blocks_elapsed = (time.time() - blocks_start) * 1000
             print(f"[Bridge] /observe: scan_blocks took {blocks_elapsed:.1f}ms, found {len(nearby_blocks)} blocks", flush=True)
 
+            # Navigation surface samples (Option B): support_y / support_block per (x,z) cell
+            nav_surface = getattr(scan_blocks, "_last_nav_surface", [])  # type: ignore[attr-defined]
+
             # Adjacent blocks around the player (for directional reasoning).
             # This is intentionally independent of the cone-filtered nearby_blocks list.
             def _get_block_name_at(bx: int, by: int, bz: int) -> Optional[str]:
@@ -1360,6 +1393,7 @@ class BridgeHandler(BaseHTTPRequestHandler):
                     "nearby_entities": nearby_entities,
                     "visibility_distances": visibility_distances,
                     "adjacent_blocks": adjacent_blocks,
+                    "nav_surface": nav_surface,
                     "blocks_complete": True,
                     "blocks_elapsed_ms": int(blocks_elapsed),
                     "entities_complete": True,

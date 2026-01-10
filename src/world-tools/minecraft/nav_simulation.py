@@ -106,79 +106,121 @@ def simulate_nav_step(
     dx, dz = yaw_to_forward_delta(yaw)
     tx, tz = x + dx, z + dz
 
-    # ---- Query forward cell at same Y ----
+    # ---- Movement semantics ----
+    # Treat state["y"] as the agent's feet Y (surface level). For climb/descend, we validate the
+    # destination standing space at y±1 and the supporting block below it.
 
-    fwd_cell = query_cell(tx, y, tz)
-    if fwd_cell is None:
-        if allow_unknown:
-            return {
-                "ok": True,
-                "new_state": {"x": tx, "y": y, "z": tz, "yaw": yaw},
-                "support": "unknown",
-            }
-        return {"ok": False, "reason": "unknown_forward_cell", "new_state": None, "support": None}
-
-    # Validate expected fields
-    for field in REQUIRED_CELL_FIELDS:
-        if field not in fwd_cell:
-            return {"ok": False, "reason": f"cell_missing_field:{field}", "new_state": None, "support": None}
-
-    # ---- Collision checks ----
-
-    if not fwd_cell["clear_body"] or not fwd_cell["clear_head"]:
-        return {"ok": False, "reason": "collision", "new_state": None, "support": None}
-
-    # ---- Vertical semantics ----
-
-    target_y = y
+    def _validate_cell_fields(cell: Dict) -> Optional[str]:
+        for field in REQUIRED_CELL_FIELDS:
+            if field not in cell:
+                return f"cell_missing_field:{field}"
+        return None
 
     if action == "nav-climb":
-        up_cell = query_cell(tx, y + 1, tz)
-        if up_cell is None:
+        # Destination feet at y+1
+        stand_cell = query_cell(tx, y + 1, tz)
+        if stand_cell is None:
+            if allow_unknown:
+                return {"ok": True, "new_state": {"x": tx, "y": y + 1, "z": tz, "yaw": yaw}, "support": "unknown"}
             return {"ok": False, "reason": "unknown_climb_cell", "new_state": None, "support": None}
-        if not up_cell.get("clear_body", False):
-            return {"ok": False, "reason": "blocked_climb", "new_state": None, "support": None}
-        target_y = y + 1
+        missing = _validate_cell_fields(stand_cell)
+        if missing:
+            return {"ok": False, "reason": missing, "new_state": None, "support": None}
+        if not stand_cell.get("clear_body", False) or not stand_cell.get("clear_head", False):
+            return {"ok": False, "reason": "collision", "new_state": None, "support": None}
 
-    elif action == "nav-descend":
-        down_cell = query_cell(tx, y - 1, tz)
-        if down_cell is None:
-            return {"ok": False, "reason": "unknown_descent_cell", "new_state": None, "support": None}
-
-        support = down_cell.get("support", "unknown")
+        # Require support under the destination feet (at y)
+        support_cell = query_cell(tx, y, tz)
+        if support_cell is None:
+            if allow_unknown:
+                return {"ok": True, "new_state": {"x": tx, "y": y + 1, "z": tz, "yaw": yaw}, "support": "unknown"}
+            return {"ok": False, "reason": "unknown_climb_support", "new_state": None, "support": None}
+        missing = _validate_cell_fields(support_cell)
+        if missing:
+            return {"ok": False, "reason": missing, "new_state": None, "support": None}
+        support = support_cell.get("support", "unknown")
         if support not in ("solid", "unsafe"):
-            return {"ok": False, "reason": "support_ambiguous", "new_state": None, "support": support}
+            if allow_unknown and support == "unknown":
+                support = "unsafe"
+            else:
+                return {"ok": False, "reason": "support_ambiguous", "new_state": None, "support": support}
 
+        return {
+            "ok": True,
+            "new_state": {"x": tx, "y": y + 1, "z": tz, "yaw": yaw},
+            "support": stand_cell.get("support", "unknown"),
+        }
+
+    if action == "nav-descend":
+        # Destination feet at y-1
+        stand_cell = query_cell(tx, y - 1, tz)
+        if stand_cell is None:
+            if allow_unknown:
+                return {"ok": True, "new_state": {"x": tx, "y": y - 1, "z": tz, "yaw": yaw}, "support": "unknown"}
+            return {"ok": False, "reason": "unknown_descent_cell", "new_state": None, "support": None}
+        missing = _validate_cell_fields(stand_cell)
+        if missing:
+            return {"ok": False, "reason": missing, "new_state": None, "support": None}
+        if not stand_cell.get("clear_body", False) or not stand_cell.get("clear_head", False):
+            return {"ok": False, "reason": "collision", "new_state": None, "support": None}
+
+        # Validate drop magnitude (one block step by default)
         delta_y = -1.0
         if abs(delta_y) > max_drop or abs(delta_y) < min_drop:
-            return {"ok": False, "reason": "invalid_descent_delta", "new_state": None, "support": support}
+            return {"ok": False, "reason": "invalid_descent_delta", "new_state": None, "support": None}
 
-        target_y = y - 1
-
-    else:  # nav-move (flat)
-        down_cell = query_cell(tx, y - 1, tz)
-        if down_cell is None:
+        # Require support under destination feet (at y-2)
+        support_cell = query_cell(tx, y - 2, tz)
+        if support_cell is None:
             if allow_unknown:
-                return {
-                    "ok": True,
-                    "new_state": {"x": tx, "y": y, "z": tz, "yaw": yaw},
-                    "support": "unknown",
-                }
+                return {"ok": True, "new_state": {"x": tx, "y": y - 1, "z": tz, "yaw": yaw}, "support": "unknown"}
             return {"ok": False, "reason": "unknown_support", "new_state": None, "support": None}
-
-        support = down_cell.get("support", "unknown")
+        missing = _validate_cell_fields(support_cell)
+        if missing:
+            return {"ok": False, "reason": missing, "new_state": None, "support": None}
+        support = support_cell.get("support", "unknown")
         if support not in ("solid", "unsafe"):
-            return {"ok": False, "reason": "support_ambiguous", "new_state": None, "support": support}
+            if allow_unknown and support == "unknown":
+                support = "unsafe"
+            else:
+                return {"ok": False, "reason": "support_ambiguous", "new_state": None, "support": support}
 
-    # ---- Success ----
+        return {
+            "ok": True,
+            "new_state": {"x": tx, "y": y - 1, "z": tz, "yaw": yaw},
+            "support": stand_cell.get("support", "unknown"),
+        }
+
+    # nav-move (flat): destination feet at same y
+    stand_cell = query_cell(tx, y, tz)
+    if stand_cell is None:
+        if allow_unknown:
+            return {"ok": True, "new_state": {"x": tx, "y": y, "z": tz, "yaw": yaw}, "support": "unknown"}
+        return {"ok": False, "reason": "unknown_forward_cell", "new_state": None, "support": None}
+    missing = _validate_cell_fields(stand_cell)
+    if missing:
+        return {"ok": False, "reason": missing, "new_state": None, "support": None}
+    if not stand_cell.get("clear_body", False) or not stand_cell.get("clear_head", False):
+        return {"ok": False, "reason": "collision", "new_state": None, "support": None}
+
+    # Require support under feet (at y-1)
+    support_cell = query_cell(tx, y - 1, tz)
+    if support_cell is None:
+        if allow_unknown:
+            return {"ok": True, "new_state": {"x": tx, "y": y, "z": tz, "yaw": yaw}, "support": "unknown"}
+        return {"ok": False, "reason": "unknown_support", "new_state": None, "support": None}
+    missing = _validate_cell_fields(support_cell)
+    if missing:
+        return {"ok": False, "reason": missing, "new_state": None, "support": None}
+    support = support_cell.get("support", "unknown")
+    if support not in ("solid", "unsafe"):
+        if allow_unknown and support == "unknown":
+            support = "unsafe"
+        else:
+            return {"ok": False, "reason": "support_ambiguous", "new_state": None, "support": support}
 
     return {
         "ok": True,
-        "new_state": {
-            "x": tx,
-            "y": target_y,
-            "z": tz,
-            "yaw": yaw,
-        },
-        "support": fwd_cell.get("support", "unknown"),
+        "new_state": {"x": tx, "y": y, "z": tz, "yaw": yaw},
+        "support": stand_cell.get("support", "unknown"),
     }

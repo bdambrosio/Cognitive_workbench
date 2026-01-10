@@ -27,15 +27,16 @@ Returns uniform_return format with:
   - `clear`: `{fwd: {body: bool, head: bool}, up: {body: bool, head: bool}}`
   - `blocks`: `{seen: [string], fluid: [string], hazard: [string], nearby: [dict]}` (nearby is exhaustive raw list)
     - Each entry in `blocks.nearby` includes: `name`, `position`, `dx`, `dy`, `dz`, `surface` (true|false|\"unknown\")
+  - `nav_surface`: Navigation-first surface samples for nearby cells: list of `{x, z, support_y, support_block, walkable, cover_block, dx, dz}`
   - `geom`: `{pit: bool, stair: bool, slope: bool}`
   - `aff`: `{step: bool, jump: bool, descend: bool, sky: bool}`
   - `conf`: `"high"` | `"med"` | `"low"`
   - `note`: string (human-readable summary)
 
 ## Behavior & Performance
-- Returns visible non-air blocks within cone/LOS (capped list)
+- Navigation-first: uses a capped forward-cone cell scan with short vertical probes to infer `support_y`/walkable; synthesized `blocks.nearby` is lightweight
 - View cone: Only reports blocks within a 120° horizontal cone (yaw ±60°) and vertical range up 60° / down 90° (relative to pitch 0)
-- Line-of-sight: Only blocks visible from bot eye position (occlusion-aware)
+- Line-of-sight: Not a rendering-accurate visibility model; tuned for navigation surfaces (non-supporting cover should not hide support)
 - Radius limits: Default 7 blocks, maximum 7 blocks
 - Confidence levels: `high` (complete, fast), `med` (complete but slow/many blocks), `low` (incomplete observation)
 

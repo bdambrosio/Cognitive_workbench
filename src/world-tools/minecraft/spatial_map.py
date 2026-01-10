@@ -446,6 +446,7 @@ class SpatialMap:
         geom = observation.get('geom', {})
         conf = observation.get('conf', 'med')
         dirs = observation.get('dirs', {})
+        nav_surface = observation.get('nav_surface', [])
         
         # ---------------------------------------------------------------------
         # 1. Update observer's cell (Current Location)
@@ -539,6 +540,48 @@ class SpatialMap:
         
         self.cells[key] = cell
         cells_updated += 1
+
+        # ---------------------------------------------------------------------
+        # 1b. Update nearby cells from nav_surface (Option B, navigation-first)
+        # ---------------------------------------------------------------------
+        # nav_surface entries: {x,z,support_y,support_block,walkable,cover_block,...}
+        if isinstance(nav_surface, list):
+            for ns in nav_surface:
+                if not isinstance(ns, dict):
+                    continue
+                nx = ns.get('x')
+                nz = ns.get('z')
+                support_y = ns.get('support_y')
+                support_block = ns.get('support_block')
+                walkable = ns.get('walkable')
+                if nx is None or nz is None:
+                    continue
+                nx_int, nz_int = int(nx), int(nz)
+                n_key = self._cell_key(nx_int, nz_int)
+                n_cell = self.cells.get(n_key) or empty_cell(nx_int, nz_int)
+
+                # Only update if present (preserve known info if missing)
+                if support_y is not None:
+                    n_cell['support']['support_y'] = int(round(float(support_y)))
+                if isinstance(walkable, bool):
+                    n_cell['support']['walkable'] = walkable
+                    n_cell['support']['movement_class'] = 'flat' if walkable else 'unknown'
+                if support_block:
+                    n_cell['surface']['support_block'] = support_block
+                    n_cell['surface']['surface_block_class'] = classify_block(support_block)
+                    n_cell['surface']['is_fluid'] = is_fluid(support_block)
+                    n_cell['surface']['is_partial_block'] = is_partial_block(support_block)
+
+                # Observability (do not overwrite better modes)
+                if n_cell['observability'].get('observation_mode') in (None, 'unknown'):
+                    n_cell['observability']['observation_mode'] = 'scanned'
+                n_cell['observability']['observed_from'] = {'x': obs_x, 'y': obs_y, 'z': obs_z}
+                n_cell['observability']['last_observed_at'] = now
+                n_cell['provenance']['updated_by'] = self.agent_name
+                n_cell['provenance']['update_reason'] = 'nav_surface'
+
+                self.cells[n_key] = n_cell
+                cells_updated += 1
 
         # ---------------------------------------------------------------------
         # 2. Update immediate neighbors from 'dirs' (Obstructions)

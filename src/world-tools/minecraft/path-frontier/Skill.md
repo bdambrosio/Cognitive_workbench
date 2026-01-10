@@ -1,7 +1,7 @@
 ---
 name: path-frontier
 type: python
-description: "Enumerate locally reachable positions within a bounded number of nav actions. Reasoning tool using conservative BFS simulation."
+description: "Enumerate possible nearby frontier positions within a bounded number of nav actions (over-approx; simulation only)."
 ---
 
 # path-frontier
@@ -11,7 +11,7 @@ Reasoning tool that enumerates reachable nearby positions using conservative bou
 ## Input
 
 - `max_actions`: Integer maximum number of nav actions to explore (default: `4`)
-- `allow_unknown`: Boolean, if True allows unknown cells in simulation (default: `False`)
+- `allow_unknown`: Boolean, if True over-approximates unknown cells as possibly traversable (default: `True`)
 
 ## Output
 
@@ -36,7 +36,7 @@ Failure (`status: "failed"`):
 - Explores `nav-move`, `nav-descend`, `nav-climb`, and `nav-turn` (left/right only)
 - Uses spatial map from `world_state("spatial_map")` for cell queries
 - Excludes starting position from results
-- Conservative: unknown cells treated as failure unless `allow_unknown=True`
+- Over-approximate by default: unknown cells are treated as possibly traversable unless `allow_unknown=False`
 - `nav-turn` changes facing direction without moving position (counts as one action)
 
 ## Planning Notes
