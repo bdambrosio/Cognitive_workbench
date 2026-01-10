@@ -51,10 +51,12 @@ From `src/`, run the launcher with UI enabled.
 
 ```bash
 cd src
-python3 launcher.py <your-characters-yaml> --ui --resource-browser
+python3 launcher.py <character_name>-<world>.yaml> --ui --resource-browser
 ```
 
 Open the UI at `http://localhost:3000`.
+
+**Note - the .yaml file defines the llm to be loaded into SGLang. you will probably want to edit that!**
 
 ## How tools work (important)
 
