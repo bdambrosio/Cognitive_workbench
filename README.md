@@ -104,6 +104,30 @@ Highlights:
 - Mapping uses a **SpatialMap** compiled representation (`mc-map-update`, `mc-map-query`, `mc-map-visualize`).
   - Legacy map-Collection queries are deprecated; SpatialMap is the source of truth.
 
+### Recent Updates (2026-01)
+
+**Navigation-First Observation**:
+- `mc-observe-blocks` now uses **navigation surface scanning** (`nav_surface`) instead of visual occlusion-based scanning.
+- Scans 2D (x,z) cells within a forward cone (yaw ±60°, pitch -60° to +90°) and probes downward to find supporting blocks.
+- Non-supporting cover blocks (snow layers, grass) don't occlude navigation surface detection.
+- Default radius: **7 blocks** (max 7).
+
+**Spatial Map Improvements**:
+- **Query-time attributes**: "blocked", "step_up", "step_down" are computed dynamically relative to current position (not stored statically).
+- Removed agent-relative data (`delta_y_from_agent`) from map storage.
+- Support detection uses `adjacent_blocks['down']` for reliable ground detection.
+- Map cells store absolute `support_y`; surface = `support_y + 1`.
+
+**Path Planning**:
+- `path-frontier` now **over-approximates** frontier candidates (default `allow_unknown=True`).
+- Handles climb/descend actions (y±1) correctly in simulation.
+- Returns frontier positions even with partial map coverage.
+
+**Observation Tools**:
+- `mc-observe-blocks`, `mc-observe-entities`, `mc-observe-items` all use **cone-based visibility** (120° horizontal, pitch -60° to +90°).
+- Default radius: **7 blocks** (max 7).
+- Entities/items include `dx`, `dy`, `dz` offsets and `distance` from agent position.
+
 ## Repository structure (high level)
 
 ```
