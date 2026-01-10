@@ -69,7 +69,7 @@ def tool(input_value=None, **kwargs):
     Args:
         input_value: Observation data from mc-observe-blocks (Note ID or dict)
         observation: Alternative parameter name for observation data
-        radius: Optional radius for mc-observe-blocks (default: 4, only used when observation is not provided)
+        radius: Optional radius for mc-observe-blocks (default: 7, only used when observation is not provided)
         blocks_radius: Alternative parameter name for radius
         x, y, z: Optional coordinates (extracted from observation if not provided)
         

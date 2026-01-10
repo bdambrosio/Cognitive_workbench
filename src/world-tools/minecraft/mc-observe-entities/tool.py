@@ -1,6 +1,6 @@
 """
 Minecraft observe-entities tool.
-Exhaustive enumeration of ALL entities within radius R.
+Enumerates visible entities within radius R, within the forward view cone and line-of-sight.
 Reports all entity types: mobs, players, items, etc.
 """
 
@@ -77,11 +77,9 @@ def tool(input_value=None, **kwargs):
     minecraft_url = kwargs.get("world_url") or kwargs.get("minecraft_url") or DEFAULT_MINECRAFT_URL
     
     try:
-        params = {}
-        if kwargs.get("entities_radius") is not None:
-            params["entities_radius"] = kwargs.get("entities_radius")
-        if kwargs.get("radius") is not None:
-            params["entities_radius"] = kwargs.get("radius")
+        radius = kwargs.get("entities_radius") or kwargs.get("radius") or 7
+        radius = max(1, min(7, int(radius)))
+        params = {"entities_radius": radius}
         
         # Explicitly request all entities (empty string triggers scanning, scan_entities only filters for "items")
         params["entity_filter"] = ""
@@ -109,7 +107,7 @@ def tool(input_value=None, **kwargs):
         nearby_entities = perception.get('nearby_entities', [])
         entities_complete = perception.get('entities_complete', True)
         entities_elapsed_ms = perception.get('entities_elapsed_ms', 0)
-        radius = kwargs.get("entities_radius") or kwargs.get("radius") or 5
+        radius = kwargs.get("entities_radius") or kwargs.get("radius") or 7
         
         # Build structured summary
         summary_parts = []

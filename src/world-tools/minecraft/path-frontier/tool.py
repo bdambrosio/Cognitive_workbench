@@ -30,7 +30,7 @@ from nav_simulation import simulate_nav_step
 logger = logging.getLogger(__name__)
 
 
-def _round_to_cardinal(yaw_deg: float) -> float:
+def _round_to_cardinal(yaw_deg: float) -> int:
     """
     Round yaw to nearest cardinal direction (0, 90, 180, 270).
     
@@ -50,7 +50,7 @@ def _round_to_cardinal(yaw_deg: float) -> float:
         abs(normalized - c - 360)
     ))
     
-    return nearest
+    return int(nearest)
 
 
 # Action set for initial frontier exploration.
@@ -91,49 +91,36 @@ def tool(input_value=None, **kwargs):
 
     status = executor.execute_action_with_log({"type": "mc-status"}, "path-frontier")
     if status.get("status") != "success":
-        return executor._create_uniform_return(
-            "failed",
-            value="Failed to obtain current status",
-            reason="status_failed",
-        )
+        return executor._create_uniform_return("failed", value="Failed to obtain current status", reason="status_failed")
 
     pos = status["data"]["position"]
     yaw = status["data"].get("yaw", 0.0)
 
-    start_state = {
-        "x": int(round(pos["x"])),
-        "y": int(round(pos["y"])),
-        "z": int(round(pos["z"])),
-        "yaw": yaw,
-    }
+    start_state = {"x": int(round(pos["x"])), "y": int(round(pos["y"])), "z": int(round(pos["z"])), "yaw": yaw}
 
     # ---- Spatial map adapter ----
     # We keep this local and explicit to avoid hidden dependencies.
+    # Converts 2D spatial map cells to 3D query format for nav_simulation.
+    # Uses uniform surface definition: surface Y = support_y + 1 (where agent stands)
 
     spatial_map = executor.get_world_state("spatial_map")
 
-    def query_cell(x: int, y: int, z: int):
-        """
-        Adapter over the persistent spatial map.
-
-        Expected to return a dict with:
-          clear_body: bool
-          clear_head: bool
-          support: str
-        or None if unknown.
-        """
-        if not spatial_map:
-            return None
-        return spatial_map.get((x, y, z))
-
     # ---- BFS over bounded nav actions ----
 
-    visited: Set[Tuple[int, int, int]] = set()
-    reachable_paths: Dict[Tuple[int, int], List[str]] = {}  # Maps (x, z) -> path sequence
+    # FIX: Visited set must include YAW.
+    # If we ignore yaw, a 'turn' action (which changes yaw but not x,y,z) is immediately pruned
+    # because the agent is "already at" that x,y,z.
+    # State tuple: (x, y, z, cardinal_yaw)
+    visited: Set[Tuple[int, int, int, int]] = set()
+    
+    # Store shortest path to distinct X,Z coordinates (regardless of final orientation)
+    reachable_paths: Dict[Tuple[int, int], List[str]] = {}
 
     queue = deque()
+    
+    start_yaw_cardinal = _round_to_cardinal(start_state["yaw"])
     queue.append((start_state, 0, []))  # (state, depth, path)
-    visited.add((start_state["x"], start_state["y"], start_state["z"]))
+    visited.add((start_state["x"], start_state["y"], start_state["z"], start_yaw_cardinal))
 
     while queue:
         state, depth, path = queue.popleft()
@@ -145,6 +132,100 @@ def tool(input_value=None, **kwargs):
 
         if depth >= max_actions:
             continue
+
+        # Create query_cell adapter with current state for query-time blocking computation
+        def query_cell(x: int, y: int, z: int):
+            """
+            Adapter over the persistent spatial map.
+            Converts 2D cell data to 3D query format expected by nav_simulation.
+            Computes "blocked" at query time relative to current state position.
+            
+            Uniform surface definition:
+            - Surface Y = support_y + 1 (top face of support block where agent stands)
+            - Support block Y = support_y (the solid block providing support)
+            
+            Returns dict with: clear_body: bool, clear_head: bool, support: SupportType
+            or None if cell is unknown.
+            """
+            if not spatial_map:
+                return None
+            
+            # Get 2D cell from spatial map
+            cell = spatial_map.get_cell(x, z)
+            if not cell:
+                return None
+            
+            # Extract support information
+            support_data = cell.get('support', {})
+            support_y = support_data.get('support_y')
+            walkable = support_data.get('walkable', False)
+            
+            # If we don't know the support Y, we can't determine 3D position
+            if support_y is None:
+                return None
+            
+            # Uniform surface definition: surface = support_y + 1
+            surface_y = support_y + 1
+            
+            # Compute if this cell is blocked from current state position (query-time)
+            is_blocked = spatial_map.is_blocked_from(
+                state['x'], state['z'], state['y'],
+                x, z, y
+            )
+            
+            # Determine support type based on queried Y and cell data
+            support_type = "unknown"
+            
+            if y == surface_y:
+                # Querying at surface level (where agent stands)
+                if walkable and not is_blocked:
+                    support_type = "solid"
+                elif is_blocked:
+                    support_type = "air"  # Blocked = can't stand here
+                else:
+                    support_type = "unsafe"
+            elif y == support_y:
+                # Querying at support block level
+                if walkable:
+                    support_type = "solid"
+                else:
+                    support_type = "unsafe"
+            elif y < support_y:
+                # Querying below support block - assume solid (underground)
+                support_type = "solid"
+            else:
+                # Querying above surface - assume air unless we know otherwise
+                # For clearance checks, we'll be conservative
+                support_type = "air"
+            
+            # Infer clearance (clear_body at Y+1, clear_head at Y+2)
+            # We don't store clearance in cells, so we infer conservatively:
+            # - If queried Y is surface_y, assume clearance above (agent can stand here)
+            # - If queried Y is above surface_y, assume no clearance (blocks exist)
+            # - If queried Y is below surface_y, assume no clearance (underground)
+            
+            clear_body = False
+            clear_head = False
+            
+            if y == surface_y:
+                # At surface level - assume clearance if walkable and not blocked
+                if walkable and not is_blocked:
+                    clear_body = True
+                    clear_head = True  # Conservative: assume head clearance if body clear
+            elif y > surface_y:
+                # Above surface - check if this is clearance space
+                # If we're querying for clearance (Y = surface_y + 1 or +2), assume clear
+                # Otherwise, assume blocked
+                if y == surface_y + 1:
+                    clear_body = True
+                if y == surface_y + 2:
+                    clear_head = True
+            
+            return {
+                "clear_body": clear_body,
+                "clear_head": clear_head,
+                "support": support_type
+            }
 
         for action in DEFAULT_ACTIONS:
             # Handle nav-turn actions (orientation change only, no position change)
@@ -176,8 +257,8 @@ def tool(input_value=None, **kwargs):
                     "yaw": cardinal_yaw,
                 }
                 
-                # Check if this position has been visited (yaw not included in visited check)
-                key = (new_state["x"], new_state["y"], new_state["z"])
+                # Check if this configuration (pos + yaw) has been visited
+                key = (new_state["x"], new_state["y"], new_state["z"], cardinal_yaw)
                 if key in visited:
                     continue
                 
@@ -199,8 +280,11 @@ def tool(input_value=None, **kwargs):
             new_state = result.get("new_state")
             if not new_state:
                 continue
-
-            key = (new_state["x"], new_state["y"], new_state["z"])
+            
+            # Ensure the new yaw is treated cardinally for the visited set key
+            new_yaw_cardinal = _round_to_cardinal(new_state["yaw"])
+            key = (new_state["x"], new_state["y"], new_state["z"], new_yaw_cardinal)
+            
             if key in visited:
                 continue
 

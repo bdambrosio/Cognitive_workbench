@@ -1,7 +1,7 @@
 ---
 name: mc-observe-entities
 type: python
-description: "Exhaustive enumeration of ALL entities within radius R. Reports all entity types: mobs, players, items, etc."
+description: "Visible entities within radius R (default/max 7), filtered by view cone and line-of-sight."
 ---
 
 # Minecraft Observe Entities Tool
@@ -10,12 +10,12 @@ Enumerates all visible entities (mobs, players, items, etc.) within observation 
 
 ## Purpose
 
-Exhaustive entity observation for awareness of mobs, players, and items in the environment. Returns both human-readable SUMMARY text and machine-readable structured data. Reports all entity types: mobs, players, items, etc.
+Visible entity observation for awareness of mobs, players, and items. Returns both human-readable SUMMARY text and machine-readable structured data.
 
 ## Input
 
-- `radius`: Optional integer observation radius (default: `5`, max: `12`)
-- `entities_radius`: Optional integer observation radius (default: `5`, max: `12`). If both provided, `entities_radius` takes precedence.
+- `radius`: Optional integer observation radius (default: `7`, max: `7`)
+- `entities_radius`: Optional integer observation radius (default: `7`, max: `7`). If both provided, `entities_radius` takes precedence.
 - `value`: Ignored
 
 ## Output
@@ -25,14 +25,15 @@ Returns uniform_return format with:
 - `data`: Structured observation dict (machine-readable). Key fields:
   - `success`: Boolean
   - `pose`: `{x, y, z, yaw, pitch}` (floats)
-  - `entities`: `{total: int, by_category: {string: int}, types: {string: int}, nearest: {string: float}, by_distance: [dict], nearby: [dict]}` (nearby is exhaustive raw list)
+  - `entities`: `{total: int, by_category: {string: int}, types: {string: int}, nearest: {string: float}, by_distance: [dict], nearby: [dict]}`
+    - Each entry in `entities.nearby` includes: `name`, `type`, `position`, `dx`, `dy`, `dz`, `distance` (items may include `item_name`, `item_count`)
   - `conf`: `"high"` | `"med"` | `"low"`
   - `note`: String (human-readable summary)
 
 ## Behavior & Performance
 
-- Exhaustive: Enumerates ALL visible entities within radius (not sampled)
-- Radius limits: Default 5 blocks, maximum 12 blocks
+- Enumerates visible entities within radius, filtered by view cone (yaw ±60°, pitch -60..+90) and line-of-sight
+- Radius limits: Default 7 blocks, maximum 7 blocks
 - Confidence levels: `high` (complete, fast), `med` (complete but slow/many entities), `low` (incomplete observation)
 - Entity categorization: Groups entities by category (mob, player, item, other)
 
@@ -54,5 +55,5 @@ Standard observation:
 
 With custom radius:
 ```json
-{"type":"mc-observe-entities","radius":8,"out":"$entities"}
+{"type":"mc-observe-entities","radius":7,"out":"$entities"}
 ```

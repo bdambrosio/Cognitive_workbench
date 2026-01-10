@@ -644,7 +644,19 @@ class InfospaceExecutor:
             action_type = action.get('type', 'unknown')
             prefixed_type = f"{method_name}:{action_type}"
             timestamp = datetime.now()
-            self.executive_node._publish_action_result(action, result, prefixed_type, timestamp)
+            # Ensure result is in uniform_return format for consistent UI display
+            if result.get('type') != 'uniform_return':
+                result = self._create_uniform_return(
+                    result.get('status', 'unknown'),
+                    value=result.get('value'),
+                    reason=result.get('reason'),
+                    extra=result.get('extra')
+                )
+            try:
+                self.executive_node._publish_action_result(action, result, prefixed_type, timestamp)
+                logger.debug(f"Published action result: {prefixed_type} -> status={result.get('status')}")
+            except Exception as e:
+                logger.error(f"Failed to publish action result for {prefixed_type}: {e}", exc_info=True)
         
         return result
     

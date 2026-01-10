@@ -115,7 +115,8 @@ def _generate_html_visualization(cells: List[Dict], map_name: str, stats: Dict) 
             'x': x,
             'z': z,
             'support_y': support.get('support_y'),
-            'delta_y_from_agent': support.get('delta_y_from_agent'),
+            # Note: delta_y_from_agent removed - it was agent-relative data that becomes stale
+            # Use absolute support_y instead
             'walkable': support.get('walkable', False),
             'movement_class': support.get('movement_class', 'unknown'),
             'surface_class': surface.get('surface_block_class', 'unknown'),
@@ -689,6 +690,9 @@ def _generate_html_visualization(cells: List[Dict], map_name: str, stats: Dict) 
             dragStart.z = e.offsetY;
         }});
         
+        // Track currently hovered cell to avoid unnecessary updates
+        let hoveredCellKey = null;
+        
         canvas.addEventListener('mousemove', (e) => {{
             if (isDragging) {{
                 offsetX += e.offsetX - dragStart.x;
@@ -696,15 +700,29 @@ def _generate_html_visualization(cells: List[Dict], map_name: str, stats: Dict) 
                 dragStart.x = e.offsetX;
                 dragStart.z = e.offsetY;
                 drawMap();
+                // Clear hover when dragging
+                if (hoveredCellKey !== null) {{
+                    hoveredCellKey = null;
+                    infoPanel.classList.remove('visible');
+                }}
             }} else {{
-                // Show info panel for hovered cell
+                // Convert canvas coordinates to world coordinates, then to integer cell coordinates
                 const worldPos = canvasToWorld(e.offsetX, e.offsetY);
-                const nearby = cells.filter(cell => 
-                    Math.abs(cell.x - worldPos.x) < 0.8 && Math.abs(cell.z - worldPos.z) < 0.8
-                );
+                const cellX = Math.floor(worldPos.x);
+                const cellZ = Math.floor(worldPos.z);
+                const currentCellKey = `${{cellX}},${{cellZ}}`;
                 
-                if (nearby.length > 0) {{
-                    const cell = nearby[0];
+                // Only update if hovering over a different cell
+                if (currentCellKey === hoveredCellKey) {{
+                    return;  // Already showing this cell's info
+                }}
+                
+                hoveredCellKey = currentCellKey;
+                
+                // Look up exact cell at these coordinates using mappedCells Map
+                const cell = mappedCells.get(currentCellKey);
+                
+                if (cell) {{
                     let infoHtml = `
                         <div class="info-row">
                             <span class="info-label">Position</span>
@@ -716,12 +734,7 @@ def _generate_html_visualization(cells: List[Dict], map_name: str, stats: Dict) 
                             <span class="info-value">Y = ${{cell.support_y.toFixed(1)}}</span>
                         </div>
                         ` : ''}}
-                        ${{cell.delta_y_from_agent !== null && cell.delta_y_from_agent !== undefined ? `
-                        <div class="info-row">
-                            <span class="info-label">Height Delta</span>
-                            <span class="info-value">${{cell.delta_y_from_agent > 0 ? '+' : ''}}${{cell.delta_y_from_agent.toFixed(1)}}</span>
-                        </div>
-                        ` : ''}}
+                        <!-- Note: Height Delta removed - was agent-relative data that becomes stale. Use absolute support_y instead. -->
                         <div class="info-row">
                             <span class="info-label">Walkable</span>
                             <span class="info-value ${{cell.walkable ? 'safe' : 'warning'}}">${{cell.walkable ? 'Yes' : 'No'}}</span>
@@ -777,6 +790,8 @@ def _generate_html_visualization(cells: List[Dict], map_name: str, stats: Dict) 
                     infoPanel.innerHTML = infoHtml;
                     infoPanel.classList.add('visible');
                 }} else {{
+                    // No cell at this location - clear the info panel
+                    hoveredCellKey = null;
                     infoPanel.classList.remove('visible');
                 }}
             }}

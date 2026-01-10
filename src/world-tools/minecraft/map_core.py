@@ -4,9 +4,15 @@ Logical grid coordinate (agent-centered or global, your choice)
 
 support (planner-critical):
 walkable: can the agent safely stand here
-support_y: Y of the block providing support
-delta_y_from_agent: relative height (more useful than absolute Y)
-movement_class: flat | step_up | step_down | drop | blocked | unknown
+support_y: Y of the block providing support (absolute coordinate)
+movement_class: flat | drop | unknown
+# Note: "blocked" is now a query-time attribute computed relative to current position.
+# Note: "step_up" and "step_down" are direction-relative and removed - compute at query time based on Y differences.
+# Use absolute support_y to compute step_up/step_down relative to current position.
+# Note: delta_y_from_agent was removed - it's agent-relative data that becomes stale.
+# Use absolute support_y instead. Compute deltas at query time if needed.
+# Note: "blocked" is now a query-time attribute computed relative to current position,
+# not a static cell property. Use SpatialMap.is_blocked_from() for query-time blocking.
 surface
 support_block: the actual block that supports standing (not “top block”)
 surface_block_class: coarse enum (stone, dirt, sand, foliage, water, lava, unknown)
@@ -35,7 +41,7 @@ Debugging + learning hooks (who/what updated this, and why)
 
 MAP_CELL_SCHEMA = {
   "cell_version": "1.0", "cell_id": {"x": 0, "z": 0},
-  "support": {"walkable": False, "support_y": None, "delta_y_from_agent": None, "movement_class": "unknown"},
+  "support": {"walkable": False, "support_y": None, "movement_class": "unknown"},
   "surface": { "support_block": None, "surface_block_class": "unknown", "is_fluid": False, "is_partial_block": False},
   "hazards": {"flags": [], "exposure_risk": "unknown", "escape_difficulty": "unknown"},
   "resources": {"resources_visible": [], "harvest_actions": [], "tool_required": "unknown"},
