@@ -267,7 +267,7 @@ def tool(input_value=None, **kwargs):
     try:
         # New bridge default: depth limit 7
         radius = kwargs.get("blocks_radius") or kwargs.get("radius") or 7
-        radius = max(1, min(7, int(radius)))
+        radius = max(1, min(8, int(radius)))
         
         params = {"radius": radius}
         url = f"{minecraft_url}/observe"
@@ -291,6 +291,7 @@ def tool(input_value=None, **kwargs):
         
         visibility_distances = perception.get('visibility_distances', {})
         adjacent_blocks = perception.get('adjacent_blocks', {}) if isinstance(perception, dict) else {}
+        nav_surface = perception.get('nav_surface', []) if isinstance(perception, dict) else []
         nearby_blocks = perception.get('nearby_blocks', [])
         blocks_complete = perception.get('blocks_complete', True)
         blocks_elapsed_ms = perception.get('blocks_elapsed_ms', 0)
@@ -351,6 +352,18 @@ def tool(input_value=None, **kwargs):
         summary_parts.append("support:")
         support_info = {}
 
+        # Option B: navigation surface samples for nearby (x,z) cells
+        nav_surface_by_xz = {}
+        if isinstance(nav_surface, list):
+            for ns in nav_surface:
+                if not isinstance(ns, dict):
+                    continue
+                x = ns.get('x')
+                z = ns.get('z')
+                if x is None or z is None:
+                    continue
+                nav_surface_by_xz[(int(x), int(z))] = ns
+
         # Blocks that occupy space but do NOT provide vertical support
         NON_SUPPORTING_BLOCKS = (
             'minecraft:snow',        # snow layers (any layers=N)
@@ -391,6 +404,17 @@ def tool(input_value=None, **kwargs):
                         # If non-solid but exists, fall through to probe deeper
             
             # Probe downward using nearby_blocks (for forward or when adjacent_blocks fails)
+            if forward_offset == 1:
+                pos_fwd = rel_to_abs(position, yaw, 1, 0, 0)
+                fwd_x, _, fwd_z = pos_fwd
+                ns = nav_surface_by_xz.get((int(fwd_x), int(fwd_z)))
+                if ns and ns.get('support_y') is not None and ns.get('support_block'):
+                    try:
+                        depth = float(position.get('y', 0)) - float(ns['support_y'])
+                    except Exception:
+                        depth = None
+                    return {'type': 'solid', 'block': ns['support_block'], 'depth': depth}
+
             for dy in range(1, MAX_SUPPORT_PROBE + 1):
                 pos = rel_to_abs(position, yaw, forward_offset, 0, -dy)
                 block = find_block_at(nearby_blocks, *pos)
@@ -439,8 +463,10 @@ def tool(input_value=None, **kwargs):
         fwd_support = classify_support_at(forward_offset=1)
 
         # Also record the block directly in front at foot level (for context)
-        pos_fwd_block = rel_to_abs(position, yaw, 1, 0, 0)
-        block_fwd_block = find_block_at(nearby_blocks, *pos_fwd_block)
+        block_fwd_block = adjacent_blocks.get('fwd') if isinstance(adjacent_blocks, dict) else None
+        if block_fwd_block is None:
+            pos_fwd_block = rel_to_abs(position, yaw, 1, 0, 0)
+            block_fwd_block = find_block_at(nearby_blocks, *pos_fwd_block)
 
         if fwd_support['type'] == 'solid':
             summary_parts.append(f"  fwd:  solid({fwd_support['block']})")
@@ -564,6 +590,7 @@ def tool(input_value=None, **kwargs):
                 "yaw": yaw,
                 "pitch": pitch
             },
+            "nav_surface": nav_surface,
             "dirs": dirs_info,
             "support": support_info,
             "clear": clear_info,

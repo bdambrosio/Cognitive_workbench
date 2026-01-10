@@ -85,7 +85,8 @@ def tool(input_value=None, **kwargs):
         }
 
     max_actions = int(kwargs.get("max_actions", 4))
-    allow_unknown = bool(kwargs.get("allow_unknown", False))
+    # Prefer over-approximation: when in doubt, include possible frontier elements.
+    allow_unknown = bool(kwargs.get("allow_unknown", True))
 
     # ---- Obtain current pose ----
 
@@ -104,6 +105,18 @@ def tool(input_value=None, **kwargs):
     # Uses uniform surface definition: surface Y = support_y + 1 (where agent stands)
 
     spatial_map = executor.get_world_state("spatial_map")
+
+    # If we have a mapped support_y for the current cell, snap start_state.y to surface_y (= support_y + 1).
+    # This avoids brittle dependence on mc-status rounding and aligns nav_simulation with the 2D map semantics.
+    try:
+        if spatial_map:
+            start_cell = spatial_map.get_cell(start_state["x"], start_state["z"])
+            if start_cell:
+                support_y = start_cell.get("support", {}).get("support_y")
+                if support_y is not None:
+                    start_state["y"] = int(round(float(support_y))) + 1
+    except Exception:
+        pass
 
     # ---- BFS over bounded nav actions ----
 
@@ -148,12 +161,12 @@ def tool(input_value=None, **kwargs):
             or None if cell is unknown.
             """
             if not spatial_map:
-                return None
+                return {"clear_body": True, "clear_head": True, "support": "unknown"} if allow_unknown else None
             
             # Get 2D cell from spatial map
             cell = spatial_map.get_cell(x, z)
             if not cell:
-                return None
+                return {"clear_body": True, "clear_head": True, "support": "unknown"} if allow_unknown else None
             
             # Extract support information
             support_data = cell.get('support', {})
@@ -162,7 +175,7 @@ def tool(input_value=None, **kwargs):
             
             # If we don't know the support Y, we can't determine 3D position
             if support_y is None:
-                return None
+                return {"clear_body": True, "clear_head": True, "support": "unknown"} if allow_unknown else None
             
             # Uniform surface definition: surface = support_y + 1
             surface_y = support_y + 1
