@@ -1,7 +1,7 @@
 ---
 name: mc-observe-blocks
 type: python
-description: "Exhaustive enumeration of ALL visible non-air blocks within radius R. Visibility = within radius R AND line-of-sight from bot's eye position. Does NOT report items (use mc-observe-items for that)."
+description: "Visible non-air blocks within radius R (default/max 7). Filtered by forward cone (yaw ±60°, pitch -60..+90) and line-of-sight. Does NOT report items."
 ---
 
 # Minecraft Observe Blocks Tool
@@ -9,11 +9,11 @@ description: "Exhaustive enumeration of ALL visible non-air blocks within radius
 Enumerates all visible non-air blocks within observation radius. Provides structured summary with pose, directional distances, footing, clearance, geometry hints, and movement affordances.
 
 ## Purpose
-Exhaustive block observation for spatial awareness and movement planning. Returns both human-readable SUMMARY text and machine-readable structured data.
+Visible block observation for spatial awareness and movement planning. Returns both human-readable SUMMARY text and machine-readable structured data.
 
 ## Input
-- `radius`: Optional integer observation radius (default: `4`, max: `6`)
-- `blocks_radius`: Optional integer observation radius (default: `4`, max: `6`). If both provided, `blocks_radius` takes precedence.
+- `radius`: Optional integer observation radius (default: `7`, max: `7`)
+- `blocks_radius`: Optional integer observation radius (default: `7`, max: `7`). If both provided, `blocks_radius` takes precedence.
 - `value`: Ignored
 
 ## Output
@@ -26,15 +26,17 @@ Returns uniform_return format with:
   - `support`: `{here: {type: "solid"|"unsafe", block, depth}, fwd: {type: "solid"|"unsafe", block, depth, forward_block}}`
   - `clear`: `{fwd: {body: bool, head: bool}, up: {body: bool, head: bool}}`
   - `blocks`: `{seen: [string], fluid: [string], hazard: [string], nearby: [dict]}` (nearby is exhaustive raw list)
+    - Each entry in `blocks.nearby` includes: `name`, `position`, `dx`, `dy`, `dz`, `surface` (true|false|\"unknown\")
   - `geom`: `{pit: bool, stair: bool, slope: bool}`
   - `aff`: `{step: bool, jump: bool, descend: bool, sky: bool}`
   - `conf`: `"high"` | `"med"` | `"low"`
   - `note`: string (human-readable summary)
 
 ## Behavior & Performance
-- Exhaustive: Enumerates ALL visible non-air blocks within radius (not sampled)
-- Line-of-sight: Only reports blocks visible from bot's eye position (occluded blocks excluded)
-- Radius limits: Default 4 blocks, maximum 6 blocks
+- Returns visible non-air blocks within cone/LOS (capped list)
+- View cone: Only reports blocks within a 120° horizontal cone (yaw ±60°) and vertical range up 60° / down 90° (relative to pitch 0)
+- Line-of-sight: Only blocks visible from bot eye position (occlusion-aware)
+- Radius limits: Default 7 blocks, maximum 7 blocks
 - Confidence levels: `high` (complete, fast), `med` (complete but slow/many blocks), `low` (incomplete observation)
 
 ## Guidelines

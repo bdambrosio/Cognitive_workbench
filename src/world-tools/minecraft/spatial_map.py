@@ -22,10 +22,9 @@ def empty_cell(x: int, z: int) -> Dict[str, Any]:
     return {
         "cell_version": "1.0",
         "cell_id": {"x": x, "z": z},
-        "support": {
+            "support": {
             "walkable": False,
             "support_y": None,
-            "delta_y_from_agent": None,
             "movement_class": "unknown"
         },
         "surface": {
@@ -33,6 +32,12 @@ def empty_cell(x: int, z: int) -> Dict[str, Any]:
             "surface_block_class": "unknown",
             "is_fluid": False,
             "is_partial_block": False
+        },
+        "obstructions": {
+            # Store blocks at surface level for query-time blocking computation
+            # Key: Y coordinate (int), Value: block name (str) or None
+            # Used to compute if cell is blocked from a given position
+            "blocks_at_y": {}  # Dict[int, Optional[str]]
         },
         "hazards": {
             "flags": [],
@@ -59,7 +64,13 @@ def empty_cell(x: int, z: int) -> Dict[str, Any]:
             "updated_by": "unknown",
             "update_reason": "unknown"
         },
-        "waypoints": []  # List of waypoint names at this location
+        "waypoints": [],  # List of waypoint names at this location
+        "obstructions": {
+            # Store blocks at surface level for query-time blocking computation
+            # Key: Y coordinate (int), Value: block name (str) or None
+            # Used to compute if cell is blocked from a given position
+            "blocks_at_y": {}  # Dict[int, Optional[str]]
+        }
     }
 
 
@@ -297,6 +308,69 @@ class SpatialMap:
         key = self._cell_key(x, z)
         self.cells[key] = cell
     
+    def is_blocked_from(self, current_x: int, current_z: int, current_y: int, target_x: int, target_z: int, target_y: int) -> bool:
+        """
+        Query-time computation: Is target cell blocked from current position?
+        
+        "Blocked" is relative - a cell may be blocked from position A but not from position B.
+        This computes blocking based on stored obstruction data.
+        
+        Args:
+            current_x, current_z, current_y: Current agent position
+            target_x, target_z, target_y: Target cell position
+            
+        Returns:
+            True if target cell is blocked from current position, False otherwise
+        """
+        # Get target cell
+        target_cell = self.get_cell(target_x, target_z)
+        if not target_cell:
+            return False  # Unknown cell is not "blocked", it's "unknown"
+        
+        # Check if there's a solid obstruction block at target Y level
+        obstructions = target_cell.get('obstructions', {})
+        blocks_at_y = obstructions.get('blocks_at_y', {})
+        block_at_target_y = blocks_at_y.get(target_y)
+        
+        if block_at_target_y:
+            # Check if it's a solid block that would block movement
+            block_class = classify_block(block_at_target_y)
+            if block_class in ['stone', 'dirt', 'sand', 'wood', 'ore']:
+                # There's a solid block at target Y - check if it blocks movement from current position
+                # For cardinal movement, if there's a solid block at target Y, it's blocked
+                dx = abs(target_x - current_x)
+                dz = abs(target_z - current_z)
+                
+                # Cardinal movement (one cell away)
+                if (dx == 1 and dz == 0) or (dx == 0 and dz == 1):
+                    return True  # Solid block at target Y blocks cardinal movement
+                
+                # For diagonal movement, check if both cardinal paths are clear
+                # (simplified - could be more sophisticated)
+                if dx == 1 and dz == 1:
+                    # Check intermediate cells
+                    mid_x, mid_z = current_x + (1 if target_x > current_x else -1), current_z
+                    mid_cell = self.get_cell(mid_x, mid_z)
+                    if mid_cell:
+                        mid_obstructions = mid_cell.get('obstructions', {})
+                        mid_blocks = mid_obstructions.get('blocks_at_y', {})
+                        if mid_blocks.get(target_y):
+                            mid_block_class = classify_block(mid_blocks[target_y])
+                            if mid_block_class in ['stone', 'dirt', 'sand', 'wood', 'ore']:
+                                return True  # Blocked via intermediate cell
+                    
+                    mid_x, mid_z = current_x, current_z + (1 if target_z > current_z else -1)
+                    mid_cell = self.get_cell(mid_x, mid_z)
+                    if mid_cell:
+                        mid_obstructions = mid_cell.get('obstructions', {})
+                        mid_blocks = mid_obstructions.get('blocks_at_y', {})
+                        if mid_blocks.get(target_y):
+                            mid_block_class = classify_block(mid_blocks[target_y])
+                            if mid_block_class in ['stone', 'dirt', 'sand', 'wood', 'ore']:
+                                return True  # Blocked via intermediate cell
+        
+        return False  # No solid obstruction detected
+    
     def add_waypoint(self, x: int, z: int, waypoint_name: str) -> bool:
         """
         Add a waypoint name to a cell.
@@ -363,148 +437,304 @@ class SpatialMap:
         
         cells_updated = 0
         
-        # Update observer's cell (primary observation)
-        key = self._cell_key(obs_x, obs_z)
-        cell = self.cells.get(key) or empty_cell(obs_x, obs_z)
-        
         # Extract data from observation
+        pose = observation.get('pose', {})
+        yaw = pose.get('yaw', 0)
         support = observation.get('support', {})
         aff = observation.get('aff', {})
         blocks = observation.get('blocks', {})
         geom = observation.get('geom', {})
         conf = observation.get('conf', 'med')
+        dirs = observation.get('dirs', {})
+        
+        # ---------------------------------------------------------------------
+        # 1. Update observer's cell (Current Location)
+        # ---------------------------------------------------------------------
+        key = self._cell_key(obs_x, obs_z)
+        cell = self.cells.get(key) or empty_cell(obs_x, obs_z)
         
         # Update support
         here_support = support.get('here', {})
-        cell['support']['walkable'] = here_support.get('type') == 'solid'
-        cell['support']['support_y'] = obs_y - 1 if here_support.get('depth') == 1 else obs_y - (here_support.get('depth') or 1)
-        cell['support']['delta_y_from_agent'] = 0  # Observer is at this cell
-        
-        # Determine movement class from affordances and geometry
-        if not cell['support']['walkable']:
-            cell['support']['movement_class'] = 'blocked'
-        elif geom.get('stair'):
-            cell['support']['movement_class'] = 'step_up'
-        elif geom.get('pit'):
-            cell['support']['movement_class'] = 'drop'
-        else:
-            cell['support']['movement_class'] = 'flat'
-        
-        # Update surface
+        support_type = here_support.get('type')
+        support_depth = here_support.get('depth')
         support_block = here_support.get('block')
-        cell['surface']['support_block'] = support_block
-        cell['surface']['surface_block_class'] = classify_block(support_block)
-        cell['surface']['is_fluid'] = is_fluid(support_block)
-        cell['surface']['is_partial_block'] = is_partial_block(support_block)
         
-        # Update hazards
-        cell['hazards']['flags'] = extract_hazard_flags(blocks)
-        if cell['hazards']['flags']:
-            cell['hazards']['exposure_risk'] = 'high'
-        elif not cell['support']['walkable']:
-            cell['hazards']['exposure_risk'] = 'medium'
-        else:
-            cell['hazards']['exposure_risk'] = 'low'
+        # Fallback to dirs.down when support.here is incomplete
+        # This handles cases where support detection failed but dirs.down has reliable data
+        dirs_down = dirs.get('down', {})
+        dirs_down_dist = dirs_down.get('dist')
+        dirs_down_blk = dirs_down.get('blk')
         
-        # Escape difficulty based on clearance and affordances
-        if aff.get('step') or aff.get('jump'):
-            cell['hazards']['escape_difficulty'] = 'easy'
-        elif aff.get('descend'):
-            cell['hazards']['escape_difficulty'] = 'medium'
-        else:
-            cell['hazards']['escape_difficulty'] = 'hard'
+        # Infer support_y from support.here.depth OR dirs.down.dist
+        if support_depth is not None:
+            cell['support']['support_y'] = obs_y - support_depth
+        elif dirs_down_dist is not None and dirs_down_dist > 0:
+            # Fallback: use dirs.down.dist to infer support_y
+            cell['support']['support_y'] = obs_y - dirs_down_dist
         
-        # Update resources (extract from seen blocks)
-        seen_blocks = blocks.get('seen', [])
-        resources = []
-        harvest_actions = []
-        for block in seen_blocks:
-            block_lower = str(block).lower()
-            if 'ore' in block_lower:
-                resources.append('ore')
-                harvest_actions.append('mine')
-            if 'log' in block_lower or 'wood' in block_lower:
-                resources.append('wood')
-                harvest_actions.append('chop')
-            if 'crop' in block_lower or 'wheat' in block_lower or 'carrot' in block_lower:
-                resources.append('food_source')
-                harvest_actions.append('harvest')
-        cell['resources']['resources_visible'] = list(set(resources))
-        cell['resources']['harvest_actions'] = list(set(harvest_actions))
+        # Infer walkable from support.here.type OR dirs.down.blk
+        if support_type is not None:
+            cell['support']['walkable'] = support_type == 'solid'
+        elif dirs_down_blk and dirs_down_blk != 'air':
+            # Fallback: if dirs.down shows a solid block, infer walkable
+            # Check if it's a non-supporting block (snow layers, etc.)
+            non_supporting_prefixes = ('minecraft:snow', 'minecraft:carpet', 'minecraft:pressure_plate', 
+                                      'minecraft:farmland', 'minecraft:rail', 'minecraft:trapdoor')
+            if not any(str(dirs_down_blk).startswith(ns) for ns in non_supporting_prefixes):
+                # Check if it's solid
+                block_class = classify_block(dirs_down_blk)
+                if block_class in ['stone', 'dirt', 'sand', 'wood', 'ore']:
+                    cell['support']['walkable'] = True
+                    # Also infer support_type for movement_class computation
+                    support_type = 'solid'
         
-        # Update environment
-        if aff.get('sky'):
-            cell['environment']['light_level'] = 'high'
-            cell['environment']['spawn_risk'] = 'low'
-        else:
-            cell['environment']['light_level'] = 'unknown'
-            cell['environment']['spawn_risk'] = 'unknown'
+        # Note: delta_y_from_agent was removed - it's agent-relative data that becomes stale.
+        # Use absolute support_y instead. Compute deltas at query time if needed.
+        
+        # Determine movement class only if we have support information
+        if support_type is not None:
+            if not cell['support']['walkable']:
+                # Support detection failed or uncertain - mark as unknown, not blocked
+                # "blocked" is reserved for detected obstructions (handled in section 2)
+                cell['support']['movement_class'] = 'unknown'
+            elif geom.get('pit'):
+                # "drop" means cell has a pit/drop below it (absolute property)
+                cell['support']['movement_class'] = 'drop'
+            else:
+                cell['support']['movement_class'] = 'flat'
+        
+        # Update surface from support.here.block OR dirs.down.blk
+        if support_block is not None:
+            cell['surface']['support_block'] = support_block
+            cell['surface']['surface_block_class'] = classify_block(support_block)
+            cell['surface']['is_fluid'] = is_fluid(support_block)
+            cell['surface']['is_partial_block'] = is_partial_block(support_block)
+        elif dirs_down_blk and dirs_down_blk != 'air':
+            # Fallback: use dirs.down.blk for surface info
+            # Only if it's not a non-supporting block (we want the actual support block)
+            non_supporting_prefixes = ('minecraft:snow', 'minecraft:carpet', 'minecraft:pressure_plate', 
+                                      'minecraft:farmland', 'minecraft:rail', 'minecraft:trapdoor')
+            if not any(str(dirs_down_blk).startswith(ns) for ns in non_supporting_prefixes):
+                cell['surface']['support_block'] = dirs_down_blk
+                cell['surface']['surface_block_class'] = classify_block(dirs_down_blk)
+                cell['surface']['is_fluid'] = is_fluid(dirs_down_blk)
+                cell['surface']['is_partial_block'] = is_partial_block(dirs_down_blk)
+        
+        # Update environment only if we have sky information
+        if 'sky' in aff:
+            if aff.get('sky'):
+                cell['environment']['light_level'] = 'high'
+                cell['environment']['spawn_risk'] = 'low'
+            else:
+                cell['environment']['light_level'] = 'unknown'
+                cell['environment']['spawn_risk'] = 'unknown'
         
         # Update observability
         cell['observability']['observed_from'] = {'x': obs_x, 'y': obs_y, 'z': obs_z}
         cell['observability']['observation_mode'] = 'direct'
         cell['observability']['confidence'] = {'high': 0.9, 'med': 0.7, 'low': 0.4}.get(conf, 0.5)
         cell['observability']['last_observed_at'] = now
-        
-        # Update provenance
         cell['provenance']['updated_by'] = self.agent_name
         cell['provenance']['update_reason'] = update_reason
         
         self.cells[key] = cell
         cells_updated += 1
+
+        # ---------------------------------------------------------------------
+        # 2. Update immediate neighbors from 'dirs' (Obstructions)
+        # ---------------------------------------------------------------------
+        # Determine cardinal facing to map 'left'/'right'/'back' to coordinates
+        # 0=South(+Z), 90=West(-X), 180=North(-Z), 270=East(+X)
+        norm_yaw = yaw % 360
+        if norm_yaw < 0: norm_yaw += 360
         
-        # Update forward cell if we have forward support info
+        cardinal_offsets = {
+            'fwd':   (0, 0), # Placeholder, handled by logic below
+            'back':  (0, 0),
+            'left':  (0, 0),
+            'right': (0, 0)
+        }
+        
+        if 315 <= norm_yaw or norm_yaw < 45:    # South (+Z)
+            cardinal_offsets = {'fwd': (0, 1), 'back': (0, -1), 'left': (1, 0), 'right': (-1, 0)}
+        elif 45 <= norm_yaw < 135:              # West (-X)
+            cardinal_offsets = {'fwd': (-1, 0), 'back': (1, 0), 'left': (0, 1), 'right': (0, -1)}
+        elif 135 <= norm_yaw < 225:             # North (-Z)
+            cardinal_offsets = {'fwd': (0, -1), 'back': (0, 1), 'left': (-1, 0), 'right': (1, 0)}
+        else:                                   # East (+X)
+            cardinal_offsets = {'fwd': (1, 0), 'back': (-1, 0), 'left': (0, -1), 'right': (0, 1)}
+
+        # Store obstruction data (blocks at positions) instead of marking cells as "blocked"
+        # "Blocked" is now a query-time attribute computed relative to current position
+        surface_y_for_obs = cell['support']['support_y']
+        if surface_y_for_obs is not None:
+            surface_y_for_obs = surface_y_for_obs + 1  # Surface = support_y + 1
+        
+        for dir_name in ['back', 'left', 'right']:
+            dir_info = dirs.get(dir_name)
+            if not dir_info: continue
+            
+            blk = dir_info.get('blk')
+            # Store block information for query-time blocking computation
+            if blk:
+                dx, dz = cardinal_offsets[dir_name]
+                nx, nz = obs_x + dx, obs_z + dz
+                n_key = self._cell_key(nx, nz)
+                
+                n_cell = self.cells.get(n_key) or empty_cell(nx, nz)
+                
+                # Store block at surface Y level (or agent Y if surface_y unknown)
+                # This allows query-time computation of "blocked" relative to any position
+                block_y = surface_y_for_obs if surface_y_for_obs is not None else obs_y
+                if 'obstructions' not in n_cell:
+                    n_cell['obstructions'] = {'blocks_at_y': {}}
+                n_cell['obstructions']['blocks_at_y'][block_y] = blk
+                
+                # If it's a solid block, we know there's an obstruction at this Y level
+                # But don't mark as "blocked" - that's computed at query time
+                if classify_block(blk) in ['stone', 'dirt', 'sand', 'wood', 'ore']:
+                    # Store that this is a solid obstruction
+                    n_cell['surface']['support_block'] = blk  # Store the wall block info
+                
+                # Metadata
+                n_cell['observability']['observation_mode'] = 'inferred_obstruction'
+                n_cell['observability']['last_observed_at'] = now
+                n_cell['provenance']['update_reason'] = f"obstruction_{dir_name}"
+                
+                self.cells[n_key] = n_cell
+                cells_updated += 1
+
+        # ---------------------------------------------------------------------
+        # 3. Update all visible cells (Resources & Hazards)
+        # ---------------------------------------------------------------------
+        # Iterate over all nearby blocks to populate resource/hazard maps
+        # IMPORTANT: Only record resources/hazards that are on the surface (Y matches support_y)
+        # This ensures we know the Y coordinate and maintain 3D surface view consistency
+        nearby_blocks = blocks.get('nearby', [])
+        for block in nearby_blocks:
+            if not isinstance(block, dict): continue
+            
+            b_name = block.get('name', '')
+            b_pos = block.get('position', {})
+            
+            # Normalize position
+            bx, by, bz = 0, 0, 0
+            if isinstance(b_pos, dict):
+                bx, by, bz = b_pos.get('x'), b_pos.get('y'), b_pos.get('z')
+            elif isinstance(b_pos, (list, tuple)) and len(b_pos) >= 3:
+                bx, by, bz = b_pos[0], b_pos[1], b_pos[2]
+            else:
+                continue
+                
+            bx_int, bz_int = int(math.floor(bx)), int(math.floor(bz))
+            b_key = self._cell_key(bx_int, bz_int)
+            
+            # Get or create cell
+            b_cell = self.cells.get(b_key)
+            
+            # CRITICAL: Only record resources/hazards if we know the surface Y coordinate
+            # Skip if cell doesn't exist or doesn't have support_y set
+            # Note: With cone-based visibility, surface blocks behind taller obstacles may be occluded,
+            # so some cells may not have support_y until observed from another angle. This is expected.
+            if not b_cell or b_cell['support']['support_y'] is None:
+                continue
+            
+            # Uniform surface definition:
+            # - Surface Y = support_y + 1 (top face of the solid support block where agent stands)
+            # - Resources on surface: blocks at support_y + 1 (crops, logs on surface)
+            # - Resources embedded: blocks at support_y (ore in the support block itself)
+            # - Do NOT record: blocks at support_y - 1 or below (underground resources)
+            cell_support_y = b_cell['support']['support_y']
+            by_int = int(math.floor(by))
+            
+            # Block must be at surface level (support_y + 1) or embedded in surface block (support_y)
+            if by_int not in (cell_support_y, cell_support_y + 1):
+                continue
+            
+            # Identify special properties
+            is_hazard = b_name.replace('minecraft:', '') in HAZARD_BLOCKS
+            
+            # Identify resources
+            resource_type = None
+            harvest_action = None
+            b_lower = b_name.lower()
+            if 'ore' in b_lower:
+                resource_type = 'ore'; harvest_action = 'mine'
+            elif 'log' in b_lower or 'wood' in b_lower:
+                resource_type = 'wood'; harvest_action = 'chop'
+            elif 'crop' in b_lower or 'wheat' in b_lower or 'carrot' in b_lower:
+                resource_type = 'food_source'; harvest_action = 'harvest'
+                
+            # Only update if we have something interesting
+            if is_hazard or resource_type:
+                modified = False
+                
+                if is_hazard:
+                    # Map hazard name to flag
+                    flag = 'unknown'
+                    if 'lava' in b_lower: flag = 'lava'
+                    elif 'fire' in b_lower: flag = 'fire'
+                    elif 'magma' in b_lower: flag = 'magma'
+                    elif 'berry' in b_lower: flag = 'sweet_berry'
+                    elif 'cactus' in b_lower: flag = 'cactus'
+                    
+                    if flag not in b_cell['hazards']['flags']:
+                        b_cell['hazards']['flags'].append(flag)
+                        b_cell['hazards']['exposure_risk'] = 'high'
+                        modified = True
+                        
+                if resource_type:
+                    if resource_type not in b_cell['resources']['resources_visible']:
+                        b_cell['resources']['resources_visible'].append(resource_type)
+                        if harvest_action and harvest_action not in b_cell['resources']['harvest_actions']:
+                            b_cell['resources']['harvest_actions'].append(harvest_action)
+                        modified = True
+                
+                if modified:
+                    # Don't overwrite higher quality observation data if existing
+                    if b_cell['observability']['observation_mode'] == 'unknown':
+                        b_cell['observability']['observation_mode'] = 'scanned'
+                        b_cell['observability']['last_observed_at'] = now
+                    
+                    self.cells[b_key] = b_cell
+        
+        # ---------------------------------------------------------------------
+        # 4. Forward Inference (Existing logic)
+        # ---------------------------------------------------------------------
         fwd_support = support.get('fwd', {})
         if fwd_support:
-            # Calculate forward cell based on yaw (simplified: assume cardinal)
-            pose = observation.get('pose', {})
-            yaw = pose.get('yaw', 0)
-            
-            # Cardinal direction offsets
-            if -45 <= yaw < 45 or yaw >= 315 or yaw < -315:  # North (negative Z)
-                fwd_x, fwd_z = obs_x, obs_z - 1
-            elif 45 <= yaw < 135 or -315 <= yaw < -225:  # West (negative X)
-                fwd_x, fwd_z = obs_x - 1, obs_z
-            elif 135 <= yaw < 225 or -225 <= yaw < -135:  # South (positive Z)
-                fwd_x, fwd_z = obs_x, obs_z + 1
-            else:  # East (positive X)
-                fwd_x, fwd_z = obs_x + 1, obs_z
+            # Re-calculate fwd coords
+            dx, dz = cardinal_offsets['fwd']
+            fwd_x, fwd_z = obs_x + dx, obs_z + dz
             
             fwd_key = self._cell_key(fwd_x, fwd_z)
             fwd_cell = self.cells.get(fwd_key) or empty_cell(fwd_x, fwd_z)
             
-            # Update forward cell with inferred data
-            fwd_cell['support']['walkable'] = fwd_support.get('type') == 'solid'
+            fwd_type = fwd_support.get('type')
+            if fwd_type is not None:
+                fwd_cell['support']['walkable'] = fwd_type == 'solid'
+            
             fwd_block = fwd_support.get('block')
             
-            # Calculate forward cell support_y based on forward support depth
-            # Forward support depth indicates how many blocks down from forward position to find solid support
+            # Forward support logic (depth calculation)
+            # Preserve existing support_y if new data is missing
             fwd_depth = fwd_support.get('depth')
             if fwd_depth is not None:
-                # Estimate forward cell support_y: observer Y minus forward support depth
-                # This assumes forward cell is approximately at observer's Y level
                 fwd_cell['support']['support_y'] = obs_y - fwd_depth
-            else:
-                # If depth unknown, estimate based on forward support type
-                if fwd_support.get('type') == 'solid':
-                    # Assume same height as observer's cell if solid
-                    fwd_cell['support']['support_y'] = cell['support'].get('support_y')
-                else:
-                    fwd_cell['support']['support_y'] = None
+            elif fwd_type == 'solid' and cell['support'].get('support_y') is not None:
+                # Only copy from observer cell if we have it
+                fwd_cell['support']['support_y'] = cell['support'].get('support_y')
             
-            # Calculate delta_y_from_agent for forward cell
-            observer_support_y = cell['support'].get('support_y')
-            if observer_support_y is not None and fwd_cell['support']['support_y'] is not None:
-                fwd_cell['support']['delta_y_from_agent'] = fwd_cell['support']['support_y'] - observer_support_y
-            else:
-                fwd_cell['support']['delta_y_from_agent'] = None
+            # Note: delta_y_from_agent was removed - it's agent-relative data that becomes stale.
+            # Use absolute support_y instead. Compute deltas at query time if needed.
             
-            fwd_cell['surface']['support_block'] = fwd_block
-            fwd_cell['surface']['surface_block_class'] = classify_block(fwd_block)
-            fwd_cell['surface']['is_fluid'] = is_fluid(fwd_block)
-            fwd_cell['surface']['is_partial_block'] = is_partial_block(fwd_block)
+            # Update surface only if we have block information
+            if fwd_block is not None:
+                fwd_cell['surface']['support_block'] = fwd_block
+                fwd_cell['surface']['surface_block_class'] = classify_block(fwd_block)
+                fwd_cell['surface']['is_fluid'] = is_fluid(fwd_block)
+                fwd_cell['surface']['is_partial_block'] = is_partial_block(fwd_block)
             
-            # Inferred observation
             fwd_cell['observability']['observed_from'] = {'x': obs_x, 'y': obs_y, 'z': obs_z}
             fwd_cell['observability']['observation_mode'] = 'inferred'
             fwd_cell['observability']['confidence'] = max(0.3, cell['observability']['confidence'] - 0.2)
@@ -618,48 +848,120 @@ class SpatialMap:
     
     # --- Reachability / Locomotion Queries ---
     
-    def cells_reachable(self, cx: int, cz: int, radius: int, max_delta_y: int = 1) -> List[Dict[str, Any]]:
-        """Get walkable cells within radius and delta_y constraint."""
+    def cells_reachable(self, cx: int, cz: int, radius: int, max_delta_y: int = 1, current_y: Optional[int] = None) -> List[Dict[str, Any]]:
+        """
+        Get walkable cells within radius and delta_y constraint.
+        
+        Note: "blocked" is now computed at query time. If current_y is provided,
+        cells blocked from current position will be excluded.
+        """
         results = []
         for cell in self.cells_within_radius(cx, cz, radius):
             if not cell.get('support', {}).get('walkable'):
                 continue
             
             movement_class = cell.get('support', {}).get('movement_class', 'unknown')
-            if movement_class in ['blocked', 'unknown']:
+            # Don't filter by 'blocked' - that's query-time now
+            if movement_class == 'unknown':
                 continue
             
-            # Check delta_y if available
-            delta_y = cell.get('support', {}).get('delta_y_from_agent')
-            if delta_y is not None and abs(delta_y) > max_delta_y:
-                continue
+            # Check if blocked from current position (query-time)
+            if current_y is not None:
+                cell_id = cell.get('cell_id', {})
+                cell_x, cell_z = cell_id.get('x', 0), cell_id.get('z', 0)
+                support_y = cell.get('support', {}).get('support_y')
+                if support_y is not None:
+                    target_y = support_y + 1  # Surface Y
+                    if self.is_blocked_from(cx, cz, current_y, cell_x, cell_z, target_y):
+                        continue  # Blocked from current position
+            
+            # Check delta_y if current_y is provided (compute at query time)
+            if current_y is not None:
+                cell_support_y = cell.get('support', {}).get('support_y')
+                if cell_support_y is not None:
+                    cell_surface_y = cell_support_y + 1  # Surface = support_y + 1
+                    delta_y = cell_surface_y - current_y
+                    if abs(delta_y) > max_delta_y:
+                        continue
             
             results.append(cell)
         return results
     
-    def cells_blocked(self) -> List[Dict[str, Any]]:
-        """Get all cells marked as blocked or unwalkable."""
-        return self.cells_matching(
-            lambda c: (
-                c.get('support', {}).get('movement_class') == 'blocked' or
-                not c.get('support', {}).get('walkable', False)
+    def cells_blocked(self, from_x: Optional[int] = None, from_z: Optional[int] = None, from_y: Optional[int] = None) -> List[Dict[str, Any]]:
+        """
+        Get cells that are blocked or unwalkable.
+        
+        If from_x, from_z, from_y are provided, computes blocking relative to that position (query-time).
+        Otherwise, returns all unwalkable cells (but not "blocked" since that's query-time now).
+        """
+        if from_x is not None and from_z is not None and from_y is not None:
+            # Query-time blocking computation
+            results = []
+            for cell in self.cells.values():
+                cell_id = cell.get('cell_id', {})
+                cell_x, cell_z = cell_id.get('x', 0), cell_id.get('z', 0)
+                support_y = cell.get('support', {}).get('support_y')
+                if support_y is not None:
+                    target_y = support_y + 1  # Surface Y
+                    if self.is_blocked_from(from_x, from_z, from_y, cell_x, cell_z, target_y):
+                        results.append(cell)
+            return results
+        else:
+            # Return unwalkable cells (but "blocked" is now query-time, so don't check movement_class)
+            return self.cells_matching(
+                lambda c: not c.get('support', {}).get('walkable', False)
             )
-        )
     
-    def cells_requiring_climb(self) -> List[Dict[str, Any]]:
-        """Get cells reachable only via upward movement."""
-        return self.cells_matching(
-            lambda c: c.get('support', {}).get('movement_class') == 'step_up'
-        )
+    def cells_requiring_climb(self, from_y: Optional[int] = None) -> List[Dict[str, Any]]:
+        """
+        Get cells reachable only via upward movement.
+        
+        If from_y is provided, computes step_up relative to that Y coordinate (query-time).
+        Otherwise, returns empty list (step_up is now query-time only).
+        """
+        if from_y is not None:
+            # Query-time computation: check if cell surface is above from_y
+            results = []
+            for cell in self.cells.values():
+                if not cell.get('support', {}).get('walkable'):
+                    continue
+                cell_support_y = cell.get('support', {}).get('support_y')
+                if cell_support_y is not None:
+                    cell_surface_y = cell_support_y + 1  # Surface = support_y + 1
+                    if cell_surface_y > from_y:  # Requires upward movement
+                        results.append(cell)
+            return results
+        else:
+            # step_up is now query-time only - return empty
+            return []
     
-    def cells_with_drop_risk(self) -> List[Dict[str, Any]]:
-        """Get cells involving unsafe descent."""
-        return self.cells_matching(
-            lambda c: (
-                c.get('support', {}).get('movement_class') == 'drop' or
-                (c.get('support', {}).get('delta_y_from_agent') or 0) < -1
+    def cells_with_drop_risk(self, from_y: Optional[int] = None) -> List[Dict[str, Any]]:
+        """
+        Get cells involving unsafe descent.
+        
+        If from_y is provided, computes drop risk relative to that Y coordinate (query-time).
+        Otherwise, only checks movement_class == 'drop'.
+        """
+        if from_y is not None:
+            # Query-time computation: check if cell surface is significantly below from_y
+            results = []
+            for cell in self.cells.values():
+                if cell.get('support', {}).get('movement_class') == 'drop':
+                    results.append(cell)
+                    continue
+                
+                cell_support_y = cell.get('support', {}).get('support_y')
+                if cell_support_y is not None:
+                    cell_surface_y = cell_support_y + 1  # Surface = support_y + 1
+                    delta_y = cell_surface_y - from_y
+                    if delta_y < -1:  # More than 1 block below
+                        results.append(cell)
+            return results
+        else:
+            # Only check movement_class
+            return self.cells_matching(
+                lambda c: c.get('support', {}).get('movement_class') == 'drop'
             )
-        )
     
     # --- Safety / Survival Queries ---
     
@@ -772,9 +1074,10 @@ class SpatialMap:
                     continue
             
             # Check reachability
+            # Note: "blocked" is now query-time, so we only check for 'unknown'
             if require_reachable:
                 movement = cell.get('support', {}).get('movement_class', 'unknown')
-                if movement in ['blocked', 'unknown']:
+                if movement == 'unknown':
                     continue
             
             results.append(cell)

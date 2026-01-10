@@ -387,7 +387,8 @@ def tool(input_value=None, **kwargs):
             )
         
         max_delta_y = int(kwargs.get('max_delta_y', 1))
-        cells = spatial_map.cells_reachable(x, z, radius, max_delta_y)
+        # Pass y if provided for query-time delta_y and blocking computation
+        cells = spatial_map.cells_reachable(x, z, radius, max_delta_y, current_y=y)
         result_text_parts.append(f"Reachable cells within radius {radius} (max_delta_y={max_delta_y}): {len(cells)}")
         result_text_parts.append(f"  {_format_cells_list(cells)}")
         
@@ -398,8 +399,13 @@ def tool(input_value=None, **kwargs):
         )
     
     elif query_type == 'cells-blocked':
-        cells = spatial_map.cells_blocked()
-        result_text_parts.append(f"Blocked cells: {len(cells)}")
+        # Pass x, z, y if provided for query-time blocking computation
+        # Otherwise returns unwalkable cells only (blocked is query-time)
+        cells = spatial_map.cells_blocked(from_x=x, from_z=z, from_y=y)
+        if x is not None and z is not None and y is not None:
+            result_text_parts.append(f"Blocked cells from ({x},{y},{z}): {len(cells)}")
+        else:
+            result_text_parts.append(f"Unwalkable cells (blocked is query-time, requires position): {len(cells)}")
         result_text_parts.append(f"  {_format_cells_list(cells)}")
         
         return executor._create_uniform_return(
@@ -409,8 +415,13 @@ def tool(input_value=None, **kwargs):
         )
     
     elif query_type == 'cells-requiring-climb':
-        cells = spatial_map.cells_requiring_climb()
-        result_text_parts.append(f"Cells requiring climb: {len(cells)}")
+        # Pass y if provided for query-time step_up computation
+        # Otherwise returns empty (step_up is query-time only)
+        cells = spatial_map.cells_requiring_climb(from_y=y)
+        if y is not None:
+            result_text_parts.append(f"Cells requiring climb from Y={y}: {len(cells)}")
+        else:
+            result_text_parts.append(f"Cells requiring climb: 0 (step_up is query-time, requires y parameter)")
         result_text_parts.append(f"  {_format_cells_list(cells)}")
         
         return executor._create_uniform_return(
@@ -420,8 +431,12 @@ def tool(input_value=None, **kwargs):
         )
     
     elif query_type == 'cells-with-drop-risk':
-        cells = spatial_map.cells_with_drop_risk()
-        result_text_parts.append(f"Cells with drop risk: {len(cells)}")
+        # Pass y if provided for query-time drop risk computation
+        cells = spatial_map.cells_with_drop_risk(from_y=y)
+        if y is not None:
+            result_text_parts.append(f"Cells with drop risk from Y={y}: {len(cells)}")
+        else:
+            result_text_parts.append(f"Cells with drop risk (absolute): {len(cells)}")
         result_text_parts.append(f"  {_format_cells_list(cells)}")
         
         return executor._create_uniform_return(

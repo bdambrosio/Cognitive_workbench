@@ -17,6 +17,7 @@ Query spatial memory for strategic information. Returns cells matching criteria 
 Common parameters:
 - `query`: Query type (see list below)
 - `x`, `z`: Center coordinates for radius-based queries
+- `y`: Y coordinate (optional, used for query-time computations)
 - `radius`: Search radius (default: 10)
 
 Query-specific parameters:
@@ -26,6 +27,12 @@ Query-specific parameters:
 - `min_dist`: Minimum distance for `cells-observed-from-distance`
 - `resource_type`: Resource type for `cells-with-resource`
 - `predicate`: Filter for `cells-nearest` (walkable, safe, hazard, resource)
+
+**Important**: Some queries now support query-time computation when `y` (and optionally `x`, `z`) are provided:
+- `cells-blocked`: Computes blocking relative to position (requires `x`, `z`, `y`)
+- `cells-reachable`: Computes delta_y and blocking relative to current position (uses `y` if provided)
+- `cells-requiring-climb`: Computes step_up relative to Y coordinate (requires `y`)
+- `cells-with-drop-risk`: Computes drop risk relative to Y coordinate (uses `y` if provided)
 
 ## Query Types
 
@@ -38,10 +45,12 @@ Coverage / Observability:
 - `cells-stale`: Cells with old observations
 
 Reachability / Locomotion:
-- `cells-reachable`: Walkable cells within delta_y constraint
-- `cells-blocked`: All blocked/unwalkable cells
-- `cells-requiring-climb`: Cells needing upward movement
-- `cells-with-drop-risk`: Cells involving unsafe descent
+- `cells-reachable`: Walkable cells within delta_y constraint (uses `y` for query-time delta_y and blocking)
+- `cells-blocked`: Blocked cells relative to position (requires `x`, `z`, `y`) or unwalkable cells if no position
+- `cells-requiring-climb`: Cells needing upward movement (requires `y` for query-time step_up computation)
+- `cells-with-drop-risk`: Cells involving unsafe descent (uses `y` for query-time drop risk computation)
+
+**Note**: "blocked", "step_up", and "step_down" are now query-time attributes computed relative to current position, not static cell properties. Provide `x`, `z`, `y` coordinates for accurate query-time computation.
 
 Safety / Survival:
 - `cells-safe-to-stand`: Low hazard, walkable cells

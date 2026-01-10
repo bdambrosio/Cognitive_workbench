@@ -1,7 +1,7 @@
 """
 Minecraft observe-blocks tool.
-Exhaustive enumeration of ALL visible non-air blocks within radius R.
-Visibility = within radius R AND line-of-sight from bot's eye position.
+Enumerates visible non-air blocks within radius R.
+Visibility = within radius R AND within forward view cone AND line-of-sight from bot's eye position.
 Does NOT report items (use mc-observe-items for that).
 """
 
@@ -252,7 +252,8 @@ def compute_confidence(blocks_complete: bool, blocks_elapsed_ms: float, nearby_b
 def tool(input_value=None, **kwargs):
     """
     Get exhaustive enumeration of ALL visible non-air blocks within radius R.
-    Visibility = within radius R AND line-of-sight from bot's eye position.
+    Visibility = within radius R AND within 120x120 degree forward cone (centered at pitch 0) AND line-of-sight from bot's eye position.
+    Uses raycast-based scanning to handle occlusion (rays terminate on opaque blocks).
     Does NOT report items (use mc-observe-items for that).
     
     Returns structured observation summary following enhanced schema.
@@ -264,9 +265,9 @@ def tool(input_value=None, **kwargs):
     minecraft_url = kwargs.get("world_url") or kwargs.get("minecraft_url") or DEFAULT_MINECRAFT_URL
     
     try:
-        # New minescript API uses simple radius parameter
-        radius = kwargs.get("blocks_radius") or kwargs.get("radius") or 4
-        radius = max(1, min(6, int(radius)))  # Clamp to valid range
+        # New bridge default: depth limit 7
+        radius = kwargs.get("blocks_radius") or kwargs.get("radius") or 7
+        radius = max(1, min(7, int(radius)))
         
         params = {"radius": radius}
         url = f"{minecraft_url}/observe"
@@ -289,6 +290,7 @@ def tool(input_value=None, **kwargs):
         pitch = status.get('pitch', 0.0)
         
         visibility_distances = perception.get('visibility_distances', {})
+        adjacent_blocks = perception.get('adjacent_blocks', {}) if isinstance(perception, dict) else {}
         nearby_blocks = perception.get('nearby_blocks', [])
         blocks_complete = perception.get('blocks_complete', True)
         blocks_elapsed_ms = perception.get('blocks_elapsed_ms', 0)
@@ -308,7 +310,7 @@ def tool(input_value=None, **kwargs):
         # dirs: directional visibility and blocks
         summary_parts.append("dirs:")
         dirs_info = {}
-        for dir_name, dir_key in [('fwd', 'forward'), ('back', 'back'), ('left', 'left'), 
+        for dir_name, dir_key in [('fwd', 'forward'), ('back', 'back'), ('left', 'left'),
                                    ('right', 'right'), ('up', 'up'), ('down', 'down')]:
             dist = visibility_distances.get(dir_key)
             if dist is not None:
@@ -319,26 +321,25 @@ def tool(input_value=None, **kwargs):
             # Find block at direction-specific positions
             # For forward/back/left/right: check at (dir:1, up:0) - the immediate adjacent block
             # For up/down: check at (forward:0, dir:1/-1)
-            blk = None
-            if dir_name == 'fwd':
-                # Check forward block at (forward:1, up:0) - critical for mc-staircase
-                pos = rel_to_abs(position, yaw, 1, 0, 0)
-                blk = find_block_at(nearby_blocks, *pos)
-            elif dir_name == 'back':
-                pos = rel_to_abs(position, yaw, -1, 0, 0)
-                blk = find_block_at(nearby_blocks, *pos)
-            elif dir_name == 'left':
-                pos = rel_to_abs(position, yaw, 0, -1, 0)
-                blk = find_block_at(nearby_blocks, *pos)
-            elif dir_name == 'right':
-                pos = rel_to_abs(position, yaw, 0, 1, 0)
-                blk = find_block_at(nearby_blocks, *pos)
-            elif dir_name == 'up':
-                pos = rel_to_abs(position, yaw, 0, 0, 1)
-                blk = find_block_at(nearby_blocks, *pos)
-            elif dir_name == 'down':
-                pos = rel_to_abs(position, yaw, 0, 0, -1)
-                blk = find_block_at(nearby_blocks, *pos)
+            # Prefer bridge-provided adjacent blocks (independent of cone-filtered nearby_blocks)
+            blk = adjacent_blocks.get(dir_name) if isinstance(adjacent_blocks, dict) else None
+            if blk is None:
+                # Fallback (legacy): search in nearby_blocks
+                pos = None
+                if dir_name == 'fwd':
+                    pos = rel_to_abs(position, yaw, 1, 0, 0)
+                elif dir_name == 'back':
+                    pos = rel_to_abs(position, yaw, -1, 0, 0)
+                elif dir_name == 'left':
+                    pos = rel_to_abs(position, yaw, 0, -1, 0)
+                elif dir_name == 'right':
+                    pos = rel_to_abs(position, yaw, 0, 1, 0)
+                elif dir_name == 'up':
+                    pos = rel_to_abs(position, yaw, 0, 0, 1)
+                elif dir_name == 'down':
+                    pos = rel_to_abs(position, yaw, 0, 0, -1)
+                if pos:
+                    blk = find_block_at(nearby_blocks, *pos)
             
             blk_str = blk if blk else "none"
             summary_parts.append(f"  {dir_name}:  dist: {dist_str},  blk: {blk_str}")
@@ -366,7 +367,30 @@ def tool(input_value=None, **kwargs):
             """
             Determine vertical support by probing downward past non-supporting blocks.
             forward_offset = 0 (here) or 1 (forward)
+            
+            For observer's location (forward_offset=0), prefer adjacent_blocks['down'] 
+            which is guaranteed to be the block directly below, independent of cone filtering.
             """
+            # For observer's location, check adjacent_blocks['down'] first (most reliable)
+            if forward_offset == 0:
+                down_blk = adjacent_blocks.get('down') if isinstance(adjacent_blocks, dict) else None
+                if down_blk and down_blk != 'air':
+                    block_name = down_blk if isinstance(down_blk, str) else str(down_blk)
+                    # Check if it's a non-supporting block (e.g., snow layer)
+                    if not any(block_name.startswith(ns) for ns in NON_SUPPORTING_BLOCKS):
+                        # Check if it's solid
+                        if is_solid(block_name):
+                            # Use dirs.down.dist if available, otherwise assume depth=1
+                            down_dist = dirs_info.get('down', {}).get('dist')
+                            depth = down_dist if down_dist is not None and down_dist > 0 else 1.0
+                            return {
+                                'type': 'solid',
+                                'block': block_name,
+                                'depth': depth
+                            }
+                        # If non-solid but exists, fall through to probe deeper
+            
+            # Probe downward using nearby_blocks (for forward or when adjacent_blocks fails)
             for dy in range(1, MAX_SUPPORT_PROBE + 1):
                 pos = rel_to_abs(position, yaw, forward_offset, 0, -dy)
                 block = find_block_at(nearby_blocks, *pos)

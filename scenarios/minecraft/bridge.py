@@ -15,7 +15,7 @@ import minescript as m  # pyright: ignore[reportMissingImports]
 
 HOST = "127.0.0.1"
 PORT = 3003
-MAX_RADIUS = 6
+MAX_RADIUS = 12
 
 # ------------------------------------------------------------------------------
 # Math & Coordinate Helpers
@@ -195,7 +195,8 @@ def compute_visibility_distances(radius: int) -> Dict[str, Optional[float]]:
             try:
                 try:
                     block = m.getblock(int(check_x), int(check_y), int(check_z))
-                except (AttributeError, TypeError):
+                except (AttributeError, TypeError) as e:
+                    print(f"[Bridge] compute_visibility_distances: ERROR getting block at {check_x},{check_y},{check_z}: {e}", flush=True)
                     block = m.get_block(int(check_x), int(check_y), int(check_z))
             except Exception:
                 continue
@@ -217,7 +218,7 @@ def compute_visibility_distances(radius: int) -> Dict[str, Optional[float]]:
         return None
     
     # Raycast in each direction
-    return {
+    result = {
         'forward': raycast_direction(forward_dx, 0, forward_dz, radius),
         'back': raycast_direction(back_dx, 0, back_dz, radius),
         'left': raycast_direction(left_dx, 0, left_dz, radius),
@@ -225,6 +226,7 @@ def compute_visibility_distances(radius: int) -> Dict[str, Optional[float]]:
         'up': raycast_direction(0, 1, 0, radius),
         'down': raycast_direction(0, -1, 0, radius),
     }
+    return result
 
 def is_position_visible(eye_x: float, eye_y: float, eye_z: float, target_x: int, target_y: int, target_z: int) -> bool:
     """Check if target block position is visible from eye position (not occluded)."""
@@ -281,125 +283,173 @@ def is_position_visible(eye_x: float, eye_y: float, eye_z: float, target_x: int,
     return True  # No occlusion found
 
 def scan_blocks(radius: int) -> List[Dict[str, Any]]:
-    """Scans blocks around the player efficiently with coarse angular grid occlusion culling."""
+    """
+    Candidate scan (cheap), then filter:
+    - Only blocks within a view cone (yaw ±60°, pitch: up 60° / down 90° relative to pitch=0)
+    - Only visible blocks (line-of-sight, via raycast)
+    """
     radius = max(1, min(MAX_RADIUS, radius))
     px, py, pz = get_player_pos()
     eye_y = py + 1.6  # Eye position
     cx, cy, cz = map(int, (px, py, pz))
     blocks = []
-    
-    # Coarse angular grid: 16 azimuth bins × 8 elevation bins = 128 bins
-    # Each bin tracks max visible distance (None = occluded)
-    AZIMUTH_BINS = 16
-    ELEVATION_BINS = 8
-    angular_grid = {}  # (azimuth_bin, elevation_bin) -> max_visible_distance
-    
-    def pos_to_angular_bin(bx: int, by: int, bz: int) -> tuple:
-        """Convert block position to angular grid bin coordinates."""
-        # Vector from eye to block center
-        dx = bx + 0.5 - px
-        dy = by + 0.5 - eye_y
-        dz = bz + 0.5 - pz
-        
+
+    yaw_deg, _ = get_player_rot()
+    yaw_rad = math.radians(yaw_deg)
+    fwd_dx = -math.sin(yaw_rad)
+    fwd_dz = math.cos(yaw_rad)
+
+    def in_view_cone(bx: int, by: int, bz: int) -> bool:
+        dx = (bx + 0.5) - px
+        dy = (by + 0.5) - eye_y
+        dz = (bz + 0.5) - pz
+
+        dist_h = math.sqrt(dx * dx + dz * dz)
+        if dist_h > 0.001:
+            vx_h = dx / dist_h
+            vz_h = dz / dist_h
+            if (vx_h * fwd_dx + vz_h * fwd_dz) < 0.5:  # cos(60°)
+                return False
+
+        pitch_deg = math.degrees(math.atan2(-dy, dist_h))
+        return (-60.0 <= pitch_deg <= 90.0)
+
+    max_blocks = 200
+    visited = set()
+    block_cache: Dict[Tuple[int, int, int], Optional[str]] = {}
+
+    transparent_blocks = {'air', 'glass', 'water', 'ice', 'leaves', 'slab', 'stairs',
+                          'fence', 'fence_gate', 'wall', 'ladder', 'vine', 'cobweb'}
+
+    def get_block_name(bx: int, by: int, bz: int) -> Optional[str]:
+        """Return block name at coords, or None if air/unknown. Cached to reduce getblock calls."""
+        key = (bx, by, bz)
+        if key in block_cache:
+            return block_cache[key]
+
+        try:
+            try:
+                block = m.getblock(bx, by, bz)
+            except (AttributeError, TypeError):
+                block = m.get_block(bx, by, bz)
+        except Exception:
+            block_cache[key] = None
+            return None
+
+        block_name = None
+        if isinstance(block, str):
+            block_name = block
+        elif block:
+            if hasattr(block, 'is_air') and block.is_air():
+                block_cache[key] = None
+                return None
+            block_name = getattr(block, 'name', str(block))
+
+        if not block_name:
+            block_cache[key] = None
+            return None
+
+        block_name_lower = block_name.lower()
+        if block_name_lower in ('air', 'minecraft:air', '') or 'air' in block_name_lower:
+            block_cache[key] = None
+            return None
+
+        block_cache[key] = block_name
+        return block_name
+
+    def is_position_visible_cached(target_x: int, target_y: int, target_z: int) -> bool:
+        """Line-of-sight check using cached block reads."""
+        dx = target_x + 0.5 - px  # Block center
+        dy = target_y + 0.5 - eye_y
+        dz = target_z + 0.5 - pz
         dist = math.sqrt(dx*dx + dy*dy + dz*dz)
         if dist < 0.1:
-            return (0, 0)  # Too close, use center bin
-        
-        # Azimuth: 0-360 degrees (0 = +Z, 90 = -X, 180 = -Z, 270 = +X)
-        azimuth_rad = math.atan2(-dx, dz)  # Minecraft convention
-        azimuth_deg = math.degrees(azimuth_rad)
-        if azimuth_deg < 0:
-            azimuth_deg += 360
-        azimuth_bin = int((azimuth_deg / 360.0) * AZIMUTH_BINS) % AZIMUTH_BINS
-        
-        # Elevation: -90 to +90 degrees (-90 = down, 0 = horizontal, +90 = up)
-        dist_horizontal = math.sqrt(dx*dx + dz*dz)
-        elevation_rad = math.atan2(-dy, dist_horizontal)
-        elevation_deg = math.degrees(elevation_rad)
-        # Map -90..+90 to 0..ELEVATION_BINS-1
-        elevation_bin = int(((elevation_deg + 90) / 180.0) * ELEVATION_BINS)
-        elevation_bin = max(0, min(ELEVATION_BINS - 1, elevation_bin))
-        
-        return (azimuth_bin, elevation_bin)
-    
-    # Transparent blocks (don't occlude)
-    transparent_blocks = {'air', 'glass', 'water', 'ice', 'leaves', 'slab', 'stairs', 
-                          'fence', 'fence_gate', 'wall', 'ladder', 'vine', 'cobweb'}
-    
-    max_blocks = 200
-    block_count = 0
-    
-    # Iterate by distance shells (Manhattan distance for simplicity)
+            return True
+
+        dx /= dist
+        dy /= dist
+        dz /= dist
+
+        step = 0.5
+        steps = int(dist / step)
+
+        for i in range(1, steps):
+            check_dist = i * step
+            cx_i = int(px + dx * check_dist)
+            cy_i = int(eye_y + dy * check_dist)
+            cz_i = int(pz + dz * check_dist)
+
+            if cx_i == target_x and cy_i == target_y and cz_i == target_z:
+                return True
+
+            bname = get_block_name(cx_i, cy_i, cz_i)
+            if not bname:
+                continue
+
+            b_lower = bname.lower()
+            is_transparent = False
+            for t in transparent_blocks:
+                if t in b_lower:
+                    is_transparent = True
+                    break
+            if not is_transparent:
+                return False
+
+        return True
+
     for shell_dist in range(1, radius + 1):
-        if block_count >= max_blocks:
+        if len(blocks) >= max_blocks:
             break
-        
-        # Generate all positions at this Manhattan distance
+
         shell_positions = []
         for dx in range(-shell_dist, shell_dist + 1):
             for dy in range(-shell_dist, shell_dist + 1):
                 for dz in range(-shell_dist, shell_dist + 1):
-                    manhattan_dist = abs(dx) + abs(dy) + abs(dz)
-                    if manhattan_dist == shell_dist:
+                    if abs(dx) + abs(dy) + abs(dz) == shell_dist:
                         shell_positions.append((dx, dy, dz))
-        
-        # Sort by priority: horizontal layer first (dy=0), then above/below
+
         shell_positions.sort(key=lambda p: (abs(p[1]), p[1]))
-        
+
         for dx, dy, dz in shell_positions:
-            if block_count >= max_blocks:
+            if len(blocks) >= max_blocks:
                 break
-            
+
             bx, by, bz = cx + dx, cy + dy, cz + dz
-            
-            # Get angular bin for this block
-            azimuth_bin, elevation_bin = pos_to_angular_bin(bx, by, bz)
-            bin_key = (azimuth_bin, elevation_bin)
-            
-            # Calculate Euclidean distance
-            euclidean_dist = math.sqrt(dx*dx + dy*dy + dz*dz)
-            
-            # Check if this angular bin is occluded at this distance
-            max_visible = angular_grid.get(bin_key)
-            if max_visible is not None and euclidean_dist > max_visible:
-                continue  # Occluded - skip
-            
-            # Check the block
-            block_name = None
-            try:
-                try:
-                    block = m.getblock(bx, by, bz)
-                except (AttributeError, TypeError):
-                    block = m.get_block(bx, by, bz)
-            except Exception:
+            if (bx, by, bz) in visited:
                 continue
-            
-            if isinstance(block, str):
-                block_name = block
-            elif block:
-                if hasattr(block, 'is_air') and block.is_air():
-                    continue
-                block_name = getattr(block, 'name', str(block))
-            else:
+            visited.add((bx, by, bz))
+
+            if not in_view_cone(bx, by, bz):
                 continue
-            
-            # Filter out air blocks
-            if block_name and block_name.lower() not in ('air', 'minecraft:air', ''):
-                blocks.append({
-                    "name": block_name,
-                    "position": {"x": bx, "y": by, "z": bz},
-                    "dx": dx,
-                    "dy": dy,
-                    "dz": dz,
-                })
-                block_count += 1
-                
-                # If block is opaque, mark this angular bin as occluded beyond this distance
-                block_name_lower = block_name.lower()
-                if block_name_lower not in transparent_blocks and 'air' not in block_name_lower:
-                    # Mark bin as occluded beyond this distance
-                    angular_grid[bin_key] = euclidean_dist
-            
+
+            block_name = get_block_name(bx, by, bz)
+            if not block_name:
+                continue
+
+            if not is_position_visible_cached(bx, by, bz):
+                continue
+
+            blocks.append({
+                "name": block_name,
+                "position": {"x": bx, "y": by, "z": bz},
+                "dx": dx,
+                "dy": dy,
+                "dz": dz,
+            })
+
+    # Tri-state surface tagging: True/False/"unknown", derived from already-retrieved blocks.
+    # Surface=True if block above is known-air, False if known-non-air, unknown otherwise.
+    for b in blocks:
+        pos = b.get("position") or {}
+        bx = int(pos.get("x", 0))
+        by = int(pos.get("y", 0))
+        bz = int(pos.get("z", 0))
+        above_key = (bx, by + 1, bz)
+        if above_key in block_cache:
+            b["surface"] = block_cache[above_key] is None
+        else:
+            b["surface"] = "unknown"
+
     return blocks
 
 def scan_entities(radius: int, entity_filter: Optional[str] = None) -> List[Dict[str, Any]]:
@@ -433,6 +483,19 @@ def scan_entities(radius: int, entity_filter: Optional[str] = None) -> List[Dict
                     entity_list = entities_func()
                 except:
                     entity_list = []
+            
+            # Helper for visibility check
+            # We must respect the 120x120 cone and line-of-sight
+            yaw_deg, _ = get_player_rot()
+            yaw_rad = math.radians(yaw_deg)
+            # View vector (horizontal only for cone check logic, or full 3D?)
+            # Requirement: "120 x 120 degrees, centered fwd at pitch 0"
+            # So we check relative yaw and relative pitch from (yaw, 0)
+            
+            # Forward vector at pitch 0
+            # dx = -sin(yaw), dz = cos(yaw)
+            fwd_dx = -math.sin(yaw_rad)
+            fwd_dz = math.cos(yaw_rad)
             
             if entity_list:
                 for entity in entity_list:
@@ -468,43 +531,84 @@ def scan_entities(radius: int, entity_filter: Optional[str] = None) -> List[Dict
                             continue
                     
                     # Calculate distance if not provided
-                    if entity_pos and distance is None:
-                        dx, dy, dz = entity_pos[0] - px, entity_pos[1] - py, entity_pos[2] - pz
-                        distance = math.sqrt(dx*dx + dy*dy + dz*dz)
+                    if entity_pos:
+                        ex, ey, ez = entity_pos
+                        dx, dy, dz = ex - px, ey - py, ez - pz
+                        curr_dist = math.sqrt(dx*dx + dy*dy + dz*dz)
+                    else:
+                        continue
+                        
+                    # 1. Distance Check
+                    if curr_dist > radius:
+                        continue
+                        
+                    # 2. Cone Check
+                    # Vector to entity
+                    if curr_dist < 0.1:
+                        # Too close, always visible
+                        pass
+                    else:
+                        vx, vy, vz = dx/curr_dist, dy/curr_dist, dz/curr_dist
+                        
+                        # Dot product with forward vector (horizontal) for yaw
+                        # Project v onto xz plane
+                        v_horiz_dist = math.sqrt(vx*vx + vz*vz)
+                        if v_horiz_dist > 0.001:
+                            vx_h, vz_h = vx/v_horiz_dist, vz/v_horiz_dist
+                            dot_h = vx_h * fwd_dx + vz_h * fwd_dz
+                            # cos(60) = 0.5. If dot < 0.5, outside 120 deg cone
+                            if dot_h < 0.5:
+                                continue
+                                
+                        # Pitch check: angle from horizon, allow up 60° and down 90°
+                        dist_h = math.sqrt(dx*dx + dz*dz)
+                        pitch_deg = math.degrees(math.atan2(-dy, dist_h))
+                        if pitch_deg < -60.0 or pitch_deg > 90.0:
+                            continue
+
+                    # 3. Occlusion Check
+                    eye_y_pos = py + 1.6
+                    if not is_position_visible(px, eye_y_pos, pz, int(ex), int(ey), int(ez)):
+                         continue
+
+                    # Entity is valid
+                    entity_data = {
+                        "name": str(entity_type) if entity_type else "unknown",
+                        "type": str(entity_type) if entity_type else "unknown",
+                        "distance": round(curr_dist, 2),
+                        "dx": round(dx, 2),
+                        "dy": round(dy, 2),
+                        "dz": round(dz, 2),
+                    }
                     
-                    # Only include entities within radius
-                    if distance and distance <= radius:
-                        entity_data = {
-                            "type": str(entity_type) if entity_type else "unknown",
-                            "distance": round(distance, 2),
-                        }
+                    if entity_pos:
+                        entity_data["position"] = {"x": entity_pos[0], "y": entity_pos[1], "z": entity_pos[2]}
+                    
+                    # For item entities, extract item name and count
+                    if entity_filter == "items" or (entity_type and "item" in str(entity_type).lower()):
+                        item_name = None
+                        item_count = 1
                         
-                        if entity_pos:
-                            entity_data["position"] = {"x": entity_pos[0], "y": entity_pos[1], "z": entity_pos[2]}
+                        # Try to get item name from entity
+                        if isinstance(entity, dict):
+                            item_name = entity.get('item_name') or entity.get('item')
+                            item_count = entity.get('count', entity.get('item_count', 1))
+                        elif hasattr(entity, 'item'):
+                            item = entity.item
+                            if isinstance(item, str):
+                                item_name = item
+                            elif hasattr(item, 'name'):
+                                item_name = item.name
+                            if hasattr(entity, 'count'):
+                                item_count = entity.count
                         
-                        # For item entities, extract item name and count
-                        if entity_filter == "items" or (entity_type and "item" in str(entity_type).lower()):
-                            item_name = None
-                            item_count = 1
-                            
-                            # Try to get item name from entity
-                            if isinstance(entity, dict):
-                                item_name = entity.get('item_name') or entity.get('item')
-                                item_count = entity.get('count', entity.get('item_count', 1))
-                            elif hasattr(entity, 'item'):
-                                item = entity.item
-                                if isinstance(item, str):
-                                    item_name = item
-                                elif hasattr(item, 'name'):
-                                    item_name = item.name
-                                if hasattr(entity, 'count'):
-                                    item_count = entity.count
-                            
-                            if item_name:
-                                entity_data["item_name"] = item_name
-                                entity_data["item_count"] = int(item_count) if item_count else 1
-                        
-                        entities.append(entity_data)
+                        if item_name:
+                            entity_data["item_name"] = item_name
+                            entity_data["item_count"] = int(item_count) if item_count else 1
+                            # Align with block convention: prefer item name as display name
+                            entity_data["name"] = item_name
+                    
+                    entities.append(entity_data)
     except Exception as e:
         print(f"[Bridge] scan_entities: failed to scan entities: {e}")
     
@@ -1172,7 +1276,7 @@ class BridgeHandler(BaseHTTPRequestHandler):
             observe_start = time.time()
             parsed = urlparse(self.path)
             query_params = parse_qs(parsed.query)
-            radius = max(1, min(MAX_RADIUS, int(query_params.get("radius", query_params.get("entities_radius", ["5"]))[0])))
+            radius = max(1, min(MAX_RADIUS, int(query_params.get("radius", query_params.get("entities_radius", ["7"]))[0])))
             entity_filter = query_params.get("entity_filter", [None])[0]  # "items" or None
             
             # Expected format: {"ok": True, "status": {...}, "perception": {"nearby_blocks": [...], "nearby_entities": [...], "visibility_distances": {...}}}
@@ -1180,12 +1284,55 @@ class BridgeHandler(BaseHTTPRequestHandler):
             vis_start = time.time()
             visibility_distances = compute_visibility_distances(radius)
             vis_elapsed = (time.time() - vis_start) * 1000
-            print(f"[Bridge] /observe: visibility_distances took {vis_elapsed:.1f}ms")
+            print(f"[Bridge] /observe: visibility_distances took {vis_elapsed:.1f}ms", flush=True)
             
             blocks_start = time.time()
             nearby_blocks = scan_blocks(radius)
             blocks_elapsed = (time.time() - blocks_start) * 1000
-            print(f"[Bridge] /observe: scan_blocks took {blocks_elapsed:.1f}ms, found {len(nearby_blocks)} blocks")
+            print(f"[Bridge] /observe: scan_blocks took {blocks_elapsed:.1f}ms, found {len(nearby_blocks)} blocks", flush=True)
+
+            # Adjacent blocks around the player (for directional reasoning).
+            # This is intentionally independent of the cone-filtered nearby_blocks list.
+            def _get_block_name_at(bx: int, by: int, bz: int) -> Optional[str]:
+                try:
+                    try:
+                        blk = m.getblock(bx, by, bz)
+                    except (AttributeError, TypeError):
+                        blk = m.get_block(bx, by, bz)
+                except Exception:
+                    return None
+
+                if isinstance(blk, str):
+                    name = blk
+                elif blk:
+                    if hasattr(blk, 'is_air') and blk.is_air():
+                        return None
+                    name = getattr(blk, 'name', str(blk))
+                else:
+                    return None
+
+                if not name:
+                    return None
+                lower = name.lower()
+                if lower in ('air', 'minecraft:air', '') or 'air' in lower:
+                    return None
+                return name
+
+            fwd_x, fwd_y, fwd_z = rel_to_abs({"forward": 1, "right": 0, "up": 0})
+            back_x, back_y, back_z = rel_to_abs({"forward": -1, "right": 0, "up": 0})
+            left_x, left_y, left_z = rel_to_abs({"forward": 0, "right": -1, "up": 0})
+            right_x, right_y, right_z = rel_to_abs({"forward": 0, "right": 1, "up": 0})
+            up_x, up_y, up_z = rel_to_abs({"forward": 0, "right": 0, "up": 1})
+            down_x, down_y, down_z = rel_to_abs({"forward": 0, "right": 0, "up": -1})
+
+            adjacent_blocks = {
+                "fwd": _get_block_name_at(fwd_x, fwd_y, fwd_z),
+                "back": _get_block_name_at(back_x, back_y, back_z),
+                "left": _get_block_name_at(left_x, left_y, left_z),
+                "right": _get_block_name_at(right_x, right_y, right_z),
+                "up": _get_block_name_at(up_x, up_y, up_z),
+                "down": _get_block_name_at(down_x, down_y, down_z),
+            }
             
             # Scan entities if entity_filter is specified (optimization: skip if not needed)
             # entity_filter can be "items" (filter items only), "" (all entities), or None (skip)
@@ -1212,6 +1359,7 @@ class BridgeHandler(BaseHTTPRequestHandler):
                     "nearby_blocks": nearby_blocks,
                     "nearby_entities": nearby_entities,
                     "visibility_distances": visibility_distances,
+                    "adjacent_blocks": adjacent_blocks,
                     "blocks_complete": True,
                     "blocks_elapsed_ms": int(blocks_elapsed),
                     "entities_complete": True,

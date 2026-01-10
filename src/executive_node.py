@@ -1125,7 +1125,9 @@ class ZenohExecutiveNode:
                 else:
                     action_data['result'] = json.dumps(result) if not isinstance(result, str) else result
             
-            self.action_publisher.put(json.dumps(action_data))
+            serialized_action = json.dumps(action_data)
+            logger.info(f"ACTION_LOG {normalized_type}: {serialized_action}")
+            self.action_publisher.put(serialized_action)
             self.action_counter += 1
         except Exception as e:
             logger.error(f'Error publishing action result: {e}')

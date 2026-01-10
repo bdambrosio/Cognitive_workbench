@@ -3,512 +3,21 @@
     "version": "1.0",
     "agent_name": "Jill",
     "world_name": "minecraft",
-    "created_at": "2026-01-09T00:15:50.078491",
-    "updated_at": "2026-01-09T19:24:53.023666",
-    "cell_count": 12
+    "created_at": "2026-01-10T19:36:29.228142",
+    "updated_at": "2026-01-10T19:36:31.319945",
+    "cell_count": 4
   },
   "cells": {
-    "-122,-154": {
+    "-122,-164": {
       "cell_version": "1.0",
       "cell_id": {
         "x": -122,
-        "z": -154
-      },
-      "support": {
-        "walkable": false,
-        "support_y": 71,
-        "delta_y_from_agent": 0,
-        "movement_class": "blocked"
-      },
-      "surface": {
-        "support_block": null,
-        "surface_block_class": "unknown",
-        "is_fluid": false,
-        "is_partial_block": false
-      },
-      "hazards": {
-        "flags": [],
-        "exposure_risk": "medium",
-        "escape_difficulty": "easy"
-      },
-      "resources": {
-        "resources_visible": [],
-        "harvest_actions": [],
-        "tool_required": "unknown"
-      },
-      "environment": {
-        "light_level": "high",
-        "spawn_risk": "low",
-        "time_sensitive": false
-      },
-      "observability": {
-        "observed_from": {
-          "x": -122,
-          "y": 72,
-          "z": -154
-        },
-        "observation_mode": "direct",
-        "confidence": 0.7,
-        "last_observed_at": "2026-01-09T00:15:51.070658"
-      },
-      "provenance": {
-        "updated_by": "Jill",
-        "update_reason": "mc-observe-blocks"
-      },
-      "waypoints": []
-    },
-    "-123,-154": {
-      "cell_version": "1.0",
-      "cell_id": {
-        "x": -123,
-        "z": -154
-      },
-      "support": {
-        "walkable": false,
-        "support_y": null,
-        "delta_y_from_agent": null,
-        "movement_class": "unknown"
-      },
-      "surface": {
-        "support_block": null,
-        "surface_block_class": "unknown",
-        "is_fluid": false,
-        "is_partial_block": false
-      },
-      "hazards": {
-        "flags": [],
-        "exposure_risk": "unknown",
-        "escape_difficulty": "unknown"
-      },
-      "resources": {
-        "resources_visible": [],
-        "harvest_actions": [],
-        "tool_required": "unknown"
-      },
-      "environment": {
-        "light_level": "unknown",
-        "spawn_risk": "unknown",
-        "time_sensitive": false
-      },
-      "observability": {
-        "observed_from": {
-          "x": -122,
-          "y": 72,
-          "z": -154
-        },
-        "observation_mode": "inferred",
-        "confidence": 0.49999999999999994,
-        "last_observed_at": "2026-01-09T00:15:51.070658"
-      },
-      "provenance": {
-        "updated_by": "Jill",
-        "update_reason": "forward_inference"
-      },
-      "waypoints": []
-    },
-    "-126,-154": {
-      "cell_version": "1.0",
-      "cell_id": {
-        "x": -126,
-        "z": -154
-      },
-      "support": {
-        "walkable": false,
-        "support_y": 71,
-        "delta_y_from_agent": 0,
-        "movement_class": "blocked"
-      },
-      "surface": {
-        "support_block": null,
-        "surface_block_class": "unknown",
-        "is_fluid": false,
-        "is_partial_block": false
-      },
-      "hazards": {
-        "flags": [],
-        "exposure_risk": "medium",
-        "escape_difficulty": "easy"
-      },
-      "resources": {
-        "resources_visible": [],
-        "harvest_actions": [],
-        "tool_required": "unknown"
-      },
-      "environment": {
-        "light_level": "high",
-        "spawn_risk": "low",
-        "time_sensitive": false
-      },
-      "observability": {
-        "observed_from": {
-          "x": -126,
-          "y": 72,
-          "z": -154
-        },
-        "observation_mode": "direct",
-        "confidence": 0.7,
-        "last_observed_at": "2026-01-09T00:16:33.160966"
-      },
-      "provenance": {
-        "updated_by": "Jill",
-        "update_reason": "mc-observe-blocks"
-      },
-      "waypoints": []
-    },
-    "-127,-154": {
-      "cell_version": "1.0",
-      "cell_id": {
-        "x": -127,
-        "z": -154
-      },
-      "support": {
-        "walkable": false,
-        "support_y": null,
-        "delta_y_from_agent": null,
-        "movement_class": "unknown"
-      },
-      "surface": {
-        "support_block": null,
-        "surface_block_class": "unknown",
-        "is_fluid": false,
-        "is_partial_block": false
-      },
-      "hazards": {
-        "flags": [],
-        "exposure_risk": "unknown",
-        "escape_difficulty": "unknown"
-      },
-      "resources": {
-        "resources_visible": [],
-        "harvest_actions": [],
-        "tool_required": "unknown"
-      },
-      "environment": {
-        "light_level": "unknown",
-        "spawn_risk": "unknown",
-        "time_sensitive": false
-      },
-      "observability": {
-        "observed_from": {
-          "x": -126,
-          "y": 72,
-          "z": -154
-        },
-        "observation_mode": "inferred",
-        "confidence": 0.49999999999999994,
-        "last_observed_at": "2026-01-09T00:16:33.160966"
-      },
-      "provenance": {
-        "updated_by": "Jill",
-        "update_reason": "forward_inference"
-      },
-      "waypoints": []
-    },
-    "-126,-162": {
-      "cell_version": "1.0",
-      "cell_id": {
-        "x": -126,
-        "z": -162
-      },
-      "support": {
-        "walkable": false,
-        "support_y": 71,
-        "delta_y_from_agent": 0,
-        "movement_class": "blocked"
-      },
-      "surface": {
-        "support_block": null,
-        "surface_block_class": "unknown",
-        "is_fluid": false,
-        "is_partial_block": false
-      },
-      "hazards": {
-        "flags": [],
-        "exposure_risk": "medium",
-        "escape_difficulty": "easy"
-      },
-      "resources": {
-        "resources_visible": [],
-        "harvest_actions": [],
-        "tool_required": "unknown"
-      },
-      "environment": {
-        "light_level": "high",
-        "spawn_risk": "low",
-        "time_sensitive": false
-      },
-      "observability": {
-        "observed_from": {
-          "x": -126,
-          "y": 72,
-          "z": -162
-        },
-        "observation_mode": "direct",
-        "confidence": 0.7,
-        "last_observed_at": "2026-01-09T19:08:52.572667"
-      },
-      "provenance": {
-        "updated_by": "Jill",
-        "update_reason": "mc-observe-blocks"
-      },
-      "waypoints": []
-    },
-    "-126,-161": {
-      "cell_version": "1.0",
-      "cell_id": {
-        "x": -126,
-        "z": -161
-      },
-      "support": {
-        "walkable": false,
-        "support_y": null,
-        "delta_y_from_agent": null,
-        "movement_class": "unknown"
-      },
-      "surface": {
-        "support_block": null,
-        "surface_block_class": "unknown",
-        "is_fluid": false,
-        "is_partial_block": false
-      },
-      "hazards": {
-        "flags": [],
-        "exposure_risk": "unknown",
-        "escape_difficulty": "unknown"
-      },
-      "resources": {
-        "resources_visible": [],
-        "harvest_actions": [],
-        "tool_required": "unknown"
-      },
-      "environment": {
-        "light_level": "unknown",
-        "spawn_risk": "unknown",
-        "time_sensitive": false
-      },
-      "observability": {
-        "observed_from": {
-          "x": -126,
-          "y": 72,
-          "z": -162
-        },
-        "observation_mode": "inferred",
-        "confidence": 0.49999999999999994,
-        "last_observed_at": "2026-01-09T19:08:52.572667"
-      },
-      "provenance": {
-        "updated_by": "Jill",
-        "update_reason": "forward_inference"
-      },
-      "waypoints": []
-    },
-    "-122,-162": {
-      "cell_version": "1.0",
-      "cell_id": {
-        "x": -122,
-        "z": -162
-      },
-      "support": {
-        "walkable": false,
-        "support_y": 71,
-        "delta_y_from_agent": 0,
-        "movement_class": "blocked"
-      },
-      "surface": {
-        "support_block": null,
-        "surface_block_class": "unknown",
-        "is_fluid": false,
-        "is_partial_block": false
-      },
-      "hazards": {
-        "flags": [],
-        "exposure_risk": "medium",
-        "escape_difficulty": "easy"
-      },
-      "resources": {
-        "resources_visible": [],
-        "harvest_actions": [],
-        "tool_required": "unknown"
-      },
-      "environment": {
-        "light_level": "high",
-        "spawn_risk": "low",
-        "time_sensitive": false
-      },
-      "observability": {
-        "observed_from": {
-          "x": -122,
-          "y": 72,
-          "z": -162
-        },
-        "observation_mode": "direct",
-        "confidence": 0.7,
-        "last_observed_at": "2026-01-09T19:10:02.491265"
-      },
-      "provenance": {
-        "updated_by": "Jill",
-        "update_reason": "mc-observe-blocks"
-      },
-      "waypoints": []
-    },
-    "-121,-162": {
-      "cell_version": "1.0",
-      "cell_id": {
-        "x": -121,
-        "z": -162
-      },
-      "support": {
-        "walkable": true,
-        "support_y": 70,
-        "delta_y_from_agent": -1,
-        "movement_class": "unknown"
-      },
-      "surface": {
-        "support_block": "minecraft:dirt",
-        "surface_block_class": "dirt",
-        "is_fluid": false,
-        "is_partial_block": false
-      },
-      "hazards": {
-        "flags": [],
-        "exposure_risk": "unknown",
-        "escape_difficulty": "unknown"
-      },
-      "resources": {
-        "resources_visible": [],
-        "harvest_actions": [],
-        "tool_required": "unknown"
-      },
-      "environment": {
-        "light_level": "unknown",
-        "spawn_risk": "unknown",
-        "time_sensitive": false
-      },
-      "observability": {
-        "observed_from": {
-          "x": -122,
-          "y": 72,
-          "z": -162
-        },
-        "observation_mode": "inferred",
-        "confidence": 0.49999999999999994,
-        "last_observed_at": "2026-01-09T19:10:02.491265"
-      },
-      "provenance": {
-        "updated_by": "Jill",
-        "update_reason": "forward_inference"
-      },
-      "waypoints": []
-    },
-    "-119,-162": {
-      "cell_version": "1.0",
-      "cell_id": {
-        "x": -119,
-        "z": -162
-      },
-      "support": {
-        "walkable": false,
-        "support_y": 71,
-        "delta_y_from_agent": 0,
-        "movement_class": "blocked"
-      },
-      "surface": {
-        "support_block": null,
-        "surface_block_class": "unknown",
-        "is_fluid": false,
-        "is_partial_block": false
-      },
-      "hazards": {
-        "flags": [],
-        "exposure_risk": "medium",
-        "escape_difficulty": "easy"
-      },
-      "resources": {
-        "resources_visible": [],
-        "harvest_actions": [],
-        "tool_required": "unknown"
-      },
-      "environment": {
-        "light_level": "unknown",
-        "spawn_risk": "unknown",
-        "time_sensitive": false
-      },
-      "observability": {
-        "observed_from": {
-          "x": -119,
-          "y": 72,
-          "z": -162
-        },
-        "observation_mode": "direct",
-        "confidence": 0.7,
-        "last_observed_at": "2026-01-09T19:22:20.046810"
-      },
-      "provenance": {
-        "updated_by": "Jill",
-        "update_reason": "mc-observe-blocks"
-      },
-      "waypoints": []
-    },
-    "-118,-162": {
-      "cell_version": "1.0",
-      "cell_id": {
-        "x": -118,
-        "z": -162
-      },
-      "support": {
-        "walkable": true,
-        "support_y": 71,
-        "delta_y_from_agent": 0,
-        "movement_class": "unknown"
-      },
-      "surface": {
-        "support_block": "minecraft:dirt",
-        "surface_block_class": "dirt",
-        "is_fluid": false,
-        "is_partial_block": false
-      },
-      "hazards": {
-        "flags": [],
-        "exposure_risk": "unknown",
-        "escape_difficulty": "unknown"
-      },
-      "resources": {
-        "resources_visible": [],
-        "harvest_actions": [],
-        "tool_required": "unknown"
-      },
-      "environment": {
-        "light_level": "unknown",
-        "spawn_risk": "unknown",
-        "time_sensitive": false
-      },
-      "observability": {
-        "observed_from": {
-          "x": -119,
-          "y": 72,
-          "z": -162
-        },
-        "observation_mode": "inferred",
-        "confidence": 0.49999999999999994,
-        "last_observed_at": "2026-01-09T19:22:20.046810"
-      },
-      "provenance": {
-        "updated_by": "Jill",
-        "update_reason": "forward_inference"
-      },
-      "waypoints": []
-    },
-    "-120,-164": {
-      "cell_version": "1.0",
-      "cell_id": {
-        "x": -120,
         "z": -164
       },
       "support": {
         "walkable": false,
-        "support_y": 70,
-        "delta_y_from_agent": 0,
-        "movement_class": "blocked"
+        "support_y": null,
+        "movement_class": "unknown"
       },
       "surface": {
         "support_block": null,
@@ -516,10 +25,66 @@
         "is_fluid": false,
         "is_partial_block": false
       },
+      "obstructions": {
+        "blocks_at_y": {}
+      },
       "hazards": {
         "flags": [],
-        "exposure_risk": "medium",
-        "escape_difficulty": "easy"
+        "exposure_risk": "unknown",
+        "escape_difficulty": "unknown"
+      },
+      "resources": {
+        "resources_visible": [],
+        "harvest_actions": [],
+        "tool_required": "unknown"
+      },
+      "environment": {
+        "light_level": "high",
+        "spawn_risk": "low",
+        "time_sensitive": false
+      },
+      "observability": {
+        "observed_from": {
+          "x": -122,
+          "y": 72,
+          "z": -164
+        },
+        "observation_mode": "direct",
+        "confidence": 0.7,
+        "last_observed_at": "2026-01-10T19:36:31.319668"
+      },
+      "provenance": {
+        "updated_by": "Jill",
+        "update_reason": "mc-observe-blocks"
+      },
+      "waypoints": []
+    },
+    "-122,-163": {
+      "cell_version": "1.0",
+      "cell_id": {
+        "x": -122,
+        "z": -163
+      },
+      "support": {
+        "walkable": false,
+        "support_y": null,
+        "movement_class": "unknown"
+      },
+      "surface": {
+        "support_block": null,
+        "surface_block_class": "unknown",
+        "is_fluid": false,
+        "is_partial_block": false
+      },
+      "obstructions": {
+        "blocks_at_y": {
+          "72": "minecraft:snow[layers=1]"
+        }
+      },
+      "hazards": {
+        "flags": [],
+        "exposure_risk": "unknown",
+        "escape_difficulty": "unknown"
       },
       "resources": {
         "resources_visible": [],
@@ -533,17 +98,17 @@
       },
       "observability": {
         "observed_from": {
-          "x": -120,
-          "y": 71,
-          "z": -164
+          "x": null,
+          "y": null,
+          "z": null
         },
-        "observation_mode": "direct",
-        "confidence": 0.7,
-        "last_observed_at": "2026-01-09T19:24:53.023244"
+        "observation_mode": "inferred_obstruction",
+        "confidence": 0.0,
+        "last_observed_at": "2026-01-10T19:36:31.319668"
       },
       "provenance": {
-        "updated_by": "Jill",
-        "update_reason": "mc-observe-blocks"
+        "updated_by": "unknown",
+        "update_reason": "obstruction_back"
       },
       "waypoints": []
     },
@@ -554,16 +119,20 @@
         "z": -164
       },
       "support": {
-        "walkable": true,
-        "support_y": 70,
-        "delta_y_from_agent": 0,
+        "walkable": false,
+        "support_y": null,
         "movement_class": "unknown"
       },
       "surface": {
-        "support_block": "minecraft:dirt",
-        "surface_block_class": "dirt",
+        "support_block": null,
+        "surface_block_class": "unknown",
         "is_fluid": false,
         "is_partial_block": false
+      },
+      "obstructions": {
+        "blocks_at_y": {
+          "72": "minecraft:snow[layers=1]"
+        }
       },
       "hazards": {
         "flags": [],
@@ -582,13 +151,64 @@
       },
       "observability": {
         "observed_from": {
-          "x": -120,
-          "y": 71,
+          "x": null,
+          "y": null,
+          "z": null
+        },
+        "observation_mode": "inferred_obstruction",
+        "confidence": 0.0,
+        "last_observed_at": "2026-01-10T19:36:31.319668"
+      },
+      "provenance": {
+        "updated_by": "unknown",
+        "update_reason": "obstruction_right"
+      },
+      "waypoints": []
+    },
+    "-122,-165": {
+      "cell_version": "1.0",
+      "cell_id": {
+        "x": -122,
+        "z": -165
+      },
+      "support": {
+        "walkable": false,
+        "support_y": null,
+        "movement_class": "unknown"
+      },
+      "surface": {
+        "support_block": null,
+        "surface_block_class": "unknown",
+        "is_fluid": false,
+        "is_partial_block": false
+      },
+      "obstructions": {
+        "blocks_at_y": {}
+      },
+      "hazards": {
+        "flags": [],
+        "exposure_risk": "unknown",
+        "escape_difficulty": "unknown"
+      },
+      "resources": {
+        "resources_visible": [],
+        "harvest_actions": [],
+        "tool_required": "unknown"
+      },
+      "environment": {
+        "light_level": "unknown",
+        "spawn_risk": "unknown",
+        "time_sensitive": false
+      },
+      "observability": {
+        "observed_from": {
+          "x": -122,
+          "y": 72,
           "z": -164
         },
         "observation_mode": "inferred",
         "confidence": 0.49999999999999994,
-        "last_observed_at": "2026-01-09T19:24:53.023244"
+        "last_observed_at": "2026-01-10T19:36:31.319668"
       },
       "provenance": {
         "updated_by": "Jill",
