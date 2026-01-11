@@ -1,7 +1,7 @@
 ---
 name: mc-map-query
 type: python
-description: "Queries persistent spatial map for strategic decision-making. Supports coverage, reachability, safety, and resource queries."
+description: "Queries the persistent spatial map representing everything the agent currently knows about the environment (from past and present observations). Useful for reasoning, explanation, and planning."
 ---
 
 # Minecraft Map Query Tool

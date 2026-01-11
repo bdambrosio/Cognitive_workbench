@@ -21,6 +21,7 @@ opentelemetry-api>=1.38.0
 opentelemetry-sdk>=1.38.0
 tqdm>=4.67.0
 sentence-transformers>=2.7.0
+transformers>=4.30.0  # Used by executive_node for AutoTokenizer
 txtai>=6.1.0
 faiss-cpu>=1.7.0  # Vector search for infospace memory
 
@@ -38,6 +39,7 @@ wordfreq>=3.0.0
 pymupdf>=1.24.0
 playwright>=1.40.0
 python-docx>=1.1.0
+lxml>=4.9.0  # Used by utils/grobid.py for PDF parsing
 
 # Development and testing (optional)
 pytest>=7.4.0
