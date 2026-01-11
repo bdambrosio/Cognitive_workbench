@@ -1499,7 +1499,10 @@ ALWAYS follow all formatting instructions exactly.
             "#Stage 3 FORMAT:\n"
             "  THOUGHTS: <text>\n"
             "  HYPOTHESES: [<hypothesis1>, <hypothesis2>, ...]\n"
-            "  AUDIT: - <hypothesis1>: {Supported / Unsupported / Contradicated}\n,...\n"
+            "  AUDIT: for each hypothesis in HYPOTHESES:\n"
+            "    <hypothesis text>\n"
+            "    scope: <observational | observed-set | global>\n"
+            "    verdict: <SUPPORTED | UNSUPPORTED | CONTRADICTED>\n"
             "  DONE: <YES or NO - is the entire GOAL satisfied?>\n"
             "  NEXT_TASK: <next high-level subgoal, or blank if DONE=YES>\n"
             "  REQUEST_TOOLS: <json array of tool names or empty array []>\n"
@@ -1510,6 +1513,7 @@ ALWAYS follow all formatting instructions exactly.
             "      2. SYSTEM: Beliefs about tool logic or failures (e.g., 'The tool failed because the query was too long').\n"
             "      3. WORLD: Causal theories about the goal (e.g., 'The user likely wants the cheapest option, not the fastest').\n"
             "   - Do NOT generate any hypothesis that was explicitly CONTRADICTED in a prior step unless it is substantively revised (narrowed, conditioned, or inverted)."
+            "\n"
             "  AUDIT Instructions:\n"
             "    - For each hypothesis, perform the following steps strictly and in order.\n"
             "    - Do not reinterpret, soften, or add qualifiers to hypotheses. Audit only what is explicitly claimed:\n"
@@ -1531,12 +1535,7 @@ ALWAYS follow all formatting instructions exactly.
             "          global hypotheses cannot be SUPPORTED.\n"
             "        - Numeric or distance calculations do not imply optimality unless all candidates\n"
             "          within the declared scope are explicitly compared.\n"
-            "      4. OUTPUT FORMAT (strict)\n"       
-            "        - For each hypothesis, output:\n"
-            "        - <hypothesis text>\n"
-            "        - scope: <observational | observed-set | global>\n"
-            "        - verdict: <SUPPORTED | UNSUPPORTED | CONTRADICTED>\n"
-            "      5. CONTRADICTION PERSISTENCE RULE (MANDATORY)\n"
+            "      4. CONTRADICTION PERSISTENCE RULE (MANDATORY)\n"
             "        - Any hypothesis that receives verdict: CONTRADICTED at this step MUST NOT reappear verbatim in HYPOTHESES in any subsequent step.\n"
             "        - If a contradicted hypothesis is still believed to be partially relevant, it may reappear ONLY if it is explicitly revised in one of the following ways:\n"
             "          a) Narrowed in scope (e.g., from global → observed-set or observational)\n"
@@ -1552,7 +1551,7 @@ ALWAYS follow all formatting instructions exactly.
             "  - If goal requires communicating to user, use 'say' primitive BEFORE marking done\n"
             "  - When DONE=YES, NEXT_TASK must be blank (leave empty)\n\n"
             "  NEXT_TASK Instructions:\n"
-            "  - If AUDIT yields any UNSUPPORTED or CONTRADICTED verdicts, the NEXT_TASK must be a remediation step (e.g., 'Broaden search', 'Switch tool', 'Verify source').\n"
+            "  - If AUDIT yields any UNSUPPORTED or CONTRADICTED verdicts, the NEXT_TASK might be a remediation step (e.g., 'Broaden search', 'Switch tool', 'Verify source').\n"
             "  - If AUDIT is fully SUPPORTED, propose the next logical step toward the #GOAL.\n"
             "  - Must be concise, actionable, and distinct from the current task.\n"
             "  - If DONE=YES, this field must be empty.\n\n"
@@ -1665,17 +1664,34 @@ ALWAYS follow all formatting instructions exactly.
             
             s += assistant(
                 "\nTHOUGHTS: "
-                + gen(f"thoughts_{step}", max_tokens=128, temperature=GEN_TEMPERATURE, stop="HYPOTHESES: ")
+                + gen(f"thoughts_{step}", max_tokens=128, temperature=GEN_TEMPERATURE, stop=["\nHYPOTHESES:", "HYPOTHESES:"])
                 +"\nHYPOTHESES: "
-                + gen(f"hypotheses_{step}", max_tokens=128, temperature=GEN_TEMPERATURE, stop="\nAUDIT: ")
+                + gen(
+                    f"hypotheses_{step}",
+                    max_tokens=128,
+                    temperature=GEN_TEMPERATURE,
+                    stop=[
+                        "\nAUDIT:", "AUDIT:","\nDONE:", "DONE:","\nNEXT_TASK:", "NEXT_TASK:","\nREQUEST_TOOLS:", "REQUEST_TOOLS:", "\nTHOUGHTS:", "THOUGHTS:","\nHYPOTHESES:", "HYPOTHESES:"
+                    ]
+                )
                 +"\nAUDIT: "
                 + gen(f"assumption_audit_{step}",max_tokens=128,temperature=0.0,stop="\nDONE: ")
                 + "\nDONE: "
                 + gen(f"done_{step}", max_tokens=8, temperature=GEN_TEMPERATURE, stop="\nNEXT_TASK: ")
                 + "\nNEXT_TASK: "
-                + gen(f"next_task_{step}", max_tokens=128, temperature=GEN_TEMPERATURE, stop="\nREQUEST_TOOLS: ")
+                + gen(
+                    f"next_task_{step}",
+                    max_tokens=128,
+                    temperature=GEN_TEMPERATURE,
+                    stop=["\nREQUEST_TOOLS: ", "\nTHOUGHTS:", "\nHYPOTHESES:", "\nAUDIT:", "\nDONE:", "\nNEXT_TASK:"]
+                )
                 + "\nREQUEST_TOOLS: "
-                + gen(f"request_tools_{step}", max_tokens=96, temperature=GEN_TEMPERATURE, stop=["\n\n"])
+                + gen(
+                    f"request_tools_{step}",
+                    max_tokens=96,
+                    temperature=GEN_TEMPERATURE,
+                    stop=["\n\n", "\nTHOUGHTS:", "\nHYPOTHESES:", "\nAUDIT:", "\nDONE:", "\nNEXT_TASK:", "\nREQUEST_TOOLS:"]
+                )
                 + "\n"
             )
             # Safely log step fields (may not exist if step was interrupted or incomplete)

@@ -1,6 +1,6 @@
 {
   "world_name": "infolab",
-  "timestamp": "2026-01-07T10:46:05.217829",
+  "timestamp": "2026-01-11T10:50:23.161942",
   "note_instances": {
     "Note_4": {
       "name": "Note_4",
@@ -27,7 +27,7 @@
       }
     }
   },
-  "note_counter": 19,
+  "note_counter": 5,
   "collection_instances": {
     "Collection_1": {
       "name": "Collection_1",
@@ -54,5 +54,5 @@
       }
     }
   },
-  "collection_counter": 5
+  "collection_counter": 3
 }

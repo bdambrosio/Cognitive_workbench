@@ -1,36 +1,74 @@
 {
   "version": "1.0",
   "created_at": "2026-01-01T16:26:07.820783",
-  "updated_at": "2026-01-07T18:38:13.867896",
-  "facts": [],
+  "updated_at": "2026-01-11T18:54:32.399203",
+  "facts": [
+    {
+      "fact": "Search-web results may not include a valid metadata.uri field, even when the source URL is present in the text.",
+      "confidence": "high",
+      "source": "observation",
+      "stability": "regularity",
+      "introduced_at": "2026-01-11T18:19:36.715111",
+      "last_confirmed_at": "2026-01-11T18:37:25.094457"
+    },
+    {
+      "fact": "The 'search-web' tool can return results that contain structured forecast data, but not all results will contain the specific information needed; verification by loading content is required.",
+      "confidence": "high",
+      "source": "observation",
+      "stability": "regularity",
+      "introduced_at": "2026-01-11T18:53:13.353972",
+      "last_confirmed_at": "2026-01-11T18:53:13.353972"
+    }
+  ],
   "tool_contracts": [
     {
       "tool": "refine",
       "insight": "The 'refine' tool returns a structured analysis of method syntax and semantics, but does not guarantee completeness or accuracy of the content; its output must be verified by loading and inspecting the resulting note.",
       "status": "constrained",
       "introduced_at": "2026-01-01T16:29:37.383311",
-      "last_confirmed_at": "2026-01-07T18:38:13.867325"
+      "last_confirmed_at": "2026-01-11T18:54:32.398828"
     },
     {
       "tool": "generate-note",
       "insight": "The 'generate-note' tool produces a new, independent output based on a prompt and style, even when the input is a static note, and is suitable for creating original evaluations when required.",
       "status": "reliable",
       "introduced_at": "2026-01-01T16:43:30.523252",
-      "last_confirmed_at": "2026-01-07T02:28:16.444011"
+      "last_confirmed_at": "2026-01-11T18:54:32.398828"
     },
     {
       "tool": "search-web",
       "insight": "The tool returns a collection of results, but the relevance of individual results must be verified by loading and inspecting content; not all results contain structured forecast data, even when the query is specific.",
       "status": "constrained",
       "introduced_at": "2026-01-06T17:34:08.224712",
-      "last_confirmed_at": "2026-01-07T18:38:13.867325"
+      "last_confirmed_at": "2026-01-11T18:53:13.353972"
     },
     {
       "tool": "fetch-text",
       "insight": "The 'fetch-text' tool requires a direct string URL; it fails if given a Collection of Notes or a Note containing a URL string, even if the URL is valid.",
       "status": "constrained",
       "introduced_at": "2026-01-07T18:27:09.171428",
-      "last_confirmed_at": "2026-01-07T18:38:13.867325"
+      "last_confirmed_at": "2026-01-11T18:37:25.094457"
+    },
+    {
+      "tool": "filter-collection",
+      "insight": "The tool's effectiveness depends on a precise and unambiguous predicate; vague or structurally ambiguous patterns may result in no matches or incorrect filtering.",
+      "status": "constrained",
+      "introduced_at": "2026-01-11T18:19:36.715111",
+      "last_confirmed_at": "2026-01-11T18:19:36.715111"
+    },
+    {
+      "tool": "load",
+      "insight": "Can load content from search results to examine whether they contain the required forecast information; this is necessary to filter out irrelevant results.",
+      "status": "reliable",
+      "introduced_at": "2026-01-11T18:53:13.353972",
+      "last_confirmed_at": "2026-01-11T18:54:32.398828"
+    },
+    {
+      "tool": "create-note",
+      "insight": "Can create formatted notes but may truncate content when the input is very large; for large data sets, a more concise approach or multiple notes may be needed.",
+      "status": "constrained",
+      "introduced_at": "2026-01-11T18:53:13.353972",
+      "last_confirmed_at": "2026-01-11T18:53:13.353972"
     }
   ]
 }
