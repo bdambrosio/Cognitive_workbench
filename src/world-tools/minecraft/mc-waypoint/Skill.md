@@ -1,7 +1,7 @@
 ---
 name: mc-waypoint
 type: python
-description: "Labels a coordinate with a waypoint name for reasoning about spatial relationships. Learning requires labeled data"
+description: "Labels a coordinate with a waypoint name for reasoning about spatial relationships. Use to mark important locations for navigation and planning"
 ---
 
 # Minecraft Waypoint Tool
