@@ -53,12 +53,17 @@ From `src/`, run the launcher with UI enabled.
 cd src
 python3 launcher.py <character_name>-<world>.yaml> --ui --resource-browser
 ```
+The core agent is jill-infospace. this gives you the full infospace reasoner, web-search, semantic-scholar search, and base tool set.
 
-Open the UI at `http://localhost:3000`.
+```bash
+python3 launcher.py jill-infospace.yaml> --ui --resource-browser
+```
+
+Open the UI at `http://localhost:3000` if it doesn't auto-open a browser window
 
 **Note - the .yaml file defines the llm to be loaded into SGLang. you will probably want to edit that!**
 
-## How tools work (important)
+## How tools work
 
 ### Schema + implementation
 
