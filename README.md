@@ -65,7 +65,15 @@ Open the UI at `http://localhost:3000` if it doesn't auto-open a browser window
 
 ## How tools work
 
-### Schema + implementation
+### Infospace: Notes & Collections (planner-facing)
+
+The planner “thinks” and communicates through an **Infospace** of **Notes** and **Collections**:
+- **Note**: a single resource containing either free-form text *or* a structured object (dict/JSON)
+- **Collection**: an ordered list of Notes (often produced by search, filtering, mapping, joins, etc.)
+
+Most built-in tools are CRUD + processing utilities over Notes/Collections (load/save/query/map/filter/project/summarize…).
+
+### Schema + implementation (tool authoring)
 
 Tools are defined by:
 - `Skill.md`: tool interface / contract (inputs, outputs, behavior)
@@ -73,15 +81,9 @@ Tools are defined by:
 
 Core tools live in `src/tools/`. World-specific tools live in `src/world-tools/<world_name>/`.
 
-### Uniform return format
+### Tool execution envelope: uniform_return (executor-facing)
 
-All tools return a uniform dictionary via `InfospaceExecutor._create_uniform_return()`:
-- `result["status"]`: `"success"` or `"failed"`
-- `result["data"]`: **raw value** (dict/list/etc.) on success (or reason/value on failure)
-- `result["value"]`: formatted/truncated string for display/logging
-- `result["reason"]`: failure reason (only on failure)
-
-When consuming tool outputs programmatically, **use `data`**, not `value`.
+At the engineering level, tool results are wrapped by the executor in a `uniform_return` dict for consistent logging/UI. For full details, see the wiki “Tools” page.
 
 ### Tool catalog ordering and sources
 
