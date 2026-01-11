@@ -83,7 +83,7 @@ Core tools live in `src/tools/`. World-specific tools live in `src/world-tools/<
 
 ### Tool execution envelope: uniform_return (executor-facing)
 
-At the engineering level, tool results are wrapped by the executor in a `uniform_return` dict for consistent logging/UI. For full details, see the wiki “Tools” page.
+At the engineering level, tool results are expected to return a `uniform_return` dict for consistent logging/UI. For full details, see the wiki “Tools” page.
 
 ### Tool catalog ordering and sources
 
@@ -95,7 +95,7 @@ Each tool entry includes a `source` field: `"core"` or `"<world_name>"`.
 
 ## Worlds: loading, state, and UI
 
-World integrations are enabled per character via `world_config.world_name` in your scenario config.
+World integrations are enabled per character via `world_name` in the `world_config` section of the .yaml.
 
 Key mechanics:
 - World tools are loaded from `src/world-tools/<world_name>/`.
