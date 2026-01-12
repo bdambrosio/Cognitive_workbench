@@ -2386,7 +2386,8 @@ class IncrementalPlanner:
                 recent_context = context.get('recent_context', '')
                 
             # Find similar plans using plan guidance
-            similar_plans = self.plan_guidance.find_similar_plans(goal)
+            #similar_plans = self.plan_guidance.find_similar_plans(goal)
+            similar_plans = None
             if similar_plans:
                 logger.info(f"Found {len(similar_plans)} similar plans")
                 for plan in similar_plans:
@@ -2558,7 +2559,7 @@ ABSTRACT_PLAN:
 END_PLAN
 """
 
-        abstract_plan = self.executor.llm_generate(ABSTRACT_PLAN_PROMPT, max_tokens=256, temperature=GEN_TEMPERATURE)
+        abstract_plan = self.executor.llm_generate(ABSTRACT_PLAN_PROMPT, max_tokens=256, temperature=GEN_TEMPERATURE, stops=["\nEND_PLAN:", "END_PLAN:"])
         return abstract_plan.text.strip()
 
     def _feedback(self, outcome: bool) -> Dict:

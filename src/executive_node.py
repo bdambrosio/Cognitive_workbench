@@ -800,14 +800,21 @@ class ZenohExecutiveNode:
             f"cognitive/{character_name}/resource/remove/*",
             self._handle_resource_remove_query
         )
-        self.resource_clear_transient_queryable = self.session.declare_queryable(
-            f"cognitive/{character_name}/resource/clear_transient",
-            self._handle_resource_clear_transient_query
-        )
         self.resource_create_note_queryable = self.session.declare_queryable(
             f"cognitive/{character_name}/resource/create_note",
             self._handle_resource_create_note_query
         )
+        
+        self.resource_clear_transient_queryable = self.session.declare_queryable(
+            f"cognitive/{character_name}/resource/clear_transient",
+            self._handle_resource_clear_transient_query
+        )
+
+        self.resource_reset_models_queryable = self.session.declare_queryable(
+            f"cognitive/{character_name}/resource/reset_models",
+            self._handle_resource_reset_models_query
+        )
+        
         self.llm_generate_queryable = self.session.declare_queryable(
             f"cognitive/{character_name}/llm/generate",
             self._handle_llm_generate_query
@@ -2455,11 +2462,23 @@ class ZenohExecutiveNode:
             query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
     
     def _handle_resource_clear_transient_query(self, query):
-        """Handle query to clear all Notes and Collections except Note_null, persistent resources, and conversation collections."""
+        """Handle query to clear all Notes and Collections except Note_null, persistent resources, and conversation collections.
+        
+        Optional JSON payload: {"global": true} to also reset world_model and tool_model to empty.
+        """
         if not self.resource_manager:
             response = {'success': False, 'error': 'Resource manager not available'}
             query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
             return
+        
+        # Parse optional payload
+        global_clear = False
+        if query.payload:
+            try:
+                payload = json.loads(query.payload.to_bytes().decode('utf-8'))
+                global_clear = payload.get('global', False)
+            except (json.JSONDecodeError, UnicodeDecodeError, AttributeError):
+                pass  # Default to False if payload parsing fails
         
         # Collections to preserve (by name) - conversation collections should persist across benchmark runs
         PRESERVED_COLLECTIONS = {'conversation', 'conversation_history'}
@@ -2509,15 +2528,103 @@ class ZenohExecutiveNode:
             bindings_cleared = len(self.infospace_executor.plan_bindings_flat)
             self.infospace_executor.clear_plan_state()
         
+        # If global=True, reset world_model and tool_model to empty
+        world_model_cleared = False
+        tool_model_cleared = False
+        if global_clear:
+            if hasattr(self, 'world_model') and self.world_model:
+                from world_model import empty_world_model
+                self.world_model.world_model = empty_world_model()
+                self.world_model.save()
+                world_model_cleared = True
+                logger.info("🌍 Cleared world_model (reset to empty)")
+            
+            if hasattr(self, 'tool_model') and self.tool_model:
+                from tool_model import empty_tool_model
+                self.tool_model.tool_model = empty_tool_model()
+                self.tool_model.save()
+                tool_model_cleared = True
+                logger.info("🔧 Cleared tool_model (reset to empty)")
+        
         response = {
             'success': True,
             'deleted_notes': deleted_notes,
             'deleted_collections': deleted_collections,
-            'bindings_cleared': bindings_cleared
+            'bindings_cleared': bindings_cleared,
+            'world_model_cleared': world_model_cleared,
+            'tool_model_cleared': tool_model_cleared
         }
         query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
-        logger.info(f"Cleared {deleted_notes} Notes, {deleted_collections} Collections, {bindings_cleared} planner bindings")
+        logger.info(f"Cleared {deleted_notes} Notes, {deleted_collections} Collections, {bindings_cleared} planner bindings" + 
+                   (f", world_model, tool_model" if global_clear else ""))
     
+    def _handle_resource_reset_models_query(self, query):
+        """Handle query to explicitly reset world_model and tool_model to empty."""
+        world_model_cleared = False
+        tool_model_cleared = False
+        exec_state_cleared = False
+        resources_file_cleared = False
+        
+        if hasattr(self, 'world_model') and self.world_model:
+            from world_model import empty_world_model
+            self.world_model.world_model = empty_world_model()
+            self.world_model.save()
+            world_model_cleared = True
+            logger.info("🌍 Explicitly cleared world_model (reset to empty)")
+        
+        if hasattr(self, 'tool_model') and self.tool_model:
+            from tool_model import empty_tool_model
+            self.tool_model.tool_model = empty_tool_model()
+            self.tool_model.save()
+            tool_model_cleared = True
+            logger.info("🔧 Explicitly cleared tool_model (reset to empty)")
+
+        # Also clear executive-local "last action" state (benchmark hygiene)
+        if hasattr(self, 'action_history'):
+            self.action_history = []
+        if hasattr(self, 'last_say_text'):
+            self.last_say_text = ''
+        if hasattr(self, 'last_out_resource_id'):
+            self.last_out_resource_id = None
+        exec_state_cleared = True
+        
+        # Clear resources.json by resetting registry to minimal state (Note_null only) and saving
+        # This ensures no cross-benchmark carryover from persistent resources
+        if hasattr(self, 'resource_manager') and self.resource_manager:
+            # Keep only Note_null (system resource)
+            note_null_id = None
+            for resource_id in list(self.resource_manager.resource_registry.keys()):
+                if resource_id == 'Note_null':
+                    note_null_id = resource_id
+                else:
+                    # Delete all other resources (including persistent ones for benchmark hygiene)
+                    self.resource_manager.delete_resource(resource_id)
+            
+            # Reset counters (Note_null counts as 1 if it exists)
+            if note_null_id:
+                self.resource_manager.note_counter = 1
+            else:
+                self.resource_manager.note_counter = 0
+                # Recreate Note_null if missing
+                self.resource_manager._create_note_null()
+                self.resource_manager.note_counter = 1
+            
+            self.resource_manager.collection_counter = 0
+            
+            # Save minimal state to resources.json
+            if self.resource_manager.save_to_file():
+                resources_file_cleared = True
+                logger.info(f"📦 Cleared resources.json (reset to minimal state: Note_null only, saved to {self.resource_manager.resources_file})")
+            
+        response = {
+            'success': True,
+            'world_model_cleared': world_model_cleared,
+            'tool_model_cleared': tool_model_cleared,
+            'exec_state_cleared': exec_state_cleared,
+            'resources_file_cleared': resources_file_cleared
+        }
+        query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
+
     def _handle_resource_create_note_query(self, query):
         """Handle query to create a Note from external caller."""
         if not self.resource_manager:

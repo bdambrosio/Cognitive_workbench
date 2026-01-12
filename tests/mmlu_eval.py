@@ -67,17 +67,31 @@ def mmlu_query_direct(session: zenoh.Session, character: str, prompt: str, tempe
     return {'reasoning': reasoning, 'answer': answer_part}
 
 
-def clear_transient_notes(session: zenoh.Session, character: str, timeout: float = 10.0) -> int:
-    """Clear all non-persistent Notes and Collections via Zenoh API."""
+def clear_transient_notes(session: zenoh.Session, character: str, timeout: float = 10.0, global_clear: bool = True) -> int:
+    """Clear all non-persistent Notes and Collections via Zenoh API.
+    
+    Args:
+        global_clear: If True, also resets world_model and tool_model to empty (default: True for benchmarks)
+    """
+    # 1. Clear Notes/Collections
     query_key = f"cognitive/{character}/resource/clear_transient"
-    replies = session.get(query_key, timeout=timeout)
+    payload = json.dumps({"global": False}).encode('utf-8') # Just clear notes first
+    replies = session.get(query_key, payload=payload, timeout=timeout)
+    deleted_count = 0
     for reply in replies:
         if hasattr(reply, 'ok') and reply.ok is not None:
             payload = reply.ok.payload.to_bytes().decode('utf-8')
             result = json.loads(payload)
             if result.get('success'):
-                return result.get('deleted_notes', 0) + result.get('deleted_collections', 0)
-    return 0
+                deleted_count += result.get('deleted_notes', 0) + result.get('deleted_collections', 0)
+    
+    # 2. Explicitly reset models if requested (more robust than payload on clear_transient)
+    if global_clear:
+        reset_key = f"cognitive/{character}/resource/reset_models"
+        replies = session.get(reset_key, timeout=timeout)
+        # We don't strictly need to check success here, best effort for benchmarks
+        
+    return deleted_count
 
 
 def send_planner_feedback(session: zenoh.Session, character: str, outcome: bool, timeout: float = 5.0) -> bool:

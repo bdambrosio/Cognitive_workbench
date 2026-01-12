@@ -10,30 +10,12 @@ llm_config:
   grobid: "http://localhost:8070/"
   
 setting: |
-  Cognitive Workbench, a virtual modern Computer Science /AI grad lab cyberspace with workplaces for several graduate students and a postdoc research associate, Jill.
-  Cognitive Workbench is a research framework for building autonomous agents with persistent memory, goal-directed planning, and tool use. 
+  Cognitive Workbench, a virtual modern 
+  Cognitive Workbench is a research framework for building and operatingautonomous agents with persistent memory, goal-directed planning, and tool use. 
   Characters operate in information spaces (semantic operations over notes, collections, and web content).
 
-  Key capabilities
-  - Autonomous planning - Jill can generate multi-step plans with control flow (conditionals, loops) to achieve goals
-  - Information space operations - Create, search, index, and manipulate structured information (notes, collections)
-  - Extensible tool system - Web search, content summarization, entity extraction, and custom tools
 
-  Primitives (built-in operations)
-  - Storage: create-note, create-collection, load, persist, index/organize
-  - Search: search-notes, search-collections, search-within-collection
-  - Communication: say, display, think, ask
-  - Data operations: map, flatten, add, remove, split, coerce
-  - Set operations: size, union, intersection, difference
-  - Structured data: project, pluck, head, filter-structured, sort, join
-  - Control flow: if/then/else, while (in plan structure)
-
-  Tool System
-  - Tools are defined as SKILL.md files with YAML frontmatter
-  - prompt_augmentation - LLM-based tools (as-json, as-markdown, matches, text-find, extract-struct, is-question)
-  - python - Code execution tools (search-web, semantic-scholar, fetch-text, filter-collection, calculate, summarize, refine, assess, relate, generate-note, extract-entities, is-empty, is-positive, word-count)
-
-characters:
+ccharacters:
   Jill:
     manual: true
     manual_response: false
@@ -45,27 +27,12 @@ characters:
       She is a careful and conscientious scholar. In particular, she verifies claims, does not invent facts merely to be a good conversationalist, 
       and is honest about her own capabilities and limitations as an LLM-powered sophisticated cognitive agent. 
       When she doesn't have access to information or lacks a capability, she says so clearly rather than fabricating having done something she cannot do.
+
     capabilities: |
       Jill exists as an agent within Cognitive Workbench, a research framework for building autonomous agents with persistent memory, goal-directed planning, and tool use. 
-      Characters operate in information spaces (semantic operations over notes, collections, and web content).
+      In this instantiation, Jill is operating in the infospace, receiving and executing tasks (goals) from the user. 
+      Basic Note and Collection primitives and tools and information space operations remain available to Jill for general information storage, reasoning, and planning.
+      
 
-      Key capabilities
-      - Autonomous planning - Jill can generate multi-step plans with control flow (conditionals, loops) to achieve goals
-      - Information space operations - Create, search, index, and manipulate structured information (notes, collections)
-      - Extensible tool system - Web search, content summarization, entity extraction, and custom tools
-
-      Primitives (built-in operations, available in all worlds)
-      - Storage: create-note, create-collection, load, persist, index/organize
-      - Search: search-notes, search-collections, search-within-collection
-      - Communication: say, display, think, ask
-      - Data operations: map, flatten, add, remove, split, coerce
-      - Set operations: size, union, intersection, difference
-      - Structured data: project, pluck, head, filter-structured, sort, join
-      - Control flow: if/then/else, while (in plan structure)
-
-      Tool System
-      - Tools are world-specific and defined as SKILL.md files with YAML frontmatter
-      - tools will be loaded from the src/world-tools/<world_name>/ directory, will be defined following, and will be available to Jill in the world.
- 
 
  

@@ -71,10 +71,15 @@ def contains_match(prediction: str, ground_truth: str) -> bool:
     return normalize_answer(ground_truth) in normalize_answer(prediction)
 
 
-def clear_transient_notes(session: zenoh.Session, character: str, timeout: float = 10.0) -> int:
-    """Clear all non-persistent Notes via Zenoh API."""
+def clear_transient_notes(session: zenoh.Session, character: str, timeout: float = 10.0, global_clear: bool = True) -> int:
+    """Clear all non-persistent Notes via Zenoh API.
+    
+    Args:
+        global_clear: If True, also resets world_model and tool_model to empty (default: True for benchmarks)
+    """
     query_key = f"cognitive/{character}/resource/clear_transient"
-    replies = session.get(query_key, timeout=timeout)
+    payload = json.dumps({"global": global_clear}).encode('utf-8')
+    replies = session.get(query_key, payload=payload, timeout=timeout)
     for reply in replies:
         if hasattr(reply, 'ok') and reply.ok is not None:
             payload = reply.ok.payload.to_bytes().decode('utf-8')
