@@ -1,7 +1,7 @@
 {
   "version": "1.0",
   "created_at": "2026-01-01T16:26:07.820783",
-  "updated_at": "2026-01-11T18:54:32.399203",
+  "updated_at": "2026-01-11T19:31:35.322271",
   "facts": [
     {
       "fact": "Search-web results may not include a valid metadata.uri field, even when the source URL is present in the text.",
@@ -24,16 +24,16 @@
     {
       "tool": "refine",
       "insight": "The 'refine' tool returns a structured analysis of method syntax and semantics, but does not guarantee completeness or accuracy of the content; its output must be verified by loading and inspecting the resulting note.",
-      "status": "constrained",
+      "status": "reliable",
       "introduced_at": "2026-01-01T16:29:37.383311",
-      "last_confirmed_at": "2026-01-11T18:54:32.398828"
+      "last_confirmed_at": "2026-01-11T19:31:35.321982"
     },
     {
       "tool": "generate-note",
       "insight": "The 'generate-note' tool produces a new, independent output based on a prompt and style, even when the input is a static note, and is suitable for creating original evaluations when required.",
       "status": "reliable",
       "introduced_at": "2026-01-01T16:43:30.523252",
-      "last_confirmed_at": "2026-01-11T18:54:32.398828"
+      "last_confirmed_at": "2026-01-11T19:31:35.321982"
     },
     {
       "tool": "search-web",
@@ -61,14 +61,49 @@
       "insight": "Can load content from search results to examine whether they contain the required forecast information; this is necessary to filter out irrelevant results.",
       "status": "reliable",
       "introduced_at": "2026-01-11T18:53:13.353972",
-      "last_confirmed_at": "2026-01-11T18:54:32.398828"
+      "last_confirmed_at": "2026-01-11T19:21:09.741892"
     },
     {
       "tool": "create-note",
       "insight": "Can create formatted notes but may truncate content when the input is very large; for large data sets, a more concise approach or multiple notes may be needed.",
-      "status": "constrained",
+      "status": "reliable",
       "introduced_at": "2026-01-11T18:53:13.353972",
-      "last_confirmed_at": "2026-01-11T18:53:13.353972"
+      "last_confirmed_at": "2026-01-11T19:27:36.802048"
+    },
+    {
+      "tool": "coerce",
+      "insight": "The 'coerce' tool correctly converts numeric strings or values to float type, which is necessary for unit conversion.",
+      "status": "reliable",
+      "introduced_at": "2026-01-11T19:04:02.296159",
+      "last_confirmed_at": "2026-01-11T19:26:37.457108"
+    },
+    {
+      "tool": "calculate",
+      "insight": "The 'calculate' tool performs basic arithmetic operations accurately when given valid expressions.",
+      "status": "reliable",
+      "introduced_at": "2026-01-11T19:04:02.296159",
+      "last_confirmed_at": "2026-01-11T19:26:37.457108"
+    },
+    {
+      "tool": "think",
+      "insight": "The 'think' tool enables systematic reasoning about physics principles and circuit behavior when prompted with structured questions.",
+      "status": "reliable",
+      "introduced_at": "2026-01-11T19:05:34.118854",
+      "last_confirmed_at": "2026-01-11T19:31:19.938954"
+    },
+    {
+      "tool": "split",
+      "insight": "The 'split' tool correctly divides a note into individual sentences based on punctuation.",
+      "status": "reliable",
+      "introduced_at": "2026-01-11T19:21:09.741892",
+      "last_confirmed_at": "2026-01-11T19:27:36.802048"
+    },
+    {
+      "tool": "flatten",
+      "insight": "The 'flatten' tool correctly extracts content from a collection of notes into a single string for examination.",
+      "status": "reliable",
+      "introduced_at": "2026-01-11T19:27:36.802048",
+      "last_confirmed_at": "2026-01-11T19:27:36.802048"
     }
   ]
 }
