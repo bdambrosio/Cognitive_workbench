@@ -59,6 +59,7 @@ Safety / Survival:
 
 Resources:
 - `cells-with-resource`: Cells with specified resource type
+- `cells-with-item-entities`: Cells with visible dropped-item entities (ephemeral resources)
 - `cells-water-source`: Cells with water
 
 Multi-Objective:

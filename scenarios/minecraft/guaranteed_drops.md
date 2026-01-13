@@ -32,3 +32,5 @@ If a task requires:
 > “collect the dropped item”
 
 The block chosen MUST appear in this list.
+
+Note: This list is intentionally conservative for reliable agent tests under Java 1.20.4.

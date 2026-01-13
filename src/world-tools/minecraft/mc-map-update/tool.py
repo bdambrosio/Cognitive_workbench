@@ -63,13 +63,13 @@ def tool(input_value=None, **kwargs):
     """
     Update persistent spatial map with observation data.
     
-    Updates the cell-based SpatialMap with observation data from mc-observe-blocks.
+    Updates the cell-based SpatialMap with observation data from mc-observe.
     Automatically checks if current location is already mapped before observing.
     
     Args:
-        input_value: Observation data from mc-observe-blocks (Note ID or dict)
+        input_value: Observation data from mc-observe (Note ID or dict)
         observation: Alternative parameter name for observation data
-        radius: Optional radius for mc-observe-blocks (default: 7, only used when observation is not provided)
+        radius: Optional radius for mc-observe (default: 7, only used when observation is not provided)
         blocks_radius: Alternative parameter name for radius
         x, y, z: Optional coordinates (extracted from observation if not provided)
         
@@ -118,49 +118,13 @@ def tool(input_value=None, **kwargs):
         else:
             observation_data = _get_content(observation_data, resource_manager)
     
-    # If no observation data provided, check if we need to observe
+    # If no observation data provided, auto-observe.
     if not observation_data:
-        # Try to get current coordinates first
-        current_x = kwargs.get('x')
-        current_y = kwargs.get('y')
-        current_z = kwargs.get('z')
-        
-        # If coordinates not provided, get from mc-status
-        if current_x is None or current_y is None or current_z is None:
-            try:
-                status_result = executor.execute_action_with_log({"type": "mc-status"}, "mc-map-update")
-                if status_result.get("status") == "success":
-                    status_data = status_result.get("data", {})
-                    position = status_data.get("position")
-                    if isinstance(position, dict):
-                        current_x = current_x or position.get('x')
-                        current_y = current_y or position.get('y')
-                        current_z = current_z or position.get('z')
-                    elif isinstance(position, (list, tuple)) and len(position) >= 3:
-                        current_x = current_x or position[0]
-                        current_y = current_y or position[1]
-                        current_z = current_z or position[2]
-            except Exception as e:
-                logger.warning(f"Failed to query mc-status for coordinates: {e}")
-        
-        # Check if current location is already mapped
-        if current_x is not None and current_z is not None:
-            x_block_check = _round_coordinate(current_x)
-            z_block_check = _round_coordinate(current_z)
-            existing_cell = spatial_map.get_cell(x_block_check, z_block_check)
-            
-            # If cell exists and has been observed, skip auto-observation
-            if existing_cell and existing_cell.get('observability', {}).get('last_observed_at'):
-                logger.info(f"Location ({x_block_check}, {z_block_check}) already mapped, skipping auto-observation")
-                # Still proceed with update using existing cell data if needed
-                # But for now, we'll still observe to get fresh data
-                # (User can explicitly pass observation to skip)
-        
-        # Automatically invoke mc-observe-blocks
+        # Automatically invoke mc-observe
         if not observation_data:
             # Optionally allow radius parameter to be passed through
             radius = kwargs.get('radius') or kwargs.get('blocks_radius')
-            observe_action = {"type": "mc-observe-blocks"}
+            observe_action = {"type": "mc-observe"}
             if radius is not None:
                 observe_action["radius"] = radius
             
@@ -184,7 +148,7 @@ def tool(input_value=None, **kwargs):
             if not observation_data:
                 return executor._create_uniform_return(
                     'failed',
-                    value="Failed to extract observation data from mc-observe-blocks result",
+                    value="Failed to extract observation data from mc-observe result",
                     reason="observation_extraction_failed"
                 )
     
@@ -208,7 +172,7 @@ def tool(input_value=None, **kwargs):
                 )
     
     # Extract coordinates from observation data
-    # mc-observe-blocks always includes pose with x, y, z coordinates
+    # mc-observe always includes pose with x, y, z coordinates
     x = None
     y = None
     z = None
@@ -272,7 +236,7 @@ def tool(input_value=None, **kwargs):
     cells_updated = 0
     if isinstance(observation_data, dict):
         cells_updated = spatial_map.update_cell_from_observation(
-            x, y, z, observation_data, update_reason="mc-observe-blocks"
+            x, y, z, observation_data, update_reason="mc-observe"
         )
         # Save after update
         spatial_map.save()

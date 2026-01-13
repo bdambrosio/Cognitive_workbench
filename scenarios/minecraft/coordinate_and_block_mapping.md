@@ -41,7 +41,8 @@ Example:
 ## Observation Implications
 
 - The block beneath the agent:
-  - May not appear in sampled observations
+  - May be missing from *visual block lists* (cone/LOS/caps)
+  - Is usually available via navigation fields (`support` / `nav_surface` / `adjacent_blocks`) when using `mc-observe`
   - Still exists unless explicitly removed
 
 ---

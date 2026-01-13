@@ -28,7 +28,7 @@ Failure (`status: "failed"`):
 1. Calls `path-frontier`; retries with `allow_unknown=True` if no positions found
 2. Autonomously selects farthest reachable position (Euclidean distance) from frontier
 3. Executes toward autonomously-selected target via `nav-advance` (1 block/step, max 8 steps)
-4. Calls `mc-map-update` before returning
+4. Calls `mc-map-update` before returning (multi-facing sweep: forward, left, right; skips back)
 
 Target Selection: The tool selects targets based on its internal spatial map state at execution time. The selected target is reported in the output but cannot be specified by the caller.
 

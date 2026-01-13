@@ -48,7 +48,7 @@ def tool(input_value=None, **kwargs):
     result_text = "Approach-wall terminated: NO_WALL_REACHABLE"
 
     while blocks_remaining > 0:
-        obs_result = executor.execute_action_with_log({"type": "mc-observe-blocks"}, "nav-approach-wall")
+        obs_result = executor.execute_action_with_log({"type": "mc-observe"}, "nav-approach-wall")
         if obs_result.get("status") != "success":
             log_messages.append("Observation failed")
             break
@@ -62,7 +62,7 @@ def tool(input_value=None, **kwargs):
 
         # Advance some amount; nav-advance is verified and updates nav history.
         adv = executor.execute_action_with_log(
-            {"type": "nav-advance", "target": blocks_remaining, "step_duration": step_duration},
+            {"type": "nav-advance", "blocks": blocks_remaining, "step_duration": step_duration},
             "nav-approach-wall",
         )
         if adv.get("status") != "success":
@@ -101,7 +101,7 @@ def tool(input_value=None, **kwargs):
                 continue
 
             # Blocked / move failed / etc: re-observe once to see if wall is in front now.
-            obs2 = executor.execute_action_with_log({"type": "mc-observe-blocks"}, "nav-approach-wall")
+            obs2 = executor.execute_action_with_log({"type": "mc-observe"}, "nav-approach-wall")
             if obs2.get("status") == "success" and _check_wall_forward(obs2.get("data", {}) or {}):
                 outcome = "SUCCESS"
                 result_text = "Approach-wall completed: SUCCESS (wall detected after advance stop)"

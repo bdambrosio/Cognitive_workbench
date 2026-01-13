@@ -45,6 +45,9 @@ from datetime import datetime
 from pathlib import Path
 import json
 import logging
+import hashlib
+import random
+import re
 
 logger = logging.getLogger(__name__)
 
@@ -55,32 +58,37 @@ logger = logging.getLogger(__name__)
 
 WorldModel = Dict[str, Any]
 
+RAW_WORLD_MODEL_VERSION = "2.0"
+BELIEFS_WORLD_MODEL_VERSION = "1.0"
+
+
+def _now_iso() -> str:
+    return datetime.utcnow().isoformat()
+
+
+def _norm_text(s: str) -> str:
+    """Deterministic, cheap canonicalization for keying evidence."""
+    if not isinstance(s, str):
+        s = str(s)
+    s = s.strip().lower()
+    s = re.sub(r"\s+", " ", s)
+    return s
+
+
 def empty_world_model() -> WorldModel:
+    """Planner-facing beliefs view (kept backward compatible)."""
+    now = _now_iso()
+    return {"version": BELIEFS_WORLD_MODEL_VERSION, "created_at": now, "updated_at": now, "facts": [], "tool_contracts": []}
+
+
+def empty_world_model_raw() -> WorldModel:
+    """Persistent raw evidence store (beliefs are derived, not stored)."""
+    now = _now_iso()
     return {
-        "version": "1.0",
-        "created_at": datetime.utcnow().isoformat(),
-        "updated_at": datetime.utcnow().isoformat(),
-        "facts": [
-            # Each fact:
-            # {
-            #   "fact": str,
-            #   "confidence": "low|medium|high",
-            #   "source": "observation|tool_guarantee|inference",
-            #   "stability": "anecdote|regularity|invariant",
-            #   "introduced_at": ISO timestamp,
-            #   "last_confirmed_at": ISO timestamp,
-            # }
-        ],
-        "tool_contracts": [
-            # Each tool contract:
-            # {
-            #   "tool": str,
-            #   "insight": str,
-            #   "status": "reliable|unreliable|unknown",
-            #   "introduced_at": ISO timestamp,
-            #   "last_confirmed_at": ISO timestamp,
-            # }
-        ],
+        "version": RAW_WORLD_MODEL_VERSION,
+        "created_at": now,
+        "updated_at": now,
+        "raw_data": {"facts": [], "tool_contracts": []},
     }
 
 
@@ -106,12 +114,15 @@ class WorldModel:
         self.base_dir.mkdir(parents=True, exist_ok=True)
         self.world_model_file = self.base_dir / "world_model.json"
         
+        # Persistent state: raw evidence only
         self.world_model = self.load()
+        # Derived state: beliefs (planner-facing)
+        self._beliefs_cache = self._derive_beliefs(self.world_model)
 
     def load(self) -> WorldModel:
-        """Load world_model from world_model.json file, or return empty if not found."""
+        """Load raw world_model from world_model.json file, or return empty raw store if not found."""
         if not self.world_model_file.exists():
-            return empty_world_model()
+            return empty_world_model_raw()
         
         try:
             with open(self.world_model_file, 'r') as f:
@@ -123,27 +134,30 @@ class WorldModel:
             else:
                 world_model = content
             
+            # Only raw v2.0 is supported. Any other format/version resets to empty raw.
+            if not (isinstance(world_model, dict) and world_model.get("version") == RAW_WORLD_MODEL_VERSION and "raw_data" in world_model):
+                logger.warning(
+                    f"WorldModel: unsupported or legacy format in {self.world_model_file}; resetting to empty raw v{RAW_WORLD_MODEL_VERSION}"
+                )
+                return empty_world_model_raw()
+
             # Extract and store created_at for backup filename
-            self.prior_create_date = world_model.get('created_at')
-            if not self.prior_create_date:
-                # Fallback to updated_at if created_at missing (legacy files)
-                self.prior_create_date = world_model.get('updated_at')
+            self.prior_create_date = world_model.get('created_at') or world_model.get('updated_at')
             
-            # Validate tool_contracts against available_tools
+            # Validate tool_contracts against available_tools (raw store)
             removed_tools = []
             if self.available_tools is not None:
                 available_tool_names = set(self.available_tools.keys())
-                tool_contracts = world_model.get('tool_contracts', [])
-                original_count = len(tool_contracts)
+                raw_data = world_model.get("raw_data", {})
+                tool_contracts = raw_data.get('tool_contracts', [])
+                original_count = len(tool_contracts or [])
                 
                 # Filter out contracts for unavailable tools
-                world_model['tool_contracts'] = [
-                    contract for contract in tool_contracts
-                    if contract.get('tool') in available_tool_names
-                ]
+                raw_data['tool_contracts'] = [contract for contract in (tool_contracts or []) if contract.get('tool') in available_tool_names]
+                world_model["raw_data"] = raw_data
                 
                 # Log warnings for removed contracts and track removed tool names
-                removed_count = original_count - len(world_model['tool_contracts'])
+                removed_count = original_count - len(raw_data.get('tool_contracts', []))
                 if removed_count > 0:
                     removed_tools = [
                         contract.get('tool') for contract in tool_contracts
@@ -152,18 +166,15 @@ class WorldModel:
                     for tool_name in removed_tools:
                         logger.warning(f"Removed tool_contract for unavailable tool '{tool_name}' from world_model")
                 
-                # Remove facts that mention any removed tool names
+                # Remove raw facts that mention any removed tool names (cheap heuristic)
                 if removed_tools:
-                    facts = world_model.get('facts', [])
-                    original_facts_count = len(facts)
+                    facts = world_model.get("raw_data", {}).get('facts', [])
+                    original_facts_count = len(facts or [])
                     
-                    world_model['facts'] = [
-                        fact for fact in facts
-                        if not any(tool_name in fact.get('fact', '') for tool_name in removed_tools)
-                    ]
+                    world_model["raw_data"]["facts"] = [fact for fact in (facts or []) if not any(tool_name in fact.get('fact', '') for tool_name in removed_tools)]
                     
                     # Log warnings for removed facts
-                    removed_facts_count = original_facts_count - len(world_model['facts'])
+                    removed_facts_count = original_facts_count - len(world_model.get("raw_data", {}).get('facts', []))
                     if removed_facts_count > 0:
                         for fact in facts:
                             fact_text = fact.get('fact', '')
@@ -174,47 +185,28 @@ class WorldModel:
             return world_model
         except (json.JSONDecodeError, IOError) as e:
             logger.warning(f"Failed to load world_model from {self.world_model_file}: {e}")
-            return empty_world_model()
+            return empty_world_model_raw()
 
     def save(self) -> bool:
-        """Save world_model to world_model.json file, backing up existing file first."""
+        """Save raw world_model to world_model.json file, backing up existing file first."""
         try:
             self.base_dir.mkdir(parents=True, exist_ok=True)
             
             # Backup existing file if it exists
             if self.world_model_file.exists():
-                # Use updated_at from the file being backed up (not created_at) so each backup has unique name
-                backup_date = None
+                backup_path = Path(str(self.world_model_file) + ".bak")
                 try:
-                    with open(self.world_model_file, 'r') as f:
-                        existing_content = json.load(f)
-                    if isinstance(existing_content, dict) and 'world_model' in existing_content:
-                        existing_content = existing_content['world_model']
-                    # Prefer updated_at (when this version was last saved) for unique backup names
-                    backup_date = existing_content.get('updated_at') or existing_content.get('created_at')
-                except Exception:
-                    # Last resort: use file modification time
-                    backup_date = datetime.fromtimestamp(self.world_model_file.stat().st_mtime).isoformat()
-                
-                if backup_date:
-                    # Format date for filename: replace colons and dots with hyphens
-                    # e.g., "2025-12-31T21-55-15" from "2025-12-31T21:55:15.178017"
-                    formatted_date = backup_date.replace(':', '-').replace('.', '-').split('+')[0].split('Z')[0]
-                    backup_filename = f"world_model_{formatted_date}.json"
-                    backup_path = self.base_dir / backup_filename
-                    
-                    try:
-                        self.world_model_file.rename(backup_path)
-                        logger.info(f"📦 Backed up world_model to {backup_filename}")
-                    except Exception as e:
-                        logger.warning(f"Failed to backup world_model file: {e}")
+                    self.world_model_file.rename(backup_path)
+                    logger.info(f"📦 Backed up world_model to {backup_path.name}")
+                except Exception as e:
+                    logger.warning(f"Failed to backup world_model file: {e}")
             
             # Ensure created_at is set (preserve existing or set new)
             save_data = self.world_model.copy()
             if 'created_at' not in save_data:
-                save_data['created_at'] = datetime.utcnow().isoformat()
+                save_data['created_at'] = _now_iso()
             
-            save_data['updated_at'] = datetime.utcnow().isoformat()
+            save_data['updated_at'] = _now_iso()
             
             # Save new file
             with open(self.world_model_file, 'w') as f:
@@ -231,12 +223,16 @@ class WorldModel:
 
     def update(self, reflection_frame: Dict[str, Any]):
         """
-        Deterministically update world_model from a ReflectionFrame.
+        Deterministically update raw evidence store from a ReflectionFrame,
+        then rebuild beliefs (planner-facing).
+
         ReflectionFrame is treated as a *proposal*, not ground truth.
         """
 
         wm = deepcopy(self.world_model)
-        now = datetime.utcnow().isoformat()
+        now = _now_iso()
+        if not isinstance(wm, dict) or wm.get("version") != RAW_WORLD_MODEL_VERSION or "raw_data" not in wm:
+            wm = empty_world_model_raw()
         
         # Preserve created_at if it exists, otherwise set it
         if 'created_at' not in wm:
@@ -247,122 +243,199 @@ class WorldModel:
         
         wm["updated_at"] = now
 
-        # --------------------------------------------------------
-        # 1. Promote World Model Facts
-        # --------------------------------------------------------
+        wm["updated_at"] = now
+        raw_data = wm.get("raw_data", {})
+        raw_facts = raw_data.get("facts", [])
+        raw_tool_contracts = raw_data.get("tool_contracts", [])
 
         for update in reflection_frame.get("world_model_updates", []):
-            fact_text = update["fact"]
-            confidence = update["confidence"]
-            source = update["source"]
-            stability = update.get("stability", "anecdote")
+            fact_text = update.get("fact")
+            if not fact_text:
+                continue
+            polarity = (update.get("polarity") or "support").strip().lower()
+            confidence = (update.get("confidence") or "medium").strip().lower()
+            source = update.get("source") or "observation"
 
-            # Guardrail 1: reject low-confidence promotions
+            # Guardrail: ignore low-confidence proposals (legacy field)
             if confidence == "low":
                 continue
 
-            # Guardrail 2: require generality (LLM-assisted)
-            try:
-                is_general = self.llm_fact_generalization_check(fact_text)
-            except NotImplementedError:
-                is_general = True  # fail-open during early development
-
-            if not is_general:
+            # Guardrail: require generality (LLM-assisted)
+            if not self.llm_fact_generalization_check(fact_text):
                 continue
 
-            # Check for equivalence with existing facts
-            eq_index = None
-            for i, f in enumerate(wm["facts"]):
-                if f["fact"] == fact_text:
-                    eq_index = i
+            key = _norm_text(fact_text)
+            existing = None
+            for rf in raw_facts:
+                if rf.get("key") == key:
+                    existing = rf
                     break
-
-            if eq_index is None:
-                # Try semantic equivalence
-                try:
-                    eq_index = self.llm_fact_equivalence_check(fact_text, wm["facts"])
-                except NotImplementedError:
-                    eq_index = None
-
-            if eq_index is None:
-                # New fact
-                wm["facts"].append({
+            if existing is None:
+                existing = {
+                    "key": key,
                     "fact": fact_text,
-                    "confidence": confidence,
-                    "source": source,
-                    "stability": stability,
-                    "introduced_at": now,
-                    "last_confirmed_at": now,
-                })
+                    "support_count": 0,
+                    "contradiction_count": 0,
+                    "source_counts": {},
+                    "first_observed_at": now,
+                    "last_observed_at": now,
+                }
+                raw_facts.append(existing)
+            if polarity == "contradict":
+                existing["contradiction_count"] = int(existing.get("contradiction_count", 0)) + 1
             else:
-                # Existing fact: update confidence conservatively
-                existing = wm["facts"][eq_index]
-                existing["last_confirmed_at"] = now
-
-                # Confidence can only increase, never decrease automatically
-                if confidence == "high" and existing["confidence"] != "high":
-                    existing["confidence"] = "high"
-
-                # Stability can only strengthen
-                stability_rank = {"anecdote": 0, "regularity": 1, "invariant": 2}
-                if stability_rank[stability] > stability_rank.get(existing["stability"], 0):
-                    existing["stability"] = stability
-
-        # --------------------------------------------------------
-        # 2. Update Tool Contracts
-        # --------------------------------------------------------
+                existing["support_count"] = int(existing.get("support_count", 0)) + 1
+            existing["last_observed_at"] = now
+            sc = existing.get("source_counts") or {}
+            sc[source] = int(sc.get(source, 0)) + 1
+            existing["source_counts"] = sc
 
         for ti in reflection_frame.get("tool_insights", []):
             tool = ti["tool"]
             insight = ti["insight"]
             status = ti["status"]
-
-            # Find existing contract
-            existing_idx = None
-            for i, tc in enumerate(wm["tool_contracts"]):
-                if tc["tool"] == tool:
-                    existing_idx = i
+            if not tool or not insight:
+                continue
+            insight_key = _norm_text(insight)
+            existing = None
+            for rtc in raw_tool_contracts:
+                if rtc.get("tool") == tool and rtc.get("insight_key") == insight_key:
+                    existing = rtc
                     break
-
-            if existing_idx is None:
-                wm["tool_contracts"].append({
+            if existing is None:
+                existing = {
                     "tool": tool,
+                    "insight_key": insight_key,
                     "insight": insight,
-                    "status": status,
-                    "introduced_at": now,
-                    "last_confirmed_at": now,
-                })
-            else:
-                existing = wm["tool_contracts"][existing_idx]
-                existing["last_confirmed_at"] = now
+                    "votes": {"reliable": 0, "unreliable": 0, "constrained": 0, "unknown": 0},
+                    "first_observed_at": now,
+                    "last_observed_at": now,
+                }
+                raw_tool_contracts.append(existing)
+            votes = existing.get("votes") or {"reliable": 0, "unreliable": 0, "constrained": 0, "unknown": 0}
+            votes[status] = int(votes.get(status, 0)) + 1
+            existing["votes"] = votes
+            existing["last_observed_at"] = now
 
-                # Detect conflicts (LLM-assisted)
-                try:
-                    conflict = self.llm_tool_contract_conflict_check( insight, existing["insight"])
-                except NotImplementedError:
-                    conflict = False
-
-                if conflict:
-                    # Downgrade reliability on conflict
-                    existing["status"] = "unreliable"
-                else:
-                    # Strengthen reliability if consistent
-                    if status == "reliable":
-                        existing["status"] = "reliable"
-
-        # --------------------------------------------------------
-        # 3. Ignore Task-State and Context-Forget
-        # --------------------------------------------------------
-        # By design:
-        # - task_state is ephemeral
-        # - context_forget is handled by the planner/runtime
-        # - neither affects the world model directly
-
+        raw_data["facts"] = raw_facts
+        raw_data["tool_contracts"] = raw_tool_contracts
+        wm["raw_data"] = raw_data
         self.world_model = wm
+        self._beliefs_cache = self._derive_beliefs(self.world_model)
 
 
     def get(self) -> WorldModel:
+        return self._beliefs_cache
+
+    def get_raw(self) -> WorldModel:
         return self.world_model
+
+    def _rng_for_key(self, key: str) -> random.Random:
+        h = hashlib.sha256(key.encode("utf-8")).hexdigest()
+        seed = int(h[:16], 16)
+        return random.Random(seed)
+
+    def _beta_prob_gt(self, alpha: float, beta: float, threshold: float, key: str, samples: int = 512) -> float:
+        rng = self._rng_for_key(key)
+        wins = 0
+        for _ in range(samples):
+            if rng.betavariate(alpha, beta) > threshold:
+                wins += 1
+        return wins / float(samples)
+
+    def _dirichlet_winner_prob(self, counts: Dict[str, int], key: str, samples: int = 512) -> tuple[str, float]:
+        """Dirichlet posterior over status votes; returns (winner_label, P(winner is argmax))."""
+        labels = ["reliable", "unreliable", "constrained"]
+        rng = self._rng_for_key(key)
+        # Symmetric Dirichlet(1,1,1) prior
+        alpha = {lab: 1.0 + float(max(0, int(counts.get(lab, 0)))) for lab in labels}
+        win_counts = {lab: 0 for lab in labels}
+        for _ in range(samples):
+            xs = {lab: rng.gammavariate(alpha[lab], 1.0) for lab in labels}
+            winner = max(labels, key=lambda lab: xs[lab])
+            win_counts[winner] += 1
+        winner = max(labels, key=lambda lab: win_counts[lab])
+        return winner, win_counts[winner] / float(samples)
+
+    def _derive_beliefs(self, raw_model: WorldModel) -> WorldModel:
+        """Build beliefs (planner-facing) from raw evidence using Bayesian thresholds."""
+        beliefs = empty_world_model()
+        created_at = raw_model.get("created_at") if isinstance(raw_model, dict) else None
+        updated_at = raw_model.get("updated_at") if isinstance(raw_model, dict) else None
+        if created_at:
+            beliefs["created_at"] = created_at
+        if updated_at:
+            beliefs["updated_at"] = updated_at
+
+        raw_data = raw_model.get("raw_data", {}) if isinstance(raw_model, dict) else {}
+        for rf in raw_data.get("facts", []) or []:
+            fact_text = rf.get("fact")
+            key = rf.get("key") or _norm_text(fact_text or "")
+            support = int(rf.get("support_count") or 0)
+            contradiction = int(rf.get("contradiction_count") or 0)
+            n = support + contradiction
+            if not fact_text or n <= 0:
+                continue
+
+            # Beta(1,1) prior; evidence: support vs contradiction
+            alpha = 1.0 + float(support)
+            beta = 1.0 + float(contradiction)
+            p_true = self._beta_prob_gt(alpha, beta, 0.5, key=key)
+
+            # Error probability thresholds: 10% / 5% / 2%  => p_true >= 0.90 / 0.95 / 0.98
+            if p_true >= 0.98 and support >= 10 and contradiction == 0:
+                stability = "invariant"
+                confidence = "high"
+            elif p_true >= 0.95 and support >= 3:
+                stability = "regularity"
+                confidence = "medium" if p_true < 0.98 else "high"
+            elif p_true >= 0.90 and support >= 1:
+                stability = "anecdote"
+                confidence = "low" if p_true < 0.95 else "medium"
+            else:
+                continue
+
+            source_counts = rf.get("source_counts") or {}
+            source = "observation"
+            if isinstance(source_counts, dict) and source_counts:
+                source = max(source_counts.keys(), key=lambda k: int(source_counts.get(k, 0) or 0))
+
+            beliefs["facts"].append({
+                "fact": fact_text,
+                "confidence": confidence,
+                "source": source,
+                "stability": stability,
+                "introduced_at": rf.get("first_observed_at") or beliefs["created_at"],
+                "last_confirmed_at": rf.get("last_observed_at") or beliefs["updated_at"],
+                "support_count": support,
+                "contradiction_count": contradiction,
+            })
+
+        for rtc in raw_data.get("tool_contracts", []) or []:
+            tool = rtc.get("tool")
+            insight = rtc.get("insight")
+            votes = rtc.get("votes") or {}
+            if not tool or not insight:
+                continue
+
+            total_votes = sum(int(votes.get(k, 0) or 0) for k in ["reliable", "unreliable", "constrained"])
+            if total_votes <= 0:
+                continue
+
+            key = f"{tool}:{rtc.get('insight_key') or _norm_text(insight)}"
+            winner, p_winner = self._dirichlet_winner_prob(votes, key=key)
+            status = winner if p_winner >= 0.90 else "unknown"
+
+            beliefs["tool_contracts"].append({
+                "tool": tool,
+                "insight": insight,
+                "status": status,
+                "introduced_at": rtc.get("first_observed_at") or beliefs["created_at"],
+                "last_confirmed_at": rtc.get("last_observed_at") or beliefs["updated_at"],
+                "evidence_count": total_votes,
+            })
+
+        return beliefs
 
     def llm_fact_generalization_check(self, fact_text: str) -> bool:
         """

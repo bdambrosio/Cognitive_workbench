@@ -8,7 +8,7 @@ Many agent errors come from conflating the two.
 ## Blocks
 
 - Occupy fixed grid positions
-- Sampled by `mc-observe`
+- Observed by `mc-observe` (via `blocks.*` fields)
 - Can be dug or replaced
 - Examples: dirt, stone, sand
 
@@ -37,8 +37,8 @@ Many agent errors come from conflating the two.
 
 ## Tool Implications
 
-- `mc-observe` → blocks only
-- `mc-inventory` → inventory only
+- `mc-observe` → blocks + entities (including item entities)
+- `mc-inventory` → inventory only (slots)
 - Pickup is implicit, not commanded
 
 This separation is intentional and mirrors vanilla Minecraft.

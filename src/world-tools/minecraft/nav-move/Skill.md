@@ -29,7 +29,7 @@ Failure (`status: "failed"`):
 ## Behavior
 
 - Calls bridge `/act/move` once (forward) with collision checking
-- Validates landing via `mc-status` + `mc-observe-blocks`
+- Validates landing via `mc-status` + `mc-observe`
 - Snaps to block center after any position change
 - Updates `world_state("nav")` history
 

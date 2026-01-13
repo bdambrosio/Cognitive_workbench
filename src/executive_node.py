@@ -2035,27 +2035,19 @@ class ZenohExecutiveNode:
             traceback.print_exc()
     
     def handle_clear_world_model(self, sample):
-        """Handle clear world model command - deletes the persistent world model Note."""
+        """Handle clear world model command - resets persistent world_model.json to empty and saves."""
         try:
-            if not self.resource_manager:
-                logger.error("Resource manager not available, cannot clear world model")
+            if not hasattr(self, 'world_model') or not self.world_model:
+                logger.error("WorldModel not available, cannot clear world model")
                 return
-            
-            agent_name = getattr(self, 'character_name', 'unknown')
-            frame_name = f"{agent_name}-world_model"
-            
-            # Resolve named Note
-            note_id = self.resource_manager._resolve_resource_id(frame_name)
-            if not note_id:
-                logger.info(f"World model '{frame_name}' not found, nothing to clear")
-                return
-            
-            # Delete the Note
-            success, error_msg = self.resource_manager.delete_resource(note_id)
-            if success:
-                logger.info(f"🗑️ Cleared world model '{frame_name}' ({note_id})")
-            else:
-                logger.error(f"Failed to clear world model '{frame_name}': {error_msg}")
+
+            from world_model import empty_world_model_raw
+            self.world_model.world_model = empty_world_model_raw()
+            # Keep planner-facing cache consistent in-memory
+            if hasattr(self.world_model, "_derive_beliefs"):
+                self.world_model._beliefs_cache = self.world_model._derive_beliefs(self.world_model.world_model)
+            self.world_model.save()
+            logger.info("🗑️ Cleared world_model (reset to empty and saved)")
         except Exception as e:
             logger.error(f'Error clearing world model: {e}')
             traceback.print_exc()
@@ -2533,8 +2525,8 @@ class ZenohExecutiveNode:
         tool_model_cleared = False
         if global_clear:
             if hasattr(self, 'world_model') and self.world_model:
-                from world_model import empty_world_model
-                self.world_model.world_model = empty_world_model()
+                from world_model import empty_world_model_raw
+                self.world_model.world_model = empty_world_model_raw()
                 self.world_model.save()
                 world_model_cleared = True
                 logger.info("🌍 Cleared world_model (reset to empty)")
@@ -2566,8 +2558,8 @@ class ZenohExecutiveNode:
         resources_file_cleared = False
         
         if hasattr(self, 'world_model') and self.world_model:
-            from world_model import empty_world_model
-            self.world_model.world_model = empty_world_model()
+            from world_model import empty_world_model_raw
+            self.world_model.world_model = empty_world_model_raw()
             self.world_model.save()
             world_model_cleared = True
             logger.info("🌍 Explicitly cleared world_model (reset to empty)")

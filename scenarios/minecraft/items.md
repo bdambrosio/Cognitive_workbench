@@ -52,7 +52,9 @@ pickup, and reporting. It excludes crafting and enchantments.
   - have positions
   - obey gravity
   - can slide or bounce
-- They are **not visible** to block observation tools.
+- They are **not blocks** and will not appear in `mc-observe.blocks.*`.
+- They **do** appear in `mc-observe.entities.*` when entity scanning is enabled.
+- **Despawn**: item entities typically despawn after ~5 minutes (~6000 ticks) if not collected.
 
 ---
 
