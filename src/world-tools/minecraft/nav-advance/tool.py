@@ -1,7 +1,7 @@
 """
 Navigation advance composite.
 
-Advance forward by a target number of blocks using nav conventions (verification, snap-to-grid, nav history).
+Advance forward by a specified number of blocks using nav conventions (verification, snap-to-grid, nav history).
 """
 
 import logging
@@ -40,13 +40,16 @@ def tool(input_value=None, **kwargs):
     if not executor:
         return {"status": "failed", "reason": "executor not available", "value": None, "resource_id": None}
 
-    target = _coerce_int(kwargs.get("target"))
-    if target is None:
-        target = _coerce_int(input_value)
-    if target is None or target <= 0:
+    # Accept 'blocks' (preferred) or 'target' (backward compatibility)
+    blocks = _coerce_int(kwargs.get("blocks"))
+    if blocks is None:
+        blocks = _coerce_int(kwargs.get("target"))  # Backward compatibility
+    if blocks is None:
+        blocks = _coerce_int(input_value)
+    if blocks is None or blocks <= 0:
         return executor._create_uniform_return(
             "failed",
-            value="nav-advance requires target (positive integer blocks)",
+            value="nav-advance requires blocks (positive integer)",
             reason="INVALID_TARGET",
             extra={"stop_reason": "INVALID_TARGET"}
         )
@@ -71,12 +74,12 @@ def tool(input_value=None, **kwargs):
     last_pos = start_pos
     last_y = start_pos.get("y")
 
-    for _ in range(target):
+    for _ in range(blocks):
         move_data = call_move_endpoint(minecraft_url, forward=True, duration=step_duration, check_collision=True)
         if move_data is None or not move_data.get("ok"):
             return executor._create_uniform_return(
                 "failed",
-                value=f"Advance stopped: MOVE_FAILED after {steps_completed}/{target}",
+                value=f"Advance stopped: MOVE_FAILED after {steps_completed}/{blocks}",
                 reason="MOVE_FAILED",
             )
 
@@ -85,7 +88,7 @@ def tool(input_value=None, **kwargs):
         if move_status == "collision":
             return executor._create_uniform_return(
                 "failed",
-                value=f"Advance stopped: COLLISION after {steps_completed}/{target}",
+                value=f"Advance stopped: COLLISION after {steps_completed}/{blocks}",
                 reason="COLLISION",
             )
 
@@ -101,16 +104,16 @@ def tool(input_value=None, **kwargs):
 
             return executor._create_uniform_return(
                 "failed",
-                value=f"Advance stopped: FELL after {steps_completed}/{target}",
+                value=f"Advance stopped: FELL after {steps_completed}/{blocks}",
                 reason="FELL",
             )
 
         # Observe for support
-        obs = executor.execute_action_with_log({"type": "mc-observe-blocks"}, "nav-advance")
+        obs = executor.execute_action_with_log({"type": "mc-observe"}, "nav-advance")
         if obs.get("status") != "success":
             return executor._create_uniform_return(
                 "failed",
-                value=f"Advance stopped: OBSERVATION_FAILED after {steps_completed}/{target}",
+                value=f"Advance stopped: OBSERVATION_FAILED after {steps_completed}/{blocks}",
                 reason="OBSERVATION_FAILED",
             )
 
@@ -121,7 +124,7 @@ def tool(input_value=None, **kwargs):
         if status_after.get("status") != "success":
             return executor._create_uniform_return(
                 "failed",
-                value=f"Advance stopped: STATUS_FAILED after {steps_completed}/{target}",
+                value=f"Advance stopped: STATUS_FAILED after {steps_completed}/{blocks}",
                 reason="STATUS_FAILED",
             )
 
@@ -141,7 +144,7 @@ def tool(input_value=None, **kwargs):
 
             return executor._create_uniform_return(
                 "failed",
-                value=f"Advance stopped: UNEXPECTED_VERTICAL_CHANGE after {steps_completed}/{target}",
+                value=f"Advance stopped: UNEXPECTED_VERTICAL_CHANGE after {steps_completed}/{blocks}",
                 reason="UNEXPECTED_VERTICAL_CHANGE",
             )
 
@@ -154,7 +157,7 @@ def tool(input_value=None, **kwargs):
 
             return executor._create_uniform_return(
                 "failed",
-                value=f"Advance stopped: SUPPORT_AMBIGUOUS after {steps_completed}/{target}",
+                value=f"Advance stopped: SUPPORT_AMBIGUOUS after {steps_completed}/{blocks}",
                 reason="SUPPORT_AMBIGUOUS",
             )
 
@@ -172,7 +175,7 @@ def tool(input_value=None, **kwargs):
 
     return executor._create_uniform_return(
         "success",
-        value=f"Advance completed: TARGET_REACHED ({steps_completed}/{target})",
+        value=f"Advance completed: TARGET_REACHED ({steps_completed}/{blocks})",
     )
 
 

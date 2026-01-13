@@ -1,7 +1,7 @@
 ---
 name: nav-advance
 type: python
-description: "Advance forward up to N blocks (target) using nav conventions. Stops early on collision, fall, or ambiguous support."
+description: "Advance forward up to N blocks using nav conventions. Stops early on collision, fall, or ambiguous support."
 ---
 
 # nav-advance
@@ -10,7 +10,7 @@ Planner-friendly multi-step forward motion. Reduces fragile planner loops while 
 
 ## Input
 
-- `target`: Integer number of blocks to advance (required)
+- `blocks`: Integer number of blocks to advance (required)
 - `step_duration`: Float seconds per move (default: `0.2`)
 - `max_abs_delta_y`: Float tolerance for Y noise (default: `0.2`)
 
@@ -25,7 +25,7 @@ Failure (`status: "failed"`):
 
 ## Behavior
 
-- Internally performs up to `target` single moves with verification
+- Internally performs up to `blocks` single moves with verification
 - Snaps to block center after each landed move and updates nav history
 - Stops immediately when unsafe conditions are detected
 
@@ -37,5 +37,5 @@ Failure (`status: "failed"`):
 ## Example
 
 ```json
-{"type":"nav-advance","target":3,"out":"$adv"}
+{"type":"nav-advance","blocks":3,"out":"$adv"}
 ```

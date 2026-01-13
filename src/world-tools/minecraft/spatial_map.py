@@ -9,6 +9,7 @@ updates from observations, and spatial queries.
 import json
 import logging
 import math
+import time
 from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
@@ -46,6 +47,7 @@ def empty_cell(x: int, z: int) -> Dict[str, Any]:
         },
         "resources": {
             "resources_visible": [],
+            "item_entities_visible": [],
             "harvest_actions": [],
             "tool_required": "unknown"
         },
@@ -238,16 +240,10 @@ class SpatialMap:
             
             # Backup existing file
             if self.map_file.exists():
+                backup_path = Path(str(self.map_file) + ".bak")
                 try:
-                    with open(self.map_file, 'r') as f:
-                        existing = json.load(f)
-                    backup_date = existing.get('metadata', {}).get('updated_at')
-                    if backup_date:
-                        formatted_date = backup_date.replace(':', '-').replace('.', '-').split('+')[0].split('Z')[0]
-                        backup_filename = f"{self.agent_name}_spatial_map_{formatted_date}.json"
-                        backup_path = self.base_dir / backup_filename
-                        self.map_file.rename(backup_path)
-                        logger.info(f"📦 Backed up spatial map to {backup_filename}")
+                    self.map_file.rename(backup_path)
+                    logger.info(f"📦 Backed up spatial map to {backup_path.name}")
                 except Exception as e:
                     logger.warning(f"Failed to backup spatial map: {e}")
             
@@ -430,7 +426,9 @@ class SpatialMap:
         Returns:
             Number of cells updated
         """
-        now = datetime.utcnow().isoformat()
+        now_dt = datetime.utcnow()
+        now = now_dt.isoformat()
+        now_ts = float(now_dt.timestamp())
         obs_x = int(round(observer_x))
         obs_y = int(round(observer_y))
         obs_z = int(round(observer_z))
@@ -447,6 +445,7 @@ class SpatialMap:
         conf = observation.get('conf', 'med')
         dirs = observation.get('dirs', {})
         nav_surface = observation.get('nav_surface', [])
+        entities = observation.get('entities', {}) if isinstance(observation, dict) else {}
         
         # ---------------------------------------------------------------------
         # 1. Update observer's cell (Current Location)
@@ -740,6 +739,81 @@ class SpatialMap:
                         b_cell['observability']['last_observed_at'] = now
                     
                     self.cells[b_key] = b_cell
+
+        # ---------------------------------------------------------------------
+        # 3b. Update visible item entities (ephemeral resources)
+        # ---------------------------------------------------------------------
+        # KISS: treat item entities as resources attached to their (x,z) cell.
+        # Store with expiry timestamps so queries can ignore stale items.
+        nearby_entities = entities.get('nearby', []) if isinstance(entities, dict) else []
+        if isinstance(nearby_entities, list):
+            items_by_cell: Dict[Tuple[int, int], List[Dict[str, Any]]] = {}
+            for ent in nearby_entities:
+                if not isinstance(ent, dict):
+                    continue
+                ent_type = ent.get('type') or ent.get('name') or ''
+                if 'item' not in str(ent_type).lower():
+                    continue
+
+                ent_pos = ent.get('position')
+                ex = ey = ez = None
+                if isinstance(ent_pos, dict):
+                    ex, ey, ez = ent_pos.get('x'), ent_pos.get('y'), ent_pos.get('z')
+                elif isinstance(ent_pos, (list, tuple)) and len(ent_pos) >= 3:
+                    ex, ey, ez = ent_pos[0], ent_pos[1], ent_pos[2]
+                if ex is None or ez is None:
+                    continue
+
+                cx = int(math.floor(float(ex)))
+                cz = int(math.floor(float(ez)))
+
+                item_name = ent.get('item_name') or ent.get('name') or str(ent_type)
+                item_count = ent.get('item_count', ent.get('count', 1))
+                try:
+                    item_count = int(item_count)
+                except Exception:
+                    item_count = 1
+
+                ttl_seconds = ent.get('time_until_despawn_seconds')
+                try:
+                    ttl_seconds = float(ttl_seconds) if ttl_seconds is not None else 300.0
+                except Exception:
+                    ttl_seconds = 300.0
+                if ttl_seconds < 1.0:
+                    ttl_seconds = 1.0
+                if ttl_seconds > 3600.0:
+                    ttl_seconds = 3600.0
+
+                item_entry = {
+                    "item_name": item_name,
+                    "item_count": item_count,
+                    "position": {"x": ex, "y": ey, "z": ez},
+                    "distance": ent.get('distance'),
+                    "age_ticks": ent.get('age_ticks'),
+                    "velocity": ent.get('velocity'),
+                    "is_stationary": ent.get('is_stationary'),
+                    "observed_at_ts": now_ts,
+                    "expires_at_ts": now_ts + ttl_seconds
+                }
+                items_by_cell.setdefault((cx, cz), []).append(item_entry)
+
+            for (ix, iz), items in items_by_cell.items():
+                i_key = self._cell_key(ix, iz)
+                i_cell = self.cells.get(i_key) or empty_cell(ix, iz)
+                if 'resources' not in i_cell:
+                    i_cell['resources'] = {"resources_visible": [], "item_entities_visible": [], "harvest_actions": [], "tool_required": "unknown"}
+                i_cell['resources']['item_entities_visible'] = items
+
+                # Light-touch observability/provenance
+                if i_cell.get('observability', {}).get('observation_mode') in (None, 'unknown'):
+                    i_cell['observability']['observation_mode'] = 'item_seen'
+                i_cell['observability']['observed_from'] = {'x': obs_x, 'y': obs_y, 'z': obs_z}
+                i_cell['observability']['last_observed_at'] = now
+                i_cell['provenance']['updated_by'] = self.agent_name
+                i_cell['provenance']['update_reason'] = 'item_entities_visible'
+
+                self.cells[i_key] = i_cell
+                cells_updated += 1
         
         # ---------------------------------------------------------------------
         # 4. Forward Inference (Existing logic)
@@ -1199,7 +1273,8 @@ class SpatialMap:
                 walkable += 1
             if cell.get('hazards', {}).get('flags'):
                 hazard += 1
-            if cell.get('resources', {}).get('resources_visible'):
+            res = cell.get('resources', {}) or {}
+            if res.get('resources_visible') or res.get('item_entities_visible'):
                 resource += 1
         
         return {

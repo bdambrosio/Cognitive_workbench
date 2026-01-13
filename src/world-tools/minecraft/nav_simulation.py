@@ -117,16 +117,34 @@ def simulate_nav_step(
         return None
 
     if action == "nav-climb":
-        # Destination feet at y+1
-        stand_cell = query_cell(tx, y + 1, tz)
-        if stand_cell is None:
+        # Composite climb (approximation):
+        # - Validate destination body space at (tx, y+1, tz)
+        # - Validate destination head space at (tx, y+2, tz)
+        # - Require support under destination feet (at y)
+        #
+        # This avoids assuming that a single query_cell() record can encode both body+head clearance
+        # at the same Y, which is not true for the current SpatialMap adapter used by path-frontier.
+
+        body_cell = query_cell(tx, y + 1, tz)
+        if body_cell is None:
             if allow_unknown:
                 return {"ok": True, "new_state": {"x": tx, "y": y + 1, "z": tz, "yaw": yaw}, "support": "unknown"}
-            return {"ok": False, "reason": "unknown_climb_cell", "new_state": None, "support": None}
-        missing = _validate_cell_fields(stand_cell)
+            return {"ok": False, "reason": "unknown_climb_body_cell", "new_state": None, "support": None}
+        missing = _validate_cell_fields(body_cell)
         if missing:
             return {"ok": False, "reason": missing, "new_state": None, "support": None}
-        if not stand_cell.get("clear_body", False) or not stand_cell.get("clear_head", False):
+        if not body_cell.get("clear_body", False):
+            return {"ok": False, "reason": "collision", "new_state": None, "support": None}
+
+        head_cell = query_cell(tx, y + 2, tz)
+        if head_cell is None:
+            if allow_unknown:
+                return {"ok": True, "new_state": {"x": tx, "y": y + 1, "z": tz, "yaw": yaw}, "support": "unknown"}
+            return {"ok": False, "reason": "unknown_climb_head_cell", "new_state": None, "support": None}
+        missing = _validate_cell_fields(head_cell)
+        if missing:
+            return {"ok": False, "reason": missing, "new_state": None, "support": None}
+        if not head_cell.get("clear_head", False):
             return {"ok": False, "reason": "collision", "new_state": None, "support": None}
 
         # Require support under the destination feet (at y)
@@ -145,11 +163,7 @@ def simulate_nav_step(
             else:
                 return {"ok": False, "reason": "support_ambiguous", "new_state": None, "support": support}
 
-        return {
-            "ok": True,
-            "new_state": {"x": tx, "y": y + 1, "z": tz, "yaw": yaw},
-            "support": stand_cell.get("support", "unknown"),
-        }
+        return {"ok": True, "new_state": {"x": tx, "y": y + 1, "z": tz, "yaw": yaw}, "support": body_cell.get("support", "unknown")}
 
     if action == "nav-descend":
         # Destination feet at y-1

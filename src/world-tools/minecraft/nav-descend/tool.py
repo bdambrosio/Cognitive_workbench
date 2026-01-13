@@ -242,7 +242,7 @@ def tool(input_value=None, **kwargs):
             delta_y = end_y - start_y
         
         # Observe landing support
-        obs = executor.execute_action_with_log({"type": "mc-observe-blocks"}, "nav-descend")
+        obs = executor.execute_action_with_log({"type": "mc-observe"}, "nav-descend")
         if obs.get("status") != "success":
             # Snap to position even if observation failed
             if end_pos:
@@ -321,7 +321,7 @@ def tool(input_value=None, **kwargs):
         )
 
     # --- Observe landing ---
-    obs = executor.execute_action_with_log({"type": "mc-observe-blocks"}, "nav-descend")
+    obs = executor.execute_action_with_log({"type": "mc-observe"}, "nav-descend")
     if obs.get("status") != "success":
         return executor._create_uniform_return(
             "failed",

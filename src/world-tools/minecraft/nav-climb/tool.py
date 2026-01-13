@@ -218,7 +218,7 @@ def tool(input_value=None, **kwargs):
             return {"ok": False, "reason": "fell"}
 
         # Observe
-        obs = executor.execute_action_with_log({"type": "mc-observe-blocks"}, f"nav-climb:{label}")
+        obs = executor.execute_action_with_log({"type": "mc-observe"}, f"nav-climb:{label}")
         if obs.get("status") != "success":
             return {"ok": False, "reason": "observation_failed"}
 

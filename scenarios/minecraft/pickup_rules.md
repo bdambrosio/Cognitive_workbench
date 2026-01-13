@@ -10,6 +10,7 @@ Defines how item entities enter inventory.
   - Player collides with item entity
   - Distance ≈ 1–1.5 blocks
 - There is NO explicit "pick up" action in vanilla Minecraft.
+- In this workbench, `mc-pickup` is a *helper tool* that moves into pickup range; inventory is still the source of truth.
 
 ---
 

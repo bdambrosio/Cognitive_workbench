@@ -200,31 +200,12 @@ class ToolModel:
             
             # Backup existing file if it exists
             if self.tool_model_file.exists():
-                # Use updated_at from the file being backed up (not created_at) so each backup has unique name
-                backup_date = None
+                backup_path = Path(str(self.tool_model_file) + ".bak")
                 try:
-                    with open(self.tool_model_file, 'r') as f:
-                        existing_content = json.load(f)
-                    if isinstance(existing_content, dict) and 'tool_model' in existing_content:
-                        existing_content = existing_content['tool_model']
-                    # Prefer updated_at (when this version was last saved) for unique backup names
-                    backup_date = existing_content.get('updated_at') or existing_content.get('created_at')
-                except Exception:
-                    # Last resort: use file modification time
-                    backup_date = datetime.fromtimestamp(self.tool_model_file.stat().st_mtime).isoformat()
-                
-                if backup_date:
-                    # Format date for filename: replace colons and dots with hyphens
-                    # e.g., "2025-12-31T21-55-15" from "2025-12-31T21:55:15.178017"
-                    formatted_date = backup_date.replace(':', '-').replace('.', '-').split('+')[0].split('Z')[0]
-                    backup_filename = f"tool_model_{formatted_date}.json"
-                    backup_path = self.base_dir / backup_filename
-                    
-                    try:
-                        self.tool_model_file.rename(backup_path)
-                        logger.info(f"📦 Backed up tool_model to {backup_filename}")
-                    except Exception as e:
-                        logger.warning(f"Failed to backup tool_model file: {e}")
+                    self.tool_model_file.rename(backup_path)
+                    logger.info(f"📦 Backed up tool_model to {backup_path.name}")
+                except Exception as e:
+                    logger.warning(f"Failed to backup tool_model file: {e}")
             
             # Ensure created_at is set (preserve existing or set new)
             save_data = self.tool_model.copy()

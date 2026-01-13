@@ -126,6 +126,8 @@ def _generate_html_visualization(cells: List[Dict], map_name: str, stats: Dict) 
             'exposure_risk': hazards.get('exposure_risk', 'unknown'),
             'escape_difficulty': hazards.get('escape_difficulty', 'unknown'),
             'resources': resources.get('resources_visible', []),
+            'item_entities': resources.get('item_entities_visible', []),
+            'item_entities_count': len(resources.get('item_entities_visible', []) or []),
             'confidence': observability.get('confidence', 0),
             'observation_mode': observability.get('observation_mode', 'unknown'),
             'last_observed': observability.get('last_observed_at'),
@@ -532,7 +534,7 @@ def _generate_html_visualization(cells: List[Dict], map_name: str, stats: Dict) 
                 return cell.surface_class === 'lava' ? lightenColor('#FF4500', 0.2) : lightenColor('#3794ff', 0.2);
             }}
             
-            if (showResources && cell.resources && cell.resources.length > 0) {{
+            if (showResources && ((cell.resources && cell.resources.length > 0) || (cell.item_entities_count && cell.item_entities_count > 0))) {{
                 return lightenColor('#ffd700', 0.2);
             }}
             
@@ -772,6 +774,21 @@ def _generate_html_visualization(cells: List[Dict], map_name: str, stats: Dict) 
                             <div class="info-row">
                                 <span class="info-label">Resources</span>
                                 <span class="info-value">${{cell.resources.join(', ')}}</span>
+                            </div>
+                        `;
+                    }}
+
+                    if (cell.item_entities_count && cell.item_entities_count > 0) {{
+                        const items = (cell.item_entities || []).slice(0, 5).map(it => {{
+                            if (!it) return 'unknown';
+                            const nm = it.item_name || it.name || 'unknown';
+                            const ct = it.item_count || 1;
+                            return `${{nm}}x${{ct}}`;
+                        }});
+                        infoHtml += `
+                            <div class="info-row">
+                                <span class="info-label">Items</span>
+                                <span class="info-value">${{items.join(', ')}}${{(cell.item_entities_count > 5) ? ' ...' : ''}}</span>
                             </div>
                         `;
                     }}

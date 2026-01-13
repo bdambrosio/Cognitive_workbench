@@ -41,7 +41,7 @@ examples:
 ## Common Workflow
 ```json
 {"type":"mc-status","out":"$status"}
-{"type":"mc-observe-blocks","out":"$obs"}
+{"type":"mc-observe","out":"$obs"}
 {"type":"mc-move","forward":true,"duration":2.0,"out":"$move_result"}
 {"type":"mc-status","out":"$status_after"}
 ```

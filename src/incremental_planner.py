@@ -154,7 +154,7 @@ except ImportError:
 
 REFLECTION_FRAME_SCHEMA = {
   "ReflectionFrame": {
-    "version": "1.0",
+    "version": "2.0",
 
     "_size_limits": {
       "task_state.active_hypotheses": 6,
@@ -164,7 +164,6 @@ REFLECTION_FRAME_SCHEMA = {
       "task_state.exhausted_search.actions": 6,
       "world_model_updates": 10,
       "tool_insights": 6,
-      "retired_beliefs": 4,
       "context_forget": 8,
       "open_questions": 4
     },
@@ -188,9 +187,9 @@ REFLECTION_FRAME_SCHEMA = {
     "world_model_updates": [
       {
         "fact": "string",
-        "confidence": "low | medium | high",
+        "polarity": "support | contradict",
         "source": "observation | tool_guarantee",
-        "stability": "invariant | regularity | anecdote"
+        "evidence": "string"
       }
     ],
 
@@ -199,14 +198,6 @@ REFLECTION_FRAME_SCHEMA = {
         "tool": "string",
         "insight": "string",
         "status": "reliable | unreliable | constrained",
-        "evidence": "string"
-      }
-    ],
-
-    "retired_beliefs": [
-      {
-        "belief": "string",
-        "reason": "contradicted | invalid_generalization",
         "evidence": "string"
       }
     ],
@@ -2447,6 +2438,7 @@ class IncrementalPlanner:
             # Extract inner ReflectionFrame content (LLM returns wrapped in 'ReflectionFrame' key)
             reflection_content = reflection_frame.get('ReflectionFrame', reflection_frame)
             task_state = reflection_content.get('task_state', {})
+            self._last_task_state = task_state
             
             # Update world_model from reflection_frame
             if hasattr(self.executor, 'world_model') and self.executor.world_model:
@@ -2968,7 +2960,7 @@ A) Updates TASK STATE for the NEXT attempt at THIS SAME goal (if any)
 B) Proposes WORLD MODEL updates ONLY if genuinely general and reusable
 C) Records TOOL INSIGHTS as contracts or constraints (not praise)
 D) Specifies CONTEXT-FORGET instructions to prune the NEXT prompt
-E) Retires false GENERAL beliefs only (not time-local facts)
+E) Adds CONTRADICTION evidence only via world_model_updates with polarity="contradict"
 
 Your output must be minimal, conservative, and behavior-constraining.
 
@@ -3055,10 +3047,19 @@ STEP 3 — WORLD MODEL UPDATE CANDIDATES (CONSERVATIVE)
 Propose world facts ONLY if they:
 - generalize across goals
 - are not tied to current agent state
-- reflect stable properties of the world or tools
+- reflect stable properties of the world (mechanics, structures, affordances)
 
 Each fact must be atomic, general, and reusable.
 If uncertain, do NOT promote.
+
+IMPORTANT: world_model_updates are EVIDENCE EVENTS, not belief labels.
+- polarity="support": the trace provides positive evidence the general fact holds.
+- polarity="contradict": the trace provides evidence the general fact is false or has a counterexample.
+- Do NOT output confidence/stability labels. Those are computed downstream from accumulated evidence.
+- WORLD FACTS ONLY: world_model_updates MUST NOT describe tool behavior and MUST NOT mention tool names.
+  - Bad (tool behavior): "path-explore can successfully navigate to frontier cells"
+  - Good (world fact): "Frontier cells may be obstructed even if adjacent cells look reachable"
+  - If a statement involves a specific tool (e.g., "mc-dig", "path-explore", "nav-*"), it belongs in tool_insights, not world_model_updates.
 
 It is acceptable — and often correct — to propose NO world updates.
 
@@ -3071,8 +3072,8 @@ Record any discovered tool properties that would constrain future planning:
 
 Each insight must be stated as a contract or constraint.
 
-STEP 5 — RETIREMENT VS CONTEXT FORGETTING
-- RETIRE only false GENERAL beliefs (keep as warnings).
+STEP 5 — CONTRADICTION VS CONTEXT FORGETTING
+- If the trace provides a counterexample to a GENERAL belief, add a world_model_updates entry with polarity="contradict".
 - CONTEXT_FORGET only episode- or goal-specific material to omit from the NEXT prompt.
 
 Never request forgetting of the world model itself.
@@ -3100,7 +3101,7 @@ REFLECTION_FRAME_SCHEMA:
 {REFLECTION_FRAME_SCHEMA}
 """
         # Convert world_model to JSON string to avoid format() interpreting braces as placeholders
-        task_state = "{}"
+        task_state = getattr(self, "_last_task_state", {}) or {}
         world_model = json.dumps(world_model, indent=2) if isinstance(world_model, dict) else str(world_model)
         task_state = json.dumps(task_state, indent=2) if isinstance(task_state, dict) else str(task_state)
         reflection_prompt = reflection_prompt.replace("{task_state}", task_state)

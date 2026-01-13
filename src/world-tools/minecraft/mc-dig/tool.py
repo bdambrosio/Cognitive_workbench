@@ -33,8 +33,7 @@ def tool(input_value=None, **kwargs):
         
     Returns:
         Dict with result using uniform return format.
-        Note: Digging is asynchronous - the request may be accepted but digging may fail
-        due to Minecraft physics (e.g., block too hard, cannot reach, already air).
+        Note: Bridge dig is synchronous with timeout: it returns on completion or timeout.
     """
     executor = kwargs.get("executor")
     if not executor:
@@ -97,8 +96,7 @@ def tool(input_value=None, **kwargs):
                 reason="dig_failed"
             )
         
-        # Dig request accepted - note that actual digging is asynchronous
-        # and may fail due to Minecraft physics (block too hard, cannot reach, etc.)
+        # Dig completes synchronously (or times out) in the bridge.
         dug = data.get("dug", {})
         block_name = dug.get("name", "unknown")
         dug_pos = dug.get("position", {})

@@ -6,19 +6,22 @@ Defines what can and cannot be inferred from observation tools.
 
 ## Observation Characteristics (Updated 2026-01)
 
-### mc-observe-blocks
-- **Reports**: Exhaustive enumeration of visible non-air blocks within radius
+### mc-observe (unified)
+- **Reports**: A *cone-limited*, *work-capped* view of nearby blocks + entities, plus navigation-first surface samples.
+- **Radius**:
+  - Bridge `/observe` defaults to 9 if omitted, clamps to max 10
+  - Tool `mc-observe` defaults smaller (typically 3) and may clamp to its own max for performance
 - **Visibility criteria**:
-  - Within radius R (default: 7 blocks)
-  - Within forward cone (yaw ±60°, pitch -60° to +90°)
-  - Line-of-sight from agent eye position (occlusion-aware)
-- **Navigation surface**: Uses `nav_surface` scan (2D cone + downward probe) for reliable terrain mapping
-- **Does NOT report**: Blocks outside cone, occluded blocks, blocks beyond radius
+  - Forward cone: yaw ±60°
+  - Vertical: up 60° / down 90° relative to pitch=0
+  - Distance ≤ radius (distance measured from player position; LOS uses eye height)
+- **Navigation surface** (`nav_surface`): 2D cone scan with downward probes to reliably recover `support_y` and walkability.
+- **Important**: block reporting is **not guaranteed exhaustive**; it is optimized for navigation and performance.
 
-### mc-observe-entities / mc-observe-items
-- **Reports**: Exhaustive enumeration of visible entities/items within radius
-- **Same visibility criteria** as blocks (cone + LOS)
-- **Distance**: Measured from agent foot position
+### Entities and items
+- `mc-observe` includes entities (items are a subset of entities) when entity scanning is enabled.
+- Same cone + LOS filtering as above.
+- **Distance** is computed from player position (not eye height).
 
 ---
 
@@ -61,10 +64,11 @@ Defines what can and cannot be inferred from observation tools.
 
 ## Correct Usage
 
-- Use `mc-observe-blocks` to:
+- Use `mc-observe` to:
   - Determine navigation surface (`nav_surface`)
-  - Identify visible block types (`nearby_blocks`)
-  - Confirm presence when observed
+  - Identify a navigation-relevant set of nearby blocks (`blocks.nearby`)
+  - See entities/items (`entities.nearby`)
+  - Confirm presence when observed (absence is never definitive)
 
 - Use `mc-map-update` to:
   - Persist navigation surface data
@@ -78,6 +82,6 @@ Defines what can and cannot be inferred from observation tools.
 
 ## Agent Rule (Strong)
 
-Observation provides **exhaustive but cone-limited** data.
+Observation provides **high-value but cone-limited and work-capped** data.
 It supplements reasoning but does not replace it.
-Blocks outside the cone or beyond radius still exist and can be reasoned about.
+Absence from observation is never proof of absence.

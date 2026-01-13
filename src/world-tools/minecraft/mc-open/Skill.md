@@ -35,7 +35,7 @@ Returns uniform_return format with:
 
 ## Guidelines
 
-- Use `mc-observe-blocks` to identify openable blocks
+- Use `mc-observe` to identify openable blocks
 - Common openable blocks: crafting_table, chest, furnace, dispenser
 - Must be within reach of block
 - Use `mc-close` to close opened UI

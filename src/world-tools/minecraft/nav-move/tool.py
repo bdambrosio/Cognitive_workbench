@@ -70,7 +70,7 @@ def tool(input_value=None, **kwargs):
 
     if move_status == "collision":
         # Observe anyway to expose clearance facts
-        obs = executor.execute_action_with_log({"type": "mc-observe-blocks"}, "nav-move")
+        obs = executor.execute_action_with_log({"type": "mc-observe"}, "nav-move")
         clear = obs.get("data", {}).get("clear", {}) if obs.get("status") == "success" else {}
 
         return executor._create_uniform_return(
@@ -109,7 +109,7 @@ def tool(input_value=None, **kwargs):
         )
 
     # --- Observe landing ---
-    obs = executor.execute_action_with_log({"type": "mc-observe-blocks"}, "nav-move")
+    obs = executor.execute_action_with_log({"type": "mc-observe"}, "nav-move")
     if obs.get("status") != "success":
         return executor._create_uniform_return(
             "failed",

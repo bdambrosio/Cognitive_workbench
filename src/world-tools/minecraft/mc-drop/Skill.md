@@ -38,7 +38,7 @@ Returns uniform_return format with:
 - Use `mc-inventory` first to check available items
 - Item name must match exactly
 - Dropped items become entities that can be picked up
-- Use `mc-observe-items` to see dropped items
+- Use `mc-observe` and inspect `entities.by_category.item` / `entities.nearby` to see dropped items
 
 ## Usage Examples
 

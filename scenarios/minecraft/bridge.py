@@ -57,10 +57,12 @@ def rel_to_abs(rel: Dict[str, float]) -> Tuple[int, int, int]:
     up = float(rel.get("up", 0))
 
     # Standard Minecraft Yaw to Cartesian conversion
-    # dx = -sin(yaw) * fwd - cos(yaw) * right
-    # dz =  cos(yaw) * fwd - sin(yaw) * right
+    # Forward vector: (-sin(yaw), -cos(yaw))
+    # Right vector: forward rotated 90° counter-clockwise = (cos(yaw), -sin(yaw))
+    # dx = -sin(yaw) * fwd + cos(yaw) * right
+    # dz = -cos(yaw) * fwd - sin(yaw) * right
     dx = -math.sin(yaw_rad) * fwd + math.cos(yaw_rad) * right
-    dz =  math.cos(yaw_rad) * fwd + math.sin(yaw_rad) * right
+    dz = -math.cos(yaw_rad) * fwd - math.sin(yaw_rad) * right
 
     return (
         int(round(px + dx)),
@@ -81,6 +83,11 @@ class State:
     }
     active_dig_future = None  # Track active dig operation for cancellation
     active_dig_attack_func = None  # Track attack function to stop on cancellation
+    # One-time diagnostics for Minescript execution context behavior
+    script_loop_checked: bool = False
+    script_loop_available: Optional[bool] = None
+    script_loop_enter_ok: Optional[bool] = None
+    script_loop_error: Optional[str] = None
 
 def log_action(action_type: str, note: str = ""):
     State.last_action = {
@@ -379,7 +386,7 @@ def scan_blocks(radius: int) -> List[Dict[str, Any]]:
     nav_surface: List[Dict[str, Any]] = []
     max_nav_cells = 120  # cap work; radius=7 diamond is 113 total cells pre-cone
     max_up = 2
-    max_down = 6
+    max_down = min(radius + 1, 6)  # Adaptive depth: radius+1, capped at 6
 
     visited_xz: Set[Tuple[int, int]] = set()
     for shell_dist in range(0, radius + 1):
@@ -613,6 +620,90 @@ def scan_entities(radius: int, entity_filter: Optional[str] = None) -> List[Dict
                     
                     if entity_pos:
                         entity_data["position"] = {"x": entity_pos[0], "y": entity_pos[1], "z": entity_pos[2]}
+                    
+                    # Extract age and velocity metadata (KISS: most likely + one fallback)
+                    age_ticks = None
+                    velocity = None
+                    age_extracted = False
+                    velocity_extracted = False
+                    
+                    # Try most likely: dict access
+                    if isinstance(entity, dict):
+                        age_ticks = entity.get('age') or entity.get('Age') or entity.get('age_ticks')
+                        if age_ticks is not None:
+                            age_extracted = True
+                        
+                        motion = entity.get('motion') or entity.get('Motion') or entity.get('velocity')
+                        if motion:
+                            if isinstance(motion, (list, tuple)) and len(motion) >= 3:
+                                velocity = {'x': float(motion[0]), 'y': float(motion[1]), 'z': float(motion[2])}
+                                velocity_extracted = True
+                            elif isinstance(motion, dict):
+                                velocity = {'x': float(motion.get('x', 0)), 'y': float(motion.get('y', 0)), 'z': float(motion.get('z', 0))}
+                                velocity_extracted = True
+                    # Fallback: object attribute access
+                    elif hasattr(entity, 'age'):
+                        try:
+                            age_ticks = entity.age
+                            if age_ticks is not None:
+                                age_extracted = True
+                        except Exception:
+                            pass
+                    elif hasattr(entity, 'getAge'):
+                        try:
+                            age_ticks = entity.getAge()
+                            if age_ticks is not None:
+                                age_extracted = True
+                        except Exception:
+                            pass
+                    
+                    if not velocity_extracted and hasattr(entity, 'motion'):
+                        try:
+                            motion = entity.motion
+                            if isinstance(motion, (list, tuple)) and len(motion) >= 3:
+                                velocity = {'x': float(motion[0]), 'y': float(motion[1]), 'z': float(motion[2])}
+                                velocity_extracted = True
+                        except Exception:
+                            pass
+                    elif not velocity_extracted and hasattr(entity, 'getMotion'):
+                        try:
+                            motion = entity.getMotion()
+                            if motion:
+                                if isinstance(motion, (list, tuple)) and len(motion) >= 3:
+                                    velocity = {'x': float(motion[0]), 'y': float(motion[1]), 'z': float(motion[2])}
+                                    velocity_extracted = True
+                                elif hasattr(motion, 'x'):
+                                    velocity = {'x': float(motion.x), 'y': float(motion.y), 'z': float(motion.z)}
+                                    velocity_extracted = True
+                        except Exception:
+                            pass
+                    
+                    # Log extraction results (only for first entity to minimize noise)
+                    if len(entities) == 0:
+                        if age_extracted:
+                            print(f"[Bridge] scan_entities: ✓ age extraction succeeded (age_ticks={age_ticks})", flush=True)
+                        else:
+                            print(f"[Bridge] scan_entities: ✗ age extraction failed (entity_type={entity_type})", flush=True)
+                        
+                        if velocity_extracted:
+                            print(f"[Bridge] scan_entities: ✓ velocity extraction succeeded (v={velocity})", flush=True)
+                        else:
+                            print(f"[Bridge] scan_entities: ✗ velocity extraction failed (entity_type={entity_type})", flush=True)
+                    
+                    # Add metadata to entity_data if extracted
+                    if age_ticks is not None:
+                        entity_data["age_ticks"] = int(age_ticks)
+                        # For items: compute time until despawn (6000 ticks = 5 minutes)
+                        if entity_type and "item" in str(entity_type).lower():
+                            time_until_despawn_ticks = max(0, 6000 - age_ticks)
+                            entity_data["time_until_despawn_ticks"] = time_until_despawn_ticks
+                            entity_data["time_until_despawn_seconds"] = round(time_until_despawn_ticks / 20.0, 1)
+                    
+                    if velocity:
+                        entity_data["velocity"] = velocity
+                        # Compute is_stationary (velocity magnitude < 0.01)
+                        v_mag = math.sqrt(velocity['x']**2 + velocity['y']**2 + velocity['z']**2)
+                        entity_data["is_stationary"] = v_mag < 0.01
                     
                     # For item entities, extract item name and count
                     if entity_filter == "items" or (entity_type and "item" in str(entity_type).lower()):
@@ -1200,7 +1291,7 @@ def handle_place(body: Dict[str, Any]) -> Dict[str, Any]:
 def handle_dig(body: Dict[str, Any]) -> Dict[str, Any]:
     """
     Dig a block using the simple execute() command approach.
-    Uses: execute("setblock {x} {y} {z} air destroy")
+    Uses: execute("setblock {x} {y} {z} air destroy"), then synchronously waits for completion.
     """
     try:
         # Resolve target coordinates
@@ -1236,8 +1327,10 @@ def handle_dig(body: Dict[str, Any]) -> Dict[str, Any]:
             log_action("already_air", f"block is air at {tx},{ty},{tz}")
             return {"ok": True, "dug": {"name": "air", "position": {"x": tx, "y": ty, "z": tz}}}
         
-        # Simple dig: execute setblock command
-        # The 'destroy' parameter makes it drop items like normal mining
+        # Simple dig: execute setblock command.
+        # The 'destroy' parameter makes it drop items like normal mining.
+        #
+        # This endpoint is synchronous: it waits until the block reads as air (or timeout).
         try:
             execute_func = getattr(m, 'execute', None)
             if not execute_func:
@@ -1245,14 +1338,86 @@ def handle_dig(body: Dict[str, Any]) -> Dict[str, Any]:
             
             cmd = f"setblock {tx} {ty} {tz} air destroy"
             execute_func(cmd)
+            # Flush immediately so client state updates promptly.
+            try:
+                m.flush()
+            except Exception:
+                pass
             
-            log_action("dig_started", f"{block_name} at {tx},{ty},{tz}")
-            return {
-                "ok": True,
-                "dug": {
-                    "name": block_name,
-                    "position": {"x": tx, "y": ty, "z": tz}
+            timeout_s = float(body.get("timeout_s", 5.0))
+            timeout_s = max(0.1, min(60.0, timeout_s))
+            poll_s = float(body.get("poll_s", 0.1))
+            poll_s = max(0.05, min(0.5, poll_s))
+
+            t0 = time.time()
+            completed = False
+            last_read = None
+            while (time.time() - t0) < timeout_s:
+                try:
+                    blk = m.getblock(tx, ty, tz)
+                except Exception:
+                    try:
+                        blk = m.get_block(tx, ty, tz)
+                    except Exception:
+                        blk = None
+
+                if isinstance(blk, str):
+                    last_read = blk
+                    lower = blk.lower()
+                    if lower in ("air", "minecraft:air", "") or "air" in lower:
+                        completed = True
+                        break
+                elif blk:
+                    # object-ish; treat is_air if available
+                    if hasattr(blk, "is_air") and blk.is_air():
+                        completed = True
+                        last_read = "air"
+                        break
+                    last_read = getattr(blk, "name", str(blk))
+                else:
+                    last_read = None
+
+                time.sleep(poll_s)
+
+            elapsed_ms = int((time.time() - t0) * 1000)
+
+            # Best-effort drop detection: scan nearby item entities and return ones close to the dug block.
+            drops = []
+            try:
+                nearby = scan_entities(radius=4, entity_filter="items")
+                for ent in nearby or []:
+                    pos = ent.get("position") or {}
+                    ex, ey, ez = pos.get("x"), pos.get("y"), pos.get("z")
+                    if ex is None or ey is None or ez is None:
+                        continue
+                    dx = float(ex) - float(tx)
+                    dy = float(ey) - float(ty)
+                    dz = float(ez) - float(tz)
+                    # Within ~2 blocks of the broken block center
+                    if (dx * dx + dy * dy + dz * dz) <= (2.0 * 2.0):
+                        drops.append(ent)
+            except Exception:
+                drops = []
+
+            if completed:
+                log_action("dig_completed", f"{block_name} at {tx},{ty},{tz} ({elapsed_ms}ms)")
+                return {
+                    "ok": True,
+                    "dug": {"name": block_name, "position": {"x": tx, "y": ty, "z": tz}},
+                    "completed": True,
+                    "elapsed_ms": elapsed_ms,
+                    "drops": drops,
                 }
+
+            log_action("dig_timeout", f"{block_name} at {tx},{ty},{tz} ({elapsed_ms}ms)")
+            return {
+                "ok": False,
+                "error": "dig_timeout",
+                "dug": {"name": block_name, "position": {"x": tx, "y": ty, "z": tz}},
+                "completed": False,
+                "elapsed_ms": elapsed_ms,
+                "last_block_read": last_read,
+                "drops": drops,
             }
         except Exception as e:
             return {"ok": False, "error": f"Failed to execute dig command: {e}"}
@@ -1305,19 +1470,51 @@ class BridgeHandler(BaseHTTPRequestHandler):
             from urllib.parse import urlparse, parse_qs
             observe_start = time.time()
             parsed = urlparse(self.path)
-            query_params = parse_qs(parsed.query)
-            radius = max(1, min(MAX_RADIUS, int(query_params.get("radius", query_params.get("entities_radius", ["7"]))[0])))
-            entity_filter = query_params.get("entity_filter", [None])[0]  # "items" or None
+            # keep_blank_values=True preserves empty strings (entity_filter="" should scan all entities)
+            query_params = parse_qs(parsed.query, keep_blank_values=True)
+            radius = max(1, min(MAX_RADIUS, int(query_params.get("radius", query_params.get("entities_radius", ["9"]))[0])))
+            # Empty string "" means "all entities", None means "skip entities"
+            entity_filter = query_params.get("entity_filter", [None])[0]
             
             # Expected format: {"ok": True, "status": {...}, "perception": {"nearby_blocks": [...], "nearby_entities": [...], "visibility_distances": {...}}}
-            # Compute visibility distances BEFORE scanning blocks (they're needed early)
-            vis_start = time.time()
-            visibility_distances = compute_visibility_distances(radius)
-            vis_elapsed = (time.time() - vis_start) * 1000
-            print(f"[Bridge] /observe: visibility_distances took {vis_elapsed:.1f}ms", flush=True)
-            
+            # Skip compute_visibility_distances (too slow, typically quick compared to other queries)
+            print(f"[Bridge] /observe: Starting observation (radius={radius}, entity_filter={entity_filter})", flush=True)
+
+            # One-time diagnostic: can we enter minescript's high-speed script loop context from this thread?
+            if not State.script_loop_checked:
+                State.script_loop_checked = True
+                try:
+                    State.script_loop_available = bool(getattr(m, "script_loop", None))
+                    print(f"[Bridge] diag: m.script_loop available={State.script_loop_available}", flush=True)
+                    print(f"[Bridge] diag: thread={threading.current_thread().name} ident={threading.get_ident()}", flush=True)
+                    if State.script_loop_available:
+                        px0, py0, pz0 = get_player_pos()
+                        tx, ty, tz = int(px0), int(py0), int(pz0)
+                        try:
+                            with m.script_loop:  # type: ignore[attr-defined]
+                                _ = m.getblock(tx, ty, tz)
+                            State.script_loop_enter_ok = True
+                            print(f"[Bridge] diag: entered m.script_loop OK; getblock({tx},{ty},{tz}) succeeded", flush=True)
+                        except Exception as e:
+                            State.script_loop_enter_ok = False
+                            State.script_loop_error = str(e)
+                            print(f"[Bridge] diag: FAILED entering m.script_loop or getblock inside it: {e}", flush=True)
+                except Exception as e:
+                    State.script_loop_available = False
+                    State.script_loop_enter_ok = False
+                    State.script_loop_error = str(e)
+                    print(f"[Bridge] diag: Exception while probing m.script_loop: {e}", flush=True)
             blocks_start = time.time()
-            nearby_blocks = scan_blocks(radius)
+            # Run scan_blocks inside script_loop when available to reduce context-switch overhead per getblock
+            if getattr(State, "script_loop_available", False):
+                try:
+                    with m.script_loop:  # type: ignore[attr-defined]
+                        nearby_blocks = scan_blocks(radius)
+                except Exception as e:
+                    print(f"[Bridge] /observe: WARNING failed to use m.script_loop for scan_blocks: {e}", flush=True)
+                    nearby_blocks = scan_blocks(radius)
+            else:
+                nearby_blocks = scan_blocks(radius)
             blocks_elapsed = (time.time() - blocks_start) * 1000
             print(f"[Bridge] /observe: scan_blocks took {blocks_elapsed:.1f}ms, found {len(nearby_blocks)} blocks", flush=True)
 
@@ -1326,29 +1523,41 @@ class BridgeHandler(BaseHTTPRequestHandler):
 
             # Adjacent blocks around the player (for directional reasoning).
             # This is intentionally independent of the cone-filtered nearby_blocks list.
+            adjacent_start = time.time()
+            adjacent_cache: Dict[Tuple[int, int, int], Optional[str]] = {}
+
             def _get_block_name_at(bx: int, by: int, bz: int) -> Optional[str]:
+                key = (bx, by, bz)
+                if key in adjacent_cache:
+                    return adjacent_cache[key]
                 try:
                     try:
                         blk = m.getblock(bx, by, bz)
                     except (AttributeError, TypeError):
                         blk = m.get_block(bx, by, bz)
                 except Exception:
+                    adjacent_cache[key] = None
                     return None
 
                 if isinstance(blk, str):
                     name = blk
                 elif blk:
                     if hasattr(blk, 'is_air') and blk.is_air():
+                        adjacent_cache[key] = None
                         return None
                     name = getattr(blk, 'name', str(blk))
                 else:
+                    adjacent_cache[key] = None
                     return None
 
                 if not name:
+                    adjacent_cache[key] = None
                     return None
                 lower = name.lower()
                 if lower in ('air', 'minecraft:air', '') or 'air' in lower:
+                    adjacent_cache[key] = None
                     return None
+                adjacent_cache[key] = name
                 return name
 
             fwd_x, fwd_y, fwd_z = rel_to_abs({"forward": 1, "right": 0, "up": 0})
@@ -1358,14 +1567,40 @@ class BridgeHandler(BaseHTTPRequestHandler):
             up_x, up_y, up_z = rel_to_abs({"forward": 0, "right": 0, "up": 1})
             down_x, down_y, down_z = rel_to_abs({"forward": 0, "right": 0, "up": -1})
 
-            adjacent_blocks = {
-                "fwd": _get_block_name_at(fwd_x, fwd_y, fwd_z),
-                "back": _get_block_name_at(back_x, back_y, back_z),
-                "left": _get_block_name_at(left_x, left_y, left_z),
-                "right": _get_block_name_at(right_x, right_y, right_z),
-                "up": _get_block_name_at(up_x, up_y, up_z),
-                "down": _get_block_name_at(down_x, down_y, down_z),
-            }
+            # Wrap adjacent reads in script_loop if available (lower overhead / fewer context switches)
+            if getattr(State, "script_loop_available", False):
+                try:
+                    with m.script_loop:  # type: ignore[attr-defined]
+                        adjacent_blocks = {
+                            "fwd": _get_block_name_at(fwd_x, fwd_y, fwd_z),
+                            "back": _get_block_name_at(back_x, back_y, back_z),
+                            "left": _get_block_name_at(left_x, left_y, left_z),
+                            "right": _get_block_name_at(right_x, right_y, right_z),
+                            "up": _get_block_name_at(up_x, up_y, up_z),
+                            "down": _get_block_name_at(down_x, down_y, down_z),
+                        }
+                except Exception as e:
+                    print(f"[Bridge] /observe: WARNING failed to use m.script_loop for adjacent_blocks: {e}", flush=True)
+                    adjacent_blocks = {
+                        "fwd": _get_block_name_at(fwd_x, fwd_y, fwd_z),
+                        "back": _get_block_name_at(back_x, back_y, back_z),
+                        "left": _get_block_name_at(left_x, left_y, left_z),
+                        "right": _get_block_name_at(right_x, right_y, right_z),
+                        "up": _get_block_name_at(up_x, up_y, up_z),
+                        "down": _get_block_name_at(down_x, down_y, down_z),
+                    }
+            else:
+                adjacent_blocks = {
+                    "fwd": _get_block_name_at(fwd_x, fwd_y, fwd_z),
+                    "back": _get_block_name_at(back_x, back_y, back_z),
+                    "left": _get_block_name_at(left_x, left_y, left_z),
+                    "right": _get_block_name_at(right_x, right_y, right_z),
+                    "up": _get_block_name_at(up_x, up_y, up_z),
+                    "down": _get_block_name_at(down_x, down_y, down_z),
+                }
+
+            adjacent_elapsed = (time.time() - adjacent_start) * 1000
+            print(f"[Bridge] /observe: adjacent_blocks took {adjacent_elapsed:.1f}ms", flush=True)
             
             # Scan entities if entity_filter is specified (optimization: skip if not needed)
             # entity_filter can be "items" (filter items only), "" (all entities), or None (skip)
@@ -1377,12 +1612,13 @@ class BridgeHandler(BaseHTTPRequestHandler):
                 filter_value = None if entity_filter == "" else entity_filter
                 nearby_entities = scan_entities(radius, filter_value)
                 entities_elapsed = (time.time() - entities_start) * 1000
-                print(f"[Bridge] /observe: scan_entities took {entities_elapsed:.1f}ms, found {len(nearby_entities)} entities")
+                print(f"[Bridge] /observe: scan_entities took {entities_elapsed:.1f}ms, found {len(nearby_entities)} entities", flush=True)
+            else:
+                print(f"[Bridge] /observe: scan_entities skipped (entity_filter=None)", flush=True)
             
             status_start = time.time()
             status = get_status()
             status_elapsed = (time.time() - status_start) * 1000
-            
             
             payload_start = time.time()
             payload = {
@@ -1391,7 +1627,7 @@ class BridgeHandler(BaseHTTPRequestHandler):
                 "perception": {
                     "nearby_blocks": nearby_blocks,
                     "nearby_entities": nearby_entities,
-                    "visibility_distances": visibility_distances,
+                    "visibility_distances": {},  # Skipped for performance (was too slow)
                     "adjacent_blocks": adjacent_blocks,
                     "nav_surface": nav_surface,
                     "blocks_complete": True,
@@ -1400,8 +1636,9 @@ class BridgeHandler(BaseHTTPRequestHandler):
                     "entities_elapsed_ms": int(entities_elapsed),
                 }
             }
+            payload_elapsed = (time.time() - payload_start) * 1000
             total_elapsed = (time.time() - observe_start) * 1000
-            print(f"[Bridge] /observe: total time {total_elapsed:.1f}ms (vis={vis_elapsed:.1f}ms, blocks={blocks_elapsed:.1f}ms, entities={entities_elapsed:.1f}ms, status={status_elapsed:.1f}ms)")
+            print(f"[Bridge] /observe: total time {total_elapsed:.1f}ms (blocks={blocks_elapsed:.1f}ms, adjacent={adjacent_elapsed:.1f}ms, entities={entities_elapsed:.1f}ms, status={status_elapsed:.1f}ms, payload={payload_elapsed:.1f}ms)", flush=True)
             self._send_json(payload)
         else:
             self._send_json({"error": "Not Found"}, 404)

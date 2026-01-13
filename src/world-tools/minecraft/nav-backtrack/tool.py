@@ -49,7 +49,8 @@ def tool(input_value=None, **kwargs):
         dz = to_pose["z"] - from_pose["z"]
         if abs(dx) < 0.01 and abs(dz) < 0.01:
             return from_pose["yaw"]
-        return degrees(atan2(-dx, dz)) % 360
+        # Match nav_core.calculate_snap_position_and_yaw convention
+        return degrees(atan2(-dx, -dz)) % 360
 
     def round_to_cardinal(yaw_deg: float) -> float:
         """Round yaw to nearest cardinal direction (0, 90, 180, 270)."""
@@ -90,7 +91,7 @@ def tool(input_value=None, **kwargs):
         r1 = executor.execute_action_with_log({"type": "nav-turn", "direction": "forward"}, "nav-backtrack")
         if r1.get("status") != "success":
             return False
-        yaw1 = r1.get("data", {}).get("yaw")
+        yaw1 = r1.get("extra", {}).get("yaw")
         if yaw1 is None:
             return False
 
@@ -131,12 +132,12 @@ def tool(input_value=None, **kwargs):
             reason="STATUS_FAILED"
         )
 
-    cur = status["result"]["position"]
+    cur = status["data"]["position"]
     cur_pose = {
         "x": cur["x"],
         "y": cur["y"],
         "z": cur["z"],
-        "yaw": status["result"]["yaw"],
+        "yaw": status["data"]["yaw"],
     }
 
     # ----------------------------
@@ -199,12 +200,12 @@ def tool(input_value=None, **kwargs):
             if status2.get("status") != "success":
                 continue
 
-            pos2 = status2["result"]["position"]
+            pos2 = status2["data"]["position"]
             now_pose = {
                 "x": pos2["x"],
                 "y": pos2["y"],
                 "z": pos2["z"],
-                "yaw": status2["result"]["yaw"],
+                "yaw": status2["data"]["yaw"],
             }
 
             if same_cell(now_pose, target_pose):

@@ -7,6 +7,7 @@ Supports both Collection-based queries and cell-based SpatialMap queries.
 import logging
 import json
 import math
+import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -187,6 +188,7 @@ QUERY_TYPES = [
     "cells-escape-nodes",
     # Resources (basic)
     "cells-with-resource",
+    "cells-with-item-entities",
     "cells-water-source",
     # Multi-Objective
     "cells-candidate-waypoints",
@@ -509,6 +511,56 @@ def tool(input_value=None, **kwargs):
             'success',
             value="\n".join(result_text_parts),
             extra={"query_type": query_type, "result_count": len(cells), "results": cells[:20]}
+        )
+
+    elif query_type == 'cells-with-item-entities':
+        # Optional: if x,z provided, filter within radius; otherwise search entire map.
+        if x is not None and z is not None:
+            candidate_cells = spatial_map.cells_within_radius(x, z, radius)
+            result_text_parts.append(f"Cells with visible item entities within radius {radius} of ({x},{z}):")
+        else:
+            candidate_cells = spatial_map.get_all_cells()
+            result_text_parts.append(f"Cells with visible item entities (entire map):")
+
+        now_ts = time.time()
+        hits = []
+        for cell in candidate_cells:
+            res = cell.get('resources', {}) or {}
+            items = res.get('item_entities_visible', [])
+            if not isinstance(items, list) or not items:
+                continue
+            live_items = [it for it in items if not isinstance(it, dict) or float(it.get('expires_at_ts', now_ts + 1)) >= now_ts]
+            if not live_items:
+                continue
+            cell_id = cell.get('cell_id', {}) or {}
+            hits.append({
+                "x": cell_id.get('x', 0),
+                "z": cell_id.get('z', 0),
+                "item_entities": live_items
+            })
+
+        # Sort by distance if reference point available
+        if x is not None and z is not None:
+            hits.sort(key=lambda h: _distance_2d(float(x), float(z), float(h.get('x', 0)), float(h.get('z', 0))))
+
+        result_text_parts.append(f"  Found {len(hits)} cells")
+        for h in hits[:10]:
+            ix, iz = h.get('x', 0), h.get('z', 0)
+            items = h.get('item_entities', [])
+            item_summ = []
+            for it in items[:5]:
+                if not isinstance(it, dict):
+                    continue
+                nm = it.get('item_name', 'unknown')
+                ct = it.get('item_count', 1)
+                item_summ.append(f"{nm}x{ct}")
+            suffix = " ..." if len(items) > 5 else ""
+            result_text_parts.append(f"  ({ix},{iz}): " + ", ".join(item_summ) + suffix)
+
+        return executor._create_uniform_return(
+            'success',
+            value="\n".join(result_text_parts),
+            extra={"query_type": query_type, "result_count": len(hits), "results": hits[:50]}
         )
     
     elif query_type == 'cells-water-source':

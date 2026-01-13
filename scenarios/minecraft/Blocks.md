@@ -72,16 +72,16 @@ Version: Java Edition (1.20+ assumptions unless noted)
 - id: `snow`
 - solid: partial
 - gravity: no (Java)
-- guaranteed_drop: ❌ none
+- guaranteed_drop: ❌ not guaranteed
 - notes:
-  - Snow *layers* do NOT drop items
-  - Common test failure case
+  - Snow layer drops are not a reliable “no drop” test case in 1.20.4
+  - Common agent pitfall: confusing cover with support / resources
 
 ### Tall Grass
 - id: `tall_grass`
 - solid: no
-- guaranteed_drop: ❌ none
-- notes: Decorative, no drop
+- guaranteed_drop: ❌ not guaranteed
+- notes: Often drops nothing; may be chance-based depending on context
 
 ### Air
 - id: `air`
@@ -108,8 +108,8 @@ These blocks become entities when unsupported:
 - Breaking a block produces:
   - zero or one **item entities** at or near the block position
 - Items must be physically collected (collision-based)
-- `mc-observe` reports **blocks only**
-- Dropped items are NOT visible to block sampling
+- `mc-observe` reports blocks **and** entities; dropped items appear under `entities.*`, not `blocks.*`
+- Dropped items are not blocks and are not part of block sampling
 
 ---
 

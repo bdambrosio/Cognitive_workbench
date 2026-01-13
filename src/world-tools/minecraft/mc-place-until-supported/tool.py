@@ -216,7 +216,7 @@ def tool(input_value=None, **kwargs):
             log_messages.append(f"Attempt {attempt_count}: Waited {verify_delay}s for placement to settle")
         
         # Step 3: Observe blocks for support verification
-        obs_result = executor.execute_action_with_log({"type": "mc-observe-blocks"}, "mc-place-until-supported")
+        obs_result = executor.execute_action_with_log({"type": "mc-observe"}, "mc-place-until-supported")
         
         if obs_result.get("status") != "success":
             # Observation failed - treat as ambiguous

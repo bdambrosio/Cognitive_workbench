@@ -32,12 +32,12 @@ Returns uniform_return format with:
 - Asynchronous: Returns immediately after accepting request
 - Actual digging may complete or fail later
 - Item spawning: May cause item entities to spawn, but details not guaranteed
-- Use `mc-observe-items` after digging to check for spawned items
+- Use `mc-observe` after digging to check for spawned item entities
 
 ## Guidelines
 
 - Status `"accepted"` means request was accepted, not that digging succeeded
-- Check for spawned items using `mc-observe-items` after digging completes
+- Check for spawned item entities using `mc-observe` after digging completes
 - Use egocentric coordinates (forward, right, up) for relative positioning
 - Use absolute coordinates (x, y, z) for precise global positioning
 
