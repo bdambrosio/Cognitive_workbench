@@ -6,6 +6,8 @@ Code as Laboratory for LLM cognitive architecture research.
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
+## Beware! I've modified several .yaml launch pages to use Qwen3-Next-80B-A3B. At the moment SGLang needs a simple one-line patch to run this model, see the llm wiki page!
+
 ## What this is
 
 This repo is experimental research software. It prioritizes **inspectable agent behavior** and fast iteration over stability.
