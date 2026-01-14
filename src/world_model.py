@@ -426,6 +426,10 @@ class WorldModel:
             winner, p_winner = self._dirichlet_winner_prob(votes, key=key)
             status = winner if p_winner >= 0.90 else "unknown"
 
+            # Only include tool_contracts with reliable or constrained status (exclude "unknown" and "unreliable")
+            if status in ("unknown", "unreliable"):
+                continue
+
             beliefs["tool_contracts"].append({
                 "tool": tool,
                 "insight": insight,

@@ -1348,6 +1348,7 @@ if HAS_SGLANG:
         system_parts.append(f"Complete primitive and tool catalog:\n{tools_catalog_text}\n#### END OF INFOSPACE TYPE SYSTEM, SPECIFICATIONS, AND TOOL CATALOG\n\n")
 
         system_parts.append(f"Setting:\n{character_context}\n\n")
+        system_parts.append(f"Situation/Context:\n{recent_context}\n\n")
         #system_parts.append(f"Again, \n#GOAL:\n\n{template}\n{goal}\n\n")
         if preplan:
             system_parts.append(f"\n## {preplan}\n")
@@ -1797,7 +1798,7 @@ ALWAYS follow all formatting instructions exactly.
                     ]
                 )
                 +"\nAUDIT: "
-                + gen(f"assumption_audit_{step}",max_tokens=128,temperature=0.0,stop="\nDONE: ")
+                + gen(f"assumption_audit_{step}",max_tokens=192,temperature=0.0,stop="\nDONE: ")
                 + "\nDONE: "
                 + gen(f"done_{step}", max_tokens=8, temperature=GEN_TEMPERATURE, stop="\nNEXT_TASK: ")
                 + "\nNEXT_TASK: "
@@ -2300,7 +2301,7 @@ class IncrementalPlanner:
         if not HAS_SGLANG:
             raise ImportError("SGLang not available")
         
-        self.executor = executor
+        self.executor: InfospaceExecutor = executor
         self.available_tools = available_tools
         self.logger = logger_instance or logger
         
@@ -2324,6 +2325,128 @@ class IncrementalPlanner:
         
         # Initialize plan guidance system
         self.plan_guidance = PlanGuidance(resource_manager=executor.resource_manager)
+
+    def build_context(
+        self,
+        goal: Optional[str] = None,
+        max_core_tools: int = 2,
+        max_world_tools: int = 3,
+        max_chars_per_tool: int = 900,
+    ) -> str:
+        """
+        Build a concise, two-section situation/context string for planning.
+
+        Design goals:
+        - KISS: robust, deterministic, and bounded
+        - No hard-coded tool names
+        - Prefer tools explicitly marked situational (SKILL.md frontmatter: situational: true)
+        - Split into two sections: infospace vs world tools (if any)
+
+        Notes:
+        - Calls situational tools with no arguments. Tools that require args are skipped.
+        - Ordering is heuristic-but-generic: status/observe/inventory-like names first.
+        """
+
+        executor = self.executor
+        if not executor:
+            return ""
+
+        # Allow future executor-provided index/hint
+        situational_names = None
+        if hasattr(executor, "situational_tools"):
+            try:
+                v = getattr(executor, "situational_tools")
+                if isinstance(v, list) and all(isinstance(x, str) for x in v):
+                    situational_names = v
+            except Exception:
+                situational_names = None
+
+        if situational_names is None:
+            situational_names = []
+            for tool_name, meta in (self.available_tools or {}).items():
+                if isinstance(meta, dict) and meta.get("situational") is True:
+                    situational_names.append(tool_name)
+
+        # Partition: core vs world, based on path (same logic as build_tool_catalog)
+        def _infer_source(tool_meta: Dict[str, Any]) -> str:
+            path = tool_meta.get('path') or tool_meta.get('python_file') or ''
+            if not isinstance(path, str) or not path:
+                return 'core'
+            p = path.replace('\\', '/')
+            marker = '/src/world-tools/'
+            if marker in p:
+                after = p.split(marker, 1)[1]
+                world_name = after.split('/', 1)[0].strip()
+                return world_name or 'core'
+            return 'core'
+
+        def _rank_name(n: str) -> int:
+            ln = (n or "").lower()
+            if "status" in ln:
+                return 0
+            if "observe" in ln:
+                return 1
+            if "inventory" in ln:
+                return 2
+            return 10
+
+        core = []
+        world = []
+        for name in situational_names:
+            meta = (self.available_tools or {}).get(name, {})
+            source = _infer_source(meta) if isinstance(meta, dict) else "core"
+            if source == "core":
+                core.append(name)
+            else:
+                world.append(name)
+
+        core = sorted(core, key=lambda n: (_rank_name(n), n))
+        world = sorted(world, key=lambda n: (_rank_name(n), n))
+
+        def _run_tools(tool_names: List[str], max_tools: int) -> List[str]:
+            out_lines = []
+            used = 0
+            for tool_name in tool_names:
+                if used >= max_tools:
+                    break
+                try:
+                    res = executor.execute_action({"type": tool_name})
+                except Exception:
+                    continue
+                if not isinstance(res, dict) or res.get("status") != "success":
+                    continue
+                val = res.get("value")
+                if not isinstance(val, str) or not val.strip():
+                    continue
+                val = val.strip()
+                if len(val) > max_chars_per_tool:
+                    val = val[:max_chars_per_tool] + "..."
+                out_lines.append(f"- {tool_name}: {val}")
+                used += 1
+            return out_lines
+
+        lines = []
+        if goal:
+            lines.append(f"Goal: {goal}")
+
+        # Infospace section: only if we have any core situational tools enabled
+        core_lines = _run_tools(core, max_core_tools) if max_core_tools > 0 else []
+        lines.append("## Infospace")
+        if core_lines:
+            lines.extend(core_lines)
+        else:
+            lines.append("(none)")
+
+        # World section: include if any world situational tools exist
+        world_lines = _run_tools(world, max_world_tools) if max_world_tools > 0 else []
+        if world or world_lines:
+            lines.append("## World")
+            if world_lines:
+                lines.extend(world_lines)
+            else:
+                lines.append("(none)")
+
+        return "\n".join(lines).strip()
     
     def _find_last_step(self, state, max_steps: int) -> int:
         """
@@ -2506,6 +2629,7 @@ class IncrementalPlanner:
             if context:
                 character_context = context.get('character_context', '')
                 recent_context = context.get('recent_context', '')
+            recent_context += self.build_context(goal=goal)
                 
             # Find similar plans using plan guidance
             #similar_plans = self.plan_guidance.find_similar_plans(goal)
@@ -2525,10 +2649,6 @@ class IncrementalPlanner:
             )
             if total_input_size > 100000:
                 logger.error(f"⚠️  Attempting to send {total_input_size:,} chars to tool_planner_infospace.run() (limit: 100,000)")
-                logger.error(f"  goal length: {len(goal):,}")
-                logger.error(f"  character_context length: {len(character_context):,}")
-                logger.error(f"  recent_context length: {len(recent_context):,}")
-                logger.error(f"  tools_catalog_text length: {len(self.tools_catalog_text):,}")
                 logger.error("Stack traceback:")
                 for line in traceback.format_stack():
                     logger.error(line.rstrip())

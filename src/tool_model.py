@@ -15,11 +15,120 @@ import math
 
 logger = logging.getLogger(__name__)
 
+_TOOL_MODEL_VERSION = "1.1"
+_MAX_EXCERPT_CHARS = 4000
+_MAX_GOAL_CHARS = 800
+
+
+def _truncate_text(s: Optional[str], max_chars: int) -> Optional[str]:
+    if s is None:
+        return None
+    if not isinstance(s, str):
+        s = str(s)
+    if max_chars <= 0:
+        return ""
+    if len(s) <= max_chars:
+        return s
+    # Preserve start + end; make truncation obvious and stable.
+    head = max_chars // 2
+    tail = max_chars - head
+    return s[:head] + "\n...[truncated]...\n" + s[-tail:]
+
+
+def _sha256_text(s: Optional[str]) -> Optional[str]:
+    if s is None:
+        return None
+    if not isinstance(s, str):
+        s = str(s)
+    return hashlib.sha256(s.encode("utf-8")).hexdigest()
+
+
+def _tool_args_signature(tool_args: Any) -> Dict[str, Any]:
+    """
+    World-independent args "shape" signature: key set + coarse value types.
+    Does NOT store literal values.
+    """
+    if not isinstance(tool_args, dict):
+        return {"kind": type(tool_args).__name__}
+
+    keys = sorted(tool_args.keys())
+    types = {}
+    for k in keys:
+        v = tool_args.get(k)
+        if v is None:
+            t = "null"
+        elif isinstance(v, bool):
+            t = "bool"
+        elif isinstance(v, (int, float)):
+            t = "num"
+        elif isinstance(v, str):
+            t = "str"
+        elif isinstance(v, dict):
+            t = "dict"
+        elif isinstance(v, list):
+            t = "list"
+        else:
+            t = type(v).__name__
+        types[k] = t
+
+    return {"kind": "dict", "keys": keys, "types": types}
+
+
+def _extract_failure_fields(result_text: Optional[str]) -> Dict[str, Optional[str]]:
+    """
+    Attempt to extract world-independent failure metadata from the "actual result" blob.
+    Conservative: returns only short, identifier-like strings.
+    """
+    if not result_text or not isinstance(result_text, str):
+        return {"failure_reason": None, "stop_reason": None}
+
+    # 1) If it's JSON, trust explicit fields.
+    try:
+        obj = json.loads(result_text)
+        if isinstance(obj, dict):
+            reason = obj.get("reason")
+            stop_reason = obj.get("stop_reason")
+            extra = obj.get("extra") if isinstance(obj.get("extra"), dict) else {}
+            if not stop_reason and isinstance(extra, dict):
+                stop_reason = extra.get("stop_reason")
+            # Normalize to identifier-like tokens only
+            def _norm(v):
+                if not isinstance(v, str):
+                    return None
+                v = v.strip()
+                if not v or len(v) > 80:
+                    return None
+                if re.fullmatch(r"[A-Za-z0-9_./-]+", v):
+                    return v
+                return None
+            return {"failure_reason": _norm(reason), "stop_reason": _norm(stop_reason)}
+    except Exception:
+        pass
+
+    # 2) Regex fallback for common log formats.
+    # Examples seen in logs:
+    # - [stop_reason: INVALID_TARGET]
+    # - stop_reason: INVALID_TARGET
+    # - reason: INVALID_TARGET
+    # - "reason": "INVALID_TARGET"
+    stop_reason = None
+    reason = None
+
+    m = re.search(r"stop_reason\s*[:=]\s*['\"]?([A-Za-z0-9_./-]{1,80})", result_text)
+    if m:
+        stop_reason = m.group(1)
+
+    m = re.search(r"\breason\s*[:=]\s*['\"]?([A-Za-z0-9_./-]{1,80})", result_text)
+    if m:
+        reason = m.group(1)
+
+    return {"failure_reason": reason, "stop_reason": stop_reason}
+
 
 def empty_tool_model() -> Dict[str, Any]:
     """Return an empty tool model structure."""
     return {
-        "version": "1.0",
+        "version": _TOOL_MODEL_VERSION,
         "created_at": datetime.utcnow().isoformat(),
         "updated_at": datetime.utcnow().isoformat(),
         "training_records": [
@@ -272,6 +381,26 @@ class ToolModel:
             record_hash = hashlib.sha256(hash_text.encode("utf-8")).hexdigest()
 
             if record_hash in self.existing_hashes:
+                # Already ingested: backfill newly-added fields if missing.
+                # (Keeps dedupe stable while allowing schema evolution.)
+                updated = False
+                for existing in self.tool_model.get("training_records", []):
+                    if existing.get("_record_hash") != record_hash:
+                        continue
+                    for k, v in rec.items():
+                        if k in existing:
+                            continue
+                        # Only backfill non-empty values
+                        if v is None:
+                            continue
+                        if isinstance(v, (list, dict)) and not v:
+                            continue
+                        existing[k] = v
+                        updated = True
+                    break
+                if updated:
+                    self.tool_model["updated_at"] = datetime.utcnow().isoformat()
+                    self.save()
                 continue  # already ingested
 
             # Attach bookkeeping metadata
@@ -334,6 +463,8 @@ class ToolModel:
         goal_match = re.search(r'Goal:\s*(.+?)(?:\n|$)', trace_content)
         goal_text = goal_match.group(1).strip() if goal_match else "unknown"
         goal_id = hashlib.sha256(goal_text.encode()).hexdigest()[:16]
+        goal_text_excerpt = _truncate_text(goal_text, _MAX_GOAL_CHARS)
+        goal_text_hash = _sha256_text(goal_text)
         
         # Determine world from executor or world_name
         world = self.world_name.lower() if self.world_name else "unknown"
@@ -371,6 +502,7 @@ class ToolModel:
             # Extract STAGE 2-PRE: Agent-State Hypotheses
             agent_state_hypotheses = []
             agent_state_support = {}
+            stage2_pre_section = None
             
             # Find STAGE 2-PRE section
             stage2_pre_match = re.search(
@@ -433,6 +565,7 @@ class ToolModel:
             chosen_tool = None
             tool_args = None
             tool_args_raw = None
+            stage2_section = None
             
             # Find STAGE 2 section
             stage2_match = re.search(
@@ -469,6 +602,14 @@ class ToolModel:
             audit_verdicts = {}
             done_flag = None
             next_task = None
+            stage3_section = None
+            result_text = None
+            result_text_excerpt = None
+            result_text_hash = None
+            audit_text = None
+            failure_reason = None
+            stop_reason = None
+            tool_status_token = None
             
             # Find STAGE 3 section
             stage3_match = re.search(
@@ -482,13 +623,19 @@ class ToolModel:
                 # Extract tool status from result
                 status_match = re.search(r'(SUCCESS|FAILED|OK)', stage3_section)
                 if status_match:
-                    tool_status = 'success' if status_match.group(1) in ['SUCCESS', 'OK'] else 'failure'
+                    tool_status_token = status_match.group(1)
+                    tool_status = 'success' if tool_status_token in ['SUCCESS', 'OK'] else 'failure'
                 
                 # Extract ACTUAL RESULT
                 result_match = re.search(r'>> ACTUAL RESULT.*?<<\n(.*?)\n>> END RESULT', stage3_section, re.DOTALL)
                 if result_match:
                     result_text = result_match.group(1).strip()
                     result_summary = self._summarize_result(result_text)
+                    result_text_excerpt = _truncate_text(result_text, _MAX_EXCERPT_CHARS)
+                    result_text_hash = _sha256_text(result_text)
+                    ff = _extract_failure_fields(result_text)
+                    failure_reason = ff.get("failure_reason")
+                    stop_reason = ff.get("stop_reason")
                 
                 # Extract DONE flag
                 done_match = re.search(r'DONE:\s*(.+?)(?:\n|$)', stage3_section, re.MULTILINE)
@@ -507,11 +654,16 @@ class ToolModel:
                     audit_text = audit_match.group(1).strip()
                     if audit_text and audit_text != '[]':
                         audit_verdicts = self._parse_audit_verdicts(audit_text)
+
+            # Derived, world-independent arg signature
+            tool_args_sig = _tool_args_signature(tool_args)
             
             # Build training record
             record = {
                 # 1. Task Context
                 'goal_id': goal_id,
+                'goal_text_excerpt': goal_text_excerpt,
+                'goal_text_hash': goal_text_hash,
                 'current_task': current_task,
                 'step_index': step_index,
                 'world': world,
@@ -521,19 +673,33 @@ class ToolModel:
                 # 2. Agent-State Hypotheses
                 'agent_state_hypotheses': agent_state_hypotheses,
                 'agent_state_support': agent_state_support,
+                'stage2_pre_excerpt': _truncate_text(stage2_pre_section, _MAX_EXCERPT_CHARS),
+                'stage2_pre_hash': _sha256_text(stage2_pre_section),
                 
                 # 3. Action Selection
                 'chosen_tool': chosen_tool,
                 'tool_args': tool_args,
                 'tool_args_raw': tool_args_raw,
+                'tool_args_signature': tool_args_sig,
+                'stage2_excerpt': _truncate_text(stage2_section, _MAX_EXCERPT_CHARS),
+                'stage2_hash': _sha256_text(stage2_section),
                 
                 # 4. Outcome Signal
                 'tool_status': tool_status,
+                'tool_status_token': tool_status_token,
+                'failure_reason': failure_reason,
+                'stop_reason': stop_reason,
                 'result_summary': result_summary,
+                'actual_result_excerpt': result_text_excerpt,
+                'actual_result_hash': result_text_hash,
+                'stage3_excerpt': _truncate_text(stage3_section, _MAX_EXCERPT_CHARS),
+                'stage3_hash': _sha256_text(stage3_section),
                 'new_bindings': new_bindings,
                 
                 # 5. Local Evaluation
                 'audit_verdicts': audit_verdicts,
+                'audit_text_excerpt': _truncate_text(audit_text, _MAX_EXCERPT_CHARS),
+                'audit_text_hash': _sha256_text(audit_text),
                 'done_flag': done_flag,
                 'next_task': next_task,
                 
@@ -795,276 +961,3 @@ class ToolModel:
         
         # Return (tool_name, score) pairs
         return [(tool, stats["weighted_score"]) for tool, stats in ranked[:top_k]]
-
-        """
-FailurePatternStore
-
-Level-1 scaffolding for persistent storage of failure / success patterns
-derived from reflection output.
-
-This module is intentionally semantic-light.
-It provides CRUD + lifecycle only.
-"""
-
-from typing import Dict, Any, List, Optional
-from pathlib import Path
-from datetime import datetime
-import json
-import uuid
-import logging
-
-logger = logging.getLogger(__name__)
-
-
-def empty_pattern_store() -> Dict[str, Any]:
-    return {
-        "version": "1.0",
-        "created_at": datetime.utcnow().isoformat(),
-        "updated_at": datetime.utcnow().isoformat(),
-        "patterns": []  # list of pattern records
-    }
-
-
-class FailurePatternStore:
-    """
-    World-scoped persistent store for mechanism / failure patterns.
-    Semantics are opaque payloads supplied by reflection code.
-    """
-
-    def __init__(self, world_name: str, base_dir: Path):
-        self.world_name = world_name
-        self.base_dir = base_dir
-        self.base_dir.mkdir(parents=True, exist_ok=True)
-
-        self.store_path = self.base_dir / "failure_patterns.json"
-        self.store = self.load()
-        self._existing_hashes = set()
-
-        logger.info(f"🧠 FailurePatternStore initialized for world='{world_name}'")
-
-    # ---------- Persistence ----------
-
-    def load(self) -> Dict[str, Any]:
-        if not self.store_path.exists():
-            return empty_pattern_store()
-
-        try:
-            with open(self.store_path, "r") as f:
-                return json.load(f)
-        except Exception as e:
-            logger.error(f"Failed to load failure pattern store: {e}")
-            return empty_pattern_store()
-
-    def save(self) -> None:
-        self.store["updated_at"] = datetime.utcnow().isoformat()
-        with open(self.store_path, "w") as f:
-            json.dump(self.store, f, indent=2)
-
-    # ---------- CRUD ----------
-
-    def add_pattern(
-        self,
-        *,
-        source_reflection_id: str,
-        pattern_type: str,
-        semantics: Dict[str, Any],
-        status: str = "tentative",
-        confidence: Optional[float] = None,
-    ) -> str:
-        """
-        Add a new failure (or success) pattern.
-
-        semantics: opaque dict produced by reflection code
-        """
-
-        pattern_id = str(uuid.uuid4())
-
-        record = {
-            "pattern_id": pattern_id,
-            "world": self.world_name,
-            "pattern_type": pattern_type,  # e.g. mechanism_constraint
-            "status": status,               # tentative | active | deprecated
-            "confidence": confidence,       # optional scalar
-            "source_reflection_id": source_reflection_id,
-            "created_at": datetime.utcnow().isoformat(),
-            "updated_at": datetime.utcnow().isoformat(),
-            "semantics": semantics,          # 🔒 opaque payload
-        }
-
-        self.store["patterns"].append(record)
-        self.save()
-
-        logger.info(f"➕ Added failure pattern {pattern_id}")
-        return pattern_id
-
-    def get_pattern(self, pattern_id: str) -> Optional[Dict[str, Any]]:
-        for p in self.store.get("patterns", []):
-            if p["pattern_id"] == pattern_id:
-                return p
-        return None
-
-    def list_patterns(
-        self,
-        *,
-        pattern_type: Optional[str] = None,
-        status: Optional[str] = None,
-    ) -> List[Dict[str, Any]]:
-        results = self.store.get("patterns", [])
-
-        if pattern_type:
-            results = [p for p in results if p["pattern_type"] == pattern_type]
-        if status:
-            results = [p for p in results if p["status"] == status]
-
-        return results
-
-    def update_pattern(
-        self,
-        pattern_id: str,
-        *,
-        status: Optional[str] = None,
-        confidence: Optional[float] = None,
-        semantics: Optional[Dict[str, Any]] = None,
-    ) -> bool:
-        pattern = self.get_pattern(pattern_id)
-        if not pattern:
-            return False
-
-        if status is not None:
-            pattern["status"] = status
-        if confidence is not None:
-            pattern["confidence"] = confidence
-        if semantics is not None:
-            pattern["semantics"] = semantics
-
-        pattern["updated_at"] = datetime.utcnow().isoformat()
-        self.save()
-        return True
-
-    def retire_pattern(self, pattern_id: str) -> bool:
-        return self.update_pattern(pattern_id, status="deprecated")
-
-    # ---------- Query (minimal, non-semantic) ----------
-
-    def find_by_tool(self, tool_name: str) -> List[Dict[str, Any]]:
-        """
-        Shallow helper: returns patterns whose semantics mention a tool name.
-        No interpretation beyond substring match.
-        """
-        matches = []
-        for p in self.store.get("patterns", []):
-            sem = p.get("semantics", {})
-            if tool_name in json.dumps(sem):
-                matches.append(p)
-        return matches
-
-    def ingest_reflection(self, reflection: Dict[str, Any]) -> int:
-        """
-        Extract and store failure patterns from a ReflectionFrame.
-
-        Returns number of new patterns added.
-        """
-        if "ReflectionFrame" not in reflection:
-            logger.warning("No ReflectionFrame found; skipping ingestion.")
-            return 0
-
-        frame = reflection["ReflectionFrame"]
-        added = 0
-
-        # 1. Primary extraction: tool_insights
-        for insight in frame.get("tool_insights", []):
-            pattern = self._pattern_from_tool_insight(
-                insight=insight,
-                failure_mode=frame.get("failure_mode"),
-            )
-            if self._add_pattern(pattern):
-                added += 1
-
-        # 2. Secondary reinforcement: immediate_blockers
-        for blocker in frame.get("task_state", {}).get("immediate_blockers", []):
-            pattern = self._pattern_from_blocker(
-                blocker=blocker,
-                failure_mode=frame.get("failure_mode"),
-            )
-            if pattern and self._add_pattern(pattern):
-                added += 1
-
-        if added > 0:
-            self.store["updated_at"] = datetime.utcnow().isoformat()
-
-        logger.info(f"🧠 FailurePatternStore: added {added} new patterns")
-        return added
-
-    # -----------------------------
-    # Pattern extraction helpers
-    # -----------------------------
-
-    def _pattern_from_tool_insight(self, insight: Dict[str, Any], failure_mode: str) -> Dict[str, Any]:
-        """
-        Convert a tool_insight entry into a normalized failure pattern.
-        """
-        pattern = {
-            "pattern_type": "mechanism_constraint",
-            "mechanism": insight.get("tool"),
-            "constraint": insight.get("insight"),
-            "status": insight.get("status"),
-            "failure_mode": failure_mode,
-            "evidence": insight.get("evidence"),
-            "source": "tool_insight",
-            "first_seen": datetime.utcnow().isoformat(),
-        }
-        return pattern
-
-    def _pattern_from_blocker(self, blocker: str, failure_mode: str) -> Dict[str, Any] | None:
-        """
-        Heuristically promote immediate blockers into tentative failure patterns.
-        Only promote blockers that describe mechanism-level constraints.
-        """
-        lower = blocker.lower()
-
-        # Extremely conservative promotion rule
-        if any(k in lower for k in ["does not", "unable to", "cannot", "prevent"]):
-            return {
-                "pattern_type": "mechanism_constraint",
-                "mechanism": "unknown",
-                "constraint": blocker,
-                "status": "tentative",
-                "failure_mode": failure_mode,
-                "evidence": "immediate_blocker",
-                "source": "task_state.immediate_blockers",
-                "first_seen": datetime.utcnow().isoformat(),
-            }
-
-        return None
-
-    # -----------------------------
-    # Storage helpers
-    # -----------------------------
-
-    def _add_pattern(self, pattern: Dict[str, Any]) -> bool:
-        """
-        Deduplicate and store a pattern.
-        """
-        h = self._hash_pattern(pattern)
-        if h in self._existing_hashes:
-            return False
-
-        pattern["_pattern_hash"] = h
-        self.store["patterns"].append(pattern)
-        self._existing_hashes.add(h)
-        return True
-
-    def _hash_pattern(self, pattern: Dict[str, Any]) -> str:
-        """
-        Hash only semantic fields (exclude timestamps).
-        """
-        hash_basis = {
-            "pattern_type": pattern.get("pattern_type"),
-            "mechanism": pattern.get("mechanism"),
-            "constraint": pattern.get("constraint"),
-            "status": pattern.get("status"),
-            "failure_mode": pattern.get("failure_mode"),
-            "source": pattern.get("source"),
-        }
-        txt = json.dumps(hash_basis, sort_keys=True, ensure_ascii=True)
-        return hashlib.sha256(txt.encode("utf-8")).hexdigest()

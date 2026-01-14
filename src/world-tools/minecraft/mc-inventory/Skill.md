@@ -2,6 +2,7 @@
 name: mc-inventory
 type: python
 description: "Observe inventory contents and equipped items - epistemic, read-only. Returns inventory slots and equipped items"
+situational: true
 ---
 
 # Minecraft Inventory Tool

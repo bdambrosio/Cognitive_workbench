@@ -2,6 +2,7 @@
 name: mc-status
 type: python
 description: "Fast heartbeat + sanity check for Minecraft bot. Returns connection status, position, orientation, health, food (hunger), current action, and vertical_state (derived from Y position changes). Use to check position, orientation, or other status values"
+situational: true
 ---
 
 # Minecraft Status Tool

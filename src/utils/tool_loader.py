@@ -220,6 +220,9 @@ def load_tools(tools_dir_path: str) -> Dict[str, Dict]:
         # Extract schema_hint from frontmatter if present
         schema_hint = metadata.get('schema_hint', {})
         
+        # Optional situational hint for context builders
+        situational = bool(metadata.get('situational', False))
+        
         tools[tool_name] = {
             'name': tool_name,
             'description': tool_description,
@@ -229,6 +232,7 @@ def load_tools(tools_dir_path: str) -> Dict[str, Dict]:
             'workflows': workflows,
             'examples': examples,
             'schema_hint': schema_hint,
+            'situational': situational,
             'path': str(tool_dir.absolute()),
             'python_file': python_file,
             'additional_files': additional_files,

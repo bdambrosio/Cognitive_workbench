@@ -2938,6 +2938,7 @@ class ZenohExecutiveNode:
                     self.infospace_executor.execute_action({"type": "say", "target": "user", "value": result.get('response')})
             else:
                 logger.error(f"Error in _plan: {result.get('error', 'Unknown error')}")
+                traceback.print_exc()
                 return
             if self.current_plan:
                 self._publish_current_plan()
