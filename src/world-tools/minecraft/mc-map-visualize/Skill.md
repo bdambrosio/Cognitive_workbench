@@ -2,6 +2,7 @@
 name: mc-map-visualize
 type: python
 description: "Generates zoomable HTML visualization of the spatial map showing walkability, hazards, resources, and observation confidence."
+situational: false
 ---
 
 # Minecraft Map Visualize Tool

@@ -125,6 +125,87 @@ def _snap_to_position(executor: InfospaceExecutor, snap_pos: Dict, minecraft_url
         return False
 
 
+def _calculate_forward_block_abs(position: Dict, yaw: float) -> Tuple[int, int, int]:
+    """
+    Calculate absolute block coordinates one block forward from current position.
+    
+    Args:
+        position: Position dict with x, y, z (floats)
+        yaw: Yaw angle in degrees
+    
+    Returns:
+        Tuple of (x, y, z) absolute block coordinates (integers)
+    """
+    bx = int(math.floor(position['x']))
+    by = int(math.floor(position['y']))
+    bz = int(math.floor(position['z']))
+    
+    # Forward vector from yaw: (-sin(yaw), 0, -cos(yaw))
+    dx = -math.sin(math.radians(yaw))
+    dz = -math.cos(math.radians(yaw))
+    
+    return (bx + int(round(dx)), by, bz + int(round(dz)))
+
+
+def _attempt_collision_recovery(executor: InfospaceExecutor, position: Dict, yaw: float, diagnostics: Dict, minecraft_url: str) -> bool:
+    """
+    Attempt to recover from collision by digging obstructing blocks.
+    
+    Args:
+        executor: InfospaceExecutor instance
+        position: Current position dict
+        yaw: Current yaw in degrees
+        diagnostics: Collision diagnostics dict
+        minecraft_url: Minecraft bridge URL
+    
+    Returns:
+        True if recovery was attempted, False otherwise
+    """
+    bx = int(math.floor(position['x']))
+    by = int(math.floor(position['y']))
+    bz = int(math.floor(position['z']))
+    
+    # Calculate forward block position
+    fwd_x, fwd_y, fwd_z = _calculate_forward_block_abs(position, yaw)
+    
+    recovery_attempted = False
+    
+    # Priority 1: Destination head space (most common failure)
+    if diagnostics.get("clear_fwd_head") == False:
+        dig_result = executor.execute_action_with_log(
+            {"type": "mc-dig", "x": float(fwd_x), "y": float(by + 2), "z": float(fwd_z)},
+            "nav-climb:recovery:dest_head"
+        )
+        if dig_result.get("status") == "success":
+            recovery_attempted = True
+            logger.info(f"nav-climb: Recovery dig at destination head ({fwd_x}, {by+2}, {fwd_z})")
+            time.sleep(0.3)  # Brief wait for async dig
+    
+    # Priority 2: Destination body space
+    if diagnostics.get("clear_fwd_body") == False:
+        dig_result = executor.execute_action_with_log(
+            {"type": "mc-dig", "x": float(fwd_x), "y": float(by + 1), "z": float(fwd_z)},
+            "nav-climb:recovery:dest_body"
+        )
+        if dig_result.get("status") == "success":
+            recovery_attempted = True
+            logger.info(f"nav-climb: Recovery dig at destination body ({fwd_x}, {by+1}, {fwd_z})")
+            time.sleep(0.3)
+    
+    # Priority 3: Source head space
+    if diagnostics.get("up_block") is not None:
+        dig_result = executor.execute_action_with_log(
+            {"type": "mc-dig", "x": float(bx), "y": float(by + 2), "z": float(bz)},
+            "nav-climb:recovery:source_head"
+        )
+        if dig_result.get("status") == "success":
+            recovery_attempted = True
+            logger.info(f"nav-climb: Recovery dig at source head ({bx}, {by+2}, {bz})")
+            time.sleep(0.3)
+    
+    return recovery_attempted
+
+
 def _update_nav_state(executor: InfospaceExecutor, pose: Dict, support_here: str, fell: bool, was_fall: bool = False):
     """
     Update navigation state by prepending a new entry to the nav list.
@@ -213,7 +294,46 @@ def tool(input_value=None, **kwargs):
 
         move_status = move_data.get("status", "success")
         if move_status == "collision":
-            return {"ok": False, "reason": "collision"}
+            # Observe to expose clearance facts (like nav-move does)
+            obs = executor.execute_action_with_log({"type": "mc-observe"}, f"nav-climb:{label}:collision")
+            clear = obs.get("data", {}).get("clear", {}) if obs.get("status") == "success" else {}
+            dirs = obs.get("data", {}).get("dirs", {}) if obs.get("status") == "success" else {}
+            diagnostics = {
+                "clear_fwd_body": clear.get("fwd", {}).get("body"),
+                "clear_fwd_head": clear.get("fwd", {}).get("head"),
+                "clear_up_body": clear.get("up", {}).get("body"),
+                "clear_up_head": clear.get("up", {}).get("head"),
+                "up_block": dirs.get("up", {}).get("blk"),
+                "fwd_block": dirs.get("fwd", {}).get("blk"),
+            }
+            
+            # Attempt recovery: dig obstructing blocks
+            recovery_attempted = _attempt_collision_recovery(executor, start_pos, current_yaw, diagnostics, minecraft_url)
+            
+            if recovery_attempted:
+                # Retry climb after recovery
+                logger.info(f"nav-climb: Retrying after recovery dig")
+                move_data_retry = _call_move_endpoint(minecraft_url, forward=True, duration=step_duration, jump=jump, check_collision=True)
+                if move_data_retry and move_data_retry.get("ok") and move_data_retry.get("status") == "success":
+                    # Recovery succeeded, continue with normal flow
+                    move_status = "success"
+                    move_data = move_data_retry
+                else:
+                    # Recovery failed, return collision
+                    return {
+                        "ok": False,
+                        "reason": "collision",
+                        "diagnostics": diagnostics,
+                        "recovery_attempted": True,
+                    }
+            else:
+                # No recovery attempted, return collision
+                return {
+                    "ok": False,
+                    "reason": "collision",
+                    "diagnostics": diagnostics,
+                    "recovery_attempted": False,
+                }
         if move_status == "fell":
             return {"ok": False, "reason": "fell"}
 
@@ -303,6 +423,7 @@ def tool(input_value=None, **kwargs):
 
     # --- Failure classification ---
     reason = res.get("reason", "not_elevated")
+    diagnostics = res.get("diagnostics") if isinstance(res, dict) else None
     end_pos = res.get("end_pos") if isinstance(res, dict) else None
     
     # Snap to block center even on failure if we have a position (preserves current yaw)
@@ -316,10 +437,17 @@ def tool(input_value=None, **kwargs):
         support_here = res.get("support_here", "unknown") if isinstance(res, dict) else "unknown"
         _update_nav_state(executor, pose, support_here, fell=False, was_fall=False)
     
+    extra = {"from": start_pos}
+    if end_pos:
+        extra["to"] = end_pos
+    if diagnostics:
+        extra["diagnostics"] = diagnostics
+    
     return executor._create_uniform_return(
         "failed",
         value=f"Climb failed: {reason}",
         reason=reason,
+        extra=extra,
     )
 
 

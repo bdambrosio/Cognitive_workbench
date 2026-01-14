@@ -2,6 +2,7 @@
 name: path-frontier
 type: python
 description: "Enumerate possible nearby frontier positions within a bounded number of nav actions (over-approx; simulation only)."
+situational: false
 ---
 
 # path-frontier

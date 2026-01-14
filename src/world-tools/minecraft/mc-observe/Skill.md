@@ -2,6 +2,7 @@
 name: mc-observe
 type: python
 description: "Unified observation tool: fetches blocks, entities, and items in a single efficient call."
+situational: false
 ---
 
 # Minecraft Unified Observe Tool
