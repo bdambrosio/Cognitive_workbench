@@ -113,6 +113,20 @@ def tool(input_value=None, **kwargs):
     
     logger.info(f"Initialized nav state: pose=({pose['x']:.2f}, {pose['y']:.2f}, {pose['z']:.2f}), yaw={pose['yaw']:.1f}°")
     
+    # Initialize L0 inference pipeline (non-fatal if fails)
+    try:
+        import sys
+        from pathlib import Path
+        # Add parent directory to path so we can import local_grid
+        current_dir = Path(__file__).parent
+        parent_dir = current_dir.parent
+        if str(parent_dir) not in sys.path:
+            sys.path.insert(0, str(parent_dir))
+        from local_grid import init_l0_inference
+        init_l0_inference(executor)
+    except Exception as e:
+        logger.warning(f"Failed to initialize L0 inference (non-fatal): {e}")
+    
     # Return success with normalized pose
     return executor._create_uniform_return(
         "success",

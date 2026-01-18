@@ -302,12 +302,14 @@ def scan_blocks(radius: int) -> List[Dict[str, Any]]:
     radius = max(1, min(MAX_RADIUS, radius))
     px, py, pz = get_player_pos()
     eye_y = py + 1.6  # Eye position (used only for legacy angle calculations)
-    cx, cy, cz = map(int, (px, py, pz))
+    # Use floor() to match tool-side coordinate system (consistent with negative coordinates)
+    cx, cy, cz = int(math.floor(px)), int(math.floor(py)), int(math.floor(pz))
 
     yaw_deg, _ = get_player_rot()
     yaw_rad = math.radians(yaw_deg)
     fwd_dx = -math.sin(yaw_rad)
-    fwd_dz = math.cos(yaw_rad)
+    # Use -cos(yaw) to match rel_to_abs() convention (forward Z direction)
+    fwd_dz = -math.cos(yaw_rad)
 
     # Cache for m.getblock calls for this scan
     block_cache: Dict[Tuple[int, int, int], Optional[str]] = {}
@@ -489,6 +491,198 @@ def scan_blocks(radius: int) -> List[Dict[str, Any]]:
 
     return blocks
 
+def handle_ground_truth(center_x: int, center_y: int, center_z: int, radius: int) -> Dict[str, Any]:
+    """
+    Generate ground truth grid for training data capture.
+    
+    Returns full voxel grid (25×25×25 for radius=12) with all properties:
+    - Block names (including air)
+    - Derived properties: support, passable, head_clear, hazard, breakable
+    - Structure cues: surface_likeness, wall_likeness, etc.
+    """
+    try:
+        # Use script_loop if available for performance
+        if getattr(State, "script_loop_available", False):
+            try:
+                with m.script_loop:
+                    return _compute_ground_truth_grid(center_x, center_y, center_z, radius)
+            except Exception as e:
+                print(f"[Bridge] /ground-truth: WARNING failed to use m.script_loop: {e}", flush=True)
+                return _compute_ground_truth_grid(center_x, center_y, center_z, radius)
+        else:
+            return _compute_ground_truth_grid(center_x, center_y, center_z, radius)
+    except Exception as e:
+        print(f"[Bridge] /ground-truth: ERROR: {e}", flush=True)
+        return {"ok": False, "error": str(e)}
+
+
+def _compute_ground_truth_grid(center_x: int, center_y: int, center_z: int, radius: int) -> Dict[str, Any]:
+    """
+    Compute ground truth grid by querying all voxels in radius.
+    
+    Returns:
+        {
+            "ok": True,
+            "center": {"x": int, "y": int, "z": int},
+            "radius": int,
+            "voxels": [{"x": int, "y": int, "z": int, "name": str, "properties": {...}}, ...]
+        }
+    """
+    block_cache: Dict[Tuple[int, int, int], Optional[str]] = {}
+    
+    def get_block_name(bx: int, by: int, bz: int) -> Optional[str]:
+        """Get block name, caching results."""
+        key = (bx, by, bz)
+        if key in block_cache:
+            return block_cache[key]
+        
+        try:
+            try:
+                block = m.getblock(bx, by, bz)
+            except (AttributeError, TypeError):
+                block = m.get_block(bx, by, bz)
+        except Exception:
+            block_cache[key] = None
+            return None
+        
+        block_name = None
+        if isinstance(block, str):
+            block_name = block
+        elif block:
+            if hasattr(block, 'is_air') and block.is_air():
+                block_cache[key] = "air"
+                return "air"
+            block_name = getattr(block, 'name', str(block))
+        
+        if not block_name:
+            block_cache[key] = "air"
+            return "air"
+        
+        block_cache[key] = block_name
+        return block_name
+    
+    def is_air(name: Optional[str]) -> bool:
+        if not name:
+            return True
+        n = name.lower().replace("minecraft:", "")
+        return n in {"air", "cave_air", "void_air"}
+    
+    def is_hazard(name: str) -> bool:
+        n = name.lower().replace("minecraft:", "")
+        hazards = {'lava', 'fire', 'cactus', 'magma_block', 'soul_fire', 'wither_rose', 'sweet_berry_bush', 'campfire', 'soul_campfire'}
+        return any(h in n for h in hazards)
+    
+    def is_breakable(name: str) -> bool:
+        n = name.lower().replace("minecraft:", "")
+        if "air" in n or "bedrock" in n:
+            return False
+        return True
+    
+    def is_solid(name: str) -> bool:
+        if is_air(name):
+            return False
+        n = name.lower().replace("minecraft:", "")
+        non_solid = {'water', 'lava', 'flowing_water', 'flowing_lava', 'air', 'cave_air', 'void_air'}
+        return not any(ns in n for ns in non_solid)
+    
+    voxels = []
+    start_time = time.time()
+    
+    # Query all voxels in radius (Chebyshev distance)
+    for dx in range(-radius, radius + 1):
+        for dy in range(-radius, radius + 1):
+            for dz in range(-radius, radius + 1):
+                if max(abs(dx), abs(dy), abs(dz)) > radius:
+                    continue
+                
+                bx = center_x + dx
+                by = center_y + dy
+                bz = center_z + dz
+                
+                name = get_block_name(bx, by, bz)
+                if name is None:
+                    name = "air"
+                
+                # Compute derived properties
+                air_here = is_air(name)
+                solid_here = is_solid(name)
+                
+                # Support: solid block provides support, air above solid provides support
+                support = False
+                if solid_here:
+                    support = True
+                elif air_here:
+                    below_name = get_block_name(bx, by - 1, bz)
+                    if below_name and is_solid(below_name):
+                        support = True
+                
+                # Passable: air is passable
+                passable = air_here
+                
+                # Head clear: air above is clear
+                head_clear = False
+                above_name = get_block_name(bx, by + 1, bz)
+                head_clear = (above_name is None) or is_air(above_name)
+                
+                # Structure cues (simplified heuristics)
+                surface_likeness = False
+                wall_likeness = False
+                enclosure_likeness = False
+                
+                if solid_here:
+                    # Surface: solid with air above
+                    if head_clear:
+                        surface_likeness = True
+                    # Wall: solid with air on side
+                    side_air = False
+                    for sx, sy, sz in [(bx+1, by, bz), (bx-1, by, bz), (bx, by, bz+1), (bx, by, bz-1)]:
+                        side_name = get_block_name(sx, sy, sz)
+                        if side_name is None or is_air(side_name):
+                            side_air = True
+                            break
+                    if side_air:
+                        wall_likeness = True
+                    # Enclosure: solid surrounded by solids
+                    surrounded = True
+                    for sx, sy, sz in [(bx+1, by, bz), (bx-1, by, bz), (bx, by+1, bz), (bx, by-1, bz), (bx, by, bz+1), (bx, by, bz-1)]:
+                        neighbor_name = get_block_name(sx, sy, sz)
+                        if neighbor_name is None or is_air(neighbor_name):
+                            surrounded = False
+                            break
+                    if surrounded:
+                        enclosure_likeness = True
+                
+                voxel = {
+                    "x": bx,
+                    "y": by,
+                    "z": bz,
+                    "name": name,
+                    "properties": {
+                        "support": support,
+                        "passable": passable,
+                        "head_clear": head_clear,
+                        "hazard": is_hazard(name),
+                        "breakable": is_breakable(name),
+                        "structure_cues": {
+                            "surface_likeness": surface_likeness,
+                            "wall_likeness": wall_likeness,
+                            "enclosure_likeness": enclosure_likeness,
+                        },
+                    },
+                }
+                voxels.append(voxel)
+    
+    elapsed_ms = (time.time() - start_time) * 1000
+    print(f"[Bridge] /ground-truth: Computed {len(voxels)} voxels in {elapsed_ms:.1f}ms", flush=True)
+    
+    return {
+        "ok": True,
+        "center": {"x": center_x, "y": center_y, "z": center_z},
+        "radius": radius,
+        "voxels": voxels,
+        "elapsed_ms": elapsed_ms,
+    }
+
 def scan_entities(radius: int, entity_filter: Optional[str] = None) -> List[Dict[str, Any]]:
     """
     Scan entities around the player.
@@ -530,9 +724,9 @@ def scan_entities(radius: int, entity_filter: Optional[str] = None) -> List[Dict
             # So we check relative yaw and relative pitch from (yaw, 0)
             
             # Forward vector at pitch 0
-            # dx = -sin(yaw), dz = cos(yaw)
+            # dx = -sin(yaw), dz = -cos(yaw) (matches rel_to_abs() convention)
             fwd_dx = -math.sin(yaw_rad)
-            fwd_dz = math.cos(yaw_rad)
+            fwd_dz = -math.cos(yaw_rad)
             
             if entity_list:
                 for entity in entity_list:
@@ -1465,6 +1659,16 @@ class BridgeHandler(BaseHTTPRequestHandler):
             self._send_json(get_status())
         elif self.path == "/inventory":
             self._send_json(handle_inventory())
+        elif self.path.startswith("/ground-truth"):
+            # Parse query string
+            from urllib.parse import urlparse, parse_qs
+            parsed = urlparse(self.path)
+            query_params = parse_qs(parsed.query, keep_blank_values=True)
+            center_x = int(query_params.get("center_x", ["0"])[0])
+            center_y = int(query_params.get("center_y", ["0"])[0])
+            center_z = int(query_params.get("center_z", ["0"])[0])
+            radius = max(1, min(15, int(query_params.get("radius", ["12"])[0])))  # Cap at 15 for safety
+            self._send_json(handle_ground_truth(center_x, center_y, center_z, radius))
         elif self.path.startswith("/observe"):
             # Parse query string from path
             from urllib.parse import urlparse, parse_qs

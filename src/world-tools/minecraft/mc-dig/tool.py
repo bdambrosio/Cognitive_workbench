@@ -10,6 +10,12 @@ from typing import Any, Dict
 
 logger = logging.getLogger(__name__)
 
+# Session-local rolling occupancy grid (agent-owned)
+try:
+    from local_grid import set_cell
+except Exception:
+    set_cell = None  # optional; do not break mc-dig
+
 # Default Minecraft bot server URL (can be overridden via environment variable or config)
 DEFAULT_MINECRAFT_URL = os.getenv("MINECRAFT_URL", "http://localhost:3003")
 
@@ -117,6 +123,17 @@ def tool(input_value=None, **kwargs):
         }
         # Merge API response data into extra
         extra_metadata.update(data)
+
+        # Side-effect: optimistic local grid update (dug block becomes air)
+        try:
+            if set_cell is not None and isinstance(dug_pos, dict):
+                x = dug_pos.get("x")
+                y = dug_pos.get("y")
+                z = dug_pos.get("z")
+                if x is not None and y is not None and z is not None:
+                    set_cell(executor, int(x), int(y), int(z), "air")
+        except Exception:
+            pass
         
         return executor._create_uniform_return('success', value=result_text, extra=extra_metadata)
     except requests.exceptions.RequestException as e:
