@@ -5,6 +5,7 @@ Advance forward by a specified number of blocks using nav conventions (verificat
 """
 
 import logging
+import math
 import os
 import sys
 from typing import Any, Dict, Optional
@@ -19,11 +20,20 @@ from nav_core import (
     DEFAULT_MINECRAFT_URL,
     call_move_endpoint,
     calculate_snap_position_and_yaw,
+    ensure_grid_aligned,
     snap_to_position,
     update_nav_state,
 )
 
 logger = logging.getLogger(__name__)
+
+# Session-local rolling occupancy grid (agent-owned)
+try:
+    from local_grid import set_center_from_pose, get_cell_name, is_air_name
+except Exception:
+    set_center_from_pose = None
+    get_cell_name = None
+    is_air_name = None
 
 
 def _coerce_int(v: Any) -> Optional[int]:
@@ -70,11 +80,50 @@ def tool(input_value=None, **kwargs):
     start_pos = status_before["data"]["position"]
     current_yaw = status_before["data"].get("yaw")
 
+    # --- Ensure grid-aligned before movement (block center, cardinal yaw, pitch 0) ---
+    normalized_pose, normalized_yaw = ensure_grid_aligned(executor, minecraft_url, status_data=status_before["data"])
+    # Update start_pos and current_yaw to normalized values for consistency
+    start_pos = normalized_pose
+    current_yaw = normalized_yaw
+
     steps_completed = 0
     last_pos = start_pos
     last_y = start_pos.get("y")
 
     for _ in range(blocks):
+        # --- Pre-check forward clearance using local_grid ---
+        if get_cell_name is not None and is_air_name is not None:
+            try:
+                bx = int(math.floor(last_pos.get("x", 0.0)))
+                by = int(math.floor(last_pos.get("y", 0.0)))
+                bz = int(math.floor(last_pos.get("z", 0.0)))
+                dx = -math.sin(math.radians(current_yaw))
+                dz = -math.cos(math.radians(current_yaw))
+                fwd_x = bx + int(round(dx))
+                fwd_z = bz + int(round(dz))
+                
+                # Check forward body and head clearance
+                fwd_body_name = get_cell_name(executor, fwd_x, by + 1, fwd_z)
+                fwd_head_name = get_cell_name(executor, fwd_x, by + 2, fwd_z)
+                
+                # If known blockers exist, pre-dig them (up to 2 blocks)
+                blockers = []
+                if fwd_body_name and not is_air_name(fwd_body_name):
+                    blockers.append((fwd_x, by + 1, fwd_z))
+                if fwd_head_name and not is_air_name(fwd_head_name):
+                    blockers.append((fwd_x, by + 2, fwd_z))
+                
+                for b_x, b_y, b_z in blockers[:2]:  # Limit to 2 pre-digs
+                    try:
+                        executor.execute_action_with_log(
+                            {"type": "mc-dig", "x": float(b_x), "y": float(b_y), "z": float(b_z)},
+                            "nav-advance:grid_pre_dig"
+                        )
+                    except Exception:
+                        pass
+            except Exception:
+                pass  # If pre-check fails, proceed with move attempt
+
         move_data = call_move_endpoint(minecraft_url, forward=True, duration=step_duration, check_collision=True)
         if move_data is None or not move_data.get("ok"):
             return executor._create_uniform_return(
@@ -99,6 +148,11 @@ def tool(input_value=None, **kwargs):
                 snap_pos, _, _ = calculate_snap_position_and_yaw(last_pos, end_pos, current_yaw)
                 snap_to_position(minecraft_url, x=snap_pos["x"], y=snap_pos["y"], z=snap_pos["z"])
                 end_pos = snap_pos
+                try:
+                    if set_center_from_pose is not None:
+                        set_center_from_pose(executor, {"x": end_pos["x"], "y": end_pos["y"], "z": end_pos["z"]})
+                except Exception:
+                    pass
                 pose = {"x": end_pos["x"], "y": end_pos["y"], "z": end_pos["z"], "yaw": current_yaw}
                 update_nav_state(executor, pose=pose, support_here="unknown", fell=True, was_fall=True)
 
@@ -139,6 +193,11 @@ def tool(input_value=None, **kwargs):
             snap_pos, _, _ = calculate_snap_position_and_yaw(last_pos, end_pos, current_yaw)
             snap_to_position(minecraft_url, x=snap_pos["x"], y=snap_pos["y"], z=snap_pos["z"])
             end_pos = snap_pos
+            try:
+                if set_center_from_pose is not None:
+                    set_center_from_pose(executor, {"x": end_pos["x"], "y": end_pos["y"], "z": end_pos["z"]})
+            except Exception:
+                pass
             pose = {"x": end_pos["x"], "y": end_pos["y"], "z": end_pos["z"], "yaw": current_yaw}
             update_nav_state(executor, pose=pose, support_here=support_type, fell=False, was_fall=False)
 
@@ -152,6 +211,11 @@ def tool(input_value=None, **kwargs):
             snap_pos, _, _ = calculate_snap_position_and_yaw(last_pos, end_pos, current_yaw)
             snap_to_position(minecraft_url, x=snap_pos["x"], y=snap_pos["y"], z=snap_pos["z"])
             end_pos = snap_pos
+            try:
+                if set_center_from_pose is not None:
+                    set_center_from_pose(executor, {"x": end_pos["x"], "y": end_pos["y"], "z": end_pos["z"]})
+            except Exception:
+                pass
             pose = {"x": end_pos["x"], "y": end_pos["y"], "z": end_pos["z"], "yaw": current_yaw}
             update_nav_state(executor, pose=pose, support_here=support_type, fell=False, was_fall=False)
 
@@ -165,6 +229,11 @@ def tool(input_value=None, **kwargs):
         snap_pos, _, _ = calculate_snap_position_and_yaw(last_pos, end_pos, current_yaw)
         snap_to_position(minecraft_url, x=snap_pos["x"], y=snap_pos["y"], z=snap_pos["z"])
         end_pos = snap_pos
+        try:
+            if set_center_from_pose is not None:
+                set_center_from_pose(executor, {"x": end_pos["x"], "y": end_pos["y"], "z": end_pos["z"]})
+        except Exception:
+            pass
         pose = {"x": end_pos["x"], "y": end_pos["y"], "z": end_pos["z"], "yaw": current_yaw}
         update_nav_state(executor, pose=pose, support_here=support_type, fell=False, was_fall=False)
 

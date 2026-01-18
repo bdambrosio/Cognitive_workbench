@@ -21,7 +21,6 @@ from infospace_executor import InfospaceExecutor
 from plan_guidance import PlanGuidance
 from tool_model import ToolModel
 from world_model import WORLD_MODEL_SCHEMA, empty_world_model
-
 # Global temperature setting for all gen() calls
 GEN_TEMPERATURE = 0.5
 
@@ -2326,6 +2325,51 @@ class IncrementalPlanner:
         # Initialize plan guidance system
         self.plan_guidance = PlanGuidance(resource_manager=executor.resource_manager)
 
+    def _planner_history_dir(self) -> Path:
+        """
+        Directory for authoritative planner history logs (JSONL).
+        Prefer world resource base_dir if available; fallback to src/logs.
+        """
+        base_dir = None
+        if hasattr(self.executor, "resource_manager") and self.executor.resource_manager:
+            base_dir = getattr(self.executor.resource_manager, "base_dir", None)
+        if isinstance(base_dir, Path):
+            d = base_dir / "planner_history"
+        else:
+            d = Path(os.path.dirname(__file__)) / "logs" / "planner_history"
+        d.mkdir(parents=True, exist_ok=True)
+        return d
+
+    def _next_planner_seq(self) -> int:
+        """
+        Monotonic sequence number for planner history records.
+        Stored in a small file in planner_history_dir.
+        """
+        seq_path = self._planner_history_dir() / "seq.txt"
+        try:
+            if seq_path.exists():
+                raw = seq_path.read_text(encoding="utf-8").strip()
+                last = int(raw) if raw else 0
+            else:
+                last = 0
+        except Exception:
+            last = 0
+        nxt = last + 1
+        try:
+            tmp = seq_path.with_suffix(".tmp")
+            tmp.write_text(str(nxt), encoding="utf-8")
+            tmp.replace(seq_path)
+        except Exception as e:
+            self.logger.warning(f"Failed to persist planner seq to {seq_path}: {e}")
+        return nxt
+
+    def _append_jsonl(self, path: Path, record: Dict[str, Any]) -> None:
+        try:
+            with open(path, "a", encoding="utf-8") as f:
+                f.write(json.dumps(record, ensure_ascii=False) + "\n")
+        except Exception as e:
+            self.logger.warning(f"Failed to append planner history to {path}: {e}")
+
     def build_context(
         self,
         goal: Optional[str] = None,
@@ -2699,6 +2743,22 @@ class IncrementalPlanner:
                 world_model = self.executor.world_model.get()
             else:
                 logger.warning("WorldModel not available, skipping update")
+
+            # Append authoritative planner history records (JSONL)
+            seq = self._next_planner_seq()
+            now_iso = datetime.datetime.utcnow().isoformat()
+            agent_name = getattr(self.executor, "agent_name", "unknown")
+            world_name = getattr(self.executor, "world_name", "unknown")
+            hist_dir = self._planner_history_dir()
+            self._append_jsonl(
+                hist_dir / "compressed_trace.jsonl",
+                {"seq": seq, "ts": now_iso, "agent": agent_name, "world": world_name, "goal": goal, "compressed_trace": compressed_trace},
+            )
+            self._append_jsonl(
+                hist_dir / "reflection_frame.jsonl",
+                {"seq": seq, "ts": now_iso, "agent": agent_name, "world": world_name, "goal": goal, "reflection_frame": reflection_content},
+            )
+
             # Safely check done_<step> before retry logic
             should_retry = False
             if step < max_steps and f'done_{step}' in state:

@@ -11,11 +11,27 @@ import logging
 import math
 import os
 import requests
+import sys
 import time
 from typing import Dict, Tuple, Optional
 from infospace_executor import InfospaceExecutor
 
+# Import nav_core helpers (ensure_grid_aligned)
+_THIS_DIR = os.path.dirname(__file__)
+_NAV_CORE_DIR = os.path.abspath(os.path.join(_THIS_DIR, ".."))
+if _NAV_CORE_DIR not in sys.path:
+    sys.path.insert(0, _NAV_CORE_DIR)
+from nav_core import ensure_grid_aligned
+
 logger = logging.getLogger(__name__)
+
+# Session-local rolling occupancy grid (agent-owned)
+try:
+    from local_grid import set_center_from_pose, get_cell_name, is_air_name
+except Exception:
+    set_center_from_pose = None
+    get_cell_name = None
+    is_air_name = None
 
 DEFAULT_MINECRAFT_URL = os.getenv("MINECRAFT_URL", "http://localhost:3003")
 MAX_NAV_HISTORY = 100
@@ -202,6 +218,48 @@ def tool(input_value=None, **kwargs):
     start_y = start_pos.get("y")
     current_yaw = status_before["data"].get("yaw")  # Get current yaw for preservation if no movement
 
+    # --- Ensure grid-aligned before movement (block center, cardinal yaw, pitch 0) ---
+    normalized_pose, normalized_yaw = ensure_grid_aligned(executor, minecraft_url, status_data=status_before["data"])
+    # Update start_pos and current_yaw to normalized values for consistency
+    start_pos = normalized_pose
+    current_yaw = normalized_yaw
+
+    # --- Pre-check forward clearance and support using local_grid ---
+    if get_cell_name is not None and is_air_name is not None:
+        try:
+            bx = int(math.floor(start_pos.get("x", 0.0)))
+            by = int(math.floor(start_pos.get("y", 0.0)))
+            bz = int(math.floor(start_pos.get("z", 0.0)))
+            dx = -math.sin(math.radians(current_yaw))
+            dz = -math.cos(math.radians(current_yaw))
+            fwd_x = bx + int(round(dx))
+            fwd_z = bz + int(round(dz))
+            
+            # Check forward body and head clearance
+            fwd_body_name = get_cell_name(executor, fwd_x, by + 1, fwd_z)
+            fwd_head_name = get_cell_name(executor, fwd_x, by + 2, fwd_z)
+            
+            # Check support at destination (one block down)
+            dest_support_name = get_cell_name(executor, fwd_x, by - 1, fwd_z)
+            
+            # If known blockers exist, pre-dig them (up to 2 blocks)
+            blockers = []
+            if fwd_body_name and not is_air_name(fwd_body_name):
+                blockers.append((fwd_x, by + 1, fwd_z))
+            if fwd_head_name and not is_air_name(fwd_head_name):
+                blockers.append((fwd_x, by + 2, fwd_z))
+            
+            for b_x, b_y, b_z in blockers[:2]:  # Limit to 2 pre-digs
+                try:
+                    executor.execute_action_with_log(
+                        {"type": "mc-dig", "x": float(b_x), "y": float(b_y), "z": float(b_z)},
+                        "nav-descend:grid_pre_dig"
+                    )
+                except Exception:
+                    pass
+        except Exception:
+            pass  # If pre-check fails, proceed with move attempt
+
     # --- Attempt move ---
     move_data = _call_move_endpoint(minecraft_url, forward=True, duration=step_duration, check_collision=True)
     
@@ -249,6 +307,11 @@ def tool(input_value=None, **kwargs):
                 snap_pos, yaw, pitch = _calculate_snap_position_and_yaw(start_pos, end_pos, current_yaw)
                 _snap_to_position(executor, snap_pos, minecraft_url)
                 end_pos = snap_pos
+                try:
+                    if set_center_from_pose is not None:
+                        set_center_from_pose(executor, {"x": end_pos["x"], "y": end_pos["y"], "z": end_pos["z"]})
+                except Exception:
+                    pass
                 pose = {"x": end_pos["x"], "y": end_pos["y"], "z": end_pos["z"], "yaw": fall_yaw}
                 _update_nav_state(executor, pose, "unknown", fell=True, was_fall=True)
             
@@ -266,6 +329,11 @@ def tool(input_value=None, **kwargs):
             snap_pos, yaw, pitch = _calculate_snap_position_and_yaw(start_pos, end_pos, current_yaw)
             _snap_to_position(executor, snap_pos, minecraft_url)
             end_pos = snap_pos
+            try:
+                if set_center_from_pose is not None:
+                    set_center_from_pose(executor, {"x": end_pos["x"], "y": end_pos["y"], "z": end_pos["z"]})
+            except Exception:
+                pass
         
         # Validate descent bounds
         if delta_y is None or delta_y >= -min_drop:
@@ -355,6 +423,11 @@ def tool(input_value=None, **kwargs):
         snap_pos, yaw, pitch = _calculate_snap_position_and_yaw(start_pos, end_pos, current_yaw)
         _snap_to_position(executor, snap_pos, minecraft_url)
         end_pos = snap_pos
+        try:
+            if set_center_from_pose is not None:
+                set_center_from_pose(executor, {"x": end_pos["x"], "y": end_pos["y"], "z": end_pos["z"]})
+        except Exception:
+            pass
         
         # Update nav state (no descent)
         pose = {"x": end_pos["x"], "y": end_pos["y"], "z": end_pos["z"], "yaw": final_yaw}
@@ -372,6 +445,11 @@ def tool(input_value=None, **kwargs):
         snap_pos, yaw, pitch = _calculate_snap_position_and_yaw(start_pos, end_pos, current_yaw)
         _snap_to_position(executor, snap_pos, minecraft_url)
         end_pos = snap_pos
+        try:
+            if set_center_from_pose is not None:
+                set_center_from_pose(executor, {"x": end_pos["x"], "y": end_pos["y"], "z": end_pos["z"]})
+        except Exception:
+            pass
         
         # Update nav state (excessive drop)
         pose = {"x": end_pos["x"], "y": end_pos["y"], "z": end_pos["z"], "yaw": final_yaw}
@@ -391,6 +469,11 @@ def tool(input_value=None, **kwargs):
         snap_pos, yaw, pitch = _calculate_snap_position_and_yaw(start_pos, end_pos, current_yaw)
         _snap_to_position(executor, snap_pos, minecraft_url)
         end_pos = snap_pos
+        try:
+            if set_center_from_pose is not None:
+                set_center_from_pose(executor, {"x": end_pos["x"], "y": end_pos["y"], "z": end_pos["z"]})
+        except Exception:
+            pass
         
         # Update nav state (support ambiguous)
         pose = {"x": end_pos["x"], "y": end_pos["y"], "z": end_pos["z"], "yaw": final_yaw}
@@ -407,6 +490,11 @@ def tool(input_value=None, **kwargs):
     snap_pos, yaw, pitch = _calculate_snap_position_and_yaw(start_pos, end_pos, current_yaw)
     _snap_to_position(executor, snap_pos, minecraft_url)
     end_pos = snap_pos
+    try:
+        if set_center_from_pose is not None:
+            set_center_from_pose(executor, {"x": end_pos["x"], "y": end_pos["y"], "z": end_pos["z"]})
+    except Exception:
+        pass
     
     # Update nav state (successful descent)
     pose = {"x": end_pos["x"], "y": end_pos["y"], "z": end_pos["z"], "yaw": final_yaw}

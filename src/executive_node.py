@@ -525,7 +525,7 @@ class ZenohExecutiveNode:
                             # Apply template bindings
                             processed_msg = msg
                             for key, value in bindings.items():
-                                processed_msg = processed_msg.replace(f"{{{{${key}}}}}", str(value))
+                                processed_msg = processed_msg.replace(f"{{${key}}}", str(value))
                             processed_messages.append(processed_msg)
                         else:
                             processed_messages.append(msg)

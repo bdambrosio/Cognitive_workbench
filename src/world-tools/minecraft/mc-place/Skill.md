@@ -41,6 +41,20 @@ Returns uniform_return format with:
 - Use egocentric coordinates for relative positioning
 - Use absolute coordinates for precise global positioning
 
+## Important: Face Semantics
+
+**The `face` parameter specifies which side of the REFERENCE block to place against, NOT the final placement location.**
+
+- `face="top"` or `face="up"`: Places block **one block above** the reference block (at `ref_y + 1`)
+- `face="bottom"` or `face="down"`: Places block **one block below** the reference block (at `ref_y - 1`)
+- `face="north"`/`"south"`/`"east"`/`"west"`: Places block adjacent in that direction
+
+**Example**: To place a block at y=55 that you can stand on:
+- Specify reference block at y=54 with `face="top"` → places at y=55 ✓
+- NOT reference block at y=55 with `face="top"` → places at y=56 ✗
+
+This matches standard Minecraft block placement semantics.
+
 ## Usage Examples
 
 Place block forward with face:

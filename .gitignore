@@ -56,5 +56,8 @@ tests/rfp_shredder_eval.py
 # External bot reference (symlink to file outside workspace)
 src/world-tools/minecraft/bot-reference/
 
+# External dependencies (cloned repos)
+src/world-tools/minecraft/voxel_affordance_model/
+
 # Scenario resources (generated/runtime data)
 scenarios/*/resources/

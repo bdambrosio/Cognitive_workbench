@@ -24,6 +24,8 @@ sentence-transformers>=2.7.0
 transformers>=4.30.0  # Used by executive_node for AutoTokenizer
 txtai>=6.1.0
 faiss-cpu>=1.7.0  # Vector search for infospace memory
+torch>=2.9.1  # VoxelAffordanceModel inference
+zstandard>=0.22.0  # Training data compression
 
 # GUI and visualization
 PyQt6>=6.0.0

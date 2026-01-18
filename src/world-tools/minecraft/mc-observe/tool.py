@@ -13,6 +13,13 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 
 logger = logging.getLogger(__name__)
 
+# Session-local rolling occupancy grid (agent-owned)
+try:
+    from local_grid import ingest_nearby_blocks, set_cell
+except Exception:
+    ingest_nearby_blocks = None  # optional; do not break mc-observe
+    set_cell = None
+
 # Default Minecraft bot server URL (can be overridden via environment variable or config)
 DEFAULT_MINECRAFT_URL = os.getenv("MINECRAFT_URL", "http://localhost:3003")
 
@@ -427,6 +434,20 @@ def tool(input_value=None, **kwargs):
 
         clear_info = {'fwd': {'body': fwd_body_clear, 'head': fwd_head_clear}, 'up': {'body': up_body_clear, 'head': up_head_clear}}
 
+        # Store air blocks inferred from clear diagnostics (side-effect to local_grid)
+        try:
+            if set_cell is not None and executor:
+                if fwd_body_clear:
+                    set_cell(executor, *pos_fwd_body, "air")
+                if fwd_head_clear:
+                    set_cell(executor, *pos_fwd_head, "air")
+                if up_body_clear:
+                    set_cell(executor, *pos_up_body, "air")
+                if up_head_clear:
+                    set_cell(executor, *pos_up_head, "air")
+        except Exception as e:
+            logger.debug(f"mc-observe: clear air storage skipped: {e}")
+
         # blocks categorization
         seen_blocks: Set[str] = set()
         fluid_blocks: Set[str] = set()
@@ -570,6 +591,13 @@ def tool(input_value=None, **kwargs):
             "conf": conf,
             "note": note
         }
+
+        # Side-effect only: keep session-local grid current (no schema changes)
+        try:
+            if ingest_nearby_blocks is not None:
+                ingest_nearby_blocks(executor, pose=structured_data.get("pose", {}), nearby_blocks=nearby_blocks)
+        except Exception as e:
+            logger.debug(f"mc-observe: local_grid ingest skipped: {e}")
         
         summary_text = "\n".join(summary_parts)
         if len(summary_text) > 1024:

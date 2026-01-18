@@ -13,11 +13,27 @@ import logging
 import math
 import os
 import requests
+import sys
 import time
 from typing import Dict, Tuple, Optional
 from infospace_executor import InfospaceExecutor
 
+# Import nav_core helpers (ensure_grid_aligned)
+_THIS_DIR = os.path.dirname(__file__)
+_NAV_CORE_DIR = os.path.abspath(os.path.join(_THIS_DIR, ".."))
+if _NAV_CORE_DIR not in sys.path:
+    sys.path.insert(0, _NAV_CORE_DIR)
+from nav_core import ensure_grid_aligned, snap_to_position
+
 logger = logging.getLogger(__name__)
+
+# Session-local rolling occupancy grid (agent-owned)
+try:
+    from local_grid import get_cell_name, is_air_name, set_center_from_pose
+except Exception:
+    set_center_from_pose = None
+    get_cell_name = None
+    is_air_name = None
 
 DEFAULT_MINECRAFT_URL = os.getenv("MINECRAFT_URL", "http://localhost:3003")
 MAX_NAV_HISTORY = 100
@@ -147,16 +163,20 @@ def _calculate_forward_block_abs(position: Dict, yaw: float) -> Tuple[int, int, 
     return (bx + int(round(dx)), by, bz + int(round(dz)))
 
 
-def _attempt_collision_recovery(executor: InfospaceExecutor, position: Dict, yaw: float, diagnostics: Dict, minecraft_url: str) -> bool:
+def _attempt_collision_recovery(executor: InfospaceExecutor, position: Dict, yaw: float, diagnostics: Dict, minecraft_url: str, is_jump: bool = False) -> bool:
     """
     Attempt to recover from collision by digging obstructing blocks.
+    
+    Systematically checks all clearance diagnostics and digs at blocked positions.
+    Uses the same coordinate system as mc-observe for consistency.
     
     Args:
         executor: InfospaceExecutor instance
         position: Current position dict
         yaw: Current yaw in degrees
-        diagnostics: Collision diagnostics dict
+        diagnostics: Collision diagnostics dict with clearance flags
         minecraft_url: Minecraft bridge URL
+        is_jump: Whether this is a jump attempt (requires additional overhead checks)
     
     Returns:
         True if recovery was attempted, False otherwise
@@ -165,43 +185,125 @@ def _attempt_collision_recovery(executor: InfospaceExecutor, position: Dict, yaw
     by = int(math.floor(position['y']))
     bz = int(math.floor(position['z']))
     
-    # Calculate forward block position
-    fwd_x, fwd_y, fwd_z = _calculate_forward_block_abs(position, yaw)
+    # Calculate forward block position (using same method as mc-observe rel_to_abs)
+    dx = -math.sin(math.radians(yaw))
+    dz = -math.cos(math.radians(yaw))
+    fwd_x = bx + int(round(dx))
+    fwd_z = bz + int(round(dz))
     
     recovery_attempted = False
     
-    # Priority 1: Destination head space (most common failure)
-    if diagnostics.get("clear_fwd_head") == False:
-        dig_result = executor.execute_action_with_log(
-            {"type": "mc-dig", "x": float(fwd_x), "y": float(by + 2), "z": float(fwd_z)},
-            "nav-climb:recovery:dest_head"
-        )
-        if dig_result.get("status") == "success":
-            recovery_attempted = True
-            logger.info(f"nav-climb: Recovery dig at destination head ({fwd_x}, {by+2}, {fwd_z})")
-            time.sleep(0.3)  # Brief wait for async dig
+    # Systematic recovery: check all clearance diagnostics and dig blocked positions
+    # Use same coordinate calculations as mc-observe (rel_to_abs with forward/up offsets)
+    def _known_air(x: int, y: int, z: int) -> bool:
+        try:
+            if get_cell_name is None or is_air_name is None:
+                return False
+            name = get_cell_name(executor, x, y, z)
+            return bool(name) and is_air_name(name)
+        except Exception:
+            return False
     
-    # Priority 2: Destination body space
+    # 1. Forward body space (destination body): rel_to_abs(position, yaw, 1, 0, 1) = (fwd_x, by+1, fwd_z)
     if diagnostics.get("clear_fwd_body") == False:
-        dig_result = executor.execute_action_with_log(
-            {"type": "mc-dig", "x": float(fwd_x), "y": float(by + 1), "z": float(fwd_z)},
-            "nav-climb:recovery:dest_body"
-        )
-        if dig_result.get("status") == "success":
-            recovery_attempted = True
-            logger.info(f"nav-climb: Recovery dig at destination body ({fwd_x}, {by+1}, {fwd_z})")
-            time.sleep(0.3)
+        if _known_air(fwd_x, by + 1, fwd_z):
+            logger.debug(f"nav-climb: Skip recovery dig (known air) at ({fwd_x}, {by+1}, {fwd_z})")
+        else:
+            dig_result = executor.execute_action_with_log(
+                {"type": "mc-dig", "x": float(fwd_x), "y": float(by + 1), "z": float(fwd_z)},
+                "nav-climb:recovery:dest_body"
+            )
+            if dig_result.get("status") == "success":
+                recovery_attempted = True
+                logger.info(f"nav-climb: Recovery dig at destination body ({fwd_x}, {by+1}, {fwd_z})")
+                time.sleep(0.3)
     
-    # Priority 3: Source head space
-    if diagnostics.get("up_block") is not None:
-        dig_result = executor.execute_action_with_log(
-            {"type": "mc-dig", "x": float(bx), "y": float(by + 2), "z": float(bz)},
-            "nav-climb:recovery:source_head"
-        )
-        if dig_result.get("status") == "success":
-            recovery_attempted = True
-            logger.info(f"nav-climb: Recovery dig at source head ({bx}, {by+2}, {bz})")
-            time.sleep(0.3)
+    # 2. Forward head space (destination head): rel_to_abs(position, yaw, 1, 0, 2) = (fwd_x, by+2, fwd_z)
+    if diagnostics.get("clear_fwd_head") == False:
+        if _known_air(fwd_x, by + 2, fwd_z):
+            logger.debug(f"nav-climb: Skip recovery dig (known air) at ({fwd_x}, {by+2}, {fwd_z})")
+        else:
+            dig_result = executor.execute_action_with_log(
+                {"type": "mc-dig", "x": float(fwd_x), "y": float(by + 2), "z": float(fwd_z)},
+                "nav-climb:recovery:dest_head"
+            )
+            if dig_result.get("status") == "success":
+                recovery_attempted = True
+                logger.info(f"nav-climb: Recovery dig at destination head ({fwd_x}, {by+2}, {fwd_z})")
+                time.sleep(0.3)
+    
+    # 3. Source overhead body space: rel_to_abs(position, yaw, 0, 0, 1) = (bx, by+1, bz)
+    # Check both up_block (block exists) and clear_up_body (clearance flag)
+    if diagnostics.get("up_block") is not None or diagnostics.get("clear_up_body") == False:
+        if _known_air(bx, by + 1, bz):
+            logger.debug(f"nav-climb: Skip recovery dig (known air) at ({bx}, {by+1}, {bz})")
+        else:
+            dig_result = executor.execute_action_with_log(
+                {"type": "mc-dig", "x": float(bx), "y": float(by + 1), "z": float(bz)},
+                "nav-climb:recovery:source_body"
+            )
+            if dig_result.get("status") == "success":
+                recovery_attempted = True
+                logger.info(f"nav-climb: Recovery dig at source body overhead ({bx}, {by+1}, {bz})")
+                time.sleep(0.3)
+    
+    # 4. Source overhead head space: rel_to_abs(position, yaw, 0, 0, 2) = (bx, by+2, bz)
+    if diagnostics.get("clear_up_head") == False:
+        if _known_air(bx, by + 2, bz):
+            logger.debug(f"nav-climb: Skip recovery dig (known air) at ({bx}, {by+2}, {bz})")
+        else:
+            dig_result = executor.execute_action_with_log(
+                {"type": "mc-dig", "x": float(bx), "y": float(by + 2), "z": float(bz)},
+                "nav-climb:recovery:source_head"
+            )
+            if dig_result.get("status") == "success":
+                recovery_attempted = True
+                logger.info(f"nav-climb: Recovery dig at source head overhead ({bx}, {by+2}, {bz})")
+                time.sleep(0.3)
+    
+    # 5. Jump-specific: destination overhead at peak height (y+3) for jump arc clearance
+    # During jump, head can reach y+3, so check destination overhead at that height
+    if is_jump:
+        if _known_air(fwd_x, by + 3, fwd_z):
+            logger.debug(f"nav-climb: Skip recovery dig (known air) at ({fwd_x}, {by+3}, {fwd_z})")
+        else:
+            dig_result = executor.execute_action_with_log(
+                {"type": "mc-dig", "x": float(fwd_x), "y": float(by + 3), "z": float(fwd_z)},
+                "nav-climb:recovery:dest_jump_arc"
+            )
+            if dig_result.get("status") == "success":
+                recovery_attempted = True
+                logger.info(f"nav-climb: Recovery dig at destination jump arc height ({fwd_x}, {by+3}, {fwd_z})")
+                time.sleep(0.3)
+    
+    # 6. Check cover_block from nav_surface at destination (blocks jump arc at support_y+1)
+    # cover_block is at surface level (support_y + 1) and can block jump arc
+    nav_surface = diagnostics.get("nav_surface", [])
+    if isinstance(nav_surface, list):
+        for ns in nav_surface:
+            if not isinstance(ns, dict):
+                continue
+            ns_x = ns.get("x")
+            ns_z = ns.get("z")
+            support_y = ns.get("support_y")
+            cover_block = ns.get("cover_block")
+            # Check if this nav_surface cell is at the forward destination
+            if ns_x == fwd_x and ns_z == fwd_z and support_y is not None and cover_block:
+                # cover_block is at support_y + 1 (surface level)
+                cover_y = int(support_y) + 1
+                # For climb, we need clearance up to by+2 (head space), so dig cover_block if it's in the way
+                if cover_y >= by + 1 and cover_y <= by + 3:
+                    if _known_air(fwd_x, cover_y, fwd_z):
+                        logger.debug(f"nav-climb: Skip recovery dig (known air) at ({fwd_x}, {cover_y}, {fwd_z})")
+                    else:
+                        dig_result = executor.execute_action_with_log(
+                            {"type": "mc-dig", "x": float(fwd_x), "y": float(cover_y), "z": float(fwd_z)},
+                            "nav-climb:recovery:dest_cover_block"
+                        )
+                        if dig_result.get("status") == "success":
+                            recovery_attempted = True
+                            logger.info(f"nav-climb: Recovery dig at destination cover_block ({fwd_x}, {cover_y}, {fwd_z})")
+                            time.sleep(0.3)
     
     return recovery_attempted
 
@@ -286,8 +388,155 @@ def tool(input_value=None, **kwargs):
     start_y = start_pos.get("y")
     current_yaw = status_before["data"].get("yaw")  # Get current yaw for preservation if no movement
 
+    # --- Ensure grid-aligned before movement (block center, cardinal yaw, pitch 0) ---
+    normalized_pose, normalized_yaw = ensure_grid_aligned(executor, minecraft_url, status_data=status_before["data"])
+    # Update start_pos and current_yaw to normalized values for consistency
+    start_pos = normalized_pose
+    current_yaw = normalized_yaw
+
+    def _grid_precheck(position: Dict, yaw: float, *, is_jump: bool) -> Dict:
+        """
+        Use session-local grid to pre-check climb clearance/support.
+        Returns dict with:
+          - blockers: [{x,y,z,name}]
+          - unknown:  [{x,y,z}]
+          - support: {"x","y","z","name","known","ok"}
+        """
+        if get_cell_name is None or is_air_name is None:
+            return {"available": False}
+        try:
+            bx = int(math.floor(position.get("x", 0.0)))
+            by = int(math.floor(position.get("y", 0.0)))
+            bz = int(math.floor(position.get("z", 0.0)))
+            dx = -math.sin(math.radians(yaw))
+            dz = -math.cos(math.radians(yaw))
+            fwd_x = bx + int(round(dx))
+            fwd_z = bz + int(round(dz))
+
+            # For a +1 climb, target support block is at (fwd_x, by, fwd_z); agent aims to occupy y=by+1.
+            checks = [
+                ("dest_body", fwd_x, by + 1, fwd_z),
+                ("dest_head", fwd_x, by + 2, fwd_z),
+                ("src_body", bx, by + 1, bz),
+                ("src_head", bx, by + 2, bz),
+            ]
+            if is_jump:
+                checks.append(("dest_arc", fwd_x, by + 3, fwd_z))
+
+            blockers = []
+            unknown = []
+            for _, x, y, z in checks:
+                name = get_cell_name(executor, x, y, z)
+                if name is None:
+                    unknown.append({"x": x, "y": y, "z": z})
+                elif not is_air_name(name):
+                    blockers.append({"x": x, "y": y, "z": z, "name": name})
+
+            sup_name = get_cell_name(executor, fwd_x, by, fwd_z)
+            support_known = sup_name is not None
+            support_ok = bool(sup_name) and (not is_air_name(sup_name))
+            support = {"x": fwd_x, "y": by, "z": fwd_z, "name": sup_name, "known": support_known, "ok": support_ok}
+
+            return {"available": True, "blockers": blockers, "unknown": unknown, "support": support}
+        except Exception:
+            return {"available": False}
+
+    def _grid_orientation_candidates(position: Dict, *, is_jump: bool) -> Dict:
+        """
+        Fast scan of the 4 cardinal yaws to find orientations where the *known* grid
+        suggests climb might work. Intended for: turn+observe to fill blind areas.
+        """
+        if get_cell_name is None or is_air_name is None:
+            return {"available": False}
+        candidates_known = []
+        candidates_possible = []
+        for yaw in (0.0, 90.0, 180.0, 270.0):
+            pre = _grid_precheck(position, yaw, is_jump=is_jump)
+            if not pre.get("available"):
+                continue
+            support = pre.get("support", {}) if isinstance(pre.get("support"), dict) else {}
+            blockers = pre.get("blockers", []) if isinstance(pre.get("blockers"), list) else []
+            unknown = pre.get("unknown", []) if isinstance(pre.get("unknown"), list) else []
+
+            # "Known candidate": support is known+ok and there are no known blockers in clearance spaces.
+            if support.get("known") and support.get("ok") and not blockers:
+                candidates_known.append(int(yaw))
+            # "Possible candidate": we don't know it's blocked; turning+observe may clarify.
+            if not blockers and (unknown or not support.get("known")):
+                candidates_possible.append(int(yaw))
+        return {"available": True, "known": sorted(list(set(candidates_known))), "possible": sorted(list(set(candidates_possible)))}
+
+    # Mandatory behavior: observe from all 4 cardinals, then choose and attempt climb.
+    if get_cell_name is None or is_air_name is None:
+        return executor._create_uniform_return(
+            "failed",
+            value="Climb aborted: local_grid unavailable",
+            reason="local_grid_unavailable",
+            extra={"from": start_pos},
+        )
+
+    cardinals = (0.0, 90.0, 180.0, 270.0)
+    for yaw in cardinals:
+        # Snap yaw/pitch (no translation), then observe to populate local_grid.
+        try:
+            snap_to_position(minecraft_url, x=start_pos["x"], y=start_pos["y"], z=start_pos["z"], yaw=yaw, pitch=0.0)
+        except Exception:
+            pass
+        executor.execute_action_with_log({"type": "mc-observe"}, f"nav-climb:probe:{int(yaw)}")
+
+    chosen_yaw = None
+    # Choose first yaw where the grid indicates a fully-known climb is feasible.
+    for yaw in cardinals:
+        pre_walk = _grid_precheck(start_pos, yaw, is_jump=False)
+        pre_jump = _grid_precheck(start_pos, yaw, is_jump=True)
+
+        def _is_climbable(pre: Dict) -> bool:
+            if not pre.get("available"):
+                return False
+            support = pre.get("support", {}) if isinstance(pre.get("support"), dict) else {}
+            blockers = pre.get("blockers", []) if isinstance(pre.get("blockers"), list) else []
+            unknown = pre.get("unknown", []) if isinstance(pre.get("unknown"), list) else []
+            return bool(support.get("known")) and bool(support.get("ok")) and (not blockers) and (not unknown)
+
+        if _is_climbable(pre_walk) or _is_climbable(pre_jump):
+            chosen_yaw = float(yaw)
+            break
+
+    if chosen_yaw is None:
+        return executor._create_uniform_return(
+            "failed",
+            value="Climb aborted: no climbable cardinal orientation found (after 4-way observe)",
+            reason="no_climbable_orientation",
+            extra={"from": start_pos, "grid_orient": _grid_orientation_candidates(start_pos, is_jump=True)},
+        )
+
+    # Realign to chosen yaw and enforce invariants before attempting motion.
+    try:
+        snap_to_position(minecraft_url, x=start_pos["x"], y=start_pos["y"], z=start_pos["z"], yaw=chosen_yaw, pitch=0.0)
+    except Exception:
+        pass
+    status_after_turn = executor.execute_action_with_log({"type": "mc-status"}, "nav-climb:chosen_yaw")
+    if status_after_turn.get("status") == "success":
+        start_pos, current_yaw = ensure_grid_aligned(executor, minecraft_url, status_data=status_after_turn.get("data", {}))
+
     def attempt(move_kwargs, label):
         jump = move_kwargs.get("jump", False)
+
+        # Pre-check using local_grid: if it already knows blockers in required clearance spaces,
+        # dig them before attempting the move (avoids guaranteed collisions).
+        grid_pre = _grid_precheck(start_pos, current_yaw, is_jump=jump)
+        if grid_pre.get("available") and isinstance(grid_pre.get("blockers"), list) and grid_pre["blockers"]:
+            # Bounded: don't over-dig; aim for first-order clearance.
+            for b in grid_pre["blockers"][:4]:
+                try:
+                    executor.execute_action_with_log(
+                        {"type": "mc-dig", "x": float(b["x"]), "y": float(b["y"]), "z": float(b["z"])},
+                        f"nav-climb:{label}:grid_pre_dig"
+                    )
+                    time.sleep(0.2)
+                except Exception:
+                    pass
+
         move_data = _call_move_endpoint(minecraft_url, forward=True, duration=step_duration, jump=jump, check_collision=True)
         if move_data is None or not move_data.get("ok"):
             return {"ok": False, "reason": "move_failed"}
@@ -298,6 +547,16 @@ def tool(input_value=None, **kwargs):
             obs = executor.execute_action_with_log({"type": "mc-observe"}, f"nav-climb:{label}:collision")
             clear = obs.get("data", {}).get("clear", {}) if obs.get("status") == "success" else {}
             dirs = obs.get("data", {}).get("dirs", {}) if obs.get("status") == "success" else {}
+            nav_surface = obs.get("data", {}).get("nav_surface", []) if obs.get("status") == "success" else []
+            # Use current position from observation (not stale start_pos) for accurate recovery
+            # The observation happens after collision, so it reflects the actual current position
+            obs_data = obs.get("data", {}) if obs.get("status") == "success" else {}
+            current_pos = obs_data.get("pose", start_pos) if isinstance(obs_data.get("pose"), dict) else start_pos
+            current_yaw_from_obs = current_pos.get("yaw") if isinstance(current_pos, dict) and "yaw" in current_pos else current_yaw
+            # Fallback to start_pos if observation doesn't have valid pose
+            if not isinstance(current_pos, dict) or "x" not in current_pos:
+                current_pos = start_pos
+                logger.warning(f"nav-climb: Observation missing pose, using start_pos for recovery")
             diagnostics = {
                 "clear_fwd_body": clear.get("fwd", {}).get("body"),
                 "clear_fwd_head": clear.get("fwd", {}).get("head"),
@@ -305,10 +564,11 @@ def tool(input_value=None, **kwargs):
                 "clear_up_head": clear.get("up", {}).get("head"),
                 "up_block": dirs.get("up", {}).get("blk"),
                 "fwd_block": dirs.get("fwd", {}).get("blk"),
+                "nav_surface": nav_surface,
             }
             
-            # Attempt recovery: dig obstructing blocks
-            recovery_attempted = _attempt_collision_recovery(executor, start_pos, current_yaw, diagnostics, minecraft_url)
+            # Attempt recovery: dig obstructing blocks (use current position, not stale start_pos)
+            recovery_attempted = _attempt_collision_recovery(executor, current_pos, current_yaw_from_obs, diagnostics, minecraft_url, is_jump=jump)
             
             if recovery_attempted:
                 # Retry climb after recovery
@@ -375,6 +635,11 @@ def tool(input_value=None, **kwargs):
                     snap_pos, _, _ = _calculate_snap_position_and_yaw(start_pos, end_pos, current_yaw)
                     _snap_to_position(executor, snap_pos, minecraft_url)
                     end_pos = snap_pos
+                    try:
+                        if set_center_from_pose is not None:
+                            set_center_from_pose(executor, {"x": end_pos["x"], "y": end_pos["y"], "z": end_pos["z"]})
+                    except Exception:
+                        pass
                     
                     # Update nav state (successful climb) - preserve current_yaw
                     pose = {"x": end_pos["x"], "y": end_pos["y"], "z": end_pos["z"], "yaw": current_yaw}
@@ -404,6 +669,11 @@ def tool(input_value=None, **kwargs):
                     snap_pos, _, _ = _calculate_snap_position_and_yaw(start_pos, end_pos, current_yaw)
                     _snap_to_position(executor, snap_pos, minecraft_url)
                     end_pos = snap_pos
+                    try:
+                        if set_center_from_pose is not None:
+                            set_center_from_pose(executor, {"x": end_pos["x"], "y": end_pos["y"], "z": end_pos["z"]})
+                    except Exception:
+                        pass
                     
                     # Update nav state (successful climb) - preserve current_yaw
                     pose = {"x": end_pos["x"], "y": end_pos["y"], "z": end_pos["z"], "yaw": current_yaw}
@@ -431,6 +701,11 @@ def tool(input_value=None, **kwargs):
         snap_pos, _, _ = _calculate_snap_position_and_yaw(start_pos, end_pos, current_yaw)
         _snap_to_position(executor, snap_pos, minecraft_url)
         end_pos = snap_pos
+        try:
+            if set_center_from_pose is not None:
+                set_center_from_pose(executor, {"x": end_pos["x"], "y": end_pos["y"], "z": end_pos["z"]})
+        except Exception:
+            pass
         
         # Update nav state (climb failure) - preserve current_yaw
         pose = {"x": end_pos["x"], "y": end_pos["y"], "z": end_pos["z"], "yaw": current_yaw}
@@ -442,6 +717,9 @@ def tool(input_value=None, **kwargs):
         extra["to"] = end_pos
     if diagnostics:
         extra["diagnostics"] = diagnostics
+    # On failure, suggest orientations to try (turn + mc-observe) based on local_grid
+    probe_pos = end_pos if isinstance(end_pos, dict) else start_pos
+    extra["grid_orient"] = _grid_orientation_candidates(probe_pos, is_jump=True)
     
     return executor._create_uniform_return(
         "failed",

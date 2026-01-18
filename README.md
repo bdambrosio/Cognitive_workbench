@@ -115,6 +115,15 @@ Highlights:
 - Mapping uses a **SpatialMap** compiled representation (`mc-map-update`, `mc-map-query`, `mc-map-visualize`).
   - Legacy map-Collection queries are deprecated; SpatialMap is the source of truth.
 
+**⚠️ Breaking Change (2026-01)**: Minecraft now integrates **VoxelAffordanceModel** L0 perceptual inference:
+- candidate for world-specific perceptual models
+- Requires PyTorch (`torch>=2.9.1`) and `zstandard>=0.22.0` (added to `requirements.txt`)
+- L0 inference pipeline initializes automatically via `minecraft/init` tool
+- Perceptual frames are computed and stored in `world_state.perceptual_frame` after each grid update
+- Access via `local_grid.get_latest_perceptual_frame()` or `get_latest_perceptual_frame_as_str()`
+- **Impact**: If VoxelAffordanceModel repo is missing, inference gracefully degrades (logs warning, continues without perceptual frames)
+- The `voxel_affordance_model/` directory is gitignored; clone separately if needed
+
 ### Recent Updates (2026-01)
 
 **Navigation-First Observation**:

@@ -1100,7 +1100,7 @@ Only provide the result, followed by the </end> tag.""")
                 if isinstance(msg, str):
                     processed_msg = msg
                     for key, value in bindings.items():
-                        processed_msg = processed_msg.replace(f"{{{{${key}}}}}", str(value))
+                        processed_msg = processed_msg.replace(f"{{${key}}}", str(value))
                     processed_messages.append(processed_msg)
                 else:
                     processed_messages.append(msg)
@@ -4655,9 +4655,9 @@ Make sure the string is in a format that can be parsed by the json.loads functio
             var_name = matches[0]
             resource_id = self._get_binding(var_name)
             if resource_id is None:
-                error_msg = f"Unbound variable: {value}"
-                logger.error(error_msg)
-                raise ValueError(error_msg)
+                # Fallthrough: treat as literal string, strip $ prefix
+                logger.warning(f"Unbound variable {value}, treating as literal (stripping $)")
+                return var_name
             
             # If it's a resource ID, fetch content from resource manager
             if isinstance(resource_id, str) and (resource_id.startswith('Note_') or resource_id.startswith('Collection_')):

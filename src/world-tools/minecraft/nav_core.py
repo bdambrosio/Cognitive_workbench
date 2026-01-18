@@ -15,6 +15,12 @@ import requests
 
 logger = logging.getLogger(__name__)
 
+# Session-local rolling occupancy grid (agent-owned)
+try:
+    from local_grid import set_center_from_pose
+except Exception:
+    set_center_from_pose = None  # optional; do not break nav_core
+
 DEFAULT_MINECRAFT_URL = os.getenv("MINECRAFT_URL", "http://localhost:3003")
 MAX_NAV_HISTORY = 100
 
@@ -111,6 +117,100 @@ def snap_to_position(
     except Exception as e:
         logger.warning(f"nav_core: snapto request failed: {e}")
         return False
+
+
+def _round_to_cardinal(yaw: float) -> float:
+    """
+    Round yaw to nearest cardinal direction (0°, 90°, 180°, 270°).
+    """
+    yaw = yaw % 360
+    if yaw < 0:
+        yaw += 360
+    
+    # Round to nearest cardinal
+    cardinals = [0.0, 90.0, 180.0, 270.0]
+    return min(cardinals, key=lambda c: min(abs(yaw - c), abs(yaw - c + 360), abs(yaw - c - 360)))
+
+
+def ensure_grid_aligned(
+    executor: Any,
+    minecraft_url: str,
+    *,
+    status_data: Optional[Dict[str, Any]] = None,
+) -> Tuple[Dict[str, float], float]:
+    """
+    Ensure agent is grid-aligned before movement: block center, cardinal yaw, pitch 0.
+    
+    MUST be called before any movement command to bridge.
+    
+    Args:
+        executor: InfospaceExecutor instance
+        minecraft_url: Minecraft server URL
+        status_data: Optional pre-fetched status data (if None, fetches via mc-status)
+    
+    Returns:
+        (normalized_pose, normalized_yaw) where:
+        - normalized_pose: {"x": block_center_x, "y": current_y, "z": block_center_z}
+        - normalized_yaw: cardinal yaw (0, 90, 180, or 270)
+    
+    On error: logs warning and returns current pose/yaw (proceeds anyway).
+    """
+    # Get current status if not provided
+    if status_data is None:
+        status_result = executor.execute_action_with_log({"type": "mc-status"}, "ensure_grid_aligned")
+        if status_result.get("status") != "success":
+            logger.warning("ensure_grid_aligned: Failed to get status, proceeding without alignment")
+            # Return dummy pose - caller should handle this
+            return {"x": 0.0, "y": 0.0, "z": 0.0}, 0.0
+        status_data = status_result.get("data", {})
+    
+    current_pos = status_data.get("position", {})
+    current_yaw = status_data.get("yaw", 0.0)
+    current_pitch = status_data.get("pitch", 0.0)
+    
+    # Calculate block center
+    block_x = math.floor(current_pos.get("x", 0.0))
+    block_z = math.floor(current_pos.get("z", 0.0))
+    center_x = block_x + 0.5
+    center_z = block_z + 0.5
+    
+    # Round yaw to nearest cardinal (no-op if already cardinal)
+    normalized_yaw = _round_to_cardinal(current_yaw)
+    
+    # Always set pitch to 0
+    normalized_pitch = 0.0
+    
+    # Snap to grid-aligned position and orientation
+    normalized_pose = {
+        "x": center_x,
+        "y": current_pos.get("y", 0.0),  # Preserve Y (vertical position)
+        "z": center_z,
+    }
+    
+    success = snap_to_position(
+        minecraft_url,
+        x=normalized_pose["x"],
+        y=normalized_pose["y"],
+        z=normalized_pose["z"],
+        yaw=normalized_yaw,
+        pitch=normalized_pitch,
+    )
+    
+    if not success:
+        logger.warning(
+            f"ensure_grid_aligned: snap_to_position failed, proceeding anyway. "
+            f"Target: ({normalized_pose['x']:.2f}, {normalized_pose['y']:.2f}, {normalized_pose['z']:.2f}), "
+            f"yaw={normalized_yaw:.1f}, pitch={normalized_pitch:.1f}"
+        )
+
+    # Side-effect: update session-local grid center and prune (tool moved/realigned pose)
+    try:
+        if set_center_from_pose is not None:
+            set_center_from_pose(executor, normalized_pose)
+    except Exception:
+        pass
+    
+    return normalized_pose, normalized_yaw
 
 
 def update_nav_state(
