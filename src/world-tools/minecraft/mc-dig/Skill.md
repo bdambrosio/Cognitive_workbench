@@ -1,21 +1,21 @@
 ---
 name: mc-dig
 type: python
-description: "Removes a block from the Minecraft world at a specified location. ASYNCHRONOUS. Returns request acceptance status. May cause an item entity to spawn, but item spawning, item type, and item location are not guaranteed and are not directly reported by this tool"
+description: "Removes a block from the Minecraft world at a specified location. SYNCHRONOUS - waits for dig completion. May cause an item entity to spawn, but item spawning, item type, and item location are not guaranteed and are not directly reported by this tool"
 ---
 
 # Minecraft Dig Tool
 
-Removes a block from the Minecraft world at a specified location. Asynchronous operation - returns request acceptance status immediately.
+Removes a block from the Minecraft world at a specified location. Synchronous operation - bridge waits for dig completion (or timeout).
 
 ## Purpose
 
-Block removal for mining, excavation, and terrain modification. Asynchronous operation means the tool returns immediately after accepting the request, but actual digging may complete later. May cause item entities to spawn, but spawning details are not guaranteed or directly reported.
+Block removal for mining, excavation, and terrain modification. Synchronous operation - bridge waits for dig completion before returning. May cause item entities to spawn, but spawning details are not guaranteed or directly reported.
 
 ## Input
 
-- Egocentric position (preferred): `forward`, `right`, `up` (relative to agent facing, floats)
-- Absolute position: `x`, `y`, `z` (legacy/global, floats, all required if using absolute)
+- Position: `dx`, `dy`, `dz` (world-relative offsets from agent, floats, all required)
+  - See coordinate system documentation in jill-minecraft.yaml for details
 - `value`: Ignored
 
 ## Output
@@ -29,31 +29,31 @@ Returns uniform_return format with:
 
 ## Behavior & Performance
 
-- Asynchronous: Returns immediately after accepting request
-- Actual digging may complete or fail later
+- Synchronous: Bridge waits for dig completion (or timeout)
 - Item spawning: May cause item entities to spawn, but details not guaranteed
 - Use `mc-observe` after digging to check for spawned item entities
+- **Automatically updates persistent spatial map** after successful dig (calls mc-map-update internally, non-fatal if fails)
 
 ## Guidelines
 
 - Status `"accepted"` means request was accepted, not that digging succeeded
 - Check for spawned item entities using `mc-observe` after digging completes
-- Use egocentric coordinates (forward, right, up) for relative positioning
-- Use absolute coordinates (x, y, z) for precise global positioning
+- All positions use world-relative coordinates `dx, dy, dz` (see coordinate system in jill-minecraft.yaml)
+- Spatial map is automatically updated after successful dig (no need to call mc-map-update separately)
 
 ## Usage Examples
 
-Dig forward one block:
+Dig block directly east:
 ```json
-{"type":"mc-dig","forward":1,"up":0,"right":0,"out":"$dig"}
+{"type":"mc-dig","dx":1,"dy":0,"dz":0,"out":"$dig"}
 ```
 
-Dig down one block:
+Dig block below:
 ```json
-{"type":"mc-dig","forward":0,"up":-1,"right":0,"out":"$dig"}
+{"type":"mc-dig","dx":0,"dy":-1,"dz":0,"out":"$dig"}
 ```
 
-Dig at absolute coordinates:
+Dig block directly south:
 ```json
-{"type":"mc-dig","x":100,"y":64,"z":200,"out":"$dig"}
+{"type":"mc-dig","dx":0,"dy":0,"dz":1,"out":"$dig"}
 ```

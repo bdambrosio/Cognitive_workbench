@@ -149,9 +149,11 @@ def tool(input_value=None, **kwargs):
         # Create query_cell adapter with current state for query-time blocking computation
         def query_cell(x: int, y: int, z: int):
             """
-            Adapter over the persistent spatial map.
+            Adapter over the persistent spatial map, with perceptual_frame override.
             Converts 2D cell data to 3D query format expected by nav_simulation.
             Computes "blocked" at query time relative to current state position.
+            
+            Perceptual_frame overrides spatial_map for immediate cells (more current, reflects recent digs/places).
             
             Uniform surface definition:
             - Surface Y = support_y + 1 (top face of support block where agent stands)
@@ -160,6 +162,44 @@ def tool(input_value=None, **kwargs):
             Returns dict with: clear_body: bool, clear_head: bool, support: SupportType
             or None if cell is unknown.
             """
+            # Compute relative position from start_state (perceptual_frame uses relative coords)
+            dx = x - start_state["x"]
+            dy = y - start_state["y"]
+            dz = z - start_state["z"]
+            
+            # Check perceptual_frame first (if within boundary=1, i.e., ±1 block)
+            # Perceptual_frame is more current and reflects recent agent actions
+            if abs(dx) <= 1 and abs(dy) <= 1 and abs(dz) <= 1:
+                try:
+                    from local_grid import get_perceptual_data_at_relative
+                    perceptual_data = get_perceptual_data_at_relative(executor, dx, dy, dz)
+                    if perceptual_data:
+                        # Check for HIGH risks - mark as unsafe
+                        for risk in perceptual_data.get('risks', []):
+                            if risk.get('severity') == 'high':
+                                # HIGH risk detected - mark as unsafe
+                                return {
+                                    "clear_body": False,
+                                    "clear_head": False,
+                                    "support": "unsafe"
+                                }
+                        
+                        # Use structure types to inform support
+                        # If we have structure data, use it to override spatial_map
+                        structures = perceptual_data.get('structures', [])
+                        if structures:
+                            # Use dominant structure type to inform support
+                            dominant = structures[0].get('dominant_type', 'unknown')
+                            if dominant == 'cliff':
+                                return {"clear_body": False, "clear_head": False, "support": "unsafe"}
+                            elif dominant == 'void':
+                                return {"clear_body": True, "clear_head": True, "support": "air"}
+                            # For surface/wall/slope, continue to spatial_map logic below
+                except Exception:
+                    # Non-fatal - fall back to spatial_map
+                    pass
+            
+            # Fall back to spatial_map (original logic)
             if not spatial_map:
                 return {"clear_body": True, "clear_head": True, "support": "unknown"} if allow_unknown else None
             
@@ -311,8 +351,11 @@ def tool(input_value=None, **kwargs):
     if start_xz in reachable_paths:
         del reachable_paths[start_xz]
 
+    # Convert to relative coordinates (dx, dz) from start position
+    start_x = start_state["x"]
+    start_z = start_state["z"]
     reachable_list: List[Dict] = [
-        {"x": x, "z": z, "path": reachable_paths[(x, z)]}
+        {"dx": x - start_x, "dz": z - start_z, "path": reachable_paths[(x, z)]}
         for (x, z) in sorted(reachable_paths.keys())
     ]
 

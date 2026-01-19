@@ -6,6 +6,8 @@ Remove a block - world manipulation.
 import logging
 import os
 import requests
+import sys
+from pathlib import Path
 from typing import Any, Dict
 
 logger = logging.getLogger(__name__)
@@ -15,6 +17,13 @@ try:
     from local_grid import set_cell
 except Exception:
     set_cell = None  # optional; do not break mc-dig
+
+# Import nav_core helper for coordinate conversion
+_THIS_DIR = os.path.dirname(__file__)
+_NAV_CORE_DIR = os.path.abspath(os.path.join(_THIS_DIR, ".."))
+if _NAV_CORE_DIR not in sys.path:
+    sys.path.insert(0, _NAV_CORE_DIR)
+from nav_core import dx_dy_dz_to_absolute
 
 # Default Minecraft bot server URL (can be overridden via environment variable or config)
 DEFAULT_MINECRAFT_URL = os.getenv("MINECRAFT_URL", "http://localhost:3003")
@@ -26,15 +35,9 @@ def tool(input_value=None, **kwargs):
     
     Args:
         input_value: ignored
-        x: float - absolute x coordinate (if using absolute)
-        y: float - absolute y coordinate (if using absolute)
-        z: float - absolute z coordinate (if using absolute)
-        forward: float - blocks forward (egocentric)
-        right: float - blocks right (egocentric)
-        up: float - blocks up (egocentric)
-        rel_x: float - relative x offset (legacy cartesian)
-        rel_y: float - relative y offset (legacy cartesian)
-        rel_z: float - relative z offset (legacy cartesian)
+        dx: float - world-relative X offset from agent (positive = east, negative = west)
+        dy: float - world-relative Y offset from agent (positive = up, negative = down)
+        dz: float - world-relative Z offset from agent (positive = south, negative = north)
         minecraft_url: Optional URL override for Minecraft bot server (default: http://localhost:3003)
         
     Returns:
@@ -47,40 +50,57 @@ def tool(input_value=None, **kwargs):
     
     minecraft_url = kwargs.get("world_url") or kwargs.get("minecraft_url") or DEFAULT_MINECRAFT_URL
     
-    # Build position parameters - bot expects pos or rel
-    dig_params = {}
+    # Get dx, dy, dz (world-relative coordinates, origin at agent)
+    dx = kwargs.get("dx")
+    dy = kwargs.get("dy")
+    dz = kwargs.get("dz")
     
-    # Check for absolute position
-    if kwargs.get("x") is not None and kwargs.get("y") is not None and kwargs.get("z") is not None:
-        dig_params["pos"] = {
-            "x": float(kwargs.get("x")),
-            "y": float(kwargs.get("y")),
-            "z": float(kwargs.get("z"))
-        }
-    # Check for relative position (Egocentric or Cartesian)
-    elif (kwargs.get("forward") is not None or kwargs.get("right") is not None or kwargs.get("up") is not None or
-          kwargs.get("rel_x") is not None or kwargs.get("rel_y") is not None or kwargs.get("rel_z") is not None):
-        
-        rel_params = {}
-        # Egocentric (preferred)
-        if kwargs.get("forward") is not None: rel_params["forward"] = float(kwargs.get("forward"))
-        if kwargs.get("right") is not None: rel_params["right"] = float(kwargs.get("right"))
-        if kwargs.get("up") is not None: rel_params["up"] = float(kwargs.get("up"))
-        if kwargs.get("down") is not None: rel_params["up"] = -float(kwargs.get("down")) # Helper alias
-        if kwargs.get("left") is not None: rel_params["right"] = -float(kwargs.get("left")) # Helper alias
-
-        # Cartesian (legacy/fallback)
-        if kwargs.get("rel_x") is not None: rel_params["dx"] = float(kwargs.get("rel_x"))
-        if kwargs.get("rel_y") is not None: rel_params["dy"] = float(kwargs.get("rel_y"))
-        if kwargs.get("rel_z") is not None: rel_params["dz"] = float(kwargs.get("rel_z"))
-        
-        dig_params["rel"] = rel_params
-    else:
+    if dx is None or dy is None or dz is None:
         return executor._create_uniform_return(
             'failed',
-            value="position required (absolute x,y,z OR relative forward,right,up)",
+            value="position required (dx, dy, dz - world-relative offsets from agent)",
             reason="missing_position"
         )
+    
+    dx = float(dx)
+    dy = float(dy)
+    dz = float(dz)
+    
+    # Get agent position to convert dx,dy,dz to absolute
+    try:
+        status_result = executor.execute_action_with_log({"type": "mc-status"}, "mc-dig")
+        if status_result.get("status") != "success":
+            return executor._create_uniform_return(
+                'failed',
+                value="Failed to get agent position for coordinate conversion",
+                reason="status_failed"
+            )
+        agent_pos = status_result.get("data", {}).get("position", {})
+        if not isinstance(agent_pos, dict):
+            return executor._create_uniform_return(
+                'failed',
+                value="Invalid agent position data",
+                reason="invalid_position"
+            )
+    except Exception as e:
+        logger.error(f"mc-dig: Failed to get agent position: {e}")
+        return executor._create_uniform_return(
+            'failed',
+            value=f"Failed to get agent position: {e}",
+            reason="status_failed"
+        )
+    
+    # Convert dx,dy,dz to absolute block coordinates
+    abs_x, abs_y, abs_z = dx_dy_dz_to_absolute(dx, dy, dz, agent_pos)
+    
+    # Build position parameters - pass absolute to bridge
+    dig_params = {
+        "pos": {
+            "x": float(abs_x),
+            "y": float(abs_y),
+            "z": float(abs_z)
+        }
+    }
     
     try:
         url = f"{minecraft_url}/act/dig"
@@ -107,9 +127,26 @@ def tool(input_value=None, **kwargs):
         block_name = dug.get("name", "unknown")
         dug_pos = dug.get("position", {})
         
+        # Get agent position for relative coordinate conversion (text output only)
+        agent_pos = None
+        try:
+            status_result = executor.execute_action_with_log({"type": "mc-status"}, "mc-dig")
+            if status_result.get("status") == "success":
+                agent_pos = status_result.get("data", {}).get("position", {})
+        except Exception:
+            pass
+        
         if block_name == "air":
             result_text = f"Dig request accepted: target block is already air"
+        elif dug_pos and agent_pos:
+            # Convert to relative coordinates for text output
+            dx = int(round(dug_pos.get('x', 0) - agent_pos.get('x', 0)))
+            dy = int(round(dug_pos.get('y', 0) - agent_pos.get('y', 0)))
+            dz = int(round(dug_pos.get('z', 0) - agent_pos.get('z', 0)))
+            pos_str = f"[{dx},{dy},{dz}]"
+            result_text = f"Dig request accepted: {block_name} at {pos_str}"
         elif dug_pos:
+            # Fallback to absolute if agent position unavailable
             pos_str = f"({dug_pos.get('x', 0)}, {dug_pos.get('y', 0)}, {dug_pos.get('z', 0)})"
             result_text = f"Dig request accepted: {block_name} at {pos_str}"
         else:
@@ -125,6 +162,7 @@ def tool(input_value=None, **kwargs):
         extra_metadata.update(data)
 
         # Side-effect: optimistic local grid update (dug block becomes air)
+        # dug_pos is already absolute from bridge response
         try:
             if set_cell is not None and isinstance(dug_pos, dict):
                 x = dug_pos.get("x")
@@ -134,6 +172,14 @@ def tool(input_value=None, **kwargs):
                     set_cell(executor, int(x), int(y), int(z), "air")
         except Exception:
             pass
+        
+        # Side-effect: update persistent spatial map (non-fatal)
+        try:
+            map_update_result = executor.execute_action_with_log({"type": "mc-map-update"}, "mc-dig")
+            if map_update_result.get("status") != "success":
+                logger.debug(f"mc-dig: spatial map update failed (non-fatal): {map_update_result.get('reason', 'unknown')}")
+        except Exception as e:
+            logger.debug(f"mc-dig: spatial map update skipped (non-fatal): {e}")
         
         return executor._create_uniform_return('success', value=result_text, extra=extra_metadata)
     except requests.exceptions.RequestException as e:
@@ -147,6 +193,6 @@ def tool(input_value=None, **kwargs):
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
-    result = tool(rel_x=0, rel_y=-1, rel_z=1)
+    result = tool(dx=0, dy=-1, dz=1)
     print(result)
 

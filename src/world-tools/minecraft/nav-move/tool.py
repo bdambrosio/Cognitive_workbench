@@ -8,7 +8,7 @@ import logging
 import math
 import os
 import sys
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 # Ensure minecraft world-tools root is importable (src/world-tools/minecraft)
 _THIS_DIR = os.path.dirname(__file__)
@@ -35,6 +35,17 @@ except Exception:
     set_center_from_pose = None
     get_cell_name = None
     is_air_name = None
+
+
+def _to_relative_delta(from_pos: Dict[str, float], to_pos: Optional[Dict[str, float]]) -> Dict[str, float]:
+    """Convert absolute positions to relative delta (dx, dy, dz)."""
+    if to_pos is None:
+        return {"dx": 0.0, "dy": 0.0, "dz": 0.0}
+    return {
+        "dx": to_pos.get("x", 0.0) - from_pos.get("x", 0.0),
+        "dy": to_pos.get("y", 0.0) - from_pos.get("y", 0.0),
+        "dz": to_pos.get("z", 0.0) - from_pos.get("z", 0.0),
+    }
 
 
 def tool(input_value=None, **kwargs):
@@ -112,7 +123,7 @@ def tool(input_value=None, **kwargs):
             "failed",
             value="Move request failed",
             reason="move_failed",
-            extra={"from": start_pos, "to": None}
+            extra={"delta": _to_relative_delta(start_pos, None)}
         )
 
     move_status = move_data.get("status", "success")
@@ -127,8 +138,7 @@ def tool(input_value=None, **kwargs):
             value="Movement blocked by collision",
             reason="collision",
             extra={
-                "from": start_pos,
-                "to": start_pos,
+                "delta": _to_relative_delta(start_pos, start_pos),
                 "clear_fwd_body": clear.get("fwd", {}).get("body"),
                 "clear_fwd_head": clear.get("fwd", {}).get("head"),
             }
@@ -159,7 +169,7 @@ def tool(input_value=None, **kwargs):
             "failed",
             value="Fall detected during movement",
             reason="fell",
-            extra={"fell": True, "from": start_pos, "to": end_pos}
+            extra={"fell": True, "delta": _to_relative_delta(start_pos, end_pos)}
         )
 
     # --- Observe landing ---
@@ -169,7 +179,7 @@ def tool(input_value=None, **kwargs):
             "failed",
             value="Failed to observe blocks at destination",
             reason="observation_failed",
-            extra={"from": start_pos, "to": start_pos}
+            extra={"delta": _to_relative_delta(start_pos, start_pos)}
         )
 
     support_here = obs.get("data", {}).get("support", {}).get("here", {})
@@ -183,7 +193,7 @@ def tool(input_value=None, **kwargs):
             "failed",
             value="Failed to obtain final status",
             reason="observation_failed",
-            extra={"from": start_pos, "to": start_pos}
+            extra={"delta": _to_relative_delta(start_pos, start_pos)}
         )
 
     end_pos = status_after["data"]["position"]
@@ -213,8 +223,7 @@ def tool(input_value=None, **kwargs):
             value=reason_text,
             reason="unexpected_vertical_change",
             extra={
-                "from": start_pos,
-                "to": end_pos,
+                "delta": _to_relative_delta(start_pos, end_pos),
                 "delta_y": delta_y,
                 "clear_fwd_body": clear.get("fwd", {}).get("body"),
                 "clear_fwd_head": clear.get("fwd", {}).get("head"),
@@ -240,8 +249,7 @@ def tool(input_value=None, **kwargs):
             value=reason_text,
             reason="support_ambiguous",
             extra={
-                "from": start_pos,
-                "to": end_pos,
+                "delta": _to_relative_delta(start_pos, end_pos),
                 "support_here": support_type,
             },
         )
@@ -263,8 +271,7 @@ def tool(input_value=None, **kwargs):
         "success",
         value="Move completed successfully",
         extra={
-            "from": start_pos,
-            "to": end_pos,
+            "delta": _to_relative_delta(start_pos, end_pos),
             "delta_y": delta_y,
             "support_here": support_type,
             "clear_fwd_body": clear.get("fwd", {}).get("body"),

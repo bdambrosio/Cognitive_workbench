@@ -4,10 +4,19 @@ Labels coordinates for reasoning about spatial relationships.
 """
 
 import logging
+import os
+import sys
 from pathlib import Path
 from typing import Any, Dict, Optional
 
 logger = logging.getLogger(__name__)
+
+# Import nav_core helper for coordinate conversion
+_THIS_DIR = os.path.dirname(__file__)
+_NAV_CORE_DIR = os.path.abspath(os.path.join(_THIS_DIR, ".."))
+if _NAV_CORE_DIR not in sys.path:
+    sys.path.insert(0, _NAV_CORE_DIR)
+from nav_core import dx_dy_dz_to_absolute
 
 # Default map name
 DEFAULT_MAP_NAME = "minecraft_map"
@@ -46,9 +55,9 @@ def tool(input_value=None, **kwargs):
     Args:
         input_value: Ignored
         name: Waypoint name (required)
-        x: Optional x coordinate (defaults to current position from status)
-        y: Optional y coordinate (defaults to current position from status)
-        z: Optional z coordinate (defaults to current position from status)
+        dx: Optional world-relative X offset from agent (defaults to 0 = current position)
+        dy: Optional world-relative Y offset from agent (defaults to 0 = current position)
+        dz: Optional world-relative Z offset from agent (defaults to 0 = current position)
         resource_manager: Resource manager instance (from executor)
         agent_name: Agent name (for creating resources)
         world_name: World name (default: 'minecraft')
@@ -72,36 +81,47 @@ def tool(input_value=None, **kwargs):
             reason="missing_name"
         )
     
-    # Get coordinates
-    x = kwargs.get('x')
-    y = kwargs.get('y')
-    z = kwargs.get('z')
+    # Get dx, dy, dz (default to 0,0,0 = current position)
+    dx = kwargs.get('dx', 0)
+    dy = kwargs.get('dy', 0)
+    dz = kwargs.get('dz', 0)
     
-    # If coordinates not provided, get from mc-status
-    if x is None or y is None or z is None:
+    dx = float(dx)
+    dy = float(dy)
+    dz = float(dz)
+    
+    # Get agent position to convert dx,dy,dz to absolute
+    try:
         status_result = executor.execute_action_with_log({"type": "mc-status"}, "mc-waypoint")
-        if status_result.get("status") == "success":
-            status_data = status_result.get("data", {})
-            position = status_data.get("position")
-            if isinstance(position, dict):
-                x = x or position.get('x')
-                y = y or position.get('y')
-                z = z or position.get('z')
-            elif isinstance(position, (list, tuple)) and len(position) >= 3:
-                x = x or position[0]
-                y = y or position[1]
-                z = z or position[2]
-    
-    if x is None or y is None or z is None:
+        if status_result.get("status") != "success":
+            return executor._create_uniform_return(
+                'failed',
+                value="Failed to get agent position for coordinate conversion",
+                reason="status_failed"
+            )
+        status_data = status_result.get("data", {})
+        agent_pos = status_data.get("position", {})
+        if not isinstance(agent_pos, dict):
+            return executor._create_uniform_return(
+                'failed',
+                value="Invalid agent position data",
+                reason="invalid_position"
+            )
+    except Exception as e:
+        logger.error(f"mc-waypoint: Failed to get agent position: {e}")
         return executor._create_uniform_return(
             'failed',
-            value="Coordinates required (x, y, z). Provide explicitly or ensure mc-status is available.",
-            reason="missing_coordinates"
+            value=f"Failed to get agent position: {e}",
+            reason="status_failed"
         )
     
+    # Convert dx,dy,dz to absolute block coordinates
+    abs_x, abs_y, abs_z = dx_dy_dz_to_absolute(dx, dy, dz, agent_pos)
+    
     # Round coordinates to block positions
-    x_block = _round_coordinate(x)
-    z_block = _round_coordinate(z)
+    x_block = abs_x
+    z_block = abs_z
+    y_block = abs_y  # Keep Y for display
     
     # Get base_dir from resource_manager if available
     base_dir = None
@@ -142,14 +162,19 @@ def tool(input_value=None, **kwargs):
     # Get updated waypoints list
     waypoints = spatial_map.get_waypoints(x_block, z_block)
     
-    result_text = f"Waypoint '{waypoint_name}' added at ({x_block}, {y}, {z_block})"
+    # Format result text with relative coordinates
+    if dx == 0 and dy == 0 and dz == 0:
+        result_text = f"Waypoint '{waypoint_name}' added at [0,0,0] (current position)"
+    else:
+        result_text = f"Waypoint '{waypoint_name}' added at [dx={dx},dy={dy},dz={dz}]"
     if len(waypoints) > 1:
         result_text += f" (total waypoints at this location: {len(waypoints)})"
     
-    # Build structured data dict
+    # Build structured data dict (store absolute for spatial_map, but also include relative)
     structured_data = {
         "waypoint": waypoint_name,
-        "location": {"x": x_block, "y": y, "z": z_block},
+        "location": {"x": x_block, "y": y_block, "z": z_block},
+        "relative": {"dx": dx, "dy": dy, "dz": dz},
         "all_waypoints": waypoints
     }
     
@@ -161,9 +186,9 @@ if __name__ == "__main__":
     # Test with mock data
     result = tool(
         name="Base_Camp",
-        x=-112,
-        y=71,
-        z=-123,
+        dx=0,
+        dy=0,
+        dz=0,
         resource_manager=None,
         agent_name="test"
     )

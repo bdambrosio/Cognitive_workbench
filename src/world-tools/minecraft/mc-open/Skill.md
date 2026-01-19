@@ -14,9 +14,8 @@ UI interaction for crafting, storage access, and furnace operations. Opens inter
 
 ## Input
 
-- Egocentric position (preferred): `forward`, `right`, `up` (floats)
-- Absolute position: `x`, `y`, `z` (floats, all required if using absolute)
-- Relative position: `rel_x`, `rel_y`, `rel_z` (floats, all required if using relative)
+- Position: `dx`, `dy`, `dz` (world-relative offsets from agent, floats, all required)
+  - See coordinate system documentation in jill-minecraft.yaml for details
 - `value`: Ignored
 
 ## Output
@@ -42,7 +41,12 @@ Returns uniform_return format with:
 
 ## Usage Examples
 
-Open block forward:
+Open block directly south:
 ```json
-{"type":"mc-open","forward":1,"up":0,"right":0,"out":"$open"}
+{"type":"mc-open","dx":0,"dy":0,"dz":1,"out":"$open"}
+```
+
+Open block directly east:
+```json
+{"type":"mc-open","dx":1,"dy":0,"dz":0,"out":"$open"}
 ```

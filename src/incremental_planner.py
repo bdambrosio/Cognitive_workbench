@@ -1697,12 +1697,41 @@ ALWAYS follow all formatting instructions exactly.
                 break
 
             # --- STAGE 2-PRE: Agent-State Hypotheses ---
-            s += user(
-                f"STAGE 2-PRE (step {step + 1}/{max_steps}):\n"
-                f"#GOAL: {goal_for_step}\n#END GOAL\n"
+            # Get perceptual frame if available (Minecraft-specific)
+            perceptual_frame_text = None
+            if executor and executor.world_name == "minecraft":
+                try:
+                    frame_data = executor.get_world_state("perceptual_frame")
+                    if frame_data:
+                        # Import PerceptionFrame only when needed
+                        import sys
+                        from pathlib import Path
+                        current_dir = Path(__file__).parent
+                        voxel_model_dir = current_dir / "world-tools" / "minecraft" / "voxel_affordance_model"
+                        if voxel_model_dir.exists():
+                            sys.path.insert(0, str(voxel_model_dir))
+                            from perceptual_frame import PerceptionFrame  # type: ignore
+                            frame = PerceptionFrame.from_json(frame_data)
+                            perceptual_frame_text = frame.pretty_print()
+                except Exception:
+                    # Non-fatal - just skip perceptual frame if unavailable
+                    pass
+            
+            # Build STAGE 2-PRE prompt
+            prompt_parts = [
+                f"STAGE 2-PRE (step {step + 1}/{max_steps}):\n",
+                f"#GOAL: {goal_for_step}\n#END GOAL\n",
                 f"CURRENT_TASK: {current_task}\n\n"
-                "Before choosing any tool, infer AGENT-STATE HYPOTHESES and AGENT-STATE-SUPPORT. Refer to STAGE 2-PRE Instructions.\n"
-            )
+            ]
+            if perceptual_frame_text:
+                prompt_parts.append(f"""#PERCEPTUAL_FRAME:\nA perceptual summary of the immediate environment relative to the agent. 
+It categorizes local cells by structures (e.g., surface, unknown, void), affordances (e.g., dig, place), and risks (e.g., suffocation:high).
+Coordinates are relative: [dx, dy, dz] from agent position.
+{perceptual_frame_text}
+#END PERCEPTUAL_FRAME\n\n""")
+            prompt_parts.append("Before choosing any tool, infer AGENT-STATE HYPOTHESES and AGENT-STATE-SUPPORT. Refer to STAGE 2-PRE Instructions.\n")
+            
+            s += user("".join(prompt_parts))
 
             s += assistant(
                 "AGENT_STATE_HYPOTHESES:\n"

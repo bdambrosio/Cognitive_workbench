@@ -1133,7 +1133,11 @@ class ZenohExecutiveNode:
                     action_data['result'] = json.dumps(result) if not isinstance(result, str) else result
             
             serialized_action = json.dumps(action_data)
-            logger.info(f"ACTION_LOG {normalized_type}: {serialized_action}")
+            # Truncate serialized_action for logging (keep full version for publisher)
+            log_action = serialized_action
+            if len(log_action) > 128:
+                log_action = log_action[:125] + "..."
+            logger.info(f"ACTION_LOG {normalized_type}: {log_action}")
             self.action_publisher.put(serialized_action)
             self.action_counter += 1
         except Exception as e:
