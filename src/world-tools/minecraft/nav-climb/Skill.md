@@ -55,11 +55,21 @@ For nav-climb to succeed, BOTH source and destination must satisfy clearance:
 
 ## Invariants
 
-- Exactly one elevation gain attempt per call (always forward)
+- Automatically aligns agent to block center and cardinal yaw before climb attempt
+- Exactly one elevation gain attempt per call (always forward, relative to current yaw)
 - Tries walk-up first, then jump-up if walk-up insufficient
 - Elevation gain must be ≥ `min_delta_y` to succeed
 - Snaps to block center after any position change
 - Updates `world_state("nav")` history
+
+## Alignment
+
+Before climb attempt, agent is automatically aligned:
+- Position: Block center (x+0.5, y, z+0.5) - eliminates fractional offsets
+- Yaw: Nearest cardinal (0°=South, 90°=West, 180°=North, 270°=East)
+- Pitch: 0°
+
+This prevents collisions from fractional offsets and ensures predictable forward direction.
 
 ## Collision Recovery
 
@@ -76,7 +86,8 @@ When `reason="collision"`, check `extra.diagnostics`:
 ## Planning Notes
 
 - Does not handle multi-block climbs; compose multiple calls for that
-- Use `nav-turn` before climbing to change direction
+- Use `nav-turn` before climbing to change direction (yaw determines forward direction)
+- Alignment to block center and cardinal yaw happens automatically (no manual alignment needed)
 - Default `step_duration` (0.6s) is longer than `nav-move` (0.2s) for step-up mechanics
 - After repeated failures, switch strategy rather than retry
 

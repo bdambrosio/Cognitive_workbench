@@ -144,22 +144,35 @@ def _compile_map_forward(map_collection_id: str, resource_manager) -> List[Dict]
     return compiled
 
 
-def _format_cell_summary(cell: Dict[str, Any]) -> str:
-    """Format a cell for human-readable output."""
+def _format_cell_summary(cell: Dict[str, Any], agent_x: Optional[int] = None, agent_z: Optional[int] = None, agent_y: Optional[int] = None) -> str:
+    """Format a cell for human-readable output with relative coordinates."""
     cell_id = cell.get('cell_id', {})
     x, z = cell_id.get('x', 0), cell_id.get('z', 0)
     support = cell.get('support', {})
+    support_y = support.get('support_y')
+    
+    # Convert to relative if agent position provided
+    if agent_x is not None and agent_z is not None:
+        dx = x - agent_x
+        dz = z - agent_z
+        coord_str = f"[{dx},{dz}]"
+        if agent_y is not None and support_y is not None:
+            dy = support_y - agent_y
+            coord_str = f"[{dx},{dy},{dz}]"
+    else:
+        coord_str = f"({x},{z})"
+    
     walkable = "walkable" if support.get('walkable') else "blocked"
     movement = support.get('movement_class', 'unknown')
     conf = cell.get('observability', {}).get('confidence', 0)
-    return f"({x},{z}): {walkable}, {movement}, conf={conf:.2f}"
+    return f"{coord_str}: {walkable}, {movement}, conf={conf:.2f}"
 
 
-def _format_cells_list(cells: List[Dict[str, Any]], max_items: int = 10) -> str:
-    """Format a list of cells for human-readable output."""
+def _format_cells_list(cells: List[Dict[str, Any]], max_items: int = 10, agent_x: Optional[int] = None, agent_z: Optional[int] = None, agent_y: Optional[int] = None) -> str:
+    """Format a list of cells for human-readable output with relative coordinates."""
     if not cells:
         return "none"
-    summaries = [_format_cell_summary(c) for c in cells[:max_items]]
+    summaries = [_format_cell_summary(c, agent_x, agent_z, agent_y) for c in cells[:max_items]]
     result = "\n  ".join(summaries)
     if len(cells) > max_items:
         result += f"\n  ... and {len(cells) - max_items} more"
@@ -271,6 +284,22 @@ def tool(input_value=None, **kwargs):
     if y is not None:
         y = _round_coordinate(y)
     
+    # Get agent position for relative coordinate conversion
+    agent_x = None
+    agent_z = None
+    agent_y = None
+    try:
+        status_result = executor.execute_action_with_log({"type": "mc-status"}, "mc-map-query")
+        if status_result.get("status") == "success":
+            pos = status_result.get("data", {}).get("position", {})
+            if isinstance(pos, dict):
+                agent_x = _round_coordinate(pos.get("x", 0))
+                agent_y = _round_coordinate(pos.get("y", 0))
+                agent_z = _round_coordinate(pos.get("z", 0))
+    except Exception:
+        # Non-fatal - will use absolute coordinates if status fails
+        pass
+    
     results = []
     result_text_parts = []
     
@@ -306,9 +335,14 @@ def tool(input_value=None, **kwargs):
             )
         
         unobserved = spatial_map.cells_unobserved(x, z, radius)
-        result_text_parts.append(f"Unobserved cells within radius {radius} of ({x},{z}): {len(unobserved)}")
-        if unobserved:
+        # Format with relative coordinates if agent position available
+        if agent_x is not None and agent_z is not None:
+            coords_str = ", ".join([f"[{ux - agent_x},{uz - agent_z}]" for ux, uz in unobserved[:20]])
+            result_text_parts.append(f"Unobserved cells within radius {radius}: {len(unobserved)}")
+        else:
             coords_str = ", ".join([f"({ux},{uz})" for ux, uz in unobserved[:20]])
+            result_text_parts.append(f"Unobserved cells within radius {radius} of ({x},{z}): {len(unobserved)}")
+        if unobserved:
             result_text_parts.append(f"  {coords_str}")
             if len(unobserved) > 20:
                 result_text_parts.append(f"  ... and {len(unobserved) - 20} more")
@@ -330,7 +364,7 @@ def tool(input_value=None, **kwargs):
         threshold = float(kwargs.get('threshold', 0.5))
         cells = spatial_map.cells_low_confidence(x, z, radius, threshold)
         result_text_parts.append(f"Low-confidence cells (< {threshold}) within radius {radius}: {len(cells)}")
-        result_text_parts.append(f"  {_format_cells_list(cells)}")
+        result_text_parts.append(f"  {_format_cells_list(cells, agent_x, agent_z, agent_y)}")
         
         return executor._create_uniform_return(
             'success',
@@ -348,7 +382,7 @@ def tool(input_value=None, **kwargs):
         
         cells = spatial_map.frontier_cells(x, z, radius)
         result_text_parts.append(f"Frontier cells within radius {radius}: {len(cells)}")
-        result_text_parts.append(f"  {_format_cells_list(cells)}")
+        result_text_parts.append(f"  {_format_cells_list(cells, agent_x, agent_z, agent_y)}")
         
         return executor._create_uniform_return(
             'success',
@@ -360,7 +394,7 @@ def tool(input_value=None, **kwargs):
         min_dist = float(kwargs.get('min_dist', 2.0))
         cells = spatial_map.cells_observed_from_distance(min_dist)
         result_text_parts.append(f"Cells observed from distance >= {min_dist}: {len(cells)}")
-        result_text_parts.append(f"  {_format_cells_list(cells)}")
+        result_text_parts.append(f"  {_format_cells_list(cells, agent_x, agent_z, agent_y)}")
         
         return executor._create_uniform_return(
             'success',
@@ -372,7 +406,7 @@ def tool(input_value=None, **kwargs):
         max_age = float(kwargs.get('max_age', 300))  # Default 5 minutes
         cells = spatial_map.cells_stale(max_age)
         result_text_parts.append(f"Stale cells (age > {max_age}s): {len(cells)}")
-        result_text_parts.append(f"  {_format_cells_list(cells)}")
+        result_text_parts.append(f"  {_format_cells_list(cells, agent_x, agent_z, agent_y)}")
         
         return executor._create_uniform_return(
             'success',
@@ -392,7 +426,7 @@ def tool(input_value=None, **kwargs):
         # Pass y if provided for query-time delta_y and blocking computation
         cells = spatial_map.cells_reachable(x, z, radius, max_delta_y, current_y=y)
         result_text_parts.append(f"Reachable cells within radius {radius} (max_delta_y={max_delta_y}): {len(cells)}")
-        result_text_parts.append(f"  {_format_cells_list(cells)}")
+        result_text_parts.append(f"  {_format_cells_list(cells, agent_x, agent_z, agent_y)}")
         
         return executor._create_uniform_return(
             'success',
@@ -408,7 +442,7 @@ def tool(input_value=None, **kwargs):
             result_text_parts.append(f"Blocked cells from ({x},{y},{z}): {len(cells)}")
         else:
             result_text_parts.append(f"Unwalkable cells (blocked is query-time, requires position): {len(cells)}")
-        result_text_parts.append(f"  {_format_cells_list(cells)}")
+        result_text_parts.append(f"  {_format_cells_list(cells, agent_x, agent_z, agent_y)}")
         
         return executor._create_uniform_return(
             'success',
@@ -424,7 +458,7 @@ def tool(input_value=None, **kwargs):
             result_text_parts.append(f"Cells requiring climb from Y={y}: {len(cells)}")
         else:
             result_text_parts.append(f"Cells requiring climb: 0 (step_up is query-time, requires y parameter)")
-        result_text_parts.append(f"  {_format_cells_list(cells)}")
+        result_text_parts.append(f"  {_format_cells_list(cells, agent_x, agent_z, agent_y)}")
         
         return executor._create_uniform_return(
             'success',
@@ -439,7 +473,7 @@ def tool(input_value=None, **kwargs):
             result_text_parts.append(f"Cells with drop risk from Y={y}: {len(cells)}")
         else:
             result_text_parts.append(f"Cells with drop risk (absolute): {len(cells)}")
-        result_text_parts.append(f"  {_format_cells_list(cells)}")
+        result_text_parts.append(f"  {_format_cells_list(cells, agent_x, agent_z, agent_y)}")
         
         return executor._create_uniform_return(
             'success',
@@ -457,7 +491,7 @@ def tool(input_value=None, **kwargs):
         
         cells = spatial_map.cells_safe_to_stand(x, z, radius)
         result_text_parts.append(f"Safe cells within radius {radius}: {len(cells)}")
-        result_text_parts.append(f"  {_format_cells_list(cells)}")
+        result_text_parts.append(f"  {_format_cells_list(cells, agent_x, agent_z, agent_y)}")
         
         return executor._create_uniform_return(
             'success',
@@ -468,7 +502,7 @@ def tool(input_value=None, **kwargs):
     elif query_type == 'cells-high-hazard':
         cells = spatial_map.cells_high_hazard()
         result_text_parts.append(f"High-hazard cells: {len(cells)}")
-        result_text_parts.append(f"  {_format_cells_list(cells)}")
+        result_text_parts.append(f"  {_format_cells_list(cells, agent_x, agent_z, agent_y)}")
         
         return executor._create_uniform_return(
             'success',
@@ -486,7 +520,7 @@ def tool(input_value=None, **kwargs):
         
         cells = spatial_map.cells_escape_nodes(x, z, radius)
         result_text_parts.append(f"Escape nodes within radius {radius}: {len(cells)}")
-        result_text_parts.append(f"  {_format_cells_list(cells)}")
+        result_text_parts.append(f"  {_format_cells_list(cells, agent_x, agent_z, agent_y)}")
         
         return executor._create_uniform_return(
             'success',
@@ -505,7 +539,7 @@ def tool(input_value=None, **kwargs):
         
         cells = spatial_map.cells_with_resource(resource_type)
         result_text_parts.append(f"Cells with resource '{resource_type}': {len(cells)}")
-        result_text_parts.append(f"  {_format_cells_list(cells)}")
+        result_text_parts.append(f"  {_format_cells_list(cells, agent_x, agent_z, agent_y)}")
         
         return executor._create_uniform_return(
             'success',
@@ -566,7 +600,7 @@ def tool(input_value=None, **kwargs):
     elif query_type == 'cells-water-source':
         cells = spatial_map.cells_water_source()
         result_text_parts.append(f"Water source cells: {len(cells)}")
-        result_text_parts.append(f"  {_format_cells_list(cells)}")
+        result_text_parts.append(f"  {_format_cells_list(cells, agent_x, agent_z, agent_y)}")
         
         return executor._create_uniform_return(
             'success',
@@ -586,7 +620,7 @@ def tool(input_value=None, **kwargs):
         require_reachable = kwargs.get('require_reachable', True)
         cells = spatial_map.cells_candidate_waypoints(x, z, radius, require_safe, require_reachable)
         result_text_parts.append(f"Candidate waypoints within radius {radius}: {len(cells)}")
-        result_text_parts.append(f"  {_format_cells_list(cells)}")
+        result_text_parts.append(f"  {_format_cells_list(cells, agent_x, agent_z, agent_y)}")
         
         return executor._create_uniform_return(
             'success',
@@ -645,7 +679,7 @@ def tool(input_value=None, **kwargs):
         max_confidence = float(kwargs.get('max_confidence', 0.6))
         cells = spatial_map.cells_worth_revisit(x, z, radius, max_confidence)
         result_text_parts.append(f"Cells worth revisiting within radius {radius}: {len(cells)}")
-        result_text_parts.append(f"  {_format_cells_list(cells)}")
+        result_text_parts.append(f"  {_format_cells_list(cells, agent_x, agent_z, agent_y)}")
         
         return executor._create_uniform_return(
             'success',

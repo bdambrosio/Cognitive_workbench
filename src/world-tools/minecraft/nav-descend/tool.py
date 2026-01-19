@@ -37,6 +37,17 @@ DEFAULT_MINECRAFT_URL = os.getenv("MINECRAFT_URL", "http://localhost:3003")
 MAX_NAV_HISTORY = 100
 
 
+def _to_relative_delta(from_pos: Dict[str, float], to_pos: Optional[Dict[str, float]]) -> Dict[str, float]:
+    """Convert absolute positions to relative delta (dx, dy, dz)."""
+    if to_pos is None:
+        return {"dx": 0.0, "dy": 0.0, "dz": 0.0}
+    return {
+        "dx": to_pos.get("x", 0.0) - from_pos.get("x", 0.0),
+        "dy": to_pos.get("y", 0.0) - from_pos.get("y", 0.0),
+        "dz": to_pos.get("z", 0.0) - from_pos.get("z", 0.0),
+    }
+
+
 def _calculate_snap_position_and_yaw(start_pos: Dict, end_pos: Dict, current_yaw: Optional[float] = None) -> Tuple[Dict, float, float]:
     """
     Calculate block center position and yaw from movement.
@@ -381,8 +392,7 @@ def tool(input_value=None, **kwargs):
             "success",
             value=f"Controlled descent completed via fall (delta_y={delta_y:.2f})",
             extra={
-                "from": start_pos,
-                "to": end_pos,
+                "delta": _to_relative_delta(start_pos, end_pos),
                 "delta_y": delta_y,
                 "support_here": support_type,
             },
@@ -504,8 +514,7 @@ def tool(input_value=None, **kwargs):
         "success",
         value=f"Descent completed successfully (delta_y={delta_y:.2f})",
         extra={
-            "from": start_pos,
-            "to": end_pos,
+            "delta": _to_relative_delta(start_pos, end_pos),
             "delta_y": delta_y,
             "support_here": support_type,
         },

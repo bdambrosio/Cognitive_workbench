@@ -28,10 +28,21 @@ Failure (`status: "failed"`):
 
 ## Behavior
 
+- Automatically aligns agent to block center and cardinal yaw before movement
 - Calls bridge `/act/move` once (forward) with collision checking
+- Moves forward relative to current facing direction
 - Validates landing via `mc-status` + `mc-observe`
 - Snaps to block center after any position change
 - Updates `world_state("nav")` history
+
+## Alignment
+
+Before movement, agent is automatically aligned:
+- Position: Block center (x+0.5, y, z+0.5) - eliminates fractional offsets
+- Yaw: Nearest cardinal (0°=South, 90°=West, 180°=North, 270°=East)
+- Pitch: 0°
+
+This prevents collisions from fractional offsets and ensures predictable movement direction.
 
 ## Planning Notes
 

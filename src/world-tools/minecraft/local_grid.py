@@ -285,6 +285,55 @@ def get_latest_perceptual_frame_as_str(executor: Any) -> Optional[str]:
         return frame.summary() if hasattr(frame, 'summary') else None
 
 
+def get_perceptual_data_at_relative(executor: Any, dx: int, dy: int, dz: int) -> Optional[Dict[str, Any]]:
+    """
+    Get perceptual data (structures, affordances, risks) at relative position (dx, dy, dz) from agent.
+    Returns dict with keys: 'structures', 'affordances', 'risks', or None if no data.
+    Used by path-frontier to override spatial_map with current perceptual data.
+    """
+    frame = get_latest_perceptual_frame(executor)
+    if frame is None:
+        return None
+    
+    rel_pos = (dx, dy, dz)
+    result = {
+        'structures': [],
+        'affordances': [],
+        'risks': []
+    }
+    
+    # Find structures at this position
+    for s in frame.structures:
+        if s.anchor == rel_pos:
+            result['structures'].append({
+                'type_scores': {k.value: v for k, v in s.type_scores.items()},
+                'dominant_type': s.dominant_type().value,
+                'salience': s.salience
+            })
+    
+    # Find affordances at this position
+    for a in frame.affordances:
+        if a.target == rel_pos:
+            result['affordances'].append({
+                'type': a.type.value,
+                'salience': a.salience
+            })
+    
+    # Find risks at this position
+    for r in frame.risks:
+        if r.source == rel_pos:
+            result['risks'].append({
+                'type': r.type.value,
+                'severity': r.severity.value
+            })
+    
+    # Return None if no data found (so caller can fall back to spatial_map)
+    if not result['structures'] and not result['affordances'] and not result['risks']:
+        return None
+    
+    return result
+
+
 def prune(executor: Any) -> None:
     grid = get_or_init(executor)
     radius = int(grid.get("radius", DEFAULT_RADIUS))

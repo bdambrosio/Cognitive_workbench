@@ -511,11 +511,11 @@ def tool(input_value=None, **kwargs):
             if t and t not in nearest_by_type:
                 nearest_by_type[t] = float(ent.get('distance', 0.0))
         
-        # Build summary
+        # Build summary (position is agent's own position, so relative is [0,0,0])
         summary_parts = []
         summary_parts.append("UNIFIED OBSERVATION SUMMARY:")
         summary_parts.append("")
-        summary_parts.append(f"Position: ({position.get('x', 0):.2f}, {position.get('y', 0):.2f}, {position.get('z', 0):.2f})")
+        summary_parts.append(f"Position: [0,0,0] (agent position)")
         summary_parts.append(f"Orientation: yaw={yaw:.1f}°, pitch={pitch:.1f}°")
         summary_parts.append("")
         summary_parts.append(f"Blocks: {len(nearby_blocks)} visible ({len(seen_blocks)} types)")
@@ -598,6 +598,17 @@ def tool(input_value=None, **kwargs):
                 ingest_nearby_blocks(executor, pose=structured_data.get("pose", {}), nearby_blocks=nearby_blocks)
         except Exception as e:
             logger.debug(f"mc-observe: local_grid ingest skipped: {e}")
+        
+        # Side-effect: update persistent spatial map (non-fatal)
+        try:
+            map_update_result = executor.execute_action_with_log(
+                {"type": "mc-map-update", "observation": structured_data},
+                "mc-observe"
+            )
+            if map_update_result.get("status") != "success":
+                logger.warning(f"mc-observe: spatial map update failed (non-fatal): {map_update_result.get('reason', 'unknown')}")
+        except Exception as e:
+            logger.debug(f"mc-observe: spatial map update skipped (non-fatal): {e}")
         
         summary_text = "\n".join(summary_parts)
         if len(summary_text) > 1024:

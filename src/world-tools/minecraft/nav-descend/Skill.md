@@ -36,16 +36,27 @@ Failure (`status: "failed"`):
 
 ## Invariants
 
-- Exactly one descent attempt per call (always forward)
+- Automatically aligns agent to block center and cardinal yaw before descent attempt
+- Exactly one descent attempt per call (always forward, relative to current yaw)
 - Descent must be within bounds: `min_drop` ≤ `|delta_y|` ≤ `max_drop`
 - Landing support must be walkable ("solid" or "unsafe")
 - Snaps to block center after any position change
 - Updates `world_state("nav")` history
 
+## Alignment
+
+Before descent attempt, agent is automatically aligned:
+- Position: Block center (x+0.5, y, z+0.5) - eliminates fractional offsets
+- Yaw: Nearest cardinal (0°=South, 90°=West, 180°=North, 270°=East)
+- Pitch: 0°
+
+This prevents collisions from fractional offsets and ensures predictable forward direction.
+
 ## Planning Notes
 
 - Does not handle multi-block drops; compose multiple calls for that
-- Use `nav-turn` before descending to change direction
+- Use `nav-turn` before descending to change direction (yaw determines forward direction)
+- Alignment to block center and cardinal yaw happens automatically (no manual alignment needed)
 - Falls within bounds are treated as controlled descent (success if landing is safe)
 
 ## Example Workflow

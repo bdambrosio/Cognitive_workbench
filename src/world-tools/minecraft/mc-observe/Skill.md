@@ -36,6 +36,7 @@ Returns uniform_return format with:
 - Entity metadata includes age_ticks, velocity, time_until_despawn (if available from Minescript API)
 - Logs what data is successfully returned and what is missing (for debugging)
 - Radius limits: Default 3 blocks (for testing), maximum 7 blocks
+- **Automatically updates persistent spatial map** (calls mc-map-update internally, non-fatal if fails)
 
 ## Guidelines
 
@@ -43,3 +44,4 @@ Returns uniform_return format with:
 - More efficient than calling mc-observe-blocks + mc-observe-entities + mc-observe-items separately
 - Entity metadata (age, velocity) may not be available depending on Minescript API version
 - Check logs for metadata availability statistics
+- Spatial map is automatically updated with each observation (no need to call mc-map-update separately)

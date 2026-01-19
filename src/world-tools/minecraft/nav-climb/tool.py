@@ -141,6 +141,17 @@ def _snap_to_position(executor: InfospaceExecutor, snap_pos: Dict, minecraft_url
         return False
 
 
+def _to_relative_delta(from_pos: Dict[str, float], to_pos: Optional[Dict[str, float]]) -> Dict[str, float]:
+    """Convert absolute positions to relative delta (dx, dy, dz)."""
+    if to_pos is None:
+        return {"dx": 0.0, "dy": 0.0, "dz": 0.0}
+    return {
+        "dx": to_pos.get("x", 0.0) - from_pos.get("x", 0.0),
+        "dy": to_pos.get("y", 0.0) - from_pos.get("y", 0.0),
+        "dz": to_pos.get("z", 0.0) - from_pos.get("z", 0.0),
+    }
+
+
 def _calculate_forward_block_abs(position: Dict, yaw: float) -> Tuple[int, int, int]:
     """
     Calculate absolute block coordinates one block forward from current position.
@@ -472,7 +483,7 @@ def tool(input_value=None, **kwargs):
             "failed",
             value="Climb aborted: local_grid unavailable",
             reason="local_grid_unavailable",
-            extra={"from": start_pos},
+            extra={"delta": _to_relative_delta(start_pos, None)},
         )
 
     cardinals = (0.0, 90.0, 180.0, 270.0)
@@ -507,7 +518,7 @@ def tool(input_value=None, **kwargs):
             "failed",
             value="Climb aborted: no climbable cardinal orientation found (after 4-way observe)",
             reason="no_climbable_orientation",
-            extra={"from": start_pos, "grid_orient": _grid_orientation_candidates(start_pos, is_jump=True)},
+            extra={"delta": _to_relative_delta(start_pos, None), "grid_orient": _grid_orientation_candidates(start_pos, is_jump=True)},
         )
 
     # Realign to chosen yaw and enforce invariants before attempting motion.
@@ -649,8 +660,7 @@ def tool(input_value=None, **kwargs):
                     "success",
                     value=f"Climbed successfully via walk (delta_y={dy:.2f})",
                     extra={
-                        "from": start_pos,
-                        "to": end_pos,
+                        "delta": _to_relative_delta(start_pos, end_pos),
                         "delta_y": dy,
                         "mode": "walk",
                         "support_here": res.get("support_here"),
@@ -683,8 +693,7 @@ def tool(input_value=None, **kwargs):
                     "success",
                     value=f"Climbed successfully via jump (delta_y={dy:.2f})",
                     extra={
-                        "from": start_pos,
-                        "to": end_pos,
+                        "delta": _to_relative_delta(start_pos, end_pos),
                         "delta_y": dy,
                         "mode": "jump",
                         "support_here": res.get("support_here"),
@@ -712,7 +721,7 @@ def tool(input_value=None, **kwargs):
         support_here = res.get("support_here", "unknown") if isinstance(res, dict) else "unknown"
         _update_nav_state(executor, pose, support_here, fell=False, was_fall=False)
     
-    extra = {"from": start_pos}
+    extra = {"delta": _to_relative_delta(start_pos, None)}
     if end_pos:
         extra["to"] = end_pos
     if diagnostics:

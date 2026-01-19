@@ -14,9 +14,8 @@ Block activation and tool use. Uses the currently equipped item in hand to inter
 
 ## Input
 
-- Egocentric position (preferred): `forward`, `right`, `up` (floats)
-- Absolute position: `x`, `y`, `z` (floats, all required if using absolute)
-- Relative position: `rel_x`, `rel_y`, `rel_z` (floats, all required if using relative)
+- Position: `dx`, `dy`, `dz` (world-relative offsets from agent, floats, all required)
+  - See coordinate system documentation in jill-minecraft.yaml for details
 - `value`: Ignored
 
 ## Output
@@ -36,17 +35,16 @@ Returns uniform_return format with:
 
 - Use `mc-equip` first to equip appropriate item
 - Use `mc-inventory` to check available items
-- Egocentric coordinates are preferred for relative positioning
-- Absolute coordinates provide precise global positioning
+- All positions use world-relative coordinates `dx, dy, dz` (see coordinate system in jill-minecraft.yaml)
 
 ## Usage Examples
 
-Use equipped item forward:
+Use equipped item at block directly east:
 ```json
-{"type":"mc-use","forward":1,"up":0,"right":0,"out":"$use"}
+{"type":"mc-use","dx":1,"dy":0,"dz":0,"out":"$use"}
 ```
 
-Use at absolute coordinates:
+Use at block directly south:
 ```json
-{"type":"mc-use","x":100,"y":64,"z":200,"out":"$activate"}
+{"type":"mc-use","dx":0,"dy":0,"dz":1,"out":"$activate"}
 ```

@@ -6,9 +6,18 @@ Left-click style interaction (entities or blocks).
 import logging
 import os
 import requests
+import sys
+from pathlib import Path
 from typing import Any, Dict
 
 logger = logging.getLogger(__name__)
+
+# Import nav_core helper for coordinate conversion
+_THIS_DIR = os.path.dirname(__file__)
+_NAV_CORE_DIR = os.path.abspath(os.path.join(_THIS_DIR, ".."))
+if _NAV_CORE_DIR not in sys.path:
+    sys.path.insert(0, _NAV_CORE_DIR)
+from nav_core import dx_dy_dz_to_absolute
 
 DEFAULT_MINECRAFT_URL = os.getenv("MINECRAFT_URL", "http://localhost:3003")
 
@@ -21,11 +30,10 @@ def tool(input_value=None, **kwargs):
         input_value: ignored
         target: dict with either:
             - entity_id: string (for entity attack)
-            - forward, right, up: floats (egocentric block attack)
-            - rel_x, rel_y, rel_z: floats (legacy cartesian block attack)
-        forward: float - blocks forward (alternative top-level arg)
-        right: float - blocks right (alternative top-level arg)
-        up: float - blocks up (alternative top-level arg)
+            - dx, dy, dz: floats (world-relative block position)
+        dx: float - world-relative X offset from agent (alternative top-level arg, positive = east)
+        dy: float - world-relative Y offset from agent (alternative top-level arg, positive = up)
+        dz: float - world-relative Z offset from agent (alternative top-level arg, positive = south)
         minecraft_url: Optional URL override for Minecraft bot server (default: http://localhost:3003)
         
     Returns:
@@ -37,46 +45,69 @@ def tool(input_value=None, **kwargs):
     
     minecraft_url = kwargs.get("world_url") or kwargs.get("minecraft_url") or DEFAULT_MINECRAFT_URL
     
-    target = kwargs.get("target")
-    if not isinstance(target, dict):
-        return executor._create_uniform_return(
-            'failed',
-            value="target required (dict with entity_id or rel_x/rel_y/rel_z)",
-            reason="missing_target"
-        )
-    
     attack_params = {}
     
-    if "entity_id" in target:
-        attack_params["entity_id"] = target["entity_id"]
-    elif (kwargs.get("forward") is not None or kwargs.get("right") is not None or kwargs.get("up") is not None or
-          "rel_x" in target or "rel_y" in target or "rel_z" in target):
-        
-        rel_params = {}
-        # Egocentric (preferred)
-        if kwargs.get("forward") is not None: rel_params["forward"] = float(kwargs.get("forward"))
-        if kwargs.get("right") is not None: rel_params["right"] = float(kwargs.get("right"))
-        if kwargs.get("up") is not None: rel_params["up"] = float(kwargs.get("up"))
-        if kwargs.get("down") is not None: rel_params["up"] = -float(kwargs.get("down"))
-        if kwargs.get("left") is not None: rel_params["right"] = -float(kwargs.get("left"))
-        
-        # Also check inside 'target' dict for direct keys if passed that way
-        if "forward" in target: rel_params["forward"] = float(target["forward"])
-        if "right" in target: rel_params["right"] = float(target["right"])
-        if "up" in target: rel_params["up"] = float(target["up"])
-
-        # Cartesian (legacy/fallback)
-        if "rel_x" in target: rel_params["dx"] = float(target["rel_x"])
-        if "rel_y" in target: rel_params["dy"] = float(target["rel_y"])
-        if "rel_z" in target: rel_params["dz"] = float(target["rel_z"])
-
-        attack_params["rel"] = rel_params
+    # Check for entity_id first (in target dict or top-level)
+    entity_id = kwargs.get("entity_id") or (kwargs.get("target", {}).get("entity_id") if isinstance(kwargs.get("target"), dict) else None)
+    if entity_id:
+        attack_params["entity_id"] = str(entity_id)
     else:
-        return executor._create_uniform_return(
-            'failed',
-            value="target must have either entity_id, absolute pos, or relative (forward,right,up)",
-            reason="invalid_target"
-        )
+        # Block attack - need dx, dy, dz
+        # Check top-level first, then target dict
+        dx = kwargs.get("dx")
+        dy = kwargs.get("dy")
+        dz = kwargs.get("dz")
+        
+        target = kwargs.get("target")
+        if isinstance(target, dict):
+            dx = dx or target.get("dx")
+            dy = dy or target.get("dy")
+            dz = dz or target.get("dz")
+        
+        if dx is None or dy is None or dz is None:
+            return executor._create_uniform_return(
+                'failed',
+                value="target required: entity_id OR (dx, dy, dz - world-relative offsets from agent)",
+                reason="missing_target"
+            )
+        
+        dx = float(dx)
+        dy = float(dy)
+        dz = float(dz)
+        
+        # Get agent position to convert dx,dy,dz to absolute
+        try:
+            status_result = executor.execute_action_with_log({"type": "mc-status"}, "mc-attack")
+            if status_result.get("status") != "success":
+                return executor._create_uniform_return(
+                    'failed',
+                    value="Failed to get agent position for coordinate conversion",
+                    reason="status_failed"
+                )
+            agent_pos = status_result.get("data", {}).get("position", {})
+            if not isinstance(agent_pos, dict):
+                return executor._create_uniform_return(
+                    'failed',
+                    value="Invalid agent position data",
+                    reason="invalid_position"
+                )
+        except Exception as e:
+            logger.error(f"mc-attack: Failed to get agent position: {e}")
+            return executor._create_uniform_return(
+                'failed',
+                value=f"Failed to get agent position: {e}",
+                reason="status_failed"
+            )
+        
+        # Convert dx,dy,dz to absolute block coordinates
+        abs_x, abs_y, abs_z = dx_dy_dz_to_absolute(dx, dy, dz, agent_pos)
+        
+        # Pass absolute to bridge
+        attack_params["pos"] = {
+            "x": float(abs_x),
+            "y": float(abs_y),
+            "z": float(abs_z)
+        }
     
     try:
         url = f"{minecraft_url}/act/attack"
@@ -111,6 +142,6 @@ def tool(input_value=None, **kwargs):
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
-    result = tool(target={"rel_x": 0, "rel_y": 0, "rel_z": 1})
+    result = tool(target={"dx": 0, "dy": 0, "dz": 1})
     print(result)
 

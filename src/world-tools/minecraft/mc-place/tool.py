@@ -6,6 +6,8 @@ Build / modify world - place blocks.
 import logging
 import os
 import requests
+import sys
+from pathlib import Path
 from typing import Any, Dict
 
 logger = logging.getLogger(__name__)
@@ -15,6 +17,13 @@ try:
     from local_grid import set_cell
 except Exception:
     set_cell = None  # optional; do not break mc-place
+
+# Import nav_core helper for coordinate conversion
+_THIS_DIR = os.path.dirname(__file__)
+_NAV_CORE_DIR = os.path.abspath(os.path.join(_THIS_DIR, ".."))
+if _NAV_CORE_DIR not in sys.path:
+    sys.path.insert(0, _NAV_CORE_DIR)
+from nav_core import dx_dy_dz_to_absolute
 
 # Default Minecraft bot server URL (can be overridden via environment variable or config)
 DEFAULT_MINECRAFT_URL = os.getenv("MINECRAFT_URL", "http://localhost:3003")
@@ -27,16 +36,10 @@ def tool(input_value=None, **kwargs):
     Args:
         input_value: Item/block name to place (preferred)
         item: Item/block name to place (alternative to input_value)
-        x: float - absolute x coordinate of reference block (if using absolute)
-        y: float - absolute y coordinate of reference block (if using absolute)
-        z: float - absolute z coordinate of reference block (if using absolute)
-        forward: float - blocks forward to ref block (egocentric)
-        right: float - blocks right to ref block (egocentric)
-        up: float - blocks up to ref block (egocentric)
-        rel_x: float - relative x offset to reference block (legacy)
-        rel_y: float - relative y offset to reference block (legacy)
-        rel_z: float - relative z offset to reference block (legacy)
-        face: string - face of reference block to place against (e.g., "top", "bottom", "north", "south", "east", "west")
+        dx: float - world-relative X offset to reference block (positive = east, negative = west)
+        dy: float - world-relative Y offset to reference block (positive = up, negative = down)
+        dz: float - world-relative Z offset to reference block (positive = south, negative = north)
+        face: string - face of reference block to place against (absolute: "top", "bottom", "north", "south", "east", "west")
         minecraft_url: Optional URL override for Minecraft bot server (default: http://localhost:3003)
         
     Returns:
@@ -58,44 +61,60 @@ def tool(input_value=None, **kwargs):
             reason="missing_item"
         )
     
-    # Build position parameters - bot expects ref.pos or ref.rel
-    place_params = {"item": item}
+    # Get dx, dy, dz (world-relative coordinates, origin at agent)
+    dx = kwargs.get("dx")
+    dy = kwargs.get("dy")
+    dz = kwargs.get("dz")
     
-    ref = {}
-    # Check for absolute position
-    if kwargs.get("x") is not None and kwargs.get("y") is not None and kwargs.get("z") is not None:
-        ref["pos"] = {
-            "x": float(kwargs.get("x")),
-            "y": float(kwargs.get("y")),
-            "z": float(kwargs.get("z"))
-        }
-    # Check for relative position (Egocentric or Cartesian)
-    elif (kwargs.get("forward") is not None or kwargs.get("right") is not None or kwargs.get("up") is not None or
-          kwargs.get("rel_x") is not None or kwargs.get("rel_y") is not None or kwargs.get("rel_z") is not None):
-        
-        rel_params = {}
-        # Egocentric (preferred)
-        if kwargs.get("forward") is not None: rel_params["forward"] = float(kwargs.get("forward"))
-        if kwargs.get("right") is not None: rel_params["right"] = float(kwargs.get("right"))
-        if kwargs.get("up") is not None: rel_params["up"] = float(kwargs.get("up"))
-        if kwargs.get("down") is not None: rel_params["up"] = -float(kwargs.get("down"))
-        if kwargs.get("left") is not None: rel_params["right"] = -float(kwargs.get("left"))
-
-        # Cartesian (legacy/fallback)
-        if kwargs.get("rel_x") is not None: rel_params["dx"] = float(kwargs.get("rel_x"))
-        if kwargs.get("rel_y") is not None: rel_params["dy"] = float(kwargs.get("rel_y"))
-        if kwargs.get("rel_z") is not None: rel_params["dz"] = float(kwargs.get("rel_z"))
-        
-        ref["rel"] = rel_params
-    
-    if not ref:
+    if dx is None or dy is None or dz is None:
         return executor._create_uniform_return(
             'failed',
-            value="reference block position required (absolute x,y,z OR relative forward,right,up)",
+            value="reference block position required (dx, dy, dz - world-relative offsets from agent)",
             reason="missing_position"
         )
     
-    place_params["ref"] = ref
+    dx = float(dx)
+    dy = float(dy)
+    dz = float(dz)
+    
+    # Get agent position to convert dx,dy,dz to absolute
+    try:
+        status_result = executor.execute_action_with_log({"type": "mc-status"}, "mc-place")
+        if status_result.get("status") != "success":
+            return executor._create_uniform_return(
+                'failed',
+                value="Failed to get agent position for coordinate conversion",
+                reason="status_failed"
+            )
+        agent_pos = status_result.get("data", {}).get("position", {})
+        if not isinstance(agent_pos, dict):
+            return executor._create_uniform_return(
+                'failed',
+                value="Invalid agent position data",
+                reason="invalid_position"
+            )
+    except Exception as e:
+        logger.error(f"mc-place: Failed to get agent position: {e}")
+        return executor._create_uniform_return(
+            'failed',
+            value=f"Failed to get agent position: {e}",
+            reason="status_failed"
+        )
+    
+    # Convert dx,dy,dz to absolute block coordinates
+    abs_x, abs_y, abs_z = dx_dy_dz_to_absolute(dx, dy, dz, agent_pos)
+    
+    # Build position parameters - pass absolute to bridge
+    place_params = {
+        "item": item,
+        "ref": {
+            "pos": {
+                "x": float(abs_x),
+                "y": float(abs_y),
+                "z": float(abs_z)
+            }
+        }
+    }
     
     # Face is required (convert "top"/"bottom" to "up"/"down" if needed)
     face = kwargs.get("face")
@@ -134,7 +153,24 @@ def tool(input_value=None, **kwargs):
         placed_info = data.get("placed", {})
         placed_pos = placed_info.get("position", {})
         
-        if placed_pos:
+        # Get agent position for relative coordinate conversion (text output only)
+        agent_pos = None
+        try:
+            status_result = executor.execute_action_with_log({"type": "mc-status"}, "mc-place")
+            if status_result.get("status") == "success":
+                agent_pos = status_result.get("data", {}).get("position", {})
+        except Exception:
+            pass
+        
+        if placed_pos and agent_pos:
+            # Convert to relative coordinates for text output
+            dx = int(round(placed_pos.get('x', 0) - agent_pos.get('x', 0)))
+            dy = int(round(placed_pos.get('y', 0) - agent_pos.get('y', 0)))
+            dz = int(round(placed_pos.get('z', 0) - agent_pos.get('z', 0)))
+            pos_str = f"[{dx},{dy},{dz}]"
+            result_text = f"Place request accepted: {item} at {pos_str} (face={face})"
+        elif placed_pos:
+            # Fallback to absolute if agent position unavailable
             pos_str = f"({placed_pos.get('x', 0)}, {placed_pos.get('y', 0)}, {placed_pos.get('z', 0)})"
             result_text = f"Place request accepted: {item} at {pos_str} (face={face})"
         else:
@@ -149,6 +185,7 @@ def tool(input_value=None, **kwargs):
         extra_metadata.update(data)
 
         # Side-effect: optimistic local grid update (placed block becomes occupied)
+        # placed_pos is already absolute from bridge response
         try:
             if set_cell is not None and isinstance(placed_pos, dict):
                 x = placed_pos.get("x")
@@ -158,6 +195,16 @@ def tool(input_value=None, **kwargs):
                     set_cell(executor, int(x), int(y), int(z), str(item))
         except Exception:
             pass
+        
+        # Side-effect: update persistent spatial map (non-fatal)
+        # Note: placement is async, so observation may capture intermediate state
+        # Next observation will correct any inconsistencies
+        try:
+            map_update_result = executor.execute_action_with_log({"type": "mc-map-update"}, "mc-place")
+            if map_update_result.get("status") != "success":
+                logger.debug(f"mc-place: spatial map update failed (non-fatal): {map_update_result.get('reason', 'unknown')}")
+        except Exception as e:
+            logger.debug(f"mc-place: spatial map update skipped (non-fatal): {e}")
         
         return executor._create_uniform_return('success', value=result_text, extra=extra_metadata)
     except requests.exceptions.RequestException as e:
@@ -171,6 +218,6 @@ def tool(input_value=None, **kwargs):
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
-    result = tool("dirt", rel_x=0, rel_y=0, rel_z=1, face="north")
+    result = tool("dirt", dx=0, dy=0, dz=1, face="north")
     print(result)
 

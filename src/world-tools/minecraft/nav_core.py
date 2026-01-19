@@ -132,6 +132,34 @@ def _round_to_cardinal(yaw: float) -> float:
     return min(cardinals, key=lambda c: min(abs(yaw - c), abs(yaw - c + 360), abs(yaw - c - 360)))
 
 
+def dx_dy_dz_to_absolute(dx: float, dy: float, dz: float, agent_pos: Dict[str, float]) -> Tuple[int, int, int]:
+    """
+    Convert world-relative coordinates (dx, dy, dz) to absolute block coordinates.
+    
+    Args:
+        dx: World-relative X offset (positive = east, negative = west)
+        dy: World-relative Y offset (positive = up, negative = down)
+        dz: World-relative Z offset (positive = south, negative = north)
+        agent_pos: Agent position dict with 'x', 'y', 'z' keys
+    
+    Returns:
+        Tuple of (absolute_x, absolute_y, absolute_z) as integers (block coordinates)
+    
+    Note: dx, dy, dz are world-relative (absolute axis directions), NOT egocentric.
+    This is different from 'forward' which depends on yaw.
+    """
+    px = agent_pos.get('x', 0.0)
+    py = agent_pos.get('y', 0.0)
+    pz = agent_pos.get('z', 0.0)
+    
+    # Convert to block coordinates (floor) then add offset
+    bx = int(math.floor(px))
+    by = int(math.floor(py))
+    bz = int(math.floor(pz))
+    
+    return (bx + int(round(dx)), by + int(round(dy)), bz + int(round(dz)))
+
+
 def ensure_grid_aligned(
     executor: Any,
     minecraft_url: str,

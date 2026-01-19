@@ -16,8 +16,9 @@ Block placement for building, construction, and terrain modification. Asynchrono
 
 - `value`: Item/block name to place (preferred)
 - `item`: Item/block name to place (alternative to value)
-- Reference position: Either Egocentric (`forward`, `right`, `up`), Absolute (`x`, `y`, `z`), or Relative (`rel_x`, `rel_y`, `rel_z`) - REQUIRED
-- `face`: String - face of reference block to place against (top, bottom, north, south, east, west) - REQUIRED
+- Reference position: `dx`, `dy`, `dz` (world-relative offsets from agent, floats, all required)
+  - See coordinate system documentation in jill-minecraft.yaml for details
+- `face`: String - face of reference block to place against (absolute: "top", "bottom", "north", "south", "east", "west") - REQUIRED
 
 ## Output
 
@@ -33,13 +34,15 @@ Returns uniform_return format with:
 - Asynchronous: Returns immediately after accepting request
 - Actual placement may complete or fail later
 - Face parameter determines which side of reference block to place against
+- **Automatically updates persistent spatial map** after successful placement (calls mc-map-update internally, non-fatal if fails)
+- Note: Due to async nature, observation may capture intermediate state; next observation will correct inconsistencies
 
 ## Guidelines
 
 - Status `"accepted"` means request was accepted, not that placement succeeded
-- Face parameter is required and determines placement orientation
-- Use egocentric coordinates for relative positioning
-- Use absolute coordinates for precise global positioning
+- Face parameter is required and determines placement orientation (absolute cardinal directions)
+- All positions use world-relative coordinates `dx, dy, dz` (see coordinate system in jill-minecraft.yaml)
+- Spatial map is automatically updated after successful placement (no need to call mc-map-update separately)
 
 ## Important: Face Semantics
 
@@ -57,12 +60,12 @@ This matches standard Minecraft block placement semantics.
 
 ## Usage Examples
 
-Place block forward with face:
+Place block directly south with face:
 ```json
-{"type":"mc-place","value":"dirt","forward":1,"up":0,"right":0,"face":"north","out":"$place"}
+{"type":"mc-place","value":"dirt","dx":0,"dy":0,"dz":1,"face":"north","out":"$place"}
 ```
 
-Place block at absolute coordinates:
+Place block above with face:
 ```json
-{"type":"mc-place","item":"cobblestone","x":100,"y":64,"z":200,"face":"top","out":"$build"}
+{"type":"mc-place","item":"cobblestone","dx":0,"dy":1,"dz":0,"face":"top","out":"$build"}
 ```

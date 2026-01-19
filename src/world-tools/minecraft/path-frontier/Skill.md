@@ -20,7 +20,8 @@ Returns uniform_return format. Access return value via `result["data"]` (not `re
 
 Success (`status: "success"`):
 - `data`: Dict containing:
-  - `reachable`: List of `{"x": int, "z": int, "path": List[str]}` positions reachable within bounds
+  - `reachable`: List of `{"dx": int, "dz": int, "path": List[str]}` positions reachable within bounds (relative to start)
+    - `dx`, `dz`: World-relative offsets from starting position (see coordinate system in jill-minecraft.yaml)
     - `path`: Sequence of action names from start to position (e.g., `["nav-turn-right", "nav-move", "nav-climb"]`)
     - path is a simulation estimate, and may fail in execution
   - `count`: Integer count of reachable positions
@@ -46,7 +47,7 @@ Failure (`status: "failed"`):
 - Requires spatial map to be populated (via `mc-map-update`)
 - Small `max_actions` (default 4) keeps exploration bounded
 - May return 0 positions. This is NOT an error, and does not require recovery
-- Results are (x, z) positions only (Y coordinate not included in output)
+- Results are relative `dx, dz` offsets from start position (Y coordinate not included)
 
 ## Example
 

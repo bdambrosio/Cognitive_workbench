@@ -15,7 +15,8 @@ Spatial memory labeling for navigation and planning. Creates named waypoints tha
 ## Input
 
 - `name`: Waypoint name string (required)
-- `x`, `y`, `z`: Coordinates (optional - if not provided, uses current position from mc-status)
+- `dx`, `dy`, `dz`: World-relative offsets from agent (optional - defaults to 0,0,0 = current position)
+  - See coordinate system documentation in jill-minecraft.yaml for details
 - `value`: Ignored
 
 ## Output
@@ -41,16 +42,16 @@ Returns uniform_return format with:
 - Use meaningful waypoint names (e.g., "Base_Camp", "Pit_Exit_1")
 - Waypoints enable spatial reasoning and navigation
 - Waypoints are stored in SpatialMap cells and persist across sessions
-- Use `mc-status` to get current coordinates, or omit coordinates to use current position
+- Omit `dx, dy, dz` to mark current position, or specify relative offsets (see coordinate system in jill-minecraft.yaml)
 
 ## Usage Examples
 
-Create waypoint:
+Create waypoint at current position:
 ```json
-{"type":"mc-waypoint","name":"Base_Camp","x":-112,"y":71,"z":-123,"out":"$result"}
+{"type":"mc-waypoint","name":"Base_Camp","out":"$result"}
 ```
 
-Create multiple waypoints:
+Create waypoint at relative position:
 ```json
-{"type":"mc-waypoint","name":"Pit_Exit_1","x":-110,"y":65,"z":-120,"out":"$result"}
+{"type":"mc-waypoint","name":"Pit_Exit_1","dx":2,"dy":-6,"dz":3,"out":"$result"}
 ```
