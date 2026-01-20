@@ -1090,7 +1090,14 @@ class ZenohExecutiveNode:
                     result_value = result.get('value', '')
                     resource_id = result.get('resource_id')
                     if result_value:
-                        action_data['result'] = result_value
+                        # Truncate result for UI display (same as logging truncation)
+                        if isinstance(result_value, (dict, list)):
+                            result_str = json.dumps(result_value)
+                        else:
+                            result_str = str(result_value)
+                        if len(result_str) > 128:
+                            result_str = result_str[:125] + "..."
+                        action_data['result'] = result_str
                     if resource_id:
                         action_data['resource_id'] = resource_id
                     action_data['target'] = target  # Keep original target (variable name)
@@ -1099,7 +1106,11 @@ class ZenohExecutiveNode:
                 else:
                     action_data['target'] = target
                     action_data['resolved_target'] = display_target if display_target != target else None
-                    action_data['value'] = value
+                    # Truncate value for UI display (same as logging truncation)
+                    value_str = str(value) if value else ''
+                    if len(value_str) > 128:
+                        value_str = value_str[:125] + "..."
+                    action_data['value'] = value_str
                     action_data['error'] = result.get('reason', 'Failed')
             else:
                 # Generic action format - serialize objects to prevent [object Object] in UI
@@ -1107,7 +1118,12 @@ class ZenohExecutiveNode:
                 if isinstance(action, dict):
                     # Extract key fields for display
                     action_data['target'] = action.get('target', '')
-                    action_data['value'] = action.get('value', '')
+                    # Truncate value for UI display (same as logging truncation)
+                    value = action.get('value', '')
+                    value_str = str(value) if value else ''
+                    if len(value_str) > 128:
+                        value_str = value_str[:125] + "..."
+                    action_data['value'] = value_str
                     action_data['out'] = action.get('out', '')
                     # If action has other complex nested structures, serialize them
                     if len(action) > 3:  # More than just target/value/out
@@ -1123,15 +1139,41 @@ class ZenohExecutiveNode:
                     if result_value:
                         # Serialize if it's a complex object (not a simple string/number)
                         if isinstance(result_value, (dict, list)):
-                            action_data['result'] = json.dumps(result_value)
+                            result_str = json.dumps(result_value)
                         else:
-                            action_data['result'] = result_value
+                            result_str = str(result_value)
+                        # Truncate result for UI display (same as logging truncation)
+                        if len(result_str) > 128:
+                            result_str = result_str[:125] + "..."
+                        action_data['result'] = result_str
                     else:
                         # Serialize the whole result dict if it's complex
-                        action_data['result'] = json.dumps(result) if len(result) > 2 else result
+                        result_str = json.dumps(result) if len(result) > 2 else str(result)
+                        # Truncate result for UI display (same as logging truncation)
+                        if len(result_str) > 128:
+                            result_str = result_str[:125] + "..."
+                        action_data['result'] = result_str
                 else:
-                    action_data['result'] = json.dumps(result) if not isinstance(result, str) else result
+                    result_str = json.dumps(result) if not isinstance(result, str) else str(result)
+                    # Truncate result for UI display (same as logging truncation)
+                    if len(result_str) > 128:
+                        result_str = result_str[:125] + "..."
+                    action_data['result'] = result_str
             
+            # Truncate action payload for UI display (mc-map-update can embed huge observations)
+            try:
+                action_field = action_data.get("action")
+                if action_field is not None:
+                    if isinstance(action_field, (dict, list)):
+                        action_str = json.dumps(action_field)
+                    else:
+                        action_str = str(action_field)
+                    if len(action_str) > 128:
+                        action_str = action_str[:125] + "..."
+                    action_data["action"] = action_str
+            except Exception:
+                pass
+
             serialized_action = json.dumps(action_data)
             # Truncate serialized_action for logging (keep full version for publisher)
             log_action = serialized_action

@@ -537,6 +537,10 @@ def tool(input_value=None, **kwargs):
                 reason="missing_resource_type"
             )
         
+        # resource_type can be:
+        # - Generic: 'wood', 'ore', 'food_source', 'stone', 'dirt', 'sand'
+        # - Instance-specific: 'minecraft:oak_log', 'oak_log', 'minecraft:coal_ore', etc.
+        # Matching handles both cases automatically
         cells = spatial_map.cells_with_resource(resource_type)
         result_text_parts.append(f"Cells with resource '{resource_type}': {len(cells)}")
         result_text_parts.append(f"  {_format_cells_list(cells, agent_x, agent_z, agent_y)}")

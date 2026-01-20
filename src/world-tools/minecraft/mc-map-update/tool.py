@@ -244,7 +244,30 @@ def tool(input_value=None, **kwargs):
     # Get spatial map stats
     map_stats = spatial_map.get_stats()
     
-    result_text = f"Map updated: ({x_block}, {y_block}, {z_block}) - {map_stats['cell_count']} cells ({cells_updated} updated)"
+    # Convert to relative coordinates for text output (LLM consistency)
+    try:
+        status_result = executor.execute_action_with_log({"type": "mc-status"}, "mc-map-update")
+        if status_result.get("status") == "success":
+            status_data = status_result.get("data", {})
+            agent_pos = status_data.get("position", {})
+            if isinstance(agent_pos, dict):
+                agent_x = agent_pos.get('x')
+                agent_y = agent_pos.get('y')
+                agent_z = agent_pos.get('z')
+                if agent_x is not None and agent_y is not None and agent_z is not None:
+                    dx = int(x_block - agent_x)
+                    dy = int(y_block - agent_y)
+                    dz = int(z_block - agent_z)
+                    result_text = f"Map updated: [{dx},{dy},{dz}] - {map_stats['cell_count']} cells ({cells_updated} updated)"
+                else:
+                    result_text = f"Map updated: ({x_block}, {y_block}, {z_block}) - {map_stats['cell_count']} cells ({cells_updated} updated)"
+            else:
+                result_text = f"Map updated: ({x_block}, {y_block}, {z_block}) - {map_stats['cell_count']} cells ({cells_updated} updated)"
+        else:
+            result_text = f"Map updated: ({x_block}, {y_block}, {z_block}) - {map_stats['cell_count']} cells ({cells_updated} updated)"
+    except Exception:
+        # Fallback to absolute if agent position unavailable
+        result_text = f"Map updated: ({x_block}, {y_block}, {z_block}) - {map_stats['cell_count']} cells ({cells_updated} updated)"
     
     # Extract metadata fields for extra
     extra_metadata = {

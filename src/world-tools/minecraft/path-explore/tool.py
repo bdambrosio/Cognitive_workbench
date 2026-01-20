@@ -28,7 +28,7 @@ def tool(input_value=None, **kwargs):
     """
     Execute a single frontier exploration attempt.
     Args: input_value: ignored, **kwargs: executor (required)
-    Returns: Uniform tool return with: value = {"outcome": "no_frontier" | "reached" | "blocked" | "no_progress" | "status_failed", "target": {"x": int, "z": int}  # present unless outcome is "no_frontier"}
+    Returns: Uniform tool return with: value = {"outcome": "no_frontier" | "reached" | "blocked" | "no_progress" | "status_failed", "target": {"dx": int, "dz": int}  # present unless outcome is "no_frontier"}
     """
     executor = kwargs.get("executor")
     if not executor:
@@ -88,15 +88,21 @@ def tool(input_value=None, **kwargs):
         if frontier.get("status") != "success":
             return executor._create_uniform_return("failed", value="Failed to get frontier", reason="path_frontier_failed")
 
-        reachable = frontier.get("data", {}).get("reachable", [])
-        if len(reachable) < MIN_FRONTIER:
+        reachable_relative = frontier.get("data", {}).get("reachable", [])
+        if len(reachable_relative) < MIN_FRONTIER:
             frontier = executor.execute_action_with_log({"type": "path-frontier", "allow_unknown": True}, "path-explore")
             if frontier.get("status") != "success":
                 return executor._create_uniform_return("failed", value="Failed to get frontier with allow_unknown", reason="path_frontier_failed_allow_unknown")
-            reachable = frontier.get("data", {}).get("reachable", [])
+            reachable_relative = frontier.get("data", {}).get("reachable", [])
 
-        if not reachable:
+        if not reachable_relative:
             return executor._create_uniform_return("success", value={"outcome": "no_frontier"})
+
+        # Convert relative coordinates (dx, dz) to absolute (x, z) for internal use
+        reachable = [
+            {"x": int(x0 + p.get("dx", 0)), "z": int(z0 + p.get("dz", 0)), "path": p.get("path", [])}
+            for p in reachable_relative
+        ]
 
         target = _select_target(reachable, banned_targets, x0, z0)
         if not target:
@@ -159,7 +165,10 @@ def tool(input_value=None, **kwargs):
     # Final outcome
     # ------------------------------------------------------------
     if target:
-        return executor._create_uniform_return("success", value={"outcome": execution_result, "target": {"x": target["x"], "z": target["z"]}})
+        # Convert absolute coordinates back to relative for LLM consistency
+        target_dx = int(target["x"] - x0)
+        target_dz = int(target["z"] - z0)
+        return executor._create_uniform_return("success", value={"outcome": execution_result, "target": {"dx": target_dx, "dz": target_dz}})
     return executor._create_uniform_return("success", value={"outcome": execution_result})
 
 

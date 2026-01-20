@@ -179,6 +179,24 @@ def init_l0_inference(executor: Any) -> None:
         executor.set_world_state(PERCEPTUAL_FRAME_KEY, None)
 
 
+def _normalize_block_name(name: str) -> str:
+    """
+    Normalize block name to ensure minecraft: prefix for L0 inference compatibility.
+    VoxelAffordanceModel expects namespace:block_id format.
+    """
+    if not name:
+        return "minecraft:air"
+    
+    name_str = str(name).strip()
+    
+    # Already has namespace prefix
+    if ":" in name_str:
+        return name_str
+    
+    # Add minecraft: prefix
+    return f"minecraft:{name_str}"
+
+
 def update_perceptual_frame(executor: Any, boundary: int = 1) -> None:
     """
     Run L0 inference on current grid and store perceptual frame.
@@ -224,8 +242,22 @@ def update_perceptual_frame(executor: Any, boundary: int = 1) -> None:
         logger.debug(f"L0 inference: center=({cx},{cy},{cz}), cells={cell_count}, boundary={boundary}")
         logger.debug(f"L0 inference: nearby blocks (within ±{boundary+1}): {', '.join(nearby_blocks[:10])}")
         
-        # Run inference
-        frame = pipeline.infer_partial_grid(grid, boundary=boundary)
+        # Normalize grid block names for L0 inference (ensure minecraft: prefix)
+        normalized_grid = {
+            "center": grid.get("center", {}),
+            "radius": grid.get("radius", DEFAULT_RADIUS),
+            "cells": {}
+        }
+        for key, entry in cells.items():
+            if not isinstance(entry, dict):
+                continue
+            normalized_entry = entry.copy()
+            original_name = entry.get("name", "air")
+            normalized_entry["name"] = _normalize_block_name(original_name)
+            normalized_grid["cells"][key] = normalized_entry
+        
+        # Run inference with normalized grid
+        frame = pipeline.infer_partial_grid(normalized_grid, boundary=boundary)
         
         # Debug: log frame results
         logger.debug(f"L0 inference result: structures={len(frame.structures)}, affordances={len(frame.affordances)}, risks={len(frame.risks)}")
@@ -269,6 +301,43 @@ def get_latest_perceptual_frame(executor: Any):
     return None
 
 
+def get_observed_voxel_grid_as_text(executor: Any, radius: int = 1) -> Optional[str]:
+    """
+    Get observed voxel grid as LLM-friendly formatted string.
+    Returns formatted text or None if grid unavailable.
+    """
+    voxel_grid = get_observed_voxel_grid(executor, radius=radius)
+    if not voxel_grid:
+        return None
+    
+    cells = voxel_grid.get("cells", [])
+    if not isinstance(cells, list):
+        return None
+    
+    if not cells:
+        return f"Observed voxel grid (radius={radius}): empty (no cells observed)"
+    
+    # Sort cells by dy (vertical), then dz, then dx for readability
+    sorted_cells = sorted(cells, key=lambda c: (c.get("dy", 0), c.get("dz", 0), c.get("dx", 0)))
+    
+    lines = [f"Observed voxel grid (radius={radius}): {len(cells)} cells"]
+    for cell in sorted_cells:
+        dx = cell.get("dx", 0)
+        dy = cell.get("dy", 0)
+        dz = cell.get("dz", 0)
+        solid = cell.get("solid", False)
+        block_id = cell.get("block_id")
+        support = cell.get("support", False)
+        
+        block_str = block_id if block_id else "air"
+        solid_str = "solid" if solid else "air/fluid"
+        support_str = "support" if support else "no_support"
+        
+        lines.append(f"  [{dx},{dy},{dz}]: {block_str} ({solid_str}, {support_str})")
+    
+    return "\n".join(lines)
+
+
 def get_latest_perceptual_frame_as_str(executor: Any) -> Optional[str]:
     """
     Get latest perceptual frame as LLM-friendly formatted string.
@@ -283,6 +352,100 @@ def get_latest_perceptual_frame_as_str(executor: Any) -> Optional[str]:
     except Exception:
         # Fallback to summary if pretty_print fails
         return frame.summary() if hasattr(frame, 'summary') else None
+
+
+def get_observed_voxel_grid(executor: Any, radius: int = 1) -> Optional[Dict[str, Any]]:
+    """
+    Extract observed voxel grid: radius-bounded explicit voxel grid centered on agent.
+    Planner-facing format with relative coordinates (dx, dy, dz).
+    Extracts from local_grid (raw voxel data from mc-observe, not CNN inference results).
+    
+    Returns dict with:
+    - "center": {"x", "y", "z"} (absolute, for reference)
+    - "radius": int
+    - "cells": [{"dx": int, "dy": int, "dz": int, "solid": bool, "block_id": str, "support": bool}, ...]
+    
+    Fields:
+    - solid: true if block is not air/fluid
+    - block_id: block name (e.g., "minecraft:stone") or null if air
+    - support: true if cell provides support (solid block, or air with solid below)
+    """
+    grid = get_or_init(executor)
+    if not isinstance(grid, dict) or "center" not in grid or "cells" not in grid:
+        return None
+    
+    center = grid.get("center", {})
+    if not isinstance(center, dict):
+        return None
+    
+    cx = int(center.get("x", 0))
+    cy = int(center.get("y", 0))
+    cz = int(center.get("z", 0))
+    
+    cells = grid.get("cells", {})
+    if not isinstance(cells, dict):
+        return None
+    
+    voxel_cells = []
+    
+    # Iterate over all cells within radius (Chebyshev ball)
+    for key, cell_data in cells.items():
+        if not isinstance(cell_data, dict):
+            continue
+        
+        xyz = _parse_key(key)
+        if not xyz:
+            continue
+        x, y, z = xyz
+        
+        # Check if within radius
+        if not _within_radius(x, y, z, cx, cy, cz, radius):
+            continue
+        
+        # Compute relative coordinates
+        dx = x - cx
+        dy = y - cy
+        dz = z - cz
+        
+        # Extract block name
+        block_name = cell_data.get("name", "")
+        if not isinstance(block_name, str):
+            block_name = ""
+        
+        # Determine solid (not air, not fluid)
+        is_air = is_air_name(block_name)
+        is_fluid = block_name.lower().replace("minecraft:", "") in FLUID_BLOCKS
+        solid = not is_air and not is_fluid
+        
+        # Compute support flag
+        # Support = true if:
+        #   - Block is solid (provides support)
+        #   - Block is air AND cell below is solid
+        support = False
+        if solid:
+            support = True
+        elif is_air:
+            # Check cell below for support
+            below_name = get_cell_name(executor, x, y - 1, z)
+            if below_name and not is_air_name(below_name):
+                below_is_fluid = below_name.lower().replace("minecraft:", "") in FLUID_BLOCKS
+                if not below_is_fluid:
+                    support = True
+        
+        voxel_cells.append({
+            "dx": dx,
+            "dy": dy,
+            "dz": dz,
+            "solid": solid,
+            "block_id": block_name if block_name else None,
+            "support": support,
+        })
+    
+    return {
+        "center": {"x": cx, "y": cy, "z": cz},
+        "radius": radius,
+        "cells": voxel_cells,
+    }
 
 
 def get_perceptual_data_at_relative(executor: Any, dx: int, dy: int, dz: int) -> Optional[Dict[str, Any]]:

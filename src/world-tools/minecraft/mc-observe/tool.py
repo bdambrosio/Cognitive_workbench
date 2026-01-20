@@ -15,9 +15,11 @@ logger = logging.getLogger(__name__)
 
 # Session-local rolling occupancy grid (agent-owned)
 try:
-    from local_grid import ingest_nearby_blocks, set_cell
+    from local_grid import ingest_nearby_blocks, is_air_name, get_cell_name, set_cell
 except Exception:
     ingest_nearby_blocks = None  # optional; do not break mc-observe
+    is_air_name = None
+    get_cell_name = None
     set_cell = None
 
 # Default Minecraft bot server URL (can be overridden via environment variable or config)
@@ -48,6 +50,294 @@ NON_SOLID_BLOCKS = {
     'mushroom', 'red_mushroom', 'brown_mushroom',
     'sapling', 'oak_sapling', 'spruce_sapling', 'birch_sapling',
 }
+
+
+def _yaw_to_cardinal(yaw: float) -> int:
+    """Return nearest cardinal yaw as int: 0, 90, 180, 270."""
+    normalized = float(yaw) % 360.0
+    if normalized < 0:
+        normalized += 360.0
+    if normalized < 45.0 or normalized >= 315.0:
+        return 0
+    if normalized < 135.0:
+        return 90
+    if normalized < 225.0:
+        return 180
+    return 270
+
+
+def _yaw_to_forward_delta_cardinal(yaw_cardinal: int) -> Tuple[int, int]:
+    """Convert cardinal yaw (0/90/180/270) to discrete forward (dx,dz)."""
+    yaw_rad = math.radians(float(yaw_cardinal))
+    dx = int(round(-math.sin(yaw_rad)))
+    dz = int(round(-math.cos(yaw_rad)))
+    return dx, dz
+
+
+def _support_depth_value(depth: Optional[float]) -> Any:
+    """Best-effort support depth (int) or 'unknown'."""
+    if depth is None:
+        return "unknown"
+    try:
+        d = float(depth)
+    except Exception:
+        return "unknown"
+    return int(round(d))
+
+
+def _is_solidish_block(block: Any) -> bool:
+    """Heuristic: treat air/fluids as non-solid. AF1 is conservative."""
+    if block is None:
+        return False
+    name = str(block).lower().replace("minecraft:", "")
+    if not name:
+        return False
+    if "air" in name:
+        return False
+    if name in ("water", "lava", "flowing_water", "flowing_lava"):
+        return False
+    return True
+
+
+def _compute_af1(executor: Any, structured_data: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    AF1 v2: deterministic, contract-aware actionability summary derived from mc-observe output.
+    - No CNN/L0 inference output is exposed here (PERCEPTUAL_FRAME remains internal).
+    - Coordinates (dx,dy,dz) are relative to agent block coords (floor(pose)).
+    """
+    pose = structured_data.get("pose", {}) if isinstance(structured_data, dict) else {}
+    dirs = structured_data.get("dirs", {}) if isinstance(structured_data, dict) else {}
+    support = structured_data.get("support", {}) if isinstance(structured_data, dict) else {}
+    # Note: 'clear' is available in structured_data but AF1 v2 prefers deterministic checks.
+    nav_surface = structured_data.get("nav_surface", []) if isinstance(structured_data, dict) else []
+
+    px = float(pose.get("x", 0.0) or 0.0)
+    py = float(pose.get("y", 0.0) or 0.0)
+    pz = float(pose.get("z", 0.0) or 0.0)
+    bx = int(math.floor(px))
+    by = int(math.floor(py))
+    bz = int(math.floor(pz))
+
+    yaw_cardinal = _yaw_to_cardinal(float(pose.get("yaw", 0.0) or 0.0))
+
+    here_support = support.get("here", {}) if isinstance(support, dict) else {}
+    depth = here_support.get("depth")
+    if depth is None:
+        down_dist = dirs.get("down", {}).get("dist") if isinstance(dirs, dict) else None
+        depth = down_dist
+    depth_val = _support_depth_value(depth if isinstance(depth, (int, float)) else None)
+
+    up_blk = dirs.get("up", {}).get("blk") if isinstance(dirs, dict) else None
+    down_blk = dirs.get("down", {}).get("blk") if isinstance(dirs, dict) else None
+
+    # Index nav_surface by relative dx,dz when present; otherwise compute from pose x,z.
+    by_rel: Dict[Tuple[int, int], Dict[str, Any]] = {}
+    if isinstance(nav_surface, list):
+        for ns in nav_surface:
+            if not isinstance(ns, dict):
+                continue
+            dx = ns.get("dx")
+            dz = ns.get("dz")
+            if dx is None or dz is None:
+                try:
+                    dx = int(ns.get("x")) - int(round(px))
+                    dz = int(ns.get("z")) - int(round(pz))
+                except Exception:
+                    continue
+            try:
+                by_rel[(int(dx), int(dz))] = ns
+            except Exception:
+                continue
+
+    def _headroom_clear(abs_x: int, stand_y: int, abs_z: int) -> Any:
+        """
+        Return True/False/'unknown' for headroom at a given standing Y.
+        Headroom means both blocks at y=stand_y and y=stand_y+1 are passable (air).
+        """
+        if get_cell_name is None or is_air_name is None:
+            return "unknown"
+        n0 = get_cell_name(executor, abs_x, stand_y, abs_z)
+        n1 = get_cell_name(executor, abs_x, stand_y + 1, abs_z)
+        if n0 is None or n1 is None:
+            return "unknown"
+        if (not is_air_name(n0)) or (not is_air_name(n1)):
+            return False
+        return True
+
+    def _standable_at_dxz(dx: int, dz: int) -> Any:
+        """
+        Return True/False/'unknown' for standability at (dx,dz) relative to agent.
+        Deterministic:
+        - Requires nav_surface cell with walkable + support_y.
+        - Requires headroom check at standing_y = support_y + 1 (local_grid; conservative).
+        """
+        ns = by_rel.get((int(dx), int(dz)))
+        if not ns:
+            return "unknown"
+        support_y = ns.get("support_y")
+        walkable = ns.get("walkable")
+        if support_y is None or not isinstance(walkable, bool):
+            return "unknown"
+        if not walkable:
+            return False
+        try:
+            standing_y = int(round(float(support_y))) + 1
+        except Exception:
+            return "unknown"
+        head = _headroom_clear(bx + int(dx), standing_y, bz + int(dz))
+        if head == "unknown":
+            return "unknown"
+        return bool(head)
+
+    # Prefer nav_surface for current stand_y; fall back to floor(pose)+1.
+    here_ns = by_rel.get((0, 0))
+    if here_ns and here_ns.get("support_y") is not None:
+        try:
+            here_stand_y = int(round(float(here_ns.get("support_y")))) + 1
+        except Exception:
+            here_stand_y = by + 1
+    else:
+        here_stand_y = by + 1
+
+    # standability
+    stand_here = _standable_at_dxz(0, 0)
+    stand_fwd: Dict[str, Any] = {}
+    for yaw in (0, 90, 180, 270):
+        fdx, fdz = _yaw_to_forward_delta_cardinal(yaw)
+        stand_fwd[str(yaw)] = _standable_at_dxz(fdx, fdz)
+
+    # nav gating
+    climb_by_yaw: Dict[str, str] = {}
+    for yaw in (0, 90, 180, 270):
+        fdx, fdz = _yaw_to_forward_delta_cardinal(yaw)
+        ns = by_rel.get((fdx, fdz))
+        if not ns:
+            climb_by_yaw[str(yaw)] = "unknown"
+            continue
+        support_y = ns.get("support_y")
+        walkable = ns.get("walkable")
+        if support_y is None or not isinstance(walkable, bool):
+            climb_by_yaw[str(yaw)] = "unknown"
+            continue
+        try:
+            landing_stand_y = int(round(float(support_y))) + 1
+        except Exception:
+            climb_by_yaw[str(yaw)] = "unknown"
+            continue
+        if not walkable:
+            climb_by_yaw[str(yaw)] = "impossible"
+            continue
+        if landing_stand_y == here_stand_y + 1:
+            climb_by_yaw[str(yaw)] = "allowed"
+        else:
+            climb_by_yaw[str(yaw)] = "impossible"
+
+    descend_by_yaw: Dict[str, str] = {}
+    for yaw in (0, 90, 180, 270):
+        fdx, fdz = _yaw_to_forward_delta_cardinal(yaw)
+        ns = by_rel.get((fdx, fdz))
+        if not ns:
+            descend_by_yaw[str(yaw)] = "unknown"
+            continue
+        support_y = ns.get("support_y")
+        walkable = ns.get("walkable")
+        if support_y is None or not isinstance(walkable, bool):
+            descend_by_yaw[str(yaw)] = "unknown"
+            continue
+        try:
+            landing_stand_y = int(round(float(support_y))) + 1
+        except Exception:
+            descend_by_yaw[str(yaw)] = "unknown"
+            continue
+        if not walkable:
+            descend_by_yaw[str(yaw)] = "blocked"
+            continue
+        # Descend is "allowed" if landing is at or below current stand_y (flat or down)
+        # Blocked if landing is above current stand_y (would require climbing)
+        drop_height = here_stand_y - landing_stand_y
+        if drop_height < 0:
+            descend_by_yaw[str(yaw)] = "blocked"
+        elif drop_height <= 2:
+            descend_by_yaw[str(yaw)] = "allowed"
+        else:
+            descend_by_yaw[str(yaw)] = "blocked"
+
+    # verified anchor candidates (conservative, small)
+    anchors: List[Dict[str, Any]] = []
+    anchor_candidates = [(0, -1, 0), (1, -1, 0), (-1, -1, 0), (0, -1, 1), (0, -1, -1)]
+    for adx, ady, adz in anchor_candidates:
+        if adx == 0 and ady == -1 and adz == 0 and _is_solidish_block(down_blk):
+            anchors.append({"dx": 0, "dy": -1, "dz": 0, "faces": ["top"]})
+            continue
+        if get_cell_name is None:
+            continue
+        try:
+            name = get_cell_name(executor, bx + adx, by + ady, bz + adz)
+        except Exception:
+            name = None
+        if name is None:
+            continue
+        if _is_solidish_block(name):
+            anchors.append({"dx": int(adx), "dy": int(ady), "dz": int(adz), "faces": ["top"]})
+
+    gap_like = False
+    if isinstance(depth, (int, float)):
+        try:
+            gap_like = float(depth) >= 2.0
+        except Exception:
+            gap_like = False
+
+    return {
+        "af1_version": "2",
+        "yaw": yaw_cardinal,
+        "vertical": {
+            "support_depth": depth_val,
+            "gap_like": bool(gap_like),
+            "up_blk": None if up_blk is None else str(up_blk),
+            "down_blk": None if down_blk is None else str(down_blk),
+        },
+        "standability": {"here": stand_here, "forward": stand_fwd},
+        "nav": {"climb": climb_by_yaw, "descend": descend_by_yaw},
+        "placement": {"pending": False, "pending_targets": []},
+        "anchors": anchors,
+    }
+
+
+def _format_af1_text(af1: Dict[str, Any]) -> str:
+    """Compact, LLM-facing AF1 string."""
+    if not isinstance(af1, dict):
+        return ""
+    yaw = af1.get("yaw", af1.get("yaw_cardinal"))
+    v = af1.get("vertical", {}) if isinstance(af1.get("vertical"), dict) else {}
+    stand = af1.get("standability", {}) if isinstance(af1.get("standability"), dict) else {}
+    nav = af1.get("nav", {}) if isinstance(af1.get("nav"), dict) else {}
+    climb = nav.get("climb", {}) if isinstance(nav.get("climb"), dict) else {}
+    descend = nav.get("descend", {}) if isinstance(nav.get("descend"), dict) else {}
+    placement = af1.get("placement", {}) if isinstance(af1.get("placement"), dict) else {}
+    pending_targets = placement.get("pending_targets", []) if isinstance(placement.get("pending_targets"), list) else []
+    anchors = af1.get("anchors", []) if isinstance(af1.get("anchors"), list) else []
+
+    parts: List[str] = []
+    parts.append(f"AF1 yaw={yaw}")
+    parts.append(
+        f"Vertical: support_depth={v.get('support_depth','unknown')} gap_like={bool(v.get('gap_like'))} "
+        f"up_blk={v.get('up_blk', v.get('up_block'))} down_blk={v.get('down_blk', v.get('down_block'))}"
+    )
+    if stand:
+        fwd = stand.get("forward", {}) if isinstance(stand.get("forward"), dict) else {}
+        fwd_s = " ".join([f"{k}:{fwd.get(k,'?')}" for k in ("0", "90", "180", "270")])
+        parts.append(f"Standability: here={stand.get('here','unknown')} fwd={fwd_s}")
+    climb_s = " ".join([f"{k}:{climb.get(k,'?')}" for k in ("0", "90", "180", "270")])
+    parts.append(f"nav-climb by yaw: {climb_s}")
+    if descend:
+        descend_s = " ".join([f"{k}:{descend.get(k,'?')}" for k in ("0", "90", "180", "270")])
+        parts.append(f"nav-descend by yaw: {descend_s}")
+    if pending_targets:
+        parts.append(f"placement: pending_targets={len(pending_targets)} (must mc-observe next)")
+    if isinstance(anchors, list) and anchors:
+        a0 = anchors[0]
+        parts.append(f"anchors: n={len(anchors)} anchor0={[a0.get('dx'), a0.get('dy'), a0.get('dz')]} faces={a0.get('faces')}")
+    return "\n".join(parts).strip()
 
 
 def categorize_entity(entity_type: str) -> str:
@@ -591,6 +881,19 @@ def tool(input_value=None, **kwargs):
             "conf": conf,
             "note": note
         }
+
+        # ------------------------------------------------------------------
+        # AF1 v2: deterministic actionability summary (planner-facing)
+        # - computed from mc-observe output + local_grid (raw voxel facts, not L0/CNN output)
+        # - overwrites AF1 on every successful observe (clears any placement pending)
+        # ------------------------------------------------------------------
+        try:
+            af1 = _compute_af1(executor, structured_data)
+            executor.set_world_state("af1", af1)
+            executor.set_world_state("af1_text", _format_af1_text(af1))
+        except Exception:
+            # Non-fatal: AF1 is advisory context only
+            pass
 
         # Side-effect only: keep session-local grid current (no schema changes)
         try:

@@ -123,13 +123,19 @@ def _round_to_cardinal(yaw: float) -> float:
     """
     Round yaw to nearest cardinal direction (0°, 90°, 180°, 270°).
     """
-    yaw = yaw % 360
-    if yaw < 0:
-        yaw += 360
+    normalized = yaw % 360
+    if normalized < 0:
+        normalized += 360
     
-    # Round to nearest cardinal
-    cardinals = [0.0, 90.0, 180.0, 270.0]
-    return min(cardinals, key=lambda c: min(abs(yaw - c), abs(yaw - c + 360), abs(yaw - c - 360)))
+    # Thresholds at midpoints: 45°, 135°, 225°, 315°
+    if normalized < 45 or normalized >= 315:
+        return 0.0
+    elif normalized < 135:
+        return 90.0
+    elif normalized < 225:
+        return 180.0
+    else:  # normalized < 315
+        return 270.0
 
 
 def dx_dy_dz_to_absolute(dx: float, dy: float, dz: float, agent_pos: Dict[str, float]) -> Tuple[int, int, int]:

@@ -40,17 +40,19 @@ def _round_to_cardinal(yaw_deg: float) -> int:
     Returns:
         Nearest cardinal yaw (0, 90, 180, or 270)
     """
-    cardinals = [0, 90, 180, 270]
     normalized = yaw_deg % 360
+    if normalized < 0:
+        normalized += 360
     
-    # Find nearest cardinal
-    nearest = min(cardinals, key=lambda c: min(
-        abs(normalized - c),
-        abs(normalized - c + 360),
-        abs(normalized - c - 360)
-    ))
-    
-    return int(nearest)
+    # Thresholds at midpoints: 45°, 135°, 225°, 315°
+    if normalized < 45 or normalized >= 315:
+        return 0
+    elif normalized < 135:
+        return 90
+    elif normalized < 225:
+        return 180
+    else:  # normalized < 315
+        return 270
 
 
 # Action set for initial frontier exploration.
