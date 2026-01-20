@@ -62,6 +62,8 @@ For nav-climb to succeed, BOTH source and destination must satisfy clearance:
 - Snaps to block center after any position change
 - Updates `world_state("nav")` history
 
+**Cannot climb straight up**: Requires forward movement. A block at [0,1,0] (purely above) is not climbable unless there's a forward elevated landing. `nav-turn` changes forward direction but cannot make vertical become forward.
+
 ## Alignment
 
 Before climb attempt, agent is automatically aligned:

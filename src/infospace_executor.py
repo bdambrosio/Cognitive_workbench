@@ -741,7 +741,11 @@ class InfospaceExecutor:
                     logger.error(error_msg)
                     return self._create_uniform_return('failed', reason=error_msg)
         
-        logger.info(f"Executing action: {json.dumps(action)}")
+        # Truncate action log for readability (keep full data for execution)
+        action_str = json.dumps(action)
+        if len(action_str) > 128:
+            action_str = action_str[:125] + "..."
+        logger.info(f"Executing action: {action_str}")
         handler = handlers.get(action_type)
         if not handler:
             # Check if it's a dynamic tool (not a primitive)

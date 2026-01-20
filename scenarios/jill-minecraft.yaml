@@ -37,6 +37,14 @@ setting: |
   - Block above: `dx=0, dy=1, dz=0`
   - Current position: `dx=0, dy=0, dz=0`
   
+  ## Block Placement (mc-place)
+  
+  Placement requires an **anchor block** (existing solid block) and a **face**:
+  - `dx, dy, dz` specify anchor block position (relative to agent)
+  - `face` specifies which side of anchor to place against
+  - Block is placed adjacent to anchor face (not at anchor position)
+  - Common: Step up = anchor `(0, -1, 0)` with `face="top"` → places at agent_y
+  
   ## PERCEPTUAL_FRAME
     A dynamically updated, egocentric summary of the agent's immediate 3D surroundings (≈7-block radius).
     - Coordinates are **relative** to agent position: [dx, dy, dz]

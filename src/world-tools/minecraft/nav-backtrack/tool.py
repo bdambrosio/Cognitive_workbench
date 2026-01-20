@@ -54,16 +54,19 @@ def tool(input_value=None, **kwargs):
 
     def round_to_cardinal(yaw_deg: float) -> float:
         """Round yaw to nearest cardinal direction (0, 90, 180, 270)."""
-        cardinals = [0.0, 90.0, 180.0, 270.0]
         normalized = float(yaw_deg) % 360.0
-        return min(
-            cardinals,
-            key=lambda c: min(
-                abs(normalized - c),
-                abs(normalized - c + 360.0),
-                abs(normalized - c - 360.0),
-            ),
-        )
+        if normalized < 0:
+            normalized += 360.0
+        
+        # Thresholds at midpoints: 45°, 135°, 225°, 315°
+        if normalized < 45.0 or normalized >= 315.0:
+            return 0.0
+        elif normalized < 135.0:
+            return 90.0
+        elif normalized < 225.0:
+            return 180.0
+        else:  # normalized < 315.0
+            return 270.0
 
     def delta_to_direction(from_yaw: float, to_yaw: float) -> str:
         """

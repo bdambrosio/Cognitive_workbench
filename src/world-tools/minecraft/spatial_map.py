@@ -696,19 +696,41 @@ class SpatialMap:
             # Identify special properties
             is_hazard = b_name.replace('minecraft:', '') in HAZARD_BLOCKS
             
-            # Identify resources
-            resource_type = None
+            # Identify resources - store instance-specific block names
+            resource_block_name = None
             harvest_action = None
             b_lower = b_name.lower()
-            if 'ore' in b_lower:
-                resource_type = 'ore'; harvest_action = 'mine'
-            elif 'log' in b_lower or 'wood' in b_lower:
-                resource_type = 'wood'; harvest_action = 'chop'
-            elif 'crop' in b_lower or 'wheat' in b_lower or 'carrot' in b_lower:
-                resource_type = 'food_source'; harvest_action = 'harvest'
+            
+            # Normalize block name (ensure minecraft: prefix)
+            if not b_name.startswith('minecraft:'):
+                normalized_block_name = f'minecraft:{b_name.replace("minecraft:", "")}'
+            else:
+                normalized_block_name = b_name
+            
+            # Detect resource types (expanded detection)
+            # Ores: any block containing 'ore' or specific ore names
+            ore_keywords = ['coal', 'iron', 'gold', 'diamond', 'emerald', 'lapis', 'redstone', 'copper']
+            if 'ore' in b_lower or any(kw in b_lower for kw in ore_keywords):
+                resource_block_name = normalized_block_name
+                harvest_action = 'mine'
+            elif 'log' in b_lower or 'planks' in b_lower:
+                resource_block_name = normalized_block_name
+                harvest_action = 'chop'
+            elif 'crop' in b_lower or 'wheat' in b_lower or 'carrot' in b_lower or 'potato' in b_lower or 'beetroot' in b_lower:
+                resource_block_name = normalized_block_name
+                harvest_action = 'harvest'
+            elif any(kw in b_lower for kw in ['stone', 'cobblestone', 'granite', 'diorite', 'andesite', 'deepslate', 'blackstone', 'basalt']):
+                resource_block_name = normalized_block_name
+                harvest_action = 'mine'  # Stone is mined
+            elif any(kw in b_lower for kw in ['dirt', 'grass_block', 'podzol', 'mycelium', 'coarse_dirt', 'rooted_dirt', 'mud']):
+                resource_block_name = normalized_block_name
+                harvest_action = 'dig'  # Dirt is dug
+            elif any(kw in b_lower for kw in ['sand', 'red_sand', 'gravel', 'soul_sand', 'soul_soil']):
+                resource_block_name = normalized_block_name
+                harvest_action = 'dig'  # Sand/gravel is dug
                 
             # Only update if we have something interesting
-            if is_hazard or resource_type:
+            if is_hazard or resource_block_name:
                 modified = False
                 
                 if is_hazard:
@@ -725,9 +747,10 @@ class SpatialMap:
                         b_cell['hazards']['exposure_risk'] = 'high'
                         modified = True
                         
-                if resource_type:
-                    if resource_type not in b_cell['resources']['resources_visible']:
-                        b_cell['resources']['resources_visible'].append(resource_type)
+                if resource_block_name:
+                    # Store instance-specific block name
+                    if resource_block_name not in b_cell['resources']['resources_visible']:
+                        b_cell['resources']['resources_visible'].append(resource_block_name)
                         if harvest_action and harvest_action not in b_cell['resources']['harvest_actions']:
                             b_cell['resources']['harvest_actions'].append(harvest_action)
                         modified = True
@@ -1141,10 +1164,54 @@ class SpatialMap:
     # --- Resource Queries ---
     
     def cells_with_resource(self, resource_type: str) -> List[Dict[str, Any]]:
-        """Get cells with visible resources of specified type."""
-        return self.cells_matching(
-            lambda c: resource_type in c.get('resources', {}).get('resources_visible', [])
-        )
+        """
+        Get cells with visible resources matching specified type.
+        
+        Supports both instance-specific queries (e.g., 'minecraft:oak_log', 'oak_log') and
+        generic queries (e.g., 'wood' matches all log/plank types).
+        """
+        # Normalize input (handle with/without minecraft: prefix)
+        original_query = resource_type
+        query_normalized = resource_type.lower()
+        if not query_normalized.startswith('minecraft:'):
+            query_normalized = f'minecraft:{query_normalized}'
+        
+        # Generic type patterns for matching
+        generic_patterns = {
+            'wood': ['log', 'planks'],
+            'ore': ['ore', 'coal', 'iron', 'gold', 'diamond', 'emerald', 'lapis', 'redstone', 'copper'],
+            'food_source': ['crop', 'wheat', 'carrot', 'potato', 'beetroot'],
+            'stone': ['stone', 'cobblestone', 'granite', 'diorite', 'andesite', 'deepslate', 'blackstone', 'basalt'],
+            'dirt': ['dirt', 'grass_block', 'podzol', 'mycelium', 'coarse_dirt', 'rooted_dirt', 'mud'],
+            'sand': ['sand', 'red_sand', 'gravel', 'soul_sand', 'soul_soil'],
+        }
+        
+        # Determine if this is a generic type query
+        # Remove minecraft: prefix for comparison
+        query_base = original_query.lower().replace('minecraft:', '')
+        generic_type = None
+        if query_base in generic_patterns:
+            generic_type = query_base
+        
+        def matches_resource(cell: Dict[str, Any]) -> bool:
+            resources = cell.get('resources', {}).get('resources_visible', [])
+            if not resources:
+                return False
+            
+            # Exact match (instance-specific) - check both normalized and original
+            if query_normalized in resources or original_query in resources:
+                return True
+            
+            # Generic match (if query is generic type)
+            if generic_type:
+                for res_block in resources:
+                    res_lower = res_block.lower().replace('minecraft:', '')
+                    if any(pattern in res_lower for pattern in generic_patterns[generic_type]):
+                        return True
+            
+            return False
+        
+        return self.cells_matching(matches_resource)
     
     def cells_harvestable_now(self, available_tools: List[str] = None) -> List[Dict[str, Any]]:
         """Get cells with resources harvestable with current tools."""

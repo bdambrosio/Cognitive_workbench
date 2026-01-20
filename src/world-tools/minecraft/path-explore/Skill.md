@@ -18,7 +18,7 @@ None. Operates using current agent state.
 
 Success (`status: "success"`):
 - `outcome`: `"no_frontier"` | `"reached"` | `"blocked"` | `"no_progress"` | `"status_failed"`
-- `target`: `{"x": int, "z": int}` — autonomously selected target position, present unless `outcome` is `"no_frontier"`
+- `target`: `{"dx": int, "dz": int}` — autonomously selected target position (relative coordinates), present unless `outcome` is `"no_frontier"`
 
 Failure (`status: "failed"`):
 - `reason`: `"path_frontier_failed"` | `"path_frontier_failed_allow_unknown"` | `"status_failed"`

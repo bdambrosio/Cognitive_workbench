@@ -39,6 +39,36 @@ DEFAULT_MINECRAFT_URL = os.getenv("MINECRAFT_URL", "http://localhost:3003")
 MAX_NAV_HISTORY = 100
 
 
+def _format_af1_text(af1: Dict) -> str:
+    """Compact AF1 string (best-effort)."""
+    if not isinstance(af1, dict):
+        return ""
+    yaw = af1.get("yaw", af1.get("yaw_cardinal"))
+    v = af1.get("vertical", {}) if isinstance(af1.get("vertical"), dict) else {}
+    nav = af1.get("nav", {}) if isinstance(af1.get("nav"), dict) else {}
+    climb = nav.get("climb", nav.get("climb_forward_by_yaw", {}))
+    placement = af1.get("placement", {}) if isinstance(af1.get("placement"), dict) else {}
+    pending_targets = placement.get("pending_targets", []) if isinstance(placement.get("pending_targets"), list) else []
+    anchors = af1.get("anchors", []) if isinstance(af1.get("anchors"), list) else []
+    lines = [
+        f"AF1 yaw={yaw}",
+        f"Vertical: support_depth={v.get('support_depth','unknown')} gap_like={bool(v.get('gap_like'))} up_blk={v.get('up_blk', v.get('up_block'))} down_blk={v.get('down_blk', v.get('down_block'))}",
+    ]
+    if isinstance(climb, dict) and climb:
+        # Support both v2 and v0.1 formats
+        if any(isinstance(climb.get(k), str) for k in ("0", "90", "180", "270")):
+            climb_s = " ".join([f"{k}:{climb.get(k,'?')}" for k in ("0", "90", "180", "270")])
+        else:
+            climb_s = " ".join([f"{k}:{(climb.get(k, {}) or {}).get('status','?')}" for k in ("0", "90", "180", "270")])
+        lines.append(f"nav-climb by yaw: {climb_s}")
+    if pending_targets:
+        lines.append(f"placement: pending_targets={len(pending_targets)} (must mc-observe next)")
+    if anchors:
+        a0 = anchors[0]
+        lines.append(f"anchors: n={len(anchors)} anchor0={[a0.get('dx'), a0.get('dy'), a0.get('dz')]} faces={a0.get('faces')}")
+    return "\n".join(lines).strip()
+
+
 def _calculate_snap_position_and_yaw(start_pos: Dict, end_pos: Dict, current_yaw: Optional[float] = None) -> Tuple[Dict, float, float]:
     """
     Calculate block center position and yaw from movement.

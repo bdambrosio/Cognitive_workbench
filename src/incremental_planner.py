@@ -1697,24 +1697,28 @@ ALWAYS follow all formatting instructions exactly.
                 break
 
             # --- STAGE 2-PRE: Agent-State Hypotheses ---
-            # Get perceptual frame if available (Minecraft-specific)
-            perceptual_frame_text = None
+            # Get observed voxel grid and AF1 if available (Minecraft-specific)
+            voxel_grid_text = None
+            af1_text = None
             if executor and executor.world_name == "minecraft":
                 try:
-                    frame_data = executor.get_world_state("perceptual_frame")
-                    if frame_data:
-                        # Import PerceptionFrame only when needed
-                        import sys
-                        from pathlib import Path
-                        current_dir = Path(__file__).parent
-                        voxel_model_dir = current_dir / "world-tools" / "minecraft" / "voxel_affordance_model"
-                        if voxel_model_dir.exists():
-                            sys.path.insert(0, str(voxel_model_dir))
-                            from perceptual_frame import PerceptionFrame  # type: ignore
-                            frame = PerceptionFrame.from_json(frame_data)
-                            perceptual_frame_text = frame.pretty_print()
+                    # Import local_grid module for observed voxel grid extraction
+                    import sys
+                    import os
+                    current_dir = os.path.dirname(__file__)
+                    minecraft_tools_root = os.path.abspath(os.path.join(current_dir, "world-tools", "minecraft"))
+                    if minecraft_tools_root not in sys.path:
+                        sys.path.insert(0, minecraft_tools_root)
+                    from local_grid import get_observed_voxel_grid_as_text  # type: ignore
+                    voxel_grid_text = get_observed_voxel_grid_as_text(executor, radius=2)
                 except Exception:
-                    # Non-fatal - just skip perceptual frame if unavailable
+                    # Non-fatal - just skip voxel grid if unavailable
+                    pass
+                try:
+                    af1_text_val = executor.get_world_state("af1_text")
+                    if isinstance(af1_text_val, str) and af1_text_val.strip():
+                        af1_text = af1_text_val.strip()
+                except Exception:
                     pass
             
             # Build STAGE 2-PRE prompt
@@ -1723,12 +1727,14 @@ ALWAYS follow all formatting instructions exactly.
                 f"#GOAL: {goal_for_step}\n#END GOAL\n",
                 f"CURRENT_TASK: {current_task}\n\n"
             ]
-            if perceptual_frame_text:
-                prompt_parts.append(f"""#PERCEPTUAL_FRAME:\nA perceptual summary of the immediate environment relative to the agent. 
-It categorizes local cells by structures (e.g., surface, unknown, void), affordances (e.g., dig, place), and risks (e.g., suffocation:high).
-Coordinates are relative: [dx, dy, dz] from agent position.
-{perceptual_frame_text}
-#END PERCEPTUAL_FRAME\n\n""")
+            if voxel_grid_text:
+                prompt_parts.append(f"""#OBSERVED_VOXEL_GRID:\nExplicit voxel grid centered on agent (radius=1). Coordinates are relative: [dx, dy, dz].
+Each cell shows: block_id, solid (true/false), support (true/false).
+This is the only planner-visible structure that supports direct (dx,dy,dz) usage for tool arguments.
+{voxel_grid_text}
+#END OBSERVED_VOXEL_GRID\n\n""")
+            if af1_text:
+                prompt_parts.append(f"""#AF1:\nContract-aware actionability summary (deterministic, derived from mc-observe).\n{af1_text}\n#END AF1\n\n""")
             prompt_parts.append("Before choosing any tool, infer AGENT-STATE HYPOTHESES and AGENT-STATE-SUPPORT. Refer to STAGE 2-PRE Instructions.\n")
             
             s += user("".join(prompt_parts))

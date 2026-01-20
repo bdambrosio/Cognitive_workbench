@@ -9,6 +9,7 @@ import requests
 import sys
 from pathlib import Path
 from typing import Any, Dict
+import time
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +28,36 @@ from nav_core import dx_dy_dz_to_absolute
 
 # Default Minecraft bot server URL (can be overridden via environment variable or config)
 DEFAULT_MINECRAFT_URL = os.getenv("MINECRAFT_URL", "http://localhost:3003")
+
+
+def _format_af1_text(af1: Dict[str, Any]) -> str:
+    """Compact AF1 string (best-effort)."""
+    if not isinstance(af1, dict):
+        return ""
+    yaw = af1.get("yaw", af1.get("yaw_cardinal"))
+    v = af1.get("vertical", {}) if isinstance(af1.get("vertical"), dict) else {}
+    nav = af1.get("nav", {}) if isinstance(af1.get("nav"), dict) else {}
+    climb = nav.get("climb", nav.get("climb_forward_by_yaw", {}))
+    placement = af1.get("placement", {}) if isinstance(af1.get("placement"), dict) else {}
+    pending_targets = placement.get("pending_targets", []) if isinstance(placement.get("pending_targets"), list) else []
+    anchors = af1.get("anchors", []) if isinstance(af1.get("anchors"), list) else []
+    lines = [
+        f"AF1 yaw={yaw}",
+        f"Vertical: support_depth={v.get('support_depth','unknown')} gap_like={bool(v.get('gap_like'))} up_blk={v.get('up_blk', v.get('up_block'))} down_blk={v.get('down_blk', v.get('down_block'))}",
+    ]
+    if isinstance(climb, dict) and climb:
+        # Support both v2 and v0.1 formats
+        if any(isinstance(climb.get(k), str) for k in ("0", "90", "180", "270")):
+            climb_s = " ".join([f"{k}:{climb.get(k,'?')}" for k in ("0", "90", "180", "270")])
+        else:
+            climb_s = " ".join([f"{k}:{(climb.get(k, {}) or {}).get('status','?')}" for k in ("0", "90", "180", "270")])
+        lines.append(f"nav-climb by yaw: {climb_s}")
+    if pending_targets:
+        lines.append(f"placement: pending_targets={len(pending_targets)} (must mc-observe next)")
+    if anchors:
+        a0 = anchors[0]
+        lines.append(f"anchors: n={len(anchors)} anchor0={[a0.get('dx'), a0.get('dy'), a0.get('dz')]} faces={a0.get('faces')}")
+    return "\n".join(lines).strip()
 
 
 def tool(input_value=None, **kwargs):
@@ -76,6 +107,7 @@ def tool(input_value=None, **kwargs):
     dx = float(dx)
     dy = float(dy)
     dz = float(dz)
+    dx_req, dy_req, dz_req = dx, dy, dz
     
     # Get agent position to convert dx,dy,dz to absolute
     try:
@@ -118,6 +150,7 @@ def tool(input_value=None, **kwargs):
     
     # Face is required (convert "top"/"bottom" to "up"/"down" if needed)
     face = kwargs.get("face")
+    face_for_af1 = face
     if not face:
         return executor._create_uniform_return(
             'failed',
@@ -205,6 +238,27 @@ def tool(input_value=None, **kwargs):
                 logger.debug(f"mc-place: spatial map update failed (non-fatal): {map_update_result.get('reason', 'unknown')}")
         except Exception as e:
             logger.debug(f"mc-place: spatial map update skipped (non-fatal): {e}")
+
+        # AF1 v2: record pending placement target (clears on next successful mc-observe)
+        try:
+            af1 = executor.get_world_state("af1")
+            if not isinstance(af1, dict):
+                af1 = {"af1_version": "2"}
+            placement = af1.get("placement")
+            if not isinstance(placement, dict):
+                placement = {}
+            pending_targets = placement.get("pending_targets")
+            if not isinstance(pending_targets, list):
+                pending_targets = []
+            af1["af1_version"] = "2"
+            pending_targets.insert(0, {"dx": float(dx_req), "dy": float(dy_req), "dz": float(dz_req), "face": str(face_for_af1)})
+            placement["pending_targets"] = pending_targets[:3]
+            placement["pending"] = bool(placement["pending_targets"])
+            af1["placement"] = placement
+            executor.set_world_state("af1", af1)
+            executor.set_world_state("af1_text", _format_af1_text(af1))
+        except Exception:
+            pass
         
         return executor._create_uniform_return('success', value=result_text, extra=extra_metadata)
     except requests.exceptions.RequestException as e:

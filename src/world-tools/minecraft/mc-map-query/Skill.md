@@ -27,6 +27,9 @@ Query-specific parameters:
 - `max_delta_y`: Max Y change for `cells-reachable` (default: 1)
 - `min_dist`: Minimum distance for `cells-observed-from-distance`
 - `resource_type`: Resource type for `cells-with-resource`
+  - Generic types: `'wood'`, `'ore'`, `'food_source'`, `'stone'`, `'dirt'`, `'sand'` (matches all instances)
+  - Instance-specific: `'minecraft:oak_log'`, `'oak_log'`, `'minecraft:coal_ore'`, etc. (exact match)
+  - `minecraft:` prefix optional (automatically normalized)
 - `predicate`: Filter for `cells-nearest` (walkable, safe, hazard, resource)
 
 **Important**: Some queries now support query-time computation when `y` (and optionally `x`, `z`) are provided:
@@ -60,6 +63,8 @@ Safety / Survival:
 
 Resources:
 - `cells-with-resource`: Cells with specified resource type
+  - Accepts generic types (`'wood'`, `'ore'`, `'food_source'`, `'stone'`, `'dirt'`, `'sand'`) or instance-specific (`'minecraft:oak_log'`, `'coal_ore'`, etc.)
+  - Generic queries match all instances (e.g., `'wood'` matches all log/plank types)
 - `cells-with-item-entities`: Cells with visible dropped-item entities (ephemeral resources)
 - `cells-water-source`: Cells with water
 
@@ -96,6 +101,21 @@ Safe cells nearby:
 Find water:
 ```json
 {"type":"mc-map-query","query":"cells-water-source"}
+```
+
+Find wood (generic - matches all log/plank types):
+```json
+{"type":"mc-map-query","query":"cells-with-resource","resource_type":"wood"}
+```
+
+Find specific wood type:
+```json
+{"type":"mc-map-query","query":"cells-with-resource","resource_type":"minecraft:oak_log"}
+```
+
+Find ore (generic - matches all ore types):
+```json
+{"type":"mc-map-query","query":"cells-with-resource","resource_type":"ore"}
 ```
 
 Nearest walkable:
