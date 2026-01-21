@@ -19,7 +19,10 @@ Block placement for building, construction, and terrain modification. Asynchrono
 - Reference block position: `dx`, `dy`, `dz` (agent-relative offsets to **anchor block**, floats, all required)
   - `dx`: Right (+) / Left (-), `dy`: Up (+) / Down (-), `dz`: Forward (+) / Back (-)
   - These specify the **anchor block** (existing solid block), NOT the placement destination
-- `face`: String - face of anchor block to place against (absolute: "top", "bottom", "north", "south", "east", "west") - REQUIRED
+- `face`: String - face of anchor block to place against - REQUIRED
+  - **Agent-relative (recommended)**: `"forward"`, `"back"`, `"left"`, `"right"`, `"up"`, `"down"`
+  - **Absolute (legacy)**: `"top"`, `"bottom"`, `"north"`, `"south"`, `"east"`, `"west"`
+  - Agent-relative faces are automatically converted based on current yaw
 
 ## Output
 
@@ -65,13 +68,27 @@ Returns uniform_return format with:
 - Destination must NOT overlap agent's hitbox (feet block or body block above)
 - Block is placed adjacent to anchor block face
 
-**Face Semantics:**
-- `face="top"`: Block placed **above** anchor → destination at `(anchor.x, anchor.y + 1, anchor.z)`
-- `face="bottom"`: Block placed **below** anchor → destination at `(anchor.x, anchor.y - 1, anchor.z)`
+**Face Semantics (Agent-Relative - Recommended):**
+- `face="up"`: Block placed **above** anchor
+- `face="down"`: Block placed **below** anchor
+- `face="forward"`: Block placed in agent's forward direction from anchor
+- `face="back"`: Block placed behind anchor (opposite of forward)
+- `face="right"`: Block placed to agent's right from anchor
+- `face="left"`: Block placed to agent's left from anchor
+
+**Face Semantics (Absolute - Legacy):**
+- `face="top"`: Same as `"up"` → destination at `(anchor.x, anchor.y + 1, anchor.z)`
+- `face="bottom"`: Same as `"down"` → destination at `(anchor.x, anchor.y - 1, anchor.z)`
 - `face="north"`: Block placed north of anchor → destination at `(anchor.x, anchor.y, anchor.z - 1)`
 - `face="south"`: Block placed south of anchor → destination at `(anchor.x, anchor.y, anchor.z + 1)`
 - `face="east"`: Block placed east of anchor → destination at `(anchor.x + 1, anchor.y, anchor.z)`
 - `face="west"`: Block placed west of anchor → destination at `(anchor.x - 1, anchor.y, anchor.z)`
+
+**Note:** Agent-relative faces are converted to absolute faces using current yaw:
+- Yaw 0° (South): forward=south, right=west, back=north, left=east
+- Yaw 90° (West): forward=west, right=north, back=east, left=south
+- Yaw 180° (North): forward=north, right=east, back=south, left=west
+- Yaw 270° (East): forward=east, right=south, back=west, left=north
 
 **Common Patterns:**
 
@@ -107,27 +124,28 @@ Returns uniform_return format with:
 
 **Pillar up (safe for standing agent):**
 ```json
-{"type":"mc-place","value":"cobblestone","dx":0,"dy":-1,"dz":1,"face":"top","out":"$pillar_step"}
+{"type":"mc-place","value":"cobblestone","dx":0,"dy":-1,"dz":1,"face":"up","out":"$pillar_step"}
 ```
-Anchor: block forward and below. Face: top. Result: block at `(0, 0, 1)` - forward at feet level.
+Anchor: block forward and below. Face: up. Result: block at `(0, 0, 1)` - forward at feet level.
 Then walk onto it with nav-move, repeat to ascend. ✅ Safe approach for gaining height.
 
 **Bridge forward:**
 ```json
-{"type":"mc-place","value":"cobblestone","dx":0,"dy":-1,"dz":1,"face":"top","out":"$bridge"}
+{"type":"mc-place","value":"cobblestone","dx":0,"dy":-1,"dz":1,"face":"up","out":"$bridge"}
 ```
-Anchor: block forward and below. Face: top. Result: block at forward position, agent_y level.
+Anchor: block forward and below. Face: up. Result: block at forward position, agent_y level.
 ✅ Safe for standing agents.
 
 **Step up (⚠️ ONLY while jumping):**
 ```json
-{"type":"mc-place","value":"dirt","dx":0,"dy":-1,"dz":0,"face":"top","out":"$step"}
+{"type":"mc-place","value":"dirt","dx":0,"dy":-1,"dz":0,"face":"up","out":"$step"}
 ```
-Anchor: block below agent. Face: top. Result: block at agent_y.
+Anchor: block below agent. Face: up. Result: block at agent_y.
 ⚠️ **Fails with `placement_overlaps_agent` if agent is standing!** Only use mid-jump.
 
-**Place adjacent (lateral):**
+**Place adjacent (lateral) - using agent-relative face:**
 ```json
-{"type":"mc-place","value":"stone","dx":1,"dy":0,"dz":0,"face":"west","out":"$wall"}
+{"type":"mc-place","value":"stone","dx":1,"dy":0,"dz":0,"face":"left","out":"$wall"}
 ```
-Anchor: block to the right of agent. Face: west. Result: block placed between agent and anchor.
+Anchor: block to the right of agent. Face: left. Result: block placed between agent and anchor.
+✅ Works regardless of yaw - "left" is always toward the agent from the anchor at dx=+1.

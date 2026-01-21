@@ -25,7 +25,7 @@ _THIS_DIR = os.path.dirname(__file__)
 _NAV_CORE_DIR = os.path.abspath(os.path.join(_THIS_DIR, ".."))
 if _NAV_CORE_DIR not in sys.path:
     sys.path.insert(0, _NAV_CORE_DIR)
-from nav_core import dx_dy_dz_to_absolute, ensure_grid_aligned
+from nav_core import dx_dy_dz_to_absolute, ensure_grid_aligned, relative_face_to_absolute, RELATIVE_FACES, ABSOLUTE_FACES
 
 # Default Minecraft bot server URL (can be overridden via environment variable or config)
 DEFAULT_MINECRAFT_URL = os.getenv("MINECRAFT_URL", "http://localhost:3003")
@@ -111,21 +111,27 @@ def tool(input_value=None, **kwargs):
     dz = float(dz)
     dx_req, dy_req, dz_req = dx, dy, dz
     
-    # Face is required (convert "top"/"bottom" to "up"/"down" if needed)
+    # Face is required
     face = kwargs.get("face")
     face_for_af1 = face
     if not face:
         return executor._create_uniform_return(
             'failed',
-            value="face required (top, bottom, north, south, east, west)",
+            value="face required: relative (forward, back, left, right, up, down) or absolute (top, bottom, north, south, east, west)",
             reason="missing_face"
         )
-    if face == "top":
-        face = "up"
-    elif face == "bottom":
-        face = "down"
     
-    # Get agent position and yaw first (needed for coordinate conversion)
+    # Normalize top/bottom to up/down
+    face_lower = face.lower().strip()
+    if face_lower == "top":
+        face_lower = "up"
+    elif face_lower == "bottom":
+        face_lower = "down"
+    
+    # Check if face is relative (needs yaw-based conversion) or already absolute
+    face_is_relative = face_lower in RELATIVE_FACES and face_lower not in ("up", "down")
+    
+    # Get agent position and yaw first (needed for coordinate conversion AND relative face conversion)
     try:
         status_result = executor.execute_action_with_log({"type": "mc-status"}, "mc-place")
         if status_result.get("status") != "success":
@@ -151,6 +157,13 @@ def tool(input_value=None, **kwargs):
             reason="status_failed"
         )
 
+    # Convert relative face to absolute if needed (now that we have yaw)
+    if face_is_relative:
+        face_absolute = relative_face_to_absolute(face_lower, agent_yaw)
+        logger.debug(f"mc-place: Converted relative face '{face}' to absolute '{face_absolute}' (yaw={agent_yaw}°)")
+    else:
+        face_absolute = face_lower
+    
     # Face offset map in WORLD coordinates (bridge adds this to reference to get placement position)
     # north=-Z, south=+Z, east=+X, west=-X in Minecraft world coordinates
     face_offset_world_map = {
@@ -161,13 +174,16 @@ def tool(input_value=None, **kwargs):
         "east": (1, 0, 0),
         "west": (-1, 0, 0),
     }
-    face_offset_world = face_offset_world_map.get(face.lower())
+    face_offset_world = face_offset_world_map.get(face_absolute)
     if not face_offset_world:
         return executor._create_uniform_return(
             'failed',
-            value=f"invalid face '{face}' (must be: top, bottom, north, south, east, west)",
+            value=f"invalid face '{face}' (must be: relative [forward, back, left, right, up, down] or absolute [top, bottom, north, south, east, west])",
             reason="invalid_face"
         )
+    
+    # Use face_absolute for bridge API, but keep original face for logging/display
+    face = face_absolute
 
     # dx, dy, dz IS the anchor block position (agent-relative)
     # Bridge will use anchor + face_offset to determine placement target
