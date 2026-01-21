@@ -170,12 +170,12 @@ def tool(input_value=None, **kwargs):
         place_params["dz"] = 1.0
         place_params["face"] = "top"
     elif placement_policy == "lateral":
-        # Place block laterally forward: anchor at (0, 0, 1), face depends on yaw
-        # For simplicity, use "north" which places south of anchor (toward agent if facing north)
+        # Place block laterally forward: anchor at (0, 0, 1), face="back"
+        # Anchor is block forward, place back toward agent = between agent and anchor
         place_params["dx"] = 0.0
         place_params["dy"] = 0.0
         place_params["dz"] = 1.0
-        place_params["face"] = "north"
+        place_params["face"] = "back"
     
     # Main loop
     while attempt_count < max_attempts:

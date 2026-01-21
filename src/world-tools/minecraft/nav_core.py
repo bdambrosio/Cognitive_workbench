@@ -186,6 +186,90 @@ def world_to_agent_rel(world_dx: float, world_dy: float, world_dz: float, yaw: f
     return dx, world_dy, dz
 
 
+# Agent-relative face names (egocentric)
+RELATIVE_FACES = {"forward", "back", "left", "right", "up", "down"}
+
+# Absolute face names (world cardinals)
+ABSOLUTE_FACES = {"north", "south", "east", "west", "up", "down", "top", "bottom"}
+
+
+def relative_face_to_absolute(face: str, yaw: float) -> str:
+    """
+    Convert agent-relative face to absolute world face.
+    
+    Agent-relative faces:
+        - forward: direction agent is facing
+        - back: opposite of forward
+        - left: 90° counter-clockwise from forward
+        - right: 90° clockwise from forward
+        - up/down: unchanged (always vertical)
+    
+    Absolute faces (Minecraft world coordinates):
+        - north: -Z direction
+        - south: +Z direction
+        - east: +X direction
+        - west: -X direction
+        - up/down: unchanged
+    
+    Yaw convention (Minecraft):
+        - 0° = facing South (+Z)
+        - 90° = facing West (-X)
+        - 180° = facing North (-Z)
+        - 270° = facing East (+X)
+    
+    Args:
+        face: Agent-relative face name (forward, back, left, right, up, down)
+              OR already-absolute face (north, south, east, west, up, down, top, bottom)
+        yaw: Agent yaw in degrees (will be cardinal-snapped)
+    
+    Returns:
+        Absolute face name (north, south, east, west, up, down)
+        Returns input unchanged if already absolute or unrecognized.
+    """
+    face_lower = face.lower().strip()
+    
+    # Handle vertical faces (unchanged)
+    if face_lower in ("up", "down", "top", "bottom"):
+        return "up" if face_lower in ("up", "top") else "down"
+    
+    # If already absolute, return as-is
+    if face_lower in ("north", "south", "east", "west"):
+        return face_lower
+    
+    # Cardinal-snap yaw
+    yaw = _round_to_cardinal(yaw)
+    
+    # Mapping from yaw to absolute forward direction
+    # yaw 0° = south, 90° = west, 180° = north, 270° = east
+    yaw_to_forward = {
+        0.0: "south",
+        90.0: "west",
+        180.0: "north",
+        270.0: "east",
+    }
+    
+    # Derive all directions from forward
+    forward = yaw_to_forward.get(yaw, "south")
+    
+    # Clockwise rotation: south -> west -> north -> east -> south
+    rotation_order = ["south", "west", "north", "east"]
+    fwd_idx = rotation_order.index(forward)
+    
+    direction_map = {
+        "forward": rotation_order[fwd_idx],
+        "right": rotation_order[(fwd_idx + 1) % 4],
+        "back": rotation_order[(fwd_idx + 2) % 4],
+        "left": rotation_order[(fwd_idx + 3) % 4],
+    }
+    
+    result = direction_map.get(face_lower)
+    if result:
+        return result
+    
+    # Unrecognized face - return as-is (let caller handle error)
+    return face
+
+
 def dx_dy_dz_to_absolute(dx: float, dy: float, dz: float, agent_pos: Dict[str, float], yaw: Optional[float] = None) -> Tuple[int, int, int]:
     """
     Convert agent-relative coordinates (dx, dy, dz) to absolute block coordinates.
@@ -331,4 +415,54 @@ def update_nav_state(
         nav_list = nav_list[:MAX_NAV_HISTORY]
 
     executor.set_world_state("nav", nav_list)
+
+
+if __name__ == "__main__":
+    # Unit tests for relative_face_to_absolute
+    print("Testing relative_face_to_absolute:")
+    
+    # Expected mappings for each yaw
+    expected = {
+        0.0: {"forward": "south", "back": "north", "left": "east", "right": "west"},
+        90.0: {"forward": "west", "back": "east", "left": "south", "right": "north"},
+        180.0: {"forward": "north", "back": "south", "left": "west", "right": "east"},
+        270.0: {"forward": "east", "back": "west", "left": "north", "right": "south"},
+    }
+    
+    errors = []
+    for yaw, mappings in expected.items():
+        for rel_face, expected_abs in mappings.items():
+            actual = relative_face_to_absolute(rel_face, yaw)
+            if actual != expected_abs:
+                errors.append(f"yaw={yaw}, face={rel_face}: expected {expected_abs}, got {actual}")
+            else:
+                print(f"  ✓ yaw={yaw}° {rel_face} -> {actual}")
+    
+    # Test vertical faces (unchanged)
+    for face in ["up", "down"]:
+        for yaw in [0.0, 90.0, 180.0, 270.0]:
+            actual = relative_face_to_absolute(face, yaw)
+            if actual != face:
+                errors.append(f"yaw={yaw}, face={face}: expected {face}, got {actual}")
+    print("  ✓ up/down pass through unchanged")
+    
+    # Test absolute faces pass through
+    for face in ["north", "south", "east", "west"]:
+        actual = relative_face_to_absolute(face, 0.0)
+        if actual != face:
+            errors.append(f"absolute face={face}: expected {face}, got {actual}")
+    print("  ✓ absolute faces pass through unchanged")
+    
+    # Test top/bottom normalization
+    assert relative_face_to_absolute("top", 0.0) == "up"
+    assert relative_face_to_absolute("bottom", 0.0) == "down"
+    print("  ✓ top/bottom normalized to up/down")
+    
+    if errors:
+        print(f"\n❌ {len(errors)} errors:")
+        for e in errors:
+            print(f"  {e}")
+        exit(1)
+    else:
+        print("\n✓ All tests passed!")
 
