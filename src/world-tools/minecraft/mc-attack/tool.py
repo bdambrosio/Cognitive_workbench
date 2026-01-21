@@ -67,7 +67,7 @@ def tool(input_value=None, **kwargs):
         if dx is None or dy is None or dz is None:
             return executor._create_uniform_return(
                 'failed',
-                value="target required: entity_id OR (dx, dy, dz - world-relative offsets from agent)",
+                value="target required: entity_id OR (dx, dy, dz - agent-relative offsets from agent)",
                 reason="missing_target"
             )
         
@@ -84,7 +84,9 @@ def tool(input_value=None, **kwargs):
                     value="Failed to get agent position for coordinate conversion",
                     reason="status_failed"
                 )
-            agent_pos = status_result.get("data", {}).get("position", {})
+            status_data = status_result.get("data", {})
+            agent_pos = status_data.get("position", {})
+            agent_yaw = status_data.get("yaw", 0.0)
             if not isinstance(agent_pos, dict):
                 return executor._create_uniform_return(
                     'failed',
@@ -99,8 +101,8 @@ def tool(input_value=None, **kwargs):
                 reason="status_failed"
             )
         
-        # Convert dx,dy,dz to absolute block coordinates
-        abs_x, abs_y, abs_z = dx_dy_dz_to_absolute(dx, dy, dz, agent_pos)
+        # Convert agent-relative dx,dy,dz to absolute block coordinates
+        abs_x, abs_y, abs_z = dx_dy_dz_to_absolute(dx, dy, dz, agent_pos, yaw=agent_yaw)
         
         # Pass absolute to bridge
         attack_params["pos"] = {

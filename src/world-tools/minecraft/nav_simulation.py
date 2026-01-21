@@ -62,6 +62,7 @@ def simulate_nav_step(
     Args:
         state:
             Dict with keys {"x","y","z","yaw"} (block-centered coordinates)
+            state["y"] is the agent's feet block coordinate (where agent stands)
         action:
             One of {"nav-move", "nav-descend", "nav-climb"}
         query_cell:

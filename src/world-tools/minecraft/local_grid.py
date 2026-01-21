@@ -21,11 +21,14 @@ Training Data Capture:
 from __future__ import annotations
 
 import json
+import logging
 import math
 import os
 import time
 from pathlib import Path
 from typing import Any, Dict, Iterable, Optional, Tuple
+
+logger = logging.getLogger(__name__)
 
 try:
     import zstandard as zstd
@@ -35,12 +38,7 @@ except ImportError:
 
 
 WORLD_STATE_KEY = "local_grid"
-PERCEPTUAL_FRAME_KEY = "perceptual_frame"
-L0_PIPELINE_INITIALIZED_KEY = "_l0_inference_initialized"
 DEFAULT_RADIUS = 10
-
-# Module-level cache for inference pipelines (keyed by executor id)
-_pipeline_cache: Dict[int, Any] = {}
 
 # Block classification constants (from existing code)
 HAZARD_BLOCKS = {'lava', 'fire', 'cactus', 'magma_block', 'soul_fire', 'wither_rose', 'sweet_berry_bush', 'campfire', 'soul_campfire'}
@@ -123,188 +121,108 @@ def get_or_init(executor: Any, *, radius: int = DEFAULT_RADIUS) -> Dict[str, Any
     return grid
 
 
-def init_l0_inference(executor: Any) -> None:
+def check_cell_safety(executor: Any, dx: int, dy: int, dz: int) -> Optional[Dict[str, Any]]:
     """
-    Initialize L0 inference pipeline. Called from init tool.
-    On error, logs and continues (non-fatal).
-    """
-    import logging
-    logger = logging.getLogger(__name__)
+    Deterministic safety check for a cell at agent-relative position (dx, dy, dz) from agent.
+    Returns dict with safety flags or None if cell is unknown.
+    Used by path-frontier to replace PERCEPTUAL_FRAME checks.
     
-    executor_id = id(executor)
+    Args:
+        dx: Agent-relative X (right+/left-)
+        dy: Agent-relative Y (up+/down-)
+        dz: Agent-relative Z (forward+/back-)
     
-    # Clean up any old pipeline objects from world_state (from previous code version)
-    old_pipeline_key = "_l0_inference_pipeline"
-    old_pipeline = executor.get_world_state(old_pipeline_key)
-    if old_pipeline is not None:
-        logger.info("Cleaning up old pipeline object from world_state")
-        executor.set_world_state(old_pipeline_key, None)
-    
-    # Check if already initialized
-    if executor_id in _pipeline_cache:
-        return
-    
-    try:
-        # Add voxel_affordance_model to path
-        import sys
-        from pathlib import Path
-        current_dir = Path(__file__).parent
-        voxel_model_dir = current_dir / "voxel_affordance_model"
-        if not voxel_model_dir.exists():
-            logger.warning("voxel_affordance_model directory not found, L0 inference disabled")
-            executor.set_world_state(PERCEPTUAL_FRAME_KEY, None)
-            return
-        
-        sys.path.insert(0, str(voxel_model_dir))
-        
-        # Import inference pipeline (optional - only available when voxel_affordance_model repo exists)
-        from voxel_l0_inference import InferencePipeline  # type: ignore
-        
-        # Model path relative to voxel_affordance_model directory
-        model_path = str(voxel_model_dir / "models" / "voxel_l0_model")
-        
-        # Initialize pipeline (CUDA default with CPU fallback)
-        pipeline = InferencePipeline(model_path=model_path, device="cuda")
-        
-        # Store in module-level cache (not world_state - not JSON serializable)
-        _pipeline_cache[executor_id] = pipeline
-        
-        # Store flag in world_state to indicate initialization
-        executor.set_world_state(L0_PIPELINE_INITIALIZED_KEY, True)
-        logger.info("L0 inference pipeline initialized successfully")
-        
-    except Exception as e:
-        logger.error(f"Failed to initialize L0 inference pipeline: {e}", exc_info=True)
-        executor.set_world_state(L0_PIPELINE_INITIALIZED_KEY, False)
-        executor.set_world_state(PERCEPTUAL_FRAME_KEY, None)
-
-
-def _normalize_block_name(name: str) -> str:
-    """
-    Normalize block name to ensure minecraft: prefix for L0 inference compatibility.
-    VoxelAffordanceModel expects namespace:block_id format.
-    """
-    if not name:
-        return "minecraft:air"
-    
-    name_str = str(name).strip()
-    
-    # Already has namespace prefix
-    if ":" in name_str:
-        return name_str
-    
-    # Add minecraft: prefix
-    return f"minecraft:{name_str}"
-
-
-def update_perceptual_frame(executor: Any, boundary: int = 1) -> None:
-    """
-    Run L0 inference on current grid and store perceptual frame.
-    Called after grid updates. Non-fatal if inference fails.
-    """
-    import logging
-    logger = logging.getLogger(__name__)
-    
-    executor_id = id(executor)
-    pipeline = _pipeline_cache.get(executor_id)
-    if pipeline is None:
-        return
-    
-    try:
-        grid = get_or_init(executor)
-        if not grid.get("cells"):
-            # Empty grid - set frame to None
-            executor.set_world_state(PERCEPTUAL_FRAME_KEY, None)
-            return
-        
-        # Debug: log grid stats and nearby blocks
-        center = grid.get("center", {})
-        cx = center.get("x", 0)
-        cy = center.get("y", 0)
-        cz = center.get("z", 0)
-        cell_count = len(grid.get("cells", {}))
-        
-        # Log blocks near agent position (within boundary+1)
-        nearby_blocks = []
-        cells = grid.get("cells", {})
-        for key, entry in cells.items():
-            if not isinstance(entry, dict):
-                continue
-            try:
-                x, y, z = map(int, key.split(","))
-                dx, dy, dz = x - cx, y - cy, z - cz
-                if abs(dx) <= boundary + 1 and abs(dy) <= boundary + 1 and abs(dz) <= boundary + 1:
-                    name = entry.get("name", "unknown")
-                    nearby_blocks.append(f"({dx},{dy},{dz})={name}")
-            except Exception:
-                continue
-        
-        logger.debug(f"L0 inference: center=({cx},{cy},{cz}), cells={cell_count}, boundary={boundary}")
-        logger.debug(f"L0 inference: nearby blocks (within ±{boundary+1}): {', '.join(nearby_blocks[:10])}")
-        
-        # Normalize grid block names for L0 inference (ensure minecraft: prefix)
-        normalized_grid = {
-            "center": grid.get("center", {}),
-            "radius": grid.get("radius", DEFAULT_RADIUS),
-            "cells": {}
+    Returns:
+        {
+            'has_hazard': bool,      # Hazard blocks detected in cell or adjacent
+            'is_void': bool,         # Air below for multiple levels (void-like)
+            'is_cliff': bool         # Significant drop detected
         }
-        for key, entry in cells.items():
-            if not isinstance(entry, dict):
-                continue
-            normalized_entry = entry.copy()
-            original_name = entry.get("name", "air")
-            normalized_entry["name"] = _normalize_block_name(original_name)
-            normalized_grid["cells"][key] = normalized_entry
-        
-        # Run inference with normalized grid
-        frame = pipeline.infer_partial_grid(normalized_grid, boundary=boundary)
-        
-        # Debug: log frame results
-        logger.debug(f"L0 inference result: structures={len(frame.structures)}, affordances={len(frame.affordances)}, risks={len(frame.risks)}")
-        if frame.structures:
-            for s in frame.structures:
-                logger.debug(f"  Structure: {s.dominant_type().value} (confidence={max(s.type_scores.values()):.3f}) at {s.anchor}")
-        if frame.risks:
-            for r in frame.risks:
-                logger.debug(f"  Risk: {r.type.value} ({r.severity.value}) at {r.source}")
-        
-        # Store frame (as dict for JSON serialization)
-        executor.set_world_state(PERCEPTUAL_FRAME_KEY, frame.to_json())
-        
-    except Exception as e:
-        logger.warning(f"L0 inference failed (non-fatal): {e}", exc_info=True)
-        executor.set_world_state(PERCEPTUAL_FRAME_KEY, None)
-
-
-def get_latest_perceptual_frame(executor: Any):
+        or None if cell data unavailable
     """
-    Get latest perceptual frame from world_state.
-    Returns PerceptionFrame object or None.
-    """
-    frame_data = executor.get_world_state(PERCEPTUAL_FRAME_KEY)
-    if frame_data is None:
+    grid = get_or_init(executor)
+    if not isinstance(grid, dict) or "center" not in grid:
         return None
     
-    try:
-        # Import only when needed
-        import sys
-        from pathlib import Path
-        current_dir = Path(__file__).parent
-        voxel_model_dir = current_dir / "voxel_affordance_model"
-        if voxel_model_dir.exists():
-            sys.path.insert(0, str(voxel_model_dir))
-            from perceptual_frame import PerceptionFrame  # type: ignore
-            return PerceptionFrame.from_json(frame_data)
-    except Exception:
-        pass
+    center = grid.get("center", {})
+    if not isinstance(center, dict):
+        return None
     
-    return None
+    cx = int(center.get("x", 0))
+    cy = int(center.get("y", 0))
+    cz = int(center.get("z", 0))
+    yaw = center.get("yaw", 0.0)
+    if yaw is None:
+        yaw = 0.0
+    
+    # Transform agent-relative to world-relative, then to absolute
+    try:
+        from nav_core import agent_rel_to_world
+        world_dx, world_dy, world_dz = agent_rel_to_world(float(dx), float(dy), float(dz), float(yaw))
+        abs_x = cx + int(round(world_dx))
+        abs_y = cy + int(round(world_dy))
+        abs_z = cz + int(round(world_dz))
+    except Exception:
+        # Fallback: treat as world-relative (should not happen)
+        abs_x = cx + int(dx)
+        abs_y = cy + int(dy)
+        abs_z = cz + int(dz)
+    
+    # Check for hazards in cell and adjacent cells (conservative)
+    has_hazard = False
+    for check_dx in (-1, 0, 1):
+        for check_dy in (-1, 0, 1):
+            for check_dz in (-1, 0, 1):
+                name = get_cell_name(executor, abs_x + check_dx, abs_y + check_dy, abs_z + check_dz)
+                if name and _is_hazard(name):
+                    has_hazard = True
+                    break
+            if has_hazard:
+                break
+        if has_hazard:
+            break
+    
+    # Check for void (air below for multiple levels)
+    is_void = False
+    void_check_depth = 3
+    void_air_count = 0
+    for check_y in range(abs_y - 1, abs_y - void_check_depth - 1, -1):
+        name = get_cell_name(executor, abs_x, check_y, abs_z)
+        if name is None:
+            break  # Unknown - can't determine void
+        if is_air_name(name):
+            void_air_count += 1
+        else:
+            break  # Hit solid block
+    is_void = (void_air_count >= void_check_depth)
+    
+    # Check for cliff (significant drop - check support_y differences)
+    is_cliff = False
+    # Simple heuristic: if cell below is air and cell 2 below is also air/unknown, likely cliff
+    below_name = get_cell_name(executor, abs_x, abs_y - 1, abs_z)
+    below2_name = get_cell_name(executor, abs_x, abs_y - 2, abs_z)
+    if below_name and is_air_name(below_name):
+        if below2_name is None or is_air_name(below2_name):
+            is_cliff = True
+    
+    return {
+        'has_hazard': has_hazard,
+        'is_void': is_void,
+        'is_cliff': is_cliff
+    }
 
 
 def get_observed_voxel_grid_as_text(executor: Any, radius: int = 1) -> Optional[str]:
     """
     Get observed voxel grid as LLM-friendly formatted string.
     Returns formatted text or None if grid unavailable.
+    
+    Coordinate semantics (agent-relative):
+    - (0,0,0) = agent's feet block
+    - (0,-1,0) = support block below
+    - dx: right(+)/left(-) relative to agent yaw
+    - dz: forward(+)/back(-) relative to agent yaw
+    - dy: up(+)/down(-) always vertical
     """
     voxel_grid = get_observed_voxel_grid(executor, radius=radius)
     if not voxel_grid:
@@ -319,8 +237,14 @@ def get_observed_voxel_grid_as_text(executor: Any, radius: int = 1) -> Optional[
     
     # Sort cells by dy (vertical), then dz, then dx for readability
     sorted_cells = sorted(cells, key=lambda c: (c.get("dy", 0), c.get("dz", 0), c.get("dx", 0)))
-    
+
+    # Extract agent's absolute position from grid center
+    center = voxel_grid.get("center", {})
+
     lines = [f"Observed voxel grid (radius={radius}): {len(cells)} cells"]
+    # Include agent's absolute position so planner knows where agent is
+    if center:
+        lines.append(f"Agent position: x={center.get('x', '?')}, y={center.get('y', '?')}, z={center.get('z', '?')}, yaw={center.get('yaw', '?')}")
     for cell in sorted_cells:
         dx = cell.get("dx", 0)
         dy = cell.get("dy", 0)
@@ -338,30 +262,23 @@ def get_observed_voxel_grid_as_text(executor: Any, radius: int = 1) -> Optional[
     return "\n".join(lines)
 
 
-def get_latest_perceptual_frame_as_str(executor: Any) -> Optional[str]:
-    """
-    Get latest perceptual frame as LLM-friendly formatted string.
-    Returns pretty_print() string or None if no frame available.
-    """
-    frame = get_latest_perceptual_frame(executor)
-    if frame is None:
-        return None
-    
-    try:
-        return frame.pretty_print()
-    except Exception:
-        # Fallback to summary if pretty_print fails
-        return frame.summary() if hasattr(frame, 'summary') else None
-
-
 def get_observed_voxel_grid(executor: Any, radius: int = 1) -> Optional[Dict[str, Any]]:
     """
     Extract observed voxel grid: radius-bounded explicit voxel grid centered on agent.
-    Planner-facing format with relative coordinates (dx, dy, dz).
+    Planner-facing format with agent-relative coordinates (dx, dy, dz).
     Extracts from local_grid (raw voxel data from mc-observe, not CNN inference results).
     
+    Coordinate semantics (agent-relative):
+    - center = floor(pose) = agent's feet block coordinate
+    - (0,0,0) = agent's feet block (where agent stands, typically air)
+    - (0,-1,0) = support block (what agent stands on, solid)
+    - (0,1,0) = head space (above agent)
+    - dx: right(+)/left(-) relative to agent yaw
+    - dz: forward(+)/back(-) relative to agent yaw
+    - dy: up(+)/down(-) always vertical
+    
     Returns dict with:
-    - "center": {"x", "y", "z"} (absolute, for reference)
+    - "center": {"x", "y", "z", "yaw"} (absolute, for reference)
     - "radius": int
     - "cells": [{"dx": int, "dy": int, "dz": int, "solid": bool, "block_id": str, "support": bool}, ...]
     
@@ -381,6 +298,24 @@ def get_observed_voxel_grid(executor: Any, radius: int = 1) -> Optional[Dict[str
     cx = int(center.get("x", 0))
     cy = int(center.get("y", 0))
     cz = int(center.get("z", 0))
+    yaw = center.get("yaw", 0.0)
+    if yaw is None:
+        logger.warning("get_observed_voxel_grid: Grid center yaw is None, defaulting to 0.0. "
+                      "This may cause incorrect coordinate transformations.")
+        yaw = 0.0
+    else:
+        # Validate yaw is cardinal (0, 90, 180, 270) - warn if not
+        yaw_float = float(yaw)
+        if yaw_float not in (0.0, 90.0, 180.0, 270.0):
+            logger.warning(f"get_observed_voxel_grid: Grid center yaw {yaw_float} is not cardinal. "
+                          "Expected 0, 90, 180, or 270. This may cause coordinate errors.")
+
+    # Import transformation function
+    try:
+        from nav_core import world_to_agent_rel
+    except Exception:
+        # Fallback: return world-relative if transformation unavailable
+        world_to_agent_rel = None
     
     cells = grid.get("cells", {})
     if not isinstance(cells, dict):
@@ -402,10 +337,21 @@ def get_observed_voxel_grid(executor: Any, radius: int = 1) -> Optional[Dict[str
         if not _within_radius(x, y, z, cx, cy, cz, radius):
             continue
         
-        # Compute relative coordinates
-        dx = x - cx
-        dy = y - cy
-        dz = z - cz
+        # Compute world-relative coordinates
+        world_dx = x - cx
+        dy = y - cy  # dy is always vertical, no transformation needed
+        world_dz = z - cz
+        
+        # Transform to agent-relative coordinates
+        if world_to_agent_rel is not None:
+            dx, _, dz = world_to_agent_rel(world_dx, dy, world_dz, yaw)
+            # Round to integers for discrete grid
+            dx = int(round(dx))
+            dz = int(round(dz))
+        else:
+            # Fallback: use world-relative (should not happen in normal operation)
+            dx = int(world_dx)
+            dz = int(world_dz)
         
         # Extract block name
         block_name = cell_data.get("name", "")
@@ -442,59 +388,12 @@ def get_observed_voxel_grid(executor: Any, radius: int = 1) -> Optional[Dict[str
         })
     
     return {
-        "center": {"x": cx, "y": cy, "z": cz},
+        "center": {"x": cx, "y": cy, "z": cz, "yaw": float(yaw)},
         "radius": radius,
         "cells": voxel_cells,
     }
 
 
-def get_perceptual_data_at_relative(executor: Any, dx: int, dy: int, dz: int) -> Optional[Dict[str, Any]]:
-    """
-    Get perceptual data (structures, affordances, risks) at relative position (dx, dy, dz) from agent.
-    Returns dict with keys: 'structures', 'affordances', 'risks', or None if no data.
-    Used by path-frontier to override spatial_map with current perceptual data.
-    """
-    frame = get_latest_perceptual_frame(executor)
-    if frame is None:
-        return None
-    
-    rel_pos = (dx, dy, dz)
-    result = {
-        'structures': [],
-        'affordances': [],
-        'risks': []
-    }
-    
-    # Find structures at this position
-    for s in frame.structures:
-        if s.anchor == rel_pos:
-            result['structures'].append({
-                'type_scores': {k.value: v for k, v in s.type_scores.items()},
-                'dominant_type': s.dominant_type().value,
-                'salience': s.salience
-            })
-    
-    # Find affordances at this position
-    for a in frame.affordances:
-        if a.target == rel_pos:
-            result['affordances'].append({
-                'type': a.type.value,
-                'salience': a.salience
-            })
-    
-    # Find risks at this position
-    for r in frame.risks:
-        if r.source == rel_pos:
-            result['risks'].append({
-                'type': r.type.value,
-                'severity': r.severity.value
-            })
-    
-    # Return None if no data found (so caller can fall back to spatial_map)
-    if not result['structures'] and not result['affordances'] and not result['risks']:
-        return None
-    
-    return result
 
 
 def prune(executor: Any) -> None:
@@ -567,6 +466,17 @@ def set_center_from_pose(executor: Any, pose: Dict[str, Any], *, radius: Optiona
         grid["radius"] = int(radius)
     cx, cy, cz = _block_coords_from_pose(pose)
     
+    # Store yaw (cardinal-snapped) for coordinate transformation
+    yaw = pose.get("yaw", 0.0)
+    if yaw is not None:
+        try:
+            from nav_core import _round_to_cardinal
+            yaw = _round_to_cardinal(float(yaw))
+        except Exception:
+            yaw = 0.0
+    else:
+        yaw = 0.0
+    
     # Check if position actually changed
     old_center = grid.get("center", {})
     old_cx = old_center.get("x", None)
@@ -574,7 +484,7 @@ def set_center_from_pose(executor: Any, pose: Dict[str, Any], *, radius: Optiona
     old_cz = old_center.get("z", None)
     position_changed = (old_cx != cx) or (old_cy != cy) or (old_cz != cz)
     
-    grid["center"] = {"x": cx, "y": cy, "z": cz}
+    grid["center"] = {"x": cx, "y": cy, "z": cz, "yaw": float(yaw)}
     executor.set_world_state(WORLD_STATE_KEY, grid)
     prune(executor)
     
@@ -625,8 +535,6 @@ def set_center_from_pose(executor: Any, pose: Dict[str, Any], *, radius: Optiona
             logger = logging.getLogger(__name__)
             logger.warning(f"Training capture failed (non-fatal): {e}")  # Don't break position updates
     
-    # Update perceptual frame after grid update
-    update_perceptual_frame(executor)
 
 
 def _classify_material(block_name: str) -> str:
@@ -712,8 +620,6 @@ def set_cell(executor: Any, x: int, y: int, z: int, name: str, *, world_tick: Op
     cells[_key(int(x), int(y), int(z))] = cell_data
     executor.set_world_state(WORLD_STATE_KEY, grid)
     
-    # Update perceptual frame after grid update
-    update_perceptual_frame(executor)
 
 
 def ingest_nearby_blocks(
@@ -757,9 +663,6 @@ def ingest_nearby_blocks(
         if not _within_radius(ax, ay, az, cx, cy, cz, radius):
             continue
         set_cell(executor, ax, ay, az, name, world_tick=world_tick)
-    
-    # Update perceptual frame after all cells ingested (set_center_from_pose already called inference, but update again with final state)
-    update_perceptual_frame(executor)
 
 
 def _compute_geometry_flags(executor: Any, x: int, y: int, z: int, name: str) -> Dict[str, bool]:
@@ -781,8 +684,9 @@ def _compute_geometry_flags(executor: Any, x: int, y: int, z: int, name: str) ->
         if below_name and not is_air_name(below_name):
             flags["support"] = True
         # Check head clearance above
+        # IMPORTANT: Only set head_clear=True when CONFIRMED air, not when unknown
         above_name = get_cell_name(executor, x, y + 1, z)
-        flags["head_clear"] = (above_name is None) or is_air_name(above_name)
+        flags["head_clear"] = above_name is not None and is_air_name(above_name)
     else:
         flags["passable"] = False
         flags["support"] = True  # Solid blocks provide support
@@ -938,9 +842,10 @@ def capture_training_sample(
         return None
     
     # Get current pose (from center + assume standing)
+    # center is the feet block, so agent Y = center Y (feet are at block coordinate level)
     pose = {
         "x": float(center.get("x", 0)) + 0.5,
-        "y": float(center.get("y", 0)) + 1.0,  # Agent feet at center Y + 1
+        "y": float(center.get("y", 0)),  # Agent feet at center Y (feet block coordinate level)
         "z": float(center.get("z", 0)) + 0.5,
         "yaw": 0.0,  # TODO: get from nav state
         "pitch": 0.0,

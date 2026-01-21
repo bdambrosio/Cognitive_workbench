@@ -138,32 +138,88 @@ def _round_to_cardinal(yaw: float) -> float:
         return 270.0
 
 
-def dx_dy_dz_to_absolute(dx: float, dy: float, dz: float, agent_pos: Dict[str, float]) -> Tuple[int, int, int]:
+def agent_rel_to_world(dx: float, dy: float, dz: float, yaw: float) -> Tuple[float, float, float]:
     """
-    Convert world-relative coordinates (dx, dy, dz) to absolute block coordinates.
+    Convert agent-relative coordinates to world-relative coordinates.
     
     Args:
-        dx: World-relative X offset (positive = east, negative = west)
-        dy: World-relative Y offset (positive = up, negative = down)
-        dz: World-relative Z offset (positive = south, negative = north)
-        agent_pos: Agent position dict with 'x', 'y', 'z' keys
+        dx: Agent-relative X offset (positive = right, negative = left)
+        dy: Agent-relative Y offset (positive = up, negative = down) - unchanged
+        dz: Agent-relative Z offset (positive = forward, negative = back)
+        yaw: Agent yaw in degrees (cardinal: 0, 90, 180, 270)
+    
+    Returns:
+        Tuple of (world_dx, world_dy, world_dz) as floats
+        - world_dx: World-relative X (positive = east, negative = west)
+        - world_dy: World-relative Y (same as dy, always vertical)
+        - world_dz: World-relative Z (positive = south, negative = north)
+    """
+    yaw_rad = math.radians(yaw)
+    # Transform agent-relative (right/forward) to world-relative (east/south)
+    # Fixed: forward (dz=+1) at yaw=0° maps to south (world_dz=+1), not north
+    world_dx = -math.sin(yaw_rad) * dz - math.cos(yaw_rad) * dx
+    world_dz = math.cos(yaw_rad) * dz - math.sin(yaw_rad) * dx
+    return world_dx, dy, world_dz
+
+
+def world_to_agent_rel(world_dx: float, world_dy: float, world_dz: float, yaw: float) -> Tuple[float, float, float]:
+    """
+    Convert world-relative coordinates to agent-relative coordinates.
+    
+    Args:
+        world_dx: World-relative X (positive = east, negative = west)
+        world_dy: World-relative Y (positive = up, negative = down)
+        world_dz: World-relative Z (positive = south, negative = north)
+        yaw: Agent yaw in degrees (cardinal: 0, 90, 180, 270)
+    
+    Returns:
+        Tuple of (dx, dy, dz) as floats
+        - dx: Agent-relative X (positive = right, negative = left)
+        - dy: Agent-relative Y (same as world_dy, always vertical)
+        - dz: Agent-relative Z (positive = forward, negative = back)
+    """
+    yaw_rad = math.radians(yaw)
+    # Inverse transform: world-relative (east/south) to agent-relative (right/forward)
+    # Fixed to match corrected forward transform
+    dx = -math.cos(yaw_rad) * world_dx - math.sin(yaw_rad) * world_dz
+    dz = -math.sin(yaw_rad) * world_dx + math.cos(yaw_rad) * world_dz
+    return dx, world_dy, dz
+
+
+def dx_dy_dz_to_absolute(dx: float, dy: float, dz: float, agent_pos: Dict[str, float], yaw: Optional[float] = None) -> Tuple[int, int, int]:
+    """
+    Convert agent-relative coordinates (dx, dy, dz) to absolute block coordinates.
+    
+    Args:
+        dx: Agent-relative X offset (positive = right, negative = left)
+        dy: Agent-relative Y offset (positive = up, negative = down)
+        dz: Agent-relative Z offset (positive = forward, negative = back)
+        agent_pos: Agent position dict with 'x', 'y', 'z', optionally 'yaw'
+        yaw: Optional agent yaw in degrees (if None, uses agent_pos.get('yaw', 0.0))
     
     Returns:
         Tuple of (absolute_x, absolute_y, absolute_z) as integers (block coordinates)
     
-    Note: dx, dy, dz are world-relative (absolute axis directions), NOT egocentric.
-    This is different from 'forward' which depends on yaw.
+    Note: dx, dy, dz are agent-relative (right/forward/up), transformed using yaw.
+    Yaw is cardinal-snapped (0°, 90°, 180°, 270°) for consistency.
     """
     px = agent_pos.get('x', 0.0)
     py = agent_pos.get('y', 0.0)
     pz = agent_pos.get('z', 0.0)
     
-    # Convert to block coordinates (floor) then add offset
+    # Get yaw (cardinal-snapped)
+    agent_yaw = yaw if yaw is not None else agent_pos.get('yaw', 0.0)
+    agent_yaw = _round_to_cardinal(agent_yaw)
+    
+    # Convert agent-relative to world-relative
+    world_dx, world_dy, world_dz = agent_rel_to_world(dx, dy, dz, agent_yaw)
+    
+    # Convert to block coordinates (floor) then add world-relative offset
     bx = int(math.floor(px))
     by = int(math.floor(py))
     bz = int(math.floor(pz))
     
-    return (bx + int(round(dx)), by + int(round(dy)), bz + int(round(dz)))
+    return (bx + int(round(world_dx)), by + int(round(world_dy)), bz + int(round(world_dz)))
 
 
 def ensure_grid_aligned(

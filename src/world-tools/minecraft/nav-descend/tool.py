@@ -262,8 +262,12 @@ def tool(input_value=None, **kwargs):
             
             for b_x, b_y, b_z in blockers[:2]:  # Limit to 2 pre-digs
                 try:
+                    # Convert absolute block coordinates to relative offsets
+                    dx = float(b_x) - start_pos.get("x", 0.0)
+                    dy = float(b_y) - start_pos.get("y", 0.0)
+                    dz = float(b_z) - start_pos.get("z", 0.0)
                     executor.execute_action_with_log(
-                        {"type": "mc-dig", "x": float(b_x), "y": float(b_y), "z": float(b_z)},
+                        {"type": "mc-dig", "dx": dx, "dy": dy, "dz": dz},
                         "nav-descend:grid_pre_dig"
                     )
                 except Exception:
