@@ -22,6 +22,13 @@ except Exception:
     get_cell_name = None
     set_cell = None
 
+# Import coordinate transforms from nav_core for consistency
+try:
+    from nav_core import agent_rel_to_world, _round_to_cardinal
+except Exception:
+    agent_rel_to_world = None
+    _round_to_cardinal = None
+
 # Default Minecraft bot server URL (can be overridden via environment variable or config)
 DEFAULT_MINECRAFT_URL = os.getenv("MINECRAFT_URL", "http://localhost:3003")
 
@@ -52,26 +59,23 @@ NON_SOLID_BLOCKS = {
 }
 
 
-def _yaw_to_cardinal(yaw: float) -> int:
-    """Return nearest cardinal yaw as int: 0, 90, 180, 270."""
-    normalized = float(yaw) % 360.0
-    if normalized < 0:
-        normalized += 360.0
-    if normalized < 45.0 or normalized >= 315.0:
-        return 0
-    if normalized < 135.0:
-        return 90
-    if normalized < 225.0:
-        return 180
-    return 270
+def _yaw_to_forward_delta_world(yaw_cardinal: int) -> Tuple[int, int]:
+    """
+    Convert cardinal yaw (0/90/180/270) to world-relative forward delta (world_dx, world_dz).
 
-
-def _yaw_to_forward_delta_cardinal(yaw_cardinal: int) -> Tuple[int, int]:
-    """Convert cardinal yaw (0/90/180/270) to discrete forward (dx,dz)."""
+    Uses standard Minecraft convention:
+    - yaw=0 (facing South): forward = (0, +1) = +Z
+    - yaw=90 (facing West): forward = (-1, 0) = -X
+    - yaw=180 (facing North): forward = (0, -1) = -Z
+    - yaw=270 (facing East): forward = (+1, 0) = +X
+    """
     yaw_rad = math.radians(float(yaw_cardinal))
-    dx = int(round(-math.sin(yaw_rad)))
-    dz = int(round(-math.cos(yaw_rad)))
-    return dx, dz
+    # Forward in agent-relative is dz=+1, transform to world coordinates
+    # world_dx = -sin(yaw) * dz = -sin(yaw) for forward
+    # world_dz = cos(yaw) * dz = cos(yaw) for forward
+    world_dx = int(round(-math.sin(yaw_rad)))
+    world_dz = int(round(math.cos(yaw_rad)))
+    return world_dx, world_dz
 
 
 def _support_depth_value(depth: Optional[float]) -> Any:
@@ -102,8 +106,9 @@ def _is_solidish_block(block: Any) -> bool:
 def _compute_af1(executor: Any, structured_data: Dict[str, Any]) -> Dict[str, Any]:
     """
     AF1 v2: deterministic, contract-aware actionability summary derived from mc-observe output.
-    - No CNN/L0 inference output is exposed here (PERCEPTUAL_FRAME remains internal).
-    - Coordinates (dx,dy,dz) are relative to agent block coords (floor(pose)).
+    - No CNN/L0 inference output is exposed here (all perceptual abstractions removed).
+    - Coordinates (dx,dy,dz) are agent-relative: dx=right/left, dz=forward/back, dy=up/down.
+    - (0,0,0) = agent's feet block (where agent stands), (0,-1,0) = support block below.
     """
     pose = structured_data.get("pose", {}) if isinstance(structured_data, dict) else {}
     dirs = structured_data.get("dirs", {}) if isinstance(structured_data, dict) else {}
@@ -118,7 +123,9 @@ def _compute_af1(executor: Any, structured_data: Dict[str, Any]) -> Dict[str, An
     by = int(math.floor(py))
     bz = int(math.floor(pz))
 
-    yaw_cardinal = _yaw_to_cardinal(float(pose.get("yaw", 0.0) or 0.0))
+    # Use nav_core's _round_to_cardinal for consistency across all tools
+    raw_yaw = float(pose.get("yaw", 0.0) or 0.0)
+    yaw_cardinal = int(_round_to_cardinal(raw_yaw)) if _round_to_cardinal else int(raw_yaw % 360)
 
     here_support = support.get("here", {}) if isinstance(support, dict) else {}
     depth = here_support.get("depth")
@@ -189,27 +196,29 @@ def _compute_af1(executor: Any, structured_data: Dict[str, Any]) -> Dict[str, An
             return "unknown"
         return bool(head)
 
-    # Prefer nav_surface for current stand_y; fall back to floor(pose)+1.
+    # Prefer nav_surface for current stand_y; fall back to floor(pose).
+    # Note: by = floor(pose.y) is the feet block (where agent stands).
+    # support_y is the support block (what agent stands on), so standing_y = support_y + 1.
     here_ns = by_rel.get((0, 0))
     if here_ns and here_ns.get("support_y") is not None:
         try:
             here_stand_y = int(round(float(here_ns.get("support_y")))) + 1
         except Exception:
-            here_stand_y = by + 1
+            here_stand_y = by  # by is already feet block
     else:
-        here_stand_y = by + 1
+        here_stand_y = by  # by is already feet block
 
     # standability
     stand_here = _standable_at_dxz(0, 0)
     stand_fwd: Dict[str, Any] = {}
     for yaw in (0, 90, 180, 270):
-        fdx, fdz = _yaw_to_forward_delta_cardinal(yaw)
+        fdx, fdz = _yaw_to_forward_delta_world(yaw)
         stand_fwd[str(yaw)] = _standable_at_dxz(fdx, fdz)
 
     # nav gating
     climb_by_yaw: Dict[str, str] = {}
     for yaw in (0, 90, 180, 270):
-        fdx, fdz = _yaw_to_forward_delta_cardinal(yaw)
+        fdx, fdz = _yaw_to_forward_delta_world(yaw)
         ns = by_rel.get((fdx, fdz))
         if not ns:
             climb_by_yaw[str(yaw)] = "unknown"
@@ -234,7 +243,7 @@ def _compute_af1(executor: Any, structured_data: Dict[str, Any]) -> Dict[str, An
 
     descend_by_yaw: Dict[str, str] = {}
     for yaw in (0, 90, 180, 270):
-        fdx, fdz = _yaw_to_forward_delta_cardinal(yaw)
+        fdx, fdz = _yaw_to_forward_delta_world(yaw)
         ns = by_rel.get((fdx, fdz))
         if not ns:
             descend_by_yaw[str(yaw)] = "unknown"
@@ -263,16 +272,36 @@ def _compute_af1(executor: Any, structured_data: Dict[str, Any]) -> Dict[str, An
             descend_by_yaw[str(yaw)] = "blocked"
 
     # verified anchor candidates (conservative, small)
+    # anchor_candidates are world-relative offsets, transform to agent-relative
     anchors: List[Dict[str, Any]] = []
-    anchor_candidates = [(0, -1, 0), (1, -1, 0), (-1, -1, 0), (0, -1, 1), (0, -1, -1)]
-    for adx, ady, adz in anchor_candidates:
+    anchor_candidates_world = [(0, -1, 0), (1, -1, 0), (-1, -1, 0), (0, -1, 1), (0, -1, -1)]
+    
+    # Transform function for world-relative to agent-relative
+    try:
+        from nav_core import world_to_agent_rel
+        transform_available = True
+    except Exception:
+        transform_available = False
+    
+    for world_adx, ady, world_adz in anchor_candidates_world:
+        # Transform to agent-relative if available
+        if transform_available:
+            try:
+                adx, _, adz = world_to_agent_rel(float(world_adx), float(ady), float(world_adz), float(yaw_cardinal))
+                adx = int(round(adx))
+                adz = int(round(adz))
+            except Exception:
+                adx, adz = world_adx, world_adz
+        else:
+            adx, adz = world_adx, world_adz
+        
         if adx == 0 and ady == -1 and adz == 0 and _is_solidish_block(down_blk):
             anchors.append({"dx": 0, "dy": -1, "dz": 0, "faces": ["top"]})
             continue
         if get_cell_name is None:
             continue
         try:
-            name = get_cell_name(executor, bx + adx, by + ady, bz + adz)
+            name = get_cell_name(executor, bx + world_adx, by + ady, bz + world_adz)
         except Exception:
             name = None
         if name is None:
@@ -369,8 +398,21 @@ def categorize_entity(entity_type: str) -> str:
 
 def rel_to_abs(position: Dict[str, float], yaw: float, forward: int, right: int, up: int) -> Tuple[int, int, int]:
     """
-    Convert relative (egocentric) position to absolute block coordinates.
-    Mirrors the older mc-observe-blocks helper.
+    Convert agent-relative position to absolute block coordinates.
+
+    Uses nav_core's agent_rel_to_world for consistency with standard convention:
+    - forward (dz=+1) at yaw=0 maps to +Z (south)
+    - right (dx=+1) at yaw=0 maps to -X (west)
+
+    Args:
+        position: Agent position dict with x, y, z
+        yaw: Agent yaw in degrees
+        forward: Agent-relative forward offset (positive = forward)
+        right: Agent-relative right offset (positive = right)
+        up: Agent-relative up offset (positive = up)
+
+    Returns:
+        Tuple of (absolute_x, absolute_y, absolute_z) as integers (block coordinates)
     """
     px = position.get('x', 0.0)
     py = position.get('y', 0.0)
@@ -380,11 +422,18 @@ def rel_to_abs(position: Dict[str, float], yaw: float, forward: int, right: int,
     by = int(math.floor(py))
     bz = int(math.floor(pz))
 
-    dx = -math.sin(math.radians(yaw)) * forward - math.cos(math.radians(yaw)) * right
-    dz = -math.cos(math.radians(yaw)) * forward + math.sin(math.radians(yaw)) * right
-    dy = up
+    # Map parameters to agent-relative coordinates:
+    # forward → dz, right → dx, up → dy
+    if agent_rel_to_world is not None:
+        world_dx, world_dy, world_dz = agent_rel_to_world(float(right), float(up), float(forward), float(yaw))
+    else:
+        # Fallback using standard convention (should not happen in normal operation)
+        yaw_rad = math.radians(yaw)
+        world_dx = -math.sin(yaw_rad) * forward - math.cos(yaw_rad) * right
+        world_dz = math.cos(yaw_rad) * forward - math.sin(yaw_rad) * right
+        world_dy = up
 
-    return (bx + int(round(dx)), by + int(round(dy)), bz + int(round(dz)))
+    return (bx + int(round(world_dx)), by + int(round(world_dy)), bz + int(round(world_dz)))
 
 
 def find_block_at(nearby_blocks: List[Dict[str, Any]], target_x: int, target_y: int, target_z: int) -> Optional[str]:
@@ -708,26 +757,33 @@ def tool(input_value=None, **kwargs):
         support_info = {'here': here_support, 'fwd': fwd_support}
 
         # clear: body/head in front and above (body=+1y, head=+2y)
+        # IMPORTANT: Only treat as clear when CONFIRMED air, not when unknown (None)
+        def _is_confirmed_air(block_name: Optional[str]) -> bool:
+            """Return True only if block is confirmed to be air, False if unknown or solid."""
+            if block_name is None:
+                return False  # Unknown - do NOT assume air
+            return block_name in ('air', 'cave_air', 'void_air')
+
         pos_fwd_body = rel_to_abs(position, yaw, 1, 0, 1)
         pos_fwd_head = rel_to_abs(position, yaw, 1, 0, 2)
         block_fwd_body = find_block_at(nearby_blocks, *pos_fwd_body)
         block_fwd_head = find_block_at(nearby_blocks, *pos_fwd_head)
-        fwd_body_clear = block_fwd_body is None or block_fwd_body == 'air'
-        fwd_head_clear = block_fwd_head is None or block_fwd_head == 'air'
+        fwd_body_clear = _is_confirmed_air(block_fwd_body)
+        fwd_head_clear = _is_confirmed_air(block_fwd_head)
 
         pos_up_body = rel_to_abs(position, yaw, 0, 0, 1)
         pos_up_head = rel_to_abs(position, yaw, 0, 0, 2)
         block_up_body = find_block_at(nearby_blocks, *pos_up_body)
         block_up_head = find_block_at(nearby_blocks, *pos_up_head)
-        up_body_clear = block_up_body is None or block_up_body == 'air'
-        up_head_clear = block_up_head is None or block_up_head == 'air'
+        up_body_clear = _is_confirmed_air(block_up_body)
+        up_head_clear = _is_confirmed_air(block_up_head)
 
         clear_info = {'fwd': {'body': fwd_body_clear, 'head': fwd_head_clear}, 'up': {'body': up_body_clear, 'head': up_head_clear}}
 
-        # Store air blocks inferred from clear diagnostics (side-effect to local_grid)
+        # Store CONFIRMED air blocks to local_grid (only when we have explicit air, not unknown)
         try:
             if set_cell is not None and executor:
-                if fwd_body_clear:
+                if fwd_body_clear:  # Only True when confirmed air
                     set_cell(executor, *pos_fwd_body, "air")
                 if fwd_head_clear:
                     set_cell(executor, *pos_fwd_head, "air")
@@ -899,6 +955,53 @@ def tool(input_value=None, **kwargs):
         try:
             if ingest_nearby_blocks is not None:
                 ingest_nearby_blocks(executor, pose=structured_data.get("pose", {}), nearby_blocks=nearby_blocks)
+            
+            # CRITICAL: Always ensure (0,-1,0) support block is included in grid
+            # This block may be excluded from nearby_blocks due to LOS occlusion (feet block blocks view)
+            # but it's essential for coordinate system validation and navigation
+            if set_cell is not None:
+                pose = structured_data.get("pose", {})
+                px = float(pose.get("x", 0.0) or 0.0)
+                py = float(pose.get("y", 0.0) or 0.0)
+                pz = float(pose.get("z", 0.0) or 0.0)
+                
+                # Calculate absolute position of support block (0,-1,0) relative to agent
+                bx = int(math.floor(px))
+                by = int(math.floor(py))
+                bz = int(math.floor(pz))
+                support_x = bx
+                support_y = by - 1  # One block below agent's feet
+                support_z = bz
+                
+                # Get support block name from adjacent_blocks (bypasses LOS, always available from bridge)
+                # Fallback to dirs_info if adjacent_blocks missing
+                down_block = None
+                if isinstance(adjacent_blocks, dict):
+                    down_block = adjacent_blocks.get('down')
+                if not down_block:
+                    # Fallback: check dirs_info which may have been populated from nearby_blocks
+                    down_info = dirs_info.get('down', {}) if isinstance(dirs_info, dict) else {}
+                    down_block = down_info.get('blk') if isinstance(down_info, dict) else None
+                if not down_block:
+                    # Last resort: try to find in nearby_blocks directly
+                    down_block = find_block_at(nearby_blocks, support_x, support_y, support_z)
+                
+                if down_block:
+                    # Ensure support block is in grid
+                    set_cell(executor, support_x, support_y, support_z, str(down_block))
+                    logger.debug(f"mc-observe: Ensured (0,-1,0) support block '{down_block}' in grid at ({support_x},{support_y},{support_z})")
+                else:
+                    logger.warning(f"mc-observe: Could not determine (0,-1,0) support block at ({support_x},{support_y},{support_z})")
+
+                # CRITICAL: Always ensure (0,0,0) feet block is included in grid
+                # This is the agent's position and is essential for coordinate system validation
+                feet_x, feet_y, feet_z = bx, by, bz
+                feet_block = find_block_at(nearby_blocks, feet_x, feet_y, feet_z)
+                if not feet_block:
+                    # Agent's feet position is typically air
+                    feet_block = "air"
+                set_cell(executor, feet_x, feet_y, feet_z, str(feet_block))
+                logger.debug(f"mc-observe: Ensured (0,0,0) feet block '{feet_block}' in grid at ({feet_x},{feet_y},{feet_z})")
         except Exception as e:
             logger.debug(f"mc-observe: local_grid ingest skipped: {e}")
         

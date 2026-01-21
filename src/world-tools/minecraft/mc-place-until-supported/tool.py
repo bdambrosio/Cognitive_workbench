@@ -152,26 +152,30 @@ def tool(input_value=None, **kwargs):
     logger.info(f"mc-place-until-supported: Starting placement (item={item}, policy={placement_policy}, max_attempts={max_attempts})")
     
     # Determine placement parameters based on policy
+    # Uses agent-relative coordinates: dx (right/left), dy (up/down), dz (forward/back)
     place_params = {"item": item}
-    
+
     if placement_policy == "underfoot":
-        # Place block directly underfoot: ref at (forward:0, up:-1), face="up"
-        place_params["forward"] = 0.0
-        place_params["up"] = -1.0
-        place_params["right"] = 0.0
-        place_params["face"] = "up"
+        # Place block directly underfoot: anchor at (0, -1, 0), face="top"
+        # Anchor is block below agent, place on top of it = at agent's feet
+        place_params["dx"] = 0.0
+        place_params["dy"] = -1.0
+        place_params["dz"] = 0.0
+        place_params["face"] = "top"
     elif placement_policy == "forward-underfoot":
-        # Place block forward and underfoot: ref at (forward:1, up:-1), face="up"
-        place_params["forward"] = 1.0
-        place_params["up"] = -1.0
-        place_params["right"] = 0.0
-        place_params["face"] = "up"
+        # Place block forward and underfoot: anchor at (0, -1, 1), face="top"
+        # Anchor is block forward-and-below, place on top = forward at agent's feet level
+        place_params["dx"] = 0.0
+        place_params["dy"] = -1.0
+        place_params["dz"] = 1.0
+        place_params["face"] = "top"
     elif placement_policy == "lateral":
-        # Place block laterally forward: ref at (forward:1, up:0), face="north" (toward agent)
-        place_params["forward"] = 1.0
-        place_params["up"] = 0.0
-        place_params["right"] = 0.0
-        place_params["face"] = "north"  # Face toward agent (opposite of forward)
+        # Place block laterally forward: anchor at (0, 0, 1), face depends on yaw
+        # For simplicity, use "north" which places south of anchor (toward agent if facing north)
+        place_params["dx"] = 0.0
+        place_params["dy"] = 0.0
+        place_params["dz"] = 1.0
+        place_params["face"] = "north"
     
     # Main loop
     while attempt_count < max_attempts:
@@ -187,6 +191,8 @@ def tool(input_value=None, **kwargs):
             
             # Check if it's an inventory issue
             place_data = place_result.get("data", {})
+            if not isinstance(place_data, dict):
+                place_data = {}
             error_code = place_data.get("error_code", "")
             if "inventory" in error_code.lower() or "not in inventory" in reason.lower():
                 outcome = "INVENTORY_EXHAUSTED"

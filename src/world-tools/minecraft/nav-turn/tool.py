@@ -17,33 +17,32 @@ from infospace_executor import InfospaceExecutor
 
 logger = logging.getLogger(__name__)
 
+# Optional import for grid updates
+try:
+    from local_grid import set_center_from_pose
+except Exception:
+    set_center_from_pose = None  # optional; do not break nav-turn
+
+# Import _round_to_cardinal from nav_core for consistency
+try:
+    from nav_core import _round_to_cardinal
+except Exception:
+    # Fallback if nav_core not available
+    def _round_to_cardinal(yaw_deg: float) -> float:
+        normalized = yaw_deg % 360
+        if normalized < 0:
+            normalized += 360
+        if normalized < 45 or normalized >= 315:
+            return 0.0
+        elif normalized < 135:
+            return 90.0
+        elif normalized < 225:
+            return 180.0
+        else:
+            return 270.0
+
 DEFAULT_MINECRAFT_URL = os.getenv("MINECRAFT_URL", "http://localhost:3003")
 MAX_NAV_HISTORY = 100
-
-
-def _round_to_cardinal(yaw_deg: float) -> float:
-    """
-    Round yaw to nearest cardinal direction (0, 90, 180, 270).
-    
-    Args:
-        yaw_deg: Yaw in degrees
-    
-    Returns:
-        Nearest cardinal yaw (0, 90, 180, or 270)
-    """
-    normalized = yaw_deg % 360
-    if normalized < 0:
-        normalized += 360
-    
-    # Thresholds at midpoints: 45°, 135°, 225°, 315°
-    if normalized < 45 or normalized >= 315:
-        return 0.0
-    elif normalized < 135:
-        return 90.0
-    elif normalized < 225:
-        return 180.0
-    else:  # normalized < 315
-        return 270.0
 
 
 def _snap_to_position(executor: InfospaceExecutor, snap_pos: Dict, yaw: float, pitch: float, minecraft_url: str) -> bool:
@@ -197,13 +196,28 @@ def tool(input_value=None, **kwargs):
         )
 
     # Update nav state (pose change - yaw changed)
-    pose = {"x": snap_pos["x"], "y": snap_pos["y"], "z": snap_pos["z"], "yaw": cardinal_yaw}
+    pose = {"x": snap_pos["x"], "y": snap_pos["y"], "z": snap_pos["z"], "yaw": cardinal_yaw, "pitch": 0.0}
     # Get current support_here from previous nav state if available
     nav_list = executor.get_world_state("nav")
     support_here = "unknown"
     if isinstance(nav_list, list) and len(nav_list) > 0:
         support_here = nav_list[0].get("support_here", "unknown")
     _update_nav_state(executor, pose, support_here, fell=False, was_fall=False)
+    
+    # Update grid center with new pose (including yaw) for coordinate transformations
+    try:
+        if set_center_from_pose is not None:
+            set_center_from_pose(executor, pose)
+    except Exception as e:
+        logger.warning(f"nav-turn: Failed to update grid center (non-fatal): {e}")
+    
+    # Observe blocks to populate grid cells (like nav-move does)
+    try:
+        obs = executor.execute_action_with_log({"type": "mc-observe"}, "nav-turn")
+        if obs.get("status") != "success":
+            logger.debug(f"nav-turn: Observation failed (non-fatal): {obs.get('reason', 'unknown')}")
+    except Exception as e:
+        logger.debug(f"nav-turn: Observation skipped (non-fatal): {e}")
 
     # --- Success ---
     return executor._create_uniform_return(

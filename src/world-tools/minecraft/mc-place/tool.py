@@ -4,6 +4,7 @@ Build / modify world - place blocks.
 """
 
 import logging
+import math
 import os
 import requests
 import sys
@@ -24,7 +25,7 @@ _THIS_DIR = os.path.dirname(__file__)
 _NAV_CORE_DIR = os.path.abspath(os.path.join(_THIS_DIR, ".."))
 if _NAV_CORE_DIR not in sys.path:
     sys.path.insert(0, _NAV_CORE_DIR)
-from nav_core import dx_dy_dz_to_absolute
+from nav_core import dx_dy_dz_to_absolute, ensure_grid_aligned
 
 # Default Minecraft bot server URL (can be overridden via environment variable or config)
 DEFAULT_MINECRAFT_URL = os.getenv("MINECRAFT_URL", "http://localhost:3003")
@@ -67,10 +68,10 @@ def tool(input_value=None, **kwargs):
     Args:
         input_value: Item/block name to place (preferred)
         item: Item/block name to place (alternative to input_value)
-        dx: float - world-relative X offset to reference block (positive = east, negative = west)
-        dy: float - world-relative Y offset to reference block (positive = up, negative = down)
-        dz: float - world-relative Z offset to reference block (positive = south, negative = north)
-        face: string - face of reference block to place against (absolute: "top", "bottom", "north", "south", "east", "west")
+        dx: float - agent-relative X offset to target block position (positive = right, negative = left)
+        dy: float - agent-relative Y offset to target block position (positive = up, negative = down)
+        dz: float - agent-relative Z offset to target block position (positive = forward, negative = back)
+        face: string - face of anchor block to place against (absolute: "top", "bottom", "north", "south", "east", "west")
         minecraft_url: Optional URL override for Minecraft bot server (default: http://localhost:3003)
         
     Returns:
@@ -92,15 +93,16 @@ def tool(input_value=None, **kwargs):
             reason="missing_item"
         )
     
-    # Get dx, dy, dz (world-relative coordinates, origin at agent)
+    # Get dx, dy, dz (agent-relative coordinates, ANCHOR block position)
+    # These specify the existing solid block to place against, NOT the target/destination
     dx = kwargs.get("dx")
     dy = kwargs.get("dy")
     dz = kwargs.get("dz")
-    
+
     if dx is None or dy is None or dz is None:
         return executor._create_uniform_return(
             'failed',
-            value="reference block position required (dx, dy, dz - world-relative offsets from agent)",
+            value="anchor block position required (dx, dy, dz - agent-relative offsets to existing solid block)",
             reason="missing_position"
         )
     
@@ -108,45 +110,6 @@ def tool(input_value=None, **kwargs):
     dy = float(dy)
     dz = float(dz)
     dx_req, dy_req, dz_req = dx, dy, dz
-    
-    # Get agent position to convert dx,dy,dz to absolute
-    try:
-        status_result = executor.execute_action_with_log({"type": "mc-status"}, "mc-place")
-        if status_result.get("status") != "success":
-            return executor._create_uniform_return(
-                'failed',
-                value="Failed to get agent position for coordinate conversion",
-                reason="status_failed"
-            )
-        agent_pos = status_result.get("data", {}).get("position", {})
-        if not isinstance(agent_pos, dict):
-            return executor._create_uniform_return(
-                'failed',
-                value="Invalid agent position data",
-                reason="invalid_position"
-            )
-    except Exception as e:
-        logger.error(f"mc-place: Failed to get agent position: {e}")
-        return executor._create_uniform_return(
-            'failed',
-            value=f"Failed to get agent position: {e}",
-            reason="status_failed"
-        )
-    
-    # Convert dx,dy,dz to absolute block coordinates
-    abs_x, abs_y, abs_z = dx_dy_dz_to_absolute(dx, dy, dz, agent_pos)
-    
-    # Build position parameters - pass absolute to bridge
-    place_params = {
-        "item": item,
-        "ref": {
-            "pos": {
-                "x": float(abs_x),
-                "y": float(abs_y),
-                "z": float(abs_z)
-            }
-        }
-    }
     
     # Face is required (convert "top"/"bottom" to "up"/"down" if needed)
     face = kwargs.get("face")
@@ -161,7 +124,90 @@ def tool(input_value=None, **kwargs):
         face = "up"
     elif face == "bottom":
         face = "down"
-    place_params["face"] = face
+    
+    # Get agent position and yaw first (needed for coordinate conversion)
+    try:
+        status_result = executor.execute_action_with_log({"type": "mc-status"}, "mc-place")
+        if status_result.get("status") != "success":
+            return executor._create_uniform_return(
+                'failed',
+                value="Failed to get agent position for coordinate conversion",
+                reason="status_failed"
+            )
+        status_data = status_result.get("data", {})
+        agent_pos = status_data.get("position", {})
+        agent_yaw = status_data.get("yaw", 0.0)
+        if not isinstance(agent_pos, dict):
+            return executor._create_uniform_return(
+                'failed',
+                value="Invalid agent position data",
+                reason="invalid_position"
+            )
+    except Exception as e:
+        logger.error(f"mc-place: Failed to get agent position: {e}")
+        return executor._create_uniform_return(
+            'failed',
+            value=f"Failed to get agent position: {e}",
+            reason="status_failed"
+        )
+
+    # Face offset map in WORLD coordinates (bridge adds this to reference to get placement position)
+    # north=-Z, south=+Z, east=+X, west=-X in Minecraft world coordinates
+    face_offset_world_map = {
+        "up": (0, 1, 0),
+        "down": (0, -1, 0),
+        "north": (0, 0, -1),
+        "south": (0, 0, 1),
+        "east": (1, 0, 0),
+        "west": (-1, 0, 0),
+    }
+    face_offset_world = face_offset_world_map.get(face.lower())
+    if not face_offset_world:
+        return executor._create_uniform_return(
+            'failed',
+            value=f"invalid face '{face}' (must be: top, bottom, north, south, east, west)",
+            reason="invalid_face"
+        )
+
+    # dx, dy, dz IS the anchor block position (agent-relative)
+    # Bridge will use anchor + face_offset to determine placement target
+    # No subtraction needed - just convert anchor position to absolute coordinates
+    abs_x, abs_y, abs_z = dx_dy_dz_to_absolute(dx, dy, dz, agent_pos, yaw=agent_yaw)
+
+    # Calculate target position (where block will actually be placed)
+    target_x = int(abs_x) + face_offset_world[0]
+    target_y = int(abs_y) + face_offset_world[1]
+    target_z = int(abs_z) + face_offset_world[2]
+
+    # Check if target position overlaps agent's hitbox (2 blocks tall: feet and body)
+    agent_block_x = int(math.floor(agent_pos.get("x", 0)))
+    agent_block_y = int(math.floor(agent_pos.get("y", 0)))  # feet level
+    agent_block_z = int(math.floor(agent_pos.get("z", 0)))
+
+    if target_x == agent_block_x and target_z == agent_block_z:
+        if target_y == agent_block_y or target_y == agent_block_y + 1:
+            hitbox_part = "feet" if target_y == agent_block_y else "body"
+            return executor._create_uniform_return(
+                'failed',
+                value=f"Cannot place block at agent's {hitbox_part} position - "
+                      f"anchor [{dx},{dy},{dz}] + face={face} targets ({target_x},{target_y},{target_z}) "
+                      f"which overlaps agent at ({agent_block_x},{agent_block_y},{agent_block_z}). "
+                      f"To pillar up: jump first, or place forward (dz=1) then walk onto it.",
+                reason="placement_overlaps_agent"
+            )
+
+    # Build position parameters - pass absolute reference to bridge
+    place_params = {
+        "item": item,
+        "ref": {
+            "pos": {
+                "x": float(abs_x),
+                "y": float(abs_y),
+                "z": float(abs_z)
+            }
+        },
+        "face": face
+    }
     
     try:
         url = f"{minecraft_url}/act/place"
@@ -185,16 +231,9 @@ def tool(input_value=None, **kwargs):
         # and may fail due to Minecraft physics (block already exists, insufficient space, etc.)
         placed_info = data.get("placed", {})
         placed_pos = placed_info.get("position", {})
-        
-        # Get agent position for relative coordinate conversion (text output only)
-        agent_pos = None
-        try:
-            status_result = executor.execute_action_with_log({"type": "mc-status"}, "mc-place")
-            if status_result.get("status") == "success":
-                agent_pos = status_result.get("data", {}).get("position", {})
-        except Exception:
-            pass
-        
+
+        # Use original agent_pos from before placement for display (not re-fetched)
+        # Agent may drift during placement animation, causing confusing display offsets
         if placed_pos and agent_pos:
             # Convert to relative coordinates for text output
             dx = int(round(placed_pos.get('x', 0) - agent_pos.get('x', 0)))
@@ -259,6 +298,25 @@ def tool(input_value=None, **kwargs):
             executor.set_world_state("af1_text", _format_af1_text(af1))
         except Exception:
             pass
+        
+        # Delay to allow placement animation to start, then restore snapto conditions
+        time.sleep(0.3)
+        
+        # Recheck position and restore grid alignment (block center, cardinal yaw, pitch 0)
+        try:
+            status_after = executor.execute_action_with_log({"type": "mc-status"}, "mc-place")
+            if status_after.get("status") == "success":
+                ensure_grid_aligned(executor, minecraft_url, status_data=status_after.get("data"))
+        except Exception as e:
+            logger.debug(f"mc-place: grid alignment restoration skipped (non-fatal): {e}")
+        
+        # Observe blocks to refresh grid with placed block (like nav-move does)
+        try:
+            obs = executor.execute_action_with_log({"type": "mc-observe"}, "mc-place")
+            if obs.get("status") != "success":
+                logger.debug(f"mc-place: Observation failed (non-fatal): {obs.get('reason', 'unknown')}")
+        except Exception as e:
+            logger.debug(f"mc-place: Observation skipped (non-fatal): {e}")
         
         return executor._create_uniform_return('success', value=result_text, extra=extra_metadata)
     except requests.exceptions.RequestException as e:

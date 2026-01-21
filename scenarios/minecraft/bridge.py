@@ -35,15 +35,24 @@ def rel_to_abs(rel: Dict[str, float]) -> Tuple[int, int, int]:
     """
     Converts relative coordinates (egocentric or offset) to absolute world integer coordinates.
     Supports: {'dx', 'dy', 'dz'} OR {'forward', 'right', 'up'}
+
+    IMPORTANT: Uses floor() for player position to match Minecraft block coordinates.
+    The player's "block position" is floor(x), floor(y), floor(z).
+    This is critical for negative coordinates: floor(-140.5) = -141, not round(-140.5) = -140.
     """
     px, py, pz = get_player_pos()
+
+    # Player's block position (floor to match Minecraft convention)
+    bx = int(math.floor(px))
+    by = int(math.floor(py))
+    bz = int(math.floor(pz))
 
     # Cartesian offset
     if any(k in rel for k in ("dx", "dy", "dz")):
         return (
-            int(px + rel.get("dx", 0)),
-            int(py + rel.get("dy", 0)),
-            int(pz + rel.get("dz", 0)),
+            bx + int(rel.get("dx", 0)),
+            by + int(rel.get("dy", 0)),
+            bz + int(rel.get("dz", 0)),
         )
 
     # Egocentric offset
@@ -51,7 +60,7 @@ def rel_to_abs(rel: Dict[str, float]) -> Tuple[int, int, int]:
     # Math: 0 radian is usually East. We must convert carefully.
     yaw_deg, _ = get_player_rot()
     yaw_rad = math.radians(yaw_deg)
-    
+
     fwd = float(rel.get("forward", 0))
     right = float(rel.get("right", 0))
     up = float(rel.get("up", 0))
@@ -65,9 +74,9 @@ def rel_to_abs(rel: Dict[str, float]) -> Tuple[int, int, int]:
     dz = -math.cos(yaw_rad) * fwd - math.sin(yaw_rad) * right
 
     return (
-        int(round(px + dx)),
-        int(round(py + up)),
-        int(round(pz + dz)),
+        bx + int(round(dx)),
+        by + int(up),
+        bz + int(round(dz)),
     )
 
 # ------------------------------------------------------------------------------
@@ -1040,10 +1049,19 @@ def handle_snapto(body: Dict[str, Any]) -> Dict[str, Any]:
         return {"ok": False, "error": f"Failed to snap: {e}"}
 
 def handle_move(body: Dict[str, Any]) -> Dict[str, Any]:
-    """Handle movement command using minescript v4.0 player_press_* APIs."""
+    """Handle movement command using minescript v4.0 player_press_* APIs.
+
+    Args (in body):
+        forward, back, left, right, jump, sprint, sneak: bool - keys to press
+        duration_ms: int - how long to hold keys (default 400)
+        check_collision: bool - whether to check for collision (default True)
+        wait_for_stable: bool - whether to wait for position to stabilize (default True)
+            Set to False for pillar-up where we need to return while still airborne
+    """
     try:
-        
+
         duration_s = max(0.05, min(10.0, body.get("duration_ms", 400) / 1000.0))
+        wait_for_stable = body.get("wait_for_stable", True)
         
         # Capture initial position before movement
         initial_pos = get_player_pos()
@@ -1097,22 +1115,27 @@ def handle_move(body: Dict[str, Any]) -> Dict[str, Any]:
             m.flush()
         except:
             pass
-        
+
         # Wait for position to stabilize (handles falling, jumping, climbing)
-        # Check if Y-coordinate is changing significantly (falling/rising)
-        stable_pos = get_player_pos()
-        for attempt in range(20):  # Max 2 seconds (20 * 0.1s)
-            time.sleep(0.1)
-            new_pos = get_player_pos()
-            
-            # Check if Y stabilized (not falling/rising)
-            if abs(stable_pos[1] - new_pos[1]) < 0.05:  # < 5cm change
-                stable_pos = new_pos
-                break
-            
-            stable_pos = new_pos  # Update for next check
-        
-        final_pos = stable_pos
+        # Skip if wait_for_stable=False (for pillar-up where we need to return while airborne)
+        if wait_for_stable:
+            # Check if Y-coordinate is changing significantly (falling/rising)
+            stable_pos = get_player_pos()
+            for attempt in range(20):  # Max 2 seconds (20 * 0.1s)
+                time.sleep(0.1)
+                new_pos = get_player_pos()
+
+                # Check if Y stabilized (not falling/rising)
+                if abs(stable_pos[1] - new_pos[1]) < 0.05:  # < 5cm change
+                    stable_pos = new_pos
+                    break
+
+                stable_pos = new_pos  # Update for next check
+
+            final_pos = stable_pos
+        else:
+            # Return immediately without waiting - caller handles timing
+            final_pos = get_player_pos()
         final_x, final_y, final_z = final_pos
         
         # Validate movement success

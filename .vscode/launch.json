@@ -228,6 +228,36 @@
             "args": [],
             "justMyCode": false,
             "stopOnEntry": false
+        },
+        {
+            "name": "Test Minecraft Coordinates",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/tests/test_minecraft_coordinates.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/tests",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src"
+            },
+            "args": ["--character", "Jill"],
+            "justMyCode": false,
+            "stopOnEntry": false,
+            "preLaunchTask": "setup-zenoh-environment"
+        },
+        {
+            "name": "Test Minecraft Coordinates - Single Test",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/tests/test_minecraft_coordinates.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/tests",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src"
+            },
+            "args": ["--character", "Jill", "--test", "pillar"],
+            "justMyCode": false,
+            "stopOnEntry": false,
+            "preLaunchTask": "setup-zenoh-environment"
         }
 
     ]

@@ -20,20 +20,20 @@ setting: |
   Minecraft is a persistent 3D block-based world where you control a bot
   
   ## Coordinate System
-  
-  All position inputs to Minecraft tools use **world-relative coordinates** `dx, dy, dz`:
+
+  All position inputs to Minecraft tools use **agent-relative (egocentric) coordinates** `dx, dy, dz`:
   - Origin: Agent's current position (always [0, 0, 0] relative to agent)
-  - Axes: World-absolute directions (NOT egocentric)
-    - `dx`: East (+) / West (-)
+  - Axes: Agent-relative directions (egocentric, based on current yaw)
+    - `dx`: Right (+) / Left (-) relative to agent facing direction
     - `dy`: Up (+) / Down (-)
-    - `dz`: South (+) / North (-)
-  - Important: These are NOT egocentric "forward/right/up" - they use absolute world axes regardless of agent yaw
-  - Yaw: Remains absolute (0°=South, 90°=West, 180°=North, 270°=East)
+    - `dz`: Forward (+) / Back (-) relative to agent facing direction
+  - Important: These ARE egocentric - dx=+1 always means "to the right" regardless of world orientation
+  - Yaw: Absolute (0°=South, 90°=West, 180°=North, 270°=East). Use nav-turn to change facing.
   - Face parameters: Absolute cardinal directions ("north", "south", "east", "west", "top", "bottom")
-  
-  Examples:
-  - Block directly east: `dx=1, dy=0, dz=0`
-  - Block directly south: `dx=0, dy=0, dz=1`
+
+  Examples (at any yaw):
+  - Block to the right: `dx=1, dy=0, dz=0`
+  - Block forward: `dx=0, dy=0, dz=1`
   - Block above: `dx=0, dy=1, dz=0`
   - Current position: `dx=0, dy=0, dz=0`
   

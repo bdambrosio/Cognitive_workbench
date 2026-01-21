@@ -14,8 +14,8 @@ Block removal for mining, excavation, and terrain modification. Synchronous oper
 
 ## Input
 
-- Position: `dx`, `dy`, `dz` (world-relative offsets from agent, floats, all required)
-  - See coordinate system documentation in jill-minecraft.yaml for details
+- Position: `dx`, `dy`, `dz` (agent-relative offsets from agent, floats, all required)
+  - `dx`: Right (+) / Left (-), `dy`: Up (+) / Down (-), `dz`: Forward (+) / Back (-)
 - `value`: Ignored
 
 ## Output
@@ -38,12 +38,12 @@ Returns uniform_return format with:
 
 - Status `"accepted"` means request was accepted, not that digging succeeded
 - Check for spawned item entities using `mc-observe` after digging completes
-- All positions use world-relative coordinates `dx, dy, dz` (see coordinate system in jill-minecraft.yaml)
+- All positions use agent-relative coordinates: `dx` (right/left), `dy` (up/down), `dz` (forward/back)
 - Spatial map is automatically updated after successful dig (no need to call mc-map-update separately)
 
 ## Usage Examples
 
-Dig block directly east:
+Dig block to the right:
 ```json
 {"type":"mc-dig","dx":1,"dy":0,"dz":0,"out":"$dig"}
 ```
@@ -53,7 +53,7 @@ Dig block below:
 {"type":"mc-dig","dx":0,"dy":-1,"dz":0,"out":"$dig"}
 ```
 
-Dig block directly south:
+Dig block forward:
 ```json
 {"type":"mc-dig","dx":0,"dy":0,"dz":1,"out":"$dig"}
 ```

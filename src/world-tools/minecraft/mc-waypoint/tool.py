@@ -55,9 +55,9 @@ def tool(input_value=None, **kwargs):
     Args:
         input_value: Ignored
         name: Waypoint name (required)
-        dx: Optional world-relative X offset from agent (defaults to 0 = current position)
-        dy: Optional world-relative Y offset from agent (defaults to 0 = current position)
-        dz: Optional world-relative Z offset from agent (defaults to 0 = current position)
+        dx: Optional agent-relative X offset from agent (defaults to 0 = current position)
+        dy: Optional agent-relative Y offset from agent (defaults to 0 = current position)
+        dz: Optional agent-relative Z offset from agent (defaults to 0 = current position)
         resource_manager: Resource manager instance (from executor)
         agent_name: Agent name (for creating resources)
         world_name: World name (default: 'minecraft')
@@ -101,6 +101,7 @@ def tool(input_value=None, **kwargs):
             )
         status_data = status_result.get("data", {})
         agent_pos = status_data.get("position", {})
+        agent_yaw = status_data.get("yaw", 0.0)
         if not isinstance(agent_pos, dict):
             return executor._create_uniform_return(
                 'failed',
@@ -115,8 +116,8 @@ def tool(input_value=None, **kwargs):
             reason="status_failed"
         )
     
-    # Convert dx,dy,dz to absolute block coordinates
-    abs_x, abs_y, abs_z = dx_dy_dz_to_absolute(dx, dy, dz, agent_pos)
+    # Convert agent-relative dx,dy,dz to absolute block coordinates
+    abs_x, abs_y, abs_z = dx_dy_dz_to_absolute(dx, dy, dz, agent_pos, yaw=agent_yaw)
     
     # Round coordinates to block positions
     x_block = abs_x

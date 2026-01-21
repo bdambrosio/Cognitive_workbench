@@ -2855,6 +2855,8 @@ class ZenohExecutiveNode:
         Returns:
             success, status, reason, executed_steps, bindings, last_result
         """
+        handler_start = time.time()
+        logger.info(f'📥 _sync_plan_execution_handler called (query key: {query.key_expr})')
         try:
             if not self.infospace_executor:
                 response = {
@@ -2862,6 +2864,7 @@ class ZenohExecutiveNode:
                     'error': 'Sync plan execution only available for infospace characters'
                 }
                 query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
+                logger.info(f'📤 Replied with error: no executor')
                 return
             
             # Parse plan from query payload
@@ -2901,7 +2904,65 @@ class ZenohExecutiveNode:
                     query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
                     return
             
-            # Execute plan synchronously
+            # Single action optimization: use fast path (like _process_text_input)
+            if len(plan_steps) == 1:
+                action = plan_steps[0]
+                action_type = action.get('type', 'unknown')
+                logger.info(f'🔧 Single-action fast path: {action_type}')
+                try:
+                    # Execute directly (fast path)
+                    exec_start = time.time()
+                    result = self.infospace_executor.execute_action(action)
+                    exec_elapsed = time.time() - exec_start
+                    logger.info(f'✅ Action {action_type} executed in {exec_elapsed:.3f}s, status={result.get("status")}')
+                    
+                    timestamp = datetime.now()
+                    
+                    # Publish action result for UI consistency (like _process_text_input does)
+                    pub_start = time.time()
+                    self._publish_action_result(action, result, action_type, timestamp)
+                    pub_elapsed = time.time() - pub_start
+                    logger.debug(f'Published action result in {pub_elapsed:.3f}s')
+                    
+                    # Reply with uniform_result format
+                    response = {
+                        'success': result.get('status') == 'success',
+                        'status': result.get('status'),
+                        'reason': result.get('reason'),
+                        'executed_steps': 1,
+                        'bindings': {},  # Single actions don't modify bindings
+                        'last_action_result': result,  # Full uniform_result format
+                        'suspended': False,
+                        'suspension_reason': None
+                    }
+                    reply_start = time.time()
+                    query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
+                    reply_elapsed = time.time() - reply_start
+                    handler_elapsed = time.time() - handler_start
+                    logger.info(f'📤 Replied to query in {reply_elapsed:.3f}s (total handler time: {handler_elapsed:.3f}s)')
+                    return
+                except Exception as e:
+                    logger.error(f'❌ Single-action execution failed: {e}')
+                    import traceback
+                    logger.error(traceback.format_exc())
+                    error_result = self.infospace_executor._create_uniform_return('failed', reason=str(e))
+                    timestamp = datetime.now()
+                    self._publish_action_result(action, error_result, action.get('type', 'unknown'), timestamp)
+                    response = {
+                        'success': False,
+                        'status': 'failed',
+                        'error': str(e),
+                        'reason': str(e),
+                        'executed_steps': 0,
+                        'bindings': {},
+                        'last_action_result': error_result,
+                        'suspended': False,
+                        'suspension_reason': None
+                    }
+                    query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
+                    return
+            
+            # Multi-action plan: execute synchronously via full plan execution
             result = self.infospace_executor.execute_plan_sync(plan_data, max_steps=max_steps)
             
             # Get last action result in uniform format (already provided by execute_plan_sync)
@@ -2930,21 +2991,30 @@ class ZenohExecutiveNode:
             query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
             
         except json.JSONDecodeError as e:
-            logger.error(f'Invalid JSON in plan execution request: {e}')
+            logger.error(f'❌ Invalid JSON in plan execution request: {e}')
             response = {
                 'success': False,
                 'error': f'Invalid JSON: {str(e)}'
             }
             query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
+            logger.info(f'📤 Replied with JSON decode error')
         except Exception as e:
-            logger.error(f'Error handling sync plan execution query: {e}')
+            handler_elapsed = time.time() - handler_start if 'handler_start' in locals() else 0
+            logger.error(f'❌ Error handling sync plan execution query after {handler_elapsed:.3f}s: {e}')
             import traceback
             logger.error(traceback.format_exc())
             response = {
                 'success': False,
-                'error': str(e)
+                'error': str(e),
+                'executed_steps': 0,
+                'bindings': {},
+                'last_action_result': None
             }
-            query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
+            try:
+                query.reply(query.key_expr, json.dumps(response).encode('utf-8'))
+                logger.info(f'📤 Replied with exception error')
+            except Exception as reply_error:
+                logger.error(f'❌❌ Failed to send error reply: {reply_error}')
     
 
     def parse_and_set_goal(self, template, goal_text):

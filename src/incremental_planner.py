@@ -609,8 +609,12 @@ def build_tool_catalog(available_tools: Dict[str, Dict]) -> Dict[str, Dict]:
     }
     TOOL_SCHEMA_HINT_OVERRIDE = {}
     
-    # Add available tools from map
+    # Add available tools from map (exclude hidden tools from catalog)
     for tool_name, tool_meta in available_tools.items():
+        # Skip hidden tools - they're executable but not shown to planner
+        if tool_meta.get('hidden', False):
+            continue
+        
         param_source = tool_meta.get('parameter_source')
         schema_hint = {}
         

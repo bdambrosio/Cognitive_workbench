@@ -223,6 +223,9 @@ def load_tools(tools_dir_path: str) -> Dict[str, Dict]:
         # Optional situational hint for context builders
         situational = bool(metadata.get('situational', False))
         
+        # Optional hidden flag - if true, tool is excluded from planner catalog but still executable
+        hidden = bool(metadata.get('hidden', False))
+        
         tools[tool_name] = {
             'name': tool_name,
             'description': tool_description,
@@ -233,6 +236,7 @@ def load_tools(tools_dir_path: str) -> Dict[str, Dict]:
             'examples': examples,
             'schema_hint': schema_hint,
             'situational': situational,
+            'hidden': hidden,
             'path': str(tool_dir.absolute()),
             'python_file': python_file,
             'additional_files': additional_files,
