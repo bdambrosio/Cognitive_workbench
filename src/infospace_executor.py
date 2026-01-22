@@ -687,8 +687,8 @@ class InfospaceExecutor:
             'index': self._execute_index,
             'organize': self._execute_index,  # Alias for index
             'search-within-collection': self._execute_search_within_collection,
-            'search-notes': self._execute_search_notes,
-            'search-collections': self._execute_search_collections,
+            'discover-notes': self._execute_discover_notes,
+            'discover-collections': self._execute_discover_collections,
             'say': self._execute_say,
             'display': self._execute_display,
             'think': self._execute_think,
@@ -1622,14 +1622,8 @@ Make sure the string is in a format that can be parsed by the json.loads functio
             if original_uri:
                 metadata['uri'] = original_uri
         
-        # Add optional metadata from original resource
-        if resource_metadata:
-            if 'source_skill' in resource_metadata:
-                metadata['source_skill'] = resource_metadata['source_skill']
-            if 'created_at' in resource_metadata:
-                metadata['created_at'] = resource_metadata['created_at']
-            if 'note_name' in resource_metadata:
-                metadata['note_name'] = resource_metadata['note_name']
+        # Note: Engine metadata (source_skill, created_at, note_name) is NOT included in content.
+        # Access engine metadata via get_resource_metadata() if needed, not via content['metadata'].
         
         return {
             'text': full_text,
@@ -1917,26 +1911,26 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         """
         Search within a specific indexed Collection.
         
-        Required: target, value, out
+        Required: target, query, out
         Optional: mode, limit, threshold
         
         Argument types:
         - target: $variable (indexed Collection to search within)
-        - value: literal string OR $variable (resolves to query text)
+        - query: literal string OR $variable (resolves to query text)
         - mode: literal string ('semantic' or 'keyword', default 'semantic')
         - limit: int (max results to return, default 5)
         - threshold: float (minimum similarity score, default 0.0)
         - out: literal string (variable name to store results)
         """
         target_arg = action.get('target')
-        query = self._resolve_value(action.get('value'))
+        query = self._resolve_value(action.get('query'))
         mode = action.get('mode', 'semantic')
         limit = action.get('limit', 5)
         threshold = action.get('threshold', 0.0)
         out_var = action.get('out')
         
         if not target_arg or not query or not out_var:
-            return self._create_uniform_return('failed', reason='search-within-collection requires target, value, and out')
+            return self._create_uniform_return('failed', reason='search-within-collection requires target, query, and out')
         
         # Target should be a Collection variable or named resource
         collection_var, error = self._resolve_target_var(target_arg)
@@ -2024,26 +2018,26 @@ Make sure the string is in a format that can be parsed by the json.loads functio
             logger.error(f"Failed to create Collection for search results")
             return self._create_uniform_return('failed', reason='Failed to create result Collection')
     
-    def _execute_search_notes(self, action: Dict) -> Dict:
+    def _execute_discover_notes(self, action: Dict) -> Dict:
         """
-        Global search across all Notes using embedding-based retrieval.
+        Global discovery across all Notes using embedding-based retrieval.
         
-        Required: value, out
+        Required: query, out
         Optional: limit, threshold
         
         Argument types:
-        - value: literal string OR $variable (resolves to query text)
+        - query: literal string OR $variable (resolves to query text)
         - limit: int (max Notes to return, default 5)
         - threshold: float (minimum similarity score, default 0.3)
         - out: literal string (variable name to store results Collection)
         """
-        query = self._resolve_value(action.get('value'))
+        query = self._resolve_value(action.get('query'))
         limit = action.get('limit', 5)
         threshold = action.get('threshold', 0.3)
         out_var = action.get('out')
         
         if not query or not out_var:
-            return self._create_uniform_return('failed', reason='search-notes requires value and out')
+            return self._create_uniform_return('failed', reason='discover-notes requires query and out')
         
         # Search for Notes globally
         search_result = self.search_resources([query], k_notes=limit, k_collections=0, threshold=threshold)
@@ -2076,7 +2070,7 @@ Make sure the string is in a format that can be parsed by the json.loads functio
                 # Create new Note with structured content
                 result_note_id = self._persist_note(
                     structured_result,
-                    'search-notes',
+                    'discover-notes',
                     note_name=f'search_result_{note_id}'
                 )
                 if result_note_id:
@@ -2090,33 +2084,33 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         if collection_id:
             self._bind_variable(out_var, collection_id)
             display_var = self._normalize_var_for_log(out_var)
-            logger.info(f"Search-notes found {len(notes)} Notes, created {collection_id} with {len(note_ids)} structured results → {display_var}")
+            logger.info(f"Discover-notes found {len(notes)} Notes, created {collection_id} with {len(note_ids)} structured results → {display_var}")
             # Format as "X items [Note_1, ...]"
             collection_value = self._format_collection_value(collection_id)
             return self._create_uniform_return('success', value=collection_value, resource_id=collection_id)
         else:
             return self._create_uniform_return('failed', reason='Failed to create result Collection')
     
-    def _execute_search_collections(self, action: Dict) -> Dict:
+    def _execute_discover_collections(self, action: Dict) -> Dict:
         """
-        Global search across all Collections using embedding-based retrieval.
+        Global discovery across all Collections using embedding-based retrieval.
         
-        Required: value, out
+        Required: query, out
         Optional: limit, threshold
         
         Argument types:
-        - value: literal string OR $variable (resolves to query text)
+        - query: literal string OR $variable (resolves to query text)
         - limit: int (max Collections to return, default 3)
         - threshold: float (minimum similarity score, default 0.3)
         - out: literal string (variable name to store results Collection)
         """
-        query = self._resolve_value(action.get('value'))
+        query = self._resolve_value(action.get('query'))
         limit = action.get('limit', 3)
         threshold = action.get('threshold', 0.3)
         out_var = action.get('out')
         
         if not query or not out_var:
-            return self._create_uniform_return('failed', reason='search-collections requires value and out')
+            return self._create_uniform_return('failed', reason='discover-collections requires query and out')
         
         # Search for Collections globally
         search_result = self.search_resources([query], k_notes=0, k_collections=limit, threshold=threshold)
@@ -2149,7 +2143,7 @@ Make sure the string is in a format that can be parsed by the json.loads functio
                 # Create new Note with structured content
                 result_note_id = self._persist_note(
                     structured_result,
-                    'search-collections',
+                    'discover-collections',
                     note_name=f'search_result_{coll_id}'
                 )
                 if result_note_id:
@@ -2163,7 +2157,7 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         if result_collection_id:
             self._bind_variable(out_var, result_collection_id)
             display_var = self._normalize_var_for_log(out_var)
-            logger.info(f"Search-collections found {len(collections)} Collections, created {result_collection_id} with {len(note_ids)} structured results → {display_var}")
+            logger.info(f"Discover-collections found {len(collections)} Collections, created {result_collection_id} with {len(note_ids)} structured results → {display_var}")
             # Format as "X items [Note_1, ...]"
             collection_value = self._format_collection_value(result_collection_id)
             return self._create_uniform_return('success', value=collection_value, resource_id=result_collection_id)
@@ -2564,7 +2558,7 @@ Make sure the string is in a format that can be parsed by the json.loads functio
             # Control flow (don't make sense in map context)
             'if', 'while', 'wait',
             # Search primitives (operate on global/indexed state, not individual Notes)
-            'search-notes', 'search-collections', 'search-within-collection',
+            'discover-notes', 'discover-collections', 'search-within-collection',
             # Persistence/resource operations (operate on resources, not content)
             'persist', 'load', 'index', 'organize',
             # Create operations (create new resources, not transform existing ones)
@@ -4043,7 +4037,7 @@ Make sure the string is in a format that can be parsed by the json.loads functio
             'relate': 'instruction',     # relate expects 'instruction' (optional)
             'text-find': 'pattern',      # text-find expects 'pattern' (required)
             'matches': 'pattern',         # matches expects 'pattern' (required)
-            'filter-collection': 'predicate',  # filter-collection expects 'predicate' (required)
+            'filter-semantic': 'predicate',  # filter-semantic expects 'predicate' (required)
             'assess': 'predicate',       # assess expects 'predicate' (required)
         }
         

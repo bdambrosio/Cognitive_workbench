@@ -242,6 +242,11 @@ Action Syntax:
 - Literal numbers: Use directly without $ (e.g., "value": 123)
 - Literal booleans: Use directly without $ (e.g., "value": true)
 
+Parameter Naming Convention:
+- `target`: Typically references a Variable (starts with "$"), Note ID/name, or Collection ID/name
+- `value`: Typically contains a literal (string, number, boolean) or may reference a Variable/Note/Collection
+- This convention is consistent across primitives and tools, though specific tools may have tool-specific parameter names
+
 InfospacePrimitive Action / Type Compatibility:
 This table applies only to native infospace primitives. World/skill tools are governed by their own contracts.
 Operation_name: applicable to: <Note | Collection | Note, Collection>;   Purpose
@@ -258,7 +263,7 @@ Operation_name: applicable to: <Note | Collection | Note, Collection>;   Purpose
  - load: Note, Collection;  Load persistent resource
  - persist: Note, Collection;  Mark resource as persistent
  - display: Note, Collection;  Show content to user (UI only)
- - search-notes, search-collections: N/A;  Global discovery (return Coll.)
+ - discover-notes, discover-collections: N/A;  Global discovery (return Coll.)
  - search-within-collection: Collection;  Search indexed Collection
 
 Key distinctions:
@@ -268,13 +273,15 @@ Key distinctions:
 - display: Use to SHOW content to user (UI popup, does NOT return content for planning)
 - persist: Mark resource as persistent (saved to filesystem)
 
-Search Primitives:
-- search-notes: Global discovery across all Notes (no target needed). Returns Collection of structured Notes with full text content, metadata.source_id, metadata.uri, metadata.score, metadata.type.
-- search-collections: Global discovery across all Collections (no target needed). Returns Collection of structured Notes with full text content, metadata.source_id, metadata.uri, metadata.score, metadata.type.
+Discovery and Search Primitives:
+- discover-notes: Global discovery across all Notes (no target needed). Returns Collection of structured Notes with full text content, metadata.source_id, metadata.uri, metadata.score, metadata.type.
+- discover-collections: Global discovery across all Collections (no target needed). Returns Collection of structured Notes with full text content, metadata.source_id, metadata.uri, metadata.score, metadata.type.
 - search-within-collection: Search within a specific indexed Collection (requires target Collection, must be indexed first). Returns Collection of structured Notes with full matched chunk text, metadata.source_id, metadata.uri, metadata.score, metadata.type, metadata.chunk_index, metadata.chunk_total.
 
+Discovery tools return Note or Collection candidates. Search-within tools refine known containers. If you think you need a target field, you are not doing discovery.
+
 All search primitives return structured Notes matching search-web/semantic-scholar format:
-- text: Full text content (for search-within-collection: the matched chunk text; for search-notes/search-collections: full Note content)
+- text: Full text content (for search-within-collection: the matched chunk text; for discover-notes/discover-collections: full Note content)
 - format: "text" or "json"
 - metadata.source_id: Original Note/Collection ID (use project to extract: project with fields=["metadata.source_id"])
 - metadata.uri: URI field (Note/Collection ID or extracted URI from source)
@@ -437,17 +444,17 @@ def build_tool_catalog(available_tools: Dict[str, Dict]) -> Dict[str, Dict]:
             "description": "Mark Note/Collection as persistent. Use this to save the Note/Collection to the filesystem.",
             "schema_hint": {"target": "$variable"}
         },
-        "search-notes": {
-            "description": "Global search all Notes in the infospace using embedding-based retrieval. Returns Collection of structured Notes with text preview (200 chars), metadata.source_id, metadata.uri, metadata.score, metadata.type. Format matches search-web/semantic-scholar for consistent project operations.",
-            "schema_hint": {"value": "string (query)", "out": "$variable", "limit": "int (optional, default 5)", "threshold": "float (optional, default 0.3)"}
+        "discover-notes": {
+            "description": "Global discovery across all Notes in the infospace using embedding-based retrieval. Returns Collection of structured Notes with text preview (200 chars), metadata.source_id, metadata.uri, metadata.score, metadata.type. Format matches search-web/semantic-scholar for consistent project operations.",
+            "schema_hint": {"query": "string (query)", "out": "$variable", "limit": "int (optional, default 5)", "threshold": "float (optional, default 0.3)"}
         },
-        "search-collections": {
-            "description": "Global search across all Collections using embedding-based retrieval. Returns Collection of structured Notes with text preview (200 chars), metadata.source_id, metadata.uri, metadata.score, metadata.type. Format matches search-web/semantic-scholar for consistent project operations.",
-            "schema_hint": {"value": "string (query)", "out": "$variable", "limit": "int (optional, default 3)", "threshold": "float (optional, default 0.3)"}
+        "discover-collections": {
+            "description": "Global discovery across all Collections using embedding-based retrieval. Returns Collection of structured Notes with text preview (200 chars), metadata.source_id, metadata.uri, metadata.score, metadata.type. Format matches search-web/semantic-scholar for consistent project operations.",
+            "schema_hint": {"query": "string (query)", "out": "$variable", "limit": "int (optional, default 3)", "threshold": "float (optional, default 0.3)"}
         },
         "search-within-collection": {
             "description": "Search within a specific indexed Collection. Returns Collection of structured Notes each containing the full matched chunk text, metadata.source_id, metadata.uri, metadata.score, metadata.type, metadata.chunk_index, metadata.chunk_total. Format matches search-web/semantic-scholar for consistent project operations. Requires Collection to be indexed first.",
-            "schema_hint": {"target": "$variable (indexed Collection)", "value": "string (query)", "out": "$variable", "limit": "int (optional, default 5)", "threshold": "float (optional, default 0.0)"}
+            "schema_hint": {"target": "$variable (indexed Collection)", "query": "string (query)", "out": "$variable", "limit": "int (optional, default 5)", "threshold": "float (optional, default 0.0)"}
         },
         "index": {
             "description": "Build embedding index for Collection. Use this when you want to search the Collection later.",
@@ -488,7 +495,7 @@ def build_tool_catalog(available_tools: Dict[str, Dict]) -> Dict[str, Dict]:
             "schema_hint": {"target": "user", "value": "string"}
         },
         "ask": {
-            "description": "Ask user a question and wait for response (suspends plan execution). NOTE: Only works with sync plan execution (manual JSON plans), not with IncrementalPlanner.",
+            "description": "Ask user a question and wait for response (suspends plan execution).",
             "schema_hint": {"target": "User (optional)", "value": "string (question text)", "out": "$variable"}
         },
         "add": {
@@ -603,8 +610,8 @@ def build_tool_catalog(available_tools: Dict[str, Dict]) -> Dict[str, Dict]:
         "search-web": "Search web and return Collection of structured Notes. Each Note has text (full content), format, metadata.uri (URL), metadata.domain, char_count. Use project with metadata.uri to extract URLs.",
         "semantic-scholar": "Search academic papers and return Collection of structured Notes. Each Note has text (abstract), format, metadata.uri (PDF URL), metadata.title, metadata.authors, metadata.year, metadata.citations, metadata.venue. Use project with metadata.uri to extract URLs.",
         "fetch-text": "Fetch text from a SINGLE specific URL, Do NOT use on search-web or semantic-scholar results. Use ONLY when you have one URL/ID to fetch directly and do not already have the text.",
-        "search-notes": "Global search across all Notes. Returns Collection of structured Notes with full text content, metadata.source_id, metadata.uri, metadata.score, metadata.type. Use project for metadata fields, refine for extracting info from text.",
-        "search-collections": "Global search across all Collections. Returns Collection of structured Notes with full text content, metadata.source_id, metadata.uri, metadata.score, metadata.type. Use project for metadata fields, refine for extracting info from text.",
+        "discover-notes": "Global discovery across all Notes. Returns Collection of structured Notes with full text content, metadata.source_id, metadata.uri, metadata.score, metadata.type. Use project for metadata fields, refine for extracting info from text.",
+        "discover-collections": "Global discovery across all Collections. Returns Collection of structured Notes with full text content, metadata.source_id, metadata.uri, metadata.score, metadata.type. Use project for metadata fields, refine for extracting info from text.",
         "search-within-collection": "Search within indexed Collection. Returns Collection of structured Notes with full matched chunk text, metadata.source_id, metadata.uri, metadata.score, metadata.type, metadata.chunk_index, metadata.chunk_total. Format matches search-web/semantic-scholar.",
     }
     TOOL_SCHEMA_HINT_OVERRIDE = {}
@@ -715,9 +722,9 @@ def tool_catalog_text(tools: Dict[str, Dict]) -> str:
     lines.append("Preferred tool order: World tools first when they apply, then Infospace Core")
     # Add critical workflows to prevent common mistakes
     lines.append("# CRITICAL WORKFLOWS:")
-    lines.append("- search-web → summarize / refine / filter-collection")
+    lines.append("- search-web → summarize / refine / filter-semantic")
     lines.append("- search-web already returns full text in 'text' field of each Note")
-    lines.append("- semantic-scholar → summarize / refine / filter-collection")
+    lines.append("- semantic-scholar → summarize / refine / filter-semantic")
     lines.append("- fetch-text is for SINGLE URLs only, NOT for Collections from search-web/semantic-scholar")
     lines.append("- Level 4 tools (search-web, semantic-scholar) return Collections with text content in the 'text' field of each Note")
     
@@ -1044,7 +1051,7 @@ def sgl_to_infospace_action(tool_name: str, args_json: str, step: int, available
     # Primitives/tools that accept literal values in 'value' field (don't normalize)
     literal_value_primitives = [
         'create-note', 'create-collection', 'add', 'remove', 'say', 'display', 'think', 'ask',
-        'search-web', 'semantic-scholar', 'search-notes', 'search-collections',
+        'search-web', 'semantic-scholar', 'discover-notes', 'discover-collections',
     ]
     if tool_name not in literal_value_primitives:
         variable_fields.extend(['target', 'value'])
@@ -1085,15 +1092,15 @@ def sgl_to_infospace_action(tool_name: str, args_json: str, step: int, available
     action.update(args)
     
     # Ensure 'out' field if tool produces output
-    output_producing = ["create-note", "create-collection", "load", "search-notes", "search-collections", "search-within-collection", "map", 
+    output_producing = ["create-note", "create-collection", "load", "discover-notes", "discover-collections", "search-within-collection", "map", 
                        "split", "flatten", "search-web", "semantic-scholar", "summarize",
-                       "refine", "generate-note", "assess", "relate", "extract-entities", "filter-collection",
+                       "refine", "generate-note", "assess", "relate", "extract-entities", "filter-semantic",
                        "fetch-text", "as-json", "as-markdown"]
     if tool_name in output_producing and "out" not in action:
         action["out"] = f"$step_{step}_result"
     
     # Add expect if needed
-    uncertain_tools = ["search-web", "semantic-scholar", "search-notes", "search-collections", "search-within-collection", "load"]
+    uncertain_tools = ["search-web", "semantic-scholar", "discover-notes", "discover-collections", "search-within-collection", "load"]
     if tool_name in uncertain_tools and "expect" not in action:
         action["expect"] = f"should get result from {tool_name}"
     
@@ -1802,7 +1809,7 @@ This is the only planner-visible structure that supports direct (dx,dy,dz) usage
             # Stage 3: Reflect
             result_display = tool_result[:512]
             if len(tool_result) > 512:
-                result_display += f"\n... [TRUNCATED - showing 512 of {len(tool_result)} chars]"
+                result_display += f"\n... [TRUNCATED - showing first 512 chars]"
             
             s += user(
                 f"=====\n"

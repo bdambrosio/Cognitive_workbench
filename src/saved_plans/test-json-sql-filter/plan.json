@@ -3,6 +3,31 @@
   "plan": {
     "plan": [
       {
+        "type": "create-note",
+        "value": {"id": "A", "title": "Deep Learning", "year": 2020, "citations": 100, "venue": "ICML"},
+        "out": "$p1"
+      },
+      {
+        "type": "create-note",
+        "value": {"id": "B", "title": "Transformers", "year": 2021, "citations": 250, "venue": "NeurIPS"},
+        "out": "$p2"
+      },
+      {
+        "type": "create-note",
+        "value": {"id": "C", "title": "GPT-4 Analysis", "year": 2023, "citations": 50, "venue": "JMLR"},
+        "out": "$p3"
+      },
+      {
+        "type": "create-note",
+        "value": {"id": "D", "title": "Scaling Laws", "year": 2022, "citations": 180, "venue": "ICML"},
+        "out": "$p4"
+      },
+      {
+        "type": "create-collection",
+        "value": ["$p1", "$p2", "$p3", "$p4"],
+        "out": "$papers"
+      },
+      {
         "type": "filter-structured",
         "target": "$papers",
         "where": "citations > 100",

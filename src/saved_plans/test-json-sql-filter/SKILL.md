@@ -6,9 +6,9 @@ manual_only: true
 
 # Test Filter-Structured Primitive
 
-**Requires:** Run test-json-sql-setup first to create $papers
+**Self-contained:** Creates test data internally
 
-**Input:** $papers collection (citations: 100, 250, 50, 180)
+**Input:** Creates $papers collection (citations: 100, 250, 50, 180)
 
 **Operation:** Filter where citations > 100
 

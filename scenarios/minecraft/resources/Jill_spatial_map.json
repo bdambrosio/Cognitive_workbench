@@ -4,7 +4,7 @@
     "agent_name": "Jill",
     "world_name": "minecraft",
     "created_at": "2026-01-20T19:31:28.315096",
-    "updated_at": "2026-01-21T20:53:44.612112",
+    "updated_at": "2026-01-21T21:16:06.815877",
     "cell_count": 276
   },
   "cells": {
@@ -16,14 +16,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 66,
+        "support_y": 65,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
-        "surface_block_class": "dirt",
+        "support_block": "minecraft:stone",
+        "surface_block_class": "stone",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {
@@ -51,19 +51,19 @@
         "tool_required": "unknown"
       },
       "environment": {
-        "light_level": "high",
-        "spawn_risk": "low",
+        "light_level": "unknown",
+        "spawn_risk": "unknown",
         "time_sensitive": false
       },
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
-        "observation_mode": "inferred",
-        "confidence": 0.7,
-        "last_observed_at": "2026-01-21T20:53:31.861753"
+        "observation_mode": "direct",
+        "confidence": 0.9,
+        "last_observed_at": "2026-01-21T21:16:06.815086"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -123,12 +123,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "inferred_obstruction",
         "confidence": 0.7,
-        "last_observed_at": "2026-01-21T20:53:31.861753"
+        "last_observed_at": "2026-01-21T21:16:06.815086"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -144,14 +144,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
-        "surface_block_class": "dirt",
+        "support_block": "minecraft:stone",
+        "surface_block_class": "stone",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {
@@ -195,12 +195,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "inferred_obstruction",
         "confidence": 0.7,
-        "last_observed_at": "2026-01-21T20:53:31.861753"
+        "last_observed_at": "2026-01-21T21:15:57.041275"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -216,14 +216,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
-        "surface_block_class": "dirt",
+        "support_block": "minecraft:stone",
+        "surface_block_class": "stone",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {
@@ -257,12 +257,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "inferred",
         "confidence": 0.7,
-        "last_observed_at": "2026-01-21T20:53:31.861753"
+        "last_observed_at": "2026-01-21T21:16:06.815086"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -278,14 +278,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 67,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
-        "surface_block_class": "dirt",
+        "support_block": "minecraft:stone",
+        "surface_block_class": "stone",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {
@@ -319,12 +319,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "inferred_obstruction",
         "confidence": 0.7,
-        "last_observed_at": "2026-01-21T20:53:31.861753"
+        "last_observed_at": "2026-01-21T21:15:57.041275"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -340,11 +340,11 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 65,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
+        "support_block": "minecraft:grass_block[snowy=false]",
         "surface_block_class": "dirt",
         "is_fluid": false,
         "is_partial_block": true
@@ -386,12 +386,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "direct",
         "confidence": 0.9,
-        "last_observed_at": "2026-01-21T20:53:31.861753"
+        "last_observed_at": "2026-01-21T21:15:57.041275"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -407,14 +407,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
-        "surface_block_class": "dirt",
+        "support_block": "minecraft:stone",
+        "surface_block_class": "stone",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {
@@ -464,12 +464,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "inferred_obstruction",
         "confidence": 0.7,
-        "last_observed_at": "2026-01-21T20:53:31.861753"
+        "last_observed_at": "2026-01-21T21:16:06.815086"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -485,14 +485,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 67,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
-        "surface_block_class": "dirt",
+        "support_block": "minecraft:stone",
+        "surface_block_class": "stone",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -555,12 +555,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:31.861753"
+        "last_observed_at": "2026-01-21T21:15:57.041275"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -576,14 +576,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
-        "surface_block_class": "dirt",
+        "support_block": "minecraft:stone",
+        "surface_block_class": "stone",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {
@@ -629,12 +629,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "inferred_obstruction",
         "confidence": 0.7,
-        "last_observed_at": "2026-01-21T20:53:31.861753"
+        "last_observed_at": "2026-01-21T21:15:57.041275"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -650,11 +650,11 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 67,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
+        "support_block": "minecraft:grass_block[snowy=false]",
         "surface_block_class": "dirt",
         "is_fluid": false,
         "is_partial_block": true
@@ -705,12 +705,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:32.472573"
+        "last_observed_at": "2026-01-21T21:16:06.815086"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -726,11 +726,11 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 67,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
+        "support_block": "minecraft:grass_block[snowy=false]",
         "surface_block_class": "dirt",
         "is_fluid": false,
         "is_partial_block": true
@@ -766,12 +766,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:31.861753"
+        "last_observed_at": "2026-01-21T21:15:57.041275"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -787,14 +787,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
-        "surface_block_class": "dirt",
+        "support_block": "minecraft:stone",
+        "surface_block_class": "stone",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -826,12 +826,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:31.861753"
+        "last_observed_at": "2026-01-21T21:15:57.041275"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -847,14 +847,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
-        "surface_block_class": "dirt",
+        "support_block": "minecraft:stone",
+        "surface_block_class": "stone",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -886,12 +886,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:31.861753"
+        "last_observed_at": "2026-01-21T21:15:57.041275"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -947,12 +947,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "inferred_obstruction",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:31.861753"
+        "last_observed_at": "2026-01-21T21:15:57.041275"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -968,11 +968,11 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 67,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
+        "support_block": "minecraft:grass_block[snowy=false]",
         "surface_block_class": "dirt",
         "is_fluid": false,
         "is_partial_block": true
@@ -1007,12 +1007,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:32.472573"
+        "last_observed_at": "2026-01-21T21:16:06.815086"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -1028,11 +1028,11 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 67,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
+        "support_block": "minecraft:grass_block[snowy=false]",
         "surface_block_class": "dirt",
         "is_fluid": false,
         "is_partial_block": true
@@ -1067,12 +1067,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:31.861753"
+        "last_observed_at": "2026-01-21T21:16:06.815086"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -1088,11 +1088,11 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 66,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
+        "support_block": "minecraft:grass_block[snowy=false]",
         "surface_block_class": "dirt",
         "is_fluid": false,
         "is_partial_block": true
@@ -1128,12 +1128,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:31.861753"
+        "last_observed_at": "2026-01-21T21:15:57.041275"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -1149,14 +1149,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
-        "surface_block_class": "dirt",
+        "support_block": "minecraft:stone",
+        "surface_block_class": "stone",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -1187,12 +1187,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:31.861753"
+        "last_observed_at": "2026-01-21T21:15:57.041275"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -1208,14 +1208,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
-        "surface_block_class": "dirt",
+        "support_block": "minecraft:stone",
+        "surface_block_class": "stone",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -1247,12 +1247,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:31.861753"
+        "last_observed_at": "2026-01-21T21:15:57.041275"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -1268,14 +1268,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
-        "surface_block_class": "dirt",
+        "support_block": "minecraft:stone",
+        "surface_block_class": "stone",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -1306,12 +1306,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:31.861753"
+        "last_observed_at": "2026-01-21T21:15:57.041275"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -1327,14 +1327,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
+        "support_block": "minecraft:dirt",
         "surface_block_class": "dirt",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -1365,12 +1365,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:31.861753"
+        "last_observed_at": "2026-01-21T21:15:57.041275"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -1386,14 +1386,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 61,
+        "support_y": 66,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:stone",
-        "surface_block_class": "stone",
+        "support_block": "minecraft:grass_block[snowy=false]",
+        "surface_block_class": "dirt",
         "is_fluid": false,
-        "is_partial_block": false
+        "is_partial_block": true
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -1424,12 +1424,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 59,
-          "z": -110
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T17:09:41.139778"
+        "last_observed_at": "2026-01-21T21:16:06.815086"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -1445,14 +1445,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 61,
+        "support_y": 66,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:stone",
-        "surface_block_class": "stone",
+        "support_block": "minecraft:grass_block[snowy=false]",
+        "surface_block_class": "dirt",
         "is_fluid": false,
-        "is_partial_block": false
+        "is_partial_block": true
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -1482,12 +1482,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 59,
-          "z": -110
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T17:09:41.139778"
+        "last_observed_at": "2026-01-21T21:16:06.815086"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -1503,14 +1503,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 61,
+        "support_y": 65,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:stone",
-        "surface_block_class": "stone",
+        "support_block": "minecraft:grass_block[snowy=false]",
+        "surface_block_class": "dirt",
         "is_fluid": false,
-        "is_partial_block": false
+        "is_partial_block": true
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -1540,12 +1540,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 59,
-          "z": -109
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T17:07:47.827072"
+        "last_observed_at": "2026-01-21T21:15:57.041275"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -1561,7 +1561,7 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 60,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
@@ -1598,12 +1598,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 59,
-          "z": -109
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T17:07:47.827072"
+        "last_observed_at": "2026-01-21T21:15:57.041275"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -1619,14 +1619,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
-        "surface_block_class": "dirt",
+        "support_block": "minecraft:stone",
+        "surface_block_class": "stone",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -1657,12 +1657,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:31.861753"
+        "last_observed_at": "2026-01-21T21:15:57.041275"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -1678,14 +1678,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
-        "surface_block_class": "dirt",
+        "support_block": "minecraft:stone",
+        "surface_block_class": "stone",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -1717,12 +1717,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:31.861753"
+        "last_observed_at": "2026-01-21T21:15:57.041275"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -1738,14 +1738,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 69,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
-        "surface_block_class": "dirt",
+        "support_block": "minecraft:stone",
+        "surface_block_class": "stone",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -1775,12 +1775,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:31.861753"
+        "last_observed_at": "2026-01-21T21:15:57.041275"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -1796,14 +1796,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 61,
+        "support_y": 66,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:copper_ore",
-        "surface_block_class": "ore",
+        "support_block": "minecraft:grass_block[snowy=false]",
+        "surface_block_class": "dirt",
         "is_fluid": false,
-        "is_partial_block": false
+        "is_partial_block": true
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -1834,12 +1834,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 59,
-          "z": -110
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T17:09:41.139778"
+        "last_observed_at": "2026-01-21T21:16:06.815086"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -1855,14 +1855,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 61,
+        "support_y": 66,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:stone",
-        "surface_block_class": "stone",
+        "support_block": "minecraft:grass_block[snowy=false]",
+        "surface_block_class": "dirt",
         "is_fluid": false,
-        "is_partial_block": false
+        "is_partial_block": true
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -1892,12 +1892,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 59,
-          "z": -110
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T17:09:41.139778"
+        "last_observed_at": "2026-01-21T21:16:06.815086"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -1913,14 +1913,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 61,
+        "support_y": 65,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:stone",
-        "surface_block_class": "stone",
+        "support_block": "minecraft:grass_block[snowy=false]",
+        "surface_block_class": "dirt",
         "is_fluid": false,
-        "is_partial_block": false
+        "is_partial_block": true
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -1950,12 +1950,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 59,
-          "z": -109
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T17:07:47.827072"
+        "last_observed_at": "2026-01-21T21:15:57.041275"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -1971,14 +1971,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 61,
+        "support_y": 65,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:stone",
-        "surface_block_class": "stone",
+        "support_block": "minecraft:grass_block[snowy=false]",
+        "surface_block_class": "dirt",
         "is_fluid": false,
-        "is_partial_block": false
+        "is_partial_block": true
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -2008,12 +2008,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 59,
-          "z": -109
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T17:07:47.827072"
+        "last_observed_at": "2026-01-21T21:15:57.041275"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -2029,11 +2029,11 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 60,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:cobblestone",
+        "support_block": "minecraft:stone",
         "surface_block_class": "stone",
         "is_fluid": false,
         "is_partial_block": false
@@ -2067,12 +2067,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 59,
-          "z": -109
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T17:07:47.827072"
+        "last_observed_at": "2026-01-21T21:15:57.041275"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -2088,14 +2088,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=false]",
-        "surface_block_class": "dirt",
+        "support_block": "minecraft:stone",
+        "surface_block_class": "stone",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -2126,12 +2126,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:31.861753"
+        "last_observed_at": "2026-01-21T21:15:57.041275"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -2147,14 +2147,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
-        "surface_block_class": "dirt",
+        "support_block": "minecraft:stone",
+        "surface_block_class": "stone",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -2186,12 +2186,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:31.861753"
+        "last_observed_at": "2026-01-21T21:15:57.041275"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -2207,14 +2207,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=false]",
-        "surface_block_class": "dirt",
+        "support_block": "minecraft:stone",
+        "surface_block_class": "stone",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -2245,12 +2245,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:31.861753"
+        "last_observed_at": "2026-01-21T21:15:57.041275"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -2266,14 +2266,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=false]",
-        "surface_block_class": "dirt",
+        "support_block": "minecraft:stone",
+        "surface_block_class": "stone",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -2304,12 +2304,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:31.861753"
+        "last_observed_at": "2026-01-21T21:15:57.041275"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -2674,7 +2674,7 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 60,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
@@ -2711,12 +2711,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 59,
-          "z": -109
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T17:07:47.827072"
+        "last_observed_at": "2026-01-21T21:15:57.041275"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -2732,7 +2732,7 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 61,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
@@ -2770,12 +2770,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 59,
-          "z": -109
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T17:07:47.827072"
+        "last_observed_at": "2026-01-21T21:15:57.041275"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -2791,7 +2791,7 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 58,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
@@ -2828,12 +2828,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 59,
-          "z": -110
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T17:10:09.106528"
+        "last_observed_at": "2026-01-21T21:15:57.041275"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -2887,11 +2887,11 @@
         "observed_from": {
           "x": -140,
           "y": 66,
-          "z": -110
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T19:17:17.288547"
+        "last_observed_at": "2026-01-21T21:15:57.041275"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -2945,11 +2945,11 @@
         "observed_from": {
           "x": -140,
           "y": 66,
-          "z": -110
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T19:17:17.288547"
+        "last_observed_at": "2026-01-21T21:15:57.041275"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -3315,7 +3315,7 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 60,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
@@ -3350,12 +3350,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 59,
-          "z": -109
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T17:07:47.827072"
+        "last_observed_at": "2026-01-21T21:15:57.041275"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -3371,11 +3371,11 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 61,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:cobblestone",
+        "support_block": "minecraft:stone",
         "surface_block_class": "stone",
         "is_fluid": false,
         "is_partial_block": false
@@ -3409,12 +3409,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 59,
-          "z": -109
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T17:07:47.827072"
+        "last_observed_at": "2026-01-21T21:15:57.041275"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -3430,7 +3430,7 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 59,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
@@ -3467,12 +3467,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 59,
-          "z": -110
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T17:09:59.616879"
+        "last_observed_at": "2026-01-21T21:15:57.041275"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -3527,11 +3527,11 @@
         "observed_from": {
           "x": -140,
           "y": 66,
-          "z": -110
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T19:17:17.288547"
+        "last_observed_at": "2026-01-21T21:15:57.041275"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -3585,11 +3585,11 @@
         "observed_from": {
           "x": -140,
           "y": 66,
-          "z": -110
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T19:17:17.288547"
+        "last_observed_at": "2026-01-21T21:15:57.041275"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -3605,11 +3605,11 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 66,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
+        "support_block": "minecraft:grass_block[snowy=false]",
         "surface_block_class": "dirt",
         "is_fluid": false,
         "is_partial_block": true
@@ -3628,7 +3628,8 @@
           "62": "minecraft:stone",
           "63": "minecraft:stone",
           "65": "minecraft:cobblestone",
-          "66": "minecraft:dirt"
+          "66": "minecraft:snow[layers=1]",
+          "66": "minecraft:grass_block[snowy=false]"
         }
       },
       "hazards": {
@@ -3641,7 +3642,8 @@
           "minecraft:cobblestone",
           "minecraft:stone",
           "minecraft:grass_block[snowy=true]",
-          "minecraft:dirt"
+          "minecraft:dirt",
+          "minecraft:grass_block[snowy=false]"
         ],
         "item_entities_visible": [],
         "harvest_actions": [
@@ -3658,16 +3660,16 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "inferred_obstruction",
-        "confidence": 0.9,
-        "last_observed_at": "2026-01-21T20:53:31.861753"
+        "confidence": 0.7,
+        "last_observed_at": "2026-01-21T21:16:06.815086"
       },
       "provenance": {
         "updated_by": "Jill",
-        "update_reason": "nav_surface"
+        "update_reason": "obstruction_right"
       },
       "waypoints": []
     },
@@ -3679,14 +3681,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
-        "surface_block_class": "dirt",
+        "support_block": "minecraft:stone",
+        "surface_block_class": "stone",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {
@@ -3721,12 +3723,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
+          "y": 66,
           "z": -106
         },
         "observation_mode": "inferred_obstruction",
         "confidence": 0.7,
-        "last_observed_at": "2026-01-21T20:53:31.861753"
+        "last_observed_at": "2026-01-21T21:14:52.818796"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -3742,14 +3744,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 69,
+        "support_y": 68.0,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=false]",
-        "surface_block_class": "dirt",
+        "support_block": "minecraft:stone",
+        "surface_block_class": "stone",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {
@@ -3783,16 +3785,16 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
-        "observation_mode": "inferred_obstruction",
+        "observation_mode": "inferred",
         "confidence": 0.7,
-        "last_observed_at": "2026-01-21T20:53:31.861753"
+        "last_observed_at": "2026-01-21T21:16:06.815086"
       },
       "provenance": {
         "updated_by": "Jill",
-        "update_reason": "nav_surface"
+        "update_reason": "forward_inference"
       },
       "waypoints": []
     },
@@ -3808,17 +3810,18 @@
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:stone",
+        "support_block": "minecraft:grass_block[snowy=false]",
         "surface_block_class": "stone",
         "is_fluid": false,
         "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {
-          "66.0": "minecraft:dirt",
+          "66.0": "minecraft:grass_block[snowy=true]",
           "67": "minecraft:stone",
-          "66": "minecraft:dirt",
-          "68": "minecraft:stone"
+          "66": "minecraft:grass_block[snowy=false]",
+          "68": "minecraft:stone",
+          "66": "minecraft:snow[layers=1]"
         }
       },
       "hazards": {
@@ -3844,16 +3847,16 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
-        "observation_mode": "inferred",
+        "observation_mode": "inferred_obstruction",
         "confidence": 0.7,
-        "last_observed_at": "2026-01-21T20:53:33.091500"
+        "last_observed_at": "2026-01-21T21:16:06.815086"
       },
       "provenance": {
         "updated_by": "Jill",
-        "update_reason": "forward_inference"
+        "update_reason": "obstruction_left"
       },
       "waypoints": []
     },
@@ -3865,14 +3868,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 67,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
-        "surface_block_class": "dirt",
+        "support_block": "minecraft:stone",
+        "surface_block_class": "stone",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {
@@ -3905,12 +3908,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "inferred_obstruction",
         "confidence": 0.7,
-        "last_observed_at": "2026-01-21T20:53:32.472573"
+        "last_observed_at": "2026-01-21T21:16:06.815086"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -3926,14 +3929,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
-        "surface_block_class": "dirt",
+        "support_block": "minecraft:stone",
+        "surface_block_class": "stone",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -3964,12 +3967,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:32.472573"
+        "last_observed_at": "2026-01-21T21:16:06.815086"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -3985,14 +3988,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 67,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
-        "surface_block_class": "dirt",
+        "support_block": "minecraft:stone",
+        "surface_block_class": "stone",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -4024,12 +4027,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "inferred",
         "confidence": 0.7,
-        "last_observed_at": "2026-01-21T20:53:32.472573"
+        "last_observed_at": "2026-01-21T21:16:06.815086"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -4045,14 +4048,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
-        "surface_block_class": "dirt",
+        "support_block": "minecraft:stone",
+        "surface_block_class": "stone",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -4083,12 +4086,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:32.472573"
+        "last_observed_at": "2026-01-21T21:16:06.815086"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -4104,14 +4107,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
-        "surface_block_class": "dirt",
+        "support_block": "minecraft:stone",
+        "surface_block_class": "stone",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {
@@ -4144,12 +4147,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "inferred",
         "confidence": 0.7,
-        "last_observed_at": "2026-01-21T20:53:32.472573"
+        "last_observed_at": "2026-01-21T21:16:06.815086"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -4165,14 +4168,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
-        "surface_block_class": "dirt",
+        "support_block": "minecraft:stone",
+        "surface_block_class": "stone",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -4204,12 +4207,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:32.472573"
+        "last_observed_at": "2026-01-21T21:16:06.815086"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -4225,14 +4228,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
-        "surface_block_class": "dirt",
+        "support_block": "minecraft:stone",
+        "surface_block_class": "stone",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -4263,12 +4266,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:32.472573"
+        "last_observed_at": "2026-01-21T21:16:06.815086"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -4284,11 +4287,11 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
+        "support_block": "minecraft:grass_block[snowy=false]",
         "surface_block_class": "dirt",
         "is_fluid": false,
         "is_partial_block": true
@@ -4322,12 +4325,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:32.472573"
+        "last_observed_at": "2026-01-21T21:16:06.815086"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -4343,14 +4346,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
-        "surface_block_class": "dirt",
+        "support_block": "minecraft:stone",
+        "surface_block_class": "stone",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -4382,12 +4385,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:32.472573"
+        "last_observed_at": "2026-01-21T21:16:06.815086"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -4403,14 +4406,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
-        "surface_block_class": "dirt",
+        "support_block": "minecraft:stone",
+        "surface_block_class": "stone",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -4441,12 +4444,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:32.472573"
+        "last_observed_at": "2026-01-21T21:16:06.815086"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -4462,11 +4465,11 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
+        "support_block": "minecraft:grass_block[snowy=false]",
         "surface_block_class": "dirt",
         "is_fluid": false,
         "is_partial_block": true
@@ -4500,12 +4503,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:32.472573"
+        "last_observed_at": "2026-01-21T21:16:06.815086"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -4521,11 +4524,11 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
+        "support_block": "minecraft:grass_block[snowy=false]",
         "surface_block_class": "dirt",
         "is_fluid": false,
         "is_partial_block": true
@@ -4559,12 +4562,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:32.472573"
+        "last_observed_at": "2026-01-21T21:16:06.815086"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -4580,14 +4583,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
-        "surface_block_class": "dirt",
+        "support_block": "minecraft:stone",
+        "surface_block_class": "stone",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -4618,12 +4621,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:32.472573"
+        "last_observed_at": "2026-01-21T21:16:06.815086"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -4639,14 +4642,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
-        "surface_block_class": "dirt",
+        "support_block": "minecraft:stone",
+        "surface_block_class": "stone",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -4677,12 +4680,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:32.472573"
+        "last_observed_at": "2026-01-21T21:16:06.815086"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -4698,14 +4701,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
-        "surface_block_class": "dirt",
+        "support_block": "minecraft:stone",
+        "surface_block_class": "stone",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -4736,12 +4739,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:32.472573"
+        "last_observed_at": "2026-01-21T21:16:06.815086"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -4757,14 +4760,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 61,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:stone",
-        "surface_block_class": "stone",
+        "support_block": "minecraft:grass_block[snowy=false]",
+        "surface_block_class": "dirt",
         "is_fluid": false,
-        "is_partial_block": false
+        "is_partial_block": true
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -4794,12 +4797,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 59,
-          "z": -110
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T17:09:41.139778"
+        "last_observed_at": "2026-01-21T21:16:06.815086"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -4815,14 +4818,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 61,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:stone",
-        "surface_block_class": "stone",
+        "support_block": "minecraft:grass_block[snowy=false]",
+        "surface_block_class": "dirt",
         "is_fluid": false,
-        "is_partial_block": false
+        "is_partial_block": true
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -4852,12 +4855,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 59,
-          "z": -110
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T17:09:41.139778"
+        "last_observed_at": "2026-01-21T21:16:06.815086"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -4873,14 +4876,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
-        "surface_block_class": "dirt",
+        "support_block": "minecraft:stone",
+        "surface_block_class": "stone",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -4911,12 +4914,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:32.472573"
+        "last_observed_at": "2026-01-21T21:16:06.815086"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -4932,14 +4935,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 61,
+        "support_y": 67,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:stone",
-        "surface_block_class": "stone",
+        "support_block": "minecraft:grass_block[snowy=false]",
+        "surface_block_class": "dirt",
         "is_fluid": false,
-        "is_partial_block": false
+        "is_partial_block": true
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -4969,12 +4972,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 59,
-          "z": -110
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T17:09:41.139778"
+        "last_observed_at": "2026-01-21T21:16:06.815086"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -4990,14 +4993,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
-        "surface_block_class": "dirt",
+        "support_block": "minecraft:stone",
+        "surface_block_class": "stone",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -5028,12 +5031,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:32.472573"
+        "last_observed_at": "2026-01-21T21:16:06.815086"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -5049,14 +5052,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
-        "surface_block_class": "dirt",
+        "support_block": "minecraft:stone",
+        "surface_block_class": "stone",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -5087,12 +5090,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:32.472573"
+        "last_observed_at": "2026-01-21T21:16:06.815086"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -5108,14 +5111,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 61,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:stone",
-        "surface_block_class": "stone",
+        "support_block": "minecraft:grass_block[snowy=true]",
+        "surface_block_class": "dirt",
         "is_fluid": false,
-        "is_partial_block": false
+        "is_partial_block": true
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -5145,12 +5148,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 59,
-          "z": -110
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T17:09:41.139778"
+        "last_observed_at": "2026-01-21T21:16:06.815086"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -5166,14 +5169,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 61,
+        "support_y": 67,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:stone",
-        "surface_block_class": "stone",
+        "support_block": "minecraft:grass_block[snowy=false]",
+        "surface_block_class": "dirt",
         "is_fluid": false,
-        "is_partial_block": false
+        "is_partial_block": true
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -5203,12 +5206,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 59,
-          "z": -110
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T17:09:41.139778"
+        "last_observed_at": "2026-01-21T21:16:06.815086"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -5224,14 +5227,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 69,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
+        "support_block": "minecraft:dirt",
         "surface_block_class": "dirt",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -5262,12 +5265,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:32.472573"
+        "last_observed_at": "2026-01-21T21:16:06.815086"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -5283,14 +5286,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 61,
+        "support_y": 67,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:stone",
-        "surface_block_class": "stone",
+        "support_block": "minecraft:grass_block[snowy=false]",
+        "surface_block_class": "dirt",
         "is_fluid": false,
-        "is_partial_block": false
+        "is_partial_block": true
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -5320,12 +5323,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 59,
-          "z": -110
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T17:09:41.139778"
+        "last_observed_at": "2026-01-21T21:16:06.815086"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -5341,14 +5344,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
-        "surface_block_class": "dirt",
+        "support_block": "minecraft:stone",
+        "surface_block_class": "stone",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -5379,12 +5382,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:32.472573"
+        "last_observed_at": "2026-01-21T21:16:06.815086"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -5400,14 +5403,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
-        "surface_block_class": "dirt",
+        "support_block": "minecraft:stone",
+        "surface_block_class": "stone",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -5438,12 +5441,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:32.472573"
+        "last_observed_at": "2026-01-21T21:16:06.815086"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -5459,14 +5462,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
+        "support_block": "minecraft:dirt",
         "surface_block_class": "dirt",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -5498,12 +5501,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:32.472573"
+        "last_observed_at": "2026-01-21T21:16:06.815086"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -5635,14 +5638,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 61,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:stone",
-        "surface_block_class": "stone",
+        "support_block": "minecraft:grass_block[snowy=true]",
+        "surface_block_class": "dirt",
         "is_fluid": false,
-        "is_partial_block": false
+        "is_partial_block": true
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -5672,12 +5675,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 59,
-          "z": -110
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T17:09:41.139778"
+        "last_observed_at": "2026-01-21T21:16:06.815086"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -5751,14 +5754,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 69,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
+        "support_block": "minecraft:dirt",
         "surface_block_class": "dirt",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -5789,12 +5792,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:32.472573"
+        "last_observed_at": "2026-01-21T21:16:06.815086"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -5810,14 +5813,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
-        "surface_block_class": "dirt",
+        "support_block": "minecraft:stone",
+        "surface_block_class": "stone",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -5848,12 +5851,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:32.472573"
+        "last_observed_at": "2026-01-21T21:16:06.815086"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -5869,14 +5872,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
-        "surface_block_class": "dirt",
+        "support_block": "minecraft:stone",
+        "surface_block_class": "stone",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -5909,12 +5912,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:32.472573"
+        "last_observed_at": "2026-01-21T21:16:06.815086"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -5930,14 +5933,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
+        "support_block": "minecraft:dirt",
         "surface_block_class": "dirt",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -5969,12 +5972,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:32.472573"
+        "last_observed_at": "2026-01-21T21:16:06.815086"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -6107,14 +6110,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 56,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:stone",
-        "surface_block_class": "stone",
+        "support_block": "minecraft:grass_block[snowy=true]",
+        "surface_block_class": "dirt",
         "is_fluid": false,
-        "is_partial_block": false
+        "is_partial_block": true
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -6143,13 +6146,13 @@
       },
       "observability": {
         "observed_from": {
-          "x": -141,
-          "y": 54,
-          "z": -110
+          "x": -140,
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T00:46:34.033714"
+        "last_observed_at": "2026-01-21T21:16:06.815086"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -6223,14 +6226,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 69,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
+        "support_block": "minecraft:dirt",
         "surface_block_class": "dirt",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -6261,12 +6264,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:32.472573"
+        "last_observed_at": "2026-01-21T21:16:06.815086"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -6340,14 +6343,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
-        "surface_block_class": "dirt",
+        "support_block": "minecraft:stone",
+        "surface_block_class": "stone",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -6378,12 +6381,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:32.472573"
+        "last_observed_at": "2026-01-21T21:16:06.815086"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -6399,14 +6402,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
-        "surface_block_class": "dirt",
+        "support_block": "minecraft:stone",
+        "surface_block_class": "stone",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -6438,12 +6441,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:32.472573"
+        "last_observed_at": "2026-01-21T21:16:06.815086"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -6459,14 +6462,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
-        "surface_block_class": "dirt",
+        "support_block": "minecraft:stone",
+        "surface_block_class": "stone",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -6498,12 +6501,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:32.472573"
+        "last_observed_at": "2026-01-21T21:16:06.815086"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -6519,7 +6522,7 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 68,
+        "support_y": 67,
         "movement_class": "flat"
       },
       "surface": {
@@ -6554,12 +6557,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:32.472573"
+        "last_observed_at": "2026-01-21T21:16:06.815086"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -6575,14 +6578,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
-        "surface_block_class": "dirt",
+        "support_block": "minecraft:stone",
+        "surface_block_class": "stone",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -6613,12 +6616,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:32.472573"
+        "last_observed_at": "2026-01-21T21:16:06.815086"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -6634,14 +6637,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70.0,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:dirt",
-        "surface_block_class": "dirt",
+        "support_block": "minecraft:stone",
+        "surface_block_class": "stone",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {
@@ -6676,16 +6679,16 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
-        "observation_mode": "inferred_obstruction",
+        "observation_mode": "inferred",
         "confidence": 0.7,
-        "last_observed_at": "2026-01-21T20:53:44.611250"
+        "last_observed_at": "2026-01-21T21:15:46.771786"
       },
       "provenance": {
         "updated_by": "Jill",
-        "update_reason": "obstruction_back"
+        "update_reason": "nav_surface"
       },
       "waypoints": []
     },
@@ -6697,14 +6700,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
-        "surface_block_class": "dirt",
+        "support_block": "minecraft:stone",
+        "surface_block_class": "stone",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -6735,12 +6738,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:32.472573"
+        "last_observed_at": "2026-01-21T21:16:06.815086"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -6756,14 +6759,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
-        "surface_block_class": "dirt",
+        "support_block": "minecraft:stone",
+        "surface_block_class": "stone",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {
@@ -6796,12 +6799,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "inferred_obstruction",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:33.091500"
+        "last_observed_at": "2026-01-21T21:15:46.771786"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -6821,15 +6824,16 @@
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:dirt",
+        "support_block": "minecraft:grass_block[snowy=false]",
         "surface_block_class": "dirt",
         "is_fluid": false,
-        "is_partial_block": false
+        "is_partial_block": true
       },
       "obstructions": {
         "blocks_at_y": {
           "67.0": "minecraft:stone",
-          "70": "minecraft:stone"
+          "70": "minecraft:stone",
+          "66": "minecraft:grass_block[snowy=true]"
         }
       },
       "hazards": {
@@ -6840,7 +6844,8 @@
       "resources": {
         "resources_visible": [
           "minecraft:stone",
-          "minecraft:dirt"
+          "minecraft:dirt",
+          "minecraft:grass_block[snowy=false]"
         ],
         "item_entities_visible": [],
         "harvest_actions": [
@@ -6857,12 +6862,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 69,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "direct",
         "confidence": 0.9,
-        "last_observed_at": "2026-01-21T20:53:44.611250"
+        "last_observed_at": "2026-01-21T21:15:46.771786"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -6878,14 +6883,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
-        "surface_block_class": "dirt",
+        "support_block": "minecraft:stone",
+        "surface_block_class": "stone",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -6916,12 +6921,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 69,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:44.611250"
+        "last_observed_at": "2026-01-21T21:15:46.771786"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -6937,14 +6942,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
-        "surface_block_class": "dirt",
+        "support_block": "minecraft:stone",
+        "surface_block_class": "stone",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -6976,12 +6981,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:32.472573"
+        "last_observed_at": "2026-01-21T21:16:06.815086"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -6997,14 +7002,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
-        "surface_block_class": "dirt",
+        "support_block": "minecraft:stone",
+        "surface_block_class": "stone",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -7037,12 +7042,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:33.091500"
+        "last_observed_at": "2026-01-21T21:15:46.771786"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -7071,7 +7076,9 @@
         "blocks_at_y": {
           "67": "minecraft:stone",
           "67.0": "minecraft:stone",
-          "68": "minecraft:stone"
+          "68": "minecraft:stone",
+          "66.0": "minecraft:stone",
+          "69": "minecraft:grass_block[snowy=true]"
         }
       },
       "hazards": {
@@ -7099,16 +7106,16 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "inferred_obstruction",
         "confidence": 0.7,
-        "last_observed_at": "2026-01-21T20:53:33.699116"
+        "last_observed_at": "2026-01-21T21:15:46.771786"
       },
       "provenance": {
         "updated_by": "Jill",
-        "update_reason": "obstruction_right"
+        "update_reason": "nav_surface"
       },
       "waypoints": []
     },
@@ -7120,20 +7127,21 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70.0,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
-        "surface_block_class": "dirt",
+        "support_block": "minecraft:stone",
+        "surface_block_class": "stone",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {
           "67": "minecraft:stone",
           "67.0": "minecraft:stone",
-          "68": "minecraft:stone"
+          "68": "minecraft:stone",
+          "69": "minecraft:snow[layers=1]"
         }
       },
       "hazards": {
@@ -7162,16 +7170,16 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 69,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
-        "observation_mode": "inferred",
+        "observation_mode": "inferred_obstruction",
         "confidence": 0.7,
-        "last_observed_at": "2026-01-21T20:53:44.611250"
+        "last_observed_at": "2026-01-21T21:15:46.771786"
       },
       "provenance": {
         "updated_by": "Jill",
-        "update_reason": "forward_inference"
+        "update_reason": "nav_surface"
       },
       "waypoints": []
     },
@@ -7226,7 +7234,7 @@
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:44.611250"
+        "last_observed_at": "2026-01-21T21:14:00.996210"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -7242,14 +7250,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
-        "surface_block_class": "dirt",
+        "support_block": "minecraft:stone",
+        "surface_block_class": "stone",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -7281,12 +7289,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:32.472573"
+        "last_observed_at": "2026-01-21T21:16:06.815086"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -7302,14 +7310,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
-        "surface_block_class": "dirt",
+        "support_block": "minecraft:stone",
+        "surface_block_class": "stone",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -7341,12 +7349,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:33.091500"
+        "last_observed_at": "2026-01-21T21:15:46.771786"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -7362,14 +7370,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
-        "surface_block_class": "dirt",
+        "support_block": "minecraft:stone",
+        "surface_block_class": "stone",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -7402,12 +7410,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:33.091500"
+        "last_observed_at": "2026-01-21T21:15:46.771786"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -7423,14 +7431,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 69,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
-        "surface_block_class": "dirt",
+        "support_block": "minecraft:stone",
+        "surface_block_class": "stone",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -7461,12 +7469,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "inferred",
         "confidence": 0.7,
-        "last_observed_at": "2026-01-21T20:53:33.091500"
+        "last_observed_at": "2026-01-21T21:15:46.771786"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -7482,14 +7490,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
-        "surface_block_class": "dirt",
+        "support_block": "minecraft:stone",
+        "surface_block_class": "stone",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {
@@ -7523,12 +7531,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 69,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "inferred_obstruction",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:44.611250"
+        "last_observed_at": "2026-01-21T21:15:46.771786"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -7544,14 +7552,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
-        "surface_block_class": "dirt",
+        "support_block": "minecraft:stone",
+        "surface_block_class": "stone",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -7582,12 +7590,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 69,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "inferred",
         "confidence": 0.7,
-        "last_observed_at": "2026-01-21T20:53:44.611250"
+        "last_observed_at": "2026-01-21T21:15:46.771786"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -7603,14 +7611,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
+        "support_block": "minecraft:dirt",
         "surface_block_class": "dirt",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -7642,12 +7650,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:33.091500"
+        "last_observed_at": "2026-01-21T21:16:06.815086"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -7663,14 +7671,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
-        "surface_block_class": "dirt",
+        "support_block": "minecraft:stone",
+        "surface_block_class": "stone",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -7703,12 +7711,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:33.091500"
+        "last_observed_at": "2026-01-21T21:15:46.771786"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -7724,14 +7732,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
-        "surface_block_class": "dirt",
+        "support_block": "minecraft:stone",
+        "surface_block_class": "stone",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -7764,12 +7772,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:33.091500"
+        "last_observed_at": "2026-01-21T21:15:46.771786"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -7785,14 +7793,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
-        "surface_block_class": "dirt",
+        "support_block": "minecraft:stone",
+        "surface_block_class": "stone",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -7825,12 +7833,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:33.091500"
+        "last_observed_at": "2026-01-21T21:15:46.771786"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -7846,14 +7854,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
-        "surface_block_class": "dirt",
+        "support_block": "minecraft:stone",
+        "surface_block_class": "stone",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -7885,12 +7893,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:33.091500"
+        "last_observed_at": "2026-01-21T21:15:46.771786"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -7906,14 +7914,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
-        "surface_block_class": "dirt",
+        "support_block": "minecraft:stone",
+        "surface_block_class": "stone",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -7944,12 +7952,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 69,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:44.611250"
+        "last_observed_at": "2026-01-21T21:15:46.771786"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -7965,14 +7973,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
-        "surface_block_class": "dirt",
+        "support_block": "minecraft:stone",
+        "surface_block_class": "stone",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -8003,12 +8011,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 69,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:44.611250"
+        "last_observed_at": "2026-01-21T21:15:46.771786"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -8024,14 +8032,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
+        "support_block": "minecraft:dirt",
         "surface_block_class": "dirt",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -8063,12 +8071,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:33.091500"
+        "last_observed_at": "2026-01-21T21:16:06.815086"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -8084,14 +8092,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
-        "surface_block_class": "dirt",
+        "support_block": "minecraft:stone",
+        "surface_block_class": "stone",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -8124,12 +8132,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:33.091500"
+        "last_observed_at": "2026-01-21T21:15:46.771786"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -8145,14 +8153,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
-        "surface_block_class": "dirt",
+        "support_block": "minecraft:stone",
+        "surface_block_class": "stone",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -8185,12 +8193,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:33.091500"
+        "last_observed_at": "2026-01-21T21:15:46.771786"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -8206,14 +8214,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
-        "surface_block_class": "dirt",
+        "support_block": "minecraft:stone",
+        "surface_block_class": "stone",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -8245,12 +8253,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:33.091500"
+        "last_observed_at": "2026-01-21T21:15:46.771786"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -8266,14 +8274,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
-        "surface_block_class": "dirt",
+        "support_block": "minecraft:stone",
+        "surface_block_class": "stone",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -8305,12 +8313,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:33.091500"
+        "last_observed_at": "2026-01-21T21:15:46.771786"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -8326,14 +8334,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 69,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
-        "surface_block_class": "dirt",
+        "support_block": "minecraft:stone",
+        "surface_block_class": "stone",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -8363,12 +8371,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 69,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:44.611250"
+        "last_observed_at": "2026-01-21T21:15:46.771786"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -8384,14 +8392,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
-        "surface_block_class": "dirt",
+        "support_block": "minecraft:stone",
+        "surface_block_class": "stone",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -8422,12 +8430,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 69,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:44.611250"
+        "last_observed_at": "2026-01-21T21:15:46.771786"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -8486,7 +8494,7 @@
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:44.611250"
+        "last_observed_at": "2026-01-21T21:14:00.996210"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -8502,14 +8510,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
-        "surface_block_class": "dirt",
+        "support_block": "minecraft:stone",
+        "surface_block_class": "stone",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -8541,12 +8549,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:33.091500"
+        "last_observed_at": "2026-01-21T21:16:06.815086"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -8562,14 +8570,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
-        "surface_block_class": "dirt",
+        "support_block": "minecraft:stone",
+        "surface_block_class": "stone",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -8601,12 +8609,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:33.091500"
+        "last_observed_at": "2026-01-21T21:15:46.771786"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -8622,14 +8630,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
-        "surface_block_class": "dirt",
+        "support_block": "minecraft:stone",
+        "surface_block_class": "stone",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -8661,12 +8669,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:33.091500"
+        "last_observed_at": "2026-01-21T21:15:46.771786"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -8682,14 +8690,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
-        "surface_block_class": "dirt",
+        "support_block": "minecraft:stone",
+        "surface_block_class": "stone",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -8720,12 +8728,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:33.091500"
+        "last_observed_at": "2026-01-21T21:15:46.771786"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -8741,14 +8749,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
-        "surface_block_class": "dirt",
+        "support_block": "minecraft:stone",
+        "surface_block_class": "stone",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -8780,12 +8788,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:33.091500"
+        "last_observed_at": "2026-01-21T21:15:46.771786"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -8801,14 +8809,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=false]",
-        "surface_block_class": "dirt",
+        "support_block": "minecraft:stone",
+        "surface_block_class": "stone",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -8840,12 +8848,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:33.091500"
+        "last_observed_at": "2026-01-21T21:15:46.771786"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -8861,14 +8869,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 69,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
-        "surface_block_class": "dirt",
+        "support_block": "minecraft:stone",
+        "surface_block_class": "stone",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -8898,12 +8906,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 69,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:44.611250"
+        "last_observed_at": "2026-01-21T21:15:46.771786"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -8919,14 +8927,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
-        "surface_block_class": "dirt",
+        "support_block": "minecraft:stone",
+        "surface_block_class": "stone",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -8957,12 +8965,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 69,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:44.611250"
+        "last_observed_at": "2026-01-21T21:15:46.771786"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -8978,14 +8986,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
-        "surface_block_class": "dirt",
+        "support_block": "minecraft:stone",
+        "surface_block_class": "stone",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -9017,12 +9025,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 69,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:44.611250"
+        "last_observed_at": "2026-01-21T21:15:46.771786"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -9038,14 +9046,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
-        "surface_block_class": "dirt",
+        "support_block": "minecraft:stone",
+        "surface_block_class": "stone",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {
@@ -9084,12 +9092,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "inferred_obstruction",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:31.861753"
+        "last_observed_at": "2026-01-21T21:15:57.041275"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -9105,14 +9113,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 67,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:dirt",
+        "support_block": "minecraft:grass_block[snowy=false]",
         "surface_block_class": "dirt",
         "is_fluid": false,
-        "is_partial_block": false
+        "is_partial_block": true
       },
       "obstructions": {
         "blocks_at_y": {
@@ -9154,12 +9162,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "inferred",
         "confidence": 0.7,
-        "last_observed_at": "2026-01-21T20:53:31.861753"
+        "last_observed_at": "2026-01-21T21:15:57.041275"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -9175,14 +9183,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
-        "surface_block_class": "dirt",
+        "support_block": "minecraft:stone",
+        "surface_block_class": "stone",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -9214,12 +9222,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 69,
+          "y": 66,
           "z": -106
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:44.611250"
+        "last_observed_at": "2026-01-21T21:14:52.818796"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -9235,14 +9243,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
-        "surface_block_class": "dirt",
+        "support_block": "minecraft:stone",
+        "surface_block_class": "stone",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -9274,12 +9282,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "inferred",
         "confidence": 0.7,
-        "last_observed_at": "2026-01-21T20:53:31.861753"
+        "last_observed_at": "2026-01-21T21:15:57.041275"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -9339,7 +9347,7 @@
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:44.611250"
+        "last_observed_at": "2026-01-21T21:14:00.996210"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -9355,14 +9363,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
-        "surface_block_class": "dirt",
+        "support_block": "minecraft:stone",
+        "surface_block_class": "stone",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -9394,12 +9402,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 69,
+          "y": 66,
           "z": -106
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:44.611250"
+        "last_observed_at": "2026-01-21T21:14:52.818796"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -9415,14 +9423,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
-        "surface_block_class": "dirt",
+        "support_block": "minecraft:stone",
+        "surface_block_class": "stone",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -9453,12 +9461,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 69,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:44.611250"
+        "last_observed_at": "2026-01-21T21:15:57.041275"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -9518,7 +9526,7 @@
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:44.611250"
+        "last_observed_at": "2026-01-21T21:14:00.996210"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -9578,7 +9586,7 @@
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:44.611250"
+        "last_observed_at": "2026-01-21T21:14:00.996210"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -9594,14 +9602,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
-        "surface_block_class": "dirt",
+        "support_block": "minecraft:stone",
+        "surface_block_class": "stone",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -9632,12 +9640,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 69,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:44.611250"
+        "last_observed_at": "2026-01-21T21:15:57.041275"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -9696,7 +9704,7 @@
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:44.611250"
+        "last_observed_at": "2026-01-21T21:14:00.996210"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -9712,14 +9720,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
-        "surface_block_class": "dirt",
+        "support_block": "minecraft:stone",
+        "surface_block_class": "stone",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -9750,12 +9758,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 69,
+          "y": 66,
           "z": -106
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:44.611250"
+        "last_observed_at": "2026-01-21T21:14:52.818796"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -9815,7 +9823,7 @@
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:44.611250"
+        "last_observed_at": "2026-01-21T21:14:00.996210"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -9874,7 +9882,7 @@
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:44.611250"
+        "last_observed_at": "2026-01-21T21:14:00.996210"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -9890,14 +9898,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
+        "support_block": "minecraft:dirt",
         "surface_block_class": "dirt",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -9928,12 +9936,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 69,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:44.611250"
+        "last_observed_at": "2026-01-21T21:15:57.041275"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -9992,7 +10000,7 @@
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:44.611250"
+        "last_observed_at": "2026-01-21T21:14:00.996210"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -10008,12 +10016,12 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 71,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:poppy",
-        "surface_block_class": "unknown",
+        "support_block": "minecraft:dirt",
+        "surface_block_class": "dirt",
         "is_fluid": false,
         "is_partial_block": false
       },
@@ -10046,12 +10054,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 69,
+          "y": 66,
           "z": -106
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:44.611250"
+        "last_observed_at": "2026-01-21T21:14:52.818796"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -10111,7 +10119,7 @@
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:44.611250"
+        "last_observed_at": "2026-01-21T21:14:00.996210"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -10170,7 +10178,7 @@
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:44.611250"
+        "last_observed_at": "2026-01-21T21:14:00.996210"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -10224,11 +10232,11 @@
         "observed_from": {
           "x": -140,
           "y": 66,
-          "z": -110
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T19:17:17.288547"
+        "last_observed_at": "2026-01-21T21:15:57.041275"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -10287,7 +10295,7 @@
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:44.611250"
+        "last_observed_at": "2026-01-21T21:14:00.996210"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -10405,7 +10413,7 @@
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:44.611250"
+        "last_observed_at": "2026-01-21T21:14:00.996210"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -10518,11 +10526,11 @@
         "observed_from": {
           "x": -140,
           "y": 66,
-          "z": -110
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T19:17:17.288547"
+        "last_observed_at": "2026-01-21T21:15:57.041275"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -10581,7 +10589,7 @@
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:44.611250"
+        "last_observed_at": "2026-01-21T21:14:00.996210"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -10699,7 +10707,7 @@
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:44.611250"
+        "last_observed_at": "2026-01-21T21:14:00.996210"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -10817,7 +10825,7 @@
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:44.611250"
+        "last_observed_at": "2026-01-21T21:14:00.996210"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -12094,11 +12102,11 @@
         "observed_from": {
           "x": -140,
           "y": 66,
-          "z": -108
+          "z": -106
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T00:03:39.054673"
+        "last_observed_at": "2026-01-21T21:15:01.916872"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -12114,14 +12122,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
-        "surface_block_class": "dirt",
+        "support_block": "minecraft:stone",
+        "surface_block_class": "stone",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -12152,12 +12160,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
+          "y": 66,
           "z": -106
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:32.472573"
+        "last_observed_at": "2026-01-21T21:15:01.916872"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -12173,14 +12181,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
-        "surface_block_class": "dirt",
+        "support_block": "minecraft:stone",
+        "surface_block_class": "stone",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -12211,12 +12219,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
+          "y": 66,
           "z": -106
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:32.472573"
+        "last_observed_at": "2026-01-21T21:15:01.916872"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -12232,14 +12240,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=false]",
+        "support_block": "minecraft:dirt",
         "surface_block_class": "dirt",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -12268,12 +12276,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
+          "y": 66,
           "z": -106
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:32.472573"
+        "last_observed_at": "2026-01-21T21:15:01.916872"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -12289,14 +12297,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
-        "surface_block_class": "dirt",
+        "support_block": "minecraft:stone",
+        "surface_block_class": "stone",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -12327,12 +12335,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
+          "y": 66,
           "z": -106
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:33.091500"
+        "last_observed_at": "2026-01-21T21:15:45.838379"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -12348,14 +12356,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
-        "surface_block_class": "dirt",
+        "support_block": "minecraft:stone",
+        "surface_block_class": "stone",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -12386,12 +12394,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
+          "y": 66,
           "z": -106
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:33.091500"
+        "last_observed_at": "2026-01-21T21:15:45.838379"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -12407,14 +12415,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
-        "surface_block_class": "dirt",
+        "support_block": "minecraft:stone",
+        "surface_block_class": "stone",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -12445,12 +12453,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
+          "y": 66,
           "z": -106
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:33.091500"
+        "last_observed_at": "2026-01-21T21:15:45.838379"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -12466,14 +12474,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
-        "surface_block_class": "dirt",
+        "support_block": "minecraft:stone",
+        "surface_block_class": "stone",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -12504,12 +12512,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
+          "y": 66,
           "z": -106
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:33.091500"
+        "last_observed_at": "2026-01-21T21:15:45.838379"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -12525,14 +12533,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
-        "surface_block_class": "dirt",
+        "support_block": "minecraft:stone",
+        "surface_block_class": "stone",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -12563,12 +12571,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
+          "y": 66,
           "z": -106
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:33.091500"
+        "last_observed_at": "2026-01-21T21:15:45.838379"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -12584,14 +12592,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
-        "surface_block_class": "dirt",
+        "support_block": "minecraft:stone",
+        "surface_block_class": "stone",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -12622,12 +12630,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:33.091500"
+        "last_observed_at": "2026-01-21T21:15:46.771786"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -12643,14 +12651,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
-        "surface_block_class": "dirt",
+        "support_block": "minecraft:stone",
+        "surface_block_class": "stone",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -12681,12 +12689,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:33.091500"
+        "last_observed_at": "2026-01-21T21:15:46.771786"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -12702,14 +12710,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
-        "surface_block_class": "dirt",
+        "support_block": "minecraft:stone",
+        "surface_block_class": "stone",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -12740,12 +12748,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:33.091500"
+        "last_observed_at": "2026-01-21T21:15:46.771786"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -12761,14 +12769,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
-        "surface_block_class": "dirt",
+        "support_block": "minecraft:stone",
+        "surface_block_class": "stone",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -12799,12 +12807,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 69,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:44.611250"
+        "last_observed_at": "2026-01-21T21:15:46.771786"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -12820,14 +12828,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
-        "surface_block_class": "dirt",
+        "support_block": "minecraft:stone",
+        "surface_block_class": "stone",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -12858,12 +12866,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 69,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:44.611250"
+        "last_observed_at": "2026-01-21T21:15:46.771786"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -12879,14 +12887,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
-        "surface_block_class": "dirt",
+        "support_block": "minecraft:stone",
+        "surface_block_class": "stone",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -12917,12 +12925,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 69,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:44.611250"
+        "last_observed_at": "2026-01-21T21:15:46.771786"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -12979,7 +12987,7 @@
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:44.611250"
+        "last_observed_at": "2026-01-21T21:14:00.996210"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -13036,7 +13044,7 @@
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:44.611250"
+        "last_observed_at": "2026-01-21T21:14:00.996210"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -14508,12 +14516,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
+          "y": 69,
           "z": -106
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:33.091500"
+        "last_observed_at": "2026-01-21T21:14:34.443626"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -14565,12 +14573,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
+          "y": 69,
           "z": -106
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:33.091500"
+        "last_observed_at": "2026-01-21T21:14:34.443626"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -14586,14 +14594,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
-        "surface_block_class": "dirt",
+        "support_block": "minecraft:stone",
+        "surface_block_class": "stone",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -14606,11 +14614,13 @@
       "resources": {
         "resources_visible": [
           "minecraft:grass_block[snowy=true]",
-          "minecraft:dirt"
+          "minecraft:dirt",
+          "minecraft:stone"
         ],
         "item_entities_visible": [],
         "harvest_actions": [
-          "dig"
+          "dig",
+          "mine"
         ],
         "tool_required": "unknown"
       },
@@ -14622,12 +14632,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:33.091500"
+        "last_observed_at": "2026-01-21T21:15:46.771786"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -14643,14 +14653,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
-        "surface_block_class": "dirt",
+        "support_block": "minecraft:stone",
+        "surface_block_class": "stone",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -14663,11 +14673,13 @@
       "resources": {
         "resources_visible": [
           "minecraft:grass_block[snowy=true]",
-          "minecraft:dirt"
+          "minecraft:dirt",
+          "minecraft:stone"
         ],
         "item_entities_visible": [],
         "harvest_actions": [
-          "dig"
+          "dig",
+          "mine"
         ],
         "tool_required": "unknown"
       },
@@ -14679,12 +14691,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:33.091500"
+        "last_observed_at": "2026-01-21T21:15:46.771786"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -14700,14 +14712,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
-        "surface_block_class": "dirt",
+        "support_block": "minecraft:stone",
+        "surface_block_class": "stone",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -14720,11 +14732,13 @@
       "resources": {
         "resources_visible": [
           "minecraft:grass_block[snowy=true]",
-          "minecraft:dirt"
+          "minecraft:dirt",
+          "minecraft:stone"
         ],
         "item_entities_visible": [],
         "harvest_actions": [
-          "dig"
+          "dig",
+          "mine"
         ],
         "tool_required": "unknown"
       },
@@ -14736,12 +14750,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:33.091500"
+        "last_observed_at": "2026-01-21T21:15:46.771786"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -14757,14 +14771,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
-        "surface_block_class": "dirt",
+        "support_block": "minecraft:stone",
+        "surface_block_class": "stone",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -14777,11 +14791,13 @@
       "resources": {
         "resources_visible": [
           "minecraft:grass_block[snowy=true]",
-          "minecraft:dirt"
+          "minecraft:dirt",
+          "minecraft:stone"
         ],
         "item_entities_visible": [],
         "harvest_actions": [
-          "dig"
+          "dig",
+          "mine"
         ],
         "tool_required": "unknown"
       },
@@ -14793,12 +14809,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 69,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:44.611250"
+        "last_observed_at": "2026-01-21T21:15:46.771786"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -14814,14 +14830,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
-        "surface_block_class": "dirt",
+        "support_block": "minecraft:stone",
+        "surface_block_class": "stone",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -14834,11 +14850,13 @@
       "resources": {
         "resources_visible": [
           "minecraft:grass_block[snowy=true]",
-          "minecraft:dirt"
+          "minecraft:dirt",
+          "minecraft:stone"
         ],
         "item_entities_visible": [],
         "harvest_actions": [
-          "dig"
+          "dig",
+          "mine"
         ],
         "tool_required": "unknown"
       },
@@ -14850,12 +14868,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 69,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:44.611250"
+        "last_observed_at": "2026-01-21T21:15:46.771786"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -14871,14 +14889,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
-        "surface_block_class": "dirt",
+        "support_block": "minecraft:stone",
+        "surface_block_class": "stone",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -14891,11 +14909,13 @@
       "resources": {
         "resources_visible": [
           "minecraft:grass_block[snowy=true]",
-          "minecraft:dirt"
+          "minecraft:dirt",
+          "minecraft:stone"
         ],
         "item_entities_visible": [],
         "harvest_actions": [
-          "dig"
+          "dig",
+          "mine"
         ],
         "tool_required": "unknown"
       },
@@ -14907,12 +14927,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
+          "y": 66,
           "z": -106
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:33.091500"
+        "last_observed_at": "2026-01-21T21:15:45.838379"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -14928,14 +14948,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
-        "surface_block_class": "dirt",
+        "support_block": "minecraft:stone",
+        "surface_block_class": "stone",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -14948,11 +14968,13 @@
       "resources": {
         "resources_visible": [
           "minecraft:grass_block[snowy=true]",
-          "minecraft:dirt"
+          "minecraft:dirt",
+          "minecraft:stone"
         ],
         "item_entities_visible": [],
         "harvest_actions": [
-          "dig"
+          "dig",
+          "mine"
         ],
         "tool_required": "unknown"
       },
@@ -14964,12 +14986,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
+          "y": 66,
           "z": -106
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:33.091500"
+        "last_observed_at": "2026-01-21T21:15:45.838379"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -14985,14 +15007,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
-        "surface_block_class": "dirt",
+        "support_block": "minecraft:stone",
+        "surface_block_class": "stone",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -15005,11 +15027,13 @@
       "resources": {
         "resources_visible": [
           "minecraft:grass_block[snowy=true]",
-          "minecraft:dirt"
+          "minecraft:dirt",
+          "minecraft:stone"
         ],
         "item_entities_visible": [],
         "harvest_actions": [
-          "dig"
+          "dig",
+          "mine"
         ],
         "tool_required": "unknown"
       },
@@ -15021,12 +15045,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
+          "y": 66,
           "z": -106
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:33.091500"
+        "last_observed_at": "2026-01-21T21:15:45.838379"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -15042,14 +15066,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
+        "support_block": "minecraft:dirt",
         "surface_block_class": "dirt",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -15078,12 +15102,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 69,
+          "y": 66,
           "z": -106
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:44.611250"
+        "last_observed_at": "2026-01-21T21:15:45.838379"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -15099,14 +15123,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
+        "support_block": "minecraft:dirt",
         "surface_block_class": "dirt",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -15135,12 +15159,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 69,
+          "y": 66,
           "z": -106
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:44.611250"
+        "last_observed_at": "2026-01-21T21:15:45.838379"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -15156,14 +15180,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
+        "support_block": "minecraft:dirt",
         "surface_block_class": "dirt",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -15192,12 +15216,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 69,
+          "y": 66,
           "z": -106
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:44.611250"
+        "last_observed_at": "2026-01-21T21:15:45.838379"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -15249,12 +15273,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
+          "y": 69,
           "z": -106
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:33.091500"
+        "last_observed_at": "2026-01-21T21:14:34.443626"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -15306,12 +15330,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
+          "y": 69,
           "z": -106
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:33.091500"
+        "last_observed_at": "2026-01-21T21:14:34.443626"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -15363,12 +15387,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
+          "y": 69,
           "z": -106
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:33.091500"
+        "last_observed_at": "2026-01-21T21:14:34.443626"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -15420,12 +15444,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
+          "y": 69,
           "z": -106
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:33.091500"
+        "last_observed_at": "2026-01-21T21:14:34.443626"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -15477,12 +15501,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
+          "y": 69,
           "z": -106
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:33.091500"
+        "last_observed_at": "2026-01-21T21:14:34.443626"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -15534,12 +15558,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
+          "y": 69,
           "z": -106
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:33.091500"
+        "last_observed_at": "2026-01-21T21:14:34.443626"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -15591,12 +15615,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 68,
+          "y": 69,
           "z": -106
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:33.091500"
+        "last_observed_at": "2026-01-21T21:14:34.443626"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -15653,7 +15677,7 @@
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:44.611250"
+        "last_observed_at": "2026-01-21T21:14:34.443626"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -15710,7 +15734,7 @@
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:44.611250"
+        "last_observed_at": "2026-01-21T21:14:34.443626"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -15726,14 +15750,14 @@
       },
       "support": {
         "walkable": true,
-        "support_y": 70,
+        "support_y": 68,
         "movement_class": "flat"
       },
       "surface": {
-        "support_block": "minecraft:grass_block[snowy=true]",
-        "surface_block_class": "dirt",
+        "support_block": "minecraft:stone",
+        "surface_block_class": "stone",
         "is_fluid": false,
-        "is_partial_block": true
+        "is_partial_block": false
       },
       "obstructions": {
         "blocks_at_y": {}
@@ -15746,11 +15770,13 @@
       "resources": {
         "resources_visible": [
           "minecraft:grass_block[snowy=true]",
-          "minecraft:dirt"
+          "minecraft:dirt",
+          "minecraft:stone"
         ],
         "item_entities_visible": [],
         "harvest_actions": [
-          "dig"
+          "dig",
+          "mine"
         ],
         "tool_required": "unknown"
       },
@@ -15762,12 +15788,12 @@
       "observability": {
         "observed_from": {
           "x": -140,
-          "y": 69,
-          "z": -106
+          "y": 66,
+          "z": -108
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:44.611250"
+        "last_observed_at": "2026-01-21T21:15:46.771786"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -15824,7 +15850,7 @@
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:44.611250"
+        "last_observed_at": "2026-01-21T21:14:00.996210"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -15881,7 +15907,7 @@
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:44.611250"
+        "last_observed_at": "2026-01-21T21:14:00.996210"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -15938,7 +15964,7 @@
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:44.611250"
+        "last_observed_at": "2026-01-21T21:14:00.996210"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -15995,7 +16021,7 @@
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:44.611250"
+        "last_observed_at": "2026-01-21T21:14:00.996210"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -16052,7 +16078,7 @@
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:44.611250"
+        "last_observed_at": "2026-01-21T21:14:00.996210"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -16109,7 +16135,7 @@
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:44.611250"
+        "last_observed_at": "2026-01-21T21:14:00.996210"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -16166,7 +16192,7 @@
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:44.611250"
+        "last_observed_at": "2026-01-21T21:14:00.996210"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -16223,7 +16249,7 @@
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:44.611250"
+        "last_observed_at": "2026-01-21T21:14:00.996210"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -16280,7 +16306,7 @@
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:44.611250"
+        "last_observed_at": "2026-01-21T21:14:00.996210"
       },
       "provenance": {
         "updated_by": "Jill",
@@ -16337,7 +16363,7 @@
         },
         "observation_mode": "scanned",
         "confidence": 0.0,
-        "last_observed_at": "2026-01-21T20:53:44.611250"
+        "last_observed_at": "2026-01-21T21:14:00.996210"
       },
       "provenance": {
         "updated_by": "Jill",

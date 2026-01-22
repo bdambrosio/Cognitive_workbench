@@ -10,7 +10,7 @@ Search academic papers using Semantic Scholar API. Returns Collection of structu
 
 ## Input
 
-- `value`: Query string (e.g., "attention mechanisms in neural networks")
+- `query`: Query string (e.g., "attention mechanisms in neural networks")
 - `limit`: Optional result limit (int, default: 10)
 
 ## Output
@@ -34,9 +34,49 @@ Success (`status: "success"`):
 - Requires `SEMANTIC_SCHOLAR_API_KEY` environment variable
 - Requires `grobid_url` in YAML config for full text extraction
 
+## Content Structure
+
+Each Note in the returned Collection has the following JSON structure:
+```json
+{
+  "text": "Full paper text or abstract...",
+  "format": "paper",
+  "metadata": {
+    "title": "Paper Title",
+    "authors": ["Author 1", "Author 2"],
+    "year": 2023,
+    "citations": 150,
+    "uri": "https://example.com/paper.pdf",
+    "venue": "NeurIPS"
+  },
+  "char_count": 5000
+}
+```
+
+**Important:** All result data is in the Note's `content` field (a dict). Engine metadata (creation date, source tool, etc.) is separate and accessed via `get_resource_metadata()`, not via `content['metadata']`.
+
+## Field Access Examples
+
+**Extract URLs for fetching:**
+```json
+{"type":"semantic-scholar","query":"BERT model","out":"$papers"}
+{"type":"project","target":"$papers","fields":["metadata.uri"],"out":"$urls"}
+{"type":"pluck","target":"$urls","field":"metadata.uri","out":"$url_list"}
+```
+
+**Extract paper metadata:**
+```json
+{"type":"project","target":"$papers","fields":["metadata.title","metadata.year","metadata.citations"],"out":"$paper_info"}
+```
+
+**Filter by year:**
+```json
+{"type":"filter-structured","target":"$papers","where":"metadata.year > 2020","out":"$recent_papers"}
+```
+
 ## Examples
 
 ```json
-{"type":"semantic-scholar","value":"BERT model","out":"$papers"}
+{"type":"semantic-scholar","query":"BERT model","out":"$papers"}
 {"type":"summarize","target":"$papers","focus":"what is BERT","out":"$summary"}
 ```

@@ -1,10 +1,10 @@
 ---
-name: filter-collection
+name: filter-semantic
 type: python
 description: "Evaluate complex text criteria on each item in a Collection and return a new Collection of matching items. Use to identify relevant items in a Collection"
 ---
 
-# filter-collection
+# filter-semantic
 
 Apply flexible, natural-language filtering criteria to Collections. Evaluates each item against specified conditions using LLM.
 
@@ -38,7 +38,7 @@ Failure (`status: "failed"`):
 ## Examples
 
 ```json
-{"type":"filter-collection","target":"$collection","predicate":"contains code or implementation details","out":"$filtered"}
-{"type":"filter-collection","target":"$collection","predicate":"mentions safety AND published after 2024","out":"$filtered"}
-{"type":"filter-collection","target":"$collection","predicate":"purely theoretical","mode":"exclude","out":"$practical_only"}
+{"type":"filter-semantic","target":"$collection","predicate":"contains code or implementation details","out":"$filtered"}
+{"type":"filter-semantic","target":"$collection","predicate":"mentions safety AND published after 2024","out":"$filtered"}
+{"type":"filter-semantic","target":"$collection","predicate":"purely theoretical","mode":"exclude","out":"$practical_only"}
 ```

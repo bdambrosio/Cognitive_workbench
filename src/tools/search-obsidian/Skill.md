@@ -10,7 +10,7 @@ Search Obsidian vault using Local REST API. Returns Collection of structured Not
 
 ## Input
 
-- `value`: Query string (literal search text, NOT a variable)
+- `query`: Query string (literal search text, NOT a variable)
 
 ## Output
 
@@ -37,6 +37,6 @@ Success (`status: "success"`):
 ## Examples
 
 ```json
-{"type":"search-obsidian","value":"neural networks","out":"$notes"}
+{"type":"search-obsidian","query":"neural networks","out":"$notes"}
 {"type":"summarize","target":"$notes","focus":"what are neural networks","out":"$summary"}
 ```

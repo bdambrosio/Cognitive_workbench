@@ -6,9 +6,9 @@ manual_only: true
 
 # Test Sort Primitive
 
-**Requires:** Run test-json-sql-setup first to create $papers
+**Self-contained:** Creates test data internally
 
-**Input:** $papers collection (years: 2020, 2021, 2023, 2022)
+**Input:** Creates $papers collection (years: 2020, 2021, 2023, 2022)
 
 **Operation:** Sort by year descending
 
