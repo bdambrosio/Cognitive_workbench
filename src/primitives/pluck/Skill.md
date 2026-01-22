@@ -41,6 +41,42 @@ Returns Collection of Notes, each containing extracted scalar value. Notes missi
 - Use `split` to convert array → Collection
 - `flatten` performs inverse (Collection → Note)
 
+## CONTENT STRUCTURE
+
+**For JSON Notes, content is a dict with fields:**
+- Top-level fields: `text`, `format`, `char_count`
+- Nested fields: `metadata.*` (e.g., `metadata.uri`, `metadata.title`, `metadata.year`)
+
+**Example Note content structure (from semantic-scholar/search-web):**
+```json
+{
+  "text": "Full text content...",
+  "format": "paper",
+  "metadata": {
+    "title": "Paper Title",
+    "uri": "https://example.com/paper.pdf"
+  },
+  "char_count": 5000
+}
+```
+
+## FIELD ACCESS EXAMPLES
+
+**Extract nested field:**
+```json
+{"type":"pluck","target":"$papers","field":"metadata.title","out":"$titles"}
+```
+
+**Extract top-level field:**
+```json
+{"type":"pluck","target":"$results","field":"text","out":"$texts"}
+```
+
+**Extract URI for fetching:**
+```json
+{"type":"pluck","target":"$search_results","field":"metadata.uri","out":"$urls"}
+```
+
 ## ANTI-PATTERNS
 
 ❌ `pluck(target=$array_note)` → Use `split` first

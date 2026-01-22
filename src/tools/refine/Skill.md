@@ -39,7 +39,7 @@ Failure (`status: "failed"`):
 **Do NOT use `refine` when:**
 - Target is a Collection → use `map(refine)` or `flatten` → `refine`
 - Combining multiple documents → use `flatten` → `refine`
-- Selecting or filtering items → use `filter-collection` / `filter-structured`
+- Selecting or filtering items → use `filter-semantic` / `filter-structured`
 - Extracting structured fields → use `project` / `pluck`
 - Creating new content → use `generate-note`
 

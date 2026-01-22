@@ -6,9 +6,9 @@ manual_only: true
 
 # Test Pluck Primitive
 
-**Requires:** Run test-json-sql-setup first to create $papers
+**Self-contained:** Creates test data internally
 
-**Input:** $papers collection
+**Input:** Creates $papers collection (4 papers with id, title, year, citations, venue)
 
 **Operation:** Pluck title field from each paper
 

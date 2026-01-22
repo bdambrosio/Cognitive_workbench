@@ -20,7 +20,7 @@ description: Filter Collection by field conditions (SQL WHERE)
 **NOT SUPPORTED:**
 - ❌ Note (must be Collection)
 - ❌ Collection of arrays (must be dict Notes)
-- ❌ Text parsing (use `filter-collection` tool for semantic filtering)
+- ❌ Text parsing (use `filter-semantic` tool for semantic filtering)
 
 ## OUTPUT
 
@@ -45,5 +45,5 @@ Returns Collection of Notes matching WHERE clause. Notes missing fields are excl
 
 ❌ `filter-structured(target=$note)` → Must be Collection
 ❌ `filter-structured(target=$coll_of_arrays)` → Elements must be dicts
-❌ `filter-structured(target=$text_note)` → Use `filter-collection` for semantic filtering
+❌ `filter-structured(target=$text_note)` → Use `filter-semantic` for semantic filtering
 ❌ Treating empty result as error → Empty = no matches

@@ -21,7 +21,7 @@ description: Apply operation to each item in Collection
 **NOT SUPPORTED IN MAP:**
 - Collection-only primitives: `size`, `union`, `intersection`, `difference`, `join`, `filter-structured`, `sort`, `head`, `flatten`, `split`
 - Control flow: `if`, `while`, `wait`
-- Search primitives: `search-notes`, `search-collections`, `search-within-collection`
+- Discovery/search primitives: `discover-notes`, `discover-collections`, `search-within-collection`
 - Persistence: `persist`, `load`, `index`
 
 ## OUTPUT

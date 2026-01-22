@@ -6,11 +6,11 @@ manual_only: true
 
 # Test Join Primitive
 
-**Requires:** Run test-json-sql-setup first to create $papers and $authors
+**Self-contained:** Creates test data internally
 
 **Input:** 
-- $papers: A, B, C, D
-- $authors: A (Alice), B (Bob), E (Eve)
+- Creates $papers: A, B, C, D
+- Creates $authors: A (Alice), B (Bob), E (Eve)
 
 **Operation:** Inner join on id field
 

@@ -6,9 +6,9 @@ manual_only: true
 
 # Test Project Primitive
 
-**Requires:** Run test-json-sql-setup first to create $papers
+**Self-contained:** Creates test data internally
 
-**Input:** $papers collection (4 papers with id, title, year, citations, venue)
+**Input:** Creates $papers collection (4 papers with id, title, year, citations, venue)
 
 **Operation:** Project only title and year fields
 

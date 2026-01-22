@@ -28,7 +28,7 @@ def _get_content(resource_id: str, resource_manager) -> Any:
     return resource.get('properties', {}).get('content')
 
 
-def _create_collection(note_ids: List[str], agent_name: str, resource_manager, source_skill: str = 'filter-collection') -> str:
+def _create_collection(note_ids: List[str], agent_name: str, resource_manager, source_skill: str = 'filter-semantic') -> str:
     """Create a new Collection with the given note_ids."""
     if not note_ids:
         note_ids = []
