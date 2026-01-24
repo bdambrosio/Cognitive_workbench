@@ -34,6 +34,7 @@ from weakref import WeakValueDictionary
 from utils.format_utils import format_views_compact
 from utils.condition_utils import deref_plan_target
 from transformers import AutoTokenizer
+import requests
 # Configure logging with unbuffered output
 # Console handler with WARNING level (less verbose)
 console_handler = logging.StreamHandler(sys.stdout)
@@ -431,14 +432,18 @@ class ZenohExecutiveNode:
                 }
             return None
         
-        # LLM backend - Use SGLang.Runtime for infospace, ZenohLLMClient as fallback
+        # LLM backend - Use SGLang.Runtime for infospace, vLLM as alternative, ZenohLLMClient as fallback
         llm_config = self.character_config.get('llm_config', {})
         server_name = llm_config.get('server_name', 'openai')
         model_name = llm_config.get('model_name', 'gpt-4.1')
         sgl_model_path = llm_config.get('sgl_model_path')
+        vllm_model_path = llm_config.get('vllm_model_path')
+        vllm_url = llm_config.get('vllm_url', 'http://localhost:5000/v1/chat/completions')
         
         self.runtime = None
         self.llm_client = None
+        self.vllm_model = None
+        self.vllm_url = None
         
         # Check SGLang availability
         HAS_SGLANG = False
@@ -448,7 +453,35 @@ class ZenohExecutiveNode:
         except ImportError:
             pass
         
-        # Initialize SGLang.Runtime if available and configured 
+        # Initialize vLLM model resolution if configured
+        if vllm_model_path:
+            try:
+                import requests
+                logger.info(f"🔍 Querying vLLM server for available models...")
+                response = requests.get('http://localhost:5000/v1/models', timeout=10)
+                response.raise_for_status()  # Fail fast
+                data = response.json()
+                available_models = []
+                if data.get('data') and len(data['data']) > 0:
+                    available_models = [model['id'] for model in data['data']]
+                    logger.info(f"📋 Available vLLM models: {available_models}")
+                    
+                    # Check if configured model is in available models
+                    if vllm_model_path in available_models:
+                        self.vllm_model = vllm_model_path
+                        logger.info(f"✅ Using configured vLLM model: {vllm_model_path}")
+                    else:
+                        # Use first available model with warning
+                        self.vllm_model = available_models[0]
+                        logger.warning(f"⚠️  Configured vLLM model '{vllm_model_path}' not found in available models. Using first available: {self.vllm_model}")
+                else:
+                    raise ValueError("No models found in vLLM response")
+                self.vllm_url = vllm_url
+            except Exception as e:
+                logger.error(f"❌ Failed to query vLLM server: {e}")
+                raise  # Fail fast
+        
+        # Initialize SGLang.Runtime if available and configured (optional if vLLM is used)
         if HAS_SGLANG and sgl_model_path:
             try:
                 logger.info(f"🚀 Initializing SGLang Runtime with model: {sgl_model_path}")
@@ -608,10 +641,13 @@ class ZenohExecutiveNode:
             executive_node=self,  # Pass actual executive node
             resource_manager=self.resource_manager
         )
-        # Share runtime with executor
+        # Share runtime and vLLM config with executor
         if self.runtime:
             self.infospace_executor.runtime = self.runtime
             self.infospace_executor.tokenizer = self.tokenizer
+        if self.vllm_model and self.vllm_url:
+            self.infospace_executor.vllm_model = self.vllm_model
+            self.infospace_executor.vllm_url = self.vllm_url
         logger.info(f'🧩 Infospace executor initialized for {character_name}')
         
         # Create WorldModel instance (with executor)
@@ -648,16 +684,19 @@ class ZenohExecutiveNode:
         
         # Initialize planners (reused across all goals)
  
-        # IncrementalPlanner for plan generation (SGLang-based)
+        # IncrementalPlanner for plan generation (SGLang or vLLM-based)
         self.incremental_planner = None
         try:
             from incremental_planner import IncrementalPlanner, HAS_SGLANG
             
-            if HAS_SGLANG:
-                # Get SGLang model path from config
-                llm_config = self.character_config.get('llm_config', {})
-                sgl_model_path = llm_config.get('sgl_model_path')   
-                
+            # Get LLM config
+            llm_config = self.character_config.get('llm_config', {})
+            sgl_model_path = llm_config.get('sgl_model_path')
+            vllm_model_path = llm_config.get('vllm_model_path')
+            vllm_url = llm_config.get('vllm_url', 'http://localhost:5000/v1/chat/completions')
+            
+            if HAS_SGLANG and sgl_model_path:
+                # Use SGLang
                 self.incremental_planner = IncrementalPlanner(
                     executor=self.infospace_executor,
                     available_tools=self.available_tools,
@@ -665,8 +704,19 @@ class ZenohExecutiveNode:
                     sgl_model_path=sgl_model_path
                 )
                 logger.info(f'🚀 IncrementalPlanner initialized (SGLang) for {character_name}')
+            elif vllm_model_path and self.vllm_model:
+                # Use vLLM
+                self.incremental_planner = IncrementalPlanner(
+                    executor=self.infospace_executor,
+                    available_tools=self.available_tools,
+                    logger_instance=logger,
+                    vllm_model_path=vllm_model_path,
+                    vllm_url=vllm_url,
+                    vllm_model=self.vllm_model
+                )
+                logger.info(f'🚀 IncrementalPlanner initialized (vLLM) for {character_name}')
             else:
-                logger.warning(f'⚠️  SGLang not available - incremental planning disabled')
+                logger.warning(f'⚠️  Neither SGLang nor vLLM configured - incremental planning disabled')
         except Exception as e:
             logger.warning(f'⚠️  Failed to initialize IncrementalPlanner: {e}')
             import traceback

@@ -194,6 +194,160 @@ def parse_pdf_grobid(pdf_filepath=None, pdf_url=None, title=None, chunk_size=100
 
     return extract
 
+
+def extract_references_grobid(pdf_filepath=None, pdf_url=None, grobid_url=None):
+    """
+    Extract bibliography/references from PDF via GROBID.
+    
+    Args:
+        pdf_filepath: Path to local PDF file (mutually exclusive with pdf_url)
+        pdf_url: URL to PDF file (mutually exclusive with pdf_filepath)
+        grobid_url: Optional GROBID server URL (defaults to module constant GROBID_URL)
+    
+    Returns:
+        List[dict]: List of reference dicts with fields: authors, title, year, venue, doi, url, raw_citation
+        or None if parsing fails
+    """
+    # Handle URL case: download to temp file (reuse logic from parse_pdf_grobid)
+    if pdf_url:
+        if pdf_filepath:
+            raise ValueError("Cannot specify both pdf_filepath and pdf_url")
+        
+        title = pdf_url.split('/')[-1].replace('.pdf', '') or "document"
+        safe_title = _unixify_title(title)
+        temp_dir = tempfile.gettempdir()
+        temp_filepath = os.path.join(temp_dir, f"{safe_title}.pdf")
+        
+        if os.path.exists(temp_filepath):
+            logger.info(f"PDF already exists at {temp_filepath}, skipping download")
+            pdf_filepath = temp_filepath
+        else:
+            try:
+                headers = {'User-Agent': 'Mozilla/5.0 (compatible; CognitiveWorkbench/1.0)'}
+                request = Request(pdf_url, headers=headers)
+                response = urlopen(request, timeout=30)
+                pdf_content = response.read()
+                
+                with open(temp_filepath, 'wb') as f:
+                    f.write(pdf_content)
+                
+                logger.info(f"Downloaded PDF to {temp_filepath}")
+                pdf_filepath = temp_filepath
+            except Exception as e:
+                logger.error(f"Failed to download PDF from {pdf_url}: {e}")
+                return None
+    
+    if not pdf_filepath:
+        raise ValueError("Must specify either pdf_filepath or pdf_url")
+    
+    if not os.path.exists(pdf_filepath):
+        logger.error(f"PDF file not found: {pdf_filepath}")
+        return None
+    
+    # Use provided grobid_url or fall back to module constant
+    if grobid_url:
+        if grobid_url.endswith('/'):
+            url = grobid_url.rstrip('/') + '/api/processFulltextDocument'
+        elif '/api/' not in grobid_url:
+            url = grobid_url.rstrip('/') + '/api/processFulltextDocument'
+        else:
+            url = grobid_url
+    else:
+        url = GROBID_URL
+    
+    logger.info(f'Extracting references from: {pdf_filepath}')
+    
+    # Send to GROBID
+    try:
+        with open(pdf_filepath, 'rb') as f:
+            files = {'input': f}
+            response = requests.post(url, files=files)
+        if response.status_code != 200:
+            logger.error(f'GROBID Error {response.status_code}')
+            return None
+    except Exception as e:
+        logger.error(f"Connection Error: {e}")
+        return None
+    
+    # Parse XML
+    xml_content = response.text
+    ns = {'tei': 'http://www.tei-c.org/ns/1.0'}
+    try:
+        tree = etree.fromstring(xml_content.encode('utf-8'))
+    except etree.XMLSyntaxError:
+        logger.error("Failed to parse GROBID XML output")
+        return None
+    
+    # Extract references from <bibl> elements
+    references = []
+    bibl_elements = tree.xpath('.//tei:listBibl/tei:biblStruct | .//tei:div[@type="references"]//tei:biblStruct | .//tei:biblStruct', namespaces=ns)
+    
+    for bibl in bibl_elements:
+        ref = {}
+        
+        # Authors
+        authors = []
+        author_nodes = bibl.xpath('.//tei:author/tei:persName', namespaces=ns)
+        for author in author_nodes:
+            names = author.xpath('.//tei:forename | .//tei:surname', namespaces=ns)
+            full_name = ' '.join([n.text for n in names if n.text])
+            if full_name:
+                authors.append(full_name)
+        ref['authors'] = authors
+        
+        # Title (can be article, journal, or monograph title)
+        title_nodes = bibl.xpath('.//tei:title[@level="a"] | .//tei:title[@level="m"]', namespaces=ns)
+        if title_nodes:
+            ref['title'] = ' '.join([t.text for t in title_nodes if t.text]).strip()
+        else:
+            ref['title'] = ""
+        
+        # Journal/venue
+        journal_nodes = bibl.xpath('.//tei:title[@level="j"]', namespaces=ns)
+        if journal_nodes:
+            ref['venue'] = ' '.join([j.text for j in journal_nodes if j.text]).strip()
+        else:
+            ref['venue'] = ""
+        
+        # Year
+        date_nodes = bibl.xpath('.//tei:date[@when]', namespaces=ns)
+        if date_nodes:
+            year_str = date_nodes[0].get('when', '')[:4]
+            try:
+                ref['year'] = int(year_str) if year_str.isdigit() else 0
+            except:
+                ref['year'] = 0
+        else:
+            ref['year'] = 0
+        
+        # DOI
+        doi_nodes = bibl.xpath('.//tei:idno[@type="DOI"]', namespaces=ns)
+        if doi_nodes:
+            ref['doi'] = doi_nodes[0].text.strip() if doi_nodes[0].text else ""
+        else:
+            ref['doi'] = ""
+        
+        # URL
+        url_nodes = bibl.xpath('.//tei:ptr[@type="web"]/@target | .//tei:idno[@type="URL"]', namespaces=ns)
+        if url_nodes:
+            if isinstance(url_nodes[0], str):
+                ref['url'] = url_nodes[0]
+            else:
+                ref['url'] = url_nodes[0].text.strip() if url_nodes[0].text else ""
+        else:
+            ref['url'] = ""
+        
+        # Raw citation text (all text in bibl element)
+        raw_text = ' '.join(bibl.xpath('.//text()'))
+        ref['raw_citation'] = ' '.join(raw_text.split()).strip()
+        
+        # Only add if we have at least title or authors
+        if ref.get('title') or ref.get('authors'):
+            references.append(ref)
+    
+    logger.info(f"Extracted {len(references)} references from PDF")
+    return references
+
 # --- Usage Example ---
 # data = parse_pdf_grobid("./my_paper.pdf")
 # for section, text in data['chunks']:

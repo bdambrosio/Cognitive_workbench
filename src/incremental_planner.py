@@ -1798,10 +1798,8 @@ This is the only planner-visible structure that supports direct (dx,dy,dz) usage
             # Execute (method tools run in an inner loop but count as one outer step)
             tool_info = executor.available_tools.get(tool_name, {})
             if tool_info.get('type') == 'method':
-                logger.info(f"Step {step}: Running method tool {tool_name} (inner loop, max_steps={max_steps})")
-                tool_result = run_method_protocol(s, executor, tool_name, max_steps, step, _loaded_skill_docs, outer_action=action)
-            else:
-                tool_result = execute_infospace_action(action, executor, executor.agent_name)
+                logger.warning(f"Step {step}: Method tools are obsolete; executing {tool_name} directly")
+            tool_result = execute_infospace_action(action, executor, executor.agent_name)
             
             logger.info(f"Stage 2: Choose tool + args\n{tool_name} -> {tool_args_json}")
             logger.info(f"Step {step}: {tool_name} -> {tool_result[:100]}")
@@ -1987,6 +1985,626 @@ This is the only planner-visible structure that supports direct (dx,dy,dz) usage
         return s
 
 
+# ============================================================================
+# vLLM-based planner (alternative to SGLang version)
+# ============================================================================
+
+def format_system(text: str) -> str:
+    """Format system message for vLLM prompt."""
+    return f"<|system|>\n{text}\n"
+
+def format_user(text: str) -> str:
+    """Format user message for vLLM prompt."""
+    return f"<|user|>\n{text}\n"
+
+def format_assistant(text: str) -> str:
+    """Format assistant message for vLLM prompt."""
+    return f"<|assistant|>\n{text}\n"
+
+def vllm_gen(slot_name: str, prompt: str, state: Dict[str, Any], max_tokens: int, 
+             temperature: float, stop: Any = None, executor: InfospaceExecutor = None) -> str:
+    """
+    Replacement for SGLang gen(). Uses executor.llm_generate() for unified LLM interface.
+    Appends response to prompt, stores in state.
+    
+    Args:
+        slot_name: Name for state storage
+        prompt: Current prompt string (will be converted to messages array)
+        state: State dictionary for storing results
+        max_tokens: Max tokens to generate
+        temperature: Temperature setting
+        stop: Stop sequence(s) - can be string, list, or None
+        executor: InfospaceExecutor instance (required for llm_generate)
+        
+    Returns:
+        Generated text string
+    """
+    if not executor:
+        raise ValueError("executor is required for vllm_gen()")
+    
+    # Convert stop to list format
+    stop_list = []
+    if stop:
+        if isinstance(stop, list):
+            stop_list = stop
+        else:
+            stop_list = [stop]
+    
+    # Convert prompt string to messages array format
+    # Parse prompt to extract system/user/assistant messages
+    messages = []
+    current_role = "user"
+    current_content = []
+    
+    # Simple parsing: look for role markers
+    lines = prompt.split('\n')
+    for line in lines:
+        if line.startswith('<|system|>'):
+            if current_content:
+                messages.append({"role": current_role, "content": '\n'.join(current_content)})
+            current_role = "system"
+            current_content = []
+            if len(line) > 11:  # Has content after marker
+                current_content.append(line[11:].strip())
+        elif line.startswith('<|user|>'):
+            if current_content:
+                messages.append({"role": current_role, "content": '\n'.join(current_content)})
+            current_role = "user"
+            current_content = []
+            if len(line) > 9:  # Has content after marker
+                current_content.append(line[9:].strip())
+        elif line.startswith('<|assistant|>'):
+            if current_content:
+                messages.append({"role": current_role, "content": '\n'.join(current_content)})
+            current_role = "assistant"
+            current_content = []
+            if len(line) > 14:  # Has content after marker
+                current_content.append(line[14:].strip())
+        else:
+            current_content.append(line)
+    
+    # Add final message
+    if current_content:
+        messages.append({"role": current_role, "content": '\n'.join(current_content)})
+    
+    # If no messages parsed, treat entire prompt as user message
+    if not messages:
+        messages = [{"role": "user", "content": prompt}]
+    
+    # Use unified llm_generate interface
+    try:
+        response = executor.llm_generate(
+            messages=messages,
+            max_tokens=max_tokens+256, # allow for reasoning
+            temperature=temperature,
+            stops=stop_list if stop_list else None
+        )
+        
+        if not response.success:
+            error_msg = f"llm_generate failed: {response.error}"
+            logger.error(error_msg)
+            raise RuntimeError(error_msg)
+        
+        text = response.text
+        if text is None:
+            error_msg = "llm_generate returned None text"
+            logger.error(error_msg)
+            raise RuntimeError(error_msg)
+        
+        state[slot_name] = text  # Store in state for later access
+        return text
+    except Exception as e:
+        logger.error(f"vllm_gen failed: {e}")
+        raise  # Fail fast
+
+
+def tool_planner_infospace_vllm(template, goal: str, world_model: Dict, character_context: str, recent_context: str, 
+                                 tools_catalog_text: str, executor, trace_file=None, max_steps: int = 16, 
+                                 similar_plan: Dict = None, preplan: str = None, vllm_url: str = None,
+                                 model: str = None):
+    """
+    vLLM-based incremental planner for infospace goals (alternative to SGLang version).
+    
+    Uses executor.llm_generate() for unified LLM interface.
+    
+    Args:
+        template: Template text
+        goal: Goal text
+        world_model: World model dict
+        character_context: Character description + drives
+        recent_context: Recent thoughts/memories + last action
+        tools_catalog_text: Formatted tool catalog
+        executor: InfospaceExecutor instance (with _plan_actions attribute and vllm_model/vllm_url configured)
+        trace_file: Optional trace file
+        max_steps: Maximum planning steps
+        similar_plan: Optional similar plan dict
+        preplan: Optional preplan text
+        vllm_url: vLLM API endpoint (deprecated - now read from executor.vllm_url)
+        model: Model name for vLLM (deprecated - now read from executor.vllm_model)
+    """
+    # Initialize prompt (string) and state (dict) - replaces SGLang's ProgramState
+    prompt = ""
+    state = {}
+    
+    # Extract goal for step prompts (truncate at ## CONTEXT ## if present)
+    goal_for_step = _extract_goal_for_step(goal)
+    
+    # Track which tools have had their skill docs loaded
+    _loaded_skill_docs = set[Any]()
+    
+    # Stage 0: Resource retrieval (if executor available)
+    available_resources_text = ""
+    if executor:
+        try:
+            available_resources_text = stage0_resource_retrieval(goal=goal, executor=executor)
+        except Exception as e:
+            logger.warning(f"Stage 0: Failed to retrieve resources: {e}")
+    
+    # Stage 1: Analysis + tool selection
+    system_parts = [f"Your task is to achieve\n#GOAL:\n{goal}\n\n"]
+    system_parts.append("You can choose tools/primitives (aka actions), if and as needed, callling them with JSON arguments,")
+    system_parts.append("and loop over execute-step / reflect / refine until the goal is satisfied.")
+    system_parts.append(f"\n{INCREMENTAL_PLAN_SPECIFICATIONS}\n")
+    system_parts.append(f"Complete primitive and tool catalog:\n{tools_catalog_text}\n#### END OF INFOSPACE TYPE SYSTEM, SPECIFICATIONS, AND TOOL CATALOG\n\n")
+    
+    system_parts.append(f"Setting:\n{character_context}\n\n")
+    system_parts.append(f"Situation/Context:\n{recent_context}\n\n")
+    if preplan:
+        system_parts.append(f"\n## {preplan}\n")
+        system_parts.append(f"\n## End ABSTRACT_PLAN\n")
+    
+    if similar_plan:
+        system_parts.append(f"##PREVIOUS PLAN FOR SIMILAR GOAL:\n{similar_plan['plan']}\n")
+        system_parts.append(f"OUTCOME: {similar_plan['outcome']} ERRORS: {similar_plan['error_count']}\n")
+    if available_resources_text:
+        system_parts.append(f"\n{available_resources_text}\n")
+    
+    system_parts.append(f"WORLD_MODEL: {json.dumps(world_model, indent=2)}\n")
+    system_parts.append(f"CURRENT_TIME: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+    system_parts.append("""Follow this process to achieve the goal:
+ - Stage 1 (once): Analyze goal, select relevant tools, decompose into FIRST_TASK.
+ - Stage 1.5 (once): Load and inject detailed docs for selected tools.
+Then you will work in repeated cycles to achieve the goal:
+ - Stage 2: Pick a single tool and JSON args for CURRENT_TASK. Be concise in text value arguments.
+ - Stage 3: Reflect on result, decide if goal done, set NEXT_TASK.
+ALWAYS follow all formatting instructions exactly.
+
+""")
+    
+    prompt += format_system("".join(system_parts))
+    
+    prompt += format_user(
+        "#Stage 1: Analyze goal and identify relevant tools from the Complete primitive and tool catalog.\n"
+        "Include tools you might need AND related/supporting tools.\n"
+        "Then, decompose the goal into a FIRST high-level task/subgoal to focus on.\n"
+        "In doing so, consider the tools you have selected, the goal you are trying to achieve, and the downstream tasks that will be required to achieve the goal.\n"
+        "Respond using the following XML format:\n"
+        "<analysis>\n"
+        "YOUR REASONING AND THOUGHTS HERE.\n"
+        "</analysis>\n"
+        "<tools>\n"
+        "JSON LIST OF TOOLS HERE\n"
+        "</tools>\n"
+        "<first_task>\n"
+        "YOUR FIRST TASK HERE\n"
+        "</first_task>\n"
+    )
+    
+    prompt += format_assistant("<analysis>\n")
+    analysis = vllm_gen("stage1_analysis", prompt, state, max_tokens=192, temperature=GEN_TEMPERATURE, stop="</analysis>", executor=executor)
+    prompt += analysis + "</analysis>\n<tools>\n"
+    tools = vllm_gen("selected_tools_json", prompt, state, max_tokens=96, temperature=GEN_TEMPERATURE, stop="</tools>", executor=executor)
+    prompt += tools + "</tools>\n<first_task>\n"
+    first_task = vllm_gen("first_task", prompt, state, max_tokens=96, temperature=GEN_TEMPERATURE, stop="</first_task>", executor=executor)
+    prompt += first_task + "</first_task>\n"
+    
+    try:
+        logger.info(f"Stage 1: Analysis + tool selection\n{state.get('stage1_analysis', 'N/A')}")
+        logger.info(f"SELECTED_TOOLS_JSON: {state.get('selected_tools_json', 'N/A')}")
+        logger.info(f"FIRST_TASK: {state.get('first_task', 'N/A')}")
+    except KeyError as e:
+        logger.warning(f"Stage 1 values not available: {e}")
+    
+    # Stage 1.5: Load and inject detailed docs for selected tools
+    try:
+        selected_tools_json = state.get('selected_tools_json', '')
+        selected_tools = parse_request_tools(selected_tools_json)
+        if selected_tools and isinstance(selected_tools, list) and selected_tools:
+            tools_to_load = [tool for tool in selected_tools if tool not in _loaded_skill_docs]
+            
+            if tools_to_load:
+                expanded_docs = load_skill_docs(tools_to_load, executor.available_tools)
+                if expanded_docs:
+                    prompt += format_user(expanded_docs)
+                    prompt += format_assistant("I have reviewed the detailed documentation for the selected tools.\n")
+                    logger.info(f"Stage 1.5: Injected detailed docs for {len(tools_to_load)} tools")
+                    _loaded_skill_docs.update(tools_to_load)
+            else:
+                logger.debug(f"Stage 1.5: All {len(selected_tools)} selected tools already have docs loaded, skipping")
+    except (KeyError, json.JSONDecodeError, TypeError) as e:
+        logger.warning(f"Failed to parse selected tools for doc expansion: {e}")
+    
+    # Stage 2/3 format instructions
+    prompt += format_user(
+        "#Stage 2-PRE: Instructions\n"
+        "Before choosing TOOL_NAME/ARGS for this step, you MUST first produce AGENT_STATE_HYPOTHESES.\n"
+        "Purpose:\n"
+        "- Make *context* explicit as TRANSIENT beliefs about the agent's current\n"
+        "  affordances, constraints, or limitations.\n"
+        "- These hypotheses exist ONLY for the current planning attempt.\n"
+        "- They are NOT persistent world facts and must NOT be promoted to memory.\n"
+        "- They should meaningfully influence tool choice when more than one tool\n"
+        "  could plausibly apply.\n"
+        "\n"
+        "# STAGE 2-PRE FORMAT (STRICT):\n"
+        "AGENT_STATE_HYPOTHESES: [<h1>, <h2>, ...]\n"
+        "AGENT_STATE_SUPPORT:\n"
+        "  - <h1>: <evidence pointer: tool result field / note id / variable / or \"none\">\n"
+        "  - <h2>: <evidence pointer ...>\n"
+        "\n"
+        "# STAGE 2-PRE RULES (STRICT):\n"
+        "- Max 6 hypotheses.\n"
+        "- Each hypothesis MUST be falsifiable (a tool call or note could contradict it).\n"
+        "- Prefer CONSTRAINTS, LIMITATIONS, or MISSING AFFORDANCES over confirmations.\n"
+        "- Each hypothesis must plausibly affect tool choice if false.\n"
+        "- Hypotheses may reference ONLY information observed before this step.\n"
+        "- Hypotheses MUST describe epistemic or physical state of the agent\n"
+        "  (e.g., known/unknown, available/unavailable, stable/unstable).\n"
+        "- DO NOT describe future actions, plans, or tools.\n"
+        "- DO NOT restate the CURRENT_TASK or GOAL.\n"
+        "- DO NOT include generic system truths unless they constrain choice.\n"
+        "- These are NOT world-model facts.\n"
+        "\n"
+        "# OPTIONAL NULL CONTEXT:\n"
+        "- If the next step is logically forced (only one reasonable tool applies),\n"
+        "  you MAY output:\n"
+        "    AGENT_STATE_HYPOTHESES: []\n"
+        "    AGENT_STATE_SUPPORT: []\n"
+        "\n"
+        "Examples (do not include world annotations in your response):\n"
+        "- 'Inventory contains at least one placeable solid block.'\n"
+        "- 'No placeable solid blocks are available in inventory.'\n"
+        "- 'Current position appears stable (on ground) rather than falling.'\n"
+        "- 'query-web returned no useful results.'\n"
+        "- 'there is no more space in /data'\n"
+        "\n"
+        "#Stage 2 Instructions:\n"
+        "- Review the ABSTRACT_PLAN and determine progress toward the goal.\n"
+        "- Review AGENT_STATE_HYPOTHESES and AGENT_STATE_SUPPORT.\n"
+        "- Choose the next tool and its JSON args from the Complete primitive and tool catalog.\n"
+        "\n"
+        "#Stage 2 FORMAT:\n"
+        "  TOOL_NAME: <name from the Complete primitive and tool catalog>\n"
+        "  TOOL_ARGS_JSON: <json object>\n"
+        "\n"
+        "#Stage 2 NUMERIC ARGUMENTS:\n"
+        "  IMPORTANT: All numeric tool arguments must be simple literals.\n"
+        "  Perform calculations in THOUGHTS, then pass only the final value.\n"
+        "  Arithmetic expressions in JSON will cause parsing errors.\n"
+        "\n"
+        "#Stage 3 FORMAT:\n"
+        "  THOUGHTS: <text>\n"
+        "  HYPOTHESES: [<hypothesis1>, <hypothesis2>, ...]\n"
+        "  AUDIT: for each hypothesis in HYPOTHESES:\n"
+        "    <hypothesis text>\n"
+        "    scope: <observational | observed-set | global>\n"
+        "    verdict: <SUPPORTED | UNSUPPORTED | CONTRADICTED>\n"
+        "  DONE: <YES or NO>\n"
+        "  NEXT_TASK: <next high-level subgoal or blank>\n"
+        "  REQUEST_TOOLS: <json array>\n"
+        "\n"
+        "#Stage 3 INSTRUCTIONS:\n"
+        "HYPOTHESES:\n"
+        "- Identify unverified beliefs influencing your next step.\n"
+        "- Consider the following categories:\n"
+        "  1. CONSTRAINT ASSUMPTIONS: what actions are allowed or meaningful.\n"
+        "  2. TRANSFORMATION ASSUMPTIONS: how inputs convert to outputs or quantities.\n"
+        "  3. STATE ASSUMPTIONS: existence, availability, or accessibility claims.\n"
+        "- Hypotheses must be explicit and falsifiable.\n"
+        "- Do NOT repeat any hypothesis previously marked CONTRADICTED unless revised.\n"
+        "\n"
+        "AUDIT (STRICT):\n"
+        "1. DECLARE SCOPE\n"
+        "   - observational: directly supported by tool output\n"
+        "   - observed-set: limited to items actually observed\n"
+        "   - global: extends beyond observed data\n"
+        "   - If unstated, assume global\n"
+        "2. EVIDENCE VS SCOPE\n"
+        "   - SUPPORTED / UNSUPPORTED / CONTRADICTED\n"
+        "3. MANDATORY DOWNGRADES\n"
+        "   - Claims using 'only', 'all', 'none', 'nearest', 'closest' require observed-set scope.\n"
+        "   - Partial, sampled, or non-exhaustive tool outputs cannot SUPPORT global claims.\n"
+        "   - Numeric comparisons do not imply optimality unless all candidates are compared.\n"
+        "4. CONTRADICTION PERSISTENCE RULE\n"
+        "   - Any CONTRADICTED hypothesis MUST NOT reappear verbatim.\n"
+        "   - It may reappear ONLY if explicitly revised by narrowing, conditioning, or inversion.\n"
+        "\n"
+        "MANDATORY CONSEQUENCE RULE:\n"
+        "- If a hypothesis is UNSUPPORTED and the plan depends on it,\n"
+        "  NEXT_TASK MUST be a verification or retrieval step.\n"
+        "- Proceeding without remediation is a protocol violation.\n"
+        "\n"
+        "SUFFICIENCY VS RETRIEVAL RULE:\n"
+        "   - If the next decision depends on domain rules (recipes, transformations, constraints),\n"
+        "   - and those rules are already present in loaded Notes or world_model facts,\n"
+        "   - DO NOT initiate retrieval or search for confirmation.\n"
+        "   - If such rules are NOT present in loaded sources,\n"
+        "   - verification using world-relative facts or knowledge, retrieval from loaded/loadable sources, or search, is REQUIRED before reasoning forward.\n"
+        "RETRIEVAL FAILURE RULE:\n"
+        "- If an authoritative Collection is loaded but no underlying Note is examined,\n"
+        "  hypotheses depending on that information Should be marked UNSUPPORTED.\n"
+        "\n"
+        "GENERAL PRIOR RULE:\n"
+        "- Justification based solely on intuition or general knowledge MUST be marked UNSUPPORTED\n"
+        "  when authoritative documentation is available.\n"
+        "\n"
+        "DONE RULES:\n"
+        "- Mark DONE: YES only when all required actions are complete.\n"
+        "- If DONE=YES, NEXT_TASK must be blank.\n"
+        "- If communication to user is required, use 'say' before DONE=YES.\n"
+        "\n"
+        "NEXT_TASK:\n"
+        "- If any hypothesis is UNSUPPORTED or CONTRADICTED, NEXT_TASK should remediate it.\n"
+        "- Otherwise, propose the next concrete step toward the goal.\n"
+        "\n"
+        "REQUEST_TOOLS:\n"
+        "- Always output valid JSON: [] or [\"tool1\", \"tool2\"].\n"
+        "- Add tools here if new documentation is required.\n"
+        "\n"
+        "Follow these formats exactly."
+    )
+    
+    prompt += format_assistant("Understood.\n\n")
+    
+    # Main loop
+    current_task = state.get("first_task", "").strip()
+    if not current_task:
+        logger.warning("No first_task found, using goal as initial task")
+        current_task = goal_for_step
+    
+    for step in range(max_steps):
+        if _interrupt_requested(executor):
+            _clear_interrupt(executor)
+            state["final_answer"] = "Interrupted by user."
+            break
+        
+        # --- STAGE 2-PRE: Agent-State Hypotheses ---
+        voxel_grid_text = None
+        af1_text = None
+        if executor and executor.world_name == "minecraft":
+            try:
+                import sys
+                import os
+                current_dir = os.path.dirname(__file__)
+                minecraft_tools_root = os.path.abspath(os.path.join(current_dir, "world-tools", "minecraft"))
+                if minecraft_tools_root not in sys.path:
+                    sys.path.insert(0, minecraft_tools_root)
+                from local_grid import get_observed_voxel_grid_as_text  # type: ignore
+                voxel_grid_text = get_observed_voxel_grid_as_text(executor, radius=2)
+            except Exception:
+                pass
+            try:
+                af1_text_val = executor.get_world_state("af1_text")
+                if isinstance(af1_text_val, str) and af1_text_val.strip():
+                    af1_text = af1_text_val.strip()
+            except Exception:
+                pass
+        
+        prompt_parts = [
+            f"STAGE 2-PRE (step {step + 1}/{max_steps}):\n",
+            f"#GOAL: {goal_for_step}\n#END GOAL\n",
+            f"CURRENT_TASK: {current_task}\n\n"
+        ]
+        if voxel_grid_text:
+            prompt_parts.append(f"""#OBSERVED_VOXEL_GRID:\nExplicit voxel grid centered on agent (radius=1). Coordinates are relative: [dx, dy, dz].
+Each cell shows: block_id, solid (true/false), support (true/false).
+This is the only planner-visible structure that supports direct (dx,dy,dz) usage for tool arguments.
+{voxel_grid_text}
+#END OBSERVED_VOXEL_GRID\n\n""")
+        if af1_text:
+            prompt_parts.append(f"""#AF1:\nContract-aware actionability summary (deterministic, derived from mc-observe).\n{af1_text}\n#END AF1\n\n""")
+        prompt_parts.append("Before choosing any tool, infer AGENT-STATE HYPOTHESES and AGENT-STATE-SUPPORT. Refer to STAGE 2-PRE Instructions.\n")
+        
+        prompt += format_user("".join(prompt_parts))
+        
+        prompt += format_assistant("AGENT_STATE_HYPOTHESES:\n")
+        hypotheses = vllm_gen(f"agent_state_hypotheses_{step}", prompt, state, max_tokens=256, temperature=GEN_TEMPERATURE, stop="\nAGENT_STATE_SUPPORT:", executor=executor)
+        prompt += hypotheses + "\nAGENT_STATE_SUPPORT:\n"
+        support = vllm_gen(f"agent_state_support_{step}", prompt, state, max_tokens=256, temperature=GEN_TEMPERATURE, stop="\n", executor=executor)
+        prompt += support + "\n"
+        
+        # Stage 2: Choose tool + args
+        prompt += format_user(
+            f"STAGE 2 (step {step + 1}/{max_steps}):\n"
+            f"#GOAL: {goal_for_step}\n#END GOAL\n"
+            f"CURRENT_TASK: {current_task}\n"
+            "Choose tool and JSON args using Stage 2 FORMAT.\n"
+        )
+        
+        prompt += format_assistant("TOOL_NAME: ")
+        tool_name = vllm_gen(f"tool_name_{step}", prompt, state, max_tokens=32, temperature=GEN_TEMPERATURE, stop="TOOL_ARGS_JSON", executor=executor)
+        prompt += tool_name + "\nTOOL_ARGS_JSON: "
+        tool_args = vllm_gen(f"tool_args_{step}", prompt, state, max_tokens=1024, temperature=GEN_TEMPERATURE, stop="\n", executor=executor)
+        prompt += tool_args + "\n"
+        
+        # Execute tool
+        tool_name = state.get(f"tool_name_{step}", "").strip()
+        tool_args_json = state.get(f"tool_args_{step}", "").strip()
+        action = sgl_to_infospace_action(tool_name, tool_args_json, step, executor.available_tools)
+        
+        # Track resource bindings before execution
+        out_var = action.get('out', '')
+        resource_id_before = None
+        if out_var:
+            resource_id_before = executor.plan_bindings_flat.get(out_var.lstrip('$'))
+        
+        # Execute (method tools run in an inner loop but count as one outer step)
+        tool_info = executor.available_tools.get(tool_name, {})
+        if tool_info.get('type') == 'method':
+            logger.warning(f"Step {step}: Method tools are obsolete; executing {tool_name} directly")
+        tool_result = execute_infospace_action(action, executor, executor.agent_name)
+        
+        logger.info(f"Stage 2: Choose tool + args\n{tool_name} -> {tool_args_json}")
+        logger.info(f"Step {step}: {tool_name} -> {tool_result[:100]}")
+        
+        # Stage 3: Reflect
+        result_display = tool_result[:512]
+        if len(tool_result) > 512:
+            result_display += f"\n... [TRUNCATED - showing first 512 chars]"
+        
+        prompt += format_user(
+            f"=====\n"
+            f"STAGE 3 - TOOL EXECUTION COMPLETE (step {step + 1}/{max_steps})\n"
+            f"=====\n\n"
+            f"Tool executed: `{tool_name}`\n"
+            f"Arguments: {tool_args_json}\n\n"
+            f">> ACTUAL RESULT (ground truth) <<\n"
+            f"{result_display}\n"
+            f">> END RESULT <<\n\n"
+            f"INSTRUCTIONS:\n"
+            f"1. The result above is GROUND TRUTH. Use it exactly as shown.\n"
+            f"2. If reporting to user, use ONLY the values from the result above.\n"
+            f"3. Do NOT approximate, summarize, or invent values.\n"
+            f"4. Evaluate: Is the GOAL complete, including actual execution of all required actions, and achievement of all required information determinations, and outcomes? If yes, respond DONE: YES.\n"
+            f"   If no, determine the next action needed.\n\n"
+            f"Respond using Stage 3 FORMAT. Be concise.\n"
+            f"Ensure the REQUEST_TOOLS list is a valid JSON list of tool names.\n"
+        )
+        
+        prompt += format_assistant("\nTHOUGHTS: ")
+        thoughts = vllm_gen(f"thoughts_{step}", prompt, state, max_tokens=128, temperature=GEN_TEMPERATURE, stop=["\nHYPOTHESES:", "HYPOTHESES:"], executor=executor)
+        prompt += thoughts + "\nHYPOTHESES: "
+        hypotheses = vllm_gen(f"hypotheses_{step}", prompt, state, max_tokens=128, temperature=GEN_TEMPERATURE, 
+                             stop=["\nAUDIT:", "AUDIT:", "\nDONE:", "DONE:", "\nNEXT_TASK:", "NEXT_TASK:", "\nREQUEST_TOOLS:", "REQUEST_TOOLS:", "\nTHOUGHTS:", "THOUGHTS:", "\nHYPOTHESES:", "HYPOTHESES:"], 
+                             executor=executor)
+        prompt += hypotheses + "\nAUDIT: "
+        audit = vllm_gen(f"assumption_audit_{step}", prompt, state, max_tokens=192, temperature=0.0, stop="\nDONE: ", executor=executor)
+        prompt += audit + "\nDONE: "
+        done = vllm_gen(f"done_{step}", prompt, state, max_tokens=8, temperature=GEN_TEMPERATURE, stop="\nNEXT_TASK: ", executor=executor)
+        prompt += done + "\nNEXT_TASK: "
+        next_task = vllm_gen(f"next_task_{step}", prompt, state, max_tokens=128, temperature=GEN_TEMPERATURE, 
+                           stop=["\nREQUEST_TOOLS: ", "\nTHOUGHTS:", "\nHYPOTHESES:", "\nAUDIT:", "\nDONE:", "\nNEXT_TASK:"], 
+                           executor=executor)
+        prompt += next_task + "\nREQUEST_TOOLS: "
+        request_tools = vllm_gen(f"request_tools_{step}", prompt, state, max_tokens=96, temperature=GEN_TEMPERATURE, 
+                                stop=["\n\n", "\nTHOUGHTS:", "\nHYPOTHESES:", "\nAUDIT:", "\nDONE:", "\nNEXT_TASK:", "\nREQUEST_TOOLS:"], 
+                                executor=executor)
+        prompt += request_tools + "\n"
+        
+        # Safely log step fields
+        def safe_get(state_dict, key, default='N/A'):
+            try:
+                return state_dict[key]
+            except (KeyError, TypeError, AttributeError):
+                return default
+        
+        logger.info(f"THOUGHTS: {safe_get(state, f'thoughts_{step}')}")
+        logger.info(f"HYPOTHESES: {safe_get(state, f'hypotheses_{step}')}")
+        logger.info(f"ASSUMPTIONS: {safe_get(state, f'assumption_audit_{step}')}")
+        logger.info(f"DONE: {safe_get(state, f'done_{step}')}")
+        logger.info(f"NEXT_TASK: {safe_get(state, f'next_task_{step}')}")
+        logger.info(f"REQUEST_TOOLS: {safe_get(state, f'request_tools_{step}')}")
+        
+        # Stage 3.1: Update resource indexes with commentary
+        thoughts_text = state.get(f'thoughts_{step}', '').strip()
+        if thoughts_text:
+            out_var = action.get('out', '')
+            resource_id = None
+            if out_var:
+                resource_id_after = executor.plan_bindings_flat.get(out_var.lstrip('$'))
+                if resource_id_after and resource_id_after != resource_id_before:
+                    if resource_id_after.startswith('Note_') or resource_id_after.startswith('Collection_'):
+                        resource_id = resource_id_after
+            
+            if resource_id:
+                try:
+                    if executor.resource_manager:
+                        executor.resource_manager.update_resource_commentary(resource_id, thoughts_text)
+                        logger.debug(f"Stage 3.1: Updated commentary for {resource_id}")
+                except Exception as e:
+                    logger.debug(f"Stage 3.1: Failed to update commentary for {resource_id}: {e}")
+        
+        # Stage 3.5: Dynamic tool loading
+        requested_tools_raw = state.get(f"request_tools_{step}", "").strip()
+        requested_tools = parse_request_tools(requested_tools_raw)
+        if requested_tools:
+            logger.info(f"Step {step}: LLM requested additional tools: {requested_tools}")
+            tools_to_load = [tool for tool in requested_tools if tool not in _loaded_skill_docs]
+            
+            if tools_to_load:
+                expanded_docs = load_skill_docs(tools_to_load, executor.available_tools)
+                if expanded_docs:
+                    prompt += format_user(f"ADDITIONAL TOOL DOCUMENTATION:\n{expanded_docs}")
+                    prompt += format_assistant("I have reviewed the additional tool documentation.\n")
+                    logger.info(f"Stage 3.5: Loaded docs for {len(tools_to_load)} additional tools: {tools_to_load}")
+                    _loaded_skill_docs.update(tools_to_load)
+            else:
+                logger.debug(f"Stage 3.5: All {len(requested_tools)} requested tools already have docs loaded, skipping")
+        elif requested_tools_raw and requested_tools_raw.lower() not in ["", "[]", "none", "null"]:
+            logger.warning(f"Step {step}: Failed to parse REQUEST_TOOLS: {requested_tools_raw[:100]}")
+        
+        # Check if done
+        done_raw = state.get(f"done_{step}", "").strip().upper()
+        if done_raw.startswith("YES"):
+            # Verification logic
+            prompt += format_user(
+                "STOP. Before providing the final answer, perform a verification step. \n"
+                "Verify that the GOAL has been achieved, including actual execution of all required actions, and achievement of all required information determinations, and outcomes:\n"
+                "#VERIFICATION_INSTRUCTIONS:\n"
+                "        Inputs: GOAL, prior state, and current state\n"
+                "        - what are the observable facts in STATE_AFTER that directly satisfy GOAL.\n"
+                "        - what are the required GOAL actions and facts not observable in STATE_AFTER.\n"
+                "        - based on the above, provide a candid VERIFICATION ANSWER: (SUCCESS, PARTIAL, INCONCLUSIVE):\n"
+                "#OUTPUT FORMAT:\n"
+                "        - VERIFICATION_ANSWER: <SUCCESS | PARTIAL | INCONCLUSIVE>\n"
+                "#Respond using the OUTPUT FORMAT. Be concise.\n"
+            )
+            
+            prompt += format_assistant("VERIFICATION_ANSWER: ")
+            verification = vllm_gen("VERIFICATION_ANSWER", prompt, state, max_tokens=96, temperature=GEN_TEMPERATURE, stop="\n", executor=executor)
+            prompt += verification + "\n"
+            
+            logger.info(f"VERIFICATION ANSWER: {state.get('VERIFICATION_ANSWER', 'N/A')}")
+            
+            # Generate final answer
+            next_task_raw = state.get(f"next_task_{step}", "").strip()
+            if next_task_raw and next_task_raw.lower() not in ["", "none", "null", "n/a"]:
+                final_prompt = next_task_raw
+            else:
+                final_prompt = "Summarize the results with focus on the original goal"
+            
+            prompt += format_user(f"FINAL TASK: {final_prompt}\nProvide a concise final answer.")
+            final_answer = vllm_gen("final_answer", prompt, state, max_tokens=256, temperature=GEN_TEMPERATURE, stop=["\n\n", "STAGE"], executor=executor)
+            prompt += final_answer
+            logger.info(f"FINAL_ANSWER: {state.get('final_answer', 'N/A')}")
+            break
+        
+        # Update current task for next iteration
+        next_task_raw = state.get(f"next_task_{step}", "").strip()
+        if next_task_raw and next_task_raw.lower() not in ["", "none", "null", "n/a"]:
+            current_task = next_task_raw
+            logger.info(f"Step {step}: Next task: {current_task}")
+        else:
+            logger.warning(f"Step {step}: No NEXT_TASK provided, stopping")
+    
+    # Write full conversation state to trace file
+    if trace_file:
+        logger.info(f"Writing full conversation state to trace file")
+        trace_file.write(f"\n{'='*80}\n")
+        trace_file.write(f"Planning session: {time.strftime('%Y-%m-%d %H:%M:%S')}\n")
+        trace_file.write(f"Goal: {goal}\n")
+        trace_file.write(f"total length: {len(prompt)}\n")
+        if executor.tokenizer:
+            trace_file.write(f"token count: {tokenize_len(executor.tokenizer, prompt)}\n")
+        trace_file.write(f"{'='*80}\n")
+        trace_file.write(prompt + "\n")
+        trace_file.write(f"\n{'='*80}\n\n")
+        trace_file.flush()
+    
+    return state
+
+
+
 def parse_request_tools(raw_text: str) -> Optional[List[str]]:
     """
     Robustly parse REQUEST_TOOLS field from LLM output.
@@ -2062,269 +2680,6 @@ def _clear_interrupt(executor: "InfospaceExecutor") -> None:
         exec_node.interrupt_requested = False
 
 
-# Maximum call depth for recursive method calls
-MAX_METHOD_DEPTH = 3
-
-def run_method_protocol(s, executor: "InfospaceExecutor", method_name: str, max_steps: int, outer_step: int,
-                        loaded_skill_docs: set, call_depth: int = 0, outer_action: Dict = None) -> str:
-    """
-    Execute a 'method' tool as an inner loop (bounded by max_steps).
-    Returns a short summary string for the outer loop (so the method counts as 1 outer step).
-    
-    Pushes a new binding scope for the method (with copy of outer scope for read access),
-    and pops it when the method completes.
-    
-    Args:
-        max_steps: Maximum steps for this method (reduced by 4 at each recursive level)
-        call_depth: Current recursion depth (0 = top level, incremented for nested calls)
-    """
-    # Check depth limit
-    if call_depth >= MAX_METHOD_DEPTH:
-        error_msg = f"Method {method_name} exceeded maximum call depth ({MAX_METHOD_DEPTH}). Nested method calls are limited to prevent unbounded recursion."
-        bound_var = outer_action.get('out', '') if outer_action else ''
-        if bound_var:
-            return f"ERROR | {error_msg} | Bound: {bound_var}"
-        return f"ERROR | {error_msg}"
-    
-    # Ensure max_steps is at least 1 (minimum viable)
-    effective_max_steps = max(1, max_steps)
-    
-    # Publish method invocation to action log
-    if hasattr(executor, 'executive_node') and executor.executive_node:
-        from datetime import datetime
-        executive_node = executor.executive_node
-        now_ts = datetime.now()
-        
-        # Create action dict for method invocation
-        method_action = {
-            'type': method_name,
-            'action_type': method_name,
-            'action_id': f'{method_name}_{int(now_ts.timestamp() * 1000)}',
-            'timestamp': now_ts.isoformat(),
-            'character': executor.agent_name,
-            'status': 'running',
-            'method_depth': call_depth,
-            'max_steps': effective_max_steps
-        }
-        
-        # Publish method invocation start
-        if hasattr(executive_node, '_publish_action_result'):
-            executive_node._publish_action_result(method_action, {'status': 'running'}, method_name, now_ts)
-    
-    # Push new binding scope for method (copy outer scope for read access)
-    executor.push_binding_scope(copy_outer=True)
-    
-    method_task = "STEP 1"
-    last_tool_result = ""
-    try:
-        for mstep in range(effective_max_steps):
-            if _interrupt_requested(executor):
-                _clear_interrupt(executor)
-                error_msg = f"Method {method_name} interrupted by user"
-                bound_var = outer_action.get('out', '') if outer_action else ''
-                if bound_var:
-                    return f"ERROR | {error_msg} | Bound: {bound_var}"
-                return f"ERROR | {error_msg}"
-
-            s += user(
-            f"#METHOD EXECUTION MODE: {method_name} (internal step {mstep + 1}/{effective_max_steps}, depth {call_depth})\n"
-                f"CURRENT METHOD STEP: {method_task}\n"
-                "Select the tool explicitly required by the current Method Step.\n"
-                "Choose tool and JSON args using Stage 2 FORMAT.\n"
-            )
-
-            tool_name_key = f"m_tool_name_{outer_step}_{mstep}"
-            tool_args_key = f"m_tool_args_{outer_step}_{mstep}"
-            s += assistant(
-            "TOOL_NAME: "
-            + gen(tool_name_key, max_tokens=32, temperature=GEN_TEMPERATURE, stop="TOOL_ARGS_JSON")
-            + "\nTOOL_ARGS_JSON: "
-            + gen(tool_args_key, max_tokens=1024, temperature=GEN_TEMPERATURE, stop="\n")
-            + "\n"
-        )
-
-            tool_name = s[tool_name_key].strip()
-            tool_args_json = s[tool_args_key].strip()
-
-            tool_info = executor.available_tools.get(tool_name, {})
-            
-            # Initialize action and resource_id_before for potential use later
-            action = None
-            resource_id_before = None
-            
-            # Handle method tool recursion with depth checking
-            if tool_info.get('type') == 'method':
-                # Recursive method call - reduce max_steps by 4 and increment depth
-                # Create a nested action dict for the recursive call
-                nested_action = {
-                    'type': tool_name,
-                    'out': ''  # Nested methods don't bind variables directly
-                }
-                nested_max_steps = max(1, effective_max_steps - 4)
-                nested_result = run_method_protocol(
-                    s, executor, tool_name, nested_max_steps, outer_step, 
-                    loaded_skill_docs, call_depth=call_depth + 1, outer_action=nested_action
-                )
-                last_tool_result = nested_result
-                result_display = nested_result[:512]
-                if len(nested_result) > 512:
-                    result_display += f"\n... [TRUNCATED - showing 512 of {len(nested_result)} chars]"
-            else:
-                # Standard tool execution
-                action = sgl_to_infospace_action(tool_name, tool_args_json, outer_step * 1000 + mstep, executor.available_tools)
-            
-                # Add inner loop metadata for UI display
-                action['_inner_loop'] = {"method_name": method_name, "inner_step": mstep + 1, "max_steps": effective_max_steps, "outer_step": outer_step}
-
-                # Track resource bindings before execution (for commentary update)
-                out_var = action.get('out', '')
-                if out_var:
-                    resource_id_before = executor.plan_bindings_flat.get(out_var.lstrip('$'))
-
-                last_tool_result = execute_infospace_action(action, executor, executor.agent_name)
-                result_display = last_tool_result[:512]
-                if len(last_tool_result) > 512:
-                    result_display += f"\n... [TRUNCATED - showing 512 of {len(last_tool_result)} chars]"
-
-            s += user(
-            f"=====\n"
-            f"METHOD STAGE 3 - TOOL EXECUTION COMPLETE (internal step {mstep + 1}/{effective_max_steps})\n"
-            f"=====\n\n"
-            f"Tool executed: `{tool_name}`\n"
-            f"Arguments: {tool_args_json}\n\n"
-            f">> ACTUAL RESULT (ground truth) <<\n"
-            f"{result_display}\n"
-            f">> END RESULT <<\n\n"
-            f"METHOD NEXT_TASK INSTRUCTIONS:\n"
-            f"Identify the Exact Step defined in the {method_name} manual that matches the ACTUAL RESULT above.\n"
-            f"NEXT_TASK must be written as: [METHOD: STEP X] <Instruction from manual>.\n"
-            f"Do not invent new steps.\n"
-            f"TERMINATION: When the Method instructs TERMINATE (SUCCESS/FAILED/INAPPLICABLE), write 'METHOD COMPLETE' in THOUGHTS.\n\n"
-            f"Respond using Stage 3 FORMAT. Be concise.\n"
-                f"Ensure the REQUEST_TOOLS list is a valid JSON list of tool names.\n"
-            )
-
-            thoughts_key = f"m_thoughts_{outer_step}_{mstep}"
-            hypotheses_key = f"m_hyp_{outer_step}_{mstep}"
-            audit_key = f"m_audit_{outer_step}_{mstep}"
-            done_key = f"m_done_{outer_step}_{mstep}"
-            next_task_key = f"m_next_{outer_step}_{mstep}"
-            req_tools_key = f"m_req_{outer_step}_{mstep}"
-
-            s += assistant(
-                "\nTHOUGHTS: "
-                + gen(thoughts_key, max_tokens=128, temperature=GEN_TEMPERATURE, stop="HYPOTHESES: ")
-                + "\nHYPOTHESES: "
-                + gen(hypotheses_key, max_tokens=128, temperature=GEN_TEMPERATURE, stop="\nAUDIT: ")
-                + "\nAUDIT: "
-                + gen(audit_key, max_tokens=128, temperature=0.0, stop="\nDONE: ")
-                + "\nDONE: "
-                + gen(done_key, max_tokens=8, temperature=GEN_TEMPERATURE, stop="\nNEXT_TASK: ")
-                + "\nNEXT_TASK: "
-                + gen(next_task_key, max_tokens=128, temperature=GEN_TEMPERATURE, stop="\nREQUEST_TOOLS: ")
-                + "\nREQUEST_TOOLS: "
-                + gen(req_tools_key, max_tokens=96, temperature=GEN_TEMPERATURE, stop=["\n\n"])
-                + "\n"
-            )
-
-            thoughts_text = s[thoughts_key].strip()
-
-            # Stage 3.1: Update resource indexes with commentary (same behavior as outer loop)
-            # Only update if we have an action (not a recursive method call)
-            if thoughts_text and action is not None:
-                out_var = action.get('out', '')
-                resource_id = None
-                if out_var:
-                    resource_id_after = executor.plan_bindings_flat.get(out_var.lstrip('$'))
-                    if resource_id_after and resource_id_after != resource_id_before:
-                        if resource_id_after.startswith('Note_') or resource_id_after.startswith('Collection_'):
-                            resource_id = resource_id_after
-                if resource_id:
-                    if executor.resource_manager:
-                        executor.resource_manager.update_resource_commentary(resource_id, thoughts_text)
-
-            # Stage 3.5: Dynamic tool loading (if requested)
-            requested_tools_raw = s[req_tools_key].strip()
-            requested_tools = parse_request_tools(requested_tools_raw)
-            if requested_tools:
-                tools_to_load = [tool for tool in requested_tools if tool not in loaded_skill_docs]
-                if tools_to_load:
-                    expanded_docs = load_skill_docs(tools_to_load, executor.available_tools)
-                    if expanded_docs:
-                        s += user(f"ADDITIONAL TOOL DOCUMENTATION:\n{expanded_docs}")
-                        s += assistant("I have reviewed the additional tool documentation.\n")
-                        loaded_skill_docs.update(tools_to_load)
-
-            if 'METHOD COMPLETE' in thoughts_text.upper():
-                summary = thoughts_text.replace("\n", " ")
-                if len(summary) > 240:
-                    summary = summary[:240] + "..."
-                
-                # Format result to match execute_infospace_action format
-                bound_var = outer_action.get('out', '') if outer_action else ''
-                if bound_var:
-                    final_result = f"SUCCESS | Method {method_name} complete | {summary} | Bound: {bound_var}"
-                else:
-                    final_result = f"SUCCESS | Method {method_name} complete | {summary}"
-                
-                # Publish method completion to action log
-                if hasattr(executor, 'executive_node') and executor.executive_node:
-                    from datetime import datetime
-                    executive_node = executor.executive_node
-                    now_ts = datetime.now()
-                    
-                    method_action = {
-                        'type': method_name,
-                        'action_type': method_name,
-                        'action_id': f'{method_name}_{int(now_ts.timestamp() * 1000)}',
-                        'timestamp': now_ts.isoformat(),
-                        'character': executor.agent_name,
-                        'status': 'success',
-                        'text': summary,
-                        'method_depth': call_depth
-                    }
-                    
-                    if hasattr(executive_node, '_publish_action_result'):
-                        executive_node._publish_action_result(method_action, {'status': 'success', 'value': summary}, method_name, now_ts)
-                
-                return final_result
-
-            next_task_raw = s[next_task_key].strip()
-            if next_task_raw and next_task_raw.lower() not in ["", "none", "null", "n/a"]:
-                method_task = next_task_raw
-
-        error_reason = f"Method {method_name} exceeded max_steps ({effective_max_steps}) | last_result={last_tool_result[:120]}"
-        bound_var = outer_action.get('out', '') if outer_action else ''
-        if bound_var:
-            final_result = f"ERROR | {error_reason} | Bound: {bound_var}"
-        else:
-            final_result = f"ERROR | {error_reason}"
-        
-        # Publish method failure to action log
-        if hasattr(executor, 'executive_node') and executor.executive_node:
-            from datetime import datetime
-            executive_node = executor.executive_node
-            now_ts = datetime.now()
-            
-            method_action = {
-                'type': method_name,
-                'action_type': method_name,
-                'action_id': f'{method_name}_{int(now_ts.timestamp() * 1000)}',
-                'timestamp': now_ts.isoformat(),
-                'character': executor.agent_name,
-                'status': 'failed',
-                'error': f'exceeded max_steps ({effective_max_steps})',
-                'method_depth': call_depth
-            }
-            
-            if hasattr(executive_node, '_publish_action_result'):
-                executive_node._publish_action_result(method_action, {'status': 'failed', 'reason': error_reason}, method_name, now_ts)
-        
-        return final_result
-    finally:
-        # Always pop the method scope when done
-        executor.pop_binding_scope()
-
 
 class IncrementalPlanner:
     """
@@ -2332,7 +2687,8 @@ class IncrementalPlanner:
     """
     
     def __init__(self, executor: InfospaceExecutor, available_tools: Dict[str, Dict], 
-                logger_instance=None, sgl_model_path: str = None):
+                logger_instance=None, sgl_model_path: str = None, vllm_model_path: str = None,
+                vllm_url: str = "http://localhost:5000/v1/chat/completions", vllm_model: str = None):
         """
         Initialize incremental planner.
         
@@ -2341,19 +2697,30 @@ class IncrementalPlanner:
             available_tools: Dict of tool_name -> metadata
             primitives_reference: Primitives reference text
             logger_instance: Optional logger
-            sgl_model_path: Path to local model for SGLang (required if not already initialized)
+            sgl_model_path: Path to local model for SGLang (optional if vLLM is used)
+            vllm_model_path: Path to model for vLLM (optional if SGLang is used)
+            vllm_url: vLLM API endpoint (default: http://localhost:5000/v1/chat/completions)
+            vllm_model: vLLM model name (resolved from vLLM server if not provided)
         """
-        if not HAS_SGLANG:
-            raise ImportError("SGLang not available")
+        # Require either SGLang or vLLM
+        if not HAS_SGLANG and not vllm_model_path:
+            raise ImportError("Neither SGLang nor vLLM available - at least one backend required")
         
         self.executor: InfospaceExecutor = executor
         self.available_tools = available_tools
         self.logger = logger_instance or logger
         
-        # SGLang runtime is now initialized in executive_node
-        # Just verify it's available
-        if not executor.runtime:
-            self.logger.warning("SGLang runtime not available in executor - incremental planner may have reduced functionality")
+        # Store vLLM config
+        self.vllm_model_path = vllm_model_path
+        self.vllm_url = vllm_url
+        self.vllm_model = vllm_model
+        
+        # SGLang runtime is now initialized in executive_node (optional)
+        # Verify availability if SGLang is expected
+        if sgl_model_path and not executor.runtime:
+            self.logger.warning("SGLang runtime not available in executor - will use vLLM if configured")
+        elif not vllm_model_path and not executor.runtime:
+            self.logger.warning("Neither SGLang runtime nor vLLM config available - incremental planner may have reduced functionality")
         
         # Build tool catalog
         self.tools = build_tool_catalog(available_tools)
@@ -2576,7 +2943,7 @@ class IncrementalPlanner:
 
     def generate_subplan(self, template, goal: str, context: Dict = None, max_steps: int = 16) -> Dict:
         """
-        Generate plan incrementally using SGLang.
+        Generate plan incrementally using SGLang or vLLM.
         
         Args:
             goal: Goal text
@@ -2586,8 +2953,8 @@ class IncrementalPlanner:
         Returns:
             Plan dict with 'plan' key containing actions
         """
-        if not HAS_SGLANG:
-            return {'error': 'SGLang not available'}
+        if not HAS_SGLANG and not self.vllm_model_path:
+            return {'error': 'Neither SGLang nor vLLM available'}
         
         # Get world_model from executor
         if not hasattr(self.executor, 'world_model') or not self.executor.world_model:
@@ -2616,21 +2983,40 @@ class IncrementalPlanner:
                 
             #
            
-            # Run SGLang planner
+            # Run planner (SGLang or vLLM)
             world_model = initial_world_model
-            state = tool_planner_infospace.run(
-                template=template,
-                goal=goal,
-                world_model=world_model,
-                character_context=character_context,
-                recent_context=recent_context,
-                tools_catalog_text=self.tools_catalog_text,
-                executor=self.executor,
-                trace_file=self.trace_file,
-                max_steps=max_steps,
-                preplan=preplan,
-                similar_plan=None
-            )
+            if self.vllm_model_path and self.vllm_model:
+                # Use vLLM planner
+                state = tool_planner_infospace_vllm(
+                    template=template,
+                    goal=goal,
+                    world_model=world_model,
+                    character_context=character_context,
+                    recent_context=recent_context,
+                    tools_catalog_text=self.tools_catalog_text,
+                    executor=self.executor,
+                    trace_file=self.trace_file,
+                    max_steps=max_steps,
+                    preplan=preplan,
+                    similar_plan=None
+                )
+            elif HAS_SGLANG and self.executor.runtime:
+                # Use SGLang planner
+                state = tool_planner_infospace.run(
+                    template=template,
+                    goal=goal,
+                    world_model=world_model,
+                    character_context=character_context,
+                    recent_context=recent_context,
+                    tools_catalog_text=self.tools_catalog_text,
+                    executor=self.executor,
+                    trace_file=self.trace_file,
+                    max_steps=max_steps,
+                    preplan=preplan,
+                    similar_plan=None
+                )
+            else:
+                return {'error': 'No planner backend available (SGLang or vLLM required)'}
 
             step = self._find_last_step(state, max_steps)
             # Safely check if done_<step> exists (may not exist if interrupted)
@@ -2682,7 +3068,7 @@ class IncrementalPlanner:
 
     def generate_plan(self, template, goal: str, context: Dict = None, max_steps: int = 16) -> Dict:
         """
-        Generate plan incrementally using SGLang.
+        Generate plan incrementally using SGLang or vLLM.
         
         Args:
             goal: Goal text
@@ -2692,8 +3078,8 @@ class IncrementalPlanner:
         Returns:
             Plan dict with 'plan' key containing actions
         """
-        if not HAS_SGLANG:
-            return {'error': 'SGLang not available'}
+        if not HAS_SGLANG and not self.vllm_model_path:
+            return {'error': 'Neither SGLang nor vLLM available'}
         
         # Get world_model from executor
         if not hasattr(self.executor, 'world_model') or not self.executor.world_model:
@@ -2738,26 +3124,47 @@ class IncrementalPlanner:
                 len(self.tools_catalog_text)
             )
             if total_input_size > 100000:
-                logger.error(f"⚠️  Attempting to send {total_input_size:,} chars to tool_planner_infospace.run() (limit: 100,000)")
+                logger.error(f"⚠️  Attempting to send {total_input_size:,} chars to planner (limit: 100,000)")
                 logger.error("Stack traceback:")
                 for line in traceback.format_stack():
                     logger.error(line.rstrip())
             
-            # Run SGLang planner
+            # Run planner (SGLang or vLLM)
             world_model = initial_world_model
-            state = tool_planner_infospace.run(
-                template=template,
-                goal=goal,
-                world_model=world_model,
-                character_context=character_context,
-                recent_context=recent_context,
-                tools_catalog_text=self.tools_catalog_text,
-                executor=self.executor,
-                trace_file=self.trace_file,
-                max_steps=max_steps,
-                preplan=preplan,
-                similar_plan=similar_plans[0] if similar_plans else None
-            )
+            if self.vllm_model_path and self.vllm_model:
+                # Use vLLM planner
+                state = tool_planner_infospace_vllm(
+                    template=template,
+                    goal=goal,
+                    world_model=world_model,
+                    character_context=character_context,
+                    recent_context=recent_context,
+                    tools_catalog_text=self.tools_catalog_text,
+                    executor=self.executor,
+                    trace_file=self.trace_file,
+                    max_steps=max_steps,
+                    preplan=preplan,
+                    similar_plan=similar_plans[0] if similar_plans else None,
+                    vllm_url=self.vllm_url,
+                    model=self.vllm_model
+                )
+            elif HAS_SGLANG and self.executor.runtime:
+                # Use SGLang planner
+                state = tool_planner_infospace.run(
+                    template=template,
+                    goal=goal,
+                    world_model=world_model,
+                    character_context=character_context,
+                    recent_context=recent_context,
+                    tools_catalog_text=self.tools_catalog_text,
+                    executor=self.executor,
+                    trace_file=self.trace_file,
+                    max_steps=max_steps,
+                    preplan=preplan,
+                    similar_plan=similar_plans[0] if similar_plans else None
+                )
+            else:
+                return {'error': 'No planner backend available (SGLang or vLLM required)'}
 
             step = self._find_last_step(state, max_steps)
             # Safely check if done_<step> exists (may not exist if interrupted)
@@ -2909,6 +3316,10 @@ END_PLAN
 """
 
         abstract_plan = self.executor.llm_generate(ABSTRACT_PLAN_PROMPT, max_tokens=256, temperature=GEN_TEMPERATURE, stops=["\nEND_PLAN:", "END_PLAN:"])
+        if not abstract_plan.success or not abstract_plan.text:
+            error_msg = abstract_plan.error or "Unknown error"
+            logger.error(f"_preplan failed: {error_msg}")
+            return "No preplan available"
         return abstract_plan.text.strip()
 
     def _feedback(self, outcome: bool) -> Dict:

@@ -17,6 +17,21 @@
             "preLaunchTask": "setup-zenoh-environment"
         },
         {
+            "name": "Jill - FS",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/launcher.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/src",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src"
+            },
+            "args": ["jill-fs.yaml", "--ui", "--resource-browser"],
+            "justMyCode": false,
+            "stopOnEntry": false,
+            "preLaunchTask": "setup-zenoh-environment"
+        },
+        {
             "name": "Jill - OSWorld",
             "type": "debugpy",
             "request": "launch",
