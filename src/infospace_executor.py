@@ -79,6 +79,10 @@ class InfospaceExecutor:
         
         # SGLang runtime (set by IncrementalPlanner if available)
         self.runtime = None
+        
+        # vLLM config (set by executive_node if vLLM is used)
+        self.vllm_model = None
+        self.vllm_url = None
 
         # Global interrupt flag (can be set by UI via executive_node control channel)
         self.interrupt_requested: bool = False
@@ -550,20 +554,88 @@ class InfospaceExecutor:
         
         return content_str
     
+    def _get_note_display_name(self, note_id: str, max_length: int = 40) -> str:
+        """
+        Get display name for a Note (filename, title, uri, or truncated content).
+        
+        Args:
+            note_id: Note ID
+            max_length: Maximum length for display name
+            
+        Returns:
+            Display name string, or note_id if unavailable
+        """
+        if not self.resource_manager:
+            return note_id
+        
+        resource = self.resource_manager.get_resource(note_id)
+        if not resource:
+            return note_id
+        
+        props = resource.get('properties', {})
+        content = props.get('content', '')
+        kind = props.get('kind', '')
+        
+        # fs-file: show filename from text field or metadata.name
+        if kind == 'fs-file':
+            if isinstance(content, dict):
+                if 'text' in content:
+                    filename = str(content['text']).strip()
+                    if filename:
+                        return filename[:max_length]
+                if 'metadata' in content and isinstance(content['metadata'], dict):
+                    name = content['metadata'].get('name', '')
+                    if name:
+                        return name[:max_length]
+            return note_id
+        
+        # Structured Notes: try metadata.title, then metadata.uri
+        if isinstance(content, dict):
+            metadata = content.get('metadata', {})
+            if isinstance(metadata, dict):
+                title = metadata.get('title', '')
+                if title:
+                    return title[:max_length]
+                uri = metadata.get('uri', '') or metadata.get('url', '')
+                if uri:
+                    # Truncate URI if too long
+                    if len(uri) > max_length:
+                        return uri[:max_length-3] + '...'
+                    return uri
+        
+        # Text content: show truncated preview
+        if isinstance(content, dict) and 'text' in content:
+            text = str(content['text']).strip()
+            if text:
+                # Remove newlines for display
+                text = text.replace('\n', ' ').replace('\r', ' ')
+                if len(text) > max_length:
+                    return text[:max_length-3] + '...'
+                return text
+        elif isinstance(content, str) and content:
+            text = content.replace('\n', ' ').replace('\r', ' ')
+            if len(text) > max_length:
+                return text[:max_length-3] + '...'
+            return text
+        
+        return note_id
+    
     def _format_collection_value(self, collection_id: str) -> str:
         """
-        Format collection value as "X items [Note_1, Note_2, ...]".
+        Format collection value with name/path prefix and Note display names.
         
         Args:
             collection_id: Collection ID
             
         Returns:
-            Formatted string like "35 items [Note_1, Note_2, ...]"
+            Formatted string like "bhagavan: 2 items [Note_9: Nan_Ar.txt, Note_10: other.txt]"
+            or "papers: 5 items [Note_1: Attention Mechanisms..., ...]"
         """
         if not collection_id or not collection_id.startswith('Collection_'):
             return ''
         
-        # Get collection content (list of Note IDs) from resource manager
+        # Get collection resource
+        resource = None
         note_ids = None
         if self.resource_manager:
             resource = self.resource_manager.get_resource(collection_id)
@@ -575,17 +647,50 @@ class InfospaceExecutor:
         
         item_count = len(note_ids)
         
-        # Format first few Note IDs
-        if item_count == 0:
-            return "0 items []"
+        # Get Collection name/path prefix
+        collection_prefix = ""
+        if resource:
+            props = resource.get('properties', {})
+            kind = props.get('kind', '')
+            
+            # fs-dir: show path from doc_meta or collection_name
+            if kind == 'fs-dir':
+                doc_meta = props.get('doc_meta', {})
+                if isinstance(doc_meta, dict) and 'path' in doc_meta:
+                    path = doc_meta['path']
+                    collection_prefix = path if path else "/"
+                else:
+                    collection_prefix = props.get('collection_name', '')
+            # Other Collections: show collection_name or source_skill
+            else:
+                collection_name = props.get('collection_name', '')
+                if collection_name:
+                    collection_prefix = collection_name
+                else:
+                    source_skill = props.get('source_skill', '')
+                    if source_skill:
+                        collection_prefix = f"{source_skill} results"
         
-        # Show up to 5 Note IDs, then ellipsis
-        display_ids = note_ids[:5]
-        note_list_str = ', '.join(display_ids)
+        # Format items with display names
+        if item_count == 0:
+            prefix_str = f"{collection_prefix}: " if collection_prefix else ""
+            return f"{prefix_str}0 items []"
+        
+        # Show up to 5 items with display names
+        display_items = []
+        for note_id in note_ids[:5]:
+            display_name = self._get_note_display_name(note_id)
+            if display_name == note_id:
+                display_items.append(note_id)
+            else:
+                display_items.append(f"{note_id}: {display_name}")
+        
+        note_list_str = ', '.join(display_items)
         if item_count > 5:
             note_list_str += ', ...'
         
-        return f"{item_count} items [{note_list_str}]"
+        prefix_str = f"{collection_prefix}: " if collection_prefix else ""
+        return f"{prefix_str}{item_count} items [{note_list_str}]"
     
     def _create_uniform_return(self, status: str, value: Any = None, resource_id: Optional[str] = None, reason: Optional[str] = None, extra: Optional[Dict] = None) -> Dict:
         """
@@ -1093,10 +1198,112 @@ Only provide the result, followed by the </end> tag.""")
             logger.exception(f"SGLang generation error: {e}")
             return Response(success=False, error=str(e))
     
+    def _vllm_generate(self, messages, max_tokens=2000, temperature=0.7, stops=None, is_json=False):
+        """
+        Generate text using vLLM API via HTTP.
+        Uses /v1/chat/completions endpoint with messages array format for consistency.
+        
+        Args:
+            messages: List of message strings (or single string)
+            max_tokens: Maximum tokens to generate
+            temperature: Sampling temperature
+            stops: List of stop sequences
+            is_json: If True, parse response as JSON and return dict
+            
+        Returns:
+            Object with .success, .text, and .error attributes (matching llm_client response)
+            If is_json=True, .text will be a dict (parsed JSON) instead of string
+        """
+        import requests
+        
+        class Response:
+            def __init__(self, success, text='', error=None):
+                self.success = success
+                self.text = text
+                self.error = error
+
+        try:
+            # Convert messages to chat format
+            if isinstance(messages, list):
+                # If list of strings, convert to messages array
+                chat_messages = [{"role": "system", "content": "Do not include reasoning, analysis, justification, or explanation. Respond only with the final answer."}]
+                for msg in messages:
+                    if isinstance(msg, str):
+                        # Simple heuristic: if starts with system/user/assistant markers, parse them
+                        if msg.strip().startswith('<|system|>'):
+                            content = msg.replace('<|system|>', '').strip()
+                            chat_messages.append({"role": "system", "content": content})
+                        elif msg.strip().startswith('<|user|>'):
+                            content = msg.replace('<|user|>', '').strip()
+                            chat_messages.append({"role": "user", "content": content})
+                        elif msg.strip().startswith('<|assistant|>'):
+                            content = msg.replace('<|assistant|>', '').strip()
+                            chat_messages.append({"role": "assistant", "content": content})
+                        else:
+                            # Default to user message
+                            chat_messages.append({"role": "user", "content": msg})
+                    else:
+                        # Already a dict with role/content
+                        chat_messages.append(msg)
+            else:
+                # Single string - treat as user message
+                chat_messages = [{"role": "user", "content": str(messages)}]
+            
+            # Prepare payload
+            payload = {
+                "model": self.vllm_model,
+                "messages": chat_messages,
+                "max_tokens": max_tokens+256, # allow for reasoning
+                "temperature": temperature,
+                "reasoning": {"effort": "low"},
+            }
+            if stops:
+                if isinstance(stops, list):
+                    payload["stop"] = stops
+                else:
+                    payload["stop"] = [stops]
+
+            
+            
+            # Call vLLM API
+            logger.debug(f"Calling vLLM API: {self.vllm_url} with model {self.vllm_model}")
+            response = requests.post(self.vllm_url, json=payload, timeout=120)
+            response.raise_for_status()  # Fail fast
+            
+            result = response.json()
+            logger.debug(f"vLLM API response structure: {list(result.keys())}")
+            
+            # Extract content from response
+            choices = result.get("choices", [])
+            if not choices:
+                logger.error(f"vLLM API returned no choices. Full response: {result}")
+                return Response(success=False, error="vLLM API returned no choices")
+            
+            message = choices[0].get("message", {})
+            result_text = message.get("content")
+            
+            # Handle None or empty content
+            if result_text is None:
+                logger.warning(f"vLLM API returned None content. Message: {message}, Full response: {result}")
+                return Response(success=False, error="vLLM API returned None content")
+            
+            # Post-process JSON if requested
+            if is_json:
+                result_text = self._parse_json_response(result_text, str(messages))
+            
+            return Response(success=True, text=result_text)
+        except requests.exceptions.RequestException as e:
+            logger.exception(f"vLLM API error: {e}")
+            return Response(success=False, error=str(e))
+        except (KeyError, ValueError) as e:
+            logger.exception(f"vLLM response parsing error: {e}")
+            return Response(success=False, error=str(e))
+        except Exception as e:
+            logger.exception(f"vLLM generation error: {e}")
+            return Response(success=False, error=str(e))
+    
     def llm_generate(self, messages, bindings=None, max_tokens=2000, temperature=0.7, is_json=False, stops=None):
-        """Unified LLM generation interface using SGLang runtime."""
-        if not self.runtime:
-            raise RuntimeError("SGLang runtime not available - ensure executive_node is started with sgl_model_path")
+        """Unified LLM generation interface using SGLang runtime or vLLM."""
         # Apply bindings to messages if provided
         if bindings and isinstance(messages, list):
             processed_messages = []
@@ -1109,7 +1316,14 @@ Only provide the result, followed by the </end> tag.""")
                 else:
                     processed_messages.append(msg)
             messages = processed_messages
-        return self._sglang_generate(messages, max_tokens, temperature, stops, is_json=is_json)
+        
+        # Use vLLM if configured, otherwise use SGLang
+        if self.vllm_model and self.vllm_url:
+            return self._vllm_generate(messages, max_tokens, temperature, stops, is_json=is_json)
+        elif self.runtime:
+            return self._sglang_generate(messages, max_tokens, temperature, stops, is_json=is_json)
+        else:
+            raise RuntimeError("Neither SGLang runtime nor vLLM config available - ensure executive_node is started with sgl_model_path or vllm_model_path")
     
     def _parse_json_response(self, response_text, original_prompt=None):
         """
@@ -1352,6 +1566,10 @@ Make sure the string is in a format that can be parsed by the json.loads functio
                 if world_config:
                     world_name = world_config.get('world_name')
                     port = world_config.get('port')
+                    
+                    # Override world_name in base_args if world_config provides it
+                    if world_name:
+                        base_args['world_name'] = world_name
                     
                     # Construct URL from world_name and port if url not explicitly provided
                     if world_config.get('url'):

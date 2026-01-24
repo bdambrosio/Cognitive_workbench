@@ -1,7 +1,7 @@
 ---
 name: nav-climb
 type: python
-description: "Attempt exactly ONE adjacent climb (+1Y) forward. Atomic navigation operation suitable for composition."
+description: "Attempt exactly ONE adjacent climb (+1Y) forward. Atomic navigation operation suitable for composition. nav-climb does not build, it traverses *existing* terrain"
 schema_hint:
   value: "ignored"
   step_duration: "float seconds for the move attempt (default: 0.6)"
@@ -49,7 +49,7 @@ For nav-climb to succeed, BOTH source and destination must satisfy clearance:
 
 **Destination (forward, y+1)**:
 - Body space at (fwd+1, y+1) and head space at (fwd+1, y+2) must be clear
-- Supporting block at (fwd+1, y) must be walkable
+- Supporting block at (fwd+1, y) must be walkable. 
 
 **Verification**: Use `dirs.up.blk` to check overhead (NOT `nav_surface.cover_block` - those are offset cells).
 
