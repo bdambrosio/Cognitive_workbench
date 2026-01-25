@@ -5,6 +5,7 @@ Reads text, JSON, or PDF files under scenarios/<world_name>/fs.
 from __future__ import annotations
 
 import logging
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Optional
 
@@ -139,6 +140,70 @@ def _extract_pdf_text(pdf_path: Path, grobid_url: Optional[str] = None) -> Dict[
         raise ValueError(f"PDF extraction failed: {str(e)}")
 
 
+def _find_existing_note(resource_manager, rel_path: str, file_mtime: float, max_chars: Optional[int]) -> Optional[str]:
+    """
+    Find existing Note for a file path, verifying it's still valid.
+    
+    Args:
+        resource_manager: Resource manager instance
+        rel_path: Relative file path
+        file_mtime: File modification time
+        max_chars: Requested max_chars (None for full read)
+        
+    Returns:
+        Note ID if valid cache hit, None if cache miss
+    """
+    if not resource_manager:
+        return None
+    
+    # Search resource_registry for matching Notes
+    for note_id, resource_data in resource_manager.resource_registry.items():
+        if not note_id.startswith('Note_'):
+            continue
+        
+        props = resource_data.get('properties', {})
+        
+        # Check if this Note matches our file
+        if (props.get('source_skill') == 'fs-read' and 
+            props.get('source_value') == rel_path and
+            props.get('kind') == 'fs-file'):
+            
+            # Verify Note still exists in resource manager
+            existing_resource = resource_manager.get_resource(note_id)
+            if not existing_resource:
+                continue
+            
+            # Check if max_chars differs (cache miss if different)
+            if max_chars is not None:
+                # If user requested truncation, check if cached Note was truncated
+                note_content = props.get('content', {})
+                if isinstance(note_content, dict):
+                    note_meta = note_content.get('metadata', {})
+                    if note_meta.get('truncated'):
+                        # Cached Note was truncated, but we don't know the original max_chars
+                        # Re-read to be safe (could optimize later by storing max_chars)
+                        continue
+            
+            # Check file modification time vs Note creation time
+            created_at_str = props.get('created_at', '')
+            if created_at_str:
+                try:
+                    created_at = datetime.fromisoformat(created_at_str).timestamp()
+                    # If file is newer than Note creation, cache is stale
+                    if file_mtime > created_at:
+                        logger.debug(f"fs-read: cache miss for {rel_path} - file modified after Note creation")
+                        continue
+                except (ValueError, TypeError):
+                    # Invalid timestamp, skip cache
+                    continue
+            
+            # Cache hit - return existing Note
+            logger.debug(f"fs-read: cache hit for {rel_path} - returning existing Note {note_id}")
+            return note_id
+    
+    return None
+
+
 def _create_note(resource_manager, agent_name: str, content: Dict[str, Any], rel_path: str) -> Optional[str]:
     if not resource_manager:
         return None
@@ -188,6 +253,13 @@ def tool(input_value=None, **kwargs):
         return executor._create_uniform_return("failed", reason="fs-read requires a file path")
 
     meta = file_metadata(abs_path, rel_path)
+    file_mtime = meta.get('mtime', 0.0)
+    
+    # Check for existing cached Note
+    cached_note_id = _find_existing_note(resource_manager, rel_path, file_mtime, max_chars)
+    if cached_note_id:
+        summary = f"read {rel_path or '/'} (cached)"
+        return executor._create_uniform_return("success", value=summary, resource_id=cached_note_id)
 
     # Check for PDF files
     if abs_path.suffix.lower() == ".pdf":
