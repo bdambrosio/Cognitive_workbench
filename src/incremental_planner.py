@@ -15,6 +15,7 @@ import re
 import os
 import sys
 import datetime
+import textwrap
 from pathlib import Path
 from typing import Dict, List, Any, Optional
 from infospace_executor import InfospaceExecutor
@@ -1107,9 +1108,50 @@ def sgl_to_infospace_action(tool_name: str, args_json: str, step: int, available
     return action
 
 
+def format_result_text(result: Dict, action: Dict) -> str:
+    """
+    Format a uniform_return result dict into a text string for Stage 3 reflection.
+    
+    Args:
+        result: uniform_return dict from execute_action_tracked / execute_action
+        action: The action dict that produced this result
+        
+    Returns:
+        Text string (format: SUCCESS | <result> | <action> | Bound: <var>)
+    """
+    action_type = action.get('type', 'unknown')
+    if result.get('status') == 'success':
+        value = result.get('value', '')
+        resource_id = result.get('resource_id')
+        bound_var = action.get('out', '')
+        
+        value_str = str(value).replace('\n', ' | ') if value else ''
+        
+        if value_str:
+            if bound_var and resource_id:
+                return f"SUCCESS | {value_str} | {action_type} completed | Bound: {bound_var} to {resource_id}"
+            elif bound_var:
+                return f"SUCCESS | {value_str} | {action_type} completed | Bound: {bound_var}"
+            else:
+                return f"SUCCESS | {value_str} | {action_type} completed"
+        else:
+            if bound_var and resource_id:
+                return f"SUCCESS | {action_type} completed | Bound: {bound_var} to {resource_id}"
+            elif bound_var:
+                return f"SUCCESS | {action_type} completed | Bound: {bound_var}"
+            else:
+                return f"SUCCESS | {action_type} completed"
+    else:
+        error_reason = result.get('reason', 'Unknown error')
+        return f"ERROR | {action_type} failed: {error_reason}"
+
+
 def execute_infospace_action(action: Dict, executor: InfospaceExecutor, agent_name: str) -> str:
     """
     Execute single action via infospace_executor, return result text.
+    
+    Delegates to executor.execute_action_tracked() for all side-effects
+    (plan_actions, ActionRecord, UI publish, compliance), then formats to text.
     
     Args:
         action: Infospace action dict
@@ -1120,95 +1162,146 @@ def execute_infospace_action(action: Dict, executor: InfospaceExecutor, agent_na
         Result text for Stage 3 reflection (format: SUCCESS | <result> | <action> | Bound: <var>)
     """
     try:
-        # Track action in executor's plan_actions if available
-        if hasattr(executor, '_plan_actions'):
-            executor._plan_actions.append(action.copy())
-        
-        result = executor.execute_action(action)
-        
-        # Track action in executive_node.action_history if available (for plan completion summary)
-        if hasattr(executor, 'executive_node') and executor.executive_node:
-            from datetime import datetime
-            executive_node = executor.executive_node
-            now_ts = datetime.now()
-            executive_node.step_counter += 1
-            
-            # Import ActionRecord from executive_node (avoid circular import by importing here)
-            from executive_node import ActionRecord
-            
-            # Format result string for backward compatibility
-            result_str = result.get('value', '') if result.get('status') == 'success' else result.get('reason', 'failed')
-            
-            action_record = ActionRecord(
-                action=action,
-                result=result_str,
-                result_dict=result.copy(),  # Store full uniform format
-                timestamp=now_ts,
-                step_id=executive_node.step_counter,
-                plan_id=getattr(executive_node, 'current_plan_id', None),
-                requested_target=action.get('target', ''),
-                started_at=now_ts,
-                ended_at=datetime.now(),
-                outcome_status=result.get('status', 'unknown')
-            )
-            # Snapshot physiology if method available
-            if hasattr(executive_node, '_snapshot_physiology'):
-                executive_node._snapshot_physiology(action_record)
-            executive_node.action_history.append(action_record)
-            
-            # Publish action result for UI display
-            if hasattr(executive_node, '_publish_action_result'):
-                executive_node._publish_action_result(action, result, action.get('type', ''), now_ts)
-        
-        # Track compliance if evaluator is active
-        if hasattr(executor, '_compliance_tracker') and executor._compliance_tracker:
-            executor._compliance_tracker.check_action(action, result, executor.plan_bindings_flat)
-        
-        if result.get('status') == 'success':
-            # Extract value and resource_id from uniform return format
-            value = result.get('value', '')
-            resource_id = result.get('resource_id')
-            
-            # Get bound variable
-            bound_var = action.get('out', '')
-            action_type = action['type']
-            
-            # Format value for display (already truncated to 384 chars in executor)
-            if value:
-                # Replace newlines with space-pipe-space for readability
-                value_str = str(value).replace('\n', ' | ')
-            else:
-                value_str = ''
-            
-            # Build result message
-            if value_str:
-                if bound_var and resource_id:
-                    return f"SUCCESS | {value_str} | {action_type} completed | Bound: {bound_var} to {resource_id}"
-                elif bound_var:
-                    return f"SUCCESS | {value_str} | {action_type} completed | Bound: {bound_var}"
-                else:
-                    return f"SUCCESS | {value_str} | {action_type} completed"
-            else:
-                # No value to show, use resource_id if available
-                if bound_var and resource_id:
-                    return f"SUCCESS | {action_type} completed | Bound: {bound_var} to {resource_id}"
-                elif bound_var:
-                    return f"SUCCESS | {action_type} completed | Bound: {bound_var}"
-                else:
-                    return f"SUCCESS | {action_type} completed"
-        else:
-            # Increment error counter
-            if hasattr(executor, '_plan_error_count'):
-                executor._plan_error_count += 1
-            error_reason = result.get('reason', 'Unknown error')
-            return f"ERROR | {action['type']} failed: {error_reason}"
+        result = executor.execute_action_tracked(action)
+        return format_result_text(result, action)
     except Exception as e:
-        # Increment error counter for exceptions
         if hasattr(executor, '_plan_error_count'):
             executor._plan_error_count += 1
         logger.error(f"Execution error: {e}")
         traceback.print_exc()
         return f"ERROR | Exception: {str(e)}"
+
+
+# ============================================================================
+# Code-block generation: validation, extraction, execution
+# ============================================================================
+
+_CODEGEN_FORBIDDEN_PATTERNS = [
+    r'\bimport\b',
+    r'\bfrom\b\s+\w+\s+import\b',
+    r'\bexec\b\s*\(', r'\beval\b\s*\(', r'\bcompile\b\s*\(',
+    r'\b__\w+__\b',
+    r'\bopen\b\s*\(',
+    r'\bos\b\.', r'\bsys\b\.', r'\bsubprocess\b',
+    r'\bwhile\b', r'\bfor\b',
+    r'\bclass\b', r'\bdef\b',
+    r'\bglobals\b\s*\(', r'\blocals\b\s*\(',
+    r'\bgetattr\b\s*\(', r'\bsetattr\b\s*\(', r'\bdelattr\b\s*\(',
+]
+
+
+def validate_codegen_block(code: str) -> tuple:
+    """
+    Static validation of LLM-generated code blocks before exec.
+    
+    Checks:
+    - Forbidden patterns (imports, exec, file I/O, loops, defs, etc.)
+    - Must contain 1-6 execute_action_tracked calls
+    - Must contain at least one return executor._create_uniform_return
+    - Max 30 lines
+    
+    Args:
+        code: Python code string
+        
+    Returns:
+        (ok: bool, reason: str) - reason is empty on success
+    """
+    if not code or not code.strip():
+        return False, "Empty code block"
+    
+    lines = code.strip().splitlines()
+    if len(lines) > 30:
+        return False, f"Code block too long ({len(lines)} lines, max 30)"
+    
+    # Check forbidden patterns
+    for pattern in _CODEGEN_FORBIDDEN_PATTERNS:
+        match = re.search(pattern, code)
+        if match:
+            return False, f"Forbidden pattern: {match.group()}"
+    
+    # Count execute_action_tracked calls (must be 1-6)
+    call_count = len(re.findall(r'executor\.execute_action_tracked\s*\(', code))
+    if call_count < 1:
+        return False, "No execute_action_tracked() calls found"
+    if call_count > 6:
+        return False, f"Too many execute_action_tracked() calls ({call_count}, max 6)"
+    
+    # Must have a return with _create_uniform_return
+    if 'executor._create_uniform_return' not in code:
+        return False, "Missing return executor._create_uniform_return(...)"
+    
+    return True, ""
+
+
+def extract_code_block(raw_text: str) -> str:
+    """
+    Extract Python code from LLM-generated Stage 2 output for _code_block_ tool.
+    
+    Handles:
+    - Triple backtick fenced blocks (```python ... ```)
+    - CODE: label prefix
+    - Raw code (fallback)
+    
+    Args:
+        raw_text: Raw text from Stage 2 generation (tool_args area)
+        
+    Returns:
+        Extracted Python code string
+    """
+    if not raw_text:
+        return ""
+    
+    text = raw_text.strip()
+    
+    # Remove CODE: prefix if present
+    if text.upper().startswith("CODE:"):
+        text = text[5:].strip()
+    
+    # Try to extract from triple backtick fences
+    fence_match = re.search(r'```(?:python)?\s*\n(.*?)```', text, re.DOTALL)
+    if fence_match:
+        return fence_match.group(1).strip()
+    
+    # Fallback: return everything (may already be raw code)
+    return text.strip()
+
+
+def execute_codegen_block(code: str, executor, method_name: str = "codegen") -> Dict:
+    """
+    Validate and execute an LLM-generated code block in a sandboxed namespace.
+    
+    The code is wrapped in a function so that 'return' statements work.
+    Only executor, json, and logger are available in the namespace.
+    
+    Args:
+        code: Python code string (from extract_code_block)
+        executor: InfospaceExecutor instance
+        method_name: Method name for UI logging (default: "codegen")
+        
+    Returns:
+        uniform_return dict
+    """
+    ok, reason = validate_codegen_block(code)
+    if not ok:
+        logger.warning(f"Code block validation failed: {reason}")
+        return executor._create_uniform_return("failed", reason=f"Code validation failed: {reason}")
+    
+    # Wrap code in a function so `return` works
+    indented = textwrap.indent(code, "    ")
+    wrapped = f"def _codegen_fn(executor):\n{indented}\n"
+    
+    namespace = {"executor": executor, "json": json, "logger": logger}
+    try:
+        exec(wrapped, namespace)
+        result = namespace["_codegen_fn"](executor)
+    except Exception as e:
+        logger.error(f"Code block execution error: {e}")
+        logger.error(traceback.format_exc())
+        return executor._create_uniform_return("failed", reason=f"Code block exception: {str(e)}")
+    
+    if not isinstance(result, dict) or result.get("type") != "uniform_return":
+        return executor._create_uniform_return("failed", reason="Code block did not return uniform_return")
+    return result
 
 
 if HAS_SGLANG:
@@ -1352,7 +1445,7 @@ if HAS_SGLANG:
         
         # Stage 1: Analysis + tool selection
         system_parts = [f"Your task is to achieve\n#GOAL:\n{goal}\n\n"]
-        system_parts.append("You can choose tools/primitives (aka actions), if and as needed, callling them with JSON arguments,")
+        system_parts.append("You can choose tools/primitives (aka actions) , if and as needed, callling them with JSON arguments,")
         system_parts.append("and loop over execute-step / reflect / refine until the goal is satisfied.")
         system_parts.append(f"\n{INCREMENTAL_PLAN_SPECIFICATIONS}\n")
         system_parts.append(f"Complete primitive and tool catalog:\n{tools_catalog_text}\n#### END OF INFOSPACE TYPE SYSTEM, SPECIFICATIONS, AND TOOL CATALOG\n\n")
@@ -1369,6 +1462,14 @@ if HAS_SGLANG:
             system_parts.append(f"OUTCOME: {similar_plan['outcome']} ERRORS: {similar_plan['error_count']}\n")
         if available_resources_text:
             system_parts.append(f"\n{available_resources_text}\n")
+        
+        # Add world-specific prompt context (generic, no world-specific code)
+        if executor:
+            world_prompt_context = executor.get_world_prompt_context()
+            if world_prompt_context:
+                for section_name, context_text in world_prompt_context.items():
+                    system_parts.append(f"\n# {section_name.upper().replace('_', ' ')}\n{context_text}\n")
+        
         # Add current date and time
 
         system_parts.append(f"WORLD_MODEL: {json.dumps(world_model, indent=2)}\n")
@@ -1616,9 +1717,27 @@ ALWAYS follow all formatting instructions exactly.
             "- Review AGENT_STATE_HYPOTHESES and AGENT_STATE_SUPPORT.\n"
             "- Choose the next tool and its JSON args from the Complete primitive and tool catalog.\n"
             "\n"
-            "#Stage 2 FORMAT:\n"
-            "  TOOL_NAME: <name from the Complete primitive and tool catalog>\n"
-            "  TOOL_ARGS_JSON: <json object>\n"
+            "#Stage 2 FORMAT (choose ONE):\n"
+            "  Option A - single tool call:\n"
+            "    TOOL_NAME: <name from the Complete primitive and tool catalog>\n"
+            "    TOOL_ARGS_JSON: <json object>\n"
+            "\n"
+            "  Option B - multi-step code block (use when CURRENT_TASK needs 2+ sequential tool calls, conditional logic, or passing data between steps):\n"
+            "    TOOL_NAME: _code_block_\n"
+            "    TOOL_ARGS_JSON: {}\n"
+            "    CODE:\n"
+            "    ```python\n"
+            "    r1 = executor.execute_action_tracked({\"type\": \"search\", \"target\": \"$col\", \"query\": \"...\", \"out\": \"$results\"}, \"codegen\")\n"
+            "    if r1[\"status\"] != \"success\":\n"
+            "        return executor._create_uniform_return(\"failed\", reason=\"search failed\")\n"
+            "    r2 = executor.execute_action_tracked({\"type\": \"load\", \"target\": \"$results\", \"out\": \"$data\"}, \"codegen\")\n"
+            "    return executor._create_uniform_return(\"success\", value=\"loaded result\")\n"
+            "    ```\n"
+            "    Rules for Option B:\n"
+            "    - Max 4-6 tool calls via executor.execute_action_tracked(action_dict, \"codegen\")\n"
+            "    - Only if/else control flow. No loops, imports, function defs.\n"
+            "    - Must end with: return executor._create_uniform_return(status, value=..., extra=...)\n"
+            "    - Prefer Option B when chaining, branching, or error-handling would be clearer than separate steps.\n"
             "\n"
             "#Stage 2 NUMERIC ARGUMENTS:\n"
             "  IMPORTANT: All numeric tool arguments must be simple literals.\n"
@@ -1785,24 +1904,50 @@ This is the only planner-visible structure that supports direct (dx,dy,dz) usage
             # Execute tool
             tool_name = s[f"tool_name_{step}"].strip()
             tool_args_json = s[f"tool_args_{step}"].strip()
-            action = sgl_to_infospace_action(tool_name, tool_args_json, step, executor.available_tools)
             
-            # Track resource bindings before execution
-            out_var = action.get('out', '')
-            resource_id_before = None
-            if out_var:
-                resource_id_before = executor.plan_bindings_flat.get(out_var.lstrip('$'))
-            
-            # Execute action normally - think/say/ask now return their text content
-            
-            # Execute (method tools run in an inner loop but count as one outer step)
-            tool_info = executor.available_tools.get(tool_name, {})
-            if tool_info.get('type') == 'method':
-                logger.warning(f"Step {step}: Method tools are obsolete; executing {tool_name} directly")
-            tool_result = execute_infospace_action(action, executor, executor.agent_name)
-            
-            logger.info(f"Stage 2: Choose tool + args\n{tool_name} -> {tool_args_json}")
-            logger.info(f"Step {step}: {tool_name} -> {tool_result[:100]}")
+            if tool_name == "_code_block_":
+                # Code-block path: generate CODE block with extended stop
+                s += assistant(
+                    "CODE:\n```python\n"
+                    + gen(f"code_block_{step}", max_tokens=2048, temperature=GEN_TEMPERATURE, stop=["```"])
+                    + "```\n"
+                )
+                code_text = s[f"code_block_{step}"].strip()
+                logger.info(f"Stage 2: Code block generated ({len(code_text)} chars)")
+                
+                # Snapshot bindings before execution
+                bindings_before = dict(executor.plan_bindings_flat)
+                
+                result_dict = execute_codegen_block(code_text, executor, "codegen")
+                action = {"type": "_code_block_"}
+                tool_result = format_result_text(result_dict, action)
+                
+                # Track new bindings for Stage 3.1
+                bindings_after = executor.plan_bindings_flat
+                new_bindings = {k: v for k, v in bindings_after.items() if bindings_before.get(k) != v}
+                resource_id_before = None  # handled via new_bindings below
+                
+                logger.info(f"Step {step}: _code_block_ -> {tool_result[:100]}")
+                if new_bindings:
+                    logger.info(f"Step {step}: New bindings from code block: {new_bindings}")
+            else:
+                action = sgl_to_infospace_action(tool_name, tool_args_json, step, executor.available_tools)
+                new_bindings = None
+                
+                # Track resource bindings before execution
+                out_var = action.get('out', '')
+                resource_id_before = None
+                if out_var:
+                    resource_id_before = executor.plan_bindings_flat.get(out_var.lstrip('$'))
+                
+                # Execute (method tools run in an inner loop but count as one outer step)
+                tool_info = executor.available_tools.get(tool_name, {})
+                if tool_info.get('type') == 'method':
+                    logger.warning(f"Step {step}: Method tools are obsolete; executing {tool_name} directly")
+                tool_result = execute_infospace_action(action, executor, executor.agent_name)
+                
+                logger.info(f"Stage 2: Choose tool + args\n{tool_name} -> {tool_args_json}")
+                logger.info(f"Step {step}: {tool_name} -> {tool_result[:100]}")
             
             # Stage 3: Reflect
             result_display = tool_result[:512]
@@ -1876,21 +2021,24 @@ This is the only planner-visible structure that supports direct (dx,dy,dz) usage
             logger.info(f"REQUEST_TOOLS: {safe_get(s, f'request_tools_{step}')}")
             
             # Stage 3.1: Update resource indexes with commentary
-            # Track ANY resource created in this step (not just explicit create-note/create-collection)
             thoughts_text = s[f'thoughts_{step}'].strip()
             if thoughts_text:
-                # Check if a new resource was bound in this step
-                out_var = action.get('out', '')
-                resource_id = None
-                if out_var:
-                    resource_id_after = executor.plan_bindings_flat.get(out_var.lstrip('$'))
-                    # If resource_id changed (new resource created) or didn't exist before
-                    if resource_id_after and resource_id_after != resource_id_before:
-                        if resource_id_after.startswith('Note_') or resource_id_after.startswith('Collection_'):
-                            resource_id = resource_id_after
+                resource_ids_to_update = []
+                if new_bindings:
+                    # Code-block path: check all new bindings
+                    for var_name, rid in new_bindings.items():
+                        if rid and (rid.startswith('Note_') or rid.startswith('Collection_')):
+                            resource_ids_to_update.append(rid)
+                else:
+                    # Single-tool path: check the one out var
+                    out_var = action.get('out', '')
+                    if out_var:
+                        resource_id_after = executor.plan_bindings_flat.get(out_var.lstrip('$'))
+                        if resource_id_after and resource_id_after != resource_id_before:
+                            if resource_id_after.startswith('Note_') or resource_id_after.startswith('Collection_'):
+                                resource_ids_to_update.append(resource_id_after)
                 
-                # Update index with commentary if resource was created
-                if resource_id:
+                for resource_id in resource_ids_to_update:
                     try:
                         if executor.resource_manager:
                             executor.resource_manager.update_resource_commentary(resource_id, thoughts_text)
@@ -1956,8 +2104,8 @@ This is the only planner-visible structure that supports direct (dx,dy,dz) usage
                 else:
                     final_prompt = "Summarize the results with focus on the original goal"
                 
-                s += user(f"FINAL TASK: {final_prompt}\nProvide a concise final answer.")
-                s += assistant(gen("final_answer", max_tokens=256, temperature=GEN_TEMPERATURE, stop=["\n\n", "STAGE"]))
+                s += user(f"FINAL TASK: {final_prompt}\nProvide a final response or answer. End your response with </end>")
+                s += assistant(gen("final_answer", max_tokens=256, temperature=GEN_TEMPERATURE, stop=["</end>"]))
                 logger.info(f"FINAL_ANSWER: {s['final_answer']}")
                 break
             
@@ -2001,6 +2149,55 @@ def format_assistant(text: str) -> str:
     """Format assistant message for vLLM prompt."""
     return f"<|assistant|>\n{text}\n"
 
+def _parse_prompt_to_messages(prompt: str) -> List[Dict[str, str]]:
+    """
+    Parse prompt string with role markers into messages array.
+    
+    Args:
+        prompt: Prompt string with <|system|>, <|user|>, <|assistant|> markers
+        
+    Returns:
+        List of message dicts with 'role' and 'content' keys
+    """
+    messages = []
+    current_role = "user"
+    current_content = []
+    
+    lines = prompt.split('\n')
+    for line in lines:
+        if line.startswith('<|system|>'):
+            if current_content:
+                messages.append({"role": current_role, "content": '\n'.join(current_content)})
+            current_role = "system"
+            current_content = []
+            if len(line) > 11:
+                current_content.append(line[11:].strip())
+        elif line.startswith('<|user|>'):
+            if current_content:
+                messages.append({"role": current_role, "content": '\n'.join(current_content)})
+            current_role = "user"
+            current_content = []
+            if len(line) > 9:
+                current_content.append(line[9:].strip())
+        elif line.startswith('<|assistant|>'):
+            if current_content:
+                messages.append({"role": current_role, "content": '\n'.join(current_content)})
+            current_role = "assistant"
+            current_content = []
+            if len(line) > 14:
+                current_content.append(line[14:].strip())
+        else:
+            current_content.append(line)
+    
+    if current_content:
+        messages.append({"role": current_role, "content": '\n'.join(current_content)})
+    
+    if not messages:
+        messages = [{"role": "user", "content": prompt}]
+    
+    return messages
+
+
 def vllm_gen(slot_name: str, prompt: str, state: Dict[str, Any], max_tokens: int, 
              temperature: float, stop: Any = None, executor: InfospaceExecutor = None) -> str:
     """
@@ -2030,52 +2227,13 @@ def vllm_gen(slot_name: str, prompt: str, state: Dict[str, Any], max_tokens: int
         else:
             stop_list = [stop]
     
-    # Convert prompt string to messages array format
-    # Parse prompt to extract system/user/assistant messages
-    messages = []
-    current_role = "user"
-    current_content = []
-    
-    # Simple parsing: look for role markers
-    lines = prompt.split('\n')
-    for line in lines:
-        if line.startswith('<|system|>'):
-            if current_content:
-                messages.append({"role": current_role, "content": '\n'.join(current_content)})
-            current_role = "system"
-            current_content = []
-            if len(line) > 11:  # Has content after marker
-                current_content.append(line[11:].strip())
-        elif line.startswith('<|user|>'):
-            if current_content:
-                messages.append({"role": current_role, "content": '\n'.join(current_content)})
-            current_role = "user"
-            current_content = []
-            if len(line) > 9:  # Has content after marker
-                current_content.append(line[9:].strip())
-        elif line.startswith('<|assistant|>'):
-            if current_content:
-                messages.append({"role": current_role, "content": '\n'.join(current_content)})
-            current_role = "assistant"
-            current_content = []
-            if len(line) > 14:  # Has content after marker
-                current_content.append(line[14:].strip())
-        else:
-            current_content.append(line)
-    
-    # Add final message
-    if current_content:
-        messages.append({"role": current_role, "content": '\n'.join(current_content)})
-    
-    # If no messages parsed, treat entire prompt as user message
-    if not messages:
-        messages = [{"role": "user", "content": prompt}]
+    messages = _parse_prompt_to_messages(prompt)
     
     # Use unified llm_generate interface
     try:
         response = executor.llm_generate(
             messages=messages,
-            max_tokens=max_tokens+256, # allow for reasoning
+            max_tokens=max_tokens+256,  # allow for reasoning
             temperature=temperature,
             stops=stop_list if stop_list else None
         )
@@ -2096,6 +2254,153 @@ def vllm_gen(slot_name: str, prompt: str, state: Dict[str, Any], max_tokens: int
     except Exception as e:
         logger.error(f"vllm_gen failed: {e}")
         raise  # Fail fast
+
+
+def vllm_gen_multi(prompt: str, state: Dict[str, Any], specs: List[Dict], 
+                   executor: InfospaceExecutor = None) -> str:
+    """
+    Generate multiple slots in a single LLM call (mirrors SGLang's chained gen() in assistant block).
+    
+    Each spec dict has:
+        - slot_name: Name for state storage
+        - prefix: Text to prepend before this generation (e.g., "\\nTOOL_NAME: ")
+        - suffix: Text to append after generation (e.g., "\\n")
+        - max_tokens: Max tokens for this slot
+        - temperature: Temperature for generation (uses max across all specs)
+        - stop: Stop sequence(s) for this slot
+    
+    The function makes a single LLM call with the combined template, then parses out
+    individual slot values using the stop sequences as delimiters.
+    
+    Args:
+        prompt: Current prompt string (will be converted to messages array)
+        state: State dictionary for storing results
+        specs: List of generation specs
+        executor: InfospaceExecutor instance (required for llm_generate)
+        
+    Returns:
+        Combined generated text (to append to prompt)
+    """
+    if not executor:
+        raise ValueError("executor is required for vllm_gen_multi()")
+    
+    if not specs:
+        return ""
+    
+    # Build the template with all prefixes/suffixes
+    # The LLM will generate text that fills in between the fixed parts
+    template_parts = []
+    total_max_tokens = 0
+    max_temperature = 0.0
+    final_stops = []
+    
+    for i, spec in enumerate(specs):
+        prefix = spec.get('prefix', '')
+        suffix = spec.get('suffix', '')
+        max_tokens = spec.get('max_tokens', 128)
+        temperature = spec.get('temperature', GEN_TEMPERATURE)
+        stop = spec.get('stop')
+        
+        template_parts.append(prefix)
+        total_max_tokens += max_tokens
+        max_temperature = max(max_temperature, temperature)
+        
+        # Collect stop sequences - the final slot's stop sequences are used for the LLM call
+        if i == len(specs) - 1 and stop:
+            if isinstance(stop, list):
+                final_stops.extend(stop)
+            else:
+                final_stops.append(stop)
+    
+    # Parse prompt to messages
+    messages = _parse_prompt_to_messages(prompt)
+    
+    # Make single LLM call
+    try:
+        response = executor.llm_generate(
+            messages=messages,
+            max_tokens=total_max_tokens + 256,  # allow for reasoning
+            temperature=max_temperature,
+            stops=final_stops if final_stops else None
+        )
+        
+        if not response.success:
+            error_msg = f"llm_generate failed: {response.error}"
+            logger.error(error_msg)
+            raise RuntimeError(error_msg)
+        
+        full_text = response.text
+        if full_text is None:
+            error_msg = "llm_generate returned None text"
+            logger.error(error_msg)
+            raise RuntimeError(error_msg)
+        
+        # Parse out individual slot values using stop sequences as delimiters
+        remaining_text = full_text
+        result_parts = []
+        
+        for i, spec in enumerate(specs):
+            slot_name = spec['slot_name']
+            prefix = spec.get('prefix', '')
+            suffix = spec.get('suffix', '')
+            stop = spec.get('stop')
+            
+            result_parts.append(prefix)
+            
+            # Find where this slot's content ends
+            if i < len(specs) - 1:
+                # Not the last slot - find the next slot's prefix or this slot's stop
+                next_prefix = specs[i + 1].get('prefix', '')
+                
+                # Normalize stops to list
+                stop_list = []
+                if stop:
+                    if isinstance(stop, list):
+                        stop_list = stop
+                    else:
+                        stop_list = [stop]
+                
+                # Find earliest delimiter
+                end_pos = len(remaining_text)
+                matched_stop = None
+                
+                # Check for stop sequences first
+                for s in stop_list:
+                    pos = remaining_text.find(s)
+                    if pos != -1 and pos < end_pos:
+                        end_pos = pos
+                        matched_stop = s
+                
+                # Check for next prefix if no stop found earlier
+                if next_prefix and matched_stop is None:
+                    pos = remaining_text.find(next_prefix)
+                    if pos != -1 and pos < end_pos:
+                        end_pos = pos
+                
+                slot_value = remaining_text[:end_pos]
+                state[slot_name] = slot_value
+                result_parts.append(slot_value)
+                result_parts.append(suffix)
+                
+                # Advance past the slot content and any matched stop
+                if matched_stop and remaining_text[end_pos:].startswith(matched_stop):
+                    remaining_text = remaining_text[end_pos + len(matched_stop):]
+                else:
+                    remaining_text = remaining_text[end_pos:]
+                
+                # Skip next prefix if it's at the start
+                if next_prefix and remaining_text.startswith(next_prefix):
+                    remaining_text = remaining_text[len(next_prefix):]
+            else:
+                # Last slot - use all remaining text
+                state[slot_name] = remaining_text
+                result_parts.append(remaining_text)
+                result_parts.append(suffix)
+        
+        return ''.join(result_parts)
+    except Exception as e:
+        logger.error(f"vllm_gen_multi failed: {e}")
+        raise
 
 
 def tool_planner_infospace_vllm(template, goal: str, world_model: Dict, character_context: str, recent_context: str, 
@@ -2125,6 +2430,94 @@ def tool_planner_infospace_vllm(template, goal: str, world_model: Dict, characte
     # Initialize prompt (string) and state (dict) - replaces SGLang's ProgramState
     prompt = ""
     state = {}
+
+    # -------------------- deterministic parsing helpers (Approach A) --------------------
+    def _extract_tag_block(text: str, tag: str) -> str:
+        """
+        Extract <tag>...</tag> content. Robust to whitespace/newlines after the tag name.
+        """
+        open_prefix = f"<{tag}"
+        close_tag = f"</{tag}>"
+        start = text.find(open_prefix)
+        if start == -1:
+            return ""
+        start_gt = text.find(">", start)
+        if start_gt == -1:
+            return ""
+        start_content = start_gt + 1
+        end = text.find(close_tag, start_content)
+        if end == -1:
+            return ""
+        return text[start_content:end].strip()
+
+    def _extract_after_label(text: str, label: str) -> str:
+        idx = text.find(label)
+        if idx == -1:
+            return ""
+        return text[idx + len(label):]
+
+    def _extract_line_value(text: str, label: str) -> str:
+        remainder = _extract_after_label(text, label)
+        if not remainder:
+            return ""
+        # Strip leading whitespace and take first line
+        remainder = remainder.lstrip()
+        line = remainder.splitlines()[0] if remainder.splitlines() else remainder
+        return line.strip()
+
+    def _strip_code_fences(text: str) -> str:
+        t = text.strip()
+        if t.startswith("```"):
+            # Remove the first fence line and the last fence if present
+            lines = t.splitlines()
+            if len(lines) >= 2:
+                # drop first line (``` or ```json)
+                lines = lines[1:]
+                # drop last line if it's ```
+                if lines and lines[-1].strip() == "```":
+                    lines = lines[:-1]
+                return "\n".join(lines).strip()
+        return t
+
+    def _extract_braced_json_object(text: str) -> str:
+        """Extract first balanced {...} JSON object from text (best-effort)."""
+        t = _strip_code_fences(text)
+        start = t.find("{")
+        if start == -1:
+            return t.strip()
+        depth = 0
+        in_str = False
+        esc = False
+        for i in range(start, len(t)):
+            ch = t[i]
+            if esc:
+                esc = False
+                continue
+            if ch == "\\":
+                esc = True
+                continue
+            if ch == "\"":
+                in_str = not in_str
+                continue
+            if in_str:
+                continue
+            if ch == "{":
+                depth += 1
+            elif ch == "}":
+                depth -= 1
+                if depth == 0:
+                    return t[start:i + 1].strip()
+        return t[start:].strip()
+
+    def _extract_between_labels(text: str, start_label: str, end_label: str) -> str:
+        start_idx = text.find(start_label)
+        if start_idx == -1:
+            return ""
+        start_idx += len(start_label)
+        end_idx = text.find(end_label, start_idx)
+        if end_idx == -1:
+            return text[start_idx:].strip()
+        return text[start_idx:end_idx].strip()
     
     # Extract goal for step prompts (truncate at ## CONTEXT ## if present)
     goal_for_step = _extract_goal_for_step(goal)
@@ -2159,6 +2552,13 @@ def tool_planner_infospace_vllm(template, goal: str, world_model: Dict, characte
     if available_resources_text:
         system_parts.append(f"\n{available_resources_text}\n")
     
+    # Add world-specific prompt context (generic, no world-specific code)
+    if executor:
+        world_prompt_context = executor.get_world_prompt_context()
+        if world_prompt_context:
+            for section_name, context_text in world_prompt_context.items():
+                system_parts.append(f"\n# {section_name.upper().replace('_', ' ')}\n{context_text}\n")
+    
     system_parts.append(f"WORLD_MODEL: {json.dumps(world_model, indent=2)}\n")
     system_parts.append(f"CURRENT_TIME: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
     system_parts.append("""Follow this process to achieve the goal:
@@ -2190,13 +2590,17 @@ ALWAYS follow all formatting instructions exactly.
         "</first_task>\n"
     )
     
-    prompt += format_assistant("<analysis>\n")
-    analysis = vllm_gen("stage1_analysis", prompt, state, max_tokens=192, temperature=GEN_TEMPERATURE, stop="</analysis>", executor=executor)
-    prompt += analysis + "</analysis>\n<tools>\n"
-    tools = vllm_gen("selected_tools_json", prompt, state, max_tokens=96, temperature=GEN_TEMPERATURE, stop="</tools>", executor=executor)
-    prompt += tools + "</tools>\n<first_task>\n"
-    first_task = vllm_gen("first_task", prompt, state, max_tokens=96, temperature=GEN_TEMPERATURE, stop="</first_task>", executor=executor)
-    prompt += first_task + "</first_task>\n"
+    prompt += format_assistant("")
+    # Single generation for entire Stage 1 XML, then deterministic tag parsing
+    stage1_block = vllm_gen("stage1_block", prompt, state, max_tokens=384, temperature=GEN_TEMPERATURE, stop="</first_task>", executor=executor)
+    # Defensive: if stop isn't honored and the model includes </first_task>, truncate to first occurrence
+    if "</first_task>" in stage1_block:
+        stage1_block = stage1_block.split("</first_task>", 1)[0].rstrip()
+    prompt += stage1_block + "</first_task>\n"
+    stage1_full = stage1_block + "</first_task>"
+    state["stage1_analysis"] = _extract_tag_block(stage1_full, "analysis")
+    state["selected_tools_json"] = _extract_tag_block(stage1_full, "tools")
+    state["first_task"] = _extract_tag_block(stage1_full, "first_task")
     
     try:
         logger.info(f"Stage 1: Analysis + tool selection\n{state.get('stage1_analysis', 'N/A')}")
@@ -2273,9 +2677,27 @@ ALWAYS follow all formatting instructions exactly.
         "- Review AGENT_STATE_HYPOTHESES and AGENT_STATE_SUPPORT.\n"
         "- Choose the next tool and its JSON args from the Complete primitive and tool catalog.\n"
         "\n"
-        "#Stage 2 FORMAT:\n"
-        "  TOOL_NAME: <name from the Complete primitive and tool catalog>\n"
-        "  TOOL_ARGS_JSON: <json object>\n"
+        "#Stage 2 FORMAT (choose ONE):\n"
+        "  Option A - single tool call:\n"
+        "    TOOL_NAME: <name from the Complete primitive and tool catalog>\n"
+        "    TOOL_ARGS_JSON: <json object>\n"
+        "\n"
+        "  Option B - multi-step code block (use when CURRENT_TASK needs 2+ sequential tool calls, conditional logic, or passing data between steps):\n"
+        "    TOOL_NAME: _code_block_\n"
+        "    TOOL_ARGS_JSON: {}\n"
+        "    CODE:\n"
+        "    ```python\n"
+        "    r1 = executor.execute_action_tracked({\"type\": \"search\", \"target\": \"$col\", \"query\": \"...\", \"out\": \"$results\"}, \"codegen\")\n"
+        "    if r1[\"status\"] != \"success\":\n"
+        "        return executor._create_uniform_return(\"failed\", reason=\"search failed\")\n"
+        "    r2 = executor.execute_action_tracked({\"type\": \"load\", \"target\": \"$results\", \"out\": \"$data\"}, \"codegen\")\n"
+        "    return executor._create_uniform_return(\"success\", value=\"loaded result\")\n"
+        "    ```\n"
+        "    Rules for Option B:\n"
+        "    - Max 4-6 tool calls via executor.execute_action_tracked(action_dict, \"codegen\")\n"
+        "    - Only if/else control flow. No loops, imports, function defs.\n"
+        "    - Must end with: return executor._create_uniform_return(status, value=..., extra=...)\n"
+        "    - Prefer Option B when chaining, branching, or error-handling would be clearer than separate steps.\n"
         "\n"
         "#Stage 2 NUMERIC ARGUMENTS:\n"
         "  IMPORTANT: All numeric tool arguments must be simple literals.\n"
@@ -2406,12 +2828,13 @@ This is the only planner-visible structure that supports direct (dx,dy,dz) usage
         prompt_parts.append("Before choosing any tool, infer AGENT-STATE HYPOTHESES and AGENT-STATE-SUPPORT. Refer to STAGE 2-PRE Instructions.\n")
         
         prompt += format_user("".join(prompt_parts))
-        
-        prompt += format_assistant("AGENT_STATE_HYPOTHESES:\n")
-        hypotheses = vllm_gen(f"agent_state_hypotheses_{step}", prompt, state, max_tokens=256, temperature=GEN_TEMPERATURE, stop="\nAGENT_STATE_SUPPORT:", executor=executor)
-        prompt += hypotheses + "\nAGENT_STATE_SUPPORT:\n"
-        support = vllm_gen(f"agent_state_support_{step}", prompt, state, max_tokens=256, temperature=GEN_TEMPERATURE, stop="\n", executor=executor)
-        prompt += support + "\n"
+
+        # --- STAGE 2-PRE: single generation + label parsing ---
+        prompt += format_assistant("")
+        stage2pre_block = vllm_gen(f"stage2pre_block_{step}", prompt, state, max_tokens=512, temperature=GEN_TEMPERATURE, executor=executor)
+        prompt += stage2pre_block + "\n"
+        state[f"agent_state_hypotheses_{step}"] = _extract_between_labels(stage2pre_block, "AGENT_STATE_HYPOTHESES:", "AGENT_STATE_SUPPORT:")
+        state[f"agent_state_support_{step}"] = _extract_after_label(stage2pre_block, "AGENT_STATE_SUPPORT:").strip()
         
         # Stage 2: Choose tool + args
         prompt += format_user(
@@ -2420,32 +2843,69 @@ This is the only planner-visible structure that supports direct (dx,dy,dz) usage
             f"CURRENT_TASK: {current_task}\n"
             "Choose tool and JSON args using Stage 2 FORMAT.\n"
         )
-        
-        prompt += format_assistant("TOOL_NAME: ")
-        tool_name = vllm_gen(f"tool_name_{step}", prompt, state, max_tokens=32, temperature=GEN_TEMPERATURE, stop="TOOL_ARGS_JSON", executor=executor)
-        prompt += tool_name + "\nTOOL_ARGS_JSON: "
-        tool_args = vllm_gen(f"tool_args_{step}", prompt, state, max_tokens=1024, temperature=GEN_TEMPERATURE, stop="\n", executor=executor)
-        prompt += tool_args + "\n"
+
+        # --- STAGE 2: single generation + label parsing ---
+        prompt += format_assistant("")
+        stage2_block = vllm_gen(f"stage2_block_{step}", prompt, state, max_tokens=384, temperature=GEN_TEMPERATURE, executor=executor)
+        prompt += stage2_block + "\n"
+        tool_name_val = _extract_line_value(stage2_block, "TOOL_NAME:")
+        tool_args_raw = _extract_after_label(stage2_block, "TOOL_ARGS_JSON:").strip()
+        # Defensive cleanup in case the model echoes labels
+        if tool_name_val.startswith("TOOL_NAME:"):
+            tool_name_val = tool_name_val[len("TOOL_NAME:"):].strip()
+        tool_args_val = _extract_braced_json_object(tool_args_raw)
+        state[f"tool_name_{step}"] = tool_name_val
+        state[f"tool_args_{step}"] = tool_args_val
         
         # Execute tool
         tool_name = state.get(f"tool_name_{step}", "").strip()
         tool_args_json = state.get(f"tool_args_{step}", "").strip()
-        action = sgl_to_infospace_action(tool_name, tool_args_json, step, executor.available_tools)
         
-        # Track resource bindings before execution
-        out_var = action.get('out', '')
-        resource_id_before = None
-        if out_var:
-            resource_id_before = executor.plan_bindings_flat.get(out_var.lstrip('$'))
-        
-        # Execute (method tools run in an inner loop but count as one outer step)
-        tool_info = executor.available_tools.get(tool_name, {})
-        if tool_info.get('type') == 'method':
-            logger.warning(f"Step {step}: Method tools are obsolete; executing {tool_name} directly")
-        tool_result = execute_infospace_action(action, executor, executor.agent_name)
-        
-        logger.info(f"Stage 2: Choose tool + args\n{tool_name} -> {tool_args_json}")
-        logger.info(f"Step {step}: {tool_name} -> {tool_result[:100]}")
+        if tool_name == "_code_block_":
+            # Code-block path: extract code from stage2_block or do follow-up gen
+            code_text = extract_code_block(stage2_block)
+            if not code_text:
+                # Code wasn't in initial gen (token limit); do follow-up gen
+                prompt += format_assistant("CODE:\n```python\n")
+                code_raw = vllm_gen(f"code_block_{step}", prompt, state, max_tokens=2048, temperature=GEN_TEMPERATURE, stop=["```"], executor=executor)
+                prompt += code_raw + "```\n"
+                code_text = code_raw.strip()
+            
+            logger.info(f"Stage 2: Code block generated ({len(code_text)} chars)")
+            
+            # Snapshot bindings before execution
+            bindings_before = dict(executor.plan_bindings_flat)
+            
+            result_dict = execute_codegen_block(code_text, executor, "codegen")
+            action = {"type": "_code_block_"}
+            tool_result = format_result_text(result_dict, action)
+            
+            # Track new bindings for Stage 3.1
+            bindings_after = executor.plan_bindings_flat
+            new_bindings = {k: v for k, v in bindings_after.items() if bindings_before.get(k) != v}
+            resource_id_before = None
+            
+            logger.info(f"Step {step}: _code_block_ -> {tool_result[:100]}")
+            if new_bindings:
+                logger.info(f"Step {step}: New bindings from code block: {new_bindings}")
+        else:
+            action = sgl_to_infospace_action(tool_name, tool_args_json, step, executor.available_tools)
+            new_bindings = None
+            
+            # Track resource bindings before execution
+            out_var = action.get('out', '')
+            resource_id_before = None
+            if out_var:
+                resource_id_before = executor.plan_bindings_flat.get(out_var.lstrip('$'))
+            
+            # Execute (method tools run in an inner loop but count as one outer step)
+            tool_info = executor.available_tools.get(tool_name, {})
+            if tool_info.get('type') == 'method':
+                logger.warning(f"Step {step}: Method tools are obsolete; executing {tool_name} directly")
+            tool_result = execute_infospace_action(action, executor, executor.agent_name)
+            
+            logger.info(f"Stage 2: Choose tool + args\n{tool_name} -> {tool_args_json}")
+            logger.info(f"Step {step}: {tool_name} -> {tool_result[:100]}")
         
         # Stage 3: Reflect
         result_display = tool_result[:512]
@@ -2470,26 +2930,25 @@ This is the only planner-visible structure that supports direct (dx,dy,dz) usage
             f"Respond using Stage 3 FORMAT. Be concise.\n"
             f"Ensure the REQUEST_TOOLS list is a valid JSON list of tool names.\n"
         )
-        
-        prompt += format_assistant("\nTHOUGHTS: ")
-        thoughts = vllm_gen(f"thoughts_{step}", prompt, state, max_tokens=128, temperature=GEN_TEMPERATURE, stop=["\nHYPOTHESES:", "HYPOTHESES:"], executor=executor)
-        prompt += thoughts + "\nHYPOTHESES: "
-        hypotheses = vllm_gen(f"hypotheses_{step}", prompt, state, max_tokens=128, temperature=GEN_TEMPERATURE, 
-                             stop=["\nAUDIT:", "AUDIT:", "\nDONE:", "DONE:", "\nNEXT_TASK:", "NEXT_TASK:", "\nREQUEST_TOOLS:", "REQUEST_TOOLS:", "\nTHOUGHTS:", "THOUGHTS:", "\nHYPOTHESES:", "HYPOTHESES:"], 
-                             executor=executor)
-        prompt += hypotheses + "\nAUDIT: "
-        audit = vllm_gen(f"assumption_audit_{step}", prompt, state, max_tokens=192, temperature=0.0, stop="\nDONE: ", executor=executor)
-        prompt += audit + "\nDONE: "
-        done = vllm_gen(f"done_{step}", prompt, state, max_tokens=8, temperature=GEN_TEMPERATURE, stop="\nNEXT_TASK: ", executor=executor)
-        prompt += done + "\nNEXT_TASK: "
-        next_task = vllm_gen(f"next_task_{step}", prompt, state, max_tokens=128, temperature=GEN_TEMPERATURE, 
-                           stop=["\nREQUEST_TOOLS: ", "\nTHOUGHTS:", "\nHYPOTHESES:", "\nAUDIT:", "\nDONE:", "\nNEXT_TASK:"], 
-                           executor=executor)
-        prompt += next_task + "\nREQUEST_TOOLS: "
-        request_tools = vllm_gen(f"request_tools_{step}", prompt, state, max_tokens=96, temperature=GEN_TEMPERATURE, 
-                                stop=["\n\n", "\nTHOUGHTS:", "\nHYPOTHESES:", "\nAUDIT:", "\nDONE:", "\nNEXT_TASK:", "\nREQUEST_TOOLS:"], 
-                                executor=executor)
-        prompt += request_tools + "\n"
+
+        # --- STAGE 3: single generation + label parsing ---
+        prompt += format_assistant("")
+        stage3_block = vllm_gen(f"stage3_block_{step}", prompt, state, max_tokens=768, temperature=GEN_TEMPERATURE, executor=executor)
+        prompt += stage3_block + "\n"
+
+        thoughts_val = _extract_between_labels(stage3_block, "THOUGHTS:", "HYPOTHESES:")
+        hypotheses_val = _extract_between_labels(stage3_block, "HYPOTHESES:", "AUDIT:")
+        audit_val = _extract_between_labels(stage3_block, "AUDIT:", "DONE:")
+        done_val = _extract_line_value(stage3_block, "DONE:")
+        next_task_val = _extract_between_labels(stage3_block, "NEXT_TASK:", "REQUEST_TOOLS:")
+        request_tools_val = _extract_after_label(stage3_block, "REQUEST_TOOLS:").strip()
+
+        state[f"thoughts_{step}"] = thoughts_val
+        state[f"hypotheses_{step}"] = hypotheses_val
+        state[f"assumption_audit_{step}"] = audit_val
+        state[f"done_{step}"] = done_val
+        state[f"next_task_{step}"] = next_task_val
+        state[f"request_tools_{step}"] = _strip_code_fences(request_tools_val)
         
         # Safely log step fields
         def safe_get(state_dict, key, default='N/A'):
@@ -2508,15 +2967,22 @@ This is the only planner-visible structure that supports direct (dx,dy,dz) usage
         # Stage 3.1: Update resource indexes with commentary
         thoughts_text = state.get(f'thoughts_{step}', '').strip()
         if thoughts_text:
-            out_var = action.get('out', '')
-            resource_id = None
-            if out_var:
-                resource_id_after = executor.plan_bindings_flat.get(out_var.lstrip('$'))
-                if resource_id_after and resource_id_after != resource_id_before:
-                    if resource_id_after.startswith('Note_') or resource_id_after.startswith('Collection_'):
-                        resource_id = resource_id_after
+            resource_ids_to_update = []
+            if new_bindings:
+                # Code-block path: check all new bindings
+                for var_name, rid in new_bindings.items():
+                    if rid and (rid.startswith('Note_') or rid.startswith('Collection_')):
+                        resource_ids_to_update.append(rid)
+            else:
+                # Single-tool path: check the one out var
+                out_var = action.get('out', '')
+                if out_var:
+                    resource_id_after = executor.plan_bindings_flat.get(out_var.lstrip('$'))
+                    if resource_id_after and resource_id_after != resource_id_before:
+                        if resource_id_after.startswith('Note_') or resource_id_after.startswith('Collection_'):
+                            resource_ids_to_update.append(resource_id_after)
             
-            if resource_id:
+            for resource_id in resource_ids_to_update:
                 try:
                     if executor.resource_manager:
                         executor.resource_manager.update_resource_commentary(resource_id, thoughts_text)
@@ -2561,8 +3027,14 @@ This is the only planner-visible structure that supports direct (dx,dy,dz) usage
             )
             
             prompt += format_assistant("VERIFICATION_ANSWER: ")
-            verification = vllm_gen("VERIFICATION_ANSWER", prompt, state, max_tokens=96, temperature=GEN_TEMPERATURE, stop="\n", executor=executor)
-            prompt += verification + "\n"
+            verification_raw = vllm_gen("VERIFICATION_ANSWER", prompt, state, max_tokens=96, temperature=GEN_TEMPERATURE, stop="\n", executor=executor)
+            # Deterministic cleanup: take last non-empty line and strip label if echoed
+            vlines = [ln.strip() for ln in str(verification_raw).splitlines() if ln.strip()]
+            cleaned = vlines[-1] if vlines else str(verification_raw).strip()
+            if cleaned.startswith("VERIFICATION_ANSWER:"):
+                cleaned = cleaned[len("VERIFICATION_ANSWER:"):].strip()
+            state["VERIFICATION_ANSWER"] = cleaned
+            prompt += cleaned + "\n"
             
             logger.info(f"VERIFICATION ANSWER: {state.get('VERIFICATION_ANSWER', 'N/A')}")
             
@@ -2594,8 +3066,9 @@ This is the only planner-visible structure that supports direct (dx,dy,dz) usage
         trace_file.write(f"Planning session: {time.strftime('%Y-%m-%d %H:%M:%S')}\n")
         trace_file.write(f"Goal: {goal}\n")
         trace_file.write(f"total length: {len(prompt)}\n")
-        if executor.tokenizer:
-            trace_file.write(f"token count: {tokenize_len(executor.tokenizer, prompt)}\n")
+        tokenizer = getattr(executor, "tokenizer", None)
+        if tokenizer:
+            trace_file.write(f"token count: {tokenize_len(tokenizer, prompt)}\n")
         trace_file.write(f"{'='*80}\n")
         trace_file.write(prompt + "\n")
         trace_file.write(f"\n{'='*80}\n\n")
@@ -2688,7 +3161,8 @@ class IncrementalPlanner:
     
     def __init__(self, executor: InfospaceExecutor, available_tools: Dict[str, Dict], 
                 logger_instance=None, sgl_model_path: str = None, vllm_model_path: str = None,
-                vllm_url: str = "http://localhost:5000/v1/chat/completions", vllm_model: str = None):
+                vllm_url: str = "http://localhost:5000/v1/chat/completions", vllm_model: str = None,
+                openrouter_model_path: str = None):
         """
         Initialize incremental planner.
         
@@ -2697,14 +3171,15 @@ class IncrementalPlanner:
             available_tools: Dict of tool_name -> metadata
             primitives_reference: Primitives reference text
             logger_instance: Optional logger
-            sgl_model_path: Path to local model for SGLang (optional if vLLM is used)
-            vllm_model_path: Path to model for vLLM (optional if SGLang is used)
+            sgl_model_path: Path to local model for SGLang (optional if vLLM/OpenRouter is used)
+            vllm_model_path: Path to model for vLLM (optional if SGLang/OpenRouter is used)
             vllm_url: vLLM API endpoint (default: http://localhost:5000/v1/chat/completions)
             vllm_model: vLLM model name (resolved from vLLM server if not provided)
+            openrouter_model_path: Model name for OpenRouter (optional if SGLang/vLLM is used)
         """
-        # Require either SGLang or vLLM
-        if not HAS_SGLANG and not vllm_model_path:
-            raise ImportError("Neither SGLang nor vLLM available - at least one backend required")
+        # Require either SGLang, vLLM, or OpenRouter
+        if not HAS_SGLANG and not vllm_model_path and not openrouter_model_path:
+            raise ImportError("Neither SGLang, vLLM, nor OpenRouter available - at least one backend required")
         
         self.executor: InfospaceExecutor = executor
         self.available_tools = available_tools
@@ -2715,12 +3190,15 @@ class IncrementalPlanner:
         self.vllm_url = vllm_url
         self.vllm_model = vllm_model
         
+        # Store OpenRouter config
+        self.openrouter_model_path = openrouter_model_path
+        
         # SGLang runtime is now initialized in executive_node (optional)
         # Verify availability if SGLang is expected
         if sgl_model_path and not executor.runtime:
-            self.logger.warning("SGLang runtime not available in executor - will use vLLM if configured")
-        elif not vllm_model_path and not executor.runtime:
-            self.logger.warning("Neither SGLang runtime nor vLLM config available - incremental planner may have reduced functionality")
+            self.logger.warning("SGLang runtime not available in executor - will use vLLM/OpenRouter if configured")
+        elif not vllm_model_path and not openrouter_model_path and not executor.runtime:
+            self.logger.warning("Neither SGLang runtime nor vLLM/OpenRouter config available - incremental planner may have reduced functionality")
         
         # Build tool catalog
         self.tools = build_tool_catalog(available_tools)
@@ -2953,8 +3431,8 @@ class IncrementalPlanner:
         Returns:
             Plan dict with 'plan' key containing actions
         """
-        if not HAS_SGLANG and not self.vllm_model_path:
-            return {'error': 'Neither SGLang nor vLLM available'}
+        if not HAS_SGLANG and not self.vllm_model_path and not self.openrouter_model_path:
+            return {'error': 'Neither SGLang, vLLM, nor OpenRouter available'}
         
         # Get world_model from executor
         if not hasattr(self.executor, 'world_model') or not self.executor.world_model:
@@ -3016,7 +3494,7 @@ class IncrementalPlanner:
                     similar_plan=None
                 )
             else:
-                return {'error': 'No planner backend available (SGLang or vLLM required)'}
+                return {'error': 'No planner backend available (SGLang, vLLM, or OpenRouter required)'}
 
             step = self._find_last_step(state, max_steps)
             # Safely check if done_<step> exists (may not exist if interrupted)
@@ -3078,8 +3556,8 @@ class IncrementalPlanner:
         Returns:
             Plan dict with 'plan' key containing actions
         """
-        if not HAS_SGLANG and not self.vllm_model_path:
-            return {'error': 'Neither SGLang nor vLLM available'}
+        if not HAS_SGLANG and not self.vllm_model_path and not self.openrouter_model_path:
+            return {'error': 'Neither SGLang, vLLM, nor OpenRouter available'}
         
         # Get world_model from executor
         if not hasattr(self.executor, 'world_model') or not self.executor.world_model:
@@ -3129,10 +3607,10 @@ class IncrementalPlanner:
                 for line in traceback.format_stack():
                     logger.error(line.rstrip())
             
-            # Run planner (SGLang or vLLM)
+            # Run planner (SGLang, vLLM, or OpenRouter)
             world_model = initial_world_model
-            if self.vllm_model_path and self.vllm_model:
-                # Use vLLM planner
+            if (self.vllm_model_path and self.vllm_model) or (self.openrouter_model_path and self.executor.openrouter_model):
+                # Use vLLM/OpenRouter planner (both use same function since executor.llm_generate routes correctly)
                 state = tool_planner_infospace_vllm(
                     template=template,
                     goal=goal,
@@ -3164,7 +3642,7 @@ class IncrementalPlanner:
                     similar_plan=similar_plans[0] if similar_plans else None
                 )
             else:
-                return {'error': 'No planner backend available (SGLang or vLLM required)'}
+                return {'error': 'No planner backend available (SGLang, vLLM, or OpenRouter required)'}
 
             step = self._find_last_step(state, max_steps)
             # Safely check if done_<step> exists (may not exist if interrupted)
@@ -3224,19 +3702,42 @@ class IncrementalPlanner:
             if should_retry:
                 #reflect and retry
                 logger.info(f"Step {step} failed, reflecting and retrying")
-                state = tool_planner_infospace.run(
-                    template=template,
-                    goal=goal,
-                    world_model=world_model,
-                    character_context=character_context,
-                    recent_context=recent_context,
-                    tools_catalog_text=self.tools_catalog_text,
-                    executor=self.executor,
-                    trace_file=self.trace_file,
-                    max_steps=max_steps,
-                    preplan="No preplan provided",
-                    similar_plan=similar_plans[0] if similar_plans else None
-                )
+                # Use same backend selection logic as main planning path
+                if (self.vllm_model_path and self.vllm_model) or (self.openrouter_model_path and self.executor.openrouter_model):
+                    # Use vLLM/OpenRouter planner (both use same function since executor.llm_generate routes correctly)
+                    state = tool_planner_infospace_vllm(
+                        template=template,
+                        goal=goal,
+                        world_model=world_model,
+                        character_context=character_context,
+                        recent_context=recent_context,
+                        tools_catalog_text=self.tools_catalog_text,
+                        executor=self.executor,
+                        trace_file=self.trace_file,
+                        max_steps=max_steps,
+                        preplan="No preplan provided",
+                        similar_plan=similar_plans[0] if similar_plans else None,
+                        vllm_url=self.vllm_url,
+                        model=self.vllm_model
+                    )
+                elif HAS_SGLANG and self.executor.runtime:
+                    # Use SGLang planner
+                    state = tool_planner_infospace.run(
+                        template=template,
+                        goal=goal,
+                        world_model=world_model,
+                        character_context=character_context,
+                        recent_context=recent_context,
+                        tools_catalog_text=self.tools_catalog_text,
+                        executor=self.executor,
+                        trace_file=self.trace_file,
+                        max_steps=max_steps,
+                        preplan="No preplan provided",
+                        similar_plan=similar_plans[0] if similar_plans else None
+                    )
+                else:
+                    logger.error('No planner backend available for retry (SGLang, vLLM, or OpenRouter required)')
+                    raise RuntimeError('No planner backend available for retry')
             
             # Extract plan actions from executor
             plan_actions = getattr(self.executor, '_plan_actions', [])
@@ -3278,7 +3779,7 @@ class IncrementalPlanner:
 
     def _preplan(self, goal_text: str) -> str:
         tool_names = list(self.tools.keys())
-        ABSTRACT_PLAN_PROMPT = f"""
+ABSTRACT_PLAN_PROMPT = f"""
 You will create a short, high-level problem-solving strategy for the goal below.
 This is NOT a domain explanation and NOT a tool invocation sequence.
 It is a goal-specific strategy sketch that guides downstream incremental planning.
@@ -3296,22 +3797,34 @@ Instructions:
 1. If this is a simple, direct goal, return the original goal. DO NOTHING ELSE.
 2. Otherwise:
    - Identify what *types of operations* the goal requires  
-   (e.g., retrieval, extraction from existing text, transformation, comparison, generation).
+     (e.g., retrieval, extraction, transformation, comparison, generation).
    - Match these operation types to the available tools.  
      - Do not assume tools that are absent.  
      - If multiple tools could serve a role, state how to choose between them.
    - Describe a minimal, ordered sequence of conceptual steps  
-     - that a tool-using planner would follow to solve the goal.  
-     - Describe *what must be achieved*, not how to call tools.
+     that a tool-using planner would follow to solve the goal.  
+     Describe *what must be achieved*, not how to call tools.
+   - For each step, mark whether the next step DEPENDS on 
+     observing this step's result to decide what to do, 
+     or whether the next step is KNOWN in advance regardless of the result.
+   - Group consecutive KNOWN steps into phases. 
+     A phase is a block of steps where the planner already knows 
+     what to do and doesn't need to deliberate between steps.
    - Include fallback logic **only if the goal plausibly needs it**  
      (e.g., multi-source lookup, ambiguous values, missing information).
    - Do not include JSON, tool calls, URLs, or domain-specific knowledge.  
-   The output must be a brief strategic outline, not an answer to the goal.
+     The output must be a brief strategic outline, not an answer to the goal.
 
 Format:
 ABSTRACT_PLAN:
-- <step>
-- ...
+PHASE 1 (pipeline): 
+  - <step>
+  - <step>
+PHASE 2 (deliberate): 
+  - <step> [depends on phase 1 results]
+PHASE 3 (pipeline):
+  - <step>
+  - <step>
 END_PLAN
 """
 

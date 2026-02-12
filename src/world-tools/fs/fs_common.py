@@ -137,5 +137,14 @@ def read_json_file(path: Path) -> Optional[Any]:
         return None
 
 
+# Documentation files that should be hidden from fs tools (used by init tool for catalog)
+DOCUMENTATION_FILES = {"Skill.md", "README.md", "DIRECTORY.md"}
+
+
+def is_documentation_file(path: Path) -> bool:
+    """Check if file is a documentation/metadata file that should be hidden from fs tools."""
+    return path.name in DOCUMENTATION_FILES
+
+
 def list_dir_entries(path: Path) -> Iterable[Path]:
     return sorted(path.iterdir(), key=lambda p: (not p.is_dir(), p.name.lower()))

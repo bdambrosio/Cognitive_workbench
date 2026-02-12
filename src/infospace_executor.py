@@ -26,6 +26,15 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
+# Primitives executed by InfospaceExecutor (used by WorldModel/ToolModel to treat as available)
+INFOSPACE_PRIMITIVES = frozenset({
+    'apply', 'create-note', 'create-collection', 'persist', 'load', 'index', 'organize',
+    'search-within-collection', 'discover-notes', 'discover-collections', 'say', 'display',
+    'think', 'ask', 'coerce', 'map', 'flatten', 'add', 'split', 'size', 'union',
+    'intersection', 'difference', 'remove', 'project', 'pluck', 'head',
+    'filter-structured', 'sort', 'join',
+})
+
 
 class InfospaceExecutor:
     """
@@ -83,6 +92,10 @@ class InfospaceExecutor:
         # vLLM config (set by executive_node if vLLM is used)
         self.vllm_model = None
         self.vllm_url = None
+        
+        # OpenRouter config (set by executive_node if OpenRouter is used)
+        self.openrouter_model = None
+        self.openrouter_api_key = None
 
         # Global interrupt flag (can be set by UI via executive_node control channel)
         self.interrupt_requested: bool = False
@@ -300,6 +313,21 @@ class InfospaceExecutor:
                 logger.warning(f"Init tool '{init_tool_name}' failed: {reason}")
         except Exception as e:
             logger.error(f"Error running init tool '{init_tool_name}': {e}", exc_info=True)
+    
+    def get_world_prompt_context(self) -> Dict[str, str]:
+        """
+        Get world-specific prompt context sections.
+        
+        Returns dict mapping section_name -> context_text.
+        Worlds can populate this via world_state['_prompt_sections'] (typically set by init tool).
+        
+        Returns:
+            Dict[str, str]: Mapping of section names to context text, empty dict if none available
+        """
+        prompt_sections = self.get_world_state("_prompt_sections")
+        if isinstance(prompt_sections, dict):
+            return prompt_sections
+        return {}
     
     def clear_plan_state(self):
         """Clear ephemeral plan state (call at start of new plan)"""
@@ -579,10 +607,12 @@ class InfospaceExecutor:
         # fs-file: show filename from text field or metadata.name
         if kind == 'fs-file':
             if isinstance(content, dict):
-                if 'text' in content:
+                # Check text field, but skip if None (placeholder Notes)
+                if 'text' in content and content['text'] is not None:
                     filename = str(content['text']).strip()
                     if filename:
                         return filename[:max_length]
+                # Fall back to metadata.name (for placeholder Notes)
                 if 'metadata' in content and isinstance(content['metadata'], dict):
                     name = content['metadata'].get('name', '')
                     if name:
@@ -727,12 +757,91 @@ class InfospaceExecutor:
         
         return result
     
+    def execute_action_tracked(self, action: Dict, method_name: str = None) -> Dict:
+        """
+        Execute an action with full side-effect tracking: plan_actions, ActionRecord,
+        UI publish (with optional method prefix), and compliance.
+        
+        This is the single consolidated execution path used by the planner loop,
+        Python tool files, and codegen blocks.
+        
+        Args:
+            action: Action dict with 'type' field
+            method_name: Optional method/caller name for UI log prefix (e.g., 'mc-seek-boundary', 'codegen')
+            
+        Returns:
+            Result dict in uniform_return format
+        """
+        # Track action in plan_actions
+        if hasattr(self, '_plan_actions'):
+            self._plan_actions.append(action.copy())
+        
+        # Execute the action
+        result = self.execute_action(action)
+        
+        # Ensure result is in uniform_return format
+        if result.get('type') != 'uniform_return':
+            result = self._create_uniform_return(
+                result.get('status', 'unknown'),
+                value=result.get('value'),
+                reason=result.get('reason'),
+                extra=result.get('extra')
+            )
+        
+        # Create ActionRecord + publish to UI
+        if self.executive_node:
+            action_type = action.get('type', 'unknown')
+            display_type = f"{method_name}:{action_type}" if method_name else action_type
+            timestamp = datetime.now()
+            
+            try:
+                # Import ActionRecord (avoid circular import)
+                from executive_node import ActionRecord
+                
+                self.executive_node.step_counter += 1
+                result_str = result.get('value', '') if result.get('status') == 'success' else result.get('reason', 'failed')
+                
+                action_record = ActionRecord(
+                    action=action,
+                    result=result_str,
+                    result_dict=result.copy(),
+                    timestamp=timestamp,
+                    step_id=self.executive_node.step_counter,
+                    plan_id=getattr(self.executive_node, 'current_plan_id', None),
+                    requested_target=action.get('target', ''),
+                    started_at=timestamp,
+                    ended_at=datetime.now(),
+                    outcome_status=result.get('status', 'unknown')
+                )
+                if hasattr(self.executive_node, '_snapshot_physiology'):
+                    self.executive_node._snapshot_physiology(action_record)
+                self.executive_node.action_history.append(action_record)
+            except Exception as e:
+                logger.debug(f"ActionRecord creation failed (non-fatal): {e}")
+            
+            try:
+                self.executive_node._publish_action_result(action, result, display_type, timestamp)
+                logger.debug(f"Published action result: {display_type} -> status={result.get('status')}")
+            except Exception as e:
+                logger.error(f"Failed to publish action result for {display_type}: {e}", exc_info=True)
+        
+        # Track compliance
+        if hasattr(self, '_compliance_tracker') and self._compliance_tracker:
+            self._compliance_tracker.check_action(action, result, self.plan_bindings_flat)
+        
+        # Increment error counter on failure
+        if result.get('status') != 'success':
+            if hasattr(self, '_plan_error_count'):
+                self._plan_error_count += 1
+        
+        return result
+    
     def execute_action_with_log(self, action: Dict, method_name: str) -> Dict:
         """
         Execute an action and publish it to the action log with method name prefix.
         
-        This is a convenience wrapper for Python tools that want their internal
-        tool calls to appear in the UI action log with a method name prefix.
+        Convenience wrapper that delegates to execute_action_tracked().
+        Backward-compatible: same signature, same return type.
         
         Args:
             action: Action dict with 'type' field
@@ -741,29 +850,7 @@ class InfospaceExecutor:
         Returns:
             Result dict with 'status' field ('success', 'failed', 'retry')
         """
-        # Execute the action
-        result = self.execute_action(action)
-        
-        # Publish to action log with method name prefix
-        if self.executive_node:
-            action_type = action.get('type', 'unknown')
-            prefixed_type = f"{method_name}:{action_type}"
-            timestamp = datetime.now()
-            # Ensure result is in uniform_return format for consistent UI display
-            if result.get('type') != 'uniform_return':
-                result = self._create_uniform_return(
-                    result.get('status', 'unknown'),
-                    value=result.get('value'),
-                    reason=result.get('reason'),
-                    extra=result.get('extra')
-                )
-            try:
-                self.executive_node._publish_action_result(action, result, prefixed_type, timestamp)
-                logger.debug(f"Published action result: {prefixed_type} -> status={result.get('status')}")
-            except Exception as e:
-                logger.error(f"Failed to publish action result for {prefixed_type}: {e}", exc_info=True)
-        
-        return result
+        return self.execute_action_tracked(action, method_name)
     
     def execute_action(self, action: Dict) -> Dict:
         """
@@ -1302,8 +1389,120 @@ Only provide the result, followed by the </end> tag.""")
             logger.exception(f"vLLM generation error: {e}")
             return Response(success=False, error=str(e))
     
+    def _openrouter_generate(self, messages, max_tokens=2000, temperature=0.7, stops=None, is_json=False):
+        """
+        Generate text using OpenRouter API via HTTP.
+        Uses /v1/chat/completions endpoint with messages array format (OpenAI-compatible).
+        
+        Args:
+            messages: List of message strings (or single string)
+            max_tokens: Maximum tokens to generate
+            temperature: Sampling temperature
+            stops: List of stop sequences
+            is_json: If True, parse response as JSON and return dict
+            
+        Returns:
+            Object with .success, .text, and .error attributes (matching llm_client response)
+            If is_json=True, .text will be a dict (parsed JSON) instead of string
+        """
+        import requests
+        
+        class Response:
+            def __init__(self, success, text='', error=None):
+                self.success = success
+                self.text = text
+                self.error = error
+
+        try:
+            # Convert messages to chat format (same as vLLM)
+            if isinstance(messages, list):
+                chat_messages = []
+                for msg in messages:
+                    if isinstance(msg, str):
+                        # Simple heuristic: if starts with system/user/assistant markers, parse them
+                        if msg.strip().startswith('<|system|>'):
+                            content = msg.replace('<|system|>', '').strip()
+                            chat_messages.append({"role": "system", "content": content})
+                        elif msg.strip().startswith('<|user|>'):
+                            content = msg.replace('<|user|>', '').strip()
+                            chat_messages.append({"role": "user", "content": content})
+                        elif msg.strip().startswith('<|assistant|>'):
+                            content = msg.replace('<|assistant|>', '').strip()
+                            chat_messages.append({"role": "assistant", "content": content})
+                        else:
+                            # Default to user message
+                            chat_messages.append({"role": "user", "content": msg})
+                    else:
+                        # Already a dict with role/content
+                        chat_messages.append(msg)
+            else:
+                # Single string - treat as user message
+                chat_messages = [{"role": "user", "content": str(messages)}]
+            
+            # Prepare payload (OpenRouter uses OpenAI-compatible format)
+            payload = {
+                "model": self.openrouter_model,
+                "messages": chat_messages,
+                "max_tokens": max_tokens,
+                "temperature": temperature,
+            }
+            if stops:
+                if isinstance(stops, list):
+                    payload["stop"] = stops
+                else:
+                    payload["stop"] = [stops]
+            
+            # Call OpenRouter API
+            headers = {
+                "Authorization": f"Bearer {self.openrouter_api_key}",
+                "Content-Type": "application/json",
+                "HTTP-Referer": "https://github.com/cognitive-workbench",  # Optional but recommended
+                "X-Title": "Cognitive Workbench"  # Optional but recommended
+            }
+            
+            logger.debug(f"Calling OpenRouter API with model {self.openrouter_model}")
+            response = requests.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                json=payload,
+                headers=headers,
+                timeout=120
+            )
+            response.raise_for_status()  # Fail fast
+            
+            result = response.json()
+            logger.debug(f"OpenRouter API response structure: {list(result.keys())}")
+            
+            # Extract content from response (same format as OpenAI/vLLM)
+            choices = result.get("choices", [])
+            if not choices:
+                logger.error(f"OpenRouter API returned no choices. Full response: {result}")
+                return Response(success=False, error="OpenRouter API returned no choices")
+            
+            message = choices[0].get("message", {})
+            result_text = message.get("content")
+            
+            # Handle None or empty content
+            if result_text is None:
+                logger.warning(f"OpenRouter API returned None content. Message: {message}, Full response: {result}")
+                return Response(success=False, error="OpenRouter API returned None content")
+            
+            # Post-process JSON if requested
+            if is_json:
+                result_text = self._parse_json_response(result_text, str(messages))
+            
+            return Response(success=True, text=result_text)
+        except requests.exceptions.RequestException as e:
+            logger.exception(f"OpenRouter API error: {e}")
+            return Response(success=False, error=str(e))
+        except (KeyError, ValueError) as e:
+            logger.exception(f"OpenRouter response parsing error: {e}")
+            return Response(success=False, error=str(e))
+        except Exception as e:
+            logger.exception(f"OpenRouter generation error: {e}")
+            return Response(success=False, error=str(e))
+    
     def llm_generate(self, messages, bindings=None, max_tokens=2000, temperature=0.7, is_json=False, stops=None):
-        """Unified LLM generation interface using SGLang runtime or vLLM."""
+        """Unified LLM generation interface using SGLang runtime, vLLM, or OpenRouter."""
         # Apply bindings to messages if provided
         if bindings and isinstance(messages, list):
             processed_messages = []
@@ -1317,13 +1516,15 @@ Only provide the result, followed by the </end> tag.""")
                     processed_messages.append(msg)
             messages = processed_messages
         
-        # Use vLLM if configured, otherwise use SGLang
-        if self.vllm_model and self.vllm_url:
+        # Use OpenRouter if configured, then vLLM, then SGLang
+        if self.openrouter_model and self.openrouter_api_key:
+            return self._openrouter_generate(messages, max_tokens, temperature, stops, is_json=is_json)
+        elif self.vllm_model and self.vllm_url:
             return self._vllm_generate(messages, max_tokens, temperature, stops, is_json=is_json)
         elif self.runtime:
             return self._sglang_generate(messages, max_tokens, temperature, stops, is_json=is_json)
         else:
-            raise RuntimeError("Neither SGLang runtime nor vLLM config available - ensure executive_node is started with sgl_model_path or vllm_model_path")
+            raise RuntimeError("No LLM backend available - ensure executive_node is started with sgl_model_path, vllm_model_path, or openrouter_model_path")
     
     def _parse_json_response(self, response_text, original_prompt=None):
         """

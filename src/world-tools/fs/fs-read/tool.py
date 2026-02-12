@@ -7,7 +7,7 @@ from __future__ import annotations
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -140,7 +140,7 @@ def _extract_pdf_text(pdf_path: Path, grobid_url: Optional[str] = None) -> Dict[
         raise ValueError(f"PDF extraction failed: {str(e)}")
 
 
-def _find_existing_note(resource_manager, rel_path: str, file_mtime: float, max_chars: Optional[int]) -> Optional[str]:
+def _find_existing_note(resource_manager, rel_path: str, file_mtime: float, max_chars: Optional[int]) -> Tuple[Optional[str], bool]:
     """
     Find existing Note for a file path, verifying it's still valid.
     
@@ -151,10 +151,14 @@ def _find_existing_note(resource_manager, rel_path: str, file_mtime: float, max_
         max_chars: Requested max_chars (None for full read)
         
     Returns:
-        Note ID if valid cache hit, None if cache miss
+        Tuple of (Note ID if found, is_placeholder flag)
+        Returns (None, False) if no Note found
     """
     if not resource_manager:
-        return None
+        return None, False
+    
+    # Accept Notes created by fs-read, fs-list, or fs-find
+    valid_source_skills = {'fs-read', 'fs-list', 'fs-find'}
     
     # Search resource_registry for matching Notes
     for note_id, resource_data in resource_manager.resource_registry.items():
@@ -163,8 +167,8 @@ def _find_existing_note(resource_manager, rel_path: str, file_mtime: float, max_
         
         props = resource_data.get('properties', {})
         
-        # Check if this Note matches our file
-        if (props.get('source_skill') == 'fs-read' and 
+        # Check if this Note matches our file (by path and kind)
+        if (props.get('source_skill') in valid_source_skills and 
             props.get('source_value') == rel_path and
             props.get('kind') == 'fs-file'):
             
@@ -173,10 +177,18 @@ def _find_existing_note(resource_manager, rel_path: str, file_mtime: float, max_
             if not existing_resource:
                 continue
             
-            # Check if max_chars differs (cache miss if different)
+            # Check if this is a placeholder Note
+            is_placeholder = props.get('placeholder', False)
+            note_content = props.get('content', {})
+            
+            # If it's a placeholder, we can always update it (don't check mtime)
+            if is_placeholder:
+                logger.debug(f"fs-read: found placeholder Note {note_id} for {rel_path}")
+                return note_id, True
+            
+            # For filled Notes, check if max_chars differs (cache miss if different)
             if max_chars is not None:
                 # If user requested truncation, check if cached Note was truncated
-                note_content = props.get('content', {})
                 if isinstance(note_content, dict):
                     note_meta = note_content.get('metadata', {})
                     if note_meta.get('truncated'):
@@ -197,11 +209,11 @@ def _find_existing_note(resource_manager, rel_path: str, file_mtime: float, max_
                     # Invalid timestamp, skip cache
                     continue
             
-            # Cache hit - return existing Note
+            # Cache hit - return existing filled Note
             logger.debug(f"fs-read: cache hit for {rel_path} - returning existing Note {note_id}")
-            return note_id
+            return note_id, False
     
-    return None
+    return None, False
 
 
 def _create_note(resource_manager, agent_name: str, content: Dict[str, Any], rel_path: str) -> Optional[str]:
@@ -255,47 +267,97 @@ def tool(input_value=None, **kwargs):
     meta = file_metadata(abs_path, rel_path)
     file_mtime = meta.get('mtime', 0.0)
     
-    # Check for existing cached Note
-    cached_note_id = _find_existing_note(resource_manager, rel_path, file_mtime, max_chars)
-    if cached_note_id:
+    # Check for existing Note (filled or placeholder)
+    existing_note_id, is_placeholder = _find_existing_note(resource_manager, rel_path, file_mtime, max_chars)
+    
+    # If filled Note exists and is valid, return it
+    if existing_note_id and not is_placeholder:
         summary = f"read {rel_path or '/'} (cached)"
-        return executor._create_uniform_return("success", value=summary, resource_id=cached_note_id)
+        return executor._create_uniform_return("success", value=summary, resource_id=existing_note_id)
+    
+    # Save original placeholder state if updating
+    original_content = None
+    original_placeholder_flag = None
+    if existing_note_id and is_placeholder:
+        existing_note = resource_manager.get_resource(existing_note_id)
+        if existing_note:
+            props = existing_note.get('properties', {})
+            original_content = props.get('content')
+            original_placeholder_flag = props.get('placeholder', False)
 
-    # Check for PDF files
-    if abs_path.suffix.lower() == ".pdf":
-        if not HAS_PYMUPDF:
-            return executor._create_uniform_return("failed", reason="pymupdf not available for PDF extraction")
-        try:
-            pdf_result = _extract_pdf_text(abs_path, grobid_url=grobid_url)
-            # Merge file metadata with PDF result
-            pdf_result["metadata"].update(meta)
-            # Apply max_chars limit if specified
-            if max_chars and pdf_result.get("text"):
-                text = pdf_result["text"]
-                if len(text) > int(max_chars):
-                    pdf_result["text"] = text[:int(max_chars)]
-                    pdf_result["metadata"]["truncated"] = True
-            content = pdf_result
-        except Exception as e:
-            logger.error(f"fs-read: PDF extraction failed for {rel_path}: {e}")
-            return executor._create_uniform_return("failed", reason=f"PDF extraction failed: {str(e)}")
-    elif is_binary_file(abs_path):
-        content = build_binary_content(meta)
-    else:
-        data = None
-        if force_json or abs_path.suffix.lower() == ".json":
-            data = read_json_file(abs_path)
-        if data is not None:
-            content = build_json_content(data, meta)
+    # Read file content
+    try:
+        # Check for PDF files
+        if abs_path.suffix.lower() == ".pdf":
+            if not HAS_PYMUPDF:
+                return executor._create_uniform_return("failed", reason="pymupdf not available for PDF extraction")
+            try:
+                pdf_result = _extract_pdf_text(abs_path, grobid_url=grobid_url)
+                # Merge file metadata with PDF result
+                pdf_result["metadata"].update(meta)
+                # Apply max_chars limit if specified
+                if max_chars and pdf_result.get("text"):
+                    text = pdf_result["text"]
+                    if len(text) > int(max_chars):
+                        pdf_result["text"] = text[:int(max_chars)]
+                        pdf_result["metadata"]["truncated"] = True
+                content = pdf_result
+            except Exception as e:
+                logger.error(f"fs-read: PDF extraction failed for {rel_path}: {e}")
+                return executor._create_uniform_return("failed", reason=f"PDF extraction failed: {str(e)}")
+        elif is_binary_file(abs_path):
+            content = build_binary_content(meta)
         else:
-            text = read_text_file(abs_path, max_chars=int(max_chars) if max_chars else None)
-            if max_chars is not None and len(text) >= int(max_chars):
-                meta["truncated"] = True
-            content = build_text_content(text, meta)
-
-    note_id = _create_note(resource_manager, agent_name, content, rel_path)
-    if not note_id:
-        return executor._create_uniform_return("failed", reason="fs-read failed to create note")
-
-    summary = f"read {rel_path or '/'}"
-    return executor._create_uniform_return("success", value=summary, resource_id=note_id)
+            data = None
+            if force_json or abs_path.suffix.lower() == ".json":
+                data = read_json_file(abs_path)
+            if data is not None:
+                content = build_json_content(data, meta)
+            else:
+                text = read_text_file(abs_path, max_chars=int(max_chars) if max_chars else None)
+                if max_chars is not None and len(text) >= int(max_chars):
+                    meta["truncated"] = True
+                content = build_text_content(text, meta)
+        
+        # Update existing placeholder Note or create new Note
+        if existing_note_id and is_placeholder:
+            # Update placeholder Note
+            success, error_msg = resource_manager.update_note_content(existing_note_id, content, reindex=True)
+            if not success:
+                logger.error(f"fs-read: failed to update placeholder Note {existing_note_id}: {error_msg}")
+                # Revert to original placeholder state
+                if original_content is not None:
+                    resource_manager.update_note_content(existing_note_id, original_content, reindex=False)
+                    # Restore placeholder flag
+                    note_data = resource_manager.resource_registry.get(existing_note_id)
+                    if note_data and original_placeholder_flag is not None:
+                        note_data['properties']['placeholder'] = original_placeholder_flag
+                return executor._create_uniform_return("failed", reason=f"Failed to update Note: {error_msg}")
+            
+            # Remove placeholder flag
+            note_data = resource_manager.resource_registry.get(existing_note_id)
+            if note_data:
+                note_data['properties'].pop('placeholder', None)
+            
+            summary = f"read {rel_path or '/'}"
+            return executor._create_uniform_return("success", value=summary, resource_id=existing_note_id)
+        else:
+            # Create new Note
+            note_id = _create_note(resource_manager, agent_name, content, rel_path)
+            if not note_id:
+                return executor._create_uniform_return("failed", reason="fs-read failed to create note")
+            
+            summary = f"read {rel_path or '/'}"
+            return executor._create_uniform_return("success", value=summary, resource_id=note_id)
+    
+    except Exception as e:
+        logger.error(f"fs-read: error reading {rel_path}: {e}")
+        # Revert to original placeholder state if we were updating
+        if existing_note_id and is_placeholder and original_content is not None:
+            resource_manager.update_note_content(existing_note_id, original_content, reindex=False)
+            # Restore placeholder flag
+            note_data = resource_manager.resource_registry.get(existing_note_id)
+            if note_data and original_placeholder_flag is not None:
+                note_data['properties']['placeholder'] = original_placeholder_flag
+            logger.info(f"fs-read: reverted {existing_note_id} to placeholder state after error")
+        return executor._create_uniform_return("failed", reason=f"Error reading file: {str(e)}")

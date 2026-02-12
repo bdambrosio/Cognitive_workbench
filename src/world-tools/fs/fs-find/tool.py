@@ -13,23 +13,83 @@ logger = logging.getLogger(__name__)
 
 try:
     from ..fs_common import (
+        build_binary_content,
+        build_json_content,
         build_text_content,
         file_metadata,
+        is_binary_file,
+        is_documentation_file,
         resolve_fs_path,
     )
 except ImportError:
     import sys
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
     from fs_common import (
+        build_binary_content,
+        build_json_content,
         build_text_content,
         file_metadata,
+        is_binary_file,
+        is_documentation_file,
         resolve_fs_path,
     )
 
 
-def _create_note(resource_manager, agent_name: str, content: Dict[str, Any], rel_path: str) -> Optional[str]:
+def _detect_file_format(abs_path: Path) -> str:
+    """
+    Detect file format from extension and sample.
+    Returns: 'text', 'json', 'binary', or 'pdf'
+    """
+    suffix_lower = abs_path.suffix.lower()
+    if suffix_lower == ".pdf":
+        return "pdf"
+    elif suffix_lower == ".json":
+        return "json"
+    elif is_binary_file(abs_path):
+        return "binary"
+    else:
+        return "text"
+
+
+def _create_placeholder_note(resource_manager, agent_name: str, abs_path: Path, rel_path: str, meta: Dict[str, Any]) -> Optional[str]:
+    """
+    Create a placeholder Note for a file with full metadata structure.
+    The content will be filled in when fs-read is called.
+    """
     if not resource_manager:
         return None
+    
+    # Detect file format
+    file_format = _detect_file_format(abs_path)
+    
+    # Create placeholder content structure matching fs-read format
+    if file_format == "pdf":
+        content = {
+            "text": None,  # Placeholder - will be filled by fs-read
+            "format": "pdf",
+            "metadata": meta,
+            "page_count": 0,  # Unknown until read
+            "char_count": 0
+        }
+    elif file_format == "json":
+        content = {
+            "data": None,  # Placeholder - will be filled by fs-read
+            "format": "json",
+            "metadata": meta
+        }
+    elif file_format == "binary":
+        content = {
+            "format": "binary",
+            "metadata": meta
+        }
+    else:  # text
+        content = {
+            "text": None,  # Placeholder - will be filled by fs-read
+            "format": "text",
+            "metadata": meta,
+            "char_count": 0
+        }
+    
     success, note_id, error_msg, _ = resource_manager.create_note(
         agent_name,
         content,
@@ -37,10 +97,10 @@ def _create_note(resource_manager, agent_name: str, content: Dict[str, Any], rel
         "fs-find",
         rel_path,
         rel_path,
-        {"kind": "fs-file"}
+        {"kind": "fs-file", "placeholder": True}
     )
     if not success:
-        logger.error(f"fs-find: failed to create Note for {rel_path}: {error_msg}")
+        logger.error(f"fs-find: failed to create placeholder Note for {rel_path}: {error_msg}")
         return None
     return note_id
 
@@ -131,6 +191,10 @@ def tool(input_value=None, **kwargs):
         if len(note_ids) >= max_results:
             break
         
+        # Skip documentation files (metadata for planner, not content)
+        if is_documentation_file(file_path):
+            continue
+        
         # Match filename only (not full path)
         filename = file_path.name
         if not fnmatch.fnmatch(filename, pattern):
@@ -144,8 +208,8 @@ def tool(input_value=None, **kwargs):
             continue
         
         meta = file_metadata(file_path, entry_rel)
-        note_content = build_text_content(filename, meta)
-        note_id = _create_note(resource_manager, agent_name, note_content, entry_rel)
+        # Create placeholder Note with full metadata structure
+        note_id = _create_placeholder_note(resource_manager, agent_name, file_path, entry_rel, meta)
         if note_id:
             note_ids.append(note_id)
 

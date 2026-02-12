@@ -17,6 +17,7 @@ try:
         file_metadata,
         get_fs_root,
         is_binary_file,
+        is_documentation_file,
         list_dir_entries,
         read_text_file,
         resolve_fs_path,
@@ -29,6 +30,7 @@ except ImportError:
         file_metadata,
         get_fs_root,
         is_binary_file,
+        is_documentation_file,
         list_dir_entries,
         read_text_file,
         resolve_fs_path,
@@ -74,14 +76,17 @@ def _create_collection(resource_manager, agent_name: str, items: List[str], name
 def _iter_files(root: Path, recursive: bool) -> List[Path]:
     files: List[Path] = []
     if root.is_file():
+        # Skip documentation files
+        if is_documentation_file(root):
+            return []
         return [root]
     if recursive:
         for path in root.rglob("*"):
-            if path.is_file():
+            if path.is_file() and not is_documentation_file(path):
                 files.append(path)
     else:
         for path in list_dir_entries(root):
-            if path.is_file():
+            if path.is_file() and not is_documentation_file(path):
                 files.append(path)
     return files
 

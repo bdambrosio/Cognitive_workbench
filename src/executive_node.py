@@ -10,8 +10,6 @@ import math
 import random
 import re
 import traceback
-import zenoh
-from zenoh import QueryTarget, ConsolidationMode
 import json
 import time
 import threading
@@ -19,20 +17,29 @@ import logging
 import sys
 import signal
 import argparse
+import os
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Any, Union, Optional
-from Messages import SystemMessage, UserMessage
-
-import utils.hash_utils as hash_utils
-from utils.zenoh_utils import datetime_handler
 from dataclasses import dataclass, asdict
-import os
+from weakref import WeakValueDictionary
+
+# Ensure src/ is on sys.path before local imports (needed for multiprocessing spawn)
+_src_dir = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, _src_dir)
+# Fallback: spawn child may not inherit PYTHONPATH (e.g. under debugger)
+for _p in os.environ.get("PYTHONPATH", "").split(os.pathsep):
+    if _p and _p not in sys.path:
+        sys.path.insert(0, _p)
+
+import zenoh
+from zenoh import QueryTarget, ConsolidationMode
+from Messages import SystemMessage, UserMessage
+from utils.zenoh_utils import datetime_handler
 from templates import DRIVE_ASSESSMENT_TEMPLATE, GOAL_TEMPLATE, PLAN_TEMPLATE, PLAN_VERBS, REWRITE_TEMPLATE
 from utils.format_utils import format_map_types, format_views_compact
-from weakref import WeakValueDictionary
-from utils.format_utils import format_views_compact
 from utils.condition_utils import deref_plan_target
+import utils.hash_utils as hash_utils
 from transformers import AutoTokenizer
 import requests
 # Configure logging with unbuffered output
@@ -57,9 +64,6 @@ logger = logging.getLogger('executive_node')
 logger.setLevel(logging.INFO)
 
 # Import LLM client
-import os
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__))))
-
 from llm_client import ZenohLLMClient
 
 # SGLang imports
@@ -432,18 +436,21 @@ class ZenohExecutiveNode:
                 }
             return None
         
-        # LLM backend - Use SGLang.Runtime for infospace, vLLM as alternative, ZenohLLMClient as fallback
+        # LLM backend - Use SGLang.Runtime for infospace, vLLM or OpenRouter as alternatives, ZenohLLMClient as fallback
         llm_config = self.character_config.get('llm_config', {})
         server_name = llm_config.get('server_name', 'openai')
         model_name = llm_config.get('model_name', 'gpt-4.1')
         sgl_model_path = llm_config.get('sgl_model_path')
         vllm_model_path = llm_config.get('vllm_model_path')
         vllm_url = llm_config.get('vllm_url', 'http://localhost:5000/v1/chat/completions')
+        openrouter_model_path = llm_config.get('openrouter_model_path')
         
         self.runtime = None
         self.llm_client = None
         self.vllm_model = None
         self.vllm_url = None
+        self.openrouter_model = None
+        self.openrouter_api_key = None
         
         # Check SGLang availability
         HAS_SGLANG = False
@@ -453,8 +460,18 @@ class ZenohExecutiveNode:
         except ImportError:
             pass
         
-        # Initialize vLLM model resolution if configured
-        if vllm_model_path:
+        # Initialize OpenRouter if configured
+        if openrouter_model_path:
+            api_key = os.getenv('OPENROUTER_API_KEY')
+            if not api_key:
+                logger.error("❌ OpenRouter model configured but OPENROUTER_API_KEY environment variable not set")
+                raise ValueError("OPENROUTER_API_KEY environment variable required for OpenRouter")
+            self.openrouter_model = openrouter_model_path
+            self.openrouter_api_key = api_key
+            logger.info(f"✅ OpenRouter configured with model: {openrouter_model_path}")
+        
+        # Initialize vLLM model resolution if configured (only if OpenRouter not configured)
+        elif vllm_model_path:
             try:
                 import requests
                 logger.info(f"🔍 Querying vLLM server for available models...")
@@ -641,15 +658,24 @@ class ZenohExecutiveNode:
             executive_node=self,  # Pass actual executive node
             resource_manager=self.resource_manager
         )
-        # Share runtime and vLLM config with executor
+        # Share runtime, vLLM, and OpenRouter config with executor
         if self.runtime:
             self.infospace_executor.runtime = self.runtime
             self.infospace_executor.tokenizer = self.tokenizer
         if self.vllm_model and self.vllm_url:
             self.infospace_executor.vllm_model = self.vllm_model
             self.infospace_executor.vllm_url = self.vllm_url
+        if self.openrouter_model and self.openrouter_api_key:
+            self.infospace_executor.openrouter_model = self.openrouter_model
+            self.infospace_executor.openrouter_api_key = self.openrouter_api_key
         logger.info(f'🧩 Infospace executor initialized for {character_name}')
         
+        # Build available_tools for models: loaded tools + infospace primitives (display, load, persist, etc.)
+        from infospace_executor import INFOSPACE_PRIMITIVES
+        available_for_models = dict(self.available_tools)
+        for p in INFOSPACE_PRIMITIVES:
+            if p not in available_for_models:
+                available_for_models[p] = {"name": p, "description": "Infospace primitive", "type": "primitive"}
         # Create WorldModel instance (with executor)
         from world_model import WorldModel
         self.world_model = WorldModel(
@@ -657,7 +683,7 @@ class ZenohExecutiveNode:
             agent_name=character_name,
             resource_manager=self.resource_manager,
             executor=self.infospace_executor,
-            available_tools=self.available_tools
+            available_tools=available_for_models
         )
         logger.info(f'🌍 WorldModel initialized for {character_name} in {world_name}')
         
@@ -668,7 +694,7 @@ class ZenohExecutiveNode:
             agent_name=character_name,
             resource_manager=self.resource_manager,
             executor=self.infospace_executor,
-            available_tools=self.available_tools
+            available_tools=available_for_models
         )
         self.tool_model.build_task_tool_index()
         logger.info(f'🔧 ToolModel initialized for {character_name} in {world_name}')
@@ -694,6 +720,7 @@ class ZenohExecutiveNode:
             sgl_model_path = llm_config.get('sgl_model_path')
             vllm_model_path = llm_config.get('vllm_model_path')
             vllm_url = llm_config.get('vllm_url', 'http://localhost:5000/v1/chat/completions')
+            openrouter_model_path = llm_config.get('openrouter_model_path')
             
             if HAS_SGLANG and sgl_model_path:
                 # Use SGLang
@@ -715,8 +742,17 @@ class ZenohExecutiveNode:
                     vllm_model=self.vllm_model
                 )
                 logger.info(f'🚀 IncrementalPlanner initialized (vLLM) for {character_name}')
+            elif openrouter_model_path and self.openrouter_model:
+                # Use OpenRouter
+                self.incremental_planner = IncrementalPlanner(
+                    executor=self.infospace_executor,
+                    available_tools=self.available_tools,
+                    logger_instance=logger,
+                    openrouter_model_path=openrouter_model_path
+                )
+                logger.info(f'🚀 IncrementalPlanner initialized (OpenRouter) for {character_name}')
             else:
-                logger.warning(f'⚠️  Neither SGLang nor vLLM configured - incremental planning disabled')
+                logger.warning(f'⚠️  Neither SGLang, vLLM, nor OpenRouter configured - incremental planning disabled')
         except Exception as e:
             logger.warning(f'⚠️  Failed to initialize IncrementalPlanner: {e}')
             import traceback
