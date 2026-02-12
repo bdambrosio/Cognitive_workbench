@@ -150,12 +150,17 @@ class CharacterLauncher:
         
                 
         # Launch executive_node for this character (needs memory, situation, and agenda)
+        _src_dir = str(Path(__file__).resolve().parent)
+        _env = os.environ.copy()
+        _env.setdefault('PYTHONPATH', _src_dir)
+        if _src_dir not in _env.get('PYTHONPATH', '').split(os.pathsep):
+            _env['PYTHONPATH'] = os.pathsep.join([_src_dir, _env.get('PYTHONPATH', '')])
         try:
             executive_process = subprocess.Popen([
-                sys.executable, 'executive_node.py', 
-                '-c', character.name, 
+                sys.executable, 'executive_node.py',
+                '-c', character.name,
                 '-config', json.dumps(character.config)
-            ], env=os.environ.copy())
+            ], cwd=_src_dir, env=_env)
             character.processes.append(executive_process)
             self.logger.info(f'✅ {character.name} executive_node launched')
         except Exception as e:

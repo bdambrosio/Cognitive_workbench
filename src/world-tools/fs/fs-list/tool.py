@@ -12,8 +12,12 @@ logger = logging.getLogger(__name__)
 
 try:
     from ..fs_common import (
+        build_binary_content,
+        build_json_content,
         build_text_content,
         file_metadata,
+        is_binary_file,
+        is_documentation_file,
         list_dir_entries,
         resolve_fs_path,
     )
@@ -21,16 +25,72 @@ except ImportError:
     import sys
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
     from fs_common import (
+        build_binary_content,
+        build_json_content,
         build_text_content,
         file_metadata,
+        is_binary_file,
+        is_documentation_file,
         list_dir_entries,
         resolve_fs_path,
     )
 
 
-def _create_note(resource_manager, agent_name: str, content: Dict[str, Any], rel_path: str) -> Optional[str]:
+def _detect_file_format(abs_path: Path) -> str:
+    """
+    Detect file format from extension and sample.
+    Returns: 'text', 'json', 'binary', or 'pdf'
+    """
+    suffix_lower = abs_path.suffix.lower()
+    if suffix_lower == ".pdf":
+        return "pdf"
+    elif suffix_lower == ".json":
+        return "json"
+    elif is_binary_file(abs_path):
+        return "binary"
+    else:
+        return "text"
+
+
+def _create_placeholder_note(resource_manager, agent_name: str, abs_path: Path, rel_path: str, meta: Dict[str, Any]) -> Optional[str]:
+    """
+    Create a placeholder Note for a file with full metadata structure.
+    The content will be filled in when fs-read is called.
+    """
     if not resource_manager:
         return None
+    
+    # Detect file format
+    file_format = _detect_file_format(abs_path)
+    
+    # Create placeholder content structure matching fs-read format
+    if file_format == "pdf":
+        content = {
+            "text": None,  # Placeholder - will be filled by fs-read
+            "format": "pdf",
+            "metadata": meta,
+            "page_count": 0,  # Unknown until read
+            "char_count": 0
+        }
+    elif file_format == "json":
+        content = {
+            "data": None,  # Placeholder - will be filled by fs-read
+            "format": "json",
+            "metadata": meta
+        }
+    elif file_format == "binary":
+        content = {
+            "format": "binary",
+            "metadata": meta
+        }
+    else:  # text
+        content = {
+            "text": None,  # Placeholder - will be filled by fs-read
+            "format": "text",
+            "metadata": meta,
+            "char_count": 0
+        }
+    
     success, note_id, error_msg, _ = resource_manager.create_note(
         agent_name,
         content,
@@ -38,10 +98,10 @@ def _create_note(resource_manager, agent_name: str, content: Dict[str, Any], rel
         "fs-list",
         rel_path,
         rel_path,
-        {"kind": "fs-file"}
+        {"kind": "fs-file", "placeholder": True}
     )
     if not success:
-        logger.error(f"fs-list: failed to create Note for {rel_path}: {error_msg}")
+        logger.error(f"fs-list: failed to create placeholder Note for {rel_path}: {error_msg}")
         return None
     return note_id
 
@@ -100,9 +160,18 @@ def tool(input_value=None, **kwargs):
 
     def build_dir(dir_path: Path, dir_rel: str) -> Tuple[Optional[str], int]:
         items: List[str] = []
-        for entry in list_dir_entries(dir_path):
+        entries = list(list_dir_entries(dir_path))
+        
+        # Performance warning for large directories
+        if len(entries) > 16:
+            logger.warning(f"fs-list: Directory {dir_rel or '/'} has {len(entries)} entries (>16), this may be slow")
+        
+        for entry in entries:
             if max_entries is not None and entry_counter["count"] >= int(max_entries):
                 break
+            # Skip documentation files (metadata for planner, not content)
+            if entry.is_file() and is_documentation_file(entry):
+                continue
             entry_rel = f"{dir_rel}/{entry.name}" if dir_rel else entry.name
             meta = file_metadata(entry, entry_rel)
             if entry.is_dir():
@@ -118,8 +187,8 @@ def tool(input_value=None, **kwargs):
             else:
                 if not include_files:
                     continue
-                note_content = build_text_content(entry.name, meta)
-                note_id = _create_note(resource_manager, agent_name, note_content, entry_rel)
+                # Create placeholder Note with full metadata structure
+                note_id = _create_placeholder_note(resource_manager, agent_name, entry, entry_rel, meta)
                 if note_id:
                     items.append(note_id)
                     entry_counter["count"] += 1

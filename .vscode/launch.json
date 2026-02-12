@@ -17,6 +17,37 @@
             "preLaunchTask": "setup-zenoh-environment"
         },
         {
+            "name": "Jill - Infospace VLLM",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/launcher.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/src",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src"
+            },
+            "args": ["jill-infospace-vllm.yaml", "--ui", "--resource-browser"],
+            "justMyCode": false,
+            "stopOnEntry": false,
+            "preLaunchTask": "setup-zenoh-environment"
+        },
+        {
+            "name": "Jill - Infospace OpenRouter",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/launcher.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/src",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src"
+            },
+            "args": ["jill-infospace-openrouter.yaml", "--ui", "--resource-browser"],
+            "justMyCode": false,
+            "stopOnEntry": false,
+            "preLaunchTask": "setup-zenoh-environment"
+        },
+
+        {
             "name": "Jill - FS",
             "type": "debugpy",
             "request": "launch",

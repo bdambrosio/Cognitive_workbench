@@ -913,6 +913,50 @@ class InfospaceResourceManager:
         
         return True, note_id, None, location
     
+    def update_note_content(self, note_id: str, new_content: Any, reindex: bool = True) -> Tuple[bool, Optional[str]]:
+        """
+        Update the content of an existing Note.
+        
+        Args:
+            note_id: Note ID to update
+            new_content: New content to set
+            reindex: Whether to re-index the Note after update
+            
+        Returns:
+            Tuple of (success, error_msg)
+        """
+        if not note_id.startswith('Note_'):
+            return False, f"Invalid note_id format: {note_id}"
+        
+        # Get existing Note
+        note_data = self.resource_registry.get(note_id)
+        if not note_data:
+            return False, f"Note {note_id} not found"
+        
+        # Update content
+        note_data['properties']['content'] = new_content
+        
+        # Update format type based on content
+        if isinstance(new_content, (dict, list)):
+            note_data['properties']['format'] = 'json'
+            note_data['properties']['content_type'] = 'json'
+            content_str = json.dumps(new_content, sort_keys=True)
+        else:
+            note_data['properties']['format'] = 'text'
+            note_data['properties']['content_type'] = 'text'
+            content_str = str(new_content)
+        
+        # Update metadata
+        note_data['properties']['length'] = len(content_str)
+        note_data['properties']['fingerprint'] = hashlib.sha1(content_str.encode('utf-8')).hexdigest()
+        
+        # Re-index if requested and Note was previously indexed
+        if reindex and note_id in self.resource_indexer.note_id_to_index:
+            self.resource_indexer.index_note(note_id, commentary="")
+        
+        logger.info(f"📝 Updated Note {note_id} content")
+        return True, None
+    
     # ==================== Collection Creation ====================
     
     def create_collection(self, character_name: str, content: Any, format_type: str,
