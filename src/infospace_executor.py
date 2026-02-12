@@ -755,6 +755,14 @@ class InfospaceExecutor:
         if extra:
             result['extra'] = extra
         
+        # Auto-inject item_count for Collection results so code blocks can use r.get("extra",{}).get("item_count")
+        if status == 'success' and resource_id and isinstance(resource_id, str) and resource_id.startswith('Collection_') and self.resource_manager:
+            resource = self.resource_manager.get_resource(resource_id)
+            if resource:
+                if 'extra' not in result or result['extra'] is None:
+                    result['extra'] = {}
+                result['extra'].setdefault('item_count', resource.get('properties', {}).get('item_count', 0))
+        
         return result
     
     def execute_action_tracked(self, action: Dict, method_name: str = None) -> Dict:
@@ -2211,17 +2219,38 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         
         return {'status': 'failed', 'reason': 'Unknown error'}
     
+    # Ceiling constants for load slice
+    LOAD_MAX_NOTE_CHARS = 4096
+    LOAD_MAX_COLLECTION_ITEMS = 16
+
+    @staticmethod
+    def _parse_slice(slice_str: str, length: int) -> slice:
+        """Parse Python-style slice string into a slice object, clamped to length."""
+        s = slice_str.strip()
+        if ':' in s:
+            parts = s.split(':', 1)
+            start = int(parts[0]) if parts[0].strip() else None
+            stop = int(parts[1]) if parts[1].strip() else None
+            return slice(start, stop)
+        # Single index
+        idx = int(s)
+        if idx < 0:
+            idx = max(0, length + idx)
+        return slice(idx, idx + 1)
+
     def _execute_load(self, action: Dict) -> Dict:
         """
         Load a persistent Note or Collection by resource ID or name.
         
         Required: target, out
+        Optional: slice (Python-style slice string, e.g. "0:4096", "-1000:", ":")
         
-        Retrieves an existing spatial resource from the map and binds it to a variable.
-        target can be: $variable, Note_X, Collection_X, or a resource name.
+        For Notes: slice units are characters. Default "0:4096".
+        For Collections: slice units are items. Default "0:5". Returns a new Collection.
         """
         target_arg = action.get('target')
         out_var = action.get('out')
+        slice_arg = action.get('slice')
         
         if not target_arg:
             return self._create_uniform_return('failed', reason='load requires target')
@@ -2230,17 +2259,14 @@ Make sure the string is in a format that can be parsed by the json.loads functio
             return self._create_uniform_return('failed', reason='load requires out')
         
         # Resolve target (handles $var, resource names, and IDs)
-        # _resolve_target_var guarantees binding if it succeeds
         var_name, error = self._resolve_target_var(target_arg)
         if error:
             return self._create_uniform_return('failed', reason=f'load: {error}')
         
-        # Get resource ID from bindings (guaranteed to exist after _resolve_target_var)
         resource_id = self._get_binding(var_name)
         if resource_id is None:
             return self._create_uniform_return('failed', reason=f'Variable ${var_name} not bound')
         
-        # Verify resource exists
         if not self.resource_manager:
             return self._create_uniform_return('failed', reason='Resource manager not available')
         
@@ -2248,29 +2274,60 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         if not resource:
             return self._create_uniform_return('failed', reason=f'Resource not found: {resource_id}')
         
-        # Bind the resource ID to out variable
-        self._bind_variable(out_var, resource_id)
-        
-        # Get content for value (truncated to 1024 chars)
-        content = self._get_content(resource_id)
-        
-        # Determine resource type for logging
-        resource_type = "Collection" if resource_id.startswith('Collection_') else "Note" if resource_id.startswith('Note_') else "Resource"
         display_var = self._normalize_var_for_log(out_var)
-        logger.info(f"Loaded {target_arg} → {display_var} = {resource_id} ({resource_type})")
         
-        # Prefix content to clarify it's Note/Collection content (prevents planner confusion with domain-specific content)
-        if content is not None:
-            if resource_id.startswith('Note_'):
-                prefixed_content = f"Note Content: {content}"
-            elif resource_id.startswith('Collection_'):
-                prefixed_content = f"Collection Content: {content}"
+        # --- Collection path ---
+        if resource_id.startswith('Collection_'):
+            note_ids = self._get_content(resource_id)
+            if not isinstance(note_ids, list):
+                note_ids = []
+            total = len(note_ids)
+            
+            # Parse slice (items), default "0:5", ceiling LOAD_MAX_COLLECTION_ITEMS
+            if slice_arg:
+                sl = self._parse_slice(str(slice_arg), total)
             else:
-                prefixed_content = f"Resource Content: {content}"
-        else:
-            prefixed_content = None
+                sl = slice(0, 5)
+            sliced_ids = note_ids[sl]
+            # Enforce ceiling
+            sliced_ids = sliced_ids[:self.LOAD_MAX_COLLECTION_ITEMS]
+            
+            # Create new Collection from slice
+            collection_id = self._create_collection(sliced_ids, f'load_slice')
+            if not collection_id:
+                return self._create_uniform_return('failed', reason='Failed to create Collection from slice')
+            self._bind_variable(out_var, collection_id)
+            
+            # Build content preview: each item as "Note_ID: first 200 chars..."
+            preview_lines = [f"Collection Content ({len(sliced_ids)}/{total} items):"]
+            for nid in sliced_ids:
+                content = self._get_content(nid)
+                preview = str(content)[:200] if content else "(empty)"
+                preview_lines.append(f"- {nid}: {preview}")
+            prefixed_content = "\n".join(preview_lines)
+            
+            logger.info(f"Loaded {target_arg} → {display_var} = {collection_id} (Collection, {len(sliced_ids)}/{total} items)")
+            return self._create_uniform_return('success', value=prefixed_content, resource_id=collection_id,
+                                               extra={"item_count": len(sliced_ids), "total_items": total})
         
-        # Return truncated content (1024 chars), resource_id is the loaded resource
+        # --- Note path ---
+        content = self._get_content(resource_id)
+        content_str = str(content) if content is not None else ""
+        total_chars = len(content_str)
+        
+        # Parse slice (chars), default "0:4096", ceiling LOAD_MAX_NOTE_CHARS
+        if slice_arg:
+            sl = self._parse_slice(str(slice_arg), total_chars)
+        else:
+            sl = slice(0, self.LOAD_MAX_NOTE_CHARS)
+        sliced_content = content_str[sl]
+        # Enforce ceiling
+        sliced_content = sliced_content[:self.LOAD_MAX_NOTE_CHARS]
+        
+        self._bind_variable(out_var, resource_id)
+        prefixed_content = f"Note Content: {sliced_content}"
+        
+        logger.info(f"Loaded {target_arg} → {display_var} = {resource_id} (Note, {len(sliced_content)}/{total_chars} chars)")
         return self._create_uniform_return('success', value=prefixed_content, resource_id=resource_id)
     
     def _execute_index(self, action: Dict) -> Dict:
@@ -4013,47 +4070,10 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         return self._create_uniform_return('failed', reason='Failed to create projected Collection')
     
     def _execute_head(self, action: Dict) -> Dict:
-        """
-        Take first N items from Collection.
-        
-        Required: target, out
-        Optional: count (default 1)
-        """
-        error = self._validate_required_fields(action, 'target', 'out')
-        if error:
-            return self._create_uniform_return('failed', reason=error)
-        
-        target_arg = action.get('target')
+        """Deprecated: routes to load with slice. Use load(target, slice="0:N") instead."""
         count = action.get('count', 1)
-        out_var = action.get('out')
-        
-        collection_var, error = self._resolve_target_var(target_arg)
-        if error:
-            return self._create_uniform_return('failed', reason=f'head: {error}')
-        
-        if not isinstance(count, int) or count < 1:
-            return self._create_uniform_return('failed', reason='head count must be positive integer')
-        
-        note_ids = self._dereference_collection(collection_var)
-        
-        if not isinstance(note_ids, list):
-            return self._create_uniform_return('failed', reason='head target must be a Collection')
-        
-        # Take first N items
-        head_ids = note_ids[:count]
-        
-        # Create new Collection
-        collection_id = self._create_collection(head_ids, f'head_{count}')
-        if not collection_id:
-            return self._create_uniform_return('failed', reason='Failed to create Collection')
-        
-        self._bind_variable(out_var, collection_id)
-        display_var = self._normalize_var_for_log(out_var)
-        logger.info(f"Took first {len(head_ids)}/{len(note_ids)} items → {display_var}")
-        
-        # Format as "X items [Note_1, ...]"
-        collection_value = self._format_collection_value(collection_id)
-        return self._create_uniform_return('success', value=collection_value, resource_id=collection_id)
+        load_action = {"type": "load", "target": action.get('target'), "slice": f"0:{count}", "out": action.get('out')}
+        return self._execute_load(load_action)
 
     def _execute_pluck(self, action: Dict) -> Dict:
         """
