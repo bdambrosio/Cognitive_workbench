@@ -253,8 +253,9 @@ This table applies only to native infospace primitives. World/skill tools are go
 Operation_name: applicable to: <Note | Collection | Note, Collection>;   Purpose
  - split: Note;  Note structure → Collection
  - flatten: Collection;  Collection → single Note
- - as-json, refine, coerce: Note;  Transform Note content
- - summarize, relate: Note, Collection;  Generate new content
+ - as-json, extract, coerce: Note;  Transform Note content
+ - extract: Note;  LLM-guided extraction, compression, or transformation of single-Note content
+ - synthesize: Collection;  Cross-document integration, comparison, and reporting
  - map: Collection;  Apply op to each Collection item
  - project, pluck, sort, filter: Collection;  SQL-like Collection ops
  - head: Collection;  Take first N items
@@ -279,7 +280,7 @@ Discovery and Search Primitives:
 - discover-collections: Global discovery across all Collections (no target needed). Returns Collection of structured Notes with full text content, metadata.source_id, metadata.uri, metadata.score, metadata.type.
 - search-within-collection: Search within a specific indexed Collection (requires target Collection, must be indexed first). Returns Collection of structured Notes with full matched chunk text, metadata.source_id, metadata.uri, metadata.score, metadata.type, metadata.chunk_index, metadata.chunk_total.
 
-Discovery tools return Note or Collection candidates. Search-within tools refine known containers. If you think you need a target field, you are not doing discovery.
+Discovery tools return Note or Collection candidates. Search-within tools search known containers. If you think you need a target field, you are not doing discovery.
 
 All search primitives return structured Notes matching search-web/semantic-scholar format:
 - text: Full text content (for search-within-collection: the matched chunk text; for discover-notes/discover-collections: full Note content)
@@ -291,7 +292,7 @@ All search primitives return structured Notes matching search-web/semantic-schol
 - metadata.chunk_index, metadata.chunk_total: (search-within-collection only) Chunk position info
 - char_count: Length of text
 
-Use project to extract metadata fields (uri, source_id, score, etc.). For extracting information FROM text content, use refine (LLM-based).
+Use project to extract metadata fields (uri, source_id, score, etc.). For extracting information FROM text content, use extract (LLM-based).
 
 Persistence Operations:
 - load: Retrieve persistent Note or Collection by ID or name. Returns prefixed content ("Note Content: <text>" or "Collection Content: <ids>") truncated to 1024 chars. The prefix clarifies that the returned text is Note/Collection content, not domain-specific output. Use to get content into planner context.
@@ -314,7 +315,7 @@ Structured-data Collection Operations (require Notes of type dict/JSON):
 - join: Combine two Collections on matching field (INNER JOIN) → merged Collection
 
 IMPORTANT: project/pluck extract NAMED FIELDS only (metadata.uri, metadata.title, etc.). They do NOT parse unstructured text.
-To extract information FROM text content, use refine (LLM-based extraction).
+To extract information FROM text content, use extract (LLM-based extraction).
 
 Use cases:
 - project: Extract metadata.uri from search results, get metadata.title+metadata.year from papers
@@ -327,7 +328,12 @@ Use cases:
 Efficiency Heuristics:
 - Use tools directly on Notes for single items
 - Create Collections only for 2+ Notes together
-- split, refine, as-json work on Notes ONLY, not Collections
+- split, extract, as-json work on Notes ONLY, not Collections
+- Use extract directly on Notes for single-item work
+- Use map(extract) for per-item extraction across a Collection
+- Use synthesize for cross-item integration, comparison, or reporting
+- Two-phase pattern: map(extract) → synthesize (extract per item, then integrate)
+- Single-phase: synthesize with focus (when per-item extraction isn't needed)
 - Use map to apply Note operations to each Collection item
 
 Common Patterns:
@@ -524,8 +530,8 @@ def build_tool_catalog(available_tools: Dict[str, Dict]) -> Dict[str, Dict]:
             "schema_hint": {"target": "$variable (Collection)", "out": "$variable"}
         },
         "project": {
-            "description": "Extract metadata/structured fields from each Note in Collection (SQL SELECT). Extracts NAMED FIELDS only (metadata.uri, metadata.title, etc.), does NOT parse unstructured text. For extracting info FROM text content, use refine instead.",
-            "full_description": "Project operation extracts specified fields from each Note in a Collection, similar to SQL SELECT. Input Collection must contain JSON/dict Notes. Output is a new Collection of projected Notes containing only the requested fields. Notes missing any requested field are excluded. Nested fields use dot notation (e.g., 'metadata.uri'). IMPORTANT: project is a field accessor for structured data - it extracts metadata fields (metadata.uri, metadata.title, metadata.year) or top-level JSON fields. It does NOT interpret or parse unstructured text content. To extract information FROM text (e.g., 'extract the nationality'), use refine (LLM-based).",
+            "description": "Extract metadata/structured fields from each Note in Collection (SQL SELECT). Extracts NAMED FIELDS only (metadata.uri, metadata.title, etc.), does NOT parse unstructured text. For extracting info FROM text content, use extract instead.",
+            "full_description": "Project operation extracts specified fields from each Note in a Collection, similar to SQL SELECT. Input Collection must contain JSON/dict Notes. Output is a new Collection of projected Notes containing only the requested fields. Notes missing any requested field are excluded. Nested fields use dot notation (e.g., 'metadata.uri'). IMPORTANT: project is a field accessor for structured data - it extracts metadata fields (metadata.uri, metadata.title, metadata.year) or top-level JSON fields. It does NOT interpret or parse unstructured text content. To extract information FROM text (e.g., 'extract the nationality'), use extract (LLM-based).",
             "examples": [
                 '{"type":"project","target":"$search_results","fields":["metadata.uri"],"out":"$urls"}',
                 '{"type":"project","target":"$papers","fields":["metadata.title","metadata.year"],"out":"$paper_info"}',
@@ -611,8 +617,8 @@ def build_tool_catalog(available_tools: Dict[str, Dict]) -> Dict[str, Dict]:
         "search-web": "Search web and return Collection of structured Notes. Each Note has text (full content), format, metadata.uri (URL), metadata.domain, char_count. Use project with metadata.uri to extract URLs.",
         "semantic-scholar": "Search academic papers and return Collection of structured Notes. Each Note has text (abstract), format, metadata.uri (PDF URL), metadata.title, metadata.authors, metadata.year, metadata.citations, metadata.venue. Use project with metadata.uri to extract URLs.",
         "fetch-text": "Fetch text from a SINGLE specific URL, Do NOT use on search-web or semantic-scholar results. Use ONLY when you have one URL/ID to fetch directly and do not already have the text.",
-        "discover-notes": "Global discovery across all Notes. Returns Collection of structured Notes with full text content, metadata.source_id, metadata.uri, metadata.score, metadata.type. Use project for metadata fields, refine for extracting info from text.",
-        "discover-collections": "Global discovery across all Collections. Returns Collection of structured Notes with full text content, metadata.source_id, metadata.uri, metadata.score, metadata.type. Use project for metadata fields, refine for extracting info from text.",
+        "discover-notes": "Global discovery across all Notes. Returns Collection of structured Notes with full text content, metadata.source_id, metadata.uri, metadata.score, metadata.type. Use project for metadata fields, extract for extracting info from text.",
+        "discover-collections": "Global discovery across all Collections. Returns Collection of structured Notes with full text content, metadata.source_id, metadata.uri, metadata.score, metadata.type. Use project for metadata fields, extract for extracting info from text.",
         "search-within-collection": "Search within indexed Collection. Returns Collection of structured Notes with full matched chunk text, metadata.source_id, metadata.uri, metadata.score, metadata.type, metadata.chunk_index, metadata.chunk_total. Format matches search-web/semantic-scholar.",
     }
     TOOL_SCHEMA_HINT_OVERRIDE = {}
@@ -723,9 +729,14 @@ def tool_catalog_text(tools: Dict[str, Dict]) -> str:
     lines.append("Preferred tool order: World tools first when they apply, then Infospace Core")
     # Add critical workflows to prevent common mistakes
     lines.append("# CRITICAL WORKFLOWS:")
-    lines.append("- search-web → summarize / refine / filter-semantic")
+    lines.append("- search-web → synthesize (with focus) — direct Collection analysis")
+    lines.append("- search-web → map(extract) → synthesize — two-phase with per-item extraction")
+    lines.append("- search-web → filter-structured → synthesize — filtered then analyzed")
     lines.append("- search-web already returns full text in 'text' field of each Note")
-    lines.append("- semantic-scholar → summarize / refine / filter-semantic")
+    lines.append("- semantic-scholar → synthesize (with focus) — direct Collection analysis")
+    lines.append("- semantic-scholar → map(extract) → synthesize — two-phase with per-item extraction")
+    lines.append("- semantic-scholar → filter-structured → synthesize — filtered then analyzed")
+    lines.append("- For comparison: synthesize with format=\"comparison\" and other= (requires two inputs)")
     lines.append("- fetch-text is for SINGLE URLs only, NOT for Collections from search-web/semantic-scholar")
     lines.append("- Level 4 tools (search-web, semantic-scholar) return Collections with text content in the 'text' field of each Note")
     
@@ -1094,8 +1105,9 @@ def sgl_to_infospace_action(tool_name: str, args_json: str, step: int, available
     
     # Ensure 'out' field if tool produces output
     output_producing = ["create-note", "create-collection", "load", "discover-notes", "discover-collections", "search-within-collection", "map", 
-                       "split", "flatten", "search-web", "semantic-scholar", "summarize",
-                       "refine", "generate-note", "assess", "relate", "extract-entities", "filter-semantic",
+                       "split", "flatten", "search-web", "semantic-scholar", "extract", "synthesize",
+                       "refine", "summarize", "relate",  # backward compat aliases
+                       "generate-note", "assess", "extract-entities", "filter-semantic",
                        "fetch-text", "as-json", "as-markdown"]
     if tool_name in output_producing and "out" not in action:
         action["out"] = f"$step_{step}_result"
@@ -1183,7 +1195,8 @@ _CODEGEN_FORBIDDEN_PATTERNS = [
     r'\b__\w+__\b',
     r'\bopen\b\s*\(',
     r'\bos\b\.', r'\bsys\b\.', r'\bsubprocess\b',
-    r'\bwhile\b', r'\bfor\b',
+    r'\bwhile\b',
+    # Note: 'for' is allowed but validated separately for bounded iteration
     r'\bclass\b', r'\bdef\b',
     r'\bglobals\b\s*\(', r'\blocals\b\s*\(',
     r'\bgetattr\b\s*\(', r'\bsetattr\b\s*\(', r'\bdelattr\b\s*\(',
@@ -1198,7 +1211,8 @@ def validate_codegen_block(code: str) -> tuple:
     - Forbidden patterns (imports, exec, file I/O, loops, defs, etc.)
     - Must contain 1-6 execute_action_tracked calls
     - Must contain at least one return executor._create_uniform_return
-    - Max 30 lines
+    - Max 60 executable code lines (comments and blanks are free)
+    - Hard cap of 100 total lines
     
     Args:
         code: Python code string
@@ -1210,8 +1224,11 @@ def validate_codegen_block(code: str) -> tuple:
         return False, "Empty code block"
     
     lines = code.strip().splitlines()
-    if len(lines) > 30:
-        return False, f"Code block too long ({len(lines)} lines, max 30)"
+    code_lines = [l for l in lines if l.strip() and not l.strip().startswith('#')]
+    if len(code_lines) > 60:
+        return False, f"Code block too long ({len(code_lines)} code lines, max 60)"
+    if len(lines) > 100:
+        return False, f"Code block too long ({len(lines)} total lines, max 100)"
     
     # Check forbidden patterns
     for pattern in _CODEGEN_FORBIDDEN_PATTERNS:
@@ -1219,12 +1236,33 @@ def validate_codegen_block(code: str) -> tuple:
         if match:
             return False, f"Forbidden pattern: {match.group()}"
     
-    # Count execute_action_tracked calls (must be 1-6)
+    # Check for loops: allow bounded 'for' over short literal lists, reject all else
+    for_matches = list(re.finditer(r'\bfor\b\s+\w+\s+in\s+', code))
+    for match in for_matches:
+        rest_of_line = code[match.end():].split('\n')[0].strip().rstrip(':')
+        # Allow: for X in [literal1, literal2, ...]
+        if re.match(r'\[.*\]$', rest_of_line):
+            items = rest_of_line[1:-1].split(',')
+            if len(items) > 5:
+                return False, f"For loop over list with {len(items)} items (max 5)"
+            continue
+        # Allow: for i, X in enumerate([...])
+        if re.match(r'enumerate\s*\(\s*\[.*\]\s*\)$', rest_of_line):
+            inner = re.search(r'\[(.*)\]', rest_of_line)
+            if inner:
+                items = inner.group(1).split(',')
+                if len(items) > 5:
+                    return False, f"For loop with enumerate over {len(items)} items (max 5)"
+            continue
+        # Reject all other for loops (range(), generator expressions, variables, etc.)
+        return False, f"Unbounded or disallowed for loop: for ... in {rest_of_line[:50]}"
+    
+    # Count execute_action_tracked calls (must be 1-10)
     call_count = len(re.findall(r'executor\.execute_action_tracked\s*\(', code))
     if call_count < 1:
         return False, "No execute_action_tracked() calls found"
-    if call_count > 6:
-        return False, f"Too many execute_action_tracked() calls ({call_count}, max 6)"
+    if call_count > 10:
+        return False, f"Too many execute_action_tracked() calls ({call_count}, max 10)"
     
     # Must have a return with _create_uniform_return
     if 'executor._create_uniform_return' not in code:
@@ -1475,48 +1513,72 @@ if HAS_SGLANG:
         system_parts.append(f"WORLD_MODEL: {json.dumps(world_model, indent=2)}\n")
         system_parts.append(f"CURRENT_TIME: {datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}\n")
         system_parts.append("""Follow this process to achieve the goal:
- - Stage 1 (once): Analyze goal, select relevant tools, decompose into FIRST_TASK.
+ - Stage 1 (once): Read the ABSTRACT_PLAN, select tools, identify first PHASE type (pipeline or deliberative).
  - Stage 1.5 (once): Load and inject detailed docs for selected tools.
-Then you will work in repeated cycles to achieve the goal:
- - Stage 2: Pick a single tool and JSON args for CURRENT_TASK. Be concise in text value arguments.
- - Stage 3: Reflect on result, decide if goal done, set NEXT_TASK.
+Then you will work in repeated cycles:
+ - Stage 2: For PIPELINE phases, write a code block (Option B) executing the full phase.
+            For DELIBERATIVE steps, pick a single tool (Option A).
+ - Stage 3: Reflect on result, decide if goal done, set NEXT_TASK and NEXT_PHASE_TYPE.
 ALWAYS follow all formatting instructions exactly.
 
 """)        
         s += system("".join(system_parts))
         
         s += user(
-            "#Stage 1: Analyze goal and identify relevant tools from the Complete primitive and tool catalog.\n"
-            "Include tools you might need AND related/supporting tools.\n"
-            "Then, decompose the goal into a FIRST high-level task/subgoal to focus on.\n"
-            "In doing so, consider the tools you have selected, the goal you are trying to achieve, and the downstream tasks that will be required to achieve the goal.\n"
-            "Respond using the following XML format:\n"
-            "<analysis>\n"
-            "YOUR REASONING AND THOUGHTS HERE.\n"
-            "</analysis>\n"
+            "#Stage 1: Read the ABSTRACT_PLAN above and prepare for execution.\n"
+            "\n"
+            "1. REASONING: Brief assessment of available resources and plan feasibility (1-2 sentences).\n"
+            "\n"
+            "2. TOOLS: Select tools you will need from the Complete primitive and tool catalog.\n"
+            "   Include tools for the full plan, not just the first step.\n"
+            "\n"
+            "3. PHASE TYPE: The ABSTRACT_PLAN includes phase hints. Evaluate the first phase:\n"
+            "   - Confirm or override the hint based on available resources and tools.\n"
+            "   - pipeline: 2-5 consecutive steps where each feeds the next,\n"
+            "     no observation-dependent branching. Execute as a code block.\n"
+            "   - deliberative: a single step where you must observe the result\n"
+            "     before deciding what to do next.\n"
+            "\n"
+            "4. FIRST TASK: State what to do first.\n"
+            "   - For pipeline phases: describe the ENTIRE phase as one task\n"
+            "     (e.g., 'Search for papers, filter to recent, extract metadata,\n"
+            "     and build comparison table').\n"
+            "   - For deliberative steps: describe just the single next step.\n"
+            "\n"
+            "Respond using this format:\n"
+            "<reasoning>\n"
+            "BRIEF ASSESSMENT\n"
+            "</reasoning>\n"
             "<tools>\n"
-            "JSON LIST OF TOOLS HERE\n"
+            "JSON LIST OF TOOLS\n"
             "</tools>\n"
+            "<phase_type>\n"
+            "pipeline OR deliberative\n"
+            "</phase_type>\n"
             "<first_task>\n"
-            "YOUR FIRST TASK HERE\n"
+            "TASK DESCRIPTION\n"
             "</first_task>\n"
         )
         
         s += assistant(
-            "<analysis>\n"
-            + gen("stage1_analysis", max_tokens=192, temperature=GEN_TEMPERATURE, stop="</analysis>")
-            + "</analysis>\n"
+            "<reasoning>\n"
+            + gen("stage1_reasoning", max_tokens=64, temperature=GEN_TEMPERATURE, stop="</reasoning>")
+            + "</reasoning>\n"
             "<tools>\n"
             + gen("selected_tools_json", max_tokens=96, temperature=GEN_TEMPERATURE, stop="</tools>")
             + "</tools>\n"
+            "<phase_type>\n"
+            + gen("phase_type", max_tokens=16, temperature=GEN_TEMPERATURE, stop="</phase_type>")
+            + "</phase_type>\n"
             "<first_task>\n"
-            + gen("first_task", max_tokens=96, temperature=GEN_TEMPERATURE, stop="</first_task>")
+            + gen("first_task", max_tokens=128, temperature=GEN_TEMPERATURE, stop="</first_task>")
             + "</first_task>\n"
         )
         
         try:
-            logger.info(f"Stage 1: Analysis + tool selection\n{s['stage1_analysis']}")
+            logger.info(f"Stage 1: Reasoning: {s['stage1_reasoning']}")
             logger.info(f"SELECTED_TOOLS_JSON: {s['selected_tools_json']}")
+            logger.info(f"PHASE_TYPE: {s['phase_type']}")
             logger.info(f"FIRST_TASK: {s['first_task']}")
         except KeyError as e:
             logger.warning(f"Stage 1 values not available: {e}")
@@ -1594,6 +1656,12 @@ ALWAYS follow all formatting instructions exactly.
             "#Stage 2 FORMAT:\n"
             "  TOOL_NAME: <name from the Complete primitive and tool catalog>\n"
             "  TOOL_ARGS_JSON: <json object>\n\n"
+            "#Stage 2 VARIABLE LIFETIME:\n"
+            "  Variables created via 'out' parameters in prior steps (including inside\n"
+            "  code blocks) remain in scope for the entire plan. You do NOT need to\n"
+            "  persist and reload them. Use $variable_name directly.\n"
+            "  Example: if step 1 created $papers, step 2 can use target: '$papers'.\n"
+            "\n"
             "#Stage 2 NUMERIC ARGUMENTS:\n"
             "  IMPORTANT: All numeric tool arguments (integers, floats) must be simple literals.\n"
             "  Perform calculations in the THOUGHTS block first, then pass only the final computed value.\n"
@@ -1714,30 +1782,53 @@ ALWAYS follow all formatting instructions exactly.
             "\n"
             "#Stage 2 Instructions:\n"
             "- Review the ABSTRACT_PLAN and determine progress toward the goal.\n"
-            "- Review AGENT_STATE_HYPOTHESES and AGENT_STATE_SUPPORT.\n"
+            "- Review AGENT_STATE_HYPOTHESES and AGENT_STATE_SUPPORT (if present).\n"
             "- Choose the next tool and its JSON args from the Complete primitive and tool catalog.\n"
             "\n"
-            "#Stage 2 FORMAT (choose ONE):\n"
+            "#Stage 2 FORMAT:\n"
+            "  The format depends on the current PHASE_TYPE.\n"
+            "\n"
+            "  PIPELINE phases (CURRENT_TASK describes multiple known steps):\n"
+            "    You SHOULD use Option B (code block) to execute the entire phase.\n"
+            "    Only fall back to Option A if the phase truly requires just one tool call.\n"
+            "\n"
+            "  DELIBERATIVE steps (you need to observe before deciding next):\n"
+            "    Use Option A (single tool call).\n"
+            "    Option B is available if you realize 2-3 calls can be safely chained.\n"
+            "\n"
             "  Option A - single tool call:\n"
             "    TOOL_NAME: <name from the Complete primitive and tool catalog>\n"
             "    TOOL_ARGS_JSON: <json object>\n"
             "\n"
-            "  Option B - multi-step code block (use when CURRENT_TASK needs 2+ sequential tool calls, conditional logic, or passing data between steps):\n"
+            "  Option B - multi-step code block:\n"
             "    TOOL_NAME: _code_block_\n"
             "    TOOL_ARGS_JSON: {}\n"
             "    CODE:\n"
             "    ```python\n"
-            "    r1 = executor.execute_action_tracked({\"type\": \"search\", \"target\": \"$col\", \"query\": \"...\", \"out\": \"$results\"}, \"codegen\")\n"
-            "    if r1[\"status\"] != \"success\":\n"
-            "        return executor._create_uniform_return(\"failed\", reason=\"search failed\")\n"
-            "    r2 = executor.execute_action_tracked({\"type\": \"load\", \"target\": \"$results\", \"out\": \"$data\"}, \"codegen\")\n"
-            "    return executor._create_uniform_return(\"success\", value=\"loaded result\")\n"
+            "    r1 = executor.execute_action_tracked({\"type\": \"search-web\", \"query\": \"transformers survey\", \"out\": \"$papers\"}, \"codegen\")\n"
+            "    if r1[\"status\"] != \"success\": return executor._create_uniform_return(\"failed\", reason=\"search failed\")\n"
+            "    r2 = executor.execute_action_tracked({\"type\": \"synthesize\", \"target\": \"$papers\", \"focus\": \"key findings\", \"out\": \"$summary\"}, \"codegen\")\n"
+            "    if r2[\"status\"] != \"success\": return executor._create_uniform_return(\"failed\", reason=\"synthesize failed\")\n"
+            "    return executor._create_uniform_return(\"success\", value=\"pipeline complete\")\n"
             "    ```\n"
             "    Rules for Option B:\n"
-            "    - Max 4-6 tool calls via executor.execute_action_tracked(action_dict, \"codegen\")\n"
-            "    - Only if/else control flow. No loops, imports, function defs.\n"
+            "    - Max 6 tool calls via executor.execute_action_tracked(action_dict, \"codegen\")\n"
+            "    - VARIABLE BINDING: The \"out\": \"$name\" field in each action dict binds the result.\n"
+            "      Subsequent actions reference it as the STRING \"$name\", NOT via Python variables.\n"
+            "      Do NOT write: val = r1[\"value\"]; next_action[\"target\"] = val\n"
+            "      DO write: {\"out\": \"$papers\"} then {\"target\": \"$papers\"}\n"
+            "      Use r1 ONLY for status checking: if r1[\"status\"] != \"success\"\n"
+            "    - if/else control flow is allowed.\n"
+            "    - Bounded iteration over KNOWN SMALL collections is allowed:\n"
+            "      e.g., `for item in [item1, item2, item3]:` (max 5 items, list must be literal).\n"
+            "    - No while loops, imports, function defs, or unbounded iteration.\n"
             "    - Must end with: return executor._create_uniform_return(status, value=..., extra=...)\n"
-            "    - Prefer Option B when chaining, branching, or error-handling would be clearer than separate steps.\n"
+            "\n"
+            "#Stage 2 VARIABLE LIFETIME:\n"
+            "  Variables created via 'out' parameters in prior steps (including inside\n"
+            "  code blocks) remain in scope for the entire plan. You do NOT need to\n"
+            "  persist and reload them. Use $variable_name directly.\n"
+            "  Example: if step 1 created $papers, step 2 can use target: '$papers'.\n"
             "\n"
             "#Stage 2 NUMERIC ARGUMENTS:\n"
             "  IMPORTANT: All numeric tool arguments must be simple literals.\n"
@@ -1753,6 +1844,7 @@ ALWAYS follow all formatting instructions exactly.
             "    verdict: <SUPPORTED | UNSUPPORTED | CONTRADICTED>\n"
             "  DONE: <YES or NO>\n"
             "  NEXT_TASK: <next high-level subgoal or blank>\n"
+            "  NEXT_PHASE_TYPE: <pipeline or deliberative>\n"
             "  REQUEST_TOOLS: <json array>\n"
             "\n"
             "#Stage 3 INSTRUCTIONS:\n"
@@ -1764,6 +1856,13 @@ ALWAYS follow all formatting instructions exactly.
             "  3. STATE ASSUMPTIONS: existence, availability, or accessibility claims.\n"
             "- Hypotheses must be explicit and falsifiable.\n"
             "- Do NOT repeat any hypothesis previously marked CONTRADICTED unless revised.\n"
+            "\n"
+            "SPIRAL DETECTION:\n"
+            "- If the same tool has failed 2+ times consecutively with the same error,\n"
+            "  do NOT retry the same approach. Either:\n"
+            "  (a) Use a different tool to achieve the same sub-goal, or\n"
+            "  (b) Skip the failing step and proceed with available data, or\n"
+            "  (c) Use a code block to call the tool with explicit parameters.\n"
             "\n"
             "AUDIT (STRICT):\n"
             "1. DECLARE SCOPE\n"
@@ -1809,6 +1908,13 @@ ALWAYS follow all formatting instructions exactly.
             "- If any hypothesis is UNSUPPORTED or CONTRADICTED, NEXT_TASK should remediate it.\n"
             "- Otherwise, propose the next concrete step toward the goal.\n"
             "\n"
+            "NEXT_PHASE_TYPE:\n"
+            "- If NEXT_TASK describes 2+ steps that form a deterministic pipeline\n"
+            "  (each feeds the next, no branching on results), set: pipeline\n"
+            "- If NEXT_TASK requires observing a result before deciding what follows,\n"
+            "  set: deliberative\n"
+            "- Default: deliberative\n"
+            "\n"
             "REQUEST_TOOLS:\n"
             "- Always output valid JSON: [] or [\"tool1\", \"tool2\"].\n"
             "- Add tools here if new documentation is required.\n"
@@ -1818,78 +1924,87 @@ ALWAYS follow all formatting instructions exactly.
         s += assistant("Understood.\n\n")
 
 
-        # Main loop
+        # Main loop — initialize phase type from Stage 1
         current_task = s["first_task"].strip()
+        try:
+            current_phase_type = s["phase_type"].strip().lower()
+            if current_phase_type not in ("pipeline", "deliberative"):
+                current_phase_type = "deliberative"
+        except (KeyError, TypeError, AttributeError):
+            current_phase_type = "deliberative"
         for step in range(max_steps):
             if _interrupt_requested(executor):
                 _clear_interrupt(executor)
                 s["final_answer"] = "Interrupted by user."
                 break
 
-            # --- STAGE 2-PRE: Agent-State Hypotheses ---
-            # Get observed voxel grid and AF1 if available (Minecraft-specific)
-            voxel_grid_text = None
-            af1_text = None
-            if executor and executor.world_name == "minecraft":
-                try:
-                    # Import local_grid module for observed voxel grid extraction
-                    import sys
-                    import os
-                    current_dir = os.path.dirname(__file__)
-                    minecraft_tools_root = os.path.abspath(os.path.join(current_dir, "world-tools", "minecraft"))
-                    if minecraft_tools_root not in sys.path:
-                        sys.path.insert(0, minecraft_tools_root)
-                    from local_grid import get_observed_voxel_grid_as_text  # type: ignore
-                    voxel_grid_text = get_observed_voxel_grid_as_text(executor, radius=2)
-                except Exception:
-                    # Non-fatal - just skip voxel grid if unavailable
-                    pass
-                try:
-                    af1_text_val = executor.get_world_state("af1_text")
-                    if isinstance(af1_text_val, str) and af1_text_val.strip():
-                        af1_text = af1_text_val.strip()
-                except Exception:
-                    pass
-            
-            # Build STAGE 2-PRE prompt
-            prompt_parts = [
-                f"STAGE 2-PRE (step {step + 1}/{max_steps}):\n",
-                f"#GOAL: {goal_for_step}\n#END GOAL\n",
-                f"CURRENT_TASK: {current_task}\n\n"
-            ]
-            if voxel_grid_text:
-                prompt_parts.append(f"""#OBSERVED_VOXEL_GRID:\nExplicit voxel grid centered on agent (radius=1). Coordinates are relative: [dx, dy, dz].
+            # --- STAGE 2-PRE: Agent-State Hypotheses (deliberative only) ---
+            if current_phase_type == "deliberative":
+                # Get observed voxel grid and AF1 if available (Minecraft-specific)
+                voxel_grid_text = None
+                af1_text = None
+                if executor and executor.world_name == "minecraft":
+                    try:
+                        import sys
+                        import os
+                        current_dir = os.path.dirname(__file__)
+                        minecraft_tools_root = os.path.abspath(os.path.join(current_dir, "world-tools", "minecraft"))
+                        if minecraft_tools_root not in sys.path:
+                            sys.path.insert(0, minecraft_tools_root)
+                        from local_grid import get_observed_voxel_grid_as_text  # type: ignore
+                        voxel_grid_text = get_observed_voxel_grid_as_text(executor, radius=2)
+                    except Exception:
+                        pass
+                    try:
+                        af1_text_val = executor.get_world_state("af1_text")
+                        if isinstance(af1_text_val, str) and af1_text_val.strip():
+                            af1_text = af1_text_val.strip()
+                    except Exception:
+                        pass
+                
+                prompt_parts = [
+                    f"STAGE 2-PRE (step {step + 1}/{max_steps}):\n",
+                    f"#GOAL: {goal_for_step}\n#END GOAL\n",
+                    f"CURRENT_TASK: {current_task}\n\n"
+                ]
+                if voxel_grid_text:
+                    prompt_parts.append(f"""#OBSERVED_VOXEL_GRID:\nExplicit voxel grid centered on agent (radius=1). Coordinates are relative: [dx, dy, dz].
 Each cell shows: block_id, solid (true/false), support (true/false).
 This is the only planner-visible structure that supports direct (dx,dy,dz) usage for tool arguments.
 {voxel_grid_text}
 #END OBSERVED_VOXEL_GRID\n\n""")
-            if af1_text:
-                prompt_parts.append(f"""#AF1:\nContract-aware actionability summary (deterministic, derived from mc-observe).\n{af1_text}\n#END AF1\n\n""")
-            prompt_parts.append("Before choosing any tool, infer AGENT-STATE HYPOTHESES and AGENT-STATE-SUPPORT. Refer to STAGE 2-PRE Instructions.\n")
-            
-            s += user("".join(prompt_parts))
+                if af1_text:
+                    prompt_parts.append(f"""#AF1:\nContract-aware actionability summary (deterministic, derived from mc-observe).\n{af1_text}\n#END AF1\n\n""")
+                prompt_parts.append("Before choosing any tool, infer AGENT-STATE HYPOTHESES and AGENT-STATE-SUPPORT. Refer to STAGE 2-PRE Instructions.\n")
+                
+                s += user("".join(prompt_parts))
 
-            s += assistant(
-                "AGENT_STATE_HYPOTHESES:\n"
-                + gen(
-                    f"agent_state_hypotheses_{step}",
-                    max_tokens=256,
-                    temperature=GEN_TEMPERATURE,
-                    stop="\nAGENT_STATE_SUPPORT:"
+                s += assistant(
+                    "AGENT_STATE_HYPOTHESES:\n"
+                    + gen(
+                        f"agent_state_hypotheses_{step}",
+                        max_tokens=256,
+                        temperature=GEN_TEMPERATURE,
+                        stop="\nAGENT_STATE_SUPPORT:"
+                    )
+                    + "\nAGENT_STATE_SUPPORT:\n"
+                    + gen(
+                        f"agent_state_support_{step}",
+                        max_tokens=256,
+                        temperature=GEN_TEMPERATURE,
+                        stop=["\n\n", "\nSTAGE", "\nTOOL_NAME:"]
+                    )
                 )
-                + "\nAGENT_STATE_SUPPORT:\n"
-                + gen(
-                    f"agent_state_support_{step}",
-                    max_tokens=256,
-                    temperature=GEN_TEMPERATURE,
-                    stop="\n"
-                )
-            )
+            else:
+                # Pipeline phase: skip Stage 2-PRE entirely
+                logger.info(f"Step {step}: Pipeline phase — skipping Stage 2-PRE")
+
             # Stage 2: Choose tool + args
             s += user(
                 f"STAGE 2 (step {step + 1}/{max_steps}):\n"
                 f"#GOAL: {goal_for_step}\n#END GOAL\n"
                 f"CURRENT_TASK: {current_task}\n"
+                f"PHASE_TYPE: {current_phase_type}\n"
                 "Choose tool and JSON args using Stage 2 FORMAT.\n"
             )
             
@@ -1897,7 +2012,7 @@ This is the only planner-visible structure that supports direct (dx,dy,dz) usage
                 "TOOL_NAME: "
                 + gen(f"tool_name_{step}", max_tokens=32, temperature=GEN_TEMPERATURE, stop="TOOL_ARGS_JSON")
                 + "\nTOOL_ARGS_JSON: "
-                + gen(f"tool_args_{step}", max_tokens=1024, temperature=GEN_TEMPERATURE, stop="\n")
+                + gen(f"tool_args_{step}", max_tokens=1024, temperature=GEN_TEMPERATURE, stop=["\n\n", "\nCODE:", "\nSTAGE", "\nTOOL_NAME:"])
                 + "\n"
             )
             
@@ -1994,7 +2109,14 @@ This is the only planner-visible structure that supports direct (dx,dy,dz) usage
                     f"next_task_{step}",
                     max_tokens=128,
                     temperature=GEN_TEMPERATURE,
-                    stop=["\nREQUEST_TOOLS: ", "\nTHOUGHTS:", "\nHYPOTHESES:", "\nAUDIT:", "\nDONE:", "\nNEXT_TASK:"]
+                    stop=["\nNEXT_PHASE_TYPE:", "\nREQUEST_TOOLS: ", "\nTHOUGHTS:", "\nHYPOTHESES:", "\nAUDIT:", "\nDONE:", "\nNEXT_TASK:"]
+                )
+                + "\nNEXT_PHASE_TYPE: "
+                + gen(
+                    f"next_phase_type_{step}",
+                    max_tokens=16,
+                    temperature=GEN_TEMPERATURE,
+                    stop=["\nREQUEST_TOOLS:", "\n\n"]
                 )
                 + "\nREQUEST_TOOLS: "
                 + gen(
@@ -2109,11 +2231,16 @@ This is the only planner-visible structure that supports direct (dx,dy,dz) usage
                 logger.info(f"FINAL_ANSWER: {s['final_answer']}")
                 break
             
-            # Update current task for next iteration
+            # Update current task and phase type for next iteration
             next_task_raw = s[f"next_task_{step}"].strip()
             if next_task_raw and next_task_raw.lower() not in ["", "none", "null", "n/a"]:
                 current_task = next_task_raw
-                logger.info(f"Step {step}: Next task: {current_task}")
+                try:
+                    npt = s[f"next_phase_type_{step}"].strip().lower()
+                    current_phase_type = npt if npt in ("pipeline", "deliberative") else "deliberative"
+                except (KeyError, TypeError, AttributeError):
+                    current_phase_type = "deliberative"
+                logger.info(f"Step {step}: Next task: {current_task} (phase: {current_phase_type})")
             else:
                 logger.warning(f"Step {step}: No NEXT_TASK provided, stopping")
         
@@ -2562,11 +2689,12 @@ def tool_planner_infospace_vllm(template, goal: str, world_model: Dict, characte
     system_parts.append(f"WORLD_MODEL: {json.dumps(world_model, indent=2)}\n")
     system_parts.append(f"CURRENT_TIME: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
     system_parts.append("""Follow this process to achieve the goal:
- - Stage 1 (once): Analyze goal, select relevant tools, decompose into FIRST_TASK.
+ - Stage 1 (once): Read the ABSTRACT_PLAN, select tools, identify first PHASE type (pipeline or deliberative).
  - Stage 1.5 (once): Load and inject detailed docs for selected tools.
-Then you will work in repeated cycles to achieve the goal:
- - Stage 2: Pick a single tool and JSON args for CURRENT_TASK. Be concise in text value arguments.
- - Stage 3: Reflect on result, decide if goal done, set NEXT_TASK.
+Then you will work in repeated cycles:
+ - Stage 2: For PIPELINE phases, write a code block (Option B) executing the full phase.
+            For DELIBERATIVE steps, pick a single tool (Option A).
+ - Stage 3: Reflect on result, decide if goal done, set NEXT_TASK and NEXT_PHASE_TYPE.
 ALWAYS follow all formatting instructions exactly.
 
 """)
@@ -2574,37 +2702,59 @@ ALWAYS follow all formatting instructions exactly.
     prompt += format_system("".join(system_parts))
     
     prompt += format_user(
-        "#Stage 1: Analyze goal and identify relevant tools from the Complete primitive and tool catalog.\n"
-        "Include tools you might need AND related/supporting tools.\n"
-        "Then, decompose the goal into a FIRST high-level task/subgoal to focus on.\n"
-        "In doing so, consider the tools you have selected, the goal you are trying to achieve, and the downstream tasks that will be required to achieve the goal.\n"
-        "Respond using the following XML format:\n"
-        "<analysis>\n"
-        "YOUR REASONING AND THOUGHTS HERE.\n"
-        "</analysis>\n"
+        "#Stage 1: Read the ABSTRACT_PLAN above and prepare for execution.\n"
+        "\n"
+        "1. REASONING: Brief assessment of available resources and plan feasibility (1-2 sentences).\n"
+        "\n"
+        "2. TOOLS: Select tools you will need from the Complete primitive and tool catalog.\n"
+        "   Include tools for the full plan, not just the first step.\n"
+        "\n"
+        "3. PHASE TYPE: The ABSTRACT_PLAN includes phase hints. Evaluate the first phase:\n"
+        "   - Confirm or override the hint based on available resources and tools.\n"
+        "   - pipeline: 2-5 consecutive steps where each feeds the next,\n"
+        "     no observation-dependent branching. Execute as a code block.\n"
+        "   - deliberative: a single step where you must observe the result\n"
+        "     before deciding what to do next.\n"
+        "\n"
+        "4. FIRST TASK: State what to do first.\n"
+        "   - For pipeline phases: describe the ENTIRE phase as one task\n"
+        "     (e.g., 'Search for papers, filter to recent, extract metadata,\n"
+        "     and build comparison table').\n"
+        "   - For deliberative steps: describe just the single next step.\n"
+        "\n"
+        "Respond using this format:\n"
+        "<reasoning>\n"
+        "BRIEF ASSESSMENT\n"
+        "</reasoning>\n"
         "<tools>\n"
-        "JSON LIST OF TOOLS HERE\n"
+        "JSON LIST OF TOOLS\n"
         "</tools>\n"
+        "<phase_type>\n"
+        "pipeline OR deliberative\n"
+        "</phase_type>\n"
         "<first_task>\n"
-        "YOUR FIRST TASK HERE\n"
+        "TASK DESCRIPTION\n"
         "</first_task>\n"
     )
     
     prompt += format_assistant("")
-    # Single generation for entire Stage 1 XML, then deterministic tag parsing
-    stage1_block = vllm_gen("stage1_block", prompt, state, max_tokens=384, temperature=GEN_TEMPERATURE, stop="</first_task>", executor=executor)
-    # Defensive: if stop isn't honored and the model includes </first_task>, truncate to first occurrence
+    stage1_block = vllm_gen("stage1_block", prompt, state, max_tokens=256, temperature=GEN_TEMPERATURE, stop="</first_task>", executor=executor)
     if "</first_task>" in stage1_block:
         stage1_block = stage1_block.split("</first_task>", 1)[0].rstrip()
     prompt += stage1_block + "</first_task>\n"
     stage1_full = stage1_block + "</first_task>"
-    state["stage1_analysis"] = _extract_tag_block(stage1_full, "analysis")
+    state["stage1_reasoning"] = _extract_tag_block(stage1_full, "reasoning")
     state["selected_tools_json"] = _extract_tag_block(stage1_full, "tools")
+    state["phase_type"] = _extract_tag_block(stage1_full, "phase_type").strip().lower()
     state["first_task"] = _extract_tag_block(stage1_full, "first_task")
+    # Normalize phase_type
+    if state["phase_type"] not in ("pipeline", "deliberative"):
+        state["phase_type"] = "deliberative"
     
     try:
-        logger.info(f"Stage 1: Analysis + tool selection\n{state.get('stage1_analysis', 'N/A')}")
+        logger.info(f"Stage 1: Reasoning: {state.get('stage1_reasoning', 'N/A')}")
         logger.info(f"SELECTED_TOOLS_JSON: {state.get('selected_tools_json', 'N/A')}")
+        logger.info(f"PHASE_TYPE: {state.get('phase_type', 'N/A')}")
         logger.info(f"FIRST_TASK: {state.get('first_task', 'N/A')}")
     except KeyError as e:
         logger.warning(f"Stage 1 values not available: {e}")
@@ -2674,30 +2824,53 @@ ALWAYS follow all formatting instructions exactly.
         "\n"
         "#Stage 2 Instructions:\n"
         "- Review the ABSTRACT_PLAN and determine progress toward the goal.\n"
-        "- Review AGENT_STATE_HYPOTHESES and AGENT_STATE_SUPPORT.\n"
+        "- Review AGENT_STATE_HYPOTHESES and AGENT_STATE_SUPPORT (if present).\n"
         "- Choose the next tool and its JSON args from the Complete primitive and tool catalog.\n"
         "\n"
-        "#Stage 2 FORMAT (choose ONE):\n"
+        "#Stage 2 FORMAT:\n"
+        "  The format depends on the current PHASE_TYPE.\n"
+        "\n"
+        "  PIPELINE phases (CURRENT_TASK describes multiple known steps):\n"
+        "    You SHOULD use Option B (code block) to execute the entire phase.\n"
+        "    Only fall back to Option A if the phase truly requires just one tool call.\n"
+        "\n"
+        "  DELIBERATIVE steps (you need to observe before deciding next):\n"
+        "    Use Option A (single tool call).\n"
+        "    Option B is available if you realize 2-3 calls can be safely chained.\n"
+        "\n"
         "  Option A - single tool call:\n"
         "    TOOL_NAME: <name from the Complete primitive and tool catalog>\n"
         "    TOOL_ARGS_JSON: <json object>\n"
         "\n"
-        "  Option B - multi-step code block (use when CURRENT_TASK needs 2+ sequential tool calls, conditional logic, or passing data between steps):\n"
+        "  Option B - multi-step code block:\n"
         "    TOOL_NAME: _code_block_\n"
         "    TOOL_ARGS_JSON: {}\n"
         "    CODE:\n"
         "    ```python\n"
-        "    r1 = executor.execute_action_tracked({\"type\": \"search\", \"target\": \"$col\", \"query\": \"...\", \"out\": \"$results\"}, \"codegen\")\n"
-        "    if r1[\"status\"] != \"success\":\n"
-        "        return executor._create_uniform_return(\"failed\", reason=\"search failed\")\n"
-        "    r2 = executor.execute_action_tracked({\"type\": \"load\", \"target\": \"$results\", \"out\": \"$data\"}, \"codegen\")\n"
-        "    return executor._create_uniform_return(\"success\", value=\"loaded result\")\n"
+        "    r1 = executor.execute_action_tracked({\"type\": \"search-web\", \"query\": \"transformers survey\", \"out\": \"$papers\"}, \"codegen\")\n"
+        "    if r1[\"status\"] != \"success\": return executor._create_uniform_return(\"failed\", reason=\"search failed\")\n"
+        "    r2 = executor.execute_action_tracked({\"type\": \"synthesize\", \"target\": \"$papers\", \"focus\": \"key findings\", \"out\": \"$summary\"}, \"codegen\")\n"
+        "    if r2[\"status\"] != \"success\": return executor._create_uniform_return(\"failed\", reason=\"synthesize failed\")\n"
+        "    return executor._create_uniform_return(\"success\", value=\"pipeline complete\")\n"
         "    ```\n"
         "    Rules for Option B:\n"
-        "    - Max 4-6 tool calls via executor.execute_action_tracked(action_dict, \"codegen\")\n"
-        "    - Only if/else control flow. No loops, imports, function defs.\n"
+        "    - Max 6 tool calls via executor.execute_action_tracked(action_dict, \"codegen\")\n"
+        "    - VARIABLE BINDING: The \"out\": \"$name\" field in each action dict binds the result.\n"
+        "      Subsequent actions reference it as the STRING \"$name\", NOT via Python variables.\n"
+        "      Do NOT write: val = r1[\"value\"]; next_action[\"target\"] = val\n"
+        "      DO write: {\"out\": \"$papers\"} then {\"target\": \"$papers\"}\n"
+        "      Use r1 ONLY for status checking: if r1[\"status\"] != \"success\"\n"
+        "    - if/else control flow is allowed.\n"
+        "    - Bounded iteration over KNOWN SMALL collections is allowed:\n"
+        "      e.g., `for item in [item1, item2, item3]:` (max 5 items, list must be literal).\n"
+        "    - No while loops, imports, function defs, or unbounded iteration.\n"
         "    - Must end with: return executor._create_uniform_return(status, value=..., extra=...)\n"
-        "    - Prefer Option B when chaining, branching, or error-handling would be clearer than separate steps.\n"
+        "\n"
+        "#Stage 2 VARIABLE LIFETIME:\n"
+        "  Variables created via 'out' parameters in prior steps (including inside\n"
+        "  code blocks) remain in scope for the entire plan. You do NOT need to\n"
+        "  persist and reload them. Use $variable_name directly.\n"
+        "  Example: if step 1 created $papers, step 2 can use target: '$papers'.\n"
         "\n"
         "#Stage 2 NUMERIC ARGUMENTS:\n"
         "  IMPORTANT: All numeric tool arguments must be simple literals.\n"
@@ -2713,6 +2886,7 @@ ALWAYS follow all formatting instructions exactly.
         "    verdict: <SUPPORTED | UNSUPPORTED | CONTRADICTED>\n"
         "  DONE: <YES or NO>\n"
         "  NEXT_TASK: <next high-level subgoal or blank>\n"
+        "  NEXT_PHASE_TYPE: <pipeline or deliberative>\n"
         "  REQUEST_TOOLS: <json array>\n"
         "\n"
         "#Stage 3 INSTRUCTIONS:\n"
@@ -2724,6 +2898,13 @@ ALWAYS follow all formatting instructions exactly.
         "  3. STATE ASSUMPTIONS: existence, availability, or accessibility claims.\n"
         "- Hypotheses must be explicit and falsifiable.\n"
         "- Do NOT repeat any hypothesis previously marked CONTRADICTED unless revised.\n"
+        "\n"
+        "SPIRAL DETECTION:\n"
+        "- If the same tool has failed 2+ times consecutively with the same error,\n"
+        "  do NOT retry the same approach. Either:\n"
+        "  (a) Use a different tool to achieve the same sub-goal, or\n"
+        "  (b) Skip the failing step and proceed with available data, or\n"
+        "  (c) Use a code block to call the tool with explicit parameters.\n"
         "\n"
         "AUDIT (STRICT):\n"
         "1. DECLARE SCOPE\n"
@@ -2769,6 +2950,13 @@ ALWAYS follow all formatting instructions exactly.
         "- If any hypothesis is UNSUPPORTED or CONTRADICTED, NEXT_TASK should remediate it.\n"
         "- Otherwise, propose the next concrete step toward the goal.\n"
         "\n"
+        "NEXT_PHASE_TYPE:\n"
+        "- If NEXT_TASK describes 2+ steps that form a deterministic pipeline\n"
+        "  (each feeds the next, no branching on results), set: pipeline\n"
+        "- If NEXT_TASK requires observing a result before deciding what follows,\n"
+        "  set: deliberative\n"
+        "- Default: deliberative\n"
+        "\n"
         "REQUEST_TOOLS:\n"
         "- Always output valid JSON: [] or [\"tool1\", \"tool2\"].\n"
         "- Add tools here if new documentation is required.\n"
@@ -2778,11 +2966,12 @@ ALWAYS follow all formatting instructions exactly.
     
     prompt += format_assistant("Understood.\n\n")
     
-    # Main loop
+    # Main loop — initialize phase type from Stage 1
     current_task = state.get("first_task", "").strip()
     if not current_task:
         logger.warning("No first_task found, using goal as initial task")
         current_task = goal_for_step
+    current_phase_type = state.get("phase_type", "deliberative")
     
     for step in range(max_steps):
         if _interrupt_requested(executor):
@@ -2790,57 +2979,63 @@ ALWAYS follow all formatting instructions exactly.
             state["final_answer"] = "Interrupted by user."
             break
         
-        # --- STAGE 2-PRE: Agent-State Hypotheses ---
-        voxel_grid_text = None
-        af1_text = None
-        if executor and executor.world_name == "minecraft":
-            try:
-                import sys
-                import os
-                current_dir = os.path.dirname(__file__)
-                minecraft_tools_root = os.path.abspath(os.path.join(current_dir, "world-tools", "minecraft"))
-                if minecraft_tools_root not in sys.path:
-                    sys.path.insert(0, minecraft_tools_root)
-                from local_grid import get_observed_voxel_grid_as_text  # type: ignore
-                voxel_grid_text = get_observed_voxel_grid_as_text(executor, radius=2)
-            except Exception:
-                pass
-            try:
-                af1_text_val = executor.get_world_state("af1_text")
-                if isinstance(af1_text_val, str) and af1_text_val.strip():
-                    af1_text = af1_text_val.strip()
-            except Exception:
-                pass
-        
-        prompt_parts = [
-            f"STAGE 2-PRE (step {step + 1}/{max_steps}):\n",
-            f"#GOAL: {goal_for_step}\n#END GOAL\n",
-            f"CURRENT_TASK: {current_task}\n\n"
-        ]
-        if voxel_grid_text:
-            prompt_parts.append(f"""#OBSERVED_VOXEL_GRID:\nExplicit voxel grid centered on agent (radius=1). Coordinates are relative: [dx, dy, dz].
+        # --- STAGE 2-PRE: Agent-State Hypotheses (deliberative only) ---
+        if current_phase_type == "deliberative":
+            voxel_grid_text = None
+            af1_text = None
+            if executor and executor.world_name == "minecraft":
+                try:
+                    import sys
+                    import os
+                    current_dir = os.path.dirname(__file__)
+                    minecraft_tools_root = os.path.abspath(os.path.join(current_dir, "world-tools", "minecraft"))
+                    if minecraft_tools_root not in sys.path:
+                        sys.path.insert(0, minecraft_tools_root)
+                    from local_grid import get_observed_voxel_grid_as_text  # type: ignore
+                    voxel_grid_text = get_observed_voxel_grid_as_text(executor, radius=2)
+                except Exception:
+                    pass
+                try:
+                    af1_text_val = executor.get_world_state("af1_text")
+                    if isinstance(af1_text_val, str) and af1_text_val.strip():
+                        af1_text = af1_text_val.strip()
+                except Exception:
+                    pass
+            
+            prompt_parts = [
+                f"STAGE 2-PRE (step {step + 1}/{max_steps}):\n",
+                f"#GOAL: {goal_for_step}\n#END GOAL\n",
+                f"CURRENT_TASK: {current_task}\n\n"
+            ]
+            if voxel_grid_text:
+                prompt_parts.append(f"""#OBSERVED_VOXEL_GRID:\nExplicit voxel grid centered on agent (radius=1). Coordinates are relative: [dx, dy, dz].
 Each cell shows: block_id, solid (true/false), support (true/false).
 This is the only planner-visible structure that supports direct (dx,dy,dz) usage for tool arguments.
 {voxel_grid_text}
 #END OBSERVED_VOXEL_GRID\n\n""")
-        if af1_text:
-            prompt_parts.append(f"""#AF1:\nContract-aware actionability summary (deterministic, derived from mc-observe).\n{af1_text}\n#END AF1\n\n""")
-        prompt_parts.append("Before choosing any tool, infer AGENT-STATE HYPOTHESES and AGENT-STATE-SUPPORT. Refer to STAGE 2-PRE Instructions.\n")
-        
-        prompt += format_user("".join(prompt_parts))
+            if af1_text:
+                prompt_parts.append(f"""#AF1:\nContract-aware actionability summary (deterministic, derived from mc-observe).\n{af1_text}\n#END AF1\n\n""")
+            prompt_parts.append("Before choosing any tool, infer AGENT-STATE HYPOTHESES and AGENT-STATE-SUPPORT. Refer to STAGE 2-PRE Instructions.\n")
+            
+            prompt += format_user("".join(prompt_parts))
 
-        # --- STAGE 2-PRE: single generation + label parsing ---
-        prompt += format_assistant("")
-        stage2pre_block = vllm_gen(f"stage2pre_block_{step}", prompt, state, max_tokens=512, temperature=GEN_TEMPERATURE, executor=executor)
-        prompt += stage2pre_block + "\n"
-        state[f"agent_state_hypotheses_{step}"] = _extract_between_labels(stage2pre_block, "AGENT_STATE_HYPOTHESES:", "AGENT_STATE_SUPPORT:")
-        state[f"agent_state_support_{step}"] = _extract_after_label(stage2pre_block, "AGENT_STATE_SUPPORT:").strip()
+            prompt += format_assistant("")
+            stage2pre_block = vllm_gen(f"stage2pre_block_{step}", prompt, state, max_tokens=512, temperature=GEN_TEMPERATURE, executor=executor)
+            prompt += stage2pre_block + "\n"
+            state[f"agent_state_hypotheses_{step}"] = _extract_between_labels(stage2pre_block, "AGENT_STATE_HYPOTHESES:", "AGENT_STATE_SUPPORT:")
+            state[f"agent_state_support_{step}"] = _extract_after_label(stage2pre_block, "AGENT_STATE_SUPPORT:").strip()
+        else:
+            # Pipeline phase: skip Stage 2-PRE entirely
+            logger.info(f"Step {step}: Pipeline phase — skipping Stage 2-PRE")
+            state[f"agent_state_hypotheses_{step}"] = "[]"
+            state[f"agent_state_support_{step}"] = ""
         
         # Stage 2: Choose tool + args
         prompt += format_user(
             f"STAGE 2 (step {step + 1}/{max_steps}):\n"
             f"#GOAL: {goal_for_step}\n#END GOAL\n"
             f"CURRENT_TASK: {current_task}\n"
+            f"PHASE_TYPE: {current_phase_type}\n"
             "Choose tool and JSON args using Stage 2 FORMAT.\n"
         )
 
@@ -2940,7 +3135,13 @@ This is the only planner-visible structure that supports direct (dx,dy,dz) usage
         hypotheses_val = _extract_between_labels(stage3_block, "HYPOTHESES:", "AUDIT:")
         audit_val = _extract_between_labels(stage3_block, "AUDIT:", "DONE:")
         done_val = _extract_line_value(stage3_block, "DONE:")
-        next_task_val = _extract_between_labels(stage3_block, "NEXT_TASK:", "REQUEST_TOOLS:")
+        # Try NEXT_TASK -> NEXT_PHASE_TYPE -> REQUEST_TOOLS chain
+        next_task_val = _extract_between_labels(stage3_block, "NEXT_TASK:", "NEXT_PHASE_TYPE:")
+        next_phase_type_val = _extract_between_labels(stage3_block, "NEXT_PHASE_TYPE:", "REQUEST_TOOLS:")
+        if not next_task_val.strip():
+            # Fallback: model may have omitted NEXT_PHASE_TYPE
+            next_task_val = _extract_between_labels(stage3_block, "NEXT_TASK:", "REQUEST_TOOLS:")
+            next_phase_type_val = ""
         request_tools_val = _extract_after_label(stage3_block, "REQUEST_TOOLS:").strip()
 
         state[f"thoughts_{step}"] = thoughts_val
@@ -2948,6 +3149,8 @@ This is the only planner-visible structure that supports direct (dx,dy,dz) usage
         state[f"assumption_audit_{step}"] = audit_val
         state[f"done_{step}"] = done_val
         state[f"next_task_{step}"] = next_task_val
+        npt = next_phase_type_val.strip().lower()
+        state[f"next_phase_type_{step}"] = npt if npt in ("pipeline", "deliberative") else "deliberative"
         state[f"request_tools_{step}"] = _strip_code_fences(request_tools_val)
         
         # Safely log step fields
@@ -3051,11 +3254,12 @@ This is the only planner-visible structure that supports direct (dx,dy,dz) usage
             logger.info(f"FINAL_ANSWER: {state.get('final_answer', 'N/A')}")
             break
         
-        # Update current task for next iteration
+        # Update current task and phase type for next iteration
         next_task_raw = state.get(f"next_task_{step}", "").strip()
         if next_task_raw and next_task_raw.lower() not in ["", "none", "null", "n/a"]:
             current_task = next_task_raw
-            logger.info(f"Step {step}: Next task: {current_task}")
+            current_phase_type = state.get(f"next_phase_type_{step}", "deliberative")
+            logger.info(f"Step {step}: Next task: {current_task} (phase: {current_phase_type})")
         else:
             logger.warning(f"Step {step}: No NEXT_TASK provided, stopping")
     
@@ -3779,7 +3983,7 @@ class IncrementalPlanner:
 
     def _preplan(self, goal_text: str) -> str:
         tool_names = list(self.tools.keys())
-ABSTRACT_PLAN_PROMPT = f"""
+        ABSTRACT_PLAN_PROMPT = f"""
 You will create a short, high-level problem-solving strategy for the goal below.
 This is NOT a domain explanation and NOT a tool invocation sequence.
 It is a goal-specific strategy sketch that guides downstream incremental planning.
@@ -3814,15 +4018,17 @@ Instructions:
      (e.g., multi-source lookup, ambiguous values, missing information).
    - Do not include JSON, tool calls, URLs, or domain-specific knowledge.  
      The output must be a brief strategic outline, not an answer to the goal.
+   - Annotate each phase with (phase-hint: pipeline) or (phase-hint: deliberative).
+     These are tentative hints — the planner may confirm or override them.
 
 Format:
 ABSTRACT_PLAN:
-PHASE 1 (pipeline): 
+PHASE 1 (phase-hint: pipeline): 
   - <step>
   - <step>
-PHASE 2 (deliberate): 
+PHASE 2 (phase-hint: deliberative): 
   - <step> [depends on phase 1 results]
-PHASE 3 (pipeline):
+PHASE 3 (phase-hint: pipeline):
   - <step>
   - <step>
 END_PLAN
