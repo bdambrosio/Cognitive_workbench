@@ -4450,10 +4450,12 @@ Make sure the string is in a format that can be parsed by the json.loads functio
         # When map has 'value' field, it maps to these tool-specific parameters.
         # If the tool-specific parameter is already present, it takes precedence (override).
         TOOL_VALUE_PARAM_MAP = {
-            'refine': 'instruction',      # refine expects 'instruction' (required)
-            'summarize': 'focus',        # summarize expects 'focus' (optional)
+            'extract': 'instruction',    # extract expects 'instruction' (required)
+            'synthesize': 'focus',       # synthesize expects 'focus' (optional)
             'generate-note': 'prompt',   # generate-note expects 'prompt' (required)
-            'relate': 'instruction',     # relate expects 'instruction' (optional)
+            'refine': 'instruction',     # refine → extract (backward compat)
+            'summarize': 'focus',        # summarize → synthesize (backward compat)
+            'relate': 'instruction',     # relate → synthesize (backward compat)
             'text-find': 'pattern',      # text-find expects 'pattern' (required)
             'matches': 'pattern',         # matches expects 'pattern' (required)
             'filter-semantic': 'predicate',  # filter-semantic expects 'predicate' (required)

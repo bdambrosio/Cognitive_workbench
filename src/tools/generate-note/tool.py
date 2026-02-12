@@ -2,91 +2,13 @@
 """
 LLM-based content generation tool.
 Generates new text or code from scratch using natural language prompts.
+No source documents — for generation from source material, use synthesize.
 """
 import logging
-import json
 from typing import Any, Dict, Optional
 from infospace_executor import InfospaceExecutor
 
 logger = logging.getLogger(__name__)
-
-
-def _get_content(resource_id: str, resource_manager) -> any:
-    """Fetch content from resource_manager for a resource ID."""
-    if resource_id == "Note_null":
-        return None
-    
-    resource = resource_manager.get_resource(resource_id)
-    if resource:
-        return resource.get('properties', {}).get('content')
-    return None
-
-
-def _resolve_context(context_arg: str, resource_manager) -> str:
-    """
-    Resolve context argument to text content.
-    
-    Supports:
-    - Collection ID: Fetches all Notes in Collection and concatenates their content
-    - Note ID: Fetches Note content
-    - Plain text: Returns as-is
-    
-    Returns:
-        Context text string
-    """
-    if not context_arg:
-        return ''
-    
-    context_str = str(context_arg)
-    
-    # Check if it's a Collection ID
-    if context_str.startswith('Collection_'):
-        try:
-            collection_content = _get_content(context_str, resource_manager)
-            if collection_content is None:
-                logger.warning(f"Collection {context_str} not found")
-                return ''
-            
-            # Get list of Note IDs
-            if not isinstance(collection_content, list):
-                logger.warning(f"Collection {context_str} content is not a list")
-                return ''
-            
-            # Fetch each Note's content and concatenate
-            context_parts = []
-            for note_id in collection_content:
-                if isinstance(note_id, str) and note_id.startswith('Note_'):
-                    note_content = _get_content(note_id, resource_manager)
-                    if note_content is not None:
-                        # Handle structured Notes (extract text field if present)
-                        if isinstance(note_content, dict) and 'text' in note_content:
-                            context_parts.append(str(note_content['text']))
-                        else:
-                            context_parts.append(str(note_content))
-            
-            return '\n\n'.join(context_parts)
-        except Exception as e:
-            logger.error(f"Failed to resolve Collection context {context_str}: {e}")
-            return ''
-    
-    # Check if it's a Note ID
-    if context_str.startswith('Note_'):
-        try:
-            note_content = _get_content(context_str, resource_manager)
-            if note_content is None:
-                logger.warning(f"Note {context_str} not found")
-                return ''
-            
-            # Handle structured Notes (extract text field if present)
-            if isinstance(note_content, dict) and 'text' in note_content:
-                return str(note_content['text'])
-            return str(note_content)
-        except Exception as e:
-            logger.error(f"Failed to resolve Note context {context_str}: {e}")
-            return ''
-    
-    # Plain text - return as-is
-    return context_str
 
 
 def _fail(executor: InfospaceExecutor, reason: str, value: Optional[str] = None, extra: Optional[Dict[str, Any]] = None):
@@ -105,13 +27,14 @@ def _success(executor: InfospaceExecutor, result: str, extra: Optional[Dict[str,
 def tool(input_value=None, runtime=None, **kwargs):
     """
     Generate new content using natural language prompt.
+    Creates content from scratch using the LLM's own knowledge — no source documents.
+    For generation from source material, use synthesize instead.
     
     Args:
         input_value: Unused (for compatibility with executor interface)
         **kwargs: Tool parameters
             - prompt: Generation instruction (REQUIRED)
             - style: "code" or "text" (optional, default: "text")
-            - context: Optional context - Collection ID, Note ID, or plain text string
     
     Returns:
         Generated content as string
@@ -129,70 +52,17 @@ def tool(input_value=None, runtime=None, **kwargs):
         return _fail(executor, "prompt parameter required")
     
     style = kwargs.get('style', 'text').lower()
+
+    # Deprecation: if context is provided, log warning and ignore
     context_arg = kwargs.get('context', '')
-    resource_manager = kwargs.get('resource_manager')
-    agent_name = kwargs.get('agent_name', 'generate-note')
-    
-    # Resolve context (handles Collection IDs, Note IDs, or plain text)
-    context = _resolve_context(context_arg, resource_manager)
-    
-    # If context is very large, use semantic search to filter relevant parts
-    if len(context) > 16000 and resource_manager and prompt:
-        logger.info(f"generate-note: context ({len(context)} chars) exceeds 16k, using semantic filtering")
-        try:
-            # 1. Create Note with context content
-            success, note_id, error_msg, _ = resource_manager.create_note(
-                agent_name, context, 'text', 'generate-note_temp', context[:100], '', {}
-            )
-            if not success:
-                logger.warning(f"generate-note: failed to create temp Note: {error_msg}, using full context")
-            else:
-                # 2. Create Collection containing the Note
-                success, collection_id, error_msg, _ = resource_manager.create_collection(
-                    agent_name, [note_id], 'list', 'generate-note_temp', '1 item', '', {}
-                )
-                if not success:
-                    logger.warning(f"generate-note: failed to create temp Collection: {error_msg}, using full context")
-                else:
-                    # 3. Index Collection
-                    success, indexed_count, error_msg = resource_manager.index_collection(
-                        agent_name, collection_id, 'semantic', {'content': 'embed'}
-                    )
-                    if not success:
-                        logger.warning(f"generate-note: failed to index Collection: {error_msg}, using full context")
-                    else:
-                        # 4. Search using prompt as query
-                        success, results, error_msg = resource_manager.search_collection(
-                            agent_name, collection_id, prompt, 'semantic', limit=5, threshold=0.3, return_mode='chunks'
-                        )
-                        if success and results:
-                            # 5. Extract text from search results
-                            filtered_parts = []
-                            for result in results:
-                                if isinstance(result, dict):
-                                    text = result.get('text', '')
-                                    if text:
-                                        filtered_parts.append(text)
-                            if filtered_parts:
-                                filtered_context = '\n\n'.join(filtered_parts)
-                                logger.info(f"generate-note: filtered context from {len(context)} to {len(filtered_context)} chars")
-                                context = filtered_context
-                            else:
-                                logger.warning(f"generate-note: search returned no text content, using full context")
-                        else:
-                            logger.warning(f"generate-note: search failed: {error_msg}, using full context")
-        except Exception as e:
-            logger.warning(f"generate-note: semantic filtering failed: {e}, using full context")
-            import traceback
-            traceback.print_exc()
+    if context_arg:
+        logger.warning(f"generate-note: 'context' parameter is deprecated. Use synthesize for generation from source material. Ignoring context.")
     
     # Build generation prompt based on style
     if style == 'code':
         generation_prompt = f"""Generate code according to the following instruction.
 
 Instruction: {prompt}
-
-{f"Context/Requirements:\n{context}\n" if context else ""}
 
 Return only the code, no explanation, no code fences, no markdown formatting.
 Do not include any introductory text, reasoning, or commentary.
@@ -206,8 +76,6 @@ End your response with:
         generation_prompt = f"""Generate text content according to the following instruction.
 
 Instruction: {prompt}
-
-{f"Context:\n{context}\n" if context else ""}
 
 Return only the generated content, no explanation, no code fences, no markdown formatting.
 Do not include any introductory text, reasoning, or commentary.
@@ -250,8 +118,6 @@ End your response with:
         result,
         {
             "style": style,
-            "context_length": len(context),
             "prompt_length": len(prompt),
         },
     )
-
