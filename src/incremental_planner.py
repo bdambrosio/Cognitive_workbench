@@ -258,7 +258,6 @@ Operation_name: applicable to: <Note | Collection | Note, Collection>;   Purpose
  - synthesize: Collection;  Cross-document integration, comparison, and reporting
  - map: Collection;  Apply op to each Collection item
  - project, pluck, sort, filter: Collection;  SQL-like Collection ops
- - head: Collection;  Take first N items
  - join: Collection;  Merge 2 Collections (SQL JOIN)
  - add, remove, size: Collection;  Collection mutation operations
  - union, intersection, difference: Collection;  Set operations on Collections
@@ -271,7 +270,7 @@ Operation_name: applicable to: <Note | Collection | Note, Collection>;   Purpose
 Key distinctions:
 - split (Note→Coll): Transforms internal structure (array/lines) into separate items
 - flatten (Coll→Note): Opposite of split, merges Collection into single Note
-- load: Use to GET content *into planner context* (returns Note content or Collection Note IDs)
+- load: Use to GET content *into planner context*. Supports slice parameter for controlled access (e.g., slice="0:3" for first 3 Collection items, slice=":" for full Note content). Slicing a Collection returns a new Collection.
 - display: Use to SHOW content to user (UI popup, does NOT return content for planning)
 - persist: Mark resource as persistent (saved to filesystem)
 
@@ -311,8 +310,9 @@ Structured-data Collection Operations (require Notes of type dict/JSON):
 - pluck: Extract single field as simple values → Collection of values  
 - filter-structured: Filter by field conditions (WHERE clauses) → filtered Collection
 - sort: Sort by field value (ORDER BY) → sorted Collection
-- head: Take first N items (LIMIT) → smaller Collection preserving original Notes
 - join: Combine two Collections on matching field (INNER JOIN) → merged Collection
+
+To take first N items from a Collection, use load with slice (e.g., load with slice="0:5"). This replaces the old head primitive.
 
 IMPORTANT: project/pluck extract NAMED FIELDS only (metadata.uri, metadata.title, etc.). They do NOT parse unstructured text.
 To extract information FROM text content, use extract (LLM-based extraction).
@@ -322,7 +322,7 @@ Use cases:
 - pluck: Get just metadata.title as simple list, extract metadata.score for analysis
 - filter-structured: Papers after 2020, results with score>0.5, venue contains "NeurIPS"
 - sort: Rank by score (descending), chronological by year, alphabetical by title
-- head: Get top 5 after sorting, take first result from search
+- load with slice: Get top 5 after sorting (slice="0:5"), take first result (slice="0")
 - join: Merge papers with citation data, combine user info with profiles
 
 Efficiency Heuristics:
@@ -444,8 +444,14 @@ def build_tool_catalog(available_tools: Dict[str, Dict]) -> Dict[str, Dict]:
             "schema_hint": PRIMITIVE_DOCS["create-collection"]["schema_hint"]
         },
         "load": {
-            "description": "Load persistent Note or Collection by ID or name. Can load named Notes/Collections by name (e.g., 'my-note') or by ID (e.g., 'Note_123'). Returns prefixed content ('Note Content: <text>' or 'Collection Content: <ids>') to clarify that the result is Note/Collection content, not domain-specific output.",
-            "schema_hint": {"target": "string (ID or name) or $variable", "out": "$variable", "expect": "string"}
+            "description": "Load persistent Note or Collection by ID or name, with optional slice. Notes: slice is characters (default 0:4096). Collections: slice is items (default 0:5), returns a new Collection. Use slice=':' for full content (up to ceiling). Slicing a Collection returns a Collection usable by downstream tools.",
+            "full_description": "Load a Note or Collection into planner context. The 'slice' parameter controls how much content is returned, using Python-style syntax: '0:1000' (first 1000), '-1000:' (last 1000), ':' (everything up to ceiling), '5' (single item). For Notes, units are characters. For Collections, units are items — the result is a new Collection bound to out. The value string shows a content preview (Note ID + first 200 chars per item for Collections).",
+            "examples": [
+                '{"type":"load","target":"$report","slice":":","out":"$full_report"}',
+                '{"type":"load","target":"$papers","slice":"0:3","out":"$top_papers"}',
+                '{"type":"load","target":"my-note","out":"$note_preview"}'
+            ],
+            "schema_hint": {"target": "string (ID or name) or $variable", "slice": "string (optional, e.g. '0:4096', ':', '0:5')", "out": "$variable"}
         },
         "persist": {
             "description": "Mark Note/Collection as persistent. Use this to save the Note/Collection to the filesystem.",
@@ -488,8 +494,8 @@ def build_tool_catalog(available_tools: Dict[str, Dict]) -> Dict[str, Dict]:
             "schema_hint": {"target": "$variable", "out": "$variable"}
         },
         "display": {
-            "description": "Display Note content to user",
-            "schema_hint": {"value": "$variable"}
+            "description": "Display Note content to user (UI popup). Does NOT return content to planner context. Use load to read content for planning.",
+            "schema_hint": {"value": "$variable or target"}
         },
         "think": {
             "description": PRIMITIVE_DOCS["think"]["description"],
@@ -498,12 +504,12 @@ def build_tool_catalog(available_tools: Dict[str, Dict]) -> Dict[str, Dict]:
             "schema_hint": PRIMITIVE_DOCS["think"]["schema_hint"]
         },
         "say": {
-            "description": "Output text to user. Use this to report progress or results to the user.",
+            "description": "Output text to user. Requires: value (text to say), target ('user').",
             "schema_hint": {"target": "user", "value": "string"}
         },
         "ask": {
-            "description": "Ask user a question and wait for response (suspends plan execution).",
-            "schema_hint": {"target": "User (optional)", "value": "string (question text)", "out": "$variable"}
+            "description": "Ask user a question and wait for response (suspends plan execution). Requires: value (the question text), out (variable to bind user's response). Example: {\"type\": \"ask\", \"value\": \"Should I continue?\", \"out\": \"$answer\"}",
+            "schema_hint": {"value": "string (question text)", "out": "$variable"}
         },
         "add": {
             "description": "Add a Note to an existing Collection (mutates Collection in place). When used with map to add multiple Notes, use collection parameter: {\"type\":\"map\",\"target\":\"$notes\",\"operation\":\"add\",\"collection\":\"$collection\",\"out\":\"$collection\"}",
@@ -548,16 +554,7 @@ def build_tool_catalog(available_tools: Dict[str, Dict]) -> Dict[str, Dict]:
             ],
             "schema_hint": {"target": "$variable (Collection of dict Notes)", "field": "string (field path)", "out": "$variable"}
         },
-        "head": {
-            "description": "Take first N items from Collection (default 1). Preserves original Notes. Use after sort to get top-ranked items.",
-            "full_description": "Head returns a new Collection containing the first N items from the input Collection. Items are taken in their current order, so combine with sort to get top/bottom ranked items. Default count is 1. All original Note content is preserved.",
-            "examples": [
-                '{"type":"head","target":"$sorted_papers","count":5,"out":"$top_5"}',
-                '{"type":"head","target":"$results","out":"$first_result"}',
-                '{"type":"head","target":"$ranked_items","count":10,"out":"$top_10"}'
-            ],
-            "schema_hint": {"target": "$variable (Collection)", "count": "int (optional, default 1)", "out": "$variable"}
-        },
+        # head: deprecated, use load with slice instead. Executor still accepts head for backward compat.
         "sort": {
             "description": "Sort Collection by a field value (SQL ORDER BY). Notes must be JSON/dict with sortable field. Default ascending order, use order:'desc' for descending.",
             "full_description": "Sort a Collection by comparing a field in each Note. Input Collection must contain JSON/dict Notes with the specified field. Field must contain sortable values (numbers, strings, dates). Default is ascending order (A-Z, 0-9), set order:'desc' for descending (Z-A, 9-0). Notes missing the sort field are placed at end.",
@@ -1342,6 +1339,50 @@ def execute_codegen_block(code: str, executor, method_name: str = "codegen") -> 
     return result
 
 
+def _vision_eval_check(vision_criteria: str, eval_target: str, executor) -> str:
+    """
+    Lightweight vision evaluation against planner-declared eval_target.
+    Returns evaluation text (pass/fail per criterion) or empty string if skipped.
+    """
+    if not vision_criteria or not eval_target:
+        return ""
+    
+    # Resolve eval_target variable to resource content
+    var_key = eval_target.lstrip('$')
+    res_id = executor.plan_bindings_flat.get(var_key)
+    if not res_id or not executor.resource_manager:
+        return ""
+    
+    # Use load with slice=":" to get full content up to ceiling
+    load_result = executor.execute_action({"type": "load", "target": eval_target, "slice": ":", "out": f"$_vision_eval_{var_key}"})
+    artifact_preview = load_result.get('data', '')
+    if not artifact_preview:
+        return ""
+    artifact_preview = str(artifact_preview)[:4096]
+    
+    eval_prompt = f"""Evaluate the following artifact against each quality criterion. For each, answer PASS or FAIL with a one-sentence reason if FAIL.
+
+CRITERIA:
+{vision_criteria}
+
+ARTIFACT ({eval_target}):
+{artifact_preview}
+
+Format (one line per criterion):
+criterion_name: PASS or FAIL - reason
+END_EVAL"""
+    
+    try:
+        result = executor.llm_generate(eval_prompt, max_tokens=256, temperature=0.1, stops=["\nEND_EVAL", "END_EVAL"])
+        if result.success and result.text:
+            eval_text = result.text.strip()
+            logger.info(f"Vision eval for {eval_target}: {eval_text}")
+            return eval_text
+    except Exception as e:
+        logger.warning(f"Vision eval failed: {e}")
+    return ""
+
+
 if HAS_SGLANG:
     #@function
     def stage0_resource_retrieval(goal: str, executor):
@@ -1452,7 +1493,7 @@ if HAS_SGLANG:
     
     @function
     def tool_planner_infospace(s, template, goal: str, world_model: Dict, character_context: str, recent_context: str, 
-                              tools_catalog_text: str, executor, trace_file=None, max_steps: int = 16, similar_plan: Dict = None, preplan: str = None):
+                              tools_catalog_text: str, executor, trace_file=None, max_steps: int = 16, similar_plan: Dict = None, preplan: str = None, vision_criteria: str = ""):
         """
         SGLang incremental planner for infospace goals.
         
@@ -1494,6 +1535,9 @@ if HAS_SGLANG:
         if preplan:
             system_parts.append(f"\n## {preplan}\n")
             system_parts.append(f"\n## End ABSTRACT_PLAN\n")
+
+        if vision_criteria:
+            system_parts.append(f"\n## QUALITY VISION\nEvaluate your output against these criteria. If an intermediate artifact fails a criterion, adjust your approach (e.g., use more detailed instructions, re-extract with richer prompts).\n{vision_criteria}\n## End QUALITY VISION\n")
 
         if similar_plan:
             system_parts.append(f"##PREVIOUS PLAN FOR SIMILAR GOAL:\n{similar_plan['plan']}\n")
@@ -1818,6 +1862,7 @@ ALWAYS follow all formatting instructions exactly.
             "      Do NOT write: val = r1[\"value\"]; next_action[\"target\"] = val\n"
             "      DO write: {\"out\": \"$papers\"} then {\"target\": \"$papers\"}\n"
             "      Use r1 ONLY for status checking: if r1[\"status\"] != \"success\"\n"
+            "      For item counts: r1.get(\"extra\",{}).get(\"item_count\") — NOT len(r1[\"value\"]) (value is a display string).\n"
             "    - if/else control flow is allowed.\n"
             "    - Bounded iteration over KNOWN SMALL collections is allowed:\n"
             "      e.g., `for item in [item1, item2, item3]:` (max 5 items, list must be literal).\n"
@@ -1846,6 +1891,7 @@ ALWAYS follow all formatting instructions exactly.
             "  NEXT_TASK: <next high-level subgoal or blank>\n"
             "  NEXT_PHASE_TYPE: <pipeline or deliberative>\n"
             "  REQUEST_TOOLS: <json array>\n"
+            "  EVAL_TARGET: <$variable to evaluate against QUALITY VISION, or blank to skip>\n"
             "\n"
             "#Stage 3 INSTRUCTIONS:\n"
             "HYPOTHESES:\n"
@@ -1918,6 +1964,12 @@ ALWAYS follow all formatting instructions exactly.
             "REQUEST_TOOLS:\n"
             "- Always output valid JSON: [] or [\"tool1\", \"tool2\"].\n"
             "- Add tools here if new documentation is required.\n"
+            "\n"
+            "EVAL_TARGET:\n"
+            "- If this step produced a candidate artifact for the goal (e.g., a report, synthesis, or final result),\n"
+            "  set EVAL_TARGET to the $variable name so it can be checked against the QUALITY VISION.\n"
+            "- If this step is intermediate (sourcing, filtering, loading), leave blank.\n"
+            "- For code blocks: include eval_target in the return extra dict instead.\n"
             "\n"
             "Follow these formats exactly."
         )
@@ -2123,7 +2175,14 @@ This is the only planner-visible structure that supports direct (dx,dy,dz) usage
                     f"request_tools_{step}",
                     max_tokens=96,
                     temperature=GEN_TEMPERATURE,
-                    stop=["\n\n", "\nTHOUGHTS:", "\nHYPOTHESES:", "\nAUDIT:", "\nDONE:", "\nNEXT_TASK:", "\nREQUEST_TOOLS:"]
+                    stop=["\nEVAL_TARGET:", "\n\n", "\nTHOUGHTS:", "\nHYPOTHESES:", "\nAUDIT:", "\nDONE:", "\nNEXT_TASK:", "\nREQUEST_TOOLS:"]
+                )
+                + "\nEVAL_TARGET: "
+                + gen(
+                    f"eval_target_{step}",
+                    max_tokens=32,
+                    temperature=GEN_TEMPERATURE,
+                    stop=["\n\n", "\n"]
                 )
                 + "\n"
             )
@@ -2141,6 +2200,7 @@ This is the only planner-visible structure that supports direct (dx,dy,dz) usage
             logger.info(f"DONE: {safe_get(s, f'done_{step}')}")
             logger.info(f"NEXT_TASK: {safe_get(s, f'next_task_{step}')}")
             logger.info(f"REQUEST_TOOLS: {safe_get(s, f'request_tools_{step}')}")
+            logger.info(f"EVAL_TARGET: {safe_get(s, f'eval_target_{step}')}")
             
             # Stage 3.1: Update resource indexes with commentary
             thoughts_text = s[f'thoughts_{step}'].strip()
@@ -2169,6 +2229,24 @@ This is the only planner-visible structure that supports direct (dx,dy,dz) usage
                             logger.debug(f"Stage 3.1: Resource manager not available for {resource_id}")
                     except Exception as e:
                         logger.debug(f"Stage 3.1: Failed to update commentary for {resource_id}: {e}")
+            
+            # Stage 3.2: Vision evaluation (planner-declared eval_target)
+            eval_target = ""
+            if tool_name == "_code_block_":
+                # Code block: eval_target from result extra dict
+                eval_target = result_dict.get('extra', {}).get('eval_target', '') if isinstance(result_dict, dict) else ""
+            else:
+                # Single tool: parse EVAL_TARGET from Stage 3 output
+                try:
+                    raw_et = s[f"eval_target_{step}"]
+                    eval_target = raw_et.strip() if raw_et else ""
+                except (KeyError, TypeError, AttributeError):
+                    eval_target = ""
+            if eval_target:
+                vision_eval_text = _vision_eval_check(vision_criteria, eval_target, executor)
+                if vision_eval_text:
+                    s += user(f"VISION EVALUATION (quality check against criteria):\n{vision_eval_text}\nIf any criterion shows FAIL, consider adjusting your approach in the next step.\n")
+                    s += assistant("Noted.\n")
             
             # Stage 3.5: Dynamic tool loading (if requested)
             requested_tools_raw = s[f"request_tools_{step}"].strip()
@@ -2533,7 +2611,7 @@ def vllm_gen_multi(prompt: str, state: Dict[str, Any], specs: List[Dict],
 def tool_planner_infospace_vllm(template, goal: str, world_model: Dict, character_context: str, recent_context: str, 
                                  tools_catalog_text: str, executor, trace_file=None, max_steps: int = 16, 
                                  similar_plan: Dict = None, preplan: str = None, vllm_url: str = None,
-                                 model: str = None):
+                                 model: str = None, vision_criteria: str = ""):
     """
     vLLM-based incremental planner for infospace goals (alternative to SGLang version).
     
@@ -2672,6 +2750,9 @@ def tool_planner_infospace_vllm(template, goal: str, world_model: Dict, characte
     if preplan:
         system_parts.append(f"\n## {preplan}\n")
         system_parts.append(f"\n## End ABSTRACT_PLAN\n")
+    
+    if vision_criteria:
+        system_parts.append(f"\n## QUALITY VISION\nEvaluate your output against these criteria. If an intermediate artifact fails a criterion, adjust your approach (e.g., use more detailed instructions, re-extract with richer prompts).\n{vision_criteria}\n## End QUALITY VISION\n")
     
     if similar_plan:
         system_parts.append(f"##PREVIOUS PLAN FOR SIMILAR GOAL:\n{similar_plan['plan']}\n")
@@ -2860,6 +2941,7 @@ ALWAYS follow all formatting instructions exactly.
         "      Do NOT write: val = r1[\"value\"]; next_action[\"target\"] = val\n"
         "      DO write: {\"out\": \"$papers\"} then {\"target\": \"$papers\"}\n"
         "      Use r1 ONLY for status checking: if r1[\"status\"] != \"success\"\n"
+        "      For item counts: r1.get(\"extra\",{}).get(\"item_count\") — NOT len(r1[\"value\"]) (value is a display string).\n"
         "    - if/else control flow is allowed.\n"
         "    - Bounded iteration over KNOWN SMALL collections is allowed:\n"
         "      e.g., `for item in [item1, item2, item3]:` (max 5 items, list must be literal).\n"
@@ -2888,6 +2970,7 @@ ALWAYS follow all formatting instructions exactly.
         "  NEXT_TASK: <next high-level subgoal or blank>\n"
         "  NEXT_PHASE_TYPE: <pipeline or deliberative>\n"
         "  REQUEST_TOOLS: <json array>\n"
+        "  EVAL_TARGET: <$variable to evaluate against QUALITY VISION, or blank to skip>\n"
         "\n"
         "#Stage 3 INSTRUCTIONS:\n"
         "HYPOTHESES:\n"
@@ -2960,6 +3043,12 @@ ALWAYS follow all formatting instructions exactly.
         "REQUEST_TOOLS:\n"
         "- Always output valid JSON: [] or [\"tool1\", \"tool2\"].\n"
         "- Add tools here if new documentation is required.\n"
+        "\n"
+        "EVAL_TARGET:\n"
+        "- If this step produced a candidate artifact for the goal (e.g., a report, synthesis, or final result),\n"
+        "  set EVAL_TARGET to the $variable name so it can be checked against the QUALITY VISION.\n"
+        "- If this step is intermediate (sourcing, filtering, loading), leave blank.\n"
+        "- For code blocks: include eval_target in the return extra dict instead.\n"
         "\n"
         "Follow these formats exactly."
     )
@@ -3142,7 +3231,10 @@ This is the only planner-visible structure that supports direct (dx,dy,dz) usage
             # Fallback: model may have omitted NEXT_PHASE_TYPE
             next_task_val = _extract_between_labels(stage3_block, "NEXT_TASK:", "REQUEST_TOOLS:")
             next_phase_type_val = ""
-        request_tools_val = _extract_after_label(stage3_block, "REQUEST_TOOLS:").strip()
+        request_tools_val = _extract_between_labels(stage3_block, "REQUEST_TOOLS:", "EVAL_TARGET:").strip()
+        if not request_tools_val:
+            request_tools_val = _extract_after_label(stage3_block, "REQUEST_TOOLS:").strip()
+        eval_target_val = _extract_line_value(stage3_block, "EVAL_TARGET:")
 
         state[f"thoughts_{step}"] = thoughts_val
         state[f"hypotheses_{step}"] = hypotheses_val
@@ -3152,6 +3244,7 @@ This is the only planner-visible structure that supports direct (dx,dy,dz) usage
         npt = next_phase_type_val.strip().lower()
         state[f"next_phase_type_{step}"] = npt if npt in ("pipeline", "deliberative") else "deliberative"
         state[f"request_tools_{step}"] = _strip_code_fences(request_tools_val)
+        state[f"eval_target_{step}"] = eval_target_val
         
         # Safely log step fields
         def safe_get(state_dict, key, default='N/A'):
@@ -3166,6 +3259,7 @@ This is the only planner-visible structure that supports direct (dx,dy,dz) usage
         logger.info(f"DONE: {safe_get(state, f'done_{step}')}")
         logger.info(f"NEXT_TASK: {safe_get(state, f'next_task_{step}')}")
         logger.info(f"REQUEST_TOOLS: {safe_get(state, f'request_tools_{step}')}")
+        logger.info(f"EVAL_TARGET: {safe_get(state, f'eval_target_{step}')}")
         
         # Stage 3.1: Update resource indexes with commentary
         thoughts_text = state.get(f'thoughts_{step}', '').strip()
@@ -3192,6 +3286,18 @@ This is the only planner-visible structure that supports direct (dx,dy,dz) usage
                         logger.debug(f"Stage 3.1: Updated commentary for {resource_id}")
                 except Exception as e:
                     logger.debug(f"Stage 3.1: Failed to update commentary for {resource_id}: {e}")
+        
+        # Stage 3.2: Vision evaluation (planner-declared eval_target)
+        eval_target = ""
+        if tool_name == "_code_block_":
+            eval_target = result_dict.get('extra', {}).get('eval_target', '') if isinstance(result_dict, dict) else ""
+        else:
+            eval_target = state.get(f"eval_target_{step}", "").strip()
+        if eval_target:
+            vision_eval_text = _vision_eval_check(vision_criteria, eval_target, executor)
+            if vision_eval_text:
+                prompt += format_user(f"VISION EVALUATION (quality check against criteria):\n{vision_eval_text}\nIf any criterion shows FAIL, consider adjusting your approach in the next step.\n")
+                prompt += format_assistant("Noted.\n")
         
         # Stage 3.5: Dynamic tool loading
         requested_tools_raw = state.get(f"request_tools_{step}", "").strip()
@@ -3781,6 +3887,7 @@ class IncrementalPlanner:
             self.goal = goal
 
             preplan = self._preplan(goal)
+            vision_criteria = self._generate_vision(goal)
             # Extract context components
             character_context = ""
             recent_context = ""
@@ -3828,7 +3935,8 @@ class IncrementalPlanner:
                     preplan=preplan,
                     similar_plan=similar_plans[0] if similar_plans else None,
                     vllm_url=self.vllm_url,
-                    model=self.vllm_model
+                    model=self.vllm_model,
+                    vision_criteria=vision_criteria
                 )
             elif HAS_SGLANG and self.executor.runtime:
                 # Use SGLang planner
@@ -3843,7 +3951,8 @@ class IncrementalPlanner:
                     trace_file=self.trace_file,
                     max_steps=max_steps,
                     preplan=preplan,
-                    similar_plan=similar_plans[0] if similar_plans else None
+                    similar_plan=similar_plans[0] if similar_plans else None,
+                    vision_criteria=vision_criteria
                 )
             else:
                 return {'error': 'No planner backend available (SGLang, vLLM, or OpenRouter required)'}
@@ -3980,6 +4089,36 @@ class IncrementalPlanner:
             traceback.print_exc()
             return {"success": False, 'error': str(e)}
 
+
+    def _generate_vision(self, goal_text: str) -> str:
+        """Generate evaluable quality criteria from the goal (vision for the target artifact)."""
+        VISION_PROMPT = f"""Given the following goal, generate 2-4 concrete, evaluable quality criteria that define what a good output looks like.
+
+GOAL:
+{goal_text}
+
+Instructions:
+- Each criterion should be a testable predicate (answerable as true/false against the output).
+- Focus on quality dimensions: depth, specificity, coverage, structure.
+- Be deliberately open on content (which topics, which specifics) — those emerge from the material.
+- Numeric criteria (e.g., min_sources: 8) will be checked in code.
+- Qualitative criteria (e.g., "contains specific method names, not just category labels") will be checked via LLM assessment.
+- If the goal is simple or direct (e.g., a factual lookup), return "No vision criteria needed."
+
+Format (one criterion per line):
+criterion_name: "testable predicate or numeric threshold"
+END_VISION"""
+
+        result = self.executor.llm_generate(VISION_PROMPT, max_tokens=192, temperature=GEN_TEMPERATURE, stops=["\nEND_VISION", "END_VISION"])
+        if not result.success or not result.text:
+            logger.warning(f"_generate_vision failed: {result.error if hasattr(result, 'error') else 'unknown'}")
+            return ""
+        vision_text = result.text.strip()
+        if "no vision criteria needed" in vision_text.lower():
+            logger.info("Vision generator: no criteria needed for this goal")
+            return ""
+        logger.info(f"Vision generator: {vision_text}")
+        return vision_text
 
     def _preplan(self, goal_text: str) -> str:
         tool_names = list(self.tools.keys())
