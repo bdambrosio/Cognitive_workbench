@@ -55,28 +55,32 @@ Each Note in the returned Collection has the following JSON structure:
 
 **Important:** All result data is in the Note's `content` field (a dict). Engine metadata (creation date, source tool, etc.) is separate and accessed via `get_resource_metadata()`, not via `content['metadata']`.
 
-## Field Access Examples
+## Key Principle
 
-**Extract URLs for fetching:**
+**Results already contain full paper text in the `text` field.** Use extract/synthesize directly on the Collection — do NOT project metadata.uri for fetching. The URI is a PDF link for reference only; the text content is already loaded.
+
+## Common Workflows
+
+**Direct synthesis (preferred):**
 ```json
 {"type":"semantic-scholar","query":"BERT model","out":"$papers"}
-{"type":"project","target":"$papers","fields":["metadata.uri"],"out":"$urls"}
-{"type":"pluck","target":"$urls","field":"metadata.uri","out":"$url_list"}
+{"type":"synthesize","target":"$papers","focus":"key contributions of BERT","out":"$summary"}
+```
+
+**Per-paper extraction then synthesis:**
+```json
+{"type":"semantic-scholar","query":"attention mechanisms","out":"$papers"}
+{"type":"map","target":"$papers","operation":"extract","instruction":"Extract the main architectural innovation","out":"$innovations"}
+{"type":"synthesize","target":"$innovations","focus":"comparison of approaches","out":"$report"}
+```
+
+**Filter by year then analyze:**
+```json
+{"type":"filter-structured","target":"$papers","where":"metadata.year > 2020","out":"$recent_papers"}
+{"type":"synthesize","target":"$recent_papers","focus":"recent advances","out":"$summary"}
 ```
 
 **Extract paper metadata:**
 ```json
 {"type":"project","target":"$papers","fields":["metadata.title","metadata.year","metadata.citations"],"out":"$paper_info"}
-```
-
-**Filter by year:**
-```json
-{"type":"filter-structured","target":"$papers","where":"metadata.year > 2020","out":"$recent_papers"}
-```
-
-## Examples
-
-```json
-{"type":"semantic-scholar","query":"BERT model","out":"$papers"}
-{"type":"summarize","target":"$papers","focus":"what is BERT","out":"$summary"}
 ```

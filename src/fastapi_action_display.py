@@ -960,6 +960,26 @@ class FastAPIActionDisplayNode:
                 logger.error(f"Error in clear_transients: {e}")
                 return {"success": False, "message": f"Error: {str(e)}"}
         
+        @self.app.post("/api/control/clear_persistents")
+        async def clear_persistents():
+            """Clear persistents."""
+            try:
+                if self.active_character_name is None:
+                    return {"success": False, "message": "No character available yet"}
+                
+                logger.info(f"🗑️ Clear persistents command received")
+                
+                # Publish clear persistents command
+                topic = f"cognitive/{self.active_character_name}/control/clear_persistents"
+                publisher = self.session.declare_publisher(topic)
+                publisher.put(json.dumps({"timestamp": datetime.now().isoformat()}).encode())
+                logger.info(f"🗑️ Clear persistents command sent to {self.active_character_name}")
+                
+                return {"success": True, "message": "Clear persistents command sent"}
+            except Exception as e:
+                logger.error(f"Error in clear_persistents: {e}")
+                return {"success": False, "message": f"Error: {str(e)}"}
+        
         @self.app.post("/api/save")
         async def save_all():
             """Trigger save for all nodes."""
@@ -3634,6 +3654,37 @@ Generated: {generated_at}
             }
         }
         
+        async function clearPersistents() {
+            if (!confirm('Are you sure you want to clear all PERSISTENT resources? This cannot be undone.')) {
+                return;
+            }
+            
+            const statusDiv = document.getElementById('controlPanelStatus');
+            statusDiv.style.display = 'block';
+            statusDiv.innerHTML = '<span style="color: #888;">Clearing persistents...</span>';
+            
+            try {
+                const response = await fetch('/api/control/clear_persistents', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    const deleted = result.deleted_notes || 0;
+                    const collections = result.deleted_collections || 0;
+                    statusDiv.innerHTML = `<span style="color: #4ecdc4;">✓ Cleared ${deleted} persistent Notes, ${collections} persistent Collections</span>`;
+                } else {
+                    statusDiv.innerHTML = `<span style="color: #ff6b6b;">✗ Error: ${result.message || 'Unknown error'}</span>`;
+                }
+            } catch (error) {
+                statusDiv.innerHTML = `<span style="color: #ff6b6b;">✗ Error: ${error.message}</span>`;
+            }
+        }
+        
         async function autonomousTurns() {
             if (commandInProgress) return; // Prevent rapid clicks
             commandInProgress = true;
@@ -4748,7 +4799,8 @@ Generated: {generated_at}
                 
                 <button onclick="clearWorldModel()" style="width: 100%; padding: 12px; margin-bottom: 10px; background: #d32f2f; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">🗑️ Clear World Model</button>
                 <button onclick="clearMap()" style="width: 100%; padding: 12px; margin-bottom: 10px; background: #d32f2f; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">🗑️ Clear Map</button>
-                <button onclick="clearTransients()" style="width: 100%; padding: 12px; background: #ff9800; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">🗑️ Clear Transients</button>
+                <button onclick="clearTransients()" style="width: 100%; padding: 12px; margin-bottom: 10px; background: #ff9800; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">🗑️ Clear Transients</button>
+                <button onclick="clearPersistents()" style="width: 100%; padding: 12px; background: #d32f2f; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">🗑️ Clear Persistents</button>
             </div>
             
             <div id="controlPanelStatus" style="margin-top: 15px; padding: 10px; background: #333; border-radius: 4px; min-height: 20px; font-size: 12px; color: #888; display: none;"></div>

@@ -611,8 +611,8 @@ def build_tool_catalog(available_tools: Dict[str, Dict]) -> Dict[str, Dict]:
     
     # Enhanced descriptions to prevent common confusions
     TOOL_DISAMBIGUATION = {
-        "search-web": "Search web and return Collection of structured Notes. Each Note has text (full content), format, metadata.uri (URL), metadata.domain, char_count. Use project with metadata.uri to extract URLs.",
-        "semantic-scholar": "Search academic papers and return Collection of structured Notes. Each Note has text (abstract), format, metadata.uri (PDF URL), metadata.title, metadata.authors, metadata.year, metadata.citations, metadata.venue. Use project with metadata.uri to extract URLs.",
+        "search-web": "Search web and return Collection of structured Notes. Each Note has text (substantial keyword-filtered page content, up to ~8K chars per result), format, metadata.uri (URL), metadata.domain, char_count. Results already contain substantial text — use extract/synthesize directly on the Collection.",
+        "semantic-scholar": "Search academic papers and return Collection of structured Notes. Each Note has text (full paper text via GROBID, or abstract if PDF unavailable), format, metadata.title, metadata.authors, metadata.year, metadata.citations, metadata.venue, metadata.uri. Results already contain full text — use extract/synthesize directly on the Collection. Do NOT project metadata.uri for fetching.",
         "fetch-text": "Fetch text from a SINGLE specific URL, Do NOT use on search-web or semantic-scholar results. Use ONLY when you have one URL/ID to fetch directly and do not already have the text.",
         "discover-notes": "Global discovery across all Notes. Returns Collection of structured Notes with full text content, metadata.source_id, metadata.uri, metadata.score, metadata.type. Use project for metadata fields, extract for extracting info from text.",
         "discover-collections": "Global discovery across all Collections. Returns Collection of structured Notes with full text content, metadata.source_id, metadata.uri, metadata.score, metadata.type. Use project for metadata fields, extract for extracting info from text.",
@@ -729,13 +729,14 @@ def tool_catalog_text(tools: Dict[str, Dict]) -> str:
     lines.append("- search-web → synthesize (with focus) — direct Collection analysis")
     lines.append("- search-web → map(extract) → synthesize — two-phase with per-item extraction")
     lines.append("- search-web → filter-structured → synthesize — filtered then analyzed")
-    lines.append("- search-web already returns full text in 'text' field of each Note")
+    lines.append("- search-web already returns substantial page content in 'text' field (keyword-filtered, up to ~8K chars per result) — use extract/synthesize directly")
     lines.append("- semantic-scholar → synthesize (with focus) — direct Collection analysis")
     lines.append("- semantic-scholar → map(extract) → synthesize — two-phase with per-item extraction")
     lines.append("- semantic-scholar → filter-structured → synthesize — filtered then analyzed")
+    lines.append("- semantic-scholar already returns full paper text (via GROBID) in 'text' field of each Note — do NOT project metadata.uri for fetching")
     lines.append("- For comparison: synthesize with format=\"comparison\" and other= (requires two inputs)")
     lines.append("- fetch-text is for SINGLE URLs only, NOT for Collections from search-web/semantic-scholar")
-    lines.append("- Level 4 tools (search-web, semantic-scholar) return Collections with text content in the 'text' field of each Note")
+    lines.append("- Level 4 tools (search-web, semantic-scholar) return Collections with substantial content in the 'text' field of each Note — use extract/synthesize directly")
     
     return "\n".join(lines)
 
@@ -1186,17 +1187,11 @@ def execute_infospace_action(action: Dict, executor: InfospaceExecutor, agent_na
 # ============================================================================
 
 _CODEGEN_FORBIDDEN_PATTERNS = [
-    r'\bimport\b',
-    r'\bfrom\b\s+\w+\s+import\b',
     r'\bexec\b\s*\(', r'\beval\b\s*\(', r'\bcompile\b\s*\(',
     r'\b__\w+__\b',
-    r'\bopen\b\s*\(',
-    r'\bos\b\.', r'\bsys\b\.', r'\bsubprocess\b',
-    r'\bwhile\b',
-    # Note: 'for' is allowed but validated separately for bounded iteration
-    r'\bclass\b', r'\bdef\b',
+    r'\bsys\b\.', r'\bsubprocess\b',
     r'\bglobals\b\s*\(', r'\blocals\b\s*\(',
-    r'\bgetattr\b\s*\(', r'\bsetattr\b\s*\(', r'\bdelattr\b\s*\(',
+    r'\bsetattr\b\s*\(', r'\bdelattr\b\s*\(',
 ]
 
 
@@ -1205,8 +1200,8 @@ def validate_codegen_block(code: str) -> tuple:
     Static validation of LLM-generated code blocks before exec.
     
     Checks:
-    - Forbidden patterns (imports, exec, file I/O, loops, defs, etc.)
-    - Must contain 1-6 execute_action_tracked calls
+    - Forbidden patterns (imports, exec, file I/O, class/def, etc.)
+    - Must contain 1-10 execute_action_tracked calls
     - Must contain at least one return executor._create_uniform_return
     - Max 60 executable code lines (comments and blanks are free)
     - Hard cap of 100 total lines
@@ -1232,27 +1227,6 @@ def validate_codegen_block(code: str) -> tuple:
         match = re.search(pattern, code)
         if match:
             return False, f"Forbidden pattern: {match.group()}"
-    
-    # Check for loops: allow bounded 'for' over short literal lists, reject all else
-    for_matches = list(re.finditer(r'\bfor\b\s+\w+\s+in\s+', code))
-    for match in for_matches:
-        rest_of_line = code[match.end():].split('\n')[0].strip().rstrip(':')
-        # Allow: for X in [literal1, literal2, ...]
-        if re.match(r'\[.*\]$', rest_of_line):
-            items = rest_of_line[1:-1].split(',')
-            if len(items) > 5:
-                return False, f"For loop over list with {len(items)} items (max 5)"
-            continue
-        # Allow: for i, X in enumerate([...])
-        if re.match(r'enumerate\s*\(\s*\[.*\]\s*\)$', rest_of_line):
-            inner = re.search(r'\[(.*)\]', rest_of_line)
-            if inner:
-                items = inner.group(1).split(',')
-                if len(items) > 5:
-                    return False, f"For loop with enumerate over {len(items)} items (max 5)"
-            continue
-        # Reject all other for loops (range(), generator expressions, variables, etc.)
-        return False, f"Unbounded or disallowed for loop: for ... in {rest_of_line[:50]}"
     
     # Count execute_action_tracked calls (must be 1-10)
     call_count = len(re.findall(r'executor\.execute_action_tracked\s*\(', code))
@@ -1339,7 +1313,322 @@ def execute_codegen_block(code: str, executor, method_name: str = "codegen") -> 
     return result
 
 
-def _vision_eval_check(vision_criteria: str, eval_target: str, executor) -> str:
+def _compress_trace(trace_str: str) -> str:
+    """
+    Compress execution trace while preserving order and event identity.
+    
+    Handles both SGLang (<|im_start|>user) and vLLM (<|user|>) marker formats.
+    
+    Rules:
+    - Preserve all events in order
+    - Compress STAGE2-PRE: keep AGENT_STATE_HYPOTHESES and AGENT_STATE_SUPPORT (important for reflection and ToolModel)
+    - Compress STAGE2: keep GOAL (full first, prefix match later), CURRENT_TASK
+    - Compress CALL: keep tool name, semantic args, truncate large values
+    - Compress RESULT: keep status, bound var, always include result
+    - Compress THOUGHT: extract intent, track hypothesis deltas
+    - Compress METHOD events: capture method tool inner loop execution (steps, calls, results, thoughts, hypotheses, audits)
+    - Omit RAW_OTHER entirely
+    - Omit duplicate content for same key (scoped by method context for inner loops)
+    
+    Args:
+        trace_str: Full trace string from str(state) or vLLM prompt
+        
+    Returns:
+        Compressed trace as single text string suitable for LLM prompt
+    """
+    if not trace_str:
+        return ""
+    
+    # Split into sections by user/assistant markers for easier parsing
+    # Handles both SGLang format (<|im_start|>user / <|im_end|>) and vLLM format (<|user|> / <|assistant|>)
+    sections = re.split(r'(<\|im_start\|>(?:user|assistant)|<\|im_end\|>|<\|(?:user|assistant)\|>)', trace_str)
+    compressed_events = []
+    
+    # Markers to skip (both formats)
+    _SKIP_MARKERS = {'<|im_start|>user', '<|im_start|>assistant', '<|im_end|>', '<|user|>', '<|assistant|>'}
+    
+    # State tracking
+    first_goal = None
+    current_goal_prefix = None
+    seen_keys = {}  # Track duplicate content by key
+    current_method = None  # Track current method tool execution
+    method_step = None
+    
+    i = 0
+    while i < len(sections):
+        section = sections[i].strip()
+        if not section or section in _SKIP_MARKERS:
+            i += 1
+            continue
+        
+        # METHOD EXECUTION MODE event (method tool inner loop start)
+        method_mode_match = re.search(r'#METHOD EXECUTION MODE:\s*([\w-]+)\s*\(internal step (\d+)/(\d+)\)', section)
+        if method_mode_match:
+            method_name = method_mode_match.group(1)
+            inner_step = method_mode_match.group(2)
+            max_inner_steps = method_mode_match.group(3)
+            current_method = method_name
+            method_step = inner_step
+            
+            # Extract method step instruction
+            method_step_match = re.search(r'CURRENT METHOD STEP:\s*(.*?)(?:\n|$)', section)
+            method_step_text = method_step_match.group(1).strip() if method_step_match else None
+            
+            if method_step_text:
+                compressed_events.append(f"[METHOD {method_name} step={inner_step}/{max_inner_steps}]\nSTEP: {method_step_text}\n")
+        
+        # STAGE 2-PRE event (Agent-State Hypotheses - outer loop only, not in method protocol)
+        elif re.search(r'STAGE 2-PRE \(step (\d+)/(\d+)\):', section):
+            stage2_pre_match = re.search(r'STAGE 2-PRE \(step (\d+)/(\d+)\):', section)
+            if stage2_pre_match:
+                step_num = stage2_pre_match.group(1)
+                max_steps = stage2_pre_match.group(2)
+                
+                # Extract AGENT_STATE_HYPOTHESES
+                hyp_match = re.search(r'AGENT_STATE_HYPOTHESES:\s*\[(.*?)\]', section, re.DOTALL)
+                hyp_text = hyp_match.group(1).strip() if hyp_match else None
+                
+                # Extract AGENT_STATE_SUPPORT
+                support_match = re.search(r'AGENT_STATE_SUPPORT:\s*(.*?)(?:\n\n|\nSTAGE|$)', section, re.DOTALL)
+                support_text = support_match.group(1).strip() if support_match else None
+                
+                if hyp_text or support_text:
+                    event_parts = [f"[STAGE2-PRE step={step_num}/{max_steps}]"]
+                    if hyp_text:
+                        # Try to parse as JSON list, fallback to raw text
+                        try:
+                            hyp_list = json.loads(f"[{hyp_text}]")
+                            event_parts.append(f"AGENT_STATE_HYPOTHESES: {json.dumps(hyp_list, ensure_ascii=False)}")
+                        except:
+                            event_parts.append(f"AGENT_STATE_HYPOTHESES: [{hyp_text}]")
+                    if support_text:
+                        # Keep support text (may be multi-line with evidence pointers)
+                        # Truncate if very long
+                        if len(support_text) > 500:
+                            support_text = support_text[:500] + "\n... [truncated]"
+                        event_parts.append(f"AGENT_STATE_SUPPORT:\n{support_text}")
+                    compressed_events.append('\n'.join(event_parts) + '\n')
+        
+        # STAGE 2 event (outer loop)
+        elif re.search(r'STAGE 2 \(step (\d+)/(\d+)\):', section):
+            stage2_match = re.search(r'STAGE 2 \(step (\d+)/(\d+)\):', section)
+            current_method = None  # Reset method context for outer loop
+            method_step = None
+            if stage2_match:
+                step_num = stage2_match.group(1)
+                max_steps = stage2_match.group(2)
+                
+                # Extract GOAL and TASK
+                goal_match = re.search(r'#GOAL:\s*(.*?)#END GOAL', section, re.DOTALL)
+                task_match = re.search(r'CURRENT_TASK:\s*(.*?)(?:\n|$)', section)
+                
+                goal_text = goal_match.group(1).strip() if goal_match else None
+                task_text = task_match.group(1).strip() if task_match else None
+                
+                # Handle goal: full first occurrence, prefix match later
+                if first_goal is None and goal_text:
+                    first_goal = goal_text
+                    current_goal_prefix = goal_text[:100]  # Use first 100 chars as prefix
+                    goal_display = goal_text
+                elif goal_text:
+                    if goal_text.startswith(current_goal_prefix):
+                        goal_display = "[unchanged from step 1]"
+                    else:
+                        # Changed - update prefix and show new goal
+                        current_goal_prefix = goal_text[:100]
+                        goal_display = goal_text
+                else:
+                    goal_display = None
+                
+                if goal_display and task_text:
+                    compressed_events.append(f"[STAGE2 step={step_num}/{max_steps}]\nGOAL: {goal_display}\nTASK: {task_text}\n")
+        
+        # CALL event (TOOL_NAME + TOOL_ARGS_JSON)
+        elif 'TOOL_NAME:' in section:
+            tool_match = re.search(r'TOOL_NAME:\s*([\w-]+)', section)
+            args_match = re.search(r'TOOL_ARGS_JSON[^:]*:\s*(\{.*?\})', section, re.DOTALL)
+            
+            if tool_match:
+                tool_name = tool_match.group(1)
+                if args_match:
+                    try:
+                        args_dict = json.loads(args_match.group(1))
+                        # Keep keys, truncate large values
+                        compressed_args = {}
+                        for k, v in args_dict.items():
+                            if k == 'out':
+                                compressed_args[k] = v  # Always keep out
+                            elif isinstance(v, str) and len(v) > 100:
+                                compressed_args[k] = v[:100] + "..."
+                            else:
+                                compressed_args[k] = v
+                        tool_args = json.dumps(compressed_args)
+                    except:
+                        tool_args = args_match.group(1)[:200]
+                else:
+                    tool_args = "{}"
+                
+                # Prefix with method context if in method execution
+                if current_method:
+                    compressed_events.append(f"[METHOD {current_method} CALL tool={tool_name}]\nARGS: {tool_args}\n")
+                else:
+                    compressed_events.append(f"[CALL tool={tool_name}]\nARGS: {tool_args}\n")
+        
+        # METHOD RESULT event (METHOD STAGE 3 + ACTUAL RESULT)
+        elif 'METHOD STAGE 3 - TOOL EXECUTION COMPLETE' in section:
+            method_result_match = re.search(r'METHOD STAGE 3 - TOOL EXECUTION COMPLETE \(internal step (\d+)/(\d+)\)', section)
+            tool_match = re.search(r'Tool executed: `([\w-]+)`', section)
+            result_match = re.search(r'>> ACTUAL RESULT.*?<<\n(.*?)\n>> END RESULT', section, re.DOTALL)
+            bound_match = re.search(r'Bound: (\$\w+)', section)
+            status_match = re.search(r'(SUCCESS|FAILED)', section)
+            
+            if method_result_match and tool_match:
+                inner_step = method_result_match.group(1)
+                max_inner_steps = method_result_match.group(2)
+                tool_name = tool_match.group(1)
+                result_text = result_match.group(1).strip() if result_match else ""
+                bound_var = bound_match.group(1) if bound_match else None
+                status = 'OK' if status_match and 'SUCCESS' in status_match.group(0) else ('FAILED' if status_match else None)
+                
+                # Always include result, truncate if too long
+                if len(result_text) > 300:  # Shorter for method inner loop
+                    result_text = result_text[:300] + f"\n... [truncated]"
+                
+                event_str = f"[METHOD {current_method or 'unknown'} RESULT step={inner_step}/{max_inner_steps} tool={tool_name}"
+                if status:
+                    event_str += f" status={status}"
+                if bound_var:
+                    event_str += f" -> {bound_var}"
+                event_str += "]\n"
+                if result_text:
+                    event_str += f"RESULT: {result_text}\n"
+                compressed_events.append(event_str)
+        
+        # RESULT event (STAGE 3 + ACTUAL RESULT) - outer loop
+        elif 'STAGE 3 - TOOL EXECUTION COMPLETE' in section and 'METHOD STAGE 3' not in section:
+            tool_match = re.search(r'Tool executed: `([\w-]+)`', section)
+            result_match = re.search(r'>> ACTUAL RESULT.*?<<\n(.*?)\n>> END RESULT', section, re.DOTALL)
+            bound_match = re.search(r'Bound: (\$\w+)', section)
+            status_match = re.search(r'(SUCCESS|FAILED)', section)
+            
+            if tool_match:
+                tool_name = tool_match.group(1)
+                result_text = result_match.group(1).strip() if result_match else ""
+                bound_var = bound_match.group(1) if bound_match else None
+                status = 'OK' if status_match and 'SUCCESS' in status_match.group(0) else ('FAILED' if status_match else None)
+                
+                # Always include result, truncate if too long
+                if len(result_text) > 500:
+                    result_text = result_text[:500] + f"\n... [truncated, total {len(result_match.group(1))} chars]"
+                
+                event_str = f"[RESULT tool={tool_name}"
+                if status:
+                    event_str += f" status={status}"
+                if bound_var:
+                    event_str += f" -> {bound_var}"
+                event_str += "]\n"
+                if result_text:
+                    event_str += f"RESULT: {result_text}\n"
+                compressed_events.append(event_str)
+        
+        # THOUGHT event (check for method context by looking for method-specific patterns)
+        elif 'THOUGHTS' in section or 'HYPOTHESES:' in section or 'DONE:' in section:
+            # Check if this is a method inner loop thought (look for METHOD NEXT_TASK pattern)
+            is_method_thought = 'METHOD NEXT_TASK INSTRUCTIONS' in section or current_method is not None
+            
+            thoughts_match = re.search(r'THOUGHTS[^:]*:\s*(.*?)(?:\nHYPOTHESES|$)', section, re.DOTALL)
+            hyp_match = re.search(r'HYPOTHESES:\s*(.*?)(?:\nAUDIT|$)', section, re.DOTALL)
+            assump_match = re.search(r'AUDIT:\s*(.*?)(?:\nDONE|$)', section, re.DOTALL)
+            done_match = re.search(r'DONE:\s*(.*?)(?:\nNEXT_TASK|$)', section)
+            next_match = re.search(r'NEXT_TASK:\s*(.*?)(?:\nREQUEST_TOOLS|$)', section)
+            request_tools_match = re.search(r'REQUEST_TOOLS:\s*(.*?)(?:\n|$)', section, re.DOTALL)
+            
+            thoughts = thoughts_match.group(1).strip() if thoughts_match else None
+            hypotheses = hyp_match.group(1).strip() if hyp_match else None
+            assumptions = assump_match.group(1).strip() if assump_match else None
+            done = done_match.group(1).strip() if done_match else None
+            next_task = next_match.group(1).strip() if next_match else None
+            request_tools = request_tools_match.group(1).strip() if request_tools_match else None
+            
+            # Build thought event with method context if applicable
+            if is_method_thought and current_method:
+                event_parts = [f"[METHOD {current_method} THOUGHT"]
+                if method_step:
+                    event_parts[0] += f" step={method_step}"
+                event_parts[0] += "]"
+            else:
+                event_parts = ["[THOUGHT]"]
+            
+            if thoughts:
+                event_parts.append(f"THOUGHTS: {thoughts}")
+            
+            if hypotheses:
+                # Include complete hypotheses (no delta tracking)
+                event_parts.append(f"HYPOTHESES: {hypotheses}")
+            
+            if assumptions:
+                # Include complete assumptions/audits (no delta tracking)
+                event_parts.append(f"AUDIT: {assumptions}")
+            
+            # Check for duplicates (use method-scoped keys if in method)
+            if done:
+                done_key = f"{current_method or 'outer'}:DONE:{done}" if is_method_thought else f"DONE:{done}"
+                if done_key not in seen_keys:
+                    event_parts.append(f"DONE: {done}")
+                    seen_keys[done_key] = True
+            
+            if next_task:
+                next_key = f"{current_method or 'outer'}:NEXT:{next_task}" if is_method_thought else f"NEXT:{next_task}"
+                if next_key not in seen_keys:
+                    event_parts.append(f"NEXT: {next_task}")
+                    seen_keys[next_key] = True
+            
+            if request_tools:
+                tools_key = f"{current_method or 'outer'}:REQUEST_TOOLS:{request_tools}" if is_method_thought else f"REQUEST_TOOLS:{request_tools}"
+                if tools_key not in seen_keys:
+                    event_parts.append(f"REQUEST_TOOLS: {request_tools}")
+                    seen_keys[tools_key] = True
+            
+            # Check for METHOD COMPLETE in thoughts
+            if is_method_thought and thoughts and 'METHOD COMPLETE' in thoughts.upper():
+                event_parts.append("METHOD COMPLETE")
+                current_method = None  # Reset method context
+                method_step = None
+            
+            if len(event_parts) > 1:  # More than just [THOUGHT] or [METHOD ... THOUGHT]
+                compressed_events.append('\n'.join(event_parts) + '\n')
+        
+        # VERIFY event
+        elif 'VERIFICATION_QUESTION:' in section or 'VERIFICATION_ANSWER:' in section:
+            verify_type = 'Q' if 'QUESTION' in section else 'A'
+            content_match = re.search(r'VERIFICATION_(?:QUESTION|ANSWER):\s*(.*?)(?:\n|$)', section)
+            content = content_match.group(1).strip() if content_match else ""
+            compressed_events.append(f"[VERIFY {verify_type}]\n{content}\n")
+        
+        # FINAL event (say action)
+        elif '{"type":"say"' in section or '"type":"say"' in section:
+            say_match = re.search(r'\{"type":"say"[^}]*"value":"([^"]*)"[^}]*"target":"([^"]*)"', section)
+            if say_match:
+                value = say_match.group(1)
+                target = say_match.group(2)
+                compressed_events.append(f"[FINAL]\nsay({target}): \"{value}\"\n")
+        
+        # Skip RAW_OTHER (everything else)
+        i += 1
+    
+    return '\n'.join(compressed_events)
+
+
+# Tools whose output is worth evaluating against the quality vision.
+# Auto-detected from bindings after each step — no LLM involvement.
+_ARTIFACT_PRODUCING_TOOLS = frozenset({"synthesize", "extract", "generate-note", "refine"})
+
+# Subset of artifact-producing tools that typically produce goal-level output.
+# A FAIL from the lightweight classifier on these triggers deep (subplanner) evaluation.
+_GOAL_LEVEL_TOOLS = frozenset({"synthesize", "_code_block_"})
+
+
+def _vision_eval_check(vision_criteria: str, eval_target: str, executor, compressed_context: str = "") -> str:
     """
     Lightweight vision evaluation against planner-declared eval_target.
     Returns evaluation text (pass/fail per criterion) or empty string if skipped.
@@ -1360,11 +1649,16 @@ def _vision_eval_check(vision_criteria: str, eval_target: str, executor) -> str:
         return ""
     artifact_preview = str(artifact_preview)[:4096]
     
+    # Build context section if available
+    context_section = ""
+    if compressed_context:
+        context_section = f"\nEXECUTION CONTEXT (compressed trace of steps so far):\n{compressed_context}\n"
+    
     eval_prompt = f"""Evaluate the following artifact against each quality criterion. For each, answer PASS or FAIL with a one-sentence reason if FAIL.
 
 CRITERIA:
 {vision_criteria}
-
+{context_section}
 ARTIFACT ({eval_target}):
 {artifact_preview}
 
@@ -1380,6 +1674,70 @@ END_EVAL"""
             return eval_text
     except Exception as e:
         logger.warning(f"Vision eval failed: {e}")
+    return ""
+
+
+def _vision_eval_deep(vision_criteria: str, eval_target: str, classifier_result: str, executor, compressed_context: str = "") -> str:
+    """
+    Deep vision evaluation via subplanner. Has full access to all pipeline bindings
+    and can issue load/inspect calls to verify content, coverage, and grounding.
+    
+    Only fires when the lightweight classifier reports a FAIL on a goal-level artifact.
+    Falls back to empty string on vLLM/OpenRouter (subplanner requires SGLang).
+    
+    Returns evaluation text or empty string if skipped/unavailable.
+    """
+    if not vision_criteria or not eval_target:
+        return ""
+    
+    # Subplanner requires SGLang runtime
+    if not HAS_SGLANG or not getattr(executor, 'runtime', None):
+        logger.debug("Vision eval deep: skipped (requires SGLang runtime)")
+        return ""
+    
+    # Build the evaluation goal for the subplanner
+    bindings_summary = ""
+    try:
+        bindings = executor.plan_bindings_flat
+        if bindings:
+            binding_lines = [f"  ${k} = {v}" for k, v in bindings.items() if not k.startswith('_')]
+            bindings_summary = "\n".join(binding_lines)
+    except Exception:
+        pass
+    
+    context_block = ""
+    if compressed_context:
+        context_block = f"\n\nEXECUTION TRACE (compressed):\n{compressed_context}"
+    
+    eval_goal = (
+        f"You are a quality evaluator. Your task is to evaluate the artifact in {eval_target} "
+        f"against the quality criteria below. You have access to ALL pipeline variables via load.\n\n"
+        f"QUALITY CRITERIA:\n{vision_criteria}\n\n"
+        f"CLASSIFIER RESULT (lightweight, may be based on truncated content):\n{classifier_result}\n\n"
+        f"AVAILABLE VARIABLES:\n{bindings_summary}\n"
+        f"{context_block}\n\n"
+        f"INSTRUCTIONS:\n"
+        f"1. Use load with slice=\":\" to inspect {eval_target} in full.\n"
+        f"2. If criteria involve coverage or completeness, load upstream variables "
+        f"(e.g., source collections) to check how many items were retained vs. discarded.\n"
+        f"3. If criteria involve specificity or accuracy, load source Notes to verify "
+        f"that claimed details actually appear in source material.\n"
+        f"4. For each criterion, report PASS or FAIL with a one-sentence evidence-based reason.\n"
+        f"5. End with a one-line RECOMMENDATION for the parent planner (e.g., 'lower filter threshold', "
+        f"'add section headers', 'broaden search terms').\n"
+        f"6. Use say to deliver your evaluation report."
+    )
+    
+    try:
+        logger.info(f"Vision eval deep: starting subplanner for {eval_target}")
+        result = executor.call_subplanner(goal=eval_goal, max_steps=6)
+        if result and not result.startswith("Subplanner failed") and not result.startswith("Subplanner requires"):
+            logger.info(f"Vision eval deep for {eval_target}: {result[:200]}")
+            return result
+        else:
+            logger.warning(f"Vision eval deep returned: {result[:100] if result else '(empty)'}")
+    except Exception as e:
+        logger.warning(f"Vision eval deep failed: {e}")
     return ""
 
 
@@ -1853,7 +2211,7 @@ ALWAYS follow all formatting instructions exactly.
             "    if r1[\"status\"] != \"success\": return executor._create_uniform_return(\"failed\", reason=\"search failed\")\n"
             "    r2 = executor.execute_action_tracked({\"type\": \"synthesize\", \"target\": \"$papers\", \"focus\": \"key findings\", \"out\": \"$summary\"}, \"codegen\")\n"
             "    if r2[\"status\"] != \"success\": return executor._create_uniform_return(\"failed\", reason=\"synthesize failed\")\n"
-            "    return executor._create_uniform_return(\"success\", value=\"pipeline complete\")\n"
+            "    return executor._create_uniform_return(\"success\", value=\"pipeline complete\", extra={\"item_count\": r1.get(\"extra\",{}).get(\"item_count\",0)})\n"
             "    ```\n"
             "    Rules for Option B:\n"
             "    - Max 6 tool calls via executor.execute_action_tracked(action_dict, \"codegen\")\n"
@@ -1862,11 +2220,8 @@ ALWAYS follow all formatting instructions exactly.
             "      Do NOT write: val = r1[\"value\"]; next_action[\"target\"] = val\n"
             "      DO write: {\"out\": \"$papers\"} then {\"target\": \"$papers\"}\n"
             "      Use r1 ONLY for status checking: if r1[\"status\"] != \"success\"\n"
-            "      For item counts: r1.get(\"extra\",{}).get(\"item_count\") — NOT len(r1[\"value\"]) (value is a display string).\n"
-            "    - if/else control flow is allowed.\n"
-            "    - Bounded iteration over KNOWN SMALL collections is allowed:\n"
-            "      e.g., `for item in [item1, item2, item3]:` (max 5 items, list must be literal).\n"
-            "    - No while loops, imports, function defs, or unbounded iteration.\n"
+            "      ITEM COUNTS: r1.get(\"extra\",{}).get(\"item_count\") — NEVER len(r1[\"value\"]) (value is a display string, not a list).\n"
+            "    - if/else control flow and loops are allowed.\n"
             "    - Must end with: return executor._create_uniform_return(status, value=..., extra=...)\n"
             "\n"
             "#Stage 2 VARIABLE LIFETIME:\n"
@@ -1891,7 +2246,6 @@ ALWAYS follow all formatting instructions exactly.
             "  NEXT_TASK: <next high-level subgoal or blank>\n"
             "  NEXT_PHASE_TYPE: <pipeline or deliberative>\n"
             "  REQUEST_TOOLS: <json array>\n"
-            "  EVAL_TARGET: <$variable to evaluate against QUALITY VISION, or blank to skip>\n"
             "\n"
             "#Stage 3 INSTRUCTIONS:\n"
             "HYPOTHESES:\n"
@@ -1965,12 +2319,6 @@ ALWAYS follow all formatting instructions exactly.
             "- Always output valid JSON: [] or [\"tool1\", \"tool2\"].\n"
             "- Add tools here if new documentation is required.\n"
             "\n"
-            "EVAL_TARGET:\n"
-            "- If this step produced a candidate artifact for the goal (e.g., a report, synthesis, or final result),\n"
-            "  set EVAL_TARGET to the $variable name so it can be checked against the QUALITY VISION.\n"
-            "- If this step is intermediate (sourcing, filtering, loading), leave blank.\n"
-            "- For code blocks: include eval_target in the return extra dict instead.\n"
-            "\n"
             "Follow these formats exactly."
         )
         s += assistant("Understood.\n\n")
@@ -1984,6 +2332,8 @@ ALWAYS follow all formatting instructions exactly.
                 current_phase_type = "deliberative"
         except (KeyError, TypeError, AttributeError):
             current_phase_type = "deliberative"
+        last_eval_target = ""  # Track most recent artifact for deep eval at done gate
+        deep_eval_continued = False  # Allow at most one deep-eval-driven continuation
         for step in range(max_steps):
             if _interrupt_requested(executor):
                 _clear_interrupt(executor)
@@ -2175,14 +2525,7 @@ This is the only planner-visible structure that supports direct (dx,dy,dz) usage
                     f"request_tools_{step}",
                     max_tokens=96,
                     temperature=GEN_TEMPERATURE,
-                    stop=["\nEVAL_TARGET:", "\n\n", "\nTHOUGHTS:", "\nHYPOTHESES:", "\nAUDIT:", "\nDONE:", "\nNEXT_TASK:", "\nREQUEST_TOOLS:"]
-                )
-                + "\nEVAL_TARGET: "
-                + gen(
-                    f"eval_target_{step}",
-                    max_tokens=32,
-                    temperature=GEN_TEMPERATURE,
-                    stop=["\n\n", "\n"]
+                    stop=["\n\n", "\nTHOUGHTS:", "\nHYPOTHESES:", "\nAUDIT:", "\nDONE:", "\nNEXT_TASK:", "\nREQUEST_TOOLS:"]
                 )
                 + "\n"
             )
@@ -2200,7 +2543,6 @@ This is the only planner-visible structure that supports direct (dx,dy,dz) usage
             logger.info(f"DONE: {safe_get(s, f'done_{step}')}")
             logger.info(f"NEXT_TASK: {safe_get(s, f'next_task_{step}')}")
             logger.info(f"REQUEST_TOOLS: {safe_get(s, f'request_tools_{step}')}")
-            logger.info(f"EVAL_TARGET: {safe_get(s, f'eval_target_{step}')}")
             
             # Stage 3.1: Update resource indexes with commentary
             thoughts_text = s[f'thoughts_{step}'].strip()
@@ -2230,20 +2572,22 @@ This is the only planner-visible structure that supports direct (dx,dy,dz) usage
                     except Exception as e:
                         logger.debug(f"Stage 3.1: Failed to update commentary for {resource_id}: {e}")
             
-            # Stage 3.2: Vision evaluation (planner-declared eval_target)
+            # Stage 3.2: Vision evaluation (auto-detect from bindings)
             eval_target = ""
             if tool_name == "_code_block_":
-                # Code block: eval_target from result extra dict
-                eval_target = result_dict.get('extra', {}).get('eval_target', '') if isinstance(result_dict, dict) else ""
-            else:
-                # Single tool: parse EVAL_TARGET from Stage 3 output
-                try:
-                    raw_et = s[f"eval_target_{step}"]
-                    eval_target = raw_et.strip() if raw_et else ""
-                except (KeyError, TypeError, AttributeError):
-                    eval_target = ""
+                # Code blocks don't have action['out']; use last new binding
+                if new_bindings:
+                    eval_target = list(new_bindings.keys())[-1]
+            elif tool_name in _ARTIFACT_PRODUCING_TOOLS:
+                out_var = action.get('out', '')
+                if out_var:
+                    eval_target = out_var
             if eval_target:
-                vision_eval_text = _vision_eval_check(vision_criteria, eval_target, executor)
+                last_eval_target = eval_target
+            if eval_target and vision_criteria:
+                logger.info(f"Step {step}: Vision eval auto-target: {eval_target} (tool={tool_name})")
+                compressed_ctx = _compress_trace(str(s))
+                vision_eval_text = _vision_eval_check(vision_criteria, eval_target, executor, compressed_context=compressed_ctx)
                 if vision_eval_text:
                     s += user(f"VISION EVALUATION (quality check against criteria):\n{vision_eval_text}\nIf any criterion shows FAIL, consider adjusting your approach in the next step.\n")
                     s += assistant("Noted.\n")
@@ -2295,8 +2639,24 @@ This is the only planner-visible structure that supports direct (dx,dy,dz) usage
                 )
                 
                 logger.info(f"VERIFICATION ANSWER: {s['VERIFICATION_ANSWER']}")
-                # --- [END NEW VERIFICATION LOGIC] ---                
-                # 
+                # --- [END NEW VERIFICATION LOGIC] ---
+                
+                # Deep vision evaluation at done gate
+                if vision_criteria and last_eval_target:
+                    logger.info(f"Done gate: Running deep vision eval on {last_eval_target}")
+                    compressed_ctx = _compress_trace(str(s))
+                    shallow_text = _vision_eval_check(vision_criteria, last_eval_target, executor, compressed_context=compressed_ctx)
+                    deep_text = _vision_eval_deep(vision_criteria, last_eval_target, shallow_text or "", executor, compressed_context=compressed_ctx)
+                    if deep_text:
+                        s += user(f"DEEP VISION EVALUATION (final quality gate):\n{deep_text}\nIf issues found, you may revise your approach instead of finishing.\n")
+                        s += assistant("Noted.\n")
+                        logger.info(f"Done gate: Deep eval result injected")
+                        # If deep eval found issues, continue the loop (once)
+                        if not deep_eval_continued and "none needed" not in deep_text.lower():
+                            deep_eval_continued = True
+                            logger.info(f"Done gate: Deep eval found issues, continuing plan")
+                            continue
+                
                 # Generate final answer using NEXT_TASK as prompt, or generic goal-focused prompt
                 next_task_raw = s[f"next_task_{step}"].strip()
                 if next_task_raw and next_task_raw.lower() not in ["", "none", "null", "n/a"]:
@@ -2932,7 +3292,7 @@ ALWAYS follow all formatting instructions exactly.
         "    if r1[\"status\"] != \"success\": return executor._create_uniform_return(\"failed\", reason=\"search failed\")\n"
         "    r2 = executor.execute_action_tracked({\"type\": \"synthesize\", \"target\": \"$papers\", \"focus\": \"key findings\", \"out\": \"$summary\"}, \"codegen\")\n"
         "    if r2[\"status\"] != \"success\": return executor._create_uniform_return(\"failed\", reason=\"synthesize failed\")\n"
-        "    return executor._create_uniform_return(\"success\", value=\"pipeline complete\")\n"
+        "    return executor._create_uniform_return(\"success\", value=\"pipeline complete\", extra={\"item_count\": r1.get(\"extra\",{}).get(\"item_count\",0)})\n"
         "    ```\n"
         "    Rules for Option B:\n"
         "    - Max 6 tool calls via executor.execute_action_tracked(action_dict, \"codegen\")\n"
@@ -2941,11 +3301,8 @@ ALWAYS follow all formatting instructions exactly.
         "      Do NOT write: val = r1[\"value\"]; next_action[\"target\"] = val\n"
         "      DO write: {\"out\": \"$papers\"} then {\"target\": \"$papers\"}\n"
         "      Use r1 ONLY for status checking: if r1[\"status\"] != \"success\"\n"
-        "      For item counts: r1.get(\"extra\",{}).get(\"item_count\") — NOT len(r1[\"value\"]) (value is a display string).\n"
-        "    - if/else control flow is allowed.\n"
-        "    - Bounded iteration over KNOWN SMALL collections is allowed:\n"
-        "      e.g., `for item in [item1, item2, item3]:` (max 5 items, list must be literal).\n"
-        "    - No while loops, imports, function defs, or unbounded iteration.\n"
+        "      ITEM COUNTS: r1.get(\"extra\",{}).get(\"item_count\") — NEVER len(r1[\"value\"]) (value is a display string, not a list).\n"
+        "    - if/else control flow and loops are allowed.\n"
         "    - Must end with: return executor._create_uniform_return(status, value=..., extra=...)\n"
         "\n"
         "#Stage 2 VARIABLE LIFETIME:\n"
@@ -2970,7 +3327,6 @@ ALWAYS follow all formatting instructions exactly.
         "  NEXT_TASK: <next high-level subgoal or blank>\n"
         "  NEXT_PHASE_TYPE: <pipeline or deliberative>\n"
         "  REQUEST_TOOLS: <json array>\n"
-        "  EVAL_TARGET: <$variable to evaluate against QUALITY VISION, or blank to skip>\n"
         "\n"
         "#Stage 3 INSTRUCTIONS:\n"
         "HYPOTHESES:\n"
@@ -3044,12 +3400,6 @@ ALWAYS follow all formatting instructions exactly.
         "- Always output valid JSON: [] or [\"tool1\", \"tool2\"].\n"
         "- Add tools here if new documentation is required.\n"
         "\n"
-        "EVAL_TARGET:\n"
-        "- If this step produced a candidate artifact for the goal (e.g., a report, synthesis, or final result),\n"
-        "  set EVAL_TARGET to the $variable name so it can be checked against the QUALITY VISION.\n"
-        "- If this step is intermediate (sourcing, filtering, loading), leave blank.\n"
-        "- For code blocks: include eval_target in the return extra dict instead.\n"
-        "\n"
         "Follow these formats exactly."
     )
     
@@ -3061,6 +3411,8 @@ ALWAYS follow all formatting instructions exactly.
         logger.warning("No first_task found, using goal as initial task")
         current_task = goal_for_step
     current_phase_type = state.get("phase_type", "deliberative")
+    last_eval_target = ""  # Track most recent artifact for deep eval at done gate
+    deep_eval_continued = False  # Allow at most one deep-eval-driven continuation
     
     for step in range(max_steps):
         if _interrupt_requested(executor):
@@ -3231,10 +3583,7 @@ This is the only planner-visible structure that supports direct (dx,dy,dz) usage
             # Fallback: model may have omitted NEXT_PHASE_TYPE
             next_task_val = _extract_between_labels(stage3_block, "NEXT_TASK:", "REQUEST_TOOLS:")
             next_phase_type_val = ""
-        request_tools_val = _extract_between_labels(stage3_block, "REQUEST_TOOLS:", "EVAL_TARGET:").strip()
-        if not request_tools_val:
-            request_tools_val = _extract_after_label(stage3_block, "REQUEST_TOOLS:").strip()
-        eval_target_val = _extract_line_value(stage3_block, "EVAL_TARGET:")
+        request_tools_val = _extract_after_label(stage3_block, "REQUEST_TOOLS:").strip()
 
         state[f"thoughts_{step}"] = thoughts_val
         state[f"hypotheses_{step}"] = hypotheses_val
@@ -3244,7 +3593,6 @@ This is the only planner-visible structure that supports direct (dx,dy,dz) usage
         npt = next_phase_type_val.strip().lower()
         state[f"next_phase_type_{step}"] = npt if npt in ("pipeline", "deliberative") else "deliberative"
         state[f"request_tools_{step}"] = _strip_code_fences(request_tools_val)
-        state[f"eval_target_{step}"] = eval_target_val
         
         # Safely log step fields
         def safe_get(state_dict, key, default='N/A'):
@@ -3259,7 +3607,6 @@ This is the only planner-visible structure that supports direct (dx,dy,dz) usage
         logger.info(f"DONE: {safe_get(state, f'done_{step}')}")
         logger.info(f"NEXT_TASK: {safe_get(state, f'next_task_{step}')}")
         logger.info(f"REQUEST_TOOLS: {safe_get(state, f'request_tools_{step}')}")
-        logger.info(f"EVAL_TARGET: {safe_get(state, f'eval_target_{step}')}")
         
         # Stage 3.1: Update resource indexes with commentary
         thoughts_text = state.get(f'thoughts_{step}', '').strip()
@@ -3287,14 +3634,22 @@ This is the only planner-visible structure that supports direct (dx,dy,dz) usage
                 except Exception as e:
                     logger.debug(f"Stage 3.1: Failed to update commentary for {resource_id}: {e}")
         
-        # Stage 3.2: Vision evaluation (planner-declared eval_target)
+        # Stage 3.2: Vision evaluation (auto-detect from bindings)
         eval_target = ""
         if tool_name == "_code_block_":
-            eval_target = result_dict.get('extra', {}).get('eval_target', '') if isinstance(result_dict, dict) else ""
-        else:
-            eval_target = state.get(f"eval_target_{step}", "").strip()
+            # Code blocks don't have action['out']; use last new binding
+            if new_bindings:
+                eval_target = list(new_bindings.keys())[-1]
+        elif tool_name in _ARTIFACT_PRODUCING_TOOLS:
+            out_var = action.get('out', '')
+            if out_var:
+                eval_target = out_var
         if eval_target:
-            vision_eval_text = _vision_eval_check(vision_criteria, eval_target, executor)
+            last_eval_target = eval_target
+        if eval_target and vision_criteria:
+            logger.info(f"Step {step}: Vision eval auto-target: {eval_target} (tool={tool_name})")
+            compressed_ctx = _compress_trace(prompt)
+            vision_eval_text = _vision_eval_check(vision_criteria, eval_target, executor, compressed_context=compressed_ctx)
             if vision_eval_text:
                 prompt += format_user(f"VISION EVALUATION (quality check against criteria):\n{vision_eval_text}\nIf any criterion shows FAIL, consider adjusting your approach in the next step.\n")
                 prompt += format_assistant("Noted.\n")
@@ -3346,6 +3701,22 @@ This is the only planner-visible structure that supports direct (dx,dy,dz) usage
             prompt += cleaned + "\n"
             
             logger.info(f"VERIFICATION ANSWER: {state.get('VERIFICATION_ANSWER', 'N/A')}")
+            
+            # Deep vision evaluation at done gate
+            if vision_criteria and last_eval_target:
+                logger.info(f"Done gate: Running deep vision eval on {last_eval_target}")
+                compressed_ctx = _compress_trace(prompt)
+                shallow_text = _vision_eval_check(vision_criteria, last_eval_target, executor, compressed_context=compressed_ctx)
+                deep_text = _vision_eval_deep(vision_criteria, last_eval_target, shallow_text or "", executor, compressed_context=compressed_ctx)
+                if deep_text:
+                    prompt += format_user(f"DEEP VISION EVALUATION (final quality gate):\n{deep_text}\nIf issues found, you may revise your approach instead of finishing.\n")
+                    prompt += format_assistant("Noted.\n")
+                    logger.info(f"Done gate: Deep eval result injected")
+                    # If deep eval found issues, continue the loop (once)
+                    if not deep_eval_continued and "none needed" not in deep_text.lower():
+                        deep_eval_continued = True
+                        logger.info(f"Done gate: Deep eval found issues, continuing plan")
+                        continue
             
             # Generate final answer
             next_task_raw = state.get(f"next_task_{step}", "").strip()
@@ -3971,7 +4342,7 @@ class IncrementalPlanner:
             trace_str = str(state)
             tool_model: ToolModel = self.executor.tool_model
             tool_model.update_from_trace(trace_str=trace_str)
-            compressed_trace = self._compress_trace(trace_str)
+            compressed_trace = _compress_trace(trace_str)
             reflection_frame = self._reflect(goal, world_model, max_steps, compressed_trace)
             
             # Extract inner ReflectionFrame content (LLM returns wrapped in 'ReflectionFrame' key)
@@ -4031,7 +4402,8 @@ class IncrementalPlanner:
                         preplan="No preplan provided",
                         similar_plan=similar_plans[0] if similar_plans else None,
                         vllm_url=self.vllm_url,
-                        model=self.vllm_model
+                        model=self.vllm_model,
+                        vision_criteria=vision_criteria
                     )
                 elif HAS_SGLANG and self.executor.runtime:
                     # Use SGLang planner
@@ -4046,7 +4418,8 @@ class IncrementalPlanner:
                         trace_file=self.trace_file,
                         max_steps=max_steps,
                         preplan="No preplan provided",
-                        similar_plan=similar_plans[0] if similar_plans else None
+                        similar_plan=similar_plans[0] if similar_plans else None,
+                        vision_criteria=vision_criteria
                     )
                 else:
                     logger.error('No planner backend available for retry (SGLang, vLLM, or OpenRouter required)')
@@ -4216,305 +4589,6 @@ END_PLAN
         self.logger.info(f"Recorded feedback: outcome={outcome}, goal={goal[:50]}...")
         
         return {'success': True}
-
-    def _compress_trace(self, trace_str: str) -> str:
-        """
-        Compress execution trace while preserving order and event identity.
-        
-        Rules:
-        - Preserve all events in order
-        - Compress STAGE2-PRE: keep AGENT_STATE_HYPOTHESES and AGENT_STATE_SUPPORT (important for reflection and ToolModel)
-        - Compress STAGE2: keep GOAL (full first, prefix match later), CURRENT_TASK
-        - Compress CALL: keep tool name, semantic args, truncate large values
-        - Compress RESULT: keep status, bound var, always include result
-        - Compress THOUGHT: extract intent, track hypothesis deltas
-        - Compress METHOD events: capture method tool inner loop execution (steps, calls, results, thoughts, hypotheses, audits)
-        - Omit RAW_OTHER entirely
-        - Omit duplicate content for same key (scoped by method context for inner loops)
-        
-        Args:
-            trace_str: Full trace string from str(state)
-            
-        Returns:
-            Compressed trace as single text string suitable for LLM prompt
-        """
-        if not trace_str:
-            return ""
-        
-        # Split into sections by user/assistant markers for easier parsing
-        sections = re.split(r'(<\|im_start\|>(?:user|assistant)|<\|im_end\|>)', trace_str)
-        compressed_events = []
-        
-        # State tracking
-        first_goal = None
-        current_goal_prefix = None
-        seen_keys = {}  # Track duplicate content by key
-        current_method = None  # Track current method tool execution
-        method_step = None
-        
-        i = 0
-        while i < len(sections):
-            section = sections[i].strip()
-            if not section or section in ['<|im_start|>user', '<|im_start|>assistant', '<|im_end|>']:
-                i += 1
-                continue
-            
-            # METHOD EXECUTION MODE event (method tool inner loop start)
-            method_mode_match = re.search(r'#METHOD EXECUTION MODE:\s*([\w-]+)\s*\(internal step (\d+)/(\d+)\)', section)
-            if method_mode_match:
-                method_name = method_mode_match.group(1)
-                inner_step = method_mode_match.group(2)
-                max_inner_steps = method_mode_match.group(3)
-                current_method = method_name
-                method_step = inner_step
-                
-                # Extract method step instruction
-                method_step_match = re.search(r'CURRENT METHOD STEP:\s*(.*?)(?:\n|$)', section)
-                method_step_text = method_step_match.group(1).strip() if method_step_match else None
-                
-                if method_step_text:
-                    compressed_events.append(f"[METHOD {method_name} step={inner_step}/{max_inner_steps}]\nSTEP: {method_step_text}\n")
-            
-            # STAGE 2-PRE event (Agent-State Hypotheses - outer loop only, not in method protocol)
-            elif re.search(r'STAGE 2-PRE \(step (\d+)/(\d+)\):', section):
-                stage2_pre_match = re.search(r'STAGE 2-PRE \(step (\d+)/(\d+)\):', section)
-                if stage2_pre_match:
-                    step_num = stage2_pre_match.group(1)
-                    max_steps = stage2_pre_match.group(2)
-                    
-                    # Extract AGENT_STATE_HYPOTHESES
-                    hyp_match = re.search(r'AGENT_STATE_HYPOTHESES:\s*\[(.*?)\]', section, re.DOTALL)
-                    hyp_text = hyp_match.group(1).strip() if hyp_match else None
-                    
-                    # Extract AGENT_STATE_SUPPORT
-                    support_match = re.search(r'AGENT_STATE_SUPPORT:\s*(.*?)(?:\n\n|\nSTAGE|$)', section, re.DOTALL)
-                    support_text = support_match.group(1).strip() if support_match else None
-                    
-                    if hyp_text or support_text:
-                        event_parts = [f"[STAGE2-PRE step={step_num}/{max_steps}]"]
-                        if hyp_text:
-                            # Try to parse as JSON list, fallback to raw text
-                            try:
-                                hyp_list = json.loads(f"[{hyp_text}]")
-                                event_parts.append(f"AGENT_STATE_HYPOTHESES: {json.dumps(hyp_list, ensure_ascii=False)}")
-                            except:
-                                event_parts.append(f"AGENT_STATE_HYPOTHESES: [{hyp_text}]")
-                        if support_text:
-                            # Keep support text (may be multi-line with evidence pointers)
-                            # Truncate if very long
-                            if len(support_text) > 500:
-                                support_text = support_text[:500] + "\n... [truncated]"
-                            event_parts.append(f"AGENT_STATE_SUPPORT:\n{support_text}")
-                        compressed_events.append('\n'.join(event_parts) + '\n')
-            
-            # STAGE 2 event (outer loop)
-            elif re.search(r'STAGE 2 \(step (\d+)/(\d+)\):', section):
-                stage2_match = re.search(r'STAGE 2 \(step (\d+)/(\d+)\):', section)
-                current_method = None  # Reset method context for outer loop
-                method_step = None
-                if stage2_match:
-                    step_num = stage2_match.group(1)
-                    max_steps = stage2_match.group(2)
-                    
-                    # Extract GOAL and TASK
-                    goal_match = re.search(r'#GOAL:\s*(.*?)#END GOAL', section, re.DOTALL)
-                    task_match = re.search(r'CURRENT_TASK:\s*(.*?)(?:\n|$)', section)
-                    
-                    goal_text = goal_match.group(1).strip() if goal_match else None
-                    task_text = task_match.group(1).strip() if task_match else None
-                    
-                    # Handle goal: full first occurrence, prefix match later
-                    if first_goal is None and goal_text:
-                        first_goal = goal_text
-                        current_goal_prefix = goal_text[:100]  # Use first 100 chars as prefix
-                        goal_display = goal_text
-                    elif goal_text:
-                        if goal_text.startswith(current_goal_prefix):
-                            goal_display = "[unchanged from step 1]"
-                        else:
-                            # Changed - update prefix and show new goal
-                            current_goal_prefix = goal_text[:100]
-                            goal_display = goal_text
-                    else:
-                        goal_display = None
-                    
-                    if goal_display and task_text:
-                        compressed_events.append(f"[STAGE2 step={step_num}/{max_steps}]\nGOAL: {goal_display}\nTASK: {task_text}\n")
-            
-            # CALL event (TOOL_NAME + TOOL_ARGS_JSON)
-            elif 'TOOL_NAME:' in section:
-                tool_match = re.search(r'TOOL_NAME:\s*([\w-]+)', section)
-                args_match = re.search(r'TOOL_ARGS_JSON[^:]*:\s*(\{.*?\})', section, re.DOTALL)
-                
-                if tool_match:
-                    tool_name = tool_match.group(1)
-                    if args_match:
-                        try:
-                            args_dict = json.loads(args_match.group(1))
-                            # Keep keys, truncate large values
-                            compressed_args = {}
-                            for k, v in args_dict.items():
-                                if k == 'out':
-                                    compressed_args[k] = v  # Always keep out
-                                elif isinstance(v, str) and len(v) > 100:
-                                    compressed_args[k] = v[:100] + "..."
-                                else:
-                                    compressed_args[k] = v
-                            tool_args = json.dumps(compressed_args)
-                        except:
-                            tool_args = args_match.group(1)[:200]
-                    else:
-                        tool_args = "{}"
-                    
-                    # Prefix with method context if in method execution
-                    if current_method:
-                        compressed_events.append(f"[METHOD {current_method} CALL tool={tool_name}]\nARGS: {tool_args}\n")
-                    else:
-                        compressed_events.append(f"[CALL tool={tool_name}]\nARGS: {tool_args}\n")
-            
-            # METHOD RESULT event (METHOD STAGE 3 + ACTUAL RESULT)
-            elif 'METHOD STAGE 3 - TOOL EXECUTION COMPLETE' in section:
-                method_result_match = re.search(r'METHOD STAGE 3 - TOOL EXECUTION COMPLETE \(internal step (\d+)/(\d+)\)', section)
-                tool_match = re.search(r'Tool executed: `([\w-]+)`', section)
-                result_match = re.search(r'>> ACTUAL RESULT.*?<<\n(.*?)\n>> END RESULT', section, re.DOTALL)
-                bound_match = re.search(r'Bound: (\$\w+)', section)
-                status_match = re.search(r'(SUCCESS|FAILED)', section)
-                
-                if method_result_match and tool_match:
-                    inner_step = method_result_match.group(1)
-                    max_inner_steps = method_result_match.group(2)
-                    tool_name = tool_match.group(1)
-                    result_text = result_match.group(1).strip() if result_match else ""
-                    bound_var = bound_match.group(1) if bound_match else None
-                    status = 'OK' if status_match and 'SUCCESS' in status_match.group(0) else ('FAILED' if status_match else None)
-                    
-                    # Always include result, truncate if too long
-                    if len(result_text) > 300:  # Shorter for method inner loop
-                        result_text = result_text[:300] + f"\n... [truncated]"
-                    
-                    event_str = f"[METHOD {current_method or 'unknown'} RESULT step={inner_step}/{max_inner_steps} tool={tool_name}"
-                    if status:
-                        event_str += f" status={status}"
-                    if bound_var:
-                        event_str += f" -> {bound_var}"
-                    event_str += "]\n"
-                    if result_text:
-                        event_str += f"RESULT: {result_text}\n"
-                    compressed_events.append(event_str)
-            
-            # RESULT event (STAGE 3 + ACTUAL RESULT) - outer loop
-            elif 'STAGE 3 - TOOL EXECUTION COMPLETE' in section and 'METHOD STAGE 3' not in section:
-                tool_match = re.search(r'Tool executed: `([\w-]+)`', section)
-                result_match = re.search(r'>> ACTUAL RESULT.*?<<\n(.*?)\n>> END RESULT', section, re.DOTALL)
-                bound_match = re.search(r'Bound: (\$\w+)', section)
-                status_match = re.search(r'(SUCCESS|FAILED)', section)
-                
-                if tool_match:
-                    tool_name = tool_match.group(1)
-                    result_text = result_match.group(1).strip() if result_match else ""
-                    bound_var = bound_match.group(1) if bound_match else None
-                    status = 'OK' if status_match and 'SUCCESS' in status_match.group(0) else ('FAILED' if status_match else None)
-                    
-                    # Always include result, truncate if too long
-                    if len(result_text) > 500:
-                        result_text = result_text[:500] + f"\n... [truncated, total {len(result_match.group(1))} chars]"
-                    
-                    event_str = f"[RESULT tool={tool_name}"
-                    if status:
-                        event_str += f" status={status}"
-                    if bound_var:
-                        event_str += f" -> {bound_var}"
-                    event_str += "]\n"
-                    if result_text:
-                        event_str += f"RESULT: {result_text}\n"
-                    compressed_events.append(event_str)
-            
-            # THOUGHT event (check for method context by looking for method-specific patterns)
-            elif 'THOUGHTS' in section or 'HYPOTHESES:' in section or 'DONE:' in section:
-                # Check if this is a method inner loop thought (look for METHOD NEXT_TASK pattern)
-                is_method_thought = 'METHOD NEXT_TASK INSTRUCTIONS' in section or current_method is not None
-                
-                thoughts_match = re.search(r'THOUGHTS[^:]*:\s*(.*?)(?:\nHYPOTHESES|$)', section, re.DOTALL)
-                hyp_match = re.search(r'HYPOTHESES:\s*(.*?)(?:\nAUDIT|$)', section, re.DOTALL)
-                assump_match = re.search(r'AUDIT:\s*(.*?)(?:\nDONE|$)', section, re.DOTALL)
-                done_match = re.search(r'DONE:\s*(.*?)(?:\nNEXT_TASK|$)', section)
-                next_match = re.search(r'NEXT_TASK:\s*(.*?)(?:\nREQUEST_TOOLS|$)', section)
-                request_tools_match = re.search(r'REQUEST_TOOLS:\s*(.*?)(?:\n|$)', section, re.DOTALL)
-                
-                thoughts = thoughts_match.group(1).strip() if thoughts_match else None
-                hypotheses = hyp_match.group(1).strip() if hyp_match else None
-                assumptions = assump_match.group(1).strip() if assump_match else None
-                done = done_match.group(1).strip() if done_match else None
-                next_task = next_match.group(1).strip() if next_match else None
-                request_tools = request_tools_match.group(1).strip() if request_tools_match else None
-                
-                # Build thought event with method context if applicable
-                if is_method_thought and current_method:
-                    event_parts = [f"[METHOD {current_method} THOUGHT"]
-                    if method_step:
-                        event_parts[0] += f" step={method_step}"
-                    event_parts[0] += "]"
-                else:
-                    event_parts = ["[THOUGHT]"]
-                
-                if thoughts:
-                    event_parts.append(f"THOUGHTS: {thoughts}")
-                
-                if hypotheses:
-                    # Include complete hypotheses (no delta tracking)
-                    event_parts.append(f"HYPOTHESES: {hypotheses}")
-                
-                if assumptions:
-                    # Include complete assumptions/audits (no delta tracking)
-                    event_parts.append(f"AUDIT: {assumptions}")
-                
-                # Check for duplicates (use method-scoped keys if in method)
-                if done:
-                    done_key = f"{current_method or 'outer'}:DONE:{done}" if is_method_thought else f"DONE:{done}"
-                    if done_key not in seen_keys:
-                        event_parts.append(f"DONE: {done}")
-                        seen_keys[done_key] = True
-                
-                if next_task:
-                    next_key = f"{current_method or 'outer'}:NEXT:{next_task}" if is_method_thought else f"NEXT:{next_task}"
-                    if next_key not in seen_keys:
-                        event_parts.append(f"NEXT: {next_task}")
-                        seen_keys[next_key] = True
-                
-                if request_tools:
-                    tools_key = f"{current_method or 'outer'}:REQUEST_TOOLS:{request_tools}" if is_method_thought else f"REQUEST_TOOLS:{request_tools}"
-                    if tools_key not in seen_keys:
-                        event_parts.append(f"REQUEST_TOOLS: {request_tools}")
-                        seen_keys[tools_key] = True
-                
-                # Check for METHOD COMPLETE in thoughts
-                if is_method_thought and thoughts and 'METHOD COMPLETE' in thoughts.upper():
-                    event_parts.append("METHOD COMPLETE")
-                    current_method = None  # Reset method context
-                    method_step = None
-                
-                if len(event_parts) > 1:  # More than just [THOUGHT] or [METHOD ... THOUGHT]
-                    compressed_events.append('\n'.join(event_parts) + '\n')
-            
-            # VERIFY event
-            elif 'VERIFICATION_QUESTION:' in section or 'VERIFICATION_ANSWER:' in section:
-                verify_type = 'Q' if 'QUESTION' in section else 'A'
-                content_match = re.search(r'VERIFICATION_(?:QUESTION|ANSWER):\s*(.*?)(?:\n|$)', section)
-                content = content_match.group(1).strip() if content_match else ""
-                compressed_events.append(f"[VERIFY {verify_type}]\n{content}\n")
-            
-            # FINAL event (say action)
-            elif '{"type":"say"' in section or '"type":"say"' in section:
-                say_match = re.search(r'\{"type":"say"[^}]*"value":"([^"]*)"[^}]*"target":"([^"]*)"', section)
-                if say_match:
-                    value = say_match.group(1)
-                    target = say_match.group(2)
-                    compressed_events.append(f"[FINAL]\nsay({target}): \"{value}\"\n")
-            
-            # Skip RAW_OTHER (everything else)
-            i += 1
-        
-        return '\n'.join(compressed_events)
 
     def _reflect(self, goal_text, world_model, steps, trace) -> Dict:
         """

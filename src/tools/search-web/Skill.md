@@ -6,7 +6,7 @@ description: "Search web using Google CSE. Returns Collection of JSON Notes with
 
 # search-web
 
-Search web using Google Custom Search Engine. Returns Collection of structured Notes with filtered excerpts.
+Search web using Google Custom Search Engine. Returns Collection of structured Notes with substantial page content.
 
 ## Input
 
@@ -16,15 +16,18 @@ Search web using Google Custom Search Engine. Returns Collection of structured N
 
 Success (`status: "success"`):
 - `resource_id`: Collection ID containing structured Notes, each with:
-  - `text`: Filtered excerpt (query-relevant snippet)
-  - `format`: "html"
+  - `text`: Keyword-filtered page content (up to ~8K chars per result — substantial extracted text, not brief snippets)
+  - `format`: "html" (or "pdf" if GROBID-parsed)
   - `metadata.uri`: Full URL
   - `metadata.domain`: Domain name
   - `char_count`: Character count
 
 ## Behavior
 
-- Returns filtered excerpts from multiple URLs (not full content)
+- Fetches each URL, extracts text, scores paragraphs by keyword relevance, keeps high-signal content
+- For PDFs (when GROBID configured): returns full parsed text, not filtered
+- LLM relevance filter discards off-topic pages entirely
+- Results contain substantial text content — use extract/synthesize directly on the Collection
 - Requires `GOOGLE_API_KEY` and `GOOGLE_CX` environment variables
 
 ## Content Structure
@@ -32,7 +35,7 @@ Success (`status: "success"`):
 Each Note in the returned Collection has the following JSON structure:
 ```json
 {
-  "text": "Filtered excerpt from webpage...",
+  "text": "Substantial keyword-filtered page content...",
   "format": "html",
   "metadata": {
     "uri": "https://example.com/page",
@@ -40,40 +43,44 @@ Each Note in the returned Collection has the following JSON structure:
     "source_url": "https://example.com/page",
     "elapsed_ms": 250
   },
-  "char_count": 1500
+  "char_count": 5000
 }
 ```
 
 **Important:** All result data is in the Note's `content` field (a dict). Engine metadata (creation date, source tool, etc.) is separate and accessed via `get_resource_metadata()`, not via `content['metadata']`.
 
-## Field Access Examples
+## Key Principle
 
-**Extract URLs for fetching full content:**
+**Results already contain substantial page content in the `text` field.** Use extract/synthesize directly on the Collection. Only use fetch-text if you specifically need the complete unfiltered page content from a single URL.
+
+## Common Workflows
+
+**Direct synthesis (preferred):**
 ```json
-{"type":"search-web","query":"transformers AI","out":"$results"}
-{"type":"project","target":"$results","fields":["metadata.uri"],"out":"$urls"}
-{"type":"pluck","target":"$urls","field":"metadata.uri","out":"$url_list"}
+{"type":"search-web","query":"transformers in AI","out":"$results"}
+{"type":"synthesize","target":"$results","focus":"what are transformers","out":"$summary"}
 ```
 
-**Extract search result metadata:**
+**Per-result extraction then synthesis:**
 ```json
-{"type":"project","target":"$results","fields":["metadata.uri","metadata.domain","text"],"out":"$result_info"}
+{"type":"search-web","query":"climate change effects","out":"$results"}
+{"type":"map","target":"$results","operation":"extract","instruction":"Extract key statistics and findings","out":"$findings"}
+{"type":"synthesize","target":"$findings","focus":"summary of effects","out":"$report"}
 ```
 
-**Filter by domain:**
+**Filter by domain then analyze:**
 ```json
 {"type":"filter-structured","target":"$results","where":"metadata.domain == 'arxiv.org'","out":"$arxiv_results"}
+{"type":"synthesize","target":"$arxiv_results","focus":"recent research","out":"$summary"}
+```
+
+**Extract metadata:**
+```json
+{"type":"project","target":"$results","fields":["metadata.uri","metadata.domain","text"],"out":"$result_info"}
 ```
 
 ## Planning Notes
 
 - Use `metadata.uri` in `project` operations for consistent access
-- For complete content from a specific URL, use `fetch-text` instead
-- Results are filtered excerpts, not full page content
-
-## Examples
-
-```json
-{"type":"search-web","query":"what are transformers in AI","out":"$results"}
-{"type":"summarize","target":"$results","focus":"what are transformers","out":"$summary"}
-```
+- Results contain substantial content — typically enough for extract/synthesize without re-fetching
+- For complete unfiltered page content from a specific URL, use `fetch-text`
